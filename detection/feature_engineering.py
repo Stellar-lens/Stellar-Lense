@@ -11,9 +11,11 @@ by `ingestion.historical_loader.trades_to_dataframe` (or the streamer,
 buffered into a DataFrame) for a single wallet.
 """
 
+import networkx as nx
 import pandas as pd
 
 from detection.benford_engine import compute_benford_metrics_for_windows
+from detection.wallet_graph import compute_wallet_graph_metrics
 from ingestion.data_models import AccountActivity
 
 
@@ -130,22 +132,30 @@ def compute_volume_timing_features(wallet_trades: pd.DataFrame) -> dict:
 
 
 def compute_wallet_graph_features(
-    wallet: str, activity: AccountActivity | None, reference_time: pd.Timestamp
+    wallet: str,
+    activity: AccountActivity | None,
+    reference_time: pd.Timestamp,
+    funding_graph: nx.DiGraph | None = None,
 ) -> dict:
     """Funding-source similarity, network centrality, account age.
 
-    `funding_source_similarity` and `network_centrality` require a wallet
-    graph built across many accounts and are left as placeholders (0.0)
-    until the graph-construction job is implemented.
+    `funding_source_similarity` and `network_centrality` are computed from
+    `funding_graph` (see `detection.wallet_graph.build_funding_graph`) when
+    provided, and default to `0.0` otherwise.
     """
     account_age_days = 0.0
     if activity is not None:
         created_at = pd.to_datetime(activity.account_created_at, utc=True)
         account_age_days = (reference_time - created_at).total_seconds() / 86400
 
+    graph_metrics = (
+        compute_wallet_graph_metrics(wallet, funding_graph)
+        if funding_graph is not None
+        else {"funding_source_similarity": 0.0, "network_centrality": 0.0}
+    )
+
     return {
-        "funding_source_similarity": 0.0,
-        "network_centrality": 0.0,
+        **graph_metrics,
         "account_age_days": float(account_age_days),
     }
 
@@ -155,13 +165,16 @@ def build_feature_vector(
     wallet_trades: pd.DataFrame,
     activity: AccountActivity | None = None,
     orderbook_events: pd.DataFrame | None = None,
+    funding_graph: nx.DiGraph | None = None,
 ) -> dict:
     """Assemble the full feature row for a single wallet.
 
     `wallet_trades` should already be filtered to trades involving `wallet`
     as base or counter account. `orderbook_events` (optional) is the output
     of `ingestion.orderbook_loader.load_accounts_orderbook_events`, used to
-    compute `order_cancellation_rate`.
+    compute `order_cancellation_rate`. `funding_graph` (optional) is the
+    output of `detection.wallet_graph.build_funding_graph`, used for the
+    wallet graph features.
     """
     reference_time = (
         pd.to_datetime(wallet_trades["ledger_close_time"], utc=True).max()
@@ -173,7 +186,7 @@ def build_feature_vector(
     features.update(compute_benford_features(wallet_trades))
     features.update(compute_trade_pattern_features(wallet, wallet_trades, orderbook_events))
     features.update(compute_volume_timing_features(wallet_trades))
-    features.update(compute_wallet_graph_features(wallet, activity, reference_time))
+    features.update(compute_wallet_graph_features(wallet, activity, reference_time, funding_graph))
 
     return features
 
@@ -181,11 +194,13 @@ def build_feature_vector(
 def build_feature_matrix(
     trades_df: pd.DataFrame,
     orderbook_events: pd.DataFrame | None = None,
+    funding_graph: nx.DiGraph | None = None,
 ) -> pd.DataFrame:
     """Build a feature matrix with one row per wallet observed in `trades_df`.
 
-    `orderbook_events` (optional) is threaded through to
-    `compute_trade_pattern_features` for `order_cancellation_rate`.
+    `orderbook_events` and `funding_graph` (both optional) are threaded
+    through to `build_feature_vector` for `order_cancellation_rate` and the
+    wallet graph features respectively.
     """
     if trades_df.empty:
         return pd.DataFrame()
@@ -196,7 +211,12 @@ def build_feature_matrix(
     for wallet in wallets:
         mask = (trades_df["base_account"] == wallet) | (trades_df["counter_account"] == wallet)
         rows.append(
-            build_feature_vector(wallet, trades_df[mask], orderbook_events=orderbook_events)
+            build_feature_vector(
+                wallet,
+                trades_df[mask],
+                orderbook_events=orderbook_events,
+                funding_graph=funding_graph,
+            )
         )
 
     return pd.DataFrame(rows)
