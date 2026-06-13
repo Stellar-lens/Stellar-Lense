@@ -10,6 +10,12 @@ from stellar_sdk import Server
 from config import config
 from ingestion.data_models import Asset, Trade
 from ingestion.horizon_streamer import _to_trade
+from utils.retry import retry_with_backoff
+
+
+@retry_with_backoff(exceptions=(ConnectionError, TimeoutError, OSError))
+def _fetch_page(call_builder):
+    return call_builder.call()
 
 
 def load_trades(
@@ -33,7 +39,7 @@ def load_trades(
     )
 
     while True:
-        page = call_builder.call()
+        page = _fetch_page(call_builder)
         records = page["_embedded"]["records"]
         if not records:
             break

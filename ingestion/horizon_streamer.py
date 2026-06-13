@@ -11,6 +11,9 @@ from stellar_sdk import Server
 
 from config import config
 from ingestion.data_models import Asset, Trade
+from utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def _to_trade(record: dict) -> Trade:
@@ -37,18 +40,36 @@ def stream_trades(
     base_asset: SdkAsset,
     counter_asset: SdkAsset,
     cursor: str = "now",
+    max_reconnect_attempts: int = 5,
 ) -> Iterator[Trade]:
     """Yield `Trade` objects as they are streamed from Horizon.
 
     This is a blocking generator intended to be run in its own worker
-    process/thread per watched asset pair.
+    process/thread per watched asset pair. On a transient connection error
+    the stream is re-opened from the last successfully processed cursor, up
+    to `max_reconnect_attempts` consecutive failures.
     """
     server = Server(horizon_url=config.HORIZON_URL)
+    attempts = 0
 
-    call_builder = server.trades().for_asset_pair(base_asset, counter_asset).cursor(cursor)
-
-    for response in call_builder.stream():
-        yield _to_trade(response)
+    while True:
+        call_builder = server.trades().for_asset_pair(base_asset, counter_asset).cursor(cursor)
+        try:
+            for response in call_builder.stream():
+                yield _to_trade(response)
+                cursor = response["paging_token"]
+                attempts = 0
+        except (ConnectionError, TimeoutError, OSError) as exc:
+            attempts += 1
+            if attempts >= max_reconnect_attempts:
+                raise
+            logger.warning(
+                "Trade stream disconnected (attempt %d/%d): %s — reconnecting from cursor %s",
+                attempts,
+                max_reconnect_attempts,
+                exc,
+                cursor,
+            )
 
 
 def stream_all_watched_pairs() -> Iterator[Trade]:
