@@ -13,7 +13,6 @@ buffered into a DataFrame) for a single wallet.
 
 import pandas as pd
 
-from config import config
 from detection.benford_engine import compute_benford_metrics_for_windows
 from ingestion.data_models import AccountActivity
 
@@ -35,14 +34,39 @@ def compute_benford_features(wallet_trades: pd.DataFrame) -> dict:
     return features
 
 
-def compute_trade_pattern_features(wallet: str, wallet_trades: pd.DataFrame) -> dict:
+def compute_order_cancellation_rate(wallet: str, orderbook_events: pd.DataFrame | None) -> float:
+    """Fraction of a wallet's manage-offer operations that were cancellations.
+
+    `orderbook_events` is the output of
+    `ingestion.orderbook_loader.load_accounts_orderbook_events` (or `None`/
+    empty if order-book ingestion wasn't run), with an `account` and
+    `action` ("created"/"cancelled"/"updated") column.
+    """
+    if orderbook_events is None or orderbook_events.empty:
+        return 0.0
+
+    wallet_events = orderbook_events[orderbook_events["account"] == wallet]
+    if wallet_events.empty:
+        return 0.0
+
+    cancelled = (wallet_events["action"] == "cancelled").sum()
+    return float(cancelled / len(wallet_events))
+
+
+def compute_trade_pattern_features(
+    wallet: str,
+    wallet_trades: pd.DataFrame,
+    orderbook_events: pd.DataFrame | None = None,
+) -> dict:
     """Counterparty concentration, round-trips, self-matching, cancellations."""
+    order_cancellation_rate = compute_order_cancellation_rate(wallet, orderbook_events)
+
     if wallet_trades.empty:
         return {
             "counterparty_concentration_ratio": 0.0,
             "round_trip_frequency": 0.0,
             "self_matching_rate": 0.0,
-            "order_cancellation_rate": 0.0,
+            "order_cancellation_rate": order_cancellation_rate,
         }
 
     counterparty_col = wallet_trades["base_account"].where(
@@ -59,15 +83,11 @@ def compute_trade_pattern_features(wallet: str, wallet_trades: pd.DataFrame) -> 
 
     self_matching_rate = round_trip_frequency  # same accounts trading with themselves
 
-    # Order cancellation rate requires order book events; placeholder until
-    # that ingestion path is wired up.
-    order_cancellation_rate = 0.0
-
     return {
         "counterparty_concentration_ratio": float(concentration),
         "round_trip_frequency": float(round_trip_frequency),
         "self_matching_rate": float(self_matching_rate),
-        "order_cancellation_rate": float(order_cancellation_rate),
+        "order_cancellation_rate": order_cancellation_rate,
     }
 
 
@@ -134,11 +154,14 @@ def build_feature_vector(
     wallet: str,
     wallet_trades: pd.DataFrame,
     activity: AccountActivity | None = None,
+    orderbook_events: pd.DataFrame | None = None,
 ) -> dict:
     """Assemble the full feature row for a single wallet.
 
     `wallet_trades` should already be filtered to trades involving `wallet`
-    as base or counter account.
+    as base or counter account. `orderbook_events` (optional) is the output
+    of `ingestion.orderbook_loader.load_accounts_orderbook_events`, used to
+    compute `order_cancellation_rate`.
     """
     reference_time = (
         pd.to_datetime(wallet_trades["ledger_close_time"], utc=True).max()
@@ -148,15 +171,22 @@ def build_feature_vector(
 
     features = {"wallet": wallet}
     features.update(compute_benford_features(wallet_trades))
-    features.update(compute_trade_pattern_features(wallet, wallet_trades))
+    features.update(compute_trade_pattern_features(wallet, wallet_trades, orderbook_events))
     features.update(compute_volume_timing_features(wallet_trades))
     features.update(compute_wallet_graph_features(wallet, activity, reference_time))
 
     return features
 
 
-def build_feature_matrix(trades_df: pd.DataFrame) -> pd.DataFrame:
-    """Build a feature matrix with one row per wallet observed in `trades_df`."""
+def build_feature_matrix(
+    trades_df: pd.DataFrame,
+    orderbook_events: pd.DataFrame | None = None,
+) -> pd.DataFrame:
+    """Build a feature matrix with one row per wallet observed in `trades_df`.
+
+    `orderbook_events` (optional) is threaded through to
+    `compute_trade_pattern_features` for `order_cancellation_rate`.
+    """
     if trades_df.empty:
         return pd.DataFrame()
 
@@ -165,6 +195,8 @@ def build_feature_matrix(trades_df: pd.DataFrame) -> pd.DataFrame:
     rows = []
     for wallet in wallets:
         mask = (trades_df["base_account"] == wallet) | (trades_df["counter_account"] == wallet)
-        rows.append(build_feature_vector(wallet, trades_df[mask]))
+        rows.append(
+            build_feature_vector(wallet, trades_df[mask], orderbook_events=orderbook_events)
+        )
 
     return pd.DataFrame(rows)
