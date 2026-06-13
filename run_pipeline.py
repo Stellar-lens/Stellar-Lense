@@ -20,6 +20,9 @@ from datetime import datetime
 from config import config
 from detection.feature_engineering import build_feature_matrix
 from ingestion.historical_loader import load_watched_pairs_to_dataframe
+from utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def parse_args() -> argparse.Namespace:
@@ -36,23 +39,23 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
 
-    print(f"[1/3] Loading trades for watched pairs: {config.WATCHED_ASSET_PAIRS}")
+    logger.info("[1/3] Loading trades for watched pairs: %s", config.WATCHED_ASSET_PAIRS)
     trades_df = load_watched_pairs_to_dataframe(start_time=args.since)
-    print(f"      Loaded {len(trades_df)} trades")
+    logger.info("      Loaded %d trades", len(trades_df))
 
-    print("[2/3] Building feature matrix")
+    logger.info("[2/3] Building feature matrix")
     feature_matrix = build_feature_matrix(trades_df)
-    print(f"      Built features for {len(feature_matrix)} wallets")
+    logger.info("      Built features for %d wallets", len(feature_matrix))
 
-    print("[3/3] Scoring wallets")
+    logger.info("[3/3] Scoring wallets")
     try:
         from detection.model_inference import RiskScorer
 
         scorer = RiskScorer()
         scored = scorer.score_matrix(feature_matrix)
     except (RuntimeError, ImportError) as exc:
-        print(f"      Skipping ML scoring: {exc}")
-        print("      Falling back to Benford-only flags")
+        logger.warning("      Skipping ML scoring: %s", exc)
+        logger.warning("      Falling back to Benford-only flags")
         mad_cols = [c for c in feature_matrix.columns if c.startswith("benford_mad_")]
         scored = feature_matrix[["wallet"] + mad_cols].copy()
         scored["benford_flag"] = (scored[mad_cols] > 0.015).any(axis=1)
@@ -62,8 +65,7 @@ def main() -> None:
     else:
         flagged = scored[scored["benford_flag"]]
 
-    print(f"\nFlagged wallets ({len(flagged)}):")
-    print(flagged)
+    logger.info("Flagged wallets (%d):\n%s", len(flagged), flagged)
 
 
 if __name__ == "__main__":
