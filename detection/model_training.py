@@ -1,13 +1,18 @@
 """Train the LedgerLens ensemble classifiers (RF, XGBoost, LightGBM).
 
-TODO (not yet implemented):
-  - Load labelled wash-trade dataset (see roadmap: "Open dataset release")
-  - Apply SMOTE to address class imbalance
-  - Hyperparameter search per model
-  - Evaluate with AUC-ROC, PR-AUC, F1 and log to a metrics report
-  - Persist trained models to `config.MODEL_DIR`
+Run as a script against a labelled feature matrix (see
+`scripts/generate_synthetic_dataset.py` for a synthetic one, or the
+"Open dataset release" roadmap item for the real thing):
+
+    python -m detection.model_training --data-path data/synthetic_dataset.parquet
+
+This trains each model in `MODEL_REGISTRY` with SMOTE-balanced training
+data, evaluates AUC-ROC / PR-AUC / F1 on a held-out split, writes the
+artifacts to `config.MODEL_DIR`, and writes `metrics.json` alongside them.
 """
 
+import argparse
+import json
 import os
 
 import joblib
@@ -15,11 +20,14 @@ import pandas as pd
 from imblearn.over_sampling import SMOTE
 from lightgbm import LGBMClassifier
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import f1_score, precision_recall_curve, roc_auc_score, auc
+from sklearn.metrics import auc, f1_score, precision_recall_curve, roc_auc_score
 from sklearn.model_selection import train_test_split
 from xgboost import XGBClassifier
 
 from config import config
+from utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 MODEL_REGISTRY = {
     "random_forest": RandomForestClassifier,
@@ -89,8 +97,50 @@ def save_models(results: dict, model_dir: str | None = None) -> None:
         joblib.dump(result["model"], os.path.join(model_dir, f"{name}.joblib"))
 
 
-if __name__ == "__main__":
-    raise SystemExit(
-        "model_training.py is a library module — wire it up to a labelled "
-        "dataset path before running as a script."
+def save_metrics_report(results: dict, model_dir: str | None = None) -> str:
+    """Write `{model_name: metrics}` to `<model_dir>/metrics.json` and return
+    the path written."""
+    model_dir = model_dir or config.MODEL_DIR
+    os.makedirs(model_dir, exist_ok=True)
+    path = os.path.join(model_dir, "metrics.json")
+    with open(path, "w") as f:
+        json.dump({name: result["metrics"] for name, result in results.items()}, f, indent=2)
+    return path
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Train the LedgerLens ensemble classifiers")
+    parser.add_argument(
+        "--data-path",
+        required=True,
+        help="Path to a labelled feature matrix (parquet) with a 'label' column",
     )
+    parser.add_argument(
+        "--model-dir",
+        default=None,
+        help="Directory to write trained model artifacts and metrics.json (default: MODEL_DIR)",
+    )
+    parser.add_argument("--test-size", type=float, default=0.2)
+    parser.add_argument("--random-state", type=int, default=42)
+    return parser.parse_args()
+
+
+def main() -> None:
+    args = parse_args()
+
+    logger.info("Loading training data from %s", args.data_path)
+    df = load_training_data(args.data_path)
+    logger.info("Loaded %d rows", len(df))
+
+    results = train_models(df, test_size=args.test_size, random_state=args.random_state)
+    for name, result in results.items():
+        logger.info("%s metrics: %s", name, result["metrics"])
+
+    save_models(results, args.model_dir)
+    metrics_path = save_metrics_report(results, args.model_dir)
+    logger.info("Saved models and metrics to %s", args.model_dir or config.MODEL_DIR)
+    logger.info("Metrics report: %s", metrics_path)
+
+
+if __name__ == "__main__":
+    main()
