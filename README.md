@@ -1,8 +1,10 @@
 # LedgerLens Data 🔍
 
+[![CI](https://github.com/Ledger-Lenz/Ledgerlens-data/actions/workflows/ci.yml/badge.svg)](https://github.com/Ledger-Lenz/Ledgerlens-data/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Built on Stellar](https://img.shields.io/badge/Built%20on-Stellar-blue?logo=stellar)](https://stellar.org)
 [![Soroban Smart Contracts](https://img.shields.io/badge/Smart%20Contracts-Soroban-purple)](https://soroban.stellar.org)
+[![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](Dockerfile)
 
 Data ingestion, fraud-detection engine, and feature pipeline for **LedgerLens** — a hybrid on-chain fraud detection system for the Stellar DEX that combines **Benford's Law digit analysis** with **ensemble machine learning** to detect wash trading and artificial volume.
 
@@ -114,41 +116,89 @@ ledgerlens-data/
 │
 ├── README.md                         ← This file
 ├── requirements.txt                  ← Python dependencies
+├── pyproject.toml                    ← Lint/format/test config (ruff, black, mypy, pytest)
+├── Makefile                          ← make install / lint / format / test / run
+├── Dockerfile                        ← Container image (entrypoint: run_pipeline.py)
 ├── run_pipeline.py                   ← Full detection pipeline entry point
 │
 ├── ingestion/
 │   ├── horizon_streamer.py           ← Real-time trade data from Horizon API
 │   ├── historical_loader.py          ← Bulk historical trade ingestion
+│   ├── orderbook_loader.py           ← Order-book event ingestion (cancellation rate)
 │   └── data_models.py                ← Pydantic schemas for trade records
 │
 ├── detection/
 │   ├── benford_engine.py             ← Benford's Law feature computation
-│   ├── feature_engineering.py        ← On-chain ML feature extraction
-│   ├── model_training.py             ← Train ensemble classifiers
+│   ├── feature_engineering.py        ← 30+ feature builder
+│   ├── wallet_graph.py               ← Funding-graph similarity/centrality features
+│   ├── model_training.py             ← Train ensemble classifiers (CLI)
 │   ├── model_inference.py            ← Real-time risk scoring
-│   └── shap_explainer.py             ← SHAP interpretability layer
+│   ├── shap_explainer.py             ← SHAP interpretability layer
+│   ├── persistence.py                ← SQLAlchemy RiskScore model + engine
+│   └── risk_score_store.py           ← RiskScore upsert/read repository
+│
+├── integrations/
+│   └── contract_client.py            ← ledgerlens-score Soroban contract client
+│
+├── scripts/
+│   └── generate_synthetic_dataset.py ← Synthetic labelled dataset for local training/demo
+│
+├── utils/
+│   ├── logging.py                    ← Shared logger setup
+│   └── retry.py                      ← Retry/backoff decorator for Horizon calls
 │
 └── tests/
     ├── test_benford.py
     ├── test_features.py
-    └── test_api.py
+    ├── test_orderbook.py
+    ├── test_wallet_graph.py
+    ├── test_persistence.py
+    ├── test_contract_client.py
+    ├── test_model_training.py
+    └── test_inference_shap.py
 ```
 
 ## Quick Start
 
 ```bash
 # Install dependencies
-pip install -r requirements.txt
+make install
+# (equivalent to: pip install -r requirements.txt)
+
+# Generate a synthetic labelled dataset and train the ensemble
+python -m scripts.generate_synthetic_dataset --output data/synthetic_dataset.parquet
+python -m detection.model_training --data-path data/synthetic_dataset.parquet
 
 # Run the full detection pipeline
 python run_pipeline.py
 ```
 
-## Testing
+### `run_pipeline.py` flags
+
+| Flag | Effect |
+|---|---|
+| `--since <ISO date>` | Only load trades from this date onward (default: all available) |
+| `--no-persist` | Skip writing scored wallets to `RISK_SCORE_DB_URL` |
+| `--no-orderbook` | Skip loading order-book events (faster; `order_cancellation_rate` stays `0`) |
+| `--submit-onchain` | Submit flagged wallets' `RiskScore` to the `ledgerlens-score` contract via `integrations/contract_client.py` |
+
+### `scripts/`
+
+See [`scripts/README.md`](scripts/README.md) for `generate_synthetic_dataset.py` usage —
+a synthetic labelled feature matrix matching `build_feature_matrix`'s schema, useful for
+local training/demo/tests without live Horizon data.
+
+## Development
 
 ```bash
-pytest tests/
+make install   # pip install -r requirements.txt
+make lint      # ruff check .
+make format    # black .
+make test      # pytest
+make run       # python run_pipeline.py
 ```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full dev setup and PR process.
 
 ## Organization Map
 
@@ -267,34 +317,47 @@ added to both the training pipeline and `model_inference.py`'s
 ```
 ledgerlens-data/
 ├── config.py                  ← env-driven configuration
-├── run_pipeline.py             ← pipeline entry point (ingest → features → score)
+├── run_pipeline.py            ← pipeline entry point (ingest → features → score → persist/submit)
 ├── ingestion/
 │   ├── data_models.py          ← Trade / OrderBookEvent / AccountActivity (shared schema)
-│   ├── horizon_streamer.py      ← live trade stream
-│   └── historical_loader.py    ← bulk historical trade load
+│   ├── horizon_streamer.py      ← live trade stream (auto-reconnect)
+│   ├── historical_loader.py    ← bulk historical trade load (retry/backoff)
+│   └── orderbook_loader.py     ← order-book event ingestion (cancellation rate)
 ├── detection/
 │   ├── benford_engine.py        ← chi-square / Z-score / MAD (done)
-│   ├── feature_engineering.py  ← 30+ feature builder (done, graph features stubbed)
-│   ├── model_training.py        ← ensemble training (needs labelled dataset)
-│   ├── model_inference.py       ← RiskScorer (needs trained models)
-│   └── shap_explainer.py        ← per-wallet SHAP attributions
-└── tests/
-    ├── test_benford.py
-    └── test_features.py
+│   ├── feature_engineering.py  ← 30+ feature builder (done)
+│   ├── wallet_graph.py          ← funding-graph similarity/centrality
+│   ├── model_training.py        ← ensemble training CLI
+│   ├── model_inference.py       ← RiskScorer ensemble scoring
+│   ├── shap_explainer.py        ← per-wallet + ensemble SHAP attributions
+│   ├── persistence.py           ← SQLAlchemy RiskScore model + engine
+│   └── risk_score_store.py      ← RiskScore upsert/read repository
+├── integrations/
+│   └── contract_client.py      ← ledgerlens-score Soroban contract client
+├── scripts/
+│   └── generate_synthetic_dataset.py ← synthetic labelled dataset generator
+└── tests/ (8 modules, see Repository Structure above)
 ```
 
-#### Known gaps / TODOs (~40% remaining)
+#### Known gaps / TODOs
 
-- `order_cancellation_rate` requires order-book event ingestion (not yet
-  built — `OrderBookEvent` model exists but no loader).
-- Wallet graph features (`funding_source_similarity`, `network_centrality`)
-  need a cross-account funding graph; currently return `0.0`.
-- `model_training.py` needs a labelled wash-trade dataset (planned roadmap
-  item: "Open dataset release").
-- No persistence layer yet for writing `RiskScore` records to
-  `RISK_SCORE_DB_URL` for `ledgerlens-api` to consume — `run_pipeline.py`
-  currently prints flagged wallets to stdout.
-- No `submit_score` client for `ledgerlens-contract`.
+- Wallet funding-graph features (`funding_source_similarity`,
+  `network_centrality`) are implemented in `detection/wallet_graph.py`, but
+  `run_pipeline.py` doesn't build a `funding_graph` yet — there's no
+  ingestion source for `AccountActivity.funding_account` data. Wiring this
+  up requires an account-creation/funding event loader (a candidate next
+  feature).
+- `model_training.py` trains on `scripts/generate_synthetic_dataset.py`'s
+  synthetic data by default; the real labelled wash-trade dataset is still
+  the "Open dataset release" roadmap item.
+- `run_pipeline.py`'s persisted `asset_pair` is a combined label across all
+  `WATCHED_ASSET_PAIRS` (`watched_pairs_label()`), not a per-pair
+  attribution — the feature matrix is currently built across all pairs
+  together. Per-pair feature matrices would need per-pair trade filtering
+  upstream of `build_feature_matrix`.
+- `--submit-onchain` assumes a deployed `ledgerlens-score` contract and a
+  funded `LEDGERLENS_SUBMITTER_SECRET`; it has unit test coverage via mocks
+  but hasn't been exercised against a live Soroban network from this repo.
 
 When picking up one of these, check whether `ledgerlens-core` already
 defines the relevant shared type before inventing a new one.
