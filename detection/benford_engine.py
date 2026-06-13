@@ -32,7 +32,7 @@ def leading_digits(amounts: pd.Series) -> pd.Series:
         return amounts
 
     magnitudes = np.floor(np.log10(amounts)).astype(int)
-    normalized = amounts / (10.0 ** magnitudes)
+    normalized = amounts / (10.0**magnitudes)
     return np.floor(normalized).astype(int).clip(1, 9)
 
 
