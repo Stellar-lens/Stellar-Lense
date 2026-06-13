@@ -33,8 +33,13 @@ class ShapExplainer:
     def _shap_values_for(self, model, X: pd.DataFrame):
         explainer = self._get_explainer(model)
         shap_values = explainer.shap_values(X)
-        # Binary classifiers may return a list [class_0, class_1]
-        return shap_values[1][0] if isinstance(shap_values, list) else shap_values[0]
+        # Binary classifiers may return a list [class_0, class_1], or a single
+        # ndarray shaped (n_samples, n_features, n_classes).
+        if isinstance(shap_values, list):
+            return shap_values[1][0]
+        if shap_values.ndim == 3:
+            return shap_values[0, :, 1]
+        return shap_values[0]
 
     def explain(self, feature_row: pd.Series, top_n: int = 5, model=None) -> list[dict]:
         """Return the top `top_n` features driving this wallet's score
@@ -47,7 +52,7 @@ class ShapExplainer:
             raise ValueError("No model provided to explain()")
 
         feature_cols = [c for c in feature_row.index if c not in FEATURE_COLUMNS_EXCLUDE]
-        X = feature_row[feature_cols].to_frame().T
+        X = feature_row[feature_cols].to_frame().T.astype(float)
 
         values = self._shap_values_for(model, X)
 
@@ -76,7 +81,7 @@ class ShapExplainer:
             raise ValueError("No models provided to explain_ensemble()")
 
         feature_cols = [c for c in feature_row.index if c not in FEATURE_COLUMNS_EXCLUDE]
-        X = feature_row[feature_cols].to_frame().T
+        X = feature_row[feature_cols].to_frame().T.astype(float)
         raw_values = X.iloc[0].values
 
         totals = [0.0] * len(feature_cols)

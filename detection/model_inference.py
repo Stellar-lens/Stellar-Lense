@@ -69,7 +69,7 @@ class RiskScorer:
             )
 
         feature_cols = [c for c in feature_row.index if c not in FEATURE_COLUMNS_EXCLUDE]
-        X = feature_row[feature_cols].to_frame().T
+        X = feature_row[feature_cols].to_frame().T.astype(float)
 
         probs = [model.predict_proba(X)[0, 1] for model in self.models.values()]
         avg_prob = _combine_probabilities(probs)
@@ -82,7 +82,7 @@ class RiskScorer:
         return {
             "score": int(round(avg_prob * 100)),
             "benford_flag": benford_flag,
-            "ml_flag": avg_prob >= ML_FLAG_THRESHOLD,
+            "ml_flag": bool(avg_prob >= ML_FLAG_THRESHOLD),
             "confidence": _confidence_from_probs(probs, avg_prob),
         }
 
