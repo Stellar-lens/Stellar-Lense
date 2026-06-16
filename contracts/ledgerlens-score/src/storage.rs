@@ -76,8 +76,7 @@ pub fn clear_pending_admin(env: &Env) {
 // ── Watchlist ────────────────────────────────────────────────────────────────
 
 pub fn is_watchlisted(env: &Env, wallet: &Address) -> bool {
-    let result: Option<bool> =
-        env.storage().persistent().get(&DataKey::Watchlist(wallet.clone()));
+    let result: Option<bool> = env.storage().persistent().get(&DataKey::Watchlist(wallet.clone()));
     result.unwrap_or(false)
 }
 
@@ -106,11 +105,8 @@ pub fn set_risk_threshold(env: &Env, threshold: u32) {
 
 pub fn push_score_history(env: &Env, wallet: &Address, asset_pair: &Symbol, score: &RiskScore) {
     let key = DataKey::ScoreHistory(wallet.clone(), asset_pair.clone());
-    let mut history: Vec<RiskScore> = env
-        .storage()
-        .persistent()
-        .get(&key)
-        .unwrap_or_else(|| Vec::new(env));
+    let mut history: Vec<RiskScore> =
+        env.storage().persistent().get(&key).unwrap_or_else(|| Vec::new(env));
 
     history.push_back(score.clone());
 

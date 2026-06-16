@@ -30,10 +30,7 @@ pub fn contract_unpaused(env: &Env, by: &Address) {
 // ── Two-step admin transfer ──────────────────────────────────────────────────
 
 pub fn admin_transfer_initiated(env: &Env, from: &Address, to: &Address) {
-    env.events().publish(
-        (symbol_short!("adm_init"),),
-        (from.clone(), to.clone()),
-    );
+    env.events().publish((symbol_short!("adm_init"),), (from.clone(), to.clone()));
 }
 
 pub fn admin_transfer_accepted(env: &Env, new_admin: &Address) {
@@ -66,8 +63,6 @@ pub fn threshold_breached(
     score: u32,
     threshold: u32,
 ) {
-    env.events().publish(
-        (symbol_short!("breach"), wallet.clone()),
-        (asset_pair.clone(), score, threshold),
-    );
+    env.events()
+        .publish((symbol_short!("breach"), wallet.clone()), (asset_pair.clone(), score, threshold));
 }

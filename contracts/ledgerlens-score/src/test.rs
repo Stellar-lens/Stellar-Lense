@@ -84,8 +84,7 @@ fn test_submit_score_invalid_score_range_rejected() {
     let wallet = Address::generate(&env);
     let asset_pair = symbol_short!("XLM_USDC");
 
-    let result =
-        client.try_submit_score(&wallet, &asset_pair, &101, &false, &false, &0, &50, &1);
+    let result = client.try_submit_score(&wallet, &asset_pair, &101, &false, &false, &0, &50, &1);
     assert_eq!(result, Err(Ok(Error::InvalidScore)));
 }
 
@@ -97,8 +96,7 @@ fn test_submit_score_invalid_confidence_range_rejected() {
     let wallet = Address::generate(&env);
     let asset_pair = symbol_short!("XLM_USDC");
 
-    let result =
-        client.try_submit_score(&wallet, &asset_pair, &50, &false, &false, &0, &101, &1);
+    let result = client.try_submit_score(&wallet, &asset_pair, &50, &false, &false, &0, &101, &1);
     assert_eq!(result, Err(Ok(Error::InvalidConfidence)));
 }
 
@@ -172,8 +170,7 @@ fn test_submit_score_blocked_when_paused() {
 
     let wallet = Address::generate(&env);
     let asset_pair = symbol_short!("XLM_USDC");
-    let result =
-        client.try_submit_score(&wallet, &asset_pair, &50, &false, &false, &0, &50, &1);
+    let result = client.try_submit_score(&wallet, &asset_pair, &50, &false, &false, &0, &50, &1);
     assert_eq!(result, Err(Ok(Error::ContractPaused)));
 }
 
@@ -377,16 +374,7 @@ fn test_score_history_max_depth_enforced() {
 
     // 12 entries — two are evicted once the ring is full (max depth = 10).
     for i in 0u32..12 {
-        client.submit_score(
-            &wallet,
-            &asset_pair,
-            &(i * 8),
-            &false,
-            &false,
-            &(i as u64),
-            &50,
-            &1,
-        );
+        client.submit_score(&wallet, &asset_pair, &(i * 8), &false, &false, &(i as u64), &50, &1);
     }
 
     let history = client.get_score_history(&wallet, &asset_pair);
@@ -487,10 +475,7 @@ fn test_submit_scores_batch_skips_invalid_entries() {
     assert_eq!(accepted, 1);
 
     assert_eq!(client.get_score(&wallet_ok, &asset_pair).score, 60);
-    assert_eq!(
-        client.try_get_score(&wallet_bad, &asset_pair),
-        Err(Ok(Error::ScoreNotFound))
-    );
+    assert_eq!(client.try_get_score(&wallet_bad, &asset_pair), Err(Ok(Error::ScoreNotFound)));
 }
 
 #[test]
@@ -575,8 +560,7 @@ fn test_submit_score_before_init_fails() {
     let (env, client, _, _) = setup();
     let wallet = Address::generate(&env);
     let asset_pair = symbol_short!("XLM_USDC");
-    let result =
-        client.try_submit_score(&wallet, &asset_pair, &50, &false, &false, &0, &50, &1);
+    let result = client.try_submit_score(&wallet, &asset_pair, &50, &false, &false, &0, &50, &1);
     assert_eq!(result, Err(Ok(Error::NotInitialized)));
 }
 

@@ -138,7 +138,13 @@ impl LedgerLensScoreContract {
             storage::push_score_history(&env, &sub.wallet, &sub.asset_pair, &risk_score);
 
             if sub.score >= threshold {
-                events::threshold_breached(&env, &sub.wallet, &sub.asset_pair, sub.score, threshold);
+                events::threshold_breached(
+                    &env,
+                    &sub.wallet,
+                    &sub.asset_pair,
+                    sub.score,
+                    threshold,
+                );
             }
 
             events::score_submitted(&env, &sub.wallet, &sub.asset_pair, &risk_score);
@@ -159,11 +165,7 @@ impl LedgerLensScoreContract {
     /// Returns the ordered history of the last `HISTORY_MAX_DEPTH` risk scores
     /// for `wallet` / `asset_pair`, oldest first.  Returns an empty Vec when no
     /// scores have been submitted yet.
-    pub fn get_score_history(
-        env: Env,
-        wallet: Address,
-        asset_pair: Symbol,
-    ) -> Vec<RiskScore> {
+    pub fn get_score_history(env: Env, wallet: Address, asset_pair: Symbol) -> Vec<RiskScore> {
         storage::get_score_history(&env, &wallet, &asset_pair)
     }
 
@@ -202,8 +204,7 @@ impl LedgerLensScoreContract {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
-        let pending =
-            storage::get_pending_admin(&env).ok_or(Error::NoPendingAdminTransfer)?;
+        let pending = storage::get_pending_admin(&env).ok_or(Error::NoPendingAdminTransfer)?;
         pending.require_auth();
         storage::set_admin(&env, &pending);
         storage::clear_pending_admin(&env);
