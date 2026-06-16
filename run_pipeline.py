@@ -72,11 +72,19 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Submit flagged wallets' RiskScore to the ledgerlens-score contract",
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Run all pipeline stages but skip all writes (DB persist and on-chain submission).",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
+
+    if args.dry_run:
+        logger.info("[DRY RUN] No data will be written.")
 
     logger.info("[1/4] Loading trades for watched pairs: %s", config.WATCHED_ASSET_PAIRS)
     trades_df = load_watched_pairs_to_dataframe(start_time=args.since)
@@ -109,7 +117,7 @@ def main() -> None:
     if "score" in scored:
         flagged = scored[scored["score"] >= config.RISK_SCORE_FLAG_THRESHOLD]
 
-        if not args.no_persist:
+        if not args.no_persist and not args.dry_run:
             asset_pair = watched_pairs_label()
             store = RiskScoreStore()
             for _, row in scored.iterrows():
@@ -132,7 +140,9 @@ def main() -> None:
     logger.info("Flagged wallets (%d):\n%s", len(flagged), flagged)
 
     if args.submit_onchain:
-        if "score" not in scored:
+        if args.dry_run:
+            logger.warning("      [DRY RUN] Skipping on-chain submission")
+        elif "score" not in scored:
             logger.warning("      Skipping on-chain submission: no ML scores available")
         else:
             submit_flagged_onchain(flagged)
