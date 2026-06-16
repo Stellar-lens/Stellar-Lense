@@ -16,6 +16,25 @@ pub struct RiskScore {
     pub timestamp: u64,
     /// Model confidence for this score, 0-100.
     pub confidence: u32,
+    /// Integer version of the detection-pipeline model that produced
+    /// this score.  Allows consumers to detect stale scores when the
+    /// pipeline is retrained.
+    pub model_version: u32,
+}
+
+/// A single entry in a batch score submission.  Mirrors the fields of
+/// `submit_score` so the service can write many scores in one call.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ScoreSubmission {
+    pub wallet: Address,
+    pub asset_pair: Symbol,
+    pub score: u32,
+    pub benford_flag: bool,
+    pub ml_flag: bool,
+    pub timestamp: u64,
+    pub confidence: u32,
+    pub model_version: u32,
 }
 
 #[contracttype]
@@ -27,4 +46,16 @@ pub enum DataKey {
     Service,
     /// Latest risk score for a (wallet, asset_pair) pair.
     Score(Address, Symbol),
+    /// Boolean flag — true when the contract is paused.
+    Paused,
+    /// Pending new admin address during a two-step admin transfer.
+    PendingAdmin,
+    /// Per-wallet watchlist flag (true = high-priority monitoring).
+    Watchlist(Address),
+    /// Global risk-score threshold; scores ≥ threshold emit a breach event.
+    RiskThreshold,
+    /// Ordered ring buffer of the last N risk scores for a wallet/pair.
+    ScoreHistory(Address, Symbol),
+    /// Baked-in contract version number.
+    ContractVersion,
 }
