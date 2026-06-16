@@ -20,4 +20,7 @@ pub enum Error {
     EmptyBatch = 9,
     /// Returned when a batch exceeds the MAX_BATCH_SIZE limit.
     BatchTooLarge = 10,
+    /// Returned when the weighted aggregate computation in
+    /// `get_aggregate_score` would overflow.
+    ArithmeticOverflow = 11,
 }

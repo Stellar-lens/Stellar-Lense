@@ -3,7 +3,7 @@ use soroban_sdk::{Address, Env, Symbol, Vec};
 use crate::constants::{
     DEFAULT_RISK_THRESHOLD, HISTORY_MAX_DEPTH, SCORE_TTL_EXTEND_TO, SCORE_TTL_THRESHOLD,
 };
-use crate::types::{DataKey, RiskScore};
+use crate::types::{AggregateRiskScore, DataKey, RiskScore};
 
 // ── Admin / Service ─────────────────────────────────────────────────────────
 
@@ -134,4 +134,56 @@ pub fn get_score_history(env: &Env, wallet: &Address, asset_pair: &Symbol) -> Ve
 pub fn get_contract_version(env: &Env) -> u32 {
     let result: Option<u32> = env.storage().instance().get(&DataKey::ContractVersion);
     result.unwrap_or(crate::constants::CONTRACT_VERSION)
+}
+
+// ── Cross-asset aggregate risk ───────────────────────────────────────────────
+
+/// Adds `asset_pair` to the wallet's tracked pair list if it isn't already
+/// present. Idempotent — re-registering an existing pair is a no-op aside
+/// from the TTL bump.
+pub fn register_pair_for_wallet(env: &Env, wallet: &Address, asset_pair: &Symbol) {
+    let key = DataKey::AssetPairs(wallet.clone());
+    let mut pairs: Vec<Symbol> =
+        env.storage().persistent().get(&key).unwrap_or_else(|| Vec::new(env));
+
+    if !pairs.contains(asset_pair) {
+        pairs.push_back(asset_pair.clone());
+        env.storage().persistent().set(&key, &pairs);
+    }
+    env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+}
+
+pub fn get_wallet_pairs(env: &Env, wallet: &Address) -> Vec<Symbol> {
+    let key = DataKey::AssetPairs(wallet.clone());
+    let pairs: Vec<Symbol> = env.storage().persistent().get(&key).unwrap_or_else(|| Vec::new(env));
+    if !pairs.is_empty() {
+        env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    }
+    pairs
+}
+
+/// Returns the configured weight for `asset_pair`, defaulting to `1` (a
+/// simple, unweighted average) when the admin has not set one explicitly.
+pub fn get_pair_weight(env: &Env, asset_pair: &Symbol) -> u32 {
+    let key = DataKey::PairWeight(asset_pair.clone());
+    let weight: Option<u32> = env.storage().persistent().get(&key);
+    if weight.is_some() {
+        env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    }
+    weight.unwrap_or(1)
+}
+
+pub fn set_pair_weight(env: &Env, asset_pair: &Symbol, weight: u32) {
+    let key = DataKey::PairWeight(asset_pair.clone());
+    env.storage().persistent().set(&key, &weight);
+    env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+}
+
+/// Refreshes the cached aggregate snapshot at `AggregateScore(wallet)`.
+/// This is a write-through cache only — `get_aggregate_score` always
+/// recomputes from live per-pair scores rather than reading it back.
+pub fn set_aggregate_score(env: &Env, wallet: &Address, aggregate: &AggregateRiskScore) {
+    let key = DataKey::AggregateScore(wallet.clone());
+    env.storage().persistent().set(&key, aggregate);
+    env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
 }
