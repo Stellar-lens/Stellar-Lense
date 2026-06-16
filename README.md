@@ -181,6 +181,7 @@ python run_pipeline.py
 | `--no-persist` | Skip writing scored wallets to `RISK_SCORE_DB_URL` |
 | `--no-orderbook` | Skip loading order-book events (faster; `order_cancellation_rate` stays `0`) |
 | `--submit-onchain` | Submit flagged wallets' `RiskScore` to the `ledgerlens-score` contract via `integrations/contract_client.py` |
+| `--dry-run` | Run all pipeline stages but skip every write — no DB persistence and no on-chain submission (implies `--no-persist`; silently skips `--submit-onchain`). Flagged wallets are still printed. |
 
 ### `scripts/`
 
