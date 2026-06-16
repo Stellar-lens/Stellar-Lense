@@ -1,0 +1,10 @@
+[alias]
+# Build contract as optimised wasm: cargo wasm -p ledgerlens-score
+wasm = "build --target wasm32-unknown-unknown --release"
+# Run all workspace tests on the host: cargo test-all
+test-all = "test --workspace"
+
+[build]
+# Extra linting; the CI enforces these too but having them locally
+# means the developer sees the same errors before pushing.
+rustflags = ["-D", "warnings"]
