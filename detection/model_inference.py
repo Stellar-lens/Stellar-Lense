@@ -58,7 +58,7 @@ class RiskScorer:
     def _load_metadata(self) -> dict | None:
         path = os.path.join(self.model_dir, "model_metadata.json")
         if os.path.exists(path):
-            with open(path, "r") as f:
+            with open(path) as f:
                 return json.load(f)
         return None
 
