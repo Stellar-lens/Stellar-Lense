@@ -327,7 +327,7 @@ fn test_has_pending_admin_transfer_false_initially() {
 
     let pending = client.has_pending_admin_transfer();
 
-    assert_eq!(pending, false)
+    assert!(!pending)
 }
 
 #[test]
@@ -342,7 +342,7 @@ fn test_has_pending_admin_transfer_true_during() {
 
     let pending = client.has_pending_admin_transfer();
 
-    assert_eq!(pending, true)
+    assert!(pending)
 }
 
 #[test]
