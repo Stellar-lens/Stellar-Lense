@@ -126,7 +126,9 @@ def main() -> None:
         sys.exit(1)
 
     # 3. Feature Engineering
-    feature_vector = build_feature_vector(args.wallet, trades_df, orderbook_events=orderbook_events_df)
+    feature_vector = build_feature_vector(
+        args.wallet, trades_df, orderbook_events=orderbook_events_df
+    )
     feature_row = pd.Series(feature_vector)
 
     # 4. Score
