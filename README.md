@@ -183,6 +183,31 @@ python run_pipeline.py
 | `--submit-onchain` | Submit flagged wallets' `RiskScore` to the `ledgerlens-score` contract via `integrations/contract_client.py` |
 | `--dry-run` | Run all pipeline stages but skip every write — no DB persistence and no on-chain submission (implies `--no-persist`; silently skips `--submit-onchain`). Flagged wallets are still printed. |
 
+## Model Artifacts
+
+Trained models and their associated metadata are stored in `config.MODEL_DIR` (default: `./models`).
+
+### `model_metadata.json`
+
+Every training run produces a `model_metadata.json` sidecar file. This is used by the `RiskScorer` at load time to ensure that the current feature schema matches the schema the model was trained on, preventing silent scoring errors due to feature drift.
+
+**Schema:**
+```json
+{
+  "trained_at": "2026-06-16T12:00:00Z",
+  "data_path": "data/synthetic_dataset.parquet",
+  "n_training_rows": 400,
+  "n_test_rows": 100,
+  "feature_columns": ["benford_chi_square_1h", "benford_mad_1h", "..."],
+  "feature_schema_hash": "sha256:<hash-of-sorted-feature-column-list>",
+  "model_names": ["random_forest", "xgboost", "lightgbm"],
+  "python_version": "3.11.9",
+  "ledgerlens_version": "0.2.0"
+}
+```
+
+If the `feature_schema_hash` computed from the input feature row does not match the hash in the metadata, `RiskScorer.score()` will raise a `RuntimeError` detailing the mismatched columns.
+
 ### `scripts/`
 
 See [`scripts/README.md`](scripts/README.md) for `generate_synthetic_dataset.py` usage —

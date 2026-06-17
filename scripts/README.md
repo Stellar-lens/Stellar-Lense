@@ -35,5 +35,6 @@ python -m detection.model_training --data-path data/synthetic_dataset.parquet
 
 This trains every model in `MODEL_REGISTRY` (Random Forest, XGBoost,
 LightGBM) with SMOTE-balanced training data, writes the fitted models to
-`config.MODEL_DIR`, and writes `metrics.json` (AUC-ROC / PR-AUC / F1 per
-model) alongside them.
+`config.MODEL_DIR`, and writes both `metrics.json` (AUC-ROC / PR-AUC / F1
+per model) and `model_metadata.json` (feature schema fingerprint and
+training metadata) alongside them.
