@@ -92,4 +92,11 @@ pub enum DataKey {
     /// it always recomputes from the live per-pair scores — so this key
     /// exists purely as a cheap snapshot for off-chain indexers.
     AggregateScore(Address),
+    /// Ordered set of N addresses authorised to co-sign score submissions.
+    /// A score submission is accepted only when M of these addresses have
+    /// individually authorized it in the same transaction.
+    ServiceSet,
+    /// The M-of-N threshold: the minimum number of service-set members that
+    /// must sign a `submit_score` call for it to be accepted.
+    ServiceThreshold,
 }

@@ -10,7 +10,7 @@
 //! a breaking change to a published ABI, not merely a regression.
 
 use soroban_sdk::{
-    symbol_short, testutils::Address as _, Address, Env, IntoVal, Symbol, TryFromVal, Val,
+    symbol_short, testutils::Address as _, Address, Env, IntoVal, Symbol, TryFromVal, Val, Vec,
 };
 
 use crate::{Error, LedgerLensScoreContract, LedgerLensScoreContractClient, RiskScore};
@@ -38,7 +38,7 @@ fn test_query_risk_gate_safe_wallet() {
     let pair = symbol_short!("XLM_USDC");
 
     // Score 40 is comfortably below the gate threshold of 75 → safe.
-    client.submit_score(&wallet, &pair, &40, &false, &false, &1_700_000_000, &90, &1);
+    client.submit_score(&Vec::new(&env), &wallet, &pair, &40, &false, &false, &1_700_000_000, &90, &1);
 
     assert!(client.query_risk_gate(&wallet, &pair, &75));
 }
@@ -50,7 +50,7 @@ fn test_query_risk_gate_risky_wallet() {
     let pair = symbol_short!("XLM_USDC");
 
     // Score 80 is above the gate threshold of 75 → not safe.
-    client.submit_score(&wallet, &pair, &80, &true, &true, &1_700_000_000, &90, &1);
+    client.submit_score(&Vec::new(&env), &wallet, &pair, &80, &true, &true, &1_700_000_000, &90, &1);
 
     assert!(!client.query_risk_gate(&wallet, &pair, &75));
 }
@@ -62,7 +62,7 @@ fn test_query_risk_gate_at_threshold() {
     let pair = symbol_short!("XLM_USDC");
 
     // Boundary: score == threshold is treated as NOT safe (gate is strict `<`).
-    client.submit_score(&wallet, &pair, &75, &false, &false, &1_700_000_000, &90, &1);
+    client.submit_score(&Vec::new(&env), &wallet, &pair, &75, &false, &false, &1_700_000_000, &90, &1);
 
     assert!(!client.query_risk_gate(&wallet, &pair, &75));
 }
@@ -108,7 +108,7 @@ fn test_query_risk_gate_never_panics() {
         // Refresh the scored wallet with an arbitrary in-range score so the
         // stored value (and the comparison against it) varies across rounds.
         let score = next() % 101;
-        client.submit_score(&scored, &pair, &score, &false, &false, &1_700_000_000, &50, &1);
+        client.submit_score(&Vec::new(&env), &scored, &pair, &score, &false, &false, &1_700_000_000, &50, &1);
 
         let threshold = next() % 200; // intentionally also exceeds the 0-100 range
         let wallet = if next() % 2 == 0 { &scored } else { &unknown };

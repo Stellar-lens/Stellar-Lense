@@ -196,3 +196,25 @@ pub fn set_aggregate_score(env: &Env, wallet: &Address, aggregate: &AggregateRis
     env.storage().persistent().set(&key, aggregate);
     env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
 }
+
+// ── Multi-sig service set ─────────────────────────────────────────────────────
+
+/// Returns the current service signer set.  Returns an empty Vec before
+/// `add_service_signer` is called for the first time.
+pub fn get_service_set(env: &Env) -> Vec<Address> {
+    env.storage().instance().get(&DataKey::ServiceSet).unwrap_or_else(|| Vec::new(env))
+}
+
+pub fn set_service_set(env: &Env, set: &Vec<Address>) {
+    env.storage().instance().set(&DataKey::ServiceSet, set);
+}
+
+/// Returns the current signing threshold.  Defaults to `0` (unset) so
+/// callers can distinguish "never configured" from a legitimate threshold.
+pub fn get_service_threshold(env: &Env) -> u32 {
+    env.storage().instance().get(&DataKey::ServiceThreshold).unwrap_or(0)
+}
+
+pub fn set_service_threshold(env: &Env, threshold: u32) {
+    env.storage().instance().set(&DataKey::ServiceThreshold, &threshold);
+}

@@ -1,4 +1,5 @@
 #![no_std]
+#![allow(deprecated)] // Required: contractimpl macro calls spec_xdr_* for all fns including deprecated ones
 
 mod constants;
 mod errors;
@@ -50,11 +51,21 @@ impl LedgerLensScoreContract {
     // ── Score submission ─────────────────────────────────────────────────────
 
     /// Register a freshly computed risk score for `wallet` / `asset_pair`.
-    /// Requires authorization from the configured scoring service account.
+    ///
+    /// When a multi-sig service set has been configured (via
+    /// `add_service_signer` / `set_service_threshold`), `signers` must
+    /// contain at least `ServiceThreshold` addresses, each of which must be
+    /// a member of `ServiceSet`.  Each listed signer must individually
+    /// authorize the transaction via Soroban's native `require_auth`.
+    ///
+    /// When no multi-sig set has been configured (legacy mode) the function
+    /// falls back to the original single-service authorization path.
+    ///
     /// Returns `ContractPaused` if the admin has activated the circuit breaker.
     #[allow(clippy::too_many_arguments)]
     pub fn submit_score(
         env: Env,
+        signers: Vec<Address>,
         wallet: Address,
         asset_pair: Symbol,
         score: u32,
@@ -71,8 +82,26 @@ impl LedgerLensScoreContract {
             return Err(Error::ContractPaused);
         }
 
-        let service = storage::get_service(&env);
-        service.require_auth();
+        let service_set = storage::get_service_set(&env);
+        let threshold = storage::get_service_threshold(&env);
+
+        if !service_set.is_empty() && threshold > 0 {
+            // Multi-sig path: verify count, membership, then require_auth each.
+            if signers.len() < threshold {
+                return Err(Error::InsufficientSigners);
+            }
+            for i in 0..signers.len() {
+                let signer = signers.get(i).unwrap();
+                if !service_set.contains(&signer) {
+                    return Err(Error::UnauthorizedSigner);
+                }
+                signer.require_auth();
+            }
+        } else {
+            // Legacy single-service path.
+            let service = storage::get_service(&env);
+            service.require_auth();
+        }
 
         if score > 100 {
             return Err(Error::InvalidScore);
@@ -89,9 +118,9 @@ impl LedgerLensScoreContract {
         storage::register_pair_for_wallet(&env, &wallet, &asset_pair);
         Self::refresh_aggregate_cache(&env, &wallet);
 
-        let threshold = storage::get_risk_threshold(&env);
-        if score >= threshold {
-            events::threshold_breached(&env, &wallet, &asset_pair, score, threshold);
+        let score_threshold = storage::get_risk_threshold(&env);
+        if score >= score_threshold {
+            events::threshold_breached(&env, &wallet, &asset_pair, score, score_threshold);
         }
 
         events::score_submitted(&env, &wallet, &asset_pair, &risk_score);
@@ -308,7 +337,102 @@ impl LedgerLensScoreContract {
 
     // ── Service management ───────────────────────────────────────────────────
 
+    /// Add `signer` to the M-of-N service signer set.  Admin only.
+    ///
+    /// Returns [`Error::ServiceSetFull`] when the set already contains
+    /// `MAX_SERVICE_SIGNERS` members, [`Error::SignerAlreadyInSet`] when
+    /// `signer` is already present.
+    pub fn add_service_signer(env: Env, signer: Address) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        storage::get_admin(&env).require_auth();
+
+        let mut set = storage::get_service_set(&env);
+        if set.len() >= constants::MAX_SERVICE_SIGNERS {
+            return Err(Error::ServiceSetFull);
+        }
+        if set.contains(&signer) {
+            return Err(Error::SignerAlreadyInSet);
+        }
+        set.push_back(signer.clone());
+        storage::set_service_set(&env, &set);
+        events::signer_added(&env, &signer);
+        Ok(())
+    }
+
+    /// Remove `signer` from the M-of-N service signer set.  Admin only.
+    ///
+    /// Returns [`Error::SignerNotInSet`] when `signer` is not in the set.
+    /// If removing the signer would make the set smaller than the current
+    /// threshold, the threshold is automatically reduced to the new set size.
+    pub fn remove_service_signer(env: Env, signer: Address) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        storage::get_admin(&env).require_auth();
+
+        let mut set = storage::get_service_set(&env);
+        let pos = set.first_index_of(&signer);
+        let idx = pos.ok_or(Error::SignerNotInSet)?;
+        set.remove(idx);
+        storage::set_service_set(&env, &set);
+
+        // Auto-adjust threshold if it now exceeds the reduced set size.
+        let threshold = storage::get_service_threshold(&env);
+        if set.is_empty() {
+            storage::set_service_threshold(&env, 0);
+            events::service_threshold_updated(&env, 0);
+        } else if threshold > set.len() {
+            storage::set_service_threshold(&env, set.len());
+            events::service_threshold_updated(&env, set.len());
+        }
+
+        events::signer_removed(&env, &signer);
+        Ok(())
+    }
+
+    /// Set the signing threshold M.  Admin only.
+    ///
+    /// Returns [`Error::InvalidThreshold`] when `threshold` is `0` or exceeds
+    /// the current service-set size.
+    pub fn set_service_threshold(env: Env, threshold: u32) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        storage::get_admin(&env).require_auth();
+
+        let set = storage::get_service_set(&env);
+        if threshold == 0 || threshold > set.len() {
+            return Err(Error::InvalidThreshold);
+        }
+        storage::set_service_threshold(&env, threshold);
+        events::service_threshold_updated(&env, threshold);
+        Ok(())
+    }
+
+    /// Returns the current M-of-N service signer set.
+    pub fn get_service_signers(env: Env) -> Vec<Address> {
+        storage::get_service_set(&env)
+    }
+
+    /// Returns the current signing threshold.
+    pub fn get_service_threshold(env: Env) -> u32 {
+        storage::get_service_threshold(&env)
+    }
+
     /// Rotate the authorised off-chain scoring service address.  Admin only.
+    ///
+    /// # Deprecation notice
+    ///
+    /// This function is deprecated in favour of the M-of-N multi-signature
+    /// model (`add_service_signer` / `set_service_threshold`).  It is
+    /// preserved for backward compatibility and will be removed in a future
+    /// major release.  New integrations should use the multisig functions.
+    #[deprecated(
+        note = "Use add_service_signer / set_service_threshold for M-of-N multisig. \
+                This single-service path will be removed in a future release."
+    )]
     pub fn set_service(env: Env, new_service: Address) -> Result<(), Error> {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
@@ -452,6 +576,15 @@ impl LedgerLensScoreContract {
     }
 
     /// Returns the current authorised scoring service address.
+    ///
+    /// # Deprecation notice
+    ///
+    /// This function is deprecated alongside [`set_service`].  Use
+    /// [`get_service_signers`] and [`get_service_threshold`] for the M-of-N
+    /// multisig model.
+    #[deprecated(
+        note = "Use get_service_signers / get_service_threshold for the M-of-N multisig model."
+    )]
     pub fn get_service(env: Env) -> Result<Address, Error> {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);

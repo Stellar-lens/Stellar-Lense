@@ -73,3 +73,20 @@ pub fn threshold_breached(
     env.events()
         .publish((symbol_short!("breach"), wallet.clone()), (asset_pair.clone(), score, threshold));
 }
+
+// ── Multi-sig service set ─────────────────────────────────────────────────────
+
+/// Emitted when a new signer is added to the service set.
+pub fn signer_added(env: &Env, signer: &Address) {
+    env.events().publish((symbol_short!("sig_add"),), signer.clone());
+}
+
+/// Emitted when a signer is removed from the service set.
+pub fn signer_removed(env: &Env, signer: &Address) {
+    env.events().publish((symbol_short!("sig_rem"),), signer.clone());
+}
+
+/// Emitted when the service signing threshold is updated.
+pub fn service_threshold_updated(env: &Env, threshold: u32) {
+    env.events().publish((symbol_short!("sig_thr"),), threshold);
+}

@@ -20,3 +20,7 @@ pub const CONTRACT_VERSION: u32 = 1;
 /// but documents the assumption the aggregate engine is designed around.
 /// See the rustdoc on `get_aggregate_score` for detail.
 pub const MAX_WALLET_PAIRS: u32 = 20;
+
+/// Maximum number of addresses that may be members of the service signer set.
+/// Attempting to add an 11th address returns `ServiceSetFull`.
+pub const MAX_SERVICE_SIGNERS: u32 = 10;
