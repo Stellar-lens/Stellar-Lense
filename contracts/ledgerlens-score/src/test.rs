@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use soroban_sdk::{symbol_short, testutils::Address as _, Address, Env, Symbol, Vec};
+use soroban_sdk::{Address, Env, Symbol, Vec, symbol_short, testutils::Address as _};
 
 use crate::{Error, LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreSubmission};
 
@@ -263,6 +263,94 @@ fn test_new_admin_can_manage_service_after_transfer() {
     let new_service = Address::generate(&env);
     client.set_service(&new_service);
     assert_eq!(client.get_service(), new_service);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #8)")]
+fn test_get_pending_admin_no_transfer() {
+    let (_, client, _, _) = initialized();
+
+    let _ = client.get_pending_admin();
+}
+
+#[test]
+fn test_get_pending_admin_returns_nominee() {
+    let (env, client, admin, _service) = initialized();
+
+    let new_admin = Address::generate(&env);
+    client.transfer_admin(&new_admin);
+
+    // Old admin still in place until the new one accepts.
+    assert_eq!(client.get_admin(), admin);
+
+    let pending_admin = client.get_pending_admin();
+
+    assert_eq!(pending_admin, new_admin);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #8)")]
+fn test_get_pending_admin_cleared_after_accept() {
+    let (env, client, admin, _service) = initialized();
+
+    let new_admin = Address::generate(&env);
+    client.transfer_admin(&new_admin);
+
+    // Old admin still in place until the new one accepts.
+    assert_eq!(client.get_admin(), admin);
+
+    client.accept_admin();
+    assert_eq!(client.get_admin(), new_admin);
+
+    let _ = client.get_pending_admin();
+}
+
+
+#[test]
+#[should_panic(expected = "Error(Contract, #8)")]
+fn test_get_pending_admin_cleared_after_cancel() {
+    let (env, client, admin, _service) = initialized();
+
+    let new_admin = Address::generate(&env);
+    client.transfer_admin(&new_admin);
+
+    // Old admin still in place until the new one accepts.
+    assert_eq!(client.get_admin(), admin);
+
+    client.cancel_admin_transfer();
+
+    let _ = client.get_pending_admin();
+}
+
+#[test]
+fn test_has_pending_admin_transfer_false_initially() {
+    let (_, client, _, _) = initialized();
+
+    let pending = client.has_pending_admin_transfer();
+
+    assert_eq!(pending, false)
+}
+
+#[test]
+fn test_has_pending_admin_transfer_true_during() {
+    let (env, client, admin, _service) = initialized();
+
+    let new_admin = Address::generate(&env);
+    client.transfer_admin(&new_admin);
+
+    // Old admin still in place until the new one accepts.
+    assert_eq!(client.get_admin(), admin);
+
+    let pending = client.has_pending_admin_transfer();
+
+    assert_eq!(pending, true)
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #2)")]
+fn test_get_pending_admin_before_init_fails() {
+    let (_, client, _, _) = setup();
+    let _ = client.get_pending_admin();
 }
 
 // ── Watchlist management ──────────────────────────────────────────────────────

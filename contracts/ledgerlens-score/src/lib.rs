@@ -379,6 +379,21 @@ impl LedgerLensScoreContract {
         Ok(storage::get_service(&env))
     }
 
+    /// Returns the address nominated as the pending new admin, or
+    /// `NoPendingAdminTransfer` if no transfer is in progress.
+    pub fn get_pending_admin(env: Env) -> Result<Address, Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        storage::get_pending_admin(&env).ok_or(Error::NoPendingAdminTransfer)
+    }
+
+    /// Returns `true` if an admin transfer has been initiated but not yet
+    /// accepted or cancelled.
+    pub fn has_pending_admin_transfer(env: Env) -> bool {
+        storage::has_pending_admin(&env)
+    }
+
     // ── Internal helpers ──────────────────────────────────────────────────────
 
     /// Shared implementation behind `get_aggregate_score`. Iterates the
