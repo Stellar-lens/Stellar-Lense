@@ -16,7 +16,7 @@ import hashlib
 import json
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import joblib
 import pandas as pd
@@ -140,7 +140,7 @@ def save_training_artifacts(
 
     # model_metadata.json
     metadata = {
-        "trained_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "trained_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "data_path": data_path,
         "n_training_rows": training_output["n_train"],
         "n_test_rows": training_output["n_test"],

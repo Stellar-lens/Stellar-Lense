@@ -69,7 +69,7 @@ def test_risk_scorer_raises_on_schema_mismatch(trained_models):
 
     # Manually corrupt the metadata hash
     meta_path = os.path.join(model_dir, "model_metadata.json")
-    with open(meta_path, "r") as f:
+    with open(meta_path) as f:
         meta = json.load(f)
     meta["feature_schema_hash"] = "sha256:wronghash"
     with open(meta_path, "w") as f:

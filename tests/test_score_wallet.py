@@ -1,8 +1,8 @@
 import json
-import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
+
 from scripts.score_wallet import main
 
 

@@ -141,7 +141,7 @@ def main() -> None:
         explainer = ShapExplainer()
         models = scorer.models
         shap_explanations = explainer.explain_ensemble(feature_row, models, top_n=5)
-    except Exception as e:
+    except Exception:
         # Fallback: empty explanations if SHAP fails
         shap_explanations = []
 
