@@ -39,7 +39,7 @@
                             "symbol": "confidence"
                           },
                           "val": {
-                            "u32": 80
+                            "u32": 60
                           }
                         },
                         {
@@ -55,7 +55,7 @@
                             "symbol": "model_version"
                           },
                           "val": {
-                            "u32": 2
+                            "u32": 1
                           }
                         },
                         {
@@ -63,7 +63,7 @@
                             "symbol": "score"
                           },
                           "val": {
-                            "u32": 45
+                            "u32": 30
                           }
                         },
                         {
@@ -71,7 +71,7 @@
                             "symbol": "timestamp"
                           },
                           "val": {
-                            "u64": 1000
+                            "u64": 1
                           }
                         },
                         {
@@ -99,7 +99,7 @@
                             "symbol": "benford_flag"
                           },
                           "val": {
-                            "bool": true
+                            "bool": false
                           }
                         },
                         {
@@ -107,7 +107,7 @@
                             "symbol": "confidence"
                           },
                           "val": {
-                            "u32": 90
+                            "u32": 80
                           }
                         },
                         {
@@ -115,7 +115,7 @@
                             "symbol": "ml_flag"
                           },
                           "val": {
-                            "bool": true
+                            "bool": false
                           }
                         },
                         {
@@ -123,7 +123,7 @@
                             "symbol": "model_version"
                           },
                           "val": {
-                            "u32": 2
+                            "u32": 1
                           }
                         },
                         {
@@ -131,7 +131,7 @@
                             "symbol": "score"
                           },
                           "val": {
-                            "u32": 85
+                            "u32": 70
                           }
                         },
                         {
@@ -139,7 +139,7 @@
                             "symbol": "timestamp"
                           },
                           "val": {
-                            "u64": 2000
+                            "u64": 2
                           }
                         },
                         {
@@ -216,7 +216,7 @@
                         "symbol": "aggregate_score"
                       },
                       "val": {
-                        "u32": 45
+                        "u32": 30
                       }
                     },
                     {
@@ -232,7 +232,7 @@
                         "symbol": "last_updated"
                       },
                       "val": {
-                        "u64": 1000
+                        "u64": 1
                       }
                     },
                     {
@@ -248,7 +248,7 @@
                         "symbol": "max_pair_score"
                       },
                       "val": {
-                        "u32": 45
+                        "u32": 30
                       }
                     },
                     {
@@ -318,7 +318,7 @@
                         "symbol": "aggregate_score"
                       },
                       "val": {
-                        "u32": 85
+                        "u32": 70
                       }
                     },
                     {
@@ -326,7 +326,7 @@
                         "symbol": "benford_flag_count"
                       },
                       "val": {
-                        "u32": 1
+                        "u32": 0
                       }
                     },
                     {
@@ -334,7 +334,7 @@
                         "symbol": "last_updated"
                       },
                       "val": {
-                        "u64": 2000
+                        "u64": 2
                       }
                     },
                     {
@@ -350,7 +350,7 @@
                         "symbol": "max_pair_score"
                       },
                       "val": {
-                        "u32": 85
+                        "u32": 70
                       }
                     },
                     {
@@ -358,7 +358,7 @@
                         "symbol": "ml_flag_count"
                       },
                       "val": {
-                        "u32": 1
+                        "u32": 0
                       }
                     },
                     {
@@ -483,108 +483,6 @@
             "key": {
               "vec": [
                 {
-                  "symbol": "LastSubmitTime"
-                },
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
-                },
-                {
-                  "symbol": "XLM_USDC"
-                }
-              ]
-            },
-            "durability": "persistent"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-                "key": {
-                  "vec": [
-                    {
-                      "symbol": "LastSubmitTime"
-                    },
-                    {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
-                    },
-                    {
-                      "symbol": "XLM_USDC"
-                    }
-                  ]
-                },
-                "durability": "persistent",
-                "val": {
-                  "u64": 0
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          777600
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-            "key": {
-              "vec": [
-                {
-                  "symbol": "LastSubmitTime"
-                },
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
-                },
-                {
-                  "symbol": "XLM_USDC"
-                }
-              ]
-            },
-            "durability": "persistent"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-                "key": {
-                  "vec": [
-                    {
-                      "symbol": "LastSubmitTime"
-                    },
-                    {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
-                    },
-                    {
-                      "symbol": "XLM_USDC"
-                    }
-                  ]
-                },
-                "durability": "persistent",
-                "val": {
-                  "u64": 0
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          777600
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-            "key": {
-              "vec": [
-                {
                   "symbol": "Score"
                 },
                 {
@@ -612,6 +510,106 @@
                     },
                     {
                       "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                    },
+                    {
+                      "symbol": "XLM_USDC"
+                    }
+                  ]
+                },
+                "durability": "persistent",
+                "val": {
+                  "map": [
+                    {
+                      "key": {
+                        "symbol": "benford_flag"
+                      },
+                      "val": {
+                        "bool": false
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "confidence"
+                      },
+                      "val": {
+                        "u32": 60
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "ml_flag"
+                      },
+                      "val": {
+                        "bool": false
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "model_version"
+                      },
+                      "val": {
+                        "u32": 1
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "score"
+                      },
+                      "val": {
+                        "u32": 30
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "timestamp"
+                      },
+                      "val": {
+                        "u64": 1
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "ext": "v0"
+          },
+          777600
+        ]
+      ],
+      [
+        {
+          "contract_data": {
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+            "key": {
+              "vec": [
+                {
+                  "symbol": "Score"
+                },
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
+                },
+                {
+                  "symbol": "XLM_USDC"
+                }
+              ]
+            },
+            "durability": "persistent"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+                "key": {
+                  "vec": [
+                    {
+                      "symbol": "Score"
+                    },
+                    {
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
                     },
                     {
                       "symbol": "XLM_USDC"
@@ -650,7 +648,7 @@
                         "symbol": "model_version"
                       },
                       "val": {
-                        "u32": 2
+                        "u32": 1
                       }
                     },
                     {
@@ -658,7 +656,7 @@
                         "symbol": "score"
                       },
                       "val": {
-                        "u32": 45
+                        "u32": 70
                       }
                     },
                     {
@@ -666,107 +664,7 @@
                         "symbol": "timestamp"
                       },
                       "val": {
-                        "u64": 1000
-                      }
-                    }
-                  ]
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          777600
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-            "key": {
-              "vec": [
-                {
-                  "symbol": "Score"
-                },
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
-                },
-                {
-                  "symbol": "XLM_USDC"
-                }
-              ]
-            },
-            "durability": "persistent"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-                "key": {
-                  "vec": [
-                    {
-                      "symbol": "Score"
-                    },
-                    {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
-                    },
-                    {
-                      "symbol": "XLM_USDC"
-                    }
-                  ]
-                },
-                "durability": "persistent",
-                "val": {
-                  "map": [
-                    {
-                      "key": {
-                        "symbol": "benford_flag"
-                      },
-                      "val": {
-                        "bool": true
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "confidence"
-                      },
-                      "val": {
-                        "u32": 90
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "ml_flag"
-                      },
-                      "val": {
-                        "bool": true
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "model_version"
-                      },
-                      "val": {
-                        "u32": 2
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "score"
-                      },
-                      "val": {
-                        "u32": 85
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "timestamp"
-                      },
-                      "val": {
-                        "u64": 2000
+                        "u64": 2
                       }
                     }
                   ]
@@ -938,7 +836,7 @@
                             "symbol": "confidence"
                           },
                           "val": {
-                            "u32": 80
+                            "u32": 60
                           }
                         },
                         {
@@ -954,7 +852,7 @@
                             "symbol": "model_version"
                           },
                           "val": {
-                            "u32": 2
+                            "u32": 1
                           }
                         },
                         {
@@ -962,7 +860,7 @@
                             "symbol": "score"
                           },
                           "val": {
-                            "u32": 45
+                            "u32": 30
                           }
                         },
                         {
@@ -970,7 +868,7 @@
                             "symbol": "timestamp"
                           },
                           "val": {
-                            "u64": 1000
+                            "u64": 1
                           }
                         }
                       ]
@@ -1034,7 +932,7 @@
                             "symbol": "benford_flag"
                           },
                           "val": {
-                            "bool": true
+                            "bool": false
                           }
                         },
                         {
@@ -1042,7 +940,7 @@
                             "symbol": "confidence"
                           },
                           "val": {
-                            "u32": 90
+                            "u32": 80
                           }
                         },
                         {
@@ -1050,7 +948,7 @@
                             "symbol": "ml_flag"
                           },
                           "val": {
-                            "bool": true
+                            "bool": false
                           }
                         },
                         {
@@ -1058,7 +956,7 @@
                             "symbol": "model_version"
                           },
                           "val": {
-                            "u32": 2
+                            "u32": 1
                           }
                         },
                         {
@@ -1066,7 +964,7 @@
                             "symbol": "score"
                           },
                           "val": {
-                            "u32": 85
+                            "u32": 70
                           }
                         },
                         {
@@ -1074,7 +972,7 @@
                             "symbol": "timestamp"
                           },
                           "val": {
-                            "u64": 2000
+                            "u64": 2
                           }
                         }
                       ]
@@ -1299,7 +1197,7 @@
                         "symbol": "confidence"
                       },
                       "val": {
-                        "u32": 80
+                        "u32": 60
                       }
                     },
                     {
@@ -1315,7 +1213,7 @@
                         "symbol": "model_version"
                       },
                       "val": {
-                        "u32": 2
+                        "u32": 1
                       }
                     },
                     {
@@ -1323,7 +1221,7 @@
                         "symbol": "score"
                       },
                       "val": {
-                        "u32": 45
+                        "u32": 30
                       }
                     },
                     {
@@ -1331,7 +1229,7 @@
                         "symbol": "timestamp"
                       },
                       "val": {
-                        "u64": 1000
+                        "u64": 1
                       }
                     },
                     {
@@ -1359,7 +1257,7 @@
                         "symbol": "benford_flag"
                       },
                       "val": {
-                        "bool": true
+                        "bool": false
                       }
                     },
                     {
@@ -1367,7 +1265,7 @@
                         "symbol": "confidence"
                       },
                       "val": {
-                        "u32": 90
+                        "u32": 80
                       }
                     },
                     {
@@ -1375,7 +1273,7 @@
                         "symbol": "ml_flag"
                       },
                       "val": {
-                        "bool": true
+                        "bool": false
                       }
                     },
                     {
@@ -1383,7 +1281,7 @@
                         "symbol": "model_version"
                       },
                       "val": {
-                        "u32": 2
+                        "u32": 1
                       }
                     },
                     {
@@ -1391,7 +1289,7 @@
                         "symbol": "score"
                       },
                       "val": {
-                        "u32": 85
+                        "u32": 70
                       }
                     },
                     {
@@ -1399,7 +1297,7 @@
                         "symbol": "timestamp"
                       },
                       "val": {
-                        "u64": 2000
+                        "u64": 2
                       }
                     },
                     {
@@ -1440,7 +1338,7 @@
             "data": {
               "vec": [
                 {
-                  "u32": 45
+                  "u32": 30
                 },
                 {
                   "bool": false
@@ -1449,43 +1347,10 @@
                   "bool": false
                 },
                 {
-                  "u32": 80
+                  "u32": 60
                 },
                 {
-                  "u64": 1000
-                }
-              ]
-            }
-          }
-        }
-      },
-      "failed_call": false
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
-        "type_": "contract",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "breach"
-              },
-              {
-                "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
-              }
-            ],
-            "data": {
-              "vec": [
-                {
-                  "symbol": "XLM_USDC"
-                },
-                {
-                  "u32": 85
-                },
-                {
-                  "u32": 75
+                  "u64": 1
                 }
               ]
             }
@@ -1515,19 +1380,19 @@
             "data": {
               "vec": [
                 {
-                  "u32": 85
+                  "u32": 70
                 },
                 {
-                  "bool": true
+                  "bool": false
                 },
                 {
-                  "bool": true
+                  "bool": false
                 },
                 {
-                  "u32": 90
+                  "u32": 80
                 },
                 {
-                  "u64": 2000
+                  "u64": 2
                 }
               ]
             }
@@ -1574,7 +1439,7 @@
                 "bytes": "0000000000000000000000000000000000000000000000000000000000000001"
               },
               {
-                "symbol": "get_score"
+                "symbol": "get_score_count"
               }
             ],
             "data": {
@@ -1604,60 +1469,11 @@
                 "symbol": "fn_return"
               },
               {
-                "symbol": "get_score"
+                "symbol": "get_score_count"
               }
             ],
             "data": {
-              "map": [
-                {
-                  "key": {
-                    "symbol": "benford_flag"
-                  },
-                  "val": {
-                    "bool": false
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "confidence"
-                  },
-                  "val": {
-                    "u32": 80
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "ml_flag"
-                  },
-                  "val": {
-                    "bool": false
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "model_version"
-                  },
-                  "val": {
-                    "u32": 2
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "score"
-                  },
-                  "val": {
-                    "u32": 45
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "timestamp"
-                  },
-                  "val": {
-                    "u64": 1000
-                  }
-                }
-              ]
+              "u32": 1
             }
           }
         }
@@ -1679,7 +1495,7 @@
                 "bytes": "0000000000000000000000000000000000000000000000000000000000000001"
               },
               {
-                "symbol": "get_score"
+                "symbol": "get_score_count"
               }
             ],
             "data": {
@@ -1709,60 +1525,11 @@
                 "symbol": "fn_return"
               },
               {
-                "symbol": "get_score"
+                "symbol": "get_score_count"
               }
             ],
             "data": {
-              "map": [
-                {
-                  "key": {
-                    "symbol": "benford_flag"
-                  },
-                  "val": {
-                    "bool": true
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "confidence"
-                  },
-                  "val": {
-                    "u32": 90
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "ml_flag"
-                  },
-                  "val": {
-                    "bool": true
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "model_version"
-                  },
-                  "val": {
-                    "u32": 2
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "score"
-                  },
-                  "val": {
-                    "u32": 85
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "timestamp"
-                  },
-                  "val": {
-                    "u64": 2000
-                  }
-                }
-              ]
+              "u32": 1
             }
           }
         }

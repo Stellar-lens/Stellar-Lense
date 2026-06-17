@@ -193,6 +193,7 @@ impl LedgerLensScoreContract {
         storage::set_score(&env, &wallet, &asset_pair, &risk_score);
         storage::push_score_history(&env, &wallet, &asset_pair, &risk_score);
         storage::register_pair_for_wallet(&env, &wallet, &asset_pair);
+        storage::increment_score_count(&env, &wallet, &asset_pair);
         Self::refresh_aggregate_cache(&env, &wallet);
 
         let score_threshold = storage::get_risk_threshold(&env);
@@ -285,6 +286,7 @@ impl LedgerLensScoreContract {
             storage::set_score(&env, &sub.wallet, &sub.asset_pair, &risk_score);
             storage::push_score_history(&env, &sub.wallet, &sub.asset_pair, &risk_score);
             storage::register_pair_for_wallet(&env, &sub.wallet, &sub.asset_pair);
+            storage::increment_score_count(&env, &sub.wallet, &sub.asset_pair);
             Self::refresh_aggregate_cache(&env, &sub.wallet);
 
             if sub.score >= threshold {
@@ -364,6 +366,42 @@ impl LedgerLensScoreContract {
     /// ```
     pub fn get_score_history(env: Env, wallet: Address, asset_pair: Symbol) -> Vec<RiskScore> {
         storage::get_score_history(&env, &wallet, &asset_pair)
+    }
+
+    /// Returns the total number of score submissions ever recorded for
+    /// `wallet` / `asset_pair`.
+    ///
+    /// Unlike `get_score_history` (which caps at [`HISTORY_MAX_DEPTH`]),
+    /// this counter is **never truncated** — it reflects every successful
+    /// submission since the first. This gives off-chain indexers and
+    /// integrators a cheap, O(1) signal to distinguish a newly monitored
+    /// wallet (count = 1) from one with a long scoring history (count > 10
+    /// after ring-buffer overflow).
+    ///
+    /// Returns 0 when no scores have ever been submitted for this pair.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use soroban_sdk::symbol_short;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// let wallet = Address::generate(&env);
+    /// let asset_pair = symbol_short!("XLM_USDC");
+    /// assert_eq!(client.get_score_count(&wallet, &asset_pair), 0);
+    /// client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &50, &false, &false, &1, &90, &1);
+    /// assert_eq!(client.get_score_count(&wallet, &asset_pair), 1);
+    /// ```
+    pub fn get_score_count(env: Env, wallet: Address, asset_pair: Symbol) -> u32 {
+        storage::get_score_count(&env, &wallet, &asset_pair)
     }
 
     // ── Cross-asset aggregate risk ───────────────────────────────────────────
@@ -505,6 +543,7 @@ impl LedgerLensScoreContract {
     /// | `batch`     | `submit_scores_batch`                              |
     /// | `gate`      | `query_risk_gate`                                  |
     /// | `aggr`      | `get_aggregate_score` (cross-asset aggregate risk) |
+    /// | `count`     | `get_score_count`                                  |
     ///
     /// Any unrecognised `capability` returns `false`.
     pub fn supports_interface(_env: Env, capability: Symbol) -> bool {
@@ -513,6 +552,7 @@ impl LedgerLensScoreContract {
             || capability == symbol_short!("batch")
             || capability == symbol_short!("gate")
             || capability == symbol_short!("aggr")
+            || capability == symbol_short!("count")
     }
 
     // ── Service management ───────────────────────────────────────────────────
