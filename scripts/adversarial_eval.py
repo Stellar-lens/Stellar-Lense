@@ -23,10 +23,10 @@ import numpy as np
 import pandas as pd
 
 from config import config
-from detection.benford_engine import MAD_NONCONFORMITY_THRESHOLD, mad_score
-from detection.model_inference import ML_FLAG_THRESHOLD, BENFORD_MAD_FLAG_THRESHOLD, RiskScorer
+from detection.benford_engine import mad_score
+from detection.model_inference import RiskScorer
 from detection.model_training import FEATURE_COLUMNS_EXCLUDE
-from scripts.generate_synthetic_dataset import generate_synthetic_dataset, feature_columns
+from scripts.generate_synthetic_dataset import generate_synthetic_dataset
 
 RANDOM_SEED = 42
 
@@ -165,7 +165,7 @@ def diversified_counterparty_simulation(
     """
     rng = np.random.default_rng(RANDOM_SEED)
     rows = []
-    total_trades = n_counterparties * trades_per_counterparty
+
     base_time = pd.Timestamp("2024-01-01", tz="UTC")
 
     for cp_idx in range(n_counterparties):
@@ -251,8 +251,6 @@ def run_benchmark(model_dir: str | None = None) -> dict:
     if not scorer.models:
         raise RuntimeError(
             f"No trained models found in {model_dir or config.MODEL_DIR}. Run model_training first.")
-
-    rng = np.random.default_rng(RANDOM_SEED)
 
     # Generate synthetic test set and get wash-trading rows (label=1)
     df = generate_synthetic_dataset(n_wallets=200, seed=RANDOM_SEED)
