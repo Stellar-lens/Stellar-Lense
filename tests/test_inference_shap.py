@@ -136,4 +136,3 @@ def test_shap_explainer_explain_ensemble(trained_models):
     assert len(explanation) == 3
     for entry in explanation:
         assert set(entry) == {"feature", "contribution", "value"}
-

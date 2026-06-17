@@ -22,8 +22,10 @@ def mock_scorer():
 
 @pytest.fixture
 def mock_ingestion():
-    with patch("scripts.score_wallet.load_trades") as m_trades, \
-         patch("scripts.score_wallet.load_orderbook_events") as m_events:
+    with (
+        patch("scripts.score_wallet.load_trades") as m_trades,
+        patch("scripts.score_wallet.load_orderbook_events") as m_events,
+    ):
         m_trades.return_value = iter([])
         m_events.return_value = iter([])
         yield m_trades, m_events
@@ -43,9 +45,7 @@ def mock_explainer():
         yield explainer_instance
 
 
-def test_score_wallet_outputs_score_and_shap(
-    capsys, mock_scorer, mock_ingestion, mock_explainer
-):
+def test_score_wallet_outputs_score_and_shap(capsys, mock_scorer, mock_ingestion, mock_explainer):
     test_wallet = "GABC1234567890123456789012345678901234567890123456789012"
     with patch("sys.argv", ["score_wallet.py", "--wallet", test_wallet, "--pair", "USDC:G..."]):
         main()
@@ -103,7 +103,9 @@ def test_score_wallet_invalid_wallet_id_exits_1(capsys):
 
 
 def test_score_wallet_missing_models_exits_1(capsys, mock_ingestion):
-    with patch("scripts.score_wallet.RiskScorer", side_effect=RuntimeError("No trained models found")):
+    with patch(
+        "scripts.score_wallet.RiskScorer", side_effect=RuntimeError("No trained models found")
+    ):
         test_wallet = "GABC1234567890123456789012345678901234567890123456789012"
         with patch("sys.argv", ["score_wallet.py", "--wallet", test_wallet, "--pair", "USDC:G..."]):
             with pytest.raises(SystemExit) as excinfo:
