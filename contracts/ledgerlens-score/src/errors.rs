@@ -23,4 +23,18 @@ pub enum Error {
     /// Returned when the weighted aggregate computation in
     /// `get_aggregate_score` would overflow.
     ArithmeticOverflow = 11,
+
+    // ── Time-locked upgrade governance ────────────────────────────────────
+    /// Returned when `execute_upgrade`, `veto_upgrade`, or
+    /// `get_pending_upgrade` is called but no proposal exists.
+    NoPendingUpgrade = 20,
+    /// Returned when `execute_upgrade` is called before the time lock
+    /// (`executable_after`) has elapsed.
+    UpgradeNotReady = 21,
+    /// Returned when `propose_upgrade` is called while a proposal is already
+    /// pending. Veto or execute the existing one first.
+    UpgradeAlreadyPending = 22,
+    /// Returned when `set_upgrade_delay` is given a value below
+    /// `MIN_UPGRADE_DELAY_SECS` or above `MAX_UPGRADE_DELAY_SECS`.
+    InvalidUpgradeDelay = 23,
 }

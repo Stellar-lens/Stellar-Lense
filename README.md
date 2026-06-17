@@ -79,6 +79,21 @@ Sets the weight used for `asset_pair` in the aggregate risk computation. Default
 ### `get_pair_weight(asset_pair: Symbol) -> u32`
 Read-only lookup of the configured weight for `asset_pair`.
 
+### `propose_upgrade(new_wasm_hash: BytesN<32>)`
+Admin only. Starts a time-locked contract upgrade by committing to `new_wasm_hash`. Stores an `UpgradeProposal` with `executable_after = now + get_upgrade_delay()` and emits `upgrade_proposed`. Does not change the code. Rejected with `UpgradeAlreadyPending` if a proposal is already in flight. See [Upgrade Governance](#upgrade-governance).
+
+### `execute_upgrade()`
+Admin only. After the time-lock elapses, re-verifies `now >= executable_after` and installs the new WASM via `env.deployer().update_current_contract_wasm(...)`, clears the proposal, and emits `upgrade_executed`. Returns `UpgradeNotReady` before the delay or `NoPendingUpgrade` if none exists.
+
+### `veto_upgrade()`
+Admin only. Cancels the pending proposal during the time-lock window (emergency escape hatch for a malicious proposal or compromised key) and emits `upgrade_vetoed`.
+
+### `get_pending_upgrade() -> UpgradeProposal`
+Permissionless. Returns the in-flight proposal so anyone can audit it during the window. Returns `NoPendingUpgrade` if none.
+
+### `set_upgrade_delay(delay_secs: u64)` / `get_upgrade_delay() -> u64`
+Admin sets the time-lock delay applied to future proposals, bounded to `[MIN_UPGRADE_DELAY_SECS, MAX_UPGRADE_DELAY_SECS]` (48 hours – 14 days); out-of-range values are rejected with `InvalidUpgradeDelay`. Defaults to 48 hours.
+
 ### `RiskScore` Structure
 
 ```rust
@@ -140,12 +155,48 @@ A wallet scoring 60-70 on three pairs individually might not breach the per-pair
 
 `get_aggregate_score` iterates the wallet's full pair list, so its cost is O(N) in the number of distinct pairs the wallet has scores for. The contract is designed around a practical maximum of `MAX_WALLET_PAIRS` (20) pairs per wallet; this is documented as a constant but not enforced on-chain.
 
+## Upgrade Governance
+
+Soroban contracts can be upgraded by the admin via `update_current_contract_wasm`, which replaces the **entire** contract logic in a single transaction. Without governance, one admin key — or a compromised one — could silently install a backdoor or disable a security check with no warning. LedgerLens gates every upgrade behind an on-chain **time-lock** so the community always gets a mandatory window to inspect and react.
+
+**The flow:**
+
+1. The admin **proposes** an upgrade, committing to a new WASM hash.
+2. A mandatory delay passes (**minimum 48 hours**, configurable up to 14 days). During this window anyone can call `get_pending_upgrade` to inspect the committed hash and alert the community.
+3. Only after the delay can the admin **execute** the upgrade. Alternatively, the admin can **veto** it at any time during the window (e.g. if the key was compromised).
+
+```
+   admin                         contract                        community
+     │                              │                                │
+     │ propose_upgrade(hash)        │                                │
+     ├─────────────────────────────►│  store UpgradeProposal         │
+     │                              │  emit upgrade_proposed ────────►│  inspect via
+     │                              │  executable_after = now + delay │  get_pending_upgrade
+     │                              │                                │  (≥ 48 h to react)
+     │            ⏳  time-lock window (no execution possible)  ⏳    │
+     │                              │                                │
+     │   ┌── after executable_after ──┐                              │
+     │   │ execute_upgrade()          │                              │
+     ├───┘                            │  require now ≥ executable_after
+     │                              │  update_current_contract_wasm  │
+     │                              │  emit upgrade_executed ────────►│
+     │                              │  clear PendingUpgrade          │
+     │                              │                                │
+     │   ── OR, any time in window ──                                │
+     │ veto_upgrade()               │                                │
+     ├─────────────────────────────►│  clear PendingUpgrade          │
+     │                              │  emit upgrade_vetoed ──────────►│
+```
+
+The time-lock is computed from `env.ledger().timestamp()` (deterministic, not caller-settable) and re-verified at execution time — never cached. The configurable delay is bounded to `[MIN_UPGRADE_DELAY_SECS, MAX_UPGRADE_DELAY_SECS]`; **raising** it is always safe, while **lowering** it shortens the veto window and should require community consensus. See [`SECURITY.md`](SECURITY.md#upgrade-governance--threat-model) for the full threat model and monitoring guidance.
+
 ## Security Features
 
 1. **Authorization Checks**: Only the authorised LedgerLens service account can submit scores
 2. **Read-Only Composability**: `get_score` is permissionless and side-effect free, safe for any contract to call
 3. **Bounded Values**: Scores and confidence are constrained to the 0-100 range
 4. **Overflow Protection**: Safe math operations with overflow checks
+5. **Time-Locked Upgrades**: Contract WASM upgrades require a mandatory delay (≥48 h) with a public proposal anyone can inspect and an admin veto — see [Upgrade Governance](#upgrade-governance)
 
 ## Testing
 
@@ -225,7 +276,8 @@ soroban contract invoke \
 │           ├── storage.rs              ← Persistent/instance storage helpers
 │           ├── errors.rs               ← Contract error codes
 │           ├── events.rs               ← Event emission helpers
-│           └── test.rs                 ← Unit tests
+│           ├── test.rs                 ← Unit tests
+│           └── test_upgrade.rs         ← Upgrade-governance tests
 ├── LICENSE
 ├── CONTRIBUTING.md
 └── README.md                            ← This file
