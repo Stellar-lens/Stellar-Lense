@@ -70,6 +70,9 @@ Rotates the authorised off-chain scoring service address. Admin only.
 ### `get_admin() -> Address` / `get_service() -> Address`
 Read-only lookups of the current admin and authorised scoring service addresses.
 
+### `get_pending_admin() -> Address` / `has_pending_admin_transfer() -> Address`
+Read-only function to check the state of a pending admin.
+
 ### `get_aggregate_score(wallet: Address) -> AggregateRiskScore`
 Read-only function. Returns `wallet`'s cross-asset aggregate risk score — a weighted average computed live from every asset pair the wallet has a `RiskScore` for. Always recomputed from current per-pair scores, never served from a stale cache. Returns `ScoreNotFound` if the wallet has no scores.
 
@@ -78,6 +81,12 @@ Sets the weight used for `asset_pair` in the aggregate risk computation. Default
 
 ### `get_pair_weight(asset_pair: Symbol) -> u32`
 Read-only lookup of the configured weight for `asset_pair`.
+
+### `query_risk_gate(wallet: Address, asset_pair: Symbol, gate_threshold: u32) -> bool`
+The cross-contract integration primitive. Returns `true` when the wallet's score is **strictly below** `gate_threshold` (safe to proceed), and `false` when the score is `>= gate_threshold` **or no score exists**. It is **infallible** (returns `bool`, never an error), **never panics**, and is **side-effect free** — designed to be called directly from inside another protocol's guard clause. See [Composability](#composability) and [`docs/interface-spec.md`](docs/interface-spec.md).
+
+### `supports_interface(capability: Symbol) -> bool`
+Runtime capability detection for the composability interface. Returns `true` for the registered capabilities `score`, `history`, `batch`, `gate`, and `aggr`, letting integrators feature-detect instead of hardcoding contract version numbers.
 
 ### `RiskScore` Structure
 
@@ -88,6 +97,7 @@ pub struct RiskScore {
     pub ml_flag: bool,       // True if ML classifier flagged
     pub timestamp: u64,      // Ledger timestamp of last update
     pub confidence: u32,     // Model confidence 0-100
+    pub model_version: u32,  // Detection-pipeline model version
 }
 ```
 
@@ -139,6 +149,48 @@ aggregate_score = (60*1 + 65*2 + 70*1) / (1 + 2 + 1)
 A wallet scoring 60-70 on three pairs individually might not breach the per-pair `RiskThreshold` (default 75), but the aggregate view makes the *combined* exposure visible to any contract or dashboard that queries `get_aggregate_score` — without needing to fetch and average every pair manually.
 
 `get_aggregate_score` iterates the wallet's full pair list, so its cost is O(N) in the number of distinct pairs the wallet has scores for. The contract is designed around a practical maximum of `MAX_WALLET_PAIRS` (20) pairs per wallet; this is documented as a constant but not enforced on-chain.
+
+## Composability
+
+LedgerLens is only useful if other protocols can actually *act* on its scores. A risk score that lives in isolation is a dashboard widget; a risk score that an AMM, a lending market, or a DEX aggregator can read mid-transaction is a shared fraud-prevention layer for the entire Stellar DeFi ecosystem.
+
+The problem with composing on a raw getter is fragility. If every integrator reverse-engineers `get_score` and decodes the `RiskScore` struct by hand, then the day we add a field or change an error code, every downstream protocol breaks silently. So LedgerLens exposes a **stable, versioned composability interface** — `ILedgerLensScore` — as the canonical integration point. It is fully specified in [`docs/interface-spec.md`](docs/interface-spec.md); the headline function is `query_risk_gate`.
+
+### Why a dedicated gate function?
+
+A guard clause inside someone else's contract has hard requirements that a normal getter doesn't meet:
+
+- **It must never panic.** A panic in a cross-contract call traps the *caller's* transaction. If LedgerLens could panic, an attacker could craft inputs that disable the AMM's risk guard — or simply burn its gas. So `query_risk_gate` returns a plain `bool` and is engineered to be infallible.
+- **It must fail closed.** Because the answer is a single `bool`, the "we have no score for this wallet" case has to collapse to one value — and that value is `false`. Unknown wallets are treated as *potentially risky*, not waved through.
+- **It must be cheap and side-effect free.** It is a pure read that doesn't even extend storage TTL, so calling it from a hot path is safe.
+
+### The AMM pattern
+
+Here is the entire integration — drop `query_risk_gate` into your swap guard and refuse risky wallets:
+
+```rust
+fn swap(env: Env, user: Address, amount: i128) -> Result<(), AmmError> {
+    // The LedgerLens contract ID you trust, stored at init time.
+    let llens_contract: Address = env
+        .storage()
+        .instance()
+        .get(&DataKey::LedgerLens)
+        .ok_or(AmmError::NotConfigured)?;
+
+    let client = LedgerLensScoreContractClient::new(&env, &llens_contract);
+
+    // Note: no `try_`, no `?`, no error handling — the gate cannot fail.
+    let is_safe = client.query_risk_gate(&user, &symbol_short!("XLM_USDC"), &75u32);
+    if !is_safe {
+        return Err(AmmError::HighRiskWallet);
+    }
+
+    // ... rest of swap logic ...
+    Ok(())
+}
+```
+
+A complete, compiling reference contract lives in [`examples/amm_gate.rs`](examples/amm_gate.rs) (build it with `cargo build --example amm_gate -p ledgerlens-score`). For versioning, error-code stability, threshold selection, and caching guidance, read the full [interface specification](docs/interface-spec.md).
 
 ## Security Features
 
@@ -216,6 +268,10 @@ soroban contract invoke \
 ├── rustfmt.toml
 ├── clippy.toml
 ├── deploy.sh                           ← Build, optimize, deploy, initialize
+├── docs/
+│   └── interface-spec.md               ← ILedgerLensScore composability spec
+├── examples/
+│   └── amm_gate.rs                     ← Reference AMM integration (query_risk_gate)
 ├── contracts/
 │   └── ledgerlens-score/
 │       ├── Cargo.toml
@@ -225,7 +281,8 @@ soroban contract invoke \
 │           ├── storage.rs              ← Persistent/instance storage helpers
 │           ├── errors.rs               ← Contract error codes
 │           ├── events.rs               ← Event emission helpers
-│           └── test.rs                 ← Unit tests
+│           ├── test.rs                 ← Implementation unit tests
+│           └── test_interface.rs       ← Interface stability tests
 ├── LICENSE
 ├── CONTRIBUTING.md
 └── README.md                            ← This file
@@ -283,6 +340,7 @@ pub struct RiskScore {
     pub ml_flag: bool,       // ML ensemble classifier flagged
     pub timestamp: u64,      // ledger timestamp of computation
     pub confidence: u32,     // model confidence, 0-100
+    pub model_version: u32,  // detection-pipeline model version
 }
 ```
 
