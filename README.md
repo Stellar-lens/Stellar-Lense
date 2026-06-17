@@ -70,6 +70,15 @@ Rotates the authorised off-chain scoring service address. Admin only.
 ### `get_admin() -> Address` / `get_service() -> Address`
 Read-only lookups of the current admin and authorised scoring service addresses.
 
+### `get_aggregate_score(wallet: Address) -> AggregateRiskScore`
+Read-only function. Returns `wallet`'s cross-asset aggregate risk score — a weighted average computed live from every asset pair the wallet has a `RiskScore` for. Always recomputed from current per-pair scores, never served from a stale cache. Returns `ScoreNotFound` if the wallet has no scores.
+
+### `set_pair_weight(asset_pair: Symbol, weight: u32)`
+Sets the weight used for `asset_pair` in the aggregate risk computation. Defaults to `1` (simple average) for any pair the admin hasn't configured. A weight of `0` excludes the pair from the aggregate's denominator. Admin only.
+
+### `get_pair_weight(asset_pair: Symbol) -> u32`
+Read-only lookup of the configured weight for `asset_pair`.
+
 ### `RiskScore` Structure
 
 ```rust
@@ -81,6 +90,55 @@ pub struct RiskScore {
     pub confidence: u32,     // Model confidence 0-100
 }
 ```
+
+### `AggregateRiskScore` Structure
+
+A wallet that is moderately suspicious across several asset pairs poses a higher *portfolio-level* risk than its individual per-pair scores suggest in isolation. `AggregateRiskScore` expresses that risk on-chain:
+
+```rust
+pub struct AggregateRiskScore {
+    pub aggregate_score: u32,     // 0-100, weighted average across all pairs
+    pub pair_count: u32,          // number of distinct pairs the wallet has a score for
+    pub max_pair_score: u32,      // highest individual pair score
+    pub max_pair: Symbol,         // the pair with the highest score
+    pub benford_flag_count: u32,  // number of pairs with benford_flag = true
+    pub ml_flag_count: u32,       // number of pairs with ml_flag = true
+    pub last_updated: u64,        // timestamp of the most recently updated pair score
+}
+```
+
+The weighted average is:
+
+```
+aggregate_score = Σ (pair_weight[i] * pair_score[i]) / Σ pair_weight[i]
+```
+
+`pair_weight[i]` defaults to `1` for every pair (a plain average) unless the admin sets a different weight via `set_pair_weight`. A pair with weight `0` is excluded from the denominator — its score still counts toward `pair_count`, `max_pair_score`, the flag counts, and `last_updated`, but not toward `aggregate_score`.
+
+#### Worked example
+
+A wallet has three scored pairs:
+
+| Pair | Score | Weight |
+|---|---|---|
+| XLM_USDC | 60 | 1 |
+| XLM_BTC | 65 | 1 |
+| XLM_ETH | 70 | 1 |
+
+With default (equal) weights: `aggregate_score = (60 + 65 + 70) / 3 = 65`.
+
+Now suppose the admin sets `XLM_BTC`'s weight to `2` (e.g. because BTC pairs carry more systemic risk):
+
+```
+aggregate_score = (60*1 + 65*2 + 70*1) / (1 + 2 + 1)
+                = (60 + 130 + 70) / 4
+                = 260 / 4
+                = 65
+```
+
+A wallet scoring 60-70 on three pairs individually might not breach the per-pair `RiskThreshold` (default 75), but the aggregate view makes the *combined* exposure visible to any contract or dashboard that queries `get_aggregate_score` — without needing to fetch and average every pair manually.
+
+`get_aggregate_score` iterates the wallet's full pair list, so its cost is O(N) in the number of distinct pairs the wallet has scores for. The contract is designed around a practical maximum of `MAX_WALLET_PAIRS` (20) pairs per wallet; this is documented as a constant but not enforced on-chain.
 
 ## Security Features
 
@@ -249,6 +307,7 @@ pub struct RiskScore {
 
 - `score` — `(wallet, asset_pair) -> (score, benford_flag, ml_flag, confidence, timestamp)`, emitted on every `submit_score`
 - `svc_upd` — emitted when the admin rotates the authorised service address
+- `pw_upd` — `(asset_pair) -> weight`, emitted when the admin sets a pair's aggregate-risk weight via `set_pair_weight`
 
 `api` (or a dedicated indexer in `data`) should subscribe to these for audit trails and to keep an off-chain cache in sync with on-chain state.
 

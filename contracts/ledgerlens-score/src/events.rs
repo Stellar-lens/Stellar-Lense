@@ -2,6 +2,13 @@ use soroban_sdk::{symbol_short, Address, Env, Symbol};
 
 use crate::types::RiskScore;
 
+// ── Aggregate risk ────────────────────────────────────────────────────────────
+
+/// Emitted when the admin sets a per-asset-pair weight via `set_pair_weight`.
+pub fn pair_weight_updated(env: &Env, asset_pair: &Symbol, weight: u32) {
+    env.events().publish((symbol_short!("pw_upd"), asset_pair.clone()), weight);
+}
+
 // ── Score events ─────────────────────────────────────────────────────────────
 
 pub fn score_submitted(env: &Env, wallet: &Address, asset_pair: &Symbol, score: &RiskScore) {

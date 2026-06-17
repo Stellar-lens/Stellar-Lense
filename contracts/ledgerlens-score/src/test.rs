@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use soroban_sdk::{symbol_short, testutils::Address as _, Address, Env, Vec};
+use soroban_sdk::{symbol_short, testutils::Address as _, Address, Env, Symbol, Vec};
 
 use crate::{Error, LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreSubmission};
 
@@ -569,4 +569,190 @@ fn test_pause_before_init_fails() {
     let (_env, client, _, _) = setup();
     let result = client.try_pause();
     assert_eq!(result, Err(Ok(Error::NotInitialized)));
+}
+
+// ── Cross-asset aggregate risk ────────────────────────────────────────────────
+
+#[test]
+fn test_aggregate_single_pair() {
+    let (env, client, _admin, _service) = initialized();
+
+    let wallet = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+    client.submit_score(&wallet, &pair, &60, &false, &false, &1, &90, &1);
+
+    let aggregate = client.get_aggregate_score(&wallet);
+    assert_eq!(aggregate.aggregate_score, 60);
+    assert_eq!(aggregate.pair_count, 1);
+}
+
+#[test]
+fn test_aggregate_equal_weights() {
+    let (env, client, _admin, _service) = initialized();
+
+    let wallet = Address::generate(&env);
+    let pair1 = symbol_short!("XLM_USDC");
+    let pair2 = symbol_short!("XLM_BTC");
+    let pair3 = symbol_short!("XLM_ETH");
+
+    client.submit_score(&wallet, &pair1, &30, &false, &false, &1, &90, &1);
+    client.submit_score(&wallet, &pair2, &60, &false, &false, &2, &90, &1);
+    client.submit_score(&wallet, &pair3, &90, &false, &false, &3, &90, &1);
+
+    // (30 + 60 + 90) / 3 = 60
+    assert_eq!(client.get_aggregate_score(&wallet).aggregate_score, 60);
+}
+
+#[test]
+fn test_aggregate_weighted() {
+    let (env, client, _admin, _service) = initialized();
+
+    let wallet = Address::generate(&env);
+    let pair_a = symbol_short!("XLM_USDC");
+    let pair_b = symbol_short!("XLM_BTC");
+    let pair_c = symbol_short!("XLM_ETH");
+
+    client.set_pair_weight(&pair_a, &1);
+    client.set_pair_weight(&pair_b, &2);
+    client.set_pair_weight(&pair_c, &1);
+
+    client.submit_score(&wallet, &pair_a, &20, &false, &false, &1, &90, &1);
+    client.submit_score(&wallet, &pair_b, &80, &false, &false, &2, &90, &1);
+    client.submit_score(&wallet, &pair_c, &40, &false, &false, &3, &90, &1);
+
+    // (20*1 + 80*2 + 40*1) / (1 + 2 + 1) = 220 / 4 = 55
+    assert_eq!(client.get_aggregate_score(&wallet).aggregate_score, 55);
+}
+
+#[test]
+fn test_aggregate_max_pair_tracked() {
+    let (env, client, _admin, _service) = initialized();
+
+    let wallet = Address::generate(&env);
+    let pair1 = symbol_short!("XLM_USDC");
+    let pair2 = symbol_short!("XLM_BTC");
+
+    client.submit_score(&wallet, &pair1, &30, &false, &false, &1, &90, &1);
+    client.submit_score(&wallet, &pair2, &90, &false, &false, &2, &90, &1);
+
+    let aggregate = client.get_aggregate_score(&wallet);
+    assert_eq!(aggregate.max_pair_score, 90);
+    assert_eq!(aggregate.max_pair, pair2);
+}
+
+#[test]
+fn test_aggregate_flag_counts() {
+    let (env, client, _admin, _service) = initialized();
+
+    let wallet = Address::generate(&env);
+    let pair1 = symbol_short!("XLM_USDC");
+    let pair2 = symbol_short!("XLM_BTC");
+    let pair3 = symbol_short!("XLM_ETH");
+
+    client.submit_score(&wallet, &pair1, &30, &true, &false, &1, &90, &1);
+    client.submit_score(&wallet, &pair2, &60, &true, &true, &2, &90, &1);
+    client.submit_score(&wallet, &pair3, &90, &false, &false, &3, &90, &1);
+
+    let aggregate = client.get_aggregate_score(&wallet);
+    assert_eq!(aggregate.benford_flag_count, 2);
+    assert_eq!(aggregate.ml_flag_count, 1);
+}
+
+#[test]
+fn test_aggregate_updates_on_rescore() {
+    let (env, client, _admin, _service) = initialized();
+
+    let wallet = Address::generate(&env);
+    let pair_a = symbol_short!("XLM_USDC");
+    let pair_b = symbol_short!("XLM_BTC");
+
+    client.submit_score(&wallet, &pair_a, &20, &false, &false, &1, &90, &1);
+    client.submit_score(&wallet, &pair_b, &40, &false, &false, &2, &90, &1);
+    assert_eq!(client.get_aggregate_score(&wallet).aggregate_score, 30);
+
+    // Re-submitting pair A with a higher score must shift the aggregate.
+    client.submit_score(&wallet, &pair_a, &80, &false, &false, &3, &90, &1);
+    assert_eq!(client.get_aggregate_score(&wallet).aggregate_score, 60);
+}
+
+#[test]
+fn test_aggregate_wallet_not_found() {
+    let (env, client, _admin, _service) = initialized();
+
+    let wallet = Address::generate(&env);
+    let result = client.try_get_aggregate_score(&wallet);
+    assert_eq!(result, Err(Ok(Error::ScoreNotFound)));
+}
+
+#[test]
+fn test_aggregate_pair_deduplication() {
+    let (env, client, _admin, _service) = initialized();
+
+    let wallet = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+
+    for i in 0..5u64 {
+        client.submit_score(&wallet, &pair, &(50 + i as u32), &false, &false, &i, &90, &1);
+    }
+
+    let aggregate = client.get_aggregate_score(&wallet);
+    assert_eq!(aggregate.pair_count, 1);
+    assert_eq!(aggregate.aggregate_score, 54);
+}
+
+#[test]
+fn test_aggregate_weight_zero_excluded() {
+    let (env, client, _admin, _service) = initialized();
+
+    let wallet = Address::generate(&env);
+    let pair_a = symbol_short!("XLM_USDC");
+    let pair_b = symbol_short!("XLM_BTC");
+
+    client.set_pair_weight(&pair_b, &0);
+
+    client.submit_score(&wallet, &pair_a, &70, &false, &false, &1, &90, &1);
+    client.submit_score(&wallet, &pair_b, &10, &false, &false, &2, &90, &1);
+
+    // pair_b's weight is 0, so only pair_a contributes to the average.
+    let aggregate = client.get_aggregate_score(&wallet);
+    assert_eq!(aggregate.aggregate_score, 70);
+    assert_eq!(aggregate.pair_count, 2);
+}
+
+#[test]
+fn test_aggregate_overflow_protection() {
+    let (env, client, _admin, _service) = initialized();
+
+    let wallet = Address::generate(&env);
+
+    let pair_names = [
+        "P0", "P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "PA", "PB", "PC", "PD", "PE",
+        "PF", "PG", "PH", "PI", "PJ",
+    ];
+    assert_eq!(pair_names.len(), 20);
+
+    for (i, name) in pair_names.iter().enumerate() {
+        let pair = Symbol::new(&env, name);
+        client.set_pair_weight(&pair, &u32::MAX);
+        client.submit_score(&wallet, &pair, &50, &false, &false, &(i as u64), &90, &1);
+    }
+
+    let result = client.try_get_aggregate_score(&wallet);
+    assert_eq!(result, Err(Ok(Error::ArithmeticOverflow)));
+}
+
+#[test]
+fn test_set_pair_weight() {
+    let (_env, client, _admin, _service) = initialized();
+    let pair = symbol_short!("XLM_USDC");
+
+    client.set_pair_weight(&pair, &3);
+    assert_eq!(client.get_pair_weight(&pair), 3);
+}
+
+#[test]
+fn test_get_pair_weight_defaults_to_one() {
+    let (_env, client, _admin, _service) = initialized();
+    let pair = symbol_short!("XLM_USDC");
+    assert_eq!(client.get_pair_weight(&pair), 1);
 }

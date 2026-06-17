@@ -37,6 +37,29 @@ pub struct ScoreSubmission {
     pub model_version: u32,
 }
 
+/// Cross-asset aggregate risk view for a single wallet — a weighted
+/// average of every per-pair `RiskScore` the wallet currently has.
+/// Returned by `get_aggregate_score`; see that function's rustdoc for the
+/// exact formula and complexity bound.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AggregateRiskScore {
+    /// Weighted average of all contributing per-pair scores, 0-100.
+    pub aggregate_score: u32,
+    /// Number of distinct asset pairs the wallet has a score for.
+    pub pair_count: u32,
+    /// The highest individual per-pair score across all of the wallet's pairs.
+    pub max_pair_score: u32,
+    /// The asset pair that produced `max_pair_score`.
+    pub max_pair: Symbol,
+    /// Count of the wallet's pairs with `benford_flag == true`.
+    pub benford_flag_count: u32,
+    /// Count of the wallet's pairs with `ml_flag == true`.
+    pub ml_flag_count: u32,
+    /// Ledger timestamp of the most recently updated component score.
+    pub last_updated: u64,
+}
+
 #[contracttype]
 #[derive(Clone)]
 pub enum DataKey {
@@ -58,4 +81,15 @@ pub enum DataKey {
     ScoreHistory(Address, Symbol),
     /// Baked-in contract version number.
     ContractVersion,
+    /// Ordered, de-duplicated list of asset pairs a wallet has a score for.
+    AssetPairs(Address),
+    /// Per-asset-pair weight used by the aggregate risk computation.
+    /// Defaults to 1 (simple average) when unset.
+    PairWeight(Symbol),
+    /// Cached snapshot of the most recently computed aggregate risk score
+    /// for a wallet, refreshed as a side effect of `submit_score` /
+    /// `submit_scores_batch`. `get_aggregate_score` never reads this cache —
+    /// it always recomputes from the live per-pair scores — so this key
+    /// exists purely as a cheap snapshot for off-chain indexers.
+    AggregateScore(Address),
 }

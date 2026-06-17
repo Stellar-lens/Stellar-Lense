@@ -13,3 +13,10 @@ pub const DEFAULT_RISK_THRESHOLD: u32 = 75;
 
 /// Semantic contract version; bump on breaking ABI changes.
 pub const CONTRACT_VERSION: u32 = 1;
+
+/// Practical upper bound on the number of distinct asset pairs tracked per
+/// wallet. `get_aggregate_score` iterates the wallet's full `AssetPairs`
+/// list, so its cost is O(N) in this value; it is not enforced on-chain,
+/// but documents the assumption the aggregate engine is designed around.
+/// See the rustdoc on `get_aggregate_score` for detail.
+pub const MAX_WALLET_PAIRS: u32 = 20;

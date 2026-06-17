@@ -12,7 +12,7 @@ mod test;
 use soroban_sdk::{contract, contractimpl, Address, Env, Symbol, Vec};
 
 pub use errors::Error;
-pub use types::{RiskScore, ScoreSubmission};
+pub use types::{AggregateRiskScore, RiskScore, ScoreSubmission};
 
 /// On-chain truth layer for LedgerLens risk scores.
 ///
@@ -83,6 +83,8 @@ impl LedgerLensScoreContract {
 
         storage::set_score(&env, &wallet, &asset_pair, &risk_score);
         storage::push_score_history(&env, &wallet, &asset_pair, &risk_score);
+        storage::register_pair_for_wallet(&env, &wallet, &asset_pair);
+        Self::refresh_aggregate_cache(&env, &wallet);
 
         let threshold = storage::get_risk_threshold(&env);
         if score >= threshold {
@@ -136,6 +138,8 @@ impl LedgerLensScoreContract {
 
             storage::set_score(&env, &sub.wallet, &sub.asset_pair, &risk_score);
             storage::push_score_history(&env, &sub.wallet, &sub.asset_pair, &risk_score);
+            storage::register_pair_for_wallet(&env, &sub.wallet, &sub.asset_pair);
+            Self::refresh_aggregate_cache(&env, &sub.wallet);
 
             if sub.score >= threshold {
                 events::threshold_breached(
@@ -167,6 +171,60 @@ impl LedgerLensScoreContract {
     /// scores have been submitted yet.
     pub fn get_score_history(env: Env, wallet: Address, asset_pair: Symbol) -> Vec<RiskScore> {
         storage::get_score_history(&env, &wallet, &asset_pair)
+    }
+
+    // ── Cross-asset aggregate risk ───────────────────────────────────────────
+
+    /// Computes `wallet`'s cross-asset aggregate risk score: a weighted
+    /// average over every asset pair the wallet has a `RiskScore` for.
+    ///
+    /// ```text
+    /// aggregate_score = Σ (pair_weight[i] * pair_score[i]) / Σ pair_weight[i]
+    /// ```
+    ///
+    /// `pair_weight[i]` defaults to `1` (an unweighted average) unless the
+    /// admin has configured one via `set_pair_weight`. A pair with weight
+    /// `0` still contributes to `pair_count`, `max_pair_score`,
+    /// `benford_flag_count`, `ml_flag_count`, and `last_updated`, but is
+    /// excluded from the weighted-average numerator and denominator.
+    ///
+    /// This function always recomputes from the live per-pair scores
+    /// stored under `AssetPairs(wallet)` — it never reads the
+    /// `AggregateScore(wallet)` cache that `submit_score` /
+    /// `submit_scores_batch` refresh as a side effect, so the result is
+    /// always consistent with the latest submissions.
+    ///
+    /// Complexity is O(N) in the number of distinct pairs the wallet has
+    /// a score for. The contract does not enforce a hard cap on N, but the
+    /// aggregate engine is designed around [`constants::MAX_WALLET_PAIRS`]
+    /// (currently 20) as the expected practical maximum.
+    ///
+    /// Returns [`Error::ScoreNotFound`] if the wallet has no scores, or if
+    /// every registered pair currently has a weight of `0` (an undefined
+    /// average). Returns [`Error::ArithmeticOverflow`] if the weighted sum
+    /// would overflow — this can only happen with extreme admin-configured
+    /// weights, since per-pair scores are bounded to 0-100.
+    pub fn get_aggregate_score(env: Env, wallet: Address) -> Result<AggregateRiskScore, Error> {
+        Self::compute_aggregate_score(&env, &wallet)
+    }
+
+    /// Sets the weight used for `asset_pair` in the aggregate risk
+    /// computation. A weight of `0` excludes the pair from the weighted
+    /// average's denominator entirely. Admin only.
+    pub fn set_pair_weight(env: Env, asset_pair: Symbol, weight: u32) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        storage::get_admin(&env).require_auth();
+        storage::set_pair_weight(&env, &asset_pair, weight);
+        events::pair_weight_updated(&env, &asset_pair, weight);
+        Ok(())
+    }
+
+    /// Returns the configured weight for `asset_pair`. Defaults to `1`
+    /// (simple average) until the admin sets one explicitly.
+    pub fn get_pair_weight(env: Env, asset_pair: Symbol) -> u32 {
+        storage::get_pair_weight(&env, &asset_pair)
     }
 
     // ── Service management ───────────────────────────────────────────────────
@@ -319,5 +377,83 @@ impl LedgerLensScoreContract {
             return Err(Error::NotInitialized);
         }
         Ok(storage::get_service(&env))
+    }
+
+    // ── Internal helpers ──────────────────────────────────────────────────────
+
+    /// Shared implementation behind `get_aggregate_score`. Iterates the
+    /// wallet's registered pairs once, accumulating the weighted sum and
+    /// weight total with checked arithmetic so a pathological admin-set
+    /// weight can never panic the contract.
+    fn compute_aggregate_score(env: &Env, wallet: &Address) -> Result<AggregateRiskScore, Error> {
+        let pairs = storage::get_wallet_pairs(env, wallet);
+        if pairs.is_empty() {
+            return Err(Error::ScoreNotFound);
+        }
+        // Documents the O(N) bound this function is designed around; a
+        // no-op in release builds (`debug-assertions = false`).
+        debug_assert!(pairs.len() <= constants::MAX_WALLET_PAIRS);
+
+        let mut weighted_sum: u64 = 0;
+        let mut weight_sum: u64 = 0;
+        let mut max_pair_score: u32 = 0;
+        let mut max_pair: Symbol = pairs.get(0).unwrap();
+        let mut benford_flag_count: u32 = 0;
+        let mut ml_flag_count: u32 = 0;
+        let mut last_updated: u64 = 0;
+
+        for i in 0..pairs.len() {
+            let pair = pairs.get(i).unwrap();
+            let component = storage::get_score(env, wallet, &pair).ok_or(Error::ScoreNotFound)?;
+
+            if i == 0 || component.score > max_pair_score {
+                max_pair_score = component.score;
+                max_pair = pair.clone();
+            }
+            if component.benford_flag {
+                benford_flag_count += 1;
+            }
+            if component.ml_flag {
+                ml_flag_count += 1;
+            }
+            if component.timestamp > last_updated {
+                last_updated = component.timestamp;
+            }
+
+            let weight = storage::get_pair_weight(env, &pair);
+            let product = weight.checked_mul(component.score).ok_or(Error::ArithmeticOverflow)?;
+            weighted_sum =
+                weighted_sum.checked_add(product as u64).ok_or(Error::ArithmeticOverflow)?;
+            weight_sum = weight_sum.checked_add(weight as u64).ok_or(Error::ArithmeticOverflow)?;
+        }
+
+        // All contributing pairs have weight 0 — the average is undefined.
+        if weight_sum == 0 {
+            return Err(Error::ScoreNotFound);
+        }
+
+        // Bounded by construction: a weighted average of values in 0-100
+        // can never itself exceed 100, so the downcast to u32 is safe.
+        let aggregate_score = (weighted_sum / weight_sum) as u32;
+
+        Ok(AggregateRiskScore {
+            aggregate_score,
+            pair_count: pairs.len(),
+            max_pair_score,
+            max_pair,
+            benford_flag_count,
+            ml_flag_count,
+            last_updated,
+        })
+    }
+
+    /// Best-effort refresh of the `AggregateScore(wallet)` cache after a
+    /// score write. Failures are swallowed (e.g. a wallet whose only pair
+    /// currently has weight 0) — the cache is informational only and must
+    /// never cause `submit_score` / `submit_scores_batch` to fail.
+    fn refresh_aggregate_cache(env: &Env, wallet: &Address) {
+        if let Ok(aggregate) = Self::compute_aggregate_score(env, wallet) {
+            storage::set_aggregate_score(env, wallet, &aggregate);
+        }
     }
 }
