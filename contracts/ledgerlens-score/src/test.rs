@@ -53,7 +53,17 @@ fn test_submit_and_get_score() {
     let wallet = Address::generate(&env);
     let asset_pair = symbol_short!("XLM_USDC");
 
-    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &87, &true, &true, &1_700_000_000, &92, &1);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &asset_pair,
+        &87,
+        &true,
+        &true,
+        &1_700_000_000,
+        &92,
+        &1,
+    );
 
     let score = client.get_score(&wallet, &asset_pair);
     assert_eq!(score.score, 87);
@@ -84,7 +94,17 @@ fn test_submit_score_invalid_score_range_rejected() {
     let wallet = Address::generate(&env);
     let asset_pair = symbol_short!("XLM_USDC");
 
-    let result = client.try_submit_score(&Vec::new(&env), &wallet, &asset_pair, &101, &false, &false, &0, &50, &1);
+    let result = client.try_submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &asset_pair,
+        &101,
+        &false,
+        &false,
+        &0,
+        &50,
+        &1,
+    );
     assert_eq!(result, Err(Ok(Error::InvalidScore)));
 }
 
@@ -96,7 +116,17 @@ fn test_submit_score_invalid_confidence_range_rejected() {
     let wallet = Address::generate(&env);
     let asset_pair = symbol_short!("XLM_USDC");
 
-    let result = client.try_submit_score(&Vec::new(&env), &wallet, &asset_pair, &50, &false, &false, &0, &101, &1);
+    let result = client.try_submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &asset_pair,
+        &50,
+        &false,
+        &false,
+        &0,
+        &101,
+        &1,
+    );
     assert_eq!(result, Err(Ok(Error::InvalidConfidence)));
 }
 
@@ -170,7 +200,17 @@ fn test_submit_score_blocked_when_paused() {
 
     let wallet = Address::generate(&env);
     let asset_pair = symbol_short!("XLM_USDC");
-    let result = client.try_submit_score(&Vec::new(&env), &wallet, &asset_pair, &50, &false, &false, &0, &50, &1);
+    let result = client.try_submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &asset_pair,
+        &50,
+        &false,
+        &false,
+        &0,
+        &50,
+        &1,
+    );
     assert_eq!(result, Err(Ok(Error::ContractPaused)));
 }
 
@@ -461,7 +501,17 @@ fn test_score_history_max_depth_enforced() {
 
     // 12 entries — two are evicted once the ring is full (max depth = 10).
     for i in 0u32..12 {
-        client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &(i * 8), &false, &false, &(i as u64), &50, &1);
+        client.submit_score(
+            &Vec::new(&env),
+            &wallet,
+            &asset_pair,
+            &(i * 8),
+            &false,
+            &false,
+            &(i as u64),
+            &50,
+            &1,
+        );
     }
 
     let history = client.get_score_history(&wallet, &asset_pair);
@@ -647,7 +697,17 @@ fn test_submit_score_before_init_fails() {
     let (env, client, _, _) = setup();
     let wallet = Address::generate(&env);
     let asset_pair = symbol_short!("XLM_USDC");
-    let result = client.try_submit_score(&Vec::new(&env), &wallet, &asset_pair, &50, &false, &false, &0, &50, &1);
+    let result = client.try_submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &asset_pair,
+        &50,
+        &false,
+        &false,
+        &0,
+        &50,
+        &1,
+    );
     assert_eq!(result, Err(Ok(Error::NotInitialized)));
 }
 
@@ -779,7 +839,17 @@ fn test_aggregate_pair_deduplication() {
     let pair = symbol_short!("XLM_USDC");
 
     for i in 0..5u64 {
-        client.submit_score(&Vec::new(&env), &wallet, &pair, &(50 + i as u32), &false, &false, &i, &90, &1);
+        client.submit_score(
+            &Vec::new(&env),
+            &wallet,
+            &pair,
+            &(50 + i as u32),
+            &false,
+            &false,
+            &i,
+            &90,
+            &1,
+        );
     }
 
     let aggregate = client.get_aggregate_score(&wallet);
@@ -821,7 +891,17 @@ fn test_aggregate_overflow_protection() {
     for (i, name) in pair_names.iter().enumerate() {
         let pair = Symbol::new(&env, name);
         client.set_pair_weight(&pair, &u32::MAX);
-        client.submit_score(&Vec::new(&env), &wallet, &pair, &50, &false, &false, &(i as u64), &90, &1);
+        client.submit_score(
+            &Vec::new(&env),
+            &wallet,
+            &pair,
+            &50,
+            &false,
+            &false,
+            &(i as u64),
+            &90,
+            &1,
+        );
     }
 
     let result = client.try_get_aggregate_score(&wallet);

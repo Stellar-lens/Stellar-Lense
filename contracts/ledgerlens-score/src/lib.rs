@@ -584,10 +584,8 @@ impl LedgerLensScoreContract {
     /// model (`add_service_signer` / `set_service_threshold`).  It is
     /// preserved for backward compatibility and will be removed in a future
     /// major release.  New integrations should use the multisig functions.
-    #[deprecated(
-        note = "Use add_service_signer / set_service_threshold for M-of-N multisig. \
-                This single-service path will be removed in a future release."
-    )]
+    #[deprecated(note = "Use add_service_signer / set_service_threshold for M-of-N multisig. \
+                This single-service path will be removed in a future release.")]
     pub fn set_service(env: Env, new_service: Address) -> Result<(), Error> {
 
         if !storage::has_admin(&env) {
