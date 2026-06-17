@@ -15,29 +15,26 @@ import json
 import os
 import tempfile
 
-import numpy as np
-import pandas as pd
 import pytest
 
+from config import config
 from detection.benford_engine import MAD_NONCONFORMITY_THRESHOLD, mad_score
-from detection.model_training import train_models, save_models, FEATURE_COLUMNS_EXCLUDE
+from detection.feature_engineering import compute_trade_pattern_features
+from detection.model_training import FEATURE_COLUMNS_EXCLUDE, save_models, train_models
 from scripts.adversarial_eval import (
-    gradient_feature_attack,
-    benford_conforming_amounts,
-    diversified_counterparty_simulation,
-    compute_ensemble_disagreement,
-    run_benchmark,
     RANDOM_SEED,
     _build_feature_bounds,
+    benford_conforming_amounts,
+    compute_ensemble_disagreement,
+    diversified_counterparty_simulation,
+    gradient_feature_attack,
+    run_benchmark,
 )
-from scripts.generate_synthetic_dataset import generate_synthetic_dataset, feature_columns
-from detection.feature_engineering import compute_trade_pattern_features
-from config import config
-
-
+from scripts.generate_synthetic_dataset import generate_synthetic_dataset
 # ---------------------------------------------------------------------------
 # Shared fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture(scope="module")
 def trained_models_and_data():
