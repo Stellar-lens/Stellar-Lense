@@ -30,8 +30,10 @@ from scripts.adversarial_eval import (
     gradient_feature_attack,
     run_benchmark,
 )
-from scripts.generate_synthetic_dataset import generate_synthetic_dataset
+
 # ---------------------------------------------------------------------------
+from scripts.generate_synthetic_dataset import generate_synthetic_dataset
+
 # Shared fixtures
 # ---------------------------------------------------------------------------
 
