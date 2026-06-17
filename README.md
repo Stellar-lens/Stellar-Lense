@@ -70,6 +70,9 @@ Rotates the authorised off-chain scoring service address. Admin only.
 ### `get_admin() -> Address` / `get_service() -> Address`
 Read-only lookups of the current admin and authorised scoring service addresses.
 
+### `get_pending_admin() -> Address` / `has_pending_admin_transfer() -> Address`
+Read-only function to check the state of a pending admin.
+
 ### `get_aggregate_score(wallet: Address) -> AggregateRiskScore`
 Read-only function. Returns `wallet`'s cross-asset aggregate risk score — a weighted average computed live from every asset pair the wallet has a `RiskScore` for. Always recomputed from current per-pair scores, never served from a stale cache. Returns `ScoreNotFound` if the wallet has no scores.
 
@@ -103,6 +106,7 @@ pub struct RiskScore {
     pub ml_flag: bool,       // True if ML classifier flagged
     pub timestamp: u64,      // Ledger timestamp of last update
     pub confidence: u32,     // Model confidence 0-100
+    pub model_version: u32,  // Detection-pipeline model version
 }
 ```
 
@@ -267,6 +271,10 @@ soroban contract invoke \
 ├── rustfmt.toml
 ├── clippy.toml
 ├── deploy.sh                           ← Build, optimize, deploy, initialize
+├── docs/
+│   └── interface-spec.md               ← ILedgerLensScore composability spec
+├── examples/
+│   └── amm_gate.rs                     ← Reference AMM integration (query_risk_gate)
 ├── contracts/
 │   └── ledgerlens-score/
 │       ├── Cargo.toml
@@ -335,6 +343,7 @@ pub struct RiskScore {
     pub ml_flag: bool,       // ML ensemble classifier flagged
     pub timestamp: u64,      // ledger timestamp of computation
     pub confidence: u32,     // model confidence, 0-100
+    pub model_version: u32,  // detection-pipeline model version
 }
 ```
 

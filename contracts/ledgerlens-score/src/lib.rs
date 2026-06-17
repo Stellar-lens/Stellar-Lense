@@ -230,6 +230,82 @@ impl LedgerLensScoreContract {
         storage::get_pair_weight(&env, &asset_pair)
     }
 
+    // ── Composability interface (stable ABI) ─────────────────────────────────
+    //
+    // The functions below form the `ILedgerLensScore` composability surface
+    // documented in `docs/interface-spec.md`. They are the canonical,
+    // version-stable integration point for third-party Soroban protocols
+    // (AMMs, lending markets, DEX aggregators). Their signatures and
+    // semantics are covered by the interface stability guarantees in that
+    // spec — do not change them without bumping `CONTRACT_VERSION` and the
+    // interface version, and announcing a breaking change.
+
+    /// Infallible cross-contract risk gate.
+    ///
+    /// Returns `true` when the wallet's latest risk score for `asset_pair`
+    /// is **strictly below** `gate_threshold` — i.e. the wallet is considered
+    /// safe to proceed. Returns `false` when:
+    ///
+    /// * the score is `>= gate_threshold` (too risky), **or**
+    /// * no score exists for the `(wallet, asset_pair)` pair.
+    ///
+    /// The "no score" case deliberately returns `false` (the *conservative*
+    /// default): an integrating protocol should treat wallets it has no
+    /// information about as potentially risky rather than waving them through.
+    ///
+    /// This function is **infallible** (returns `bool`, never `Result`) and
+    /// **side-effect free** — it performs a pure read that does not even
+    /// extend storage TTL. It is designed to be called directly from inside
+    /// another contract's authorization / guard logic: it can never panic and
+    /// can never propagate an `Error` back into the caller, so it cannot be
+    /// used to grief the calling protocol's gas or disable its security guard.
+    ///
+    /// # Example (caller side)
+    ///
+    /// ```ignore
+    /// let client = LedgerLensScoreContractClient::new(&env, &llens_id);
+    /// if !client.query_risk_gate(&user, &symbol_short!("XLM_USDC"), &75) {
+    ///     return Err(MyError::HighRiskWallet);
+    /// }
+    /// ```
+    pub fn query_risk_gate(
+        env: Env,
+        wallet: Address,
+        asset_pair: Symbol,
+        gate_threshold: u32,
+    ) -> bool {
+        match storage::peek_score(&env, &wallet, &asset_pair) {
+            Some(risk) => risk.score < gate_threshold,
+            None => false,
+        }
+    }
+
+    /// Capability-detection registry for the composability interface.
+    ///
+    /// Returns `true` if this contract build supports the named `capability`,
+    /// allowing cross-contract callers to feature-detect at runtime instead of
+    /// hardcoding contract version numbers. The capability symbols are part of
+    /// the stable ABI: removing one is a breaking change.
+    ///
+    /// Recognised capabilities:
+    ///
+    /// | Symbol      | Backing functionality                              |
+    /// |-------------|----------------------------------------------------|
+    /// | `score`     | `get_score` / `submit_score`                       |
+    /// | `history`   | `get_score_history`                                |
+    /// | `batch`     | `submit_scores_batch`                              |
+    /// | `gate`      | `query_risk_gate`                                  |
+    /// | `aggr`      | `get_aggregate_score` (cross-asset aggregate risk) |
+    ///
+    /// Any unrecognised `capability` returns `false`.
+    pub fn supports_interface(_env: Env, capability: Symbol) -> bool {
+        capability == symbol_short!("score")
+            || capability == symbol_short!("history")
+            || capability == symbol_short!("batch")
+            || capability == symbol_short!("gate")
+            || capability == symbol_short!("aggr")
+    }
+
     // ── Service management ───────────────────────────────────────────────────
 
     /// Rotate the authorised off-chain scoring service address.  Admin only.
@@ -248,6 +324,7 @@ impl LedgerLensScoreContract {
     /// Initiate a two-step admin transfer.  The current admin calls this to
     /// nominate `new_admin`; `new_admin` must then call `accept_admin` to
     /// complete the handoff.  This prevents accidental loss of admin access.
+    /// get_pending_admin() returns the nominate new_admin.
     pub fn transfer_admin(env: Env, new_admin: Address) -> Result<(), Error> {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
@@ -539,6 +616,21 @@ impl LedgerLensScoreContract {
             return Err(Error::NotInitialized);
         }
         Ok(storage::get_service(&env))
+    }
+
+    /// Returns the address nominated as the pending new admin, or
+    /// `NoPendingAdminTransfer` if no transfer is in progress.
+    pub fn get_pending_admin(env: Env) -> Result<Address, Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        storage::get_pending_admin(&env).ok_or(Error::NoPendingAdminTransfer)
+    }
+
+    /// Returns `true` if an admin transfer has been initiated but not yet
+    /// accepted or cancelled.
+    pub fn has_pending_admin_transfer(env: Env) -> bool {
+        storage::has_pending_admin(&env)
     }
 
     // ── Internal helpers ──────────────────────────────────────────────────────
