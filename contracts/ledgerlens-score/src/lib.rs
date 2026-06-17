@@ -245,6 +245,7 @@ impl LedgerLensScoreContract {
     /// Initiate a two-step admin transfer.  The current admin calls this to
     /// nominate `new_admin`; `new_admin` must then call `accept_admin` to
     /// complete the handoff.  This prevents accidental loss of admin access.
+    /// get_pending_admin() returns the nominate new_admin.
     pub fn transfer_admin(env: Env, new_admin: Address) -> Result<(), Error> {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
