@@ -64,8 +64,17 @@ fn test_first_submit_always_accepted() {
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
 
-    let result =
-        client.try_submit_score(&Vec::new(&env), &wallet, &pair, &50, &false, &false, &START_TS, &90, &1);
+    let result = client.try_submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &50,
+        &false,
+        &false,
+        &START_TS,
+        &90,
+        &1,
+    );
     assert!(result.is_ok());
     assert_eq!(client.get_last_submit_time(&wallet, &pair), START_TS);
 }
@@ -79,8 +88,17 @@ fn test_second_submit_within_cooldown_rejected() {
     client.submit_score(&Vec::new(&env), &wallet, &pair, &50, &false, &false, &START_TS, &90, &1);
 
     advance_to(&env, START_TS + DEFAULT_COOLDOWN_SECS - 1);
-    let result =
-        client.try_submit_score(&Vec::new(&env), &wallet, &pair, &60, &false, &false, &START_TS, &90, &1);
+    let result = client.try_submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &60,
+        &false,
+        &false,
+        &START_TS,
+        &90,
+        &1,
+    );
     assert_eq!(result, Err(Ok(Error::RateLimitExceeded)));
 
     // The rejected submission must not have overwritten the stored score.
@@ -110,8 +128,17 @@ fn test_cooldown_exactly_at_boundary() {
 
     // now == last_submit + cooldown exactly — must be accepted (strict `<` rejects).
     advance_to(&env, START_TS + DEFAULT_COOLDOWN_SECS);
-    let result =
-        client.try_submit_score(&Vec::new(&env), &wallet, &pair, &60, &false, &false, &START_TS, &90, &1);
+    let result = client.try_submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &60,
+        &false,
+        &false,
+        &START_TS,
+        &90,
+        &1,
+    );
     assert!(result.is_ok());
     assert_eq!(client.get_score(&wallet, &pair).score, 60);
 }
@@ -125,7 +152,17 @@ fn test_batch_rate_limited_entry_skipped() {
     let fresh_wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
 
-    client.submit_score(&Vec::new(&env), &limited_wallet, &pair, &10, &false, &false, &START_TS, &50, &1);
+    client.submit_score(
+        &Vec::new(&env),
+        &limited_wallet,
+        &pair,
+        &10,
+        &false,
+        &false,
+        &START_TS,
+        &50,
+        &1,
+    );
 
     advance_to(&env, START_TS + 10); // still well within the default cooldown
 
@@ -280,8 +317,17 @@ fn test_cooldown_is_per_pair() {
     client.submit_score(&Vec::new(&env), &wallet, &pair_a, &50, &false, &false, &START_TS, &90, &1);
 
     // Still within pair_a's cooldown, but pair_b has never been submitted.
-    let result =
-        client.try_submit_score(&Vec::new(&env), &wallet, &pair_b, &60, &false, &false, &START_TS, &90, &1);
+    let result = client.try_submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair_b,
+        &60,
+        &false,
+        &false,
+        &START_TS,
+        &90,
+        &1,
+    );
     assert!(result.is_ok());
 }
 
@@ -294,7 +340,16 @@ fn test_cooldown_is_per_wallet() {
 
     client.submit_score(&Vec::new(&env), &wallet_a, &pair, &50, &false, &false, &START_TS, &90, &1);
 
-    let result =
-        client.try_submit_score(&Vec::new(&env), &wallet_b, &pair, &60, &false, &false, &START_TS, &90, &1);
+    let result = client.try_submit_score(
+        &Vec::new(&env),
+        &wallet_b,
+        &pair,
+        &60,
+        &false,
+        &false,
+        &START_TS,
+        &90,
+        &1,
+    );
     assert!(result.is_ok());
 }

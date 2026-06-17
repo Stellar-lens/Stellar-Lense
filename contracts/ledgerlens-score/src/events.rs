@@ -117,8 +117,6 @@ pub fn cooldown_updated(env: &Env, cooldown_secs: u64) {
 /// cooldown for `(wallet, asset_pair)` — the emergency re-score path, not a
 /// routine operation, so this is worth a dedicated audit-trail event.
 pub fn rate_limit_overridden(env: &Env, by: &Address, wallet: &Address, asset_pair: &Symbol) {
-    env.events().publish(
-        (symbol_short!("rl_ovrd"), wallet.clone(), asset_pair.clone()),
-        by.clone(),
-    );
+    env.events()
+        .publish((symbol_short!("rl_ovrd"), wallet.clone(), asset_pair.clone()), by.clone());
 }
