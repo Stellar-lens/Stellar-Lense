@@ -171,6 +171,9 @@ python -m detection.model_training --data-path data/synthetic_dataset.parquet
 
 # Run the full detection pipeline
 python run_pipeline.py
+
+# Score a single wallet on-demand (targeted investigation)
+python -m scripts.score_wallet --wallet <G...> --pair "USDC:<G...>/XLM:native"
 ```
 
 ### `run_pipeline.py` flags
