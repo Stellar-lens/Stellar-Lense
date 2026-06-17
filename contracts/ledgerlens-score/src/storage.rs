@@ -1,9 +1,10 @@
 use soroban_sdk::{Address, Env, Symbol, Vec};
 
 use crate::constants::{
-    DEFAULT_RISK_THRESHOLD, HISTORY_MAX_DEPTH, SCORE_TTL_EXTEND_TO, SCORE_TTL_THRESHOLD,
+    DEFAULT_RISK_THRESHOLD, DEFAULT_UPGRADE_DELAY_SECS, HISTORY_MAX_DEPTH, SCORE_TTL_EXTEND_TO,
+    SCORE_TTL_THRESHOLD,
 };
-use crate::types::{AggregateRiskScore, DataKey, RiskScore};
+use crate::types::{AggregateRiskScore, DataKey, RiskScore, UpgradeProposal};
 
 // ── Admin / Service ─────────────────────────────────────────────────────────
 
@@ -195,4 +196,32 @@ pub fn set_aggregate_score(env: &Env, wallet: &Address, aggregate: &AggregateRis
     let key = DataKey::AggregateScore(wallet.clone());
     env.storage().persistent().set(&key, aggregate);
     env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+}
+
+// ── Time-locked upgrade governance ────────────────────────────────────────────
+
+pub fn has_pending_upgrade(env: &Env) -> bool {
+    env.storage().instance().has(&DataKey::PendingUpgrade)
+}
+
+pub fn set_pending_upgrade(env: &Env, proposal: &UpgradeProposal) {
+    env.storage().instance().set(&DataKey::PendingUpgrade, proposal);
+}
+
+pub fn get_pending_upgrade(env: &Env) -> Option<UpgradeProposal> {
+    env.storage().instance().get(&DataKey::PendingUpgrade)
+}
+
+pub fn clear_pending_upgrade(env: &Env) {
+    env.storage().instance().remove(&DataKey::PendingUpgrade);
+}
+
+/// Returns the configured upgrade delay, defaulting to
+/// `DEFAULT_UPGRADE_DELAY_SECS` until the admin sets one explicitly.
+pub fn get_upgrade_delay(env: &Env) -> u64 {
+    env.storage().instance().get(&DataKey::UpgradeDelay).unwrap_or(DEFAULT_UPGRADE_DELAY_SECS)
+}
+
+pub fn set_upgrade_delay(env: &Env, delay_secs: u64) {
+    env.storage().instance().set(&DataKey::UpgradeDelay, &delay_secs);
 }

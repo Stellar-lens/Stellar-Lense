@@ -1,4 +1,4 @@
-use soroban_sdk::{symbol_short, Address, Env, Symbol};
+use soroban_sdk::{symbol_short, Address, BytesN, Env, Symbol};
 
 use crate::types::RiskScore;
 
@@ -72,4 +72,24 @@ pub fn threshold_breached(
 ) {
     env.events()
         .publish((symbol_short!("breach"), wallet.clone()), (asset_pair.clone(), score, threshold));
+}
+
+// ── Time-locked upgrade governance ────────────────────────────────────────────
+
+/// Emitted by `propose_upgrade`. The `executable_after` timestamp gives
+/// monitoring services the exact start of the veto window's end so they can
+/// alert the community ahead of execution.
+pub fn upgrade_proposed(env: &Env, wasm_hash: &BytesN<32>, executable_after: u64) {
+    env.events().publish((symbol_short!("upg_prop"),), (wasm_hash.clone(), executable_after));
+}
+
+/// Emitted by `execute_upgrade` once the new WASM hash has been installed.
+pub fn upgrade_executed(env: &Env, wasm_hash: &BytesN<32>) {
+    env.events().publish((symbol_short!("upg_exec"),), wasm_hash.clone());
+}
+
+/// Emitted by `veto_upgrade`. `by` is the admin that cancelled the pending
+/// proposal, completing the on-chain audit trail.
+pub fn upgrade_vetoed(env: &Env, by: &Address) {
+    env.events().publish((symbol_short!("upg_veto"),), by.clone());
 }

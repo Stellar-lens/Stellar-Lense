@@ -10,12 +10,15 @@ mod types;
 mod test;
 
 #[cfg(test)]
+mod test_upgrade;
+
+#[cfg(test)]
 mod test_interface;
 
-use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, Symbol, Vec};
+use soroban_sdk::{contract, contractimpl, symbol_short, Address, BytesN, Env, Symbol, Vec};
 
 pub use errors::Error;
-pub use types::{AggregateRiskScore, RiskScore, ScoreSubmission};
+pub use types::{AggregateRiskScore, RiskScore, ScoreSubmission, UpgradeProposal};
 
 /// On-chain truth layer for LedgerLens risk scores.
 ///
@@ -394,6 +397,165 @@ impl LedgerLensScoreContract {
     /// Returns `true` when the contract is paused.
     pub fn is_paused(env: Env) -> bool {
         storage::is_paused(&env)
+    }
+
+    // ── Time-locked upgrade governance ────────────────────────────────────────
+
+    /// Propose a contract WASM upgrade, starting the mandatory time-lock.
+    ///
+    /// The admin commits to `new_wasm_hash` (the hash of an already-installed
+    /// WASM, as produced by `install_contract_wasm`). The proposal is recorded
+    /// with `executable_after = now + get_upgrade_delay()`, and an
+    /// `upgrade_proposed` event is emitted so monitoring services and the
+    /// community can inspect and react during the delay window.
+    ///
+    /// Only the current admin may call this; a compromised *service* key
+    /// cannot initiate an upgrade. The proposal does **not** take effect until
+    /// `execute_upgrade` is called after the lock elapses, and it can be
+    /// cancelled at any time before then via `veto_upgrade`.
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if the contract has no admin yet.
+    /// - [`Error::UpgradeAlreadyPending`] if a proposal already exists — veto
+    ///   or execute it first (one in-flight proposal at a time).
+    pub fn propose_upgrade(env: Env, new_wasm_hash: BytesN<32>) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        let admin = storage::get_admin(&env);
+        admin.require_auth();
+
+        if storage::has_pending_upgrade(&env) {
+            return Err(Error::UpgradeAlreadyPending);
+        }
+
+        let now = env.ledger().timestamp();
+        let delay = storage::get_upgrade_delay(&env);
+        // delay is bounded to MAX_UPGRADE_DELAY_SECS on the way in, so this
+        // addition cannot realistically overflow; saturate as defence in depth.
+        let executable_after = now.saturating_add(delay);
+
+        let proposal = UpgradeProposal {
+            new_wasm_hash: new_wasm_hash.clone(),
+            proposed_at: now,
+            executable_after,
+            proposed_by: admin,
+        };
+        storage::set_pending_upgrade(&env, &proposal);
+
+        events::upgrade_proposed(&env, &new_wasm_hash, executable_after);
+        Ok(())
+    }
+
+    /// Execute the pending upgrade once its time-lock has elapsed.
+    ///
+    /// Re-verifies — at execution time, never from a cached decision — that
+    /// `now >= executable_after`, then invokes the Soroban upgrade primitive
+    /// `env.deployer().update_current_contract_wasm(new_wasm_hash)` to swap in
+    /// the new logic. The pending proposal is cleared and an `upgrade_executed`
+    /// event is emitted.
+    ///
+    /// Admin only.
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if the contract has no admin yet.
+    /// - [`Error::NoPendingUpgrade`] if there is no proposal to execute.
+    /// - [`Error::UpgradeNotReady`] if the time-lock has not yet elapsed.
+    pub fn execute_upgrade(env: Env) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        let admin = storage::get_admin(&env);
+        admin.require_auth();
+
+        let proposal = storage::get_pending_upgrade(&env).ok_or(Error::NoPendingUpgrade)?;
+
+        // Deterministic, caller-independent: the ledger timestamp cannot be
+        // manipulated by the invoker. Re-checked here so a delay change or a
+        // long-pending proposal is always evaluated against the real clock.
+        let now = env.ledger().timestamp();
+        if now < proposal.executable_after {
+            return Err(Error::UpgradeNotReady);
+        }
+
+        // The actual Soroban upgrade primitive — replaces this contract's WASM.
+        env.deployer().update_current_contract_wasm(proposal.new_wasm_hash.clone());
+
+        storage::clear_pending_upgrade(&env);
+        events::upgrade_executed(&env, &proposal.new_wasm_hash);
+        Ok(())
+    }
+
+    /// Cancel the pending upgrade during the time-lock window.
+    ///
+    /// Intended as the emergency escape hatch if a proposal is malicious or the
+    /// admin key was compromised and the legitimate admin (or a recovered key)
+    /// wants to stop it before execution. Clears the proposal and emits an
+    /// `upgrade_vetoed` event naming the caller for the audit trail.
+    ///
+    /// Admin only.
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if the contract has no admin yet.
+    /// - [`Error::NoPendingUpgrade`] if there is no proposal to veto.
+    pub fn veto_upgrade(env: Env) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        let admin = storage::get_admin(&env);
+        admin.require_auth();
+
+        if !storage::has_pending_upgrade(&env) {
+            return Err(Error::NoPendingUpgrade);
+        }
+        storage::clear_pending_upgrade(&env);
+
+        events::upgrade_vetoed(&env, &admin);
+        Ok(())
+    }
+
+    /// Returns the pending upgrade proposal so anyone can audit it during the
+    /// time-lock window. Read-only and callable by any account or contract.
+    ///
+    /// # Errors
+    /// - [`Error::NoPendingUpgrade`] if no proposal is currently pending.
+    pub fn get_pending_upgrade(env: Env) -> Result<UpgradeProposal, Error> {
+        storage::get_pending_upgrade(&env).ok_or(Error::NoPendingUpgrade)
+    }
+
+    /// Configure the upgrade time-lock delay (seconds) applied to future
+    /// proposals. Must be within `[MIN_UPGRADE_DELAY_SECS,
+    /// MAX_UPGRADE_DELAY_SECS]` (48 hours – 14 days). Admin only.
+    ///
+    /// Changing the delay only affects proposals created *after* the change;
+    /// an already-pending proposal keeps its original `executable_after`.
+    ///
+    /// Security note: *raising* the delay is always safe. *Lowering* it
+    /// shortens the community veto window and should only be done with broad
+    /// community consensus — see the README's Upgrade Governance section.
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if the contract has no admin yet.
+    /// - [`Error::InvalidUpgradeDelay`] if `delay_secs` is outside the bounds.
+    pub fn set_upgrade_delay(env: Env, delay_secs: u64) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        if !(constants::MIN_UPGRADE_DELAY_SECS..=constants::MAX_UPGRADE_DELAY_SECS)
+            .contains(&delay_secs)
+        {
+            return Err(Error::InvalidUpgradeDelay);
+        }
+        let admin = storage::get_admin(&env);
+        admin.require_auth();
+        storage::set_upgrade_delay(&env, delay_secs);
+        Ok(())
+    }
+
+    /// Returns the current upgrade time-lock delay in seconds. Defaults to
+    /// `DEFAULT_UPGRADE_DELAY_SECS` (48 hours) until configured.
+    pub fn get_upgrade_delay(env: Env) -> u64 {
+        storage::get_upgrade_delay(&env)
     }
 
     // ── Watchlist ────────────────────────────────────────────────────────────
