@@ -243,3 +243,14 @@ pub fn get_service_threshold(env: &Env) -> u32 {
 pub fn set_service_threshold(env: &Env, threshold: u32) {
     env.storage().instance().set(&DataKey::ServiceThreshold, &threshold);
 }
+
+// ── Staleness window ──────────────────────────────────────────────────────────
+
+pub fn get_staleness_window(env: &Env) -> u64 {
+    let result: Option<u64> = env.storage().instance().get(&DataKey::StalenessWindow);
+    result.unwrap_or(crate::constants::DEFAULT_STALENESS_WINDOW_SECS)
+}
+
+pub fn set_staleness_window(env: &Env, window_secs: u64) {
+    env.storage().instance().set(&DataKey::StalenessWindow, &window_secs);
+}

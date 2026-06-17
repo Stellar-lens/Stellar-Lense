@@ -1,6 +1,10 @@
 #![cfg(test)]
 
-use soroban_sdk::{symbol_short, testutils::Address as _, Address, Env, Symbol, Vec};
+use soroban_sdk::{
+    symbol_short,
+    testutils::{Address as _, Ledger as _},
+    Address, Env, Symbol, Vec,
+};
 
 use crate::{Error, LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreSubmission};
 
@@ -1116,4 +1120,92 @@ fn test_remove_signer_reduces_set() {
     one.push_back(s1);
     client.submit_score(&one, &wallet, &pair, &33, &false, &false, &1, &70, &1);
     assert_eq!(client.get_score(&wallet, &pair).score, 33);
+}
+
+// ── Staleness window ──────────────────────────────────────────────────────────
+
+#[test]
+fn test_is_score_stale_no_score() {
+    let (env, client, _admin, _service) = initialized();
+    let wallet = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+    assert!(client.is_score_stale(&wallet, &pair));
+}
+
+#[test]
+fn test_is_score_stale_fresh_score() {
+    let (env, client, _admin, _service) = initialized();
+    let wallet = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+
+    let ts: u64 = 1_700_000_000;
+    env.ledger().with_mut(|l| l.timestamp = ts);
+    client.submit_score(&Vec::new(&env), &wallet, &pair, &50, &false, &false, &ts, &80, &1);
+
+    assert!(!client.is_score_stale(&wallet, &pair));
+}
+
+#[test]
+fn test_is_score_stale_after_window() {
+    let (env, client, _admin, _service) = initialized();
+    let wallet = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+
+    let ts: u64 = 1_700_000_000;
+    let window = client.get_staleness_window();
+
+    env.ledger().with_mut(|l| l.timestamp = ts);
+    client.submit_score(&Vec::new(&env), &wallet, &pair, &50, &false, &false, &ts, &80, &1);
+
+    // Advance ledger past the window boundary.
+    env.ledger().with_mut(|l| l.timestamp = ts + window + 1);
+    assert!(client.is_score_stale(&wallet, &pair));
+}
+
+#[test]
+fn test_is_score_stale_exactly_at_window() {
+    let (env, client, _admin, _service) = initialized();
+    let wallet = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+
+    let ts: u64 = 1_700_000_000;
+    let window = client.get_staleness_window();
+
+    env.ledger().with_mut(|l| l.timestamp = ts);
+    client.submit_score(&Vec::new(&env), &wallet, &pair, &50, &false, &false, &ts, &80, &1);
+
+    // Exactly at the window boundary: age == window, not > window → fresh.
+    env.ledger().with_mut(|l| l.timestamp = ts + window);
+    assert!(!client.is_score_stale(&wallet, &pair));
+}
+
+#[test]
+fn test_set_staleness_window_zero_rejected() {
+    let (_env, client, _admin, _service) = initialized();
+    let result = client.try_set_staleness_window(&0);
+    assert_eq!(result, Err(Ok(Error::InvalidStalenessWindow)));
+}
+
+#[test]
+fn test_default_staleness_window_is_7_days() {
+    let (_env, client, _admin, _service) = initialized();
+    assert_eq!(client.get_staleness_window(), 604_800);
+}
+
+#[test]
+fn test_set_staleness_window_updates_stale_check() {
+    let (env, client, _admin, _service) = initialized();
+    let wallet = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+
+    let ts: u64 = 1_700_000_000;
+    env.ledger().with_mut(|l| l.timestamp = ts);
+    client.submit_score(&Vec::new(&env), &wallet, &pair, &50, &false, &false, &ts, &80, &1);
+
+    // Set a very narrow window (10 seconds).
+    client.set_staleness_window(&10);
+
+    // Advance by 11 seconds — should be stale now.
+    env.ledger().with_mut(|l| l.timestamp = ts + 11);
+    assert!(client.is_score_stale(&wallet, &pair));
 }

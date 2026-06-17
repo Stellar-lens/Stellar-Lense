@@ -43,3 +43,6 @@ pub const DEFAULT_UPGRADE_DELAY_SECS: u64 = 172_800; // 48 hours
 
 /// Maximum number of addresses in the M-of-N service signer set.
 pub const MAX_SERVICE_SIGNERS: u32 = 10;
+
+/// Default staleness window: 7 days in seconds.
+pub const DEFAULT_STALENESS_WINDOW_SECS: u64 = 604_800;
