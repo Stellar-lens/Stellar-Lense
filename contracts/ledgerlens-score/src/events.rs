@@ -90,3 +90,17 @@ pub fn signer_removed(env: &Env, signer: &Address) {
 pub fn service_threshold_updated(env: &Env, threshold: u32) {
     env.events().publish((symbol_short!("sig_thr"),), threshold);
 }
+
+// ── Upgrade governance ────────────────────────────────────────────────────────
+
+pub fn upgrade_proposed(env: &Env, new_wasm_hash: &BytesN<32>, executable_after: u64) {
+    env.events().publish((symbol_short!("upg_prop"),), (new_wasm_hash.clone(), executable_after));
+}
+
+pub fn upgrade_executed(env: &Env, new_wasm_hash: &BytesN<32>) {
+    env.events().publish((symbol_short!("upg_exec"),), new_wasm_hash.clone());
+}
+
+pub fn upgrade_vetoed(env: &Env, by: &Address) {
+    env.events().publish((symbol_short!("upg_veto"),), by.clone());
+}

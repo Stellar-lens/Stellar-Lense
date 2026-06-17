@@ -225,3 +225,21 @@ pub fn get_upgrade_delay(env: &Env) -> u64 {
 pub fn set_upgrade_delay(env: &Env, delay_secs: u64) {
     env.storage().instance().set(&DataKey::UpgradeDelay, &delay_secs);
 }
+
+// ── Multi-sig service set ─────────────────────────────────────────────────────
+
+pub fn get_service_set(env: &Env) -> Vec<Address> {
+    env.storage().instance().get(&DataKey::ServiceSet).unwrap_or_else(|| Vec::new(env))
+}
+
+pub fn set_service_set(env: &Env, set: &Vec<Address>) {
+    env.storage().instance().set(&DataKey::ServiceSet, set);
+}
+
+pub fn get_service_threshold(env: &Env) -> u32 {
+    env.storage().instance().get(&DataKey::ServiceThreshold).unwrap_or(0)
+}
+
+pub fn set_service_threshold(env: &Env, threshold: u32) {
+    env.storage().instance().set(&DataKey::ServiceThreshold, &threshold);
+}

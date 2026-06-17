@@ -56,7 +56,6 @@ impl LedgerLensScoreContract {
     /// assert_eq!(client.get_service(), service);
     /// ```
     pub fn initialize(env: Env, admin: Address, service: Address) -> Result<(), Error> {
-
         if storage::has_admin(&env) {
             return Err(Error::AlreadyInitialized);
         }
@@ -83,7 +82,6 @@ impl LedgerLensScoreContract {
     /// assert_eq!(client.get_version(), 1);
     /// ```
     pub fn get_version(env: Env) -> u32 {
-
         storage::get_contract_version(&env)
     }
 
@@ -125,7 +123,6 @@ impl LedgerLensScoreContract {
     /// ```
     #[allow(clippy::too_many_arguments)]
     pub fn submit_score(
-
         env: Env,
         signers: Vec<Address>,
         wallet: Address,
@@ -219,7 +216,6 @@ impl LedgerLensScoreContract {
     /// assert_eq!(client.get_score(&wallet2, &asset_pair).unwrap().score, 85);
     /// ```
     pub fn submit_scores_batch(env: Env, submissions: Vec<ScoreSubmission>) -> Result<u32, Error> {
-
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
@@ -304,7 +300,6 @@ impl LedgerLensScoreContract {
     /// assert_eq!(score.score, 10);
     /// ```
     pub fn get_score(env: Env, wallet: Address, asset_pair: Symbol) -> Result<RiskScore, Error> {
-
         storage::get_score(&env, &wallet, &asset_pair).ok_or(Error::ScoreNotFound)
     }
 
@@ -336,7 +331,6 @@ impl LedgerLensScoreContract {
     /// assert_eq!(history.get(1).unwrap().score, 20);
     /// ```
     pub fn get_score_history(env: Env, wallet: Address, asset_pair: Symbol) -> Vec<RiskScore> {
-
         storage::get_score_history(&env, &wallet, &asset_pair)
     }
 
@@ -378,7 +372,6 @@ impl LedgerLensScoreContract {
     /// Sets the weight used for `asset_pair` in the aggregate risk
     /// computation. A weight of `0` excludes the pair from the weighted
     /// average's denominator entirely. Admin only.
-
     ///
     /// # Examples
     ///
@@ -587,7 +580,6 @@ impl LedgerLensScoreContract {
     #[deprecated(note = "Use add_service_signer / set_service_threshold for M-of-N multisig. \
                 This single-service path will be removed in a future release.")]
     pub fn set_service(env: Env, new_service: Address) -> Result<(), Error> {
-
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
@@ -604,7 +596,6 @@ impl LedgerLensScoreContract {
     /// complete the handoff.  This prevents accidental loss of admin access.
     /// get_pending_admin() returns the nominate new_admin.
     pub fn transfer_admin(env: Env, new_admin: Address) -> Result<(), Error> {
-
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
@@ -637,7 +628,6 @@ impl LedgerLensScoreContract {
     /// assert_eq!(client.get_admin(), new_admin);
     /// ```
     pub fn accept_admin(env: Env) -> Result<(), Error> {
-
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
@@ -670,7 +660,6 @@ impl LedgerLensScoreContract {
     /// assert_eq!(client.get_admin(), admin);
     /// ```
     pub fn cancel_admin_transfer(env: Env) -> Result<(), Error> {
-
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
@@ -706,7 +695,6 @@ impl LedgerLensScoreContract {
     /// assert!(client.is_paused());
     /// ```
     pub fn pause(env: Env) -> Result<(), Error> {
-
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
@@ -738,7 +726,6 @@ impl LedgerLensScoreContract {
     /// assert!(!client.is_paused());
     /// ```
     pub fn unpause(env: Env) -> Result<(), Error> {
-
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
@@ -767,7 +754,6 @@ impl LedgerLensScoreContract {
     /// assert!(!client.is_paused());
     /// ```
     pub fn is_paused(env: Env) -> bool {
-
         storage::is_paused(&env)
     }
 
@@ -955,7 +941,6 @@ impl LedgerLensScoreContract {
     /// assert!(client.is_watchlisted(&wallet));
     /// ```
     pub fn set_watchlist(env: Env, wallet: Address, flagged: bool) -> Result<(), Error> {
-
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
@@ -984,7 +969,6 @@ impl LedgerLensScoreContract {
     /// assert!(!client.is_watchlisted(&wallet));
     /// ```
     pub fn is_watchlisted(env: Env, wallet: Address) -> bool {
-
         storage::is_watchlisted(&env, &wallet)
     }
 
@@ -1011,7 +995,6 @@ impl LedgerLensScoreContract {
     /// assert_eq!(client.get_risk_threshold(), 80);
     /// ```
     pub fn set_risk_threshold(env: Env, threshold: u32) -> Result<(), Error> {
-
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
@@ -1044,7 +1027,6 @@ impl LedgerLensScoreContract {
     /// assert_eq!(client.get_risk_threshold(), 75);
     /// ```
     pub fn get_risk_threshold(env: Env) -> u32 {
-
         storage::get_risk_threshold(&env)
     }
 
@@ -1068,7 +1050,6 @@ impl LedgerLensScoreContract {
     /// assert_eq!(client.get_admin(), admin);
     /// ```
     pub fn get_admin(env: Env) -> Result<Address, Error> {
-
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
@@ -1086,7 +1067,6 @@ impl LedgerLensScoreContract {
         note = "Use get_service_signers / get_service_threshold for the M-of-N multisig model."
     )]
     pub fn get_service(env: Env) -> Result<Address, Error> {
-
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }

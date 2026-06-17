@@ -38,4 +38,13 @@ pub enum Error {
     SignerAlreadyInSet = 18,
     /// `remove_service_signer` was called with an address not in the set.
     SignerNotInSet = 19,
+    /// `propose_upgrade` was called while a proposal is already pending.
+    UpgradeAlreadyPending = 12,
+    /// `execute_upgrade` was called before the time-lock elapsed, or
+    /// `get_pending_upgrade` was called when no proposal exists.
+    NoPendingUpgrade = 13,
+    /// `execute_upgrade` called before `executable_after` timestamp.
+    UpgradeNotReady = 20,
+    /// `set_upgrade_delay` called with a value outside the allowed bounds.
+    InvalidUpgradeDelay = 21,
 }
