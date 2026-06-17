@@ -1,4 +1,4 @@
-use soroban_sdk::{symbol_short, Address, Env, Symbol};
+use soroban_sdk::{symbol_short, Address, BytesN, Env, Symbol};
 
 use crate::types::RiskScore;
 

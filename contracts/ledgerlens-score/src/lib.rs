@@ -11,12 +11,15 @@ mod types;
 mod test;
 
 #[cfg(test)]
+mod test_upgrade;
+
+#[cfg(test)]
 mod test_interface;
 
-use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, Symbol, Vec};
+use soroban_sdk::{contract, contractimpl, symbol_short, Address, BytesN, Env, Symbol, Vec};
 
 pub use errors::Error;
-pub use types::{AggregateRiskScore, RiskScore, ScoreSubmission};
+pub use types::{AggregateRiskScore, RiskScore, ScoreSubmission, UpgradeProposal};
 
 /// On-chain truth layer for LedgerLens risk scores.
 ///
@@ -34,7 +37,26 @@ impl LedgerLensScoreContract {
     /// One-time setup.  `admin` can rotate the scoring service address
     /// and manage contract-wide configuration; `service` is the off-chain
     /// LedgerLens account authorised to submit scores.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use soroban_sdk::symbol_short;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// assert_eq!(client.get_admin(), admin);
+    /// assert_eq!(client.get_service(), service);
+    /// ```
     pub fn initialize(env: Env, admin: Address, service: Address) -> Result<(), Error> {
+
         if storage::has_admin(&env) {
             return Err(Error::AlreadyInitialized);
         }
@@ -44,7 +66,24 @@ impl LedgerLensScoreContract {
     }
 
     /// Returns the baked-in ABI version of this contract build.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// assert_eq!(client.get_version(), 1);
+    /// ```
     pub fn get_version(env: Env) -> u32 {
+
         storage::get_contract_version(&env)
     }
 
@@ -62,8 +101,31 @@ impl LedgerLensScoreContract {
     /// falls back to the original single-service authorization path.
     ///
     /// Returns `ContractPaused` if the admin has activated the circuit breaker.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use soroban_sdk::symbol_short;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// let wallet = Address::generate(&env);
+    /// let asset_pair = symbol_short!("XLM_USDC");
+    /// client.submit_score(&wallet, &asset_pair, &42, &true, &false, &1, &90, &1).unwrap();
+    /// let score = client.get_score(&wallet, &asset_pair).unwrap();
+    /// assert_eq!(score.score, 42);
+    /// assert!(score.benford_flag);
+    /// ```
     #[allow(clippy::too_many_arguments)]
     pub fn submit_score(
+
         env: Env,
         signers: Vec<Address>,
         wallet: Address,
@@ -131,7 +193,33 @@ impl LedgerLensScoreContract {
     /// account authorises once for the whole batch.  Entries with
     /// out-of-range `score` or `confidence` are silently skipped; the
     /// function returns the count of successfully written entries.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreSubmission};
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
+    /// # use soroban_sdk::symbol_short;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// let wallet1 = Address::generate(&env);
+    /// let wallet2 = Address::generate(&env);
+    /// let asset_pair = symbol_short!("XLM_USDC");
+    /// let mut batch: Vec<ScoreSubmission> = Vec::new(&env);
+    /// batch.push_back(ScoreSubmission { wallet: wallet1.clone(), asset_pair: asset_pair.clone(), score: 45, benford_flag: false, ml_flag: false, timestamp: 1000, confidence: 80, model_version: 2 });
+    /// batch.push_back(ScoreSubmission { wallet: wallet2.clone(), asset_pair: asset_pair.clone(), score: 85, benford_flag: true, ml_flag: true, timestamp: 2000, confidence: 90, model_version: 2 });
+    /// let accepted = client.submit_scores_batch(&batch);
+    /// assert_eq!(accepted, 2);
+    /// assert_eq!(client.get_score(&wallet1, &asset_pair).unwrap().score, 45);
+    /// assert_eq!(client.get_score(&wallet2, &asset_pair).unwrap().score, 85);
+    /// ```
     pub fn submit_scores_batch(env: Env, submissions: Vec<ScoreSubmission>) -> Result<u32, Error> {
+
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
@@ -194,14 +282,61 @@ impl LedgerLensScoreContract {
 
     /// Read-only lookup of the latest risk score for `wallet` / `asset_pair`.
     /// Callable by any account or contract.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use soroban_sdk::symbol_short;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// let wallet = Address::generate(&env);
+    /// let asset_pair = symbol_short!("XLM_USDC");
+    /// client.submit_score(&wallet, &asset_pair, &10, &false, &false, &1, &50, &1).unwrap();
+    /// let score = client.get_score(&wallet, &asset_pair);
+    /// assert_eq!(score.score, 10);
+    /// ```
     pub fn get_score(env: Env, wallet: Address, asset_pair: Symbol) -> Result<RiskScore, Error> {
+
         storage::get_score(&env, &wallet, &asset_pair).ok_or(Error::ScoreNotFound)
     }
 
     /// Returns the ordered history of the last `HISTORY_MAX_DEPTH` risk scores
     /// for `wallet` / `asset_pair`, oldest first.  Returns an empty Vec when no
     /// scores have been submitted yet.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use soroban_sdk::symbol_short;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// let wallet = Address::generate(&env);
+    /// let asset_pair = symbol_short!("XLM_USDC");
+    /// client.submit_score(&wallet, &asset_pair, &10, &false, &false, &1, &50, &1).unwrap();
+    /// client.submit_score(&wallet, &asset_pair, &20, &false, &false, &2, &60, &1).unwrap();
+    /// let history = client.get_score_history(&wallet, &asset_pair);
+    /// assert_eq!(history.len(), 2);
+    /// assert_eq!(history.get(0).unwrap().score, 10);
+    /// assert_eq!(history.get(1).unwrap().score, 20);
+    /// ```
     pub fn get_score_history(env: Env, wallet: Address, asset_pair: Symbol) -> Vec<RiskScore> {
+
         storage::get_score_history(&env, &wallet, &asset_pair)
     }
 
@@ -243,6 +378,26 @@ impl LedgerLensScoreContract {
     /// Sets the weight used for `asset_pair` in the aggregate risk
     /// computation. A weight of `0` excludes the pair from the weighted
     /// average's denominator entirely. Admin only.
+
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use soroban_sdk::symbol_short;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// let pair = symbol_short!("XLM_USDC");
+    /// client.set_pair_weight(&pair, &3).unwrap();
+    /// assert_eq!(client.get_pair_weight(&pair), 3);
+    /// ```
     pub fn set_pair_weight(env: Env, asset_pair: Symbol, weight: u32) -> Result<(), Error> {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
@@ -434,6 +589,7 @@ impl LedgerLensScoreContract {
                 This single-service path will be removed in a future release."
     )]
     pub fn set_service(env: Env, new_service: Address) -> Result<(), Error> {
+
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
@@ -450,6 +606,7 @@ impl LedgerLensScoreContract {
     /// complete the handoff.  This prevents accidental loss of admin access.
     /// get_pending_admin() returns the nominate new_admin.
     pub fn transfer_admin(env: Env, new_admin: Address) -> Result<(), Error> {
+
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
@@ -462,7 +619,27 @@ impl LedgerLensScoreContract {
 
     /// Complete a pending admin transfer.  Must be called by the address
     /// nominated in `transfer_admin`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// let new_admin = Address::generate(&env);
+    /// client.transfer_admin(&new_admin);
+    /// client.accept_admin();
+    /// assert_eq!(client.get_admin(), new_admin);
+    /// ```
     pub fn accept_admin(env: Env) -> Result<(), Error> {
+
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
@@ -475,7 +652,27 @@ impl LedgerLensScoreContract {
     }
 
     /// Cancel a pending admin transfer.  Admin only.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// let new_admin = Address::generate(&env);
+    /// client.transfer_admin(&new_admin);
+    /// client.cancel_admin_transfer();
+    /// assert_eq!(client.get_admin(), admin);
+    /// ```
     pub fn cancel_admin_transfer(env: Env) -> Result<(), Error> {
+
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
@@ -492,7 +689,26 @@ impl LedgerLensScoreContract {
     // ── Pause circuit breaker ────────────────────────────────────────────────
 
     /// Pause the contract, blocking all score submissions.  Admin only.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// assert!(!client.is_paused());
+    /// client.pause();
+    /// assert!(client.is_paused());
+    /// ```
     pub fn pause(env: Env) -> Result<(), Error> {
+
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
@@ -504,7 +720,27 @@ impl LedgerLensScoreContract {
     }
 
     /// Resume normal operations after a pause.  Admin only.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// client.pause();
+    /// assert!(client.is_paused());
+    /// client.unpause();
+    /// assert!(!client.is_paused());
+    /// ```
     pub fn unpause(env: Env) -> Result<(), Error> {
+
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
@@ -516,8 +752,184 @@ impl LedgerLensScoreContract {
     }
 
     /// Returns `true` when the contract is paused.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// assert!(!client.is_paused());
+    /// ```
     pub fn is_paused(env: Env) -> bool {
+
         storage::is_paused(&env)
+    }
+
+    // ── Time-locked upgrade governance ────────────────────────────────────────
+
+    /// Propose a contract WASM upgrade, starting the mandatory time-lock.
+    ///
+    /// The admin commits to `new_wasm_hash` (the hash of an already-installed
+    /// WASM, as produced by `install_contract_wasm`). The proposal is recorded
+    /// with `executable_after = now + get_upgrade_delay()`, and an
+    /// `upgrade_proposed` event is emitted so monitoring services and the
+    /// community can inspect and react during the delay window.
+    ///
+    /// Only the current admin may call this; a compromised *service* key
+    /// cannot initiate an upgrade. The proposal does **not** take effect until
+    /// `execute_upgrade` is called after the lock elapses, and it can be
+    /// cancelled at any time before then via `veto_upgrade`.
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if the contract has no admin yet.
+    /// - [`Error::UpgradeAlreadyPending`] if a proposal already exists — veto
+    ///   or execute it first (one in-flight proposal at a time).
+    pub fn propose_upgrade(env: Env, new_wasm_hash: BytesN<32>) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        let admin = storage::get_admin(&env);
+        admin.require_auth();
+
+        if storage::has_pending_upgrade(&env) {
+            return Err(Error::UpgradeAlreadyPending);
+        }
+
+        let now = env.ledger().timestamp();
+        let delay = storage::get_upgrade_delay(&env);
+        // delay is bounded to MAX_UPGRADE_DELAY_SECS on the way in, so this
+        // addition cannot realistically overflow; saturate as defence in depth.
+        let executable_after = now.saturating_add(delay);
+
+        let proposal = UpgradeProposal {
+            new_wasm_hash: new_wasm_hash.clone(),
+            proposed_at: now,
+            executable_after,
+            proposed_by: admin,
+        };
+        storage::set_pending_upgrade(&env, &proposal);
+
+        events::upgrade_proposed(&env, &new_wasm_hash, executable_after);
+        Ok(())
+    }
+
+    /// Execute the pending upgrade once its time-lock has elapsed.
+    ///
+    /// Re-verifies — at execution time, never from a cached decision — that
+    /// `now >= executable_after`, then invokes the Soroban upgrade primitive
+    /// `env.deployer().update_current_contract_wasm(new_wasm_hash)` to swap in
+    /// the new logic. The pending proposal is cleared and an `upgrade_executed`
+    /// event is emitted.
+    ///
+    /// Admin only.
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if the contract has no admin yet.
+    /// - [`Error::NoPendingUpgrade`] if there is no proposal to execute.
+    /// - [`Error::UpgradeNotReady`] if the time-lock has not yet elapsed.
+    pub fn execute_upgrade(env: Env) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        let admin = storage::get_admin(&env);
+        admin.require_auth();
+
+        let proposal = storage::get_pending_upgrade(&env).ok_or(Error::NoPendingUpgrade)?;
+
+        // Deterministic, caller-independent: the ledger timestamp cannot be
+        // manipulated by the invoker. Re-checked here so a delay change or a
+        // long-pending proposal is always evaluated against the real clock.
+        let now = env.ledger().timestamp();
+        if now < proposal.executable_after {
+            return Err(Error::UpgradeNotReady);
+        }
+
+        // The actual Soroban upgrade primitive — replaces this contract's WASM.
+        env.deployer().update_current_contract_wasm(proposal.new_wasm_hash.clone());
+
+        storage::clear_pending_upgrade(&env);
+        events::upgrade_executed(&env, &proposal.new_wasm_hash);
+        Ok(())
+    }
+
+    /// Cancel the pending upgrade during the time-lock window.
+    ///
+    /// Intended as the emergency escape hatch if a proposal is malicious or the
+    /// admin key was compromised and the legitimate admin (or a recovered key)
+    /// wants to stop it before execution. Clears the proposal and emits an
+    /// `upgrade_vetoed` event naming the caller for the audit trail.
+    ///
+    /// Admin only.
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if the contract has no admin yet.
+    /// - [`Error::NoPendingUpgrade`] if there is no proposal to veto.
+    pub fn veto_upgrade(env: Env) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        let admin = storage::get_admin(&env);
+        admin.require_auth();
+
+        if !storage::has_pending_upgrade(&env) {
+            return Err(Error::NoPendingUpgrade);
+        }
+        storage::clear_pending_upgrade(&env);
+
+        events::upgrade_vetoed(&env, &admin);
+        Ok(())
+    }
+
+    /// Returns the pending upgrade proposal so anyone can audit it during the
+    /// time-lock window. Read-only and callable by any account or contract.
+    ///
+    /// # Errors
+    /// - [`Error::NoPendingUpgrade`] if no proposal is currently pending.
+    pub fn get_pending_upgrade(env: Env) -> Result<UpgradeProposal, Error> {
+        storage::get_pending_upgrade(&env).ok_or(Error::NoPendingUpgrade)
+    }
+
+    /// Configure the upgrade time-lock delay (seconds) applied to future
+    /// proposals. Must be within `[MIN_UPGRADE_DELAY_SECS,
+    /// MAX_UPGRADE_DELAY_SECS]` (48 hours – 14 days). Admin only.
+    ///
+    /// Changing the delay only affects proposals created *after* the change;
+    /// an already-pending proposal keeps its original `executable_after`.
+    ///
+    /// Security note: *raising* the delay is always safe. *Lowering* it
+    /// shortens the community veto window and should only be done with broad
+    /// community consensus — see the README's Upgrade Governance section.
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if the contract has no admin yet.
+    /// - [`Error::InvalidUpgradeDelay`] if `delay_secs` is outside the bounds.
+    pub fn set_upgrade_delay(env: Env, delay_secs: u64) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        if !(constants::MIN_UPGRADE_DELAY_SECS..=constants::MAX_UPGRADE_DELAY_SECS)
+            .contains(&delay_secs)
+        {
+            return Err(Error::InvalidUpgradeDelay);
+        }
+        let admin = storage::get_admin(&env);
+        admin.require_auth();
+        storage::set_upgrade_delay(&env, delay_secs);
+        Ok(())
+    }
+
+    /// Returns the current upgrade time-lock delay in seconds. Defaults to
+    /// `DEFAULT_UPGRADE_DELAY_SECS` (48 hours) until configured.
+    pub fn get_upgrade_delay(env: Env) -> u64 {
+        storage::get_upgrade_delay(&env)
     }
 
     // ── Watchlist ────────────────────────────────────────────────────────────
@@ -525,7 +937,27 @@ impl LedgerLensScoreContract {
     /// Add or remove `wallet` from the priority-monitoring watchlist.
     /// Watchlisted wallets receive elevated scrutiny in off-chain analysis.
     /// Admin only.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// let wallet = Address::generate(&env);
+    /// assert!(!client.is_watchlisted(&wallet));
+    /// client.set_watchlist(&wallet, &true);
+    /// assert!(client.is_watchlisted(&wallet));
+    /// ```
     pub fn set_watchlist(env: Env, wallet: Address, flagged: bool) -> Result<(), Error> {
+
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
@@ -536,7 +968,25 @@ impl LedgerLensScoreContract {
     }
 
     /// Returns `true` if `wallet` is on the priority-monitoring watchlist.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// let wallet = Address::generate(&env);
+    /// assert!(!client.is_watchlisted(&wallet));
+    /// ```
     pub fn is_watchlisted(env: Env, wallet: Address) -> bool {
+
         storage::is_watchlisted(&env, &wallet)
     }
 
@@ -545,7 +995,25 @@ impl LedgerLensScoreContract {
     /// Set the global risk threshold (0-100).  Scores at or above this
     /// value will emit a `threshold_breached` event on every submission.
     /// Admin only.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// client.set_risk_threshold(&80);
+    /// assert_eq!(client.get_risk_threshold(), 80);
+    /// ```
     pub fn set_risk_threshold(env: Env, threshold: u32) -> Result<(), Error> {
+
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
@@ -561,14 +1029,48 @@ impl LedgerLensScoreContract {
     }
 
     /// Returns the current risk threshold.  Defaults to 75 until configured.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// assert_eq!(client.get_risk_threshold(), 75);
+    /// ```
     pub fn get_risk_threshold(env: Env) -> u32 {
+
         storage::get_risk_threshold(&env)
     }
 
     // ── Read-only admin / service ─────────────────────────────────────────────
 
     /// Returns the current admin address.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// assert_eq!(client.get_admin(), admin);
+    /// ```
     pub fn get_admin(env: Env) -> Result<Address, Error> {
+
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
@@ -586,6 +1088,7 @@ impl LedgerLensScoreContract {
         note = "Use get_service_signers / get_service_threshold for the M-of-N multisig model."
     )]
     pub fn get_service(env: Env) -> Result<Address, Error> {
+
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }

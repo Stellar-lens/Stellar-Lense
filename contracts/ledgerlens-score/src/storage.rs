@@ -1,9 +1,10 @@
 use soroban_sdk::{Address, Env, Symbol, Vec};
 
 use crate::constants::{
-    DEFAULT_RISK_THRESHOLD, HISTORY_MAX_DEPTH, SCORE_TTL_EXTEND_TO, SCORE_TTL_THRESHOLD,
+    DEFAULT_RISK_THRESHOLD, DEFAULT_UPGRADE_DELAY_SECS, HISTORY_MAX_DEPTH, SCORE_TTL_EXTEND_TO,
+    SCORE_TTL_THRESHOLD,
 };
-use crate::types::{AggregateRiskScore, DataKey, RiskScore};
+use crate::types::{AggregateRiskScore, DataKey, RiskScore, UpgradeProposal};
 
 // ── Admin / Service ─────────────────────────────────────────────────────────
 
@@ -197,24 +198,30 @@ pub fn set_aggregate_score(env: &Env, wallet: &Address, aggregate: &AggregateRis
     env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
 }
 
-// ── Multi-sig service set ─────────────────────────────────────────────────────
+// ── Time-locked upgrade governance ────────────────────────────────────────────
 
-/// Returns the current service signer set.  Returns an empty Vec before
-/// `add_service_signer` is called for the first time.
-pub fn get_service_set(env: &Env) -> Vec<Address> {
-    env.storage().instance().get(&DataKey::ServiceSet).unwrap_or_else(|| Vec::new(env))
+pub fn has_pending_upgrade(env: &Env) -> bool {
+    env.storage().instance().has(&DataKey::PendingUpgrade)
 }
 
-pub fn set_service_set(env: &Env, set: &Vec<Address>) {
-    env.storage().instance().set(&DataKey::ServiceSet, set);
+pub fn set_pending_upgrade(env: &Env, proposal: &UpgradeProposal) {
+    env.storage().instance().set(&DataKey::PendingUpgrade, proposal);
 }
 
-/// Returns the current signing threshold.  Defaults to `0` (unset) so
-/// callers can distinguish "never configured" from a legitimate threshold.
-pub fn get_service_threshold(env: &Env) -> u32 {
-    env.storage().instance().get(&DataKey::ServiceThreshold).unwrap_or(0)
+pub fn get_pending_upgrade(env: &Env) -> Option<UpgradeProposal> {
+    env.storage().instance().get(&DataKey::PendingUpgrade)
 }
 
-pub fn set_service_threshold(env: &Env, threshold: u32) {
-    env.storage().instance().set(&DataKey::ServiceThreshold, &threshold);
+pub fn clear_pending_upgrade(env: &Env) {
+    env.storage().instance().remove(&DataKey::PendingUpgrade);
+}
+
+/// Returns the configured upgrade delay, defaulting to
+/// `DEFAULT_UPGRADE_DELAY_SECS` until the admin sets one explicitly.
+pub fn get_upgrade_delay(env: &Env) -> u64 {
+    env.storage().instance().get(&DataKey::UpgradeDelay).unwrap_or(DEFAULT_UPGRADE_DELAY_SECS)
+}
+
+pub fn set_upgrade_delay(env: &Env, delay_secs: u64) {
+    env.storage().instance().set(&DataKey::UpgradeDelay, &delay_secs);
 }

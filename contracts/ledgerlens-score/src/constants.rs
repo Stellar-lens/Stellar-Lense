@@ -21,6 +21,22 @@ pub const CONTRACT_VERSION: u32 = 1;
 /// See the rustdoc on `get_aggregate_score` for detail.
 pub const MAX_WALLET_PAIRS: u32 = 20;
 
-/// Maximum number of addresses that may be members of the service signer set.
-/// Attempting to add an 11th address returns `ServiceSetFull`.
-pub const MAX_SERVICE_SIGNERS: u32 = 10;
+// ── Time-locked upgrade governance ────────────────────────────────────────────
+//
+// A WASM upgrade can replace the entire contract logic in one transaction, so
+// it is gated behind a mandatory delay during which the community can inspect
+// the pending proposal and react. These bounds frame the admin-configurable
+// delay; see `propose_upgrade` / `set_upgrade_delay` and the Upgrade Governance
+// section of the README.
+
+/// Minimum mandatory delay between proposing and executing an upgrade —
+/// 48 hours. The delay can be raised (safer) but never lowered below this.
+pub const MIN_UPGRADE_DELAY_SECS: u64 = 172_800; // 48 hours
+
+/// Maximum configurable upgrade delay — 14 days. Caps the lock so a
+/// legitimate, urgent fix is not stalled indefinitely.
+pub const MAX_UPGRADE_DELAY_SECS: u64 = 1_209_600; // 14 days
+
+/// Delay applied to a proposal when the admin has not configured one
+/// explicitly. Equal to the minimum (most conservative) by default.
+pub const DEFAULT_UPGRADE_DELAY_SECS: u64 = 172_800; // 48 hours

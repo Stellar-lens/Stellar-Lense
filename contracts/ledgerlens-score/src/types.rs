@@ -1,4 +1,4 @@
-use soroban_sdk::{contracttype, Address, Symbol};
+use soroban_sdk::{contracttype, Address, BytesN, Symbol};
 
 /// On-chain record of the latest LedgerLens risk assessment for a
 /// wallet / asset-pair combination. Written by `submit_score` and
@@ -60,6 +60,28 @@ pub struct AggregateRiskScore {
     pub last_updated: u64,
 }
 
+/// A pending, time-locked contract WASM upgrade.
+///
+/// Created by `propose_upgrade` and cleared by `execute_upgrade` /
+/// `veto_upgrade`. While one exists, any observer can read it via
+/// `get_pending_upgrade` to inspect the committed WASM hash and the earliest
+/// time the upgrade can take effect — the basis of the community monitoring
+/// window described in the README's Upgrade Governance section.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct UpgradeProposal {
+    /// Hash of the new contract WASM the admin has committed to installing.
+    pub new_wasm_hash: BytesN<32>,
+    /// Ledger timestamp when the proposal was created.
+    pub proposed_at: u64,
+    /// Earliest ledger timestamp at which `execute_upgrade` may run
+    /// (`proposed_at + upgrade_delay_secs`).
+    pub executable_after: u64,
+    /// The admin address that created the proposal — recorded for the audit
+    /// trail so a veto can attribute the original proposer.
+    pub proposed_by: Address,
+}
+
 #[contracttype]
 #[derive(Clone)]
 pub enum DataKey {
@@ -92,11 +114,9 @@ pub enum DataKey {
     /// it always recomputes from the live per-pair scores — so this key
     /// exists purely as a cheap snapshot for off-chain indexers.
     AggregateScore(Address),
-    /// Ordered set of N addresses authorised to co-sign score submissions.
-    /// A score submission is accepted only when M of these addresses have
-    /// individually authorized it in the same transaction.
-    ServiceSet,
-    /// The M-of-N threshold: the minimum number of service-set members that
-    /// must sign a `submit_score` call for it to be accepted.
-    ServiceThreshold,
+    /// The single in-flight time-locked upgrade proposal, if any.
+    PendingUpgrade,
+    /// Admin-configured delay (seconds) between proposing and executing an
+    /// upgrade. Defaults to `DEFAULT_UPGRADE_DELAY_SECS` when unset.
+    UpgradeDelay,
 }
