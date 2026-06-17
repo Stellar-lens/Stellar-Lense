@@ -74,22 +74,33 @@ pub fn threshold_breached(
         .publish((symbol_short!("breach"), wallet.clone()), (asset_pair.clone(), score, threshold));
 }
 
-// ── Time-locked upgrade governance ────────────────────────────────────────────
+// ── Multi-sig service set ─────────────────────────────────────────────────────
 
-/// Emitted by `propose_upgrade`. The `executable_after` timestamp gives
-/// monitoring services the exact start of the veto window's end so they can
-/// alert the community ahead of execution.
-pub fn upgrade_proposed(env: &Env, wasm_hash: &BytesN<32>, executable_after: u64) {
-    env.events().publish((symbol_short!("upg_prop"),), (wasm_hash.clone(), executable_after));
+/// Emitted when a new signer is added to the service set.
+pub fn signer_added(env: &Env, signer: &Address) {
+    env.events().publish((symbol_short!("sig_add"),), signer.clone());
 }
 
-/// Emitted by `execute_upgrade` once the new WASM hash has been installed.
-pub fn upgrade_executed(env: &Env, wasm_hash: &BytesN<32>) {
-    env.events().publish((symbol_short!("upg_exec"),), wasm_hash.clone());
+/// Emitted when a signer is removed from the service set.
+pub fn signer_removed(env: &Env, signer: &Address) {
+    env.events().publish((symbol_short!("sig_rem"),), signer.clone());
 }
 
-/// Emitted by `veto_upgrade`. `by` is the admin that cancelled the pending
-/// proposal, completing the on-chain audit trail.
+/// Emitted when the service signing threshold is updated.
+pub fn service_threshold_updated(env: &Env, threshold: u32) {
+    env.events().publish((symbol_short!("sig_thr"),), threshold);
+}
+
+// ── Upgrade governance ────────────────────────────────────────────────────────
+
+pub fn upgrade_proposed(env: &Env, new_wasm_hash: &BytesN<32>, executable_after: u64) {
+    env.events().publish((symbol_short!("upg_prop"),), (new_wasm_hash.clone(), executable_after));
+}
+
+pub fn upgrade_executed(env: &Env, new_wasm_hash: &BytesN<32>) {
+    env.events().publish((symbol_short!("upg_exec"),), new_wasm_hash.clone());
+}
+
 pub fn upgrade_vetoed(env: &Env, by: &Address) {
     env.events().publish((symbol_short!("upg_veto"),), by.clone());
 }

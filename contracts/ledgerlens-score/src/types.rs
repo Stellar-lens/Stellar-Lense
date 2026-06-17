@@ -119,4 +119,9 @@ pub enum DataKey {
     /// Admin-configured delay (seconds) between proposing and executing an
     /// upgrade. Defaults to `DEFAULT_UPGRADE_DELAY_SECS` when unset.
     UpgradeDelay,
+    /// Ordered set of N addresses authorised to co-sign score submissions.
+    ServiceSet,
+    /// The M-of-N threshold: minimum number of service-set members that must
+    /// sign a `submit_score` call for it to be accepted.
+    ServiceThreshold,
 }

@@ -40,3 +40,6 @@ pub const MAX_UPGRADE_DELAY_SECS: u64 = 1_209_600; // 14 days
 /// Delay applied to a proposal when the admin has not configured one
 /// explicitly. Equal to the minimum (most conservative) by default.
 pub const DEFAULT_UPGRADE_DELAY_SECS: u64 = 172_800; // 48 hours
+
+/// Maximum number of addresses in the M-of-N service signer set.
+pub const MAX_SERVICE_SIGNERS: u32 = 10;

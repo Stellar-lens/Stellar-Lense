@@ -12,7 +12,7 @@
           "function": {
             "contract_fn": {
               "contract_address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-              "function_name": "set_service",
+              "function_name": "add_service_signer",
               "args": [
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
@@ -24,7 +24,25 @@
         }
       ]
     ],
-    [],
+    [
+      [
+        "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
+        {
+          "function": {
+            "contract_fn": {
+              "contract_address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+              "function_name": "set_service_threshold",
+              "args": [
+                {
+                  "u32": 1
+                }
+              ]
+            }
+          },
+          "sub_invocations": []
+        }
+      ]
+    ],
     [
       [
         "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4",
@@ -35,7 +53,11 @@
               "function_name": "submit_score",
               "args": [
                 {
-                  "vec": []
+                  "vec": [
+                    {
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                    }
+                  ]
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
@@ -44,19 +66,19 @@
                   "symbol": "XLM_USDC"
                 },
                 {
-                  "u32": 10
+                  "u32": 42
                 },
                 {
                   "bool": false
                 },
                 {
-                  "bool": false
+                  "bool": true
                 },
                 {
-                  "u64": 0
+                  "u64": 100
                 },
                 {
-                  "u32": 10
+                  "u32": 90
                 },
                 {
                   "u32": 1
@@ -67,7 +89,8 @@
           "sub_invocations": []
         }
       ]
-    ]
+    ],
+    []
   ],
   "ledger": {
     "protocol_version": 21,
@@ -121,7 +144,7 @@
                         "symbol": "aggregate_score"
                       },
                       "val": {
-                        "u32": 10
+                        "u32": 42
                       }
                     },
                     {
@@ -137,7 +160,7 @@
                         "symbol": "last_updated"
                       },
                       "val": {
-                        "u64": 0
+                        "u64": 100
                       }
                     },
                     {
@@ -153,7 +176,7 @@
                         "symbol": "max_pair_score"
                       },
                       "val": {
-                        "u32": 10
+                        "u32": 42
                       }
                     },
                     {
@@ -161,7 +184,7 @@
                         "symbol": "ml_flag_count"
                       },
                       "val": {
-                        "u32": 0
+                        "u32": 1
                       }
                     },
                     {
@@ -286,7 +309,7 @@
                         "symbol": "confidence"
                       },
                       "val": {
-                        "u32": 10
+                        "u32": 90
                       }
                     },
                     {
@@ -294,7 +317,7 @@
                         "symbol": "ml_flag"
                       },
                       "val": {
-                        "bool": false
+                        "bool": true
                       }
                     },
                     {
@@ -310,7 +333,7 @@
                         "symbol": "score"
                       },
                       "val": {
-                        "u32": 10
+                        "u32": 42
                       }
                     },
                     {
@@ -318,7 +341,7 @@
                         "symbol": "timestamp"
                       },
                       "val": {
-                        "u64": 0
+                        "u64": 100
                       }
                     }
                   ]
@@ -388,7 +411,7 @@
                             "symbol": "confidence"
                           },
                           "val": {
-                            "u32": 10
+                            "u32": 90
                           }
                         },
                         {
@@ -396,7 +419,7 @@
                             "symbol": "ml_flag"
                           },
                           "val": {
-                            "bool": false
+                            "bool": true
                           }
                         },
                         {
@@ -412,7 +435,7 @@
                             "symbol": "score"
                           },
                           "val": {
-                            "u32": 10
+                            "u32": 42
                           }
                         },
                         {
@@ -420,7 +443,7 @@
                             "symbol": "timestamp"
                           },
                           "val": {
-                            "u64": 0
+                            "u64": 100
                           }
                         }
                       ]
@@ -478,7 +501,35 @@
                           ]
                         },
                         "val": {
-                          "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                          "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
+                        }
+                      },
+                      {
+                        "key": {
+                          "vec": [
+                            {
+                              "symbol": "ServiceSet"
+                            }
+                          ]
+                        },
+                        "val": {
+                          "vec": [
+                            {
+                              "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "key": {
+                          "vec": [
+                            {
+                              "symbol": "ServiceThreshold"
+                            }
+                          ]
+                        },
+                        "val": {
+                          "u32": 1
                         }
                       }
                     ]
@@ -527,7 +578,7 @@
       [
         {
           "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4",
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
             "key": {
               "ledger_key_nonce": {
                 "nonce": 5541220902715666415
@@ -542,10 +593,43 @@
             "data": {
               "contract_data": {
                 "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
                 "key": {
                   "ledger_key_nonce": {
                     "nonce": 5541220902715666415
+                  }
+                },
+                "durability": "temporary",
+                "val": "void"
+              }
+            },
+            "ext": "v0"
+          },
+          6311999
+        ]
+      ],
+      [
+        {
+          "contract_data": {
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4",
+            "key": {
+              "ledger_key_nonce": {
+                "nonce": 1033654523790656264
+              }
+            },
+            "durability": "temporary"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4",
+                "key": {
+                  "ledger_key_nonce": {
+                    "nonce": 1033654523790656264
                   }
                 },
                 "durability": "temporary",
@@ -650,7 +734,7 @@
                 "bytes": "0000000000000000000000000000000000000000000000000000000000000001"
               },
               {
-                "symbol": "set_service"
+                "symbol": "add_service_signer"
               }
             ],
             "data": {
@@ -670,7 +754,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "svc_upd"
+                "symbol": "sig_add"
               }
             ],
             "data": {
@@ -693,7 +777,7 @@
                 "symbol": "fn_return"
               },
               {
-                "symbol": "set_service"
+                "symbol": "add_service_signer"
               }
             ],
             "data": "void"
@@ -717,10 +801,32 @@
                 "bytes": "0000000000000000000000000000000000000000000000000000000000000001"
               },
               {
-                "symbol": "get_service"
+                "symbol": "set_service_threshold"
               }
             ],
-            "data": "void"
+            "data": {
+              "u32": 1
+            }
+          }
+        }
+      },
+      "failed_call": false
+    },
+    {
+      "event": {
+        "ext": "v0",
+        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
+        "type_": "contract",
+        "body": {
+          "v0": {
+            "topics": [
+              {
+                "symbol": "sig_thr"
+              }
+            ],
+            "data": {
+              "u32": 1
+            }
           }
         }
       },
@@ -738,12 +844,10 @@
                 "symbol": "fn_return"
               },
               {
-                "symbol": "get_service"
+                "symbol": "set_service_threshold"
               }
             ],
-            "data": {
-              "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
-            }
+            "data": "void"
           }
         }
       },
@@ -770,7 +874,11 @@
             "data": {
               "vec": [
                 {
-                  "vec": []
+                  "vec": [
+                    {
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                    }
+                  ]
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
@@ -779,19 +887,19 @@
                   "symbol": "XLM_USDC"
                 },
                 {
-                  "u32": 10
+                  "u32": 42
                 },
                 {
                   "bool": false
                 },
                 {
-                  "bool": false
+                  "bool": true
                 },
                 {
-                  "u64": 0
+                  "u64": 100
                 },
                 {
-                  "u32": 10
+                  "u32": 90
                 },
                 {
                   "u32": 1
@@ -824,19 +932,19 @@
             "data": {
               "vec": [
                 {
-                  "u32": 10
+                  "u32": 42
                 },
                 {
                   "bool": false
                 },
                 {
-                  "bool": false
+                  "bool": true
                 },
                 {
-                  "u32": 10
+                  "u32": 90
                 },
                 {
-                  "u64": 0
+                  "u64": 100
                 }
               ]
             }
@@ -861,6 +969,111 @@
               }
             ],
             "data": "void"
+          }
+        }
+      },
+      "failed_call": false
+    },
+    {
+      "event": {
+        "ext": "v0",
+        "contract_id": null,
+        "type_": "diagnostic",
+        "body": {
+          "v0": {
+            "topics": [
+              {
+                "symbol": "fn_call"
+              },
+              {
+                "bytes": "0000000000000000000000000000000000000000000000000000000000000001"
+              },
+              {
+                "symbol": "get_score"
+              }
+            ],
+            "data": {
+              "vec": [
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
+                },
+                {
+                  "symbol": "XLM_USDC"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "failed_call": false
+    },
+    {
+      "event": {
+        "ext": "v0",
+        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
+        "type_": "diagnostic",
+        "body": {
+          "v0": {
+            "topics": [
+              {
+                "symbol": "fn_return"
+              },
+              {
+                "symbol": "get_score"
+              }
+            ],
+            "data": {
+              "map": [
+                {
+                  "key": {
+                    "symbol": "benford_flag"
+                  },
+                  "val": {
+                    "bool": false
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "confidence"
+                  },
+                  "val": {
+                    "u32": 90
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "ml_flag"
+                  },
+                  "val": {
+                    "bool": true
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "model_version"
+                  },
+                  "val": {
+                    "u32": 1
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "score"
+                  },
+                  "val": {
+                    "u32": 42
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "timestamp"
+                  },
+                  "val": {
+                    "u64": 100
+                  }
+                }
+              ]
+            }
           }
         }
       },

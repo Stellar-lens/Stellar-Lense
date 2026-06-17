@@ -23,18 +23,28 @@ pub enum Error {
     /// Returned when the weighted aggregate computation in
     /// `get_aggregate_score` would overflow.
     ArithmeticOverflow = 11,
-
-    // ── Time-locked upgrade governance ────────────────────────────────────
-    /// Returned when `execute_upgrade`, `veto_upgrade`, or
-    /// `get_pending_upgrade` is called but no proposal exists.
-    NoPendingUpgrade = 20,
-    /// Returned when `execute_upgrade` is called before the time lock
-    /// (`executable_after`) has elapsed.
-    UpgradeNotReady = 21,
-    /// Returned when `propose_upgrade` is called while a proposal is already
-    /// pending. Veto or execute the existing one first.
-    UpgradeAlreadyPending = 22,
-    /// Returned when `set_upgrade_delay` is given a value below
-    /// `MIN_UPGRADE_DELAY_SECS` or above `MAX_UPGRADE_DELAY_SECS`.
-    InvalidUpgradeDelay = 23,
+    /// Fewer than the configured threshold of signers were provided to
+    /// `submit_score`.
+    InsufficientSigners = 14,
+    /// A signer passed to `submit_score` is not a member of the service set.
+    UnauthorizedSigner = 15,
+    /// `set_service_threshold` was called with `0` or a value exceeding
+    /// the current service-set size.
+    InvalidThreshold = 16,
+    /// `add_service_signer` was called when the service set already contains
+    /// `MAX_SERVICE_SIGNERS` members.
+    ServiceSetFull = 17,
+    /// `add_service_signer` was called with an address already in the set.
+    SignerAlreadyInSet = 18,
+    /// `remove_service_signer` was called with an address not in the set.
+    SignerNotInSet = 19,
+    /// `propose_upgrade` was called while a proposal is already pending.
+    UpgradeAlreadyPending = 12,
+    /// `execute_upgrade` was called before the time-lock elapsed, or
+    /// `get_pending_upgrade` was called when no proposal exists.
+    NoPendingUpgrade = 13,
+    /// `execute_upgrade` called before `executable_after` timestamp.
+    UpgradeNotReady = 20,
+    /// `set_upgrade_delay` called with a value outside the allowed bounds.
+    InvalidUpgradeDelay = 21,
 }
