@@ -18,7 +18,10 @@ import networkx as nx
 import pandas as pd
 
 from config import config
-from detection.benford_engine import compute_benford_metrics_for_windows, cross_pair_benford_consistency
+from detection.benford_engine import (
+    compute_benford_metrics_for_windows,
+    cross_pair_benford_consistency,
+)
 from detection.wallet_graph import compute_wallet_graph_metrics
 from ingestion.data_models import AccountActivity
 
@@ -198,8 +201,6 @@ def compute_cross_asset_features(
     if "ledger_close_time" not in all_pairs_df.columns:
         return default_features
 
-    timestamps = pd.to_datetime(all_pairs_df["ledger_close_time"], errors="coerce")
-
     # Filter to trades involving the wallet
     mask = (all_pairs_df["base_account"] == wallet) | (all_pairs_df["counter_account"] == wallet)
     wallet_trades = all_pairs_df[mask].copy()
@@ -225,7 +226,7 @@ def compute_cross_asset_features(
     wallet_times = pd.to_datetime(wallet_trades["ledger_close_time"], errors="coerce")
     window_seconds = config.CROSS_PAIR_SYNCHRONY_WINDOW_SECONDS
     synchrony_count = 0
-    for idx, trade_time in enumerate(wallet_times):
+    for trade_time in wallet_times:
         if pd.isna(trade_time):
             continue
         other_trades = wallet_times[

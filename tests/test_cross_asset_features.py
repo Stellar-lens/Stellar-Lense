@@ -1,7 +1,6 @@
 """Tests for cross-asset coordination detection features."""
 
 import pandas as pd
-import pytest
 
 from detection.benford_engine import cross_pair_benford_consistency
 from detection.feature_engineering import (
