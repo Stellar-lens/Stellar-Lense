@@ -128,4 +128,11 @@ pub enum DataKey {
     /// are considered stale by `is_score_stale`. Defaults to
     /// `DEFAULT_STALENESS_WINDOW_SECS` when unset.
     StalenessWindow,
+    /// Ledger timestamp of the most recent accepted submission for a
+    /// (wallet, asset_pair) pair, used to enforce the submission cooldown.
+    LastSubmitTime(Address, Symbol),
+    /// Admin-configured cooldown (seconds) enforced between accepted
+    /// submissions for the same (wallet, asset_pair). Defaults to
+    /// `DEFAULT_COOLDOWN_SECS` when unset.
+    CooldownSecs,
 }

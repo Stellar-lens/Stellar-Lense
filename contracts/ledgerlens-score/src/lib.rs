@@ -16,6 +16,9 @@ mod test_upgrade;
 #[cfg(test)]
 mod test_interface;
 
+#[cfg(test)]
+mod test_rate_limit;
+
 use soroban_sdk::{contract, contractimpl, symbol_short, Address, BytesN, Env, Symbol, Vec};
 
 pub use errors::Error;
@@ -100,6 +103,11 @@ impl LedgerLensScoreContract {
     ///
     /// Returns `ContractPaused` if the admin has activated the circuit breaker.
     ///
+    /// Rejects submissions for the same `(wallet, asset_pair)` that arrive
+    /// before the configured cooldown (`get_cooldown`, 1 hour by default) has
+    /// elapsed since the last accepted one, returning `RateLimitExceeded`.
+    /// See the README's Rate Limiting section.
+    ///
     /// # Examples
     ///
     /// ```
@@ -169,6 +177,16 @@ impl LedgerLensScoreContract {
             return Err(Error::InvalidConfidence);
         }
 
+        let last_submit = storage::get_last_submit_time(&env, &wallet, &asset_pair);
+        let cooldown = storage::get_cooldown_secs(&env);
+        let now = env.ledger().timestamp();
+        // `last_submit == 0` means "never accepted" (see get_last_submit_time) —
+        // not a real submission at the epoch — so the cooldown doesn't apply yet.
+        if last_submit != 0 && now < last_submit.saturating_add(cooldown) {
+            return Err(Error::RateLimitExceeded);
+        }
+        storage::set_last_submit_time(&env, &wallet, &asset_pair, now);
+
         let risk_score =
             RiskScore { score, benford_flag, ml_flag, timestamp, confidence, model_version };
 
@@ -188,8 +206,12 @@ impl LedgerLensScoreContract {
 
     /// Submit multiple risk scores in a single invocation.  The service
     /// account authorises once for the whole batch.  Entries with
-    /// out-of-range `score` or `confidence` are silently skipped; the
-    /// function returns the count of successfully written entries.
+    /// out-of-range `score` or `confidence`, or that arrive before their
+    /// `(wallet, asset_pair)`'s submission cooldown has elapsed, are silently
+    /// skipped; the function returns the count of successfully written
+    /// entries. Two entries for the same pair within one batch are subject to
+    /// the same cooldown — the second is skipped, since both share the same
+    /// ledger timestamp.
     ///
     /// # Examples
     ///
@@ -234,6 +256,8 @@ impl LedgerLensScoreContract {
         }
 
         let threshold = storage::get_risk_threshold(&env);
+        let cooldown = storage::get_cooldown_secs(&env);
+        let now = env.ledger().timestamp();
         let mut accepted: u32 = 0;
 
         for i in 0..submissions.len() {
@@ -242,6 +266,12 @@ impl LedgerLensScoreContract {
             if sub.score > 100 || sub.confidence > 100 {
                 continue;
             }
+
+            let last_submit = storage::get_last_submit_time(&env, &sub.wallet, &sub.asset_pair);
+            if last_submit != 0 && now < last_submit.saturating_add(cooldown) {
+                continue;
+            }
+            storage::set_last_submit_time(&env, &sub.wallet, &sub.asset_pair, now);
 
             let risk_score = RiskScore {
                 score: sub.score,
@@ -311,7 +341,7 @@ impl LedgerLensScoreContract {
     ///
     /// ```
     /// # use ledgerlens_score::LedgerLensScoreContractClient;
-    /// # use soroban_sdk::{testutils::Address as _, Env, Address};
+    /// # use soroban_sdk::{testutils::{Address as _, Ledger as _}, Env, Address};
     /// # use ledgerlens_score::LedgerLensScoreContract;
     /// # use soroban_sdk::symbol_short;
     /// let env = Env::default();
@@ -324,6 +354,8 @@ impl LedgerLensScoreContract {
     /// let wallet = Address::generate(&env);
     /// let asset_pair = symbol_short!("XLM_USDC");
     /// client.submit_score(&wallet, &asset_pair, &10, &false, &false, &1, &50, &1).unwrap();
+    /// // Advance past the default 1-hour cooldown before re-scoring the same pair.
+    /// env.ledger().with_mut(|l| l.timestamp += 3_601);
     /// client.submit_score(&wallet, &asset_pair, &20, &false, &false, &2, &60, &1).unwrap();
     /// let history = client.get_score_history(&wallet, &asset_pair);
     /// assert_eq!(history.len(), 2);
@@ -1068,6 +1100,97 @@ impl LedgerLensScoreContract {
     /// `DEFAULT_STALENESS_WINDOW_SECS` (7 days) until configured.
     pub fn get_staleness_window(env: Env) -> u64 {
         storage::get_staleness_window(&env)
+    }
+
+    // ── Per-wallet/pair submission rate limiting ─────────────────────────────
+
+    /// Configure the cooldown (seconds) enforced between accepted
+    /// submissions for the same `(wallet, asset_pair)`. Must be within
+    /// `[MIN_COOLDOWN_SECS, MAX_COOLDOWN_SECS]` (1 minute – 24 hours).
+    /// Admin only.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// client.set_cooldown(&120);
+    /// assert_eq!(client.get_cooldown(), 120);
+    /// ```
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if the contract has no admin yet.
+    /// - [`Error::InvalidCooldown`] if `secs` is outside the bounds.
+    pub fn set_cooldown(env: Env, secs: u64) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        if !(constants::MIN_COOLDOWN_SECS..=constants::MAX_COOLDOWN_SECS).contains(&secs) {
+            return Err(Error::InvalidCooldown);
+        }
+        let admin = storage::get_admin(&env);
+        admin.require_auth();
+        storage::set_cooldown_secs(&env, secs);
+        events::cooldown_updated(&env, secs);
+        Ok(())
+    }
+
+    /// Returns the current submission cooldown in seconds. Defaults to
+    /// `DEFAULT_COOLDOWN_SECS` (1 hour) until configured.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// assert_eq!(client.get_cooldown(), 3_600);
+    /// ```
+    pub fn get_cooldown(env: Env) -> u64 {
+        storage::get_cooldown_secs(&env)
+    }
+
+    /// Emergency re-score path: immediately clears the submission cooldown
+    /// for `(wallet, asset_pair)`, allowing the very next `submit_score` /
+    /// `submit_scores_batch` call to be accepted regardless of how recently
+    /// the last one was. This is **not** a routine operation — it exists for
+    /// situations such as a known-bad score that needs correcting right away,
+    /// not for working around the rate limiter during normal operation.
+    /// Admin only.
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if the contract has no admin yet.
+    pub fn override_rate_limit(env: Env, wallet: Address, asset_pair: Symbol) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        let admin = storage::get_admin(&env);
+        admin.require_auth();
+        storage::clear_last_submit_time(&env, &wallet, &asset_pair);
+        events::rate_limit_overridden(&env, &admin, &wallet, &asset_pair);
+        Ok(())
+    }
+
+    /// Returns the ledger timestamp of the last accepted submission for
+    /// `(wallet, asset_pair)`, or `0` if none has ever been accepted (or it
+    /// was cleared by `override_rate_limit`).
+    pub fn get_last_submit_time(env: Env, wallet: Address, asset_pair: Symbol) -> u64 {
+        storage::get_last_submit_time(&env, &wallet, &asset_pair)
     }
 
     // ── Read-only admin / service ─────────────────────────────────────────────

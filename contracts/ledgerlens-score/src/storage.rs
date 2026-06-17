@@ -1,8 +1,8 @@
 use soroban_sdk::{Address, Env, Symbol, Vec};
 
 use crate::constants::{
-    DEFAULT_RISK_THRESHOLD, DEFAULT_UPGRADE_DELAY_SECS, HISTORY_MAX_DEPTH, SCORE_TTL_EXTEND_TO,
-    SCORE_TTL_THRESHOLD,
+    DEFAULT_COOLDOWN_SECS, DEFAULT_RISK_THRESHOLD, DEFAULT_UPGRADE_DELAY_SECS, HISTORY_MAX_DEPTH,
+    SCORE_TTL_EXTEND_TO, SCORE_TTL_THRESHOLD,
 };
 use crate::types::{AggregateRiskScore, DataKey, RiskScore, UpgradeProposal};
 
@@ -253,4 +253,44 @@ pub fn get_staleness_window(env: &Env) -> u64 {
 
 pub fn set_staleness_window(env: &Env, window_secs: u64) {
     env.storage().instance().set(&DataKey::StalenessWindow, &window_secs);
+}
+
+// ── Per-wallet/pair submission rate limiting ─────────────────────────────────
+
+/// Returns the ledger timestamp of the last accepted submission for
+/// `(wallet, asset_pair)`, or `0` if none has ever been accepted (or it was
+/// cleared by `override_rate_limit`).
+pub fn get_last_submit_time(env: &Env, wallet: &Address, asset_pair: &Symbol) -> u64 {
+    let key = DataKey::LastSubmitTime(wallet.clone(), asset_pair.clone());
+    let result: Option<u64> = env.storage().persistent().get(&key);
+    if result.is_some() {
+        env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    }
+    result.unwrap_or(0)
+}
+
+/// Records `timestamp` as the most recent accepted submission time for
+/// `(wallet, asset_pair)`. Uses the same TTL as `Score` so a cooldown entry
+/// never outlives (or falls out of sync with) the score it gates.
+pub fn set_last_submit_time(env: &Env, wallet: &Address, asset_pair: &Symbol, timestamp: u64) {
+    let key = DataKey::LastSubmitTime(wallet.clone(), asset_pair.clone());
+    env.storage().persistent().set(&key, &timestamp);
+    env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+}
+
+/// Clears the last-submit timestamp for `(wallet, asset_pair)`, immediately
+/// lifting its cooldown. Used by the admin emergency path `override_rate_limit`.
+pub fn clear_last_submit_time(env: &Env, wallet: &Address, asset_pair: &Symbol) {
+    let key = DataKey::LastSubmitTime(wallet.clone(), asset_pair.clone());
+    env.storage().persistent().remove(&key);
+}
+
+/// Returns the configured submission cooldown (seconds), defaulting to
+/// `DEFAULT_COOLDOWN_SECS` (1 hour) until the admin sets one explicitly.
+pub fn get_cooldown_secs(env: &Env) -> u64 {
+    env.storage().instance().get(&DataKey::CooldownSecs).unwrap_or(DEFAULT_COOLDOWN_SECS)
+}
+
+pub fn set_cooldown_secs(env: &Env, secs: u64) {
+    env.storage().instance().set(&DataKey::CooldownSecs, &secs);
 }

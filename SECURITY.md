@@ -54,6 +54,7 @@ We follow [Responsible Disclosure](https://en.wikipedia.org/wiki/Coordinated_vul
 | Score poisoning via out-of-range data | `score` and `confidence` clamped to 0-100 on-chain               |
 | DoS via unbounded storage            | History ring buffer capped at `HISTORY_MAX_DEPTH` (10) per pair  |
 | Large batch denial of service        | Batch size capped at `MAX_BATCH_SIZE` (20) per invocation        |
+| Compromised service floods a pair with submissions | Per-`(wallet, asset_pair)` cooldown (`RateLimitExceeded`); admin-bounded `[MIN_COOLDOWN_SECS, MAX_COOLDOWN_SECS]`, with `override_rate_limit` as an audited emergency escape hatch |
 | Silent malicious contract upgrade    | Time-locked upgrade governance (see below): mandatory delay + on-chain proposal anyone can inspect, plus admin veto |
 
 ## Upgrade Governance & Threat Model

@@ -104,3 +104,19 @@ pub fn upgrade_executed(env: &Env, new_wasm_hash: &BytesN<32>) {
 pub fn upgrade_vetoed(env: &Env, by: &Address) {
     env.events().publish((symbol_short!("upg_veto"),), by.clone());
 }
+
+// ── Per-wallet/pair submission rate limiting ──────────────────────────────────
+
+/// Emitted when the admin sets the global submission cooldown via
+/// `set_cooldown`.
+pub fn cooldown_updated(env: &Env, cooldown_secs: u64) {
+    env.events().publish((symbol_short!("cd_upd"),), cooldown_secs);
+}
+
+/// Emitted by `override_rate_limit`. `by` is the admin that cleared the
+/// cooldown for `(wallet, asset_pair)` — the emergency re-score path, not a
+/// routine operation, so this is worth a dedicated audit-trail event.
+pub fn rate_limit_overridden(env: &Env, by: &Address, wallet: &Address, asset_pair: &Symbol) {
+    env.events()
+        .publish((symbol_short!("rl_ovrd"), wallet.clone(), asset_pair.clone()), by.clone());
+}

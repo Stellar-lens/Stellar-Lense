@@ -10,7 +10,9 @@
 //! a breaking change to a published ABI, not merely a regression.
 
 use soroban_sdk::{
-    symbol_short, testutils::Address as _, Address, Env, IntoVal, Symbol, TryFromVal, Val, Vec,
+    symbol_short,
+    testutils::{Address as _, Ledger as _},
+    Address, Env, IntoVal, Symbol, TryFromVal, Val, Vec,
 };
 
 use crate::{Error, LedgerLensScoreContract, LedgerLensScoreContractClient, RiskScore};
@@ -135,6 +137,11 @@ fn test_query_risk_gate_never_panics() {
     };
 
     for _ in 0..1000 {
+        // Each round resubmits the same (wallet, pair); advance past the
+        // default cooldown each time so the rate limiter doesn't reject these
+        // refreshes — this loop fuzzes the *gate*, not the rate limiter.
+        env.ledger().with_mut(|l| l.timestamp += 3_601);
+
         // Refresh the scored wallet with an arbitrary in-range score so the
         // stored value (and the comparison against it) varies across rounds.
         let score = next() % 101;

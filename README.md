@@ -103,6 +103,15 @@ Permissionless. Returns the in-flight proposal so anyone can audit it during the
 ### `set_upgrade_delay(delay_secs: u64)` / `get_upgrade_delay() -> u64`
 Admin sets the time-lock delay applied to future proposals, bounded to `[MIN_UPGRADE_DELAY_SECS, MAX_UPGRADE_DELAY_SECS]` (48 hours – 14 days); out-of-range values are rejected with `InvalidUpgradeDelay`. Defaults to 48 hours.
 
+### `set_cooldown(secs: u64)` / `get_cooldown() -> u64`
+Admin sets the cooldown enforced between accepted submissions for the same `(wallet, asset_pair)`, bounded to `[MIN_COOLDOWN_SECS, MAX_COOLDOWN_SECS]` (1 minute – 24 hours); out-of-range values are rejected with `InvalidCooldown`. Defaults to 1 hour. See [Rate Limiting](#rate-limiting).
+
+### `override_rate_limit(wallet: Address, asset_pair: Symbol)`
+Admin-only emergency escape hatch. Immediately clears the stored cooldown deadline for `(wallet, asset_pair)`, so the next `submit_score` / `submit_scores_batch` call for that pair is accepted regardless of how recently the last one was. Intended for correcting a known-bad score right away, not for routine use. Emits `rl_ovrd`.
+
+### `get_last_submit_time(wallet: Address, asset_pair: Symbol) -> u64`
+Read-only lookup of the ledger timestamp of the last accepted submission for `(wallet, asset_pair)`, or `0` if none has ever been accepted (or it was cleared by `override_rate_limit`).
+
 ### `RiskScore` Structure
 
 ```rust
@@ -200,6 +209,20 @@ Soroban contracts can be upgraded by the admin via `update_current_contract_wasm
 
 The time-lock is computed from `env.ledger().timestamp()` (deterministic, not caller-settable) and re-verified at execution time — never cached. The configurable delay is bounded to `[MIN_UPGRADE_DELAY_SECS, MAX_UPGRADE_DELAY_SECS]`; **raising** it is always safe, while **lowering** it shortens the veto window and should require community consensus. See [`SECURITY.md`](SECURITY.md#upgrade-governance--threat-model) for the full threat model and monitoring guidance.
 
+## Rate Limiting
+
+A compromised or malfunctioning off-chain service could otherwise flood the contract with submissions for the same `(wallet, asset_pair)`, exhausting storage rent, overwhelming indexers, and poisoning the score signal with rapid fluctuations. LedgerLens enforces a configurable **cooldown** between accepted submissions for any given wallet/asset-pair to bound that blast radius.
+
+**The flow:**
+
+1. On every `submit_score` (and per-entry in `submit_scores_batch`), the contract compares `env.ledger().timestamp()` against the pair's last accepted submission time plus the configured cooldown.
+2. If the cooldown hasn't elapsed, `submit_score` returns `RateLimitExceeded`; in `submit_scores_batch` the offending entry is silently skipped (the rest of the batch still processes) and counted as not accepted.
+3. A successful submission updates the pair's last-submit timestamp, starting the next cooldown window.
+
+The cooldown defaults to **1 hour** and is admin-configurable via `set_cooldown`, bounded to `[MIN_COOLDOWN_SECS, MAX_COOLDOWN_SECS]` (1 minute – 24 hours) so the admin can neither disable rate limiting entirely nor lock a pair out indefinitely. For situations that need an immediate re-score (e.g. correcting a known-bad score), the admin can call `override_rate_limit` to clear a specific pair's cooldown rather than lowering the global setting.
+
+Like the upgrade time-lock, the cooldown deadline is computed from `env.ledger().timestamp()` — deterministic and not caller-settable — so it cannot be bypassed by manipulating submission metadata such as the `timestamp` field on `RiskScore` itself.
+
 ## Composability
 
 LedgerLens is only useful if other protocols can actually *act* on its scores. A risk score that lives in isolation is a dashboard widget; a risk score that an AMM, a lending market, or a DEX aggregator can read mid-transaction is a shared fraud-prevention layer for the entire Stellar DeFi ecosystem.
@@ -249,6 +272,7 @@ A complete, compiling reference contract lives in [`examples/amm_gate.rs`](examp
 3. **Bounded Values**: Scores and confidence are constrained to the 0-100 range
 4. **Overflow Protection**: Safe math operations with overflow checks
 5. **Time-Locked Upgrades**: Contract WASM upgrades require a mandatory delay (≥48 h) with a public proposal anyone can inspect and an admin veto — see [Upgrade Governance](#upgrade-governance)
+6. **Submission Rate Limiting**: A configurable per-`(wallet, asset_pair)` cooldown (default 1 h) bounds how often the service account can overwrite a score — see [Rate Limiting](#rate-limiting)
 
 ## Testing
 
@@ -334,7 +358,8 @@ soroban contract invoke \
 │           ├── events.rs               ← Event emission helpers
 │           ├── test.rs                 ← Implementation unit tests
 │           ├── test_interface.rs       ← Interface stability tests
-│           └── test_upgrade.rs         ← Upgrade-governance tests
+│           ├── test_upgrade.rs         ← Upgrade-governance tests
+│           └── test_rate_limit.rs      ← Submission rate-limiting tests
 ├── LICENSE
 ├── CONTRIBUTING.md
 └── README.md                            ← This file
@@ -418,6 +443,8 @@ pub struct RiskScore {
 - `score` — `(wallet, asset_pair) -> (score, benford_flag, ml_flag, confidence, timestamp)`, emitted on every `submit_score`
 - `svc_upd` — emitted when the admin rotates the authorised service address
 - `pw_upd` — `(asset_pair) -> weight`, emitted when the admin sets a pair's aggregate-risk weight via `set_pair_weight`
+- `cd_upd` — `() -> cooldown_secs`, emitted when the admin changes the submission cooldown via `set_cooldown`
+- `rl_ovrd` — `(wallet, asset_pair) -> admin`, emitted when the admin clears a pair's cooldown via `override_rate_limit`
 
 `api` (or a dedicated indexer in `data`) should subscribe to these for audit trails and to keep an off-chain cache in sync with on-chain state.
 

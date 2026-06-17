@@ -21,6 +21,27 @@ pub const CONTRACT_VERSION: u32 = 1;
 /// See the rustdoc on `get_aggregate_score` for detail.
 pub const MAX_WALLET_PAIRS: u32 = 20;
 
+// ── Per-wallet/pair submission rate limiting ──────────────────────────────────
+//
+// A compromised or malfunctioning off-chain service could otherwise flood the
+// contract with submissions for the same wallet/asset-pair, exhausting
+// storage rent, overwhelming indexers, and poisoning the score signal with
+// rapid fluctuations. See `submit_score` / `set_cooldown` and the Rate
+// Limiting section of the README.
+
+/// Default cooldown applied between accepted submissions for the same
+/// (wallet, asset_pair) until the admin configures one explicitly — 1 hour.
+pub const DEFAULT_COOLDOWN_SECS: u64 = 3_600; // 1 hour
+
+/// Minimum configurable cooldown — 1 minute floor, so the admin cannot
+/// disable rate limiting entirely by setting it arbitrarily low.
+pub const MIN_COOLDOWN_SECS: u64 = 60; // 1 minute
+
+/// Maximum configurable cooldown — 24 hour ceiling, so a misconfigured admin
+/// cannot lock a wallet/pair out of re-scoring for an unreasonable length of
+/// time.
+pub const MAX_COOLDOWN_SECS: u64 = 86_400; // 24 hours
+
 // ── Time-locked upgrade governance ────────────────────────────────────────────
 //
 // A WASM upgrade can replace the entire contract logic in one transaction, so
