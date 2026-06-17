@@ -135,4 +135,10 @@ pub enum DataKey {
     /// submissions for the same (wallet, asset_pair). Defaults to
     /// `DEFAULT_COOLDOWN_SECS` when unset.
     CooldownSecs,
+    /// Boolean flag set while a fee withdrawal is in-flight to prevent
+    /// concurrent or duplicate withdrawal requests.
+    WithdrawalLock,
+    /// The token contract address used for fee withdrawals.  Must be set
+    /// via `set_fee_token` before `withdraw_fees` can be called.
+    FeeToken,
 }

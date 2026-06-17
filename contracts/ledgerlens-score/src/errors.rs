@@ -59,4 +59,13 @@ pub enum Error {
     /// Returned when `set_cooldown` is given a value below
     /// `MIN_COOLDOWN_SECS` or above `MAX_COOLDOWN_SECS`.
     InvalidCooldown = 24,
+    /// Returned by `withdraw_fees` when another withdrawal is already in
+    /// progress (the `WithdrawalLock` key is set). Prevents concurrent or
+    /// duplicate withdrawal requests.
+    WithdrawalInProgress = 25,
+    /// Returned by `withdraw_fees` when the requested amount is zero.
+    InvalidWithdrawalAmount = 26,
+    /// Returned by `withdraw_fees` when no fee token has been configured via
+    /// `set_fee_token`.
+    FeeTokenNotSet = 27,
 }

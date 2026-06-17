@@ -294,3 +294,31 @@ pub fn get_cooldown_secs(env: &Env) -> u64 {
 pub fn set_cooldown_secs(env: &Env, secs: u64) {
     env.storage().instance().set(&DataKey::CooldownSecs, &secs);
 }
+
+// ── Fee withdrawal ─────────────────────────────────────────────────────────────
+
+/// Returns `true` when a withdrawal is currently in-flight.
+pub fn is_withdrawal_locked(env: &Env) -> bool {
+    let result: Option<bool> = env.storage().instance().get(&DataKey::WithdrawalLock);
+    result.unwrap_or(false)
+}
+
+/// Acquires the withdrawal lock — set before initiating the token transfer.
+pub fn set_withdrawal_lock(env: &Env) {
+    env.storage().instance().set(&DataKey::WithdrawalLock, &true);
+}
+
+/// Releases the withdrawal lock — cleared after the transfer completes or fails.
+pub fn clear_withdrawal_lock(env: &Env) {
+    env.storage().instance().remove(&DataKey::WithdrawalLock);
+}
+
+/// Returns the configured fee token address, if any.
+pub fn get_fee_token(env: &Env) -> Option<Address> {
+    env.storage().instance().get(&DataKey::FeeToken)
+}
+
+/// Sets the fee token address used by `withdraw_fees`.
+pub fn set_fee_token(env: &Env, token: &Address) {
+    env.storage().instance().set(&DataKey::FeeToken, token);
+}
