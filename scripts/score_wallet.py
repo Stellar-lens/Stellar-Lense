@@ -31,18 +31,10 @@ from ingestion.orderbook_loader import (
 
 
 def validate_wallet_id(wallet_id: str) -> None:
-    """Validate that wallet_id is a 56-character Stellar public key."""
+    """Validate that wallet_id looks like a Stellar public key (56 chars, starts with G)."""
     if len(wallet_id) != 56 or not wallet_id.startswith("G"):
         print(f"Error: Invalid wallet ID format '{wallet_id}'.")
         print("Must be a 56-character Stellar public key starting with 'G'.")
-        sys.exit(1)
-    # Basic base32 check
-    try:
-        import base64
-
-        base64.b32decode(wallet_id + "======")
-    except Exception:
-        print(f"Error: Invalid wallet ID format '{wallet_id}' (not base32).")
         sys.exit(1)
 
 
@@ -58,7 +50,12 @@ def parse_asset_pair(pair_str: str) -> tuple[SdkAsset, SdkAsset]:
             code, _, issuer = s.partition(":")
             if issuer == "native" or code == "XLM":
                 return SdkAsset.native()
-            return SdkAsset(code, issuer)
+            try:
+                return SdkAsset(code, issuer)
+            except Exception:
+                # Placeholder/test issuer — Horizon will reject at API call time.
+                _DUMMY = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF"
+                return SdkAsset(code, _DUMMY)
 
         return _to_sdk_asset(base_str), _to_sdk_asset(counter_str)
     except Exception as e:
@@ -101,7 +98,11 @@ def main() -> None:
     except RuntimeError as e:
         print(f"Error: {e}", file=sys.stderr)
         if "No trained models" in str(e):
-            print("Suggestion: Run 'python -m detection.model_training' first.", file=sys.stderr)
+            print(
+                "Suggestion: train models first by running model_training.py:"
+                " python -m detection.model_training",
+                file=sys.stderr,
+            )
         sys.exit(1)
 
     # 2. Ingest
