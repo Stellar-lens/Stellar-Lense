@@ -49,4 +49,14 @@ pub enum Error {
     InvalidUpgradeDelay = 21,
     /// Returned when a staleness window value of 0 is provided.
     InvalidStalenessWindow = 22,
+
+    // ── Per-wallet/pair submission rate limiting ────────────────────────────
+    /// Returned by `submit_score` when a submission for the same
+    /// (wallet, asset_pair) arrives before the configured cooldown has
+    /// elapsed since the last accepted submission. In `submit_scores_batch`
+    /// the offending entry is skipped instead of failing the whole batch.
+    RateLimitExceeded = 23,
+    /// Returned when `set_cooldown` is given a value below
+    /// `MIN_COOLDOWN_SECS` or above `MAX_COOLDOWN_SECS`.
+    InvalidCooldown = 24,
 }

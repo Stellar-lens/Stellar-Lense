@@ -143,6 +143,7 @@ fn test_submit_score_overwrites_previous() {
     let asset_pair = symbol_short!("XLM_USDC");
 
     client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &40, &false, &false, &1000, &70, &1);
+    env.ledger().with_mut(|l| l.timestamp += 3_601); // past the default cooldown
     client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &80, &true, &true, &2000, &90, &2);
 
     let score = client.get_score(&wallet, &asset_pair);
@@ -486,7 +487,9 @@ fn test_score_history_accumulates_in_order() {
     let asset_pair = symbol_short!("XLM_USDC");
 
     client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &10, &false, &false, &1, &50, &1);
+    env.ledger().with_mut(|l| l.timestamp += 3_601);
     client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &20, &false, &false, &2, &60, &1);
+    env.ledger().with_mut(|l| l.timestamp += 3_601);
     client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &30, &false, &false, &3, &70, &1);
 
     let history = client.get_score_history(&wallet, &asset_pair);
@@ -505,6 +508,7 @@ fn test_score_history_max_depth_enforced() {
 
     // 12 entries — two are evicted once the ring is full (max depth = 10).
     for i in 0u32..12 {
+        env.ledger().with_mut(|l| l.timestamp += 3_601); // past the default cooldown
         client.submit_score(
             &Vec::new(&env),
             &wallet,
@@ -822,6 +826,7 @@ fn test_aggregate_updates_on_rescore() {
     assert_eq!(client.get_aggregate_score(&wallet).aggregate_score, 30);
 
     // Re-submitting pair A with a higher score must shift the aggregate.
+    env.ledger().with_mut(|l| l.timestamp += 3_601); // past the default cooldown
     client.submit_score(&Vec::new(&env), &wallet, &pair_a, &80, &false, &false, &3, &90, &1);
     assert_eq!(client.get_aggregate_score(&wallet).aggregate_score, 60);
 }
@@ -843,6 +848,7 @@ fn test_aggregate_pair_deduplication() {
     let pair = symbol_short!("XLM_USDC");
 
     for i in 0..5u64 {
+        env.ledger().with_mut(|l| l.timestamp += 3_601); // past the default cooldown
         client.submit_score(
             &Vec::new(&env),
             &wallet,
