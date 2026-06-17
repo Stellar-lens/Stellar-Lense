@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use soroban_sdk::{Address, Env, Symbol, Vec, symbol_short, testutils::Address as _};
+use soroban_sdk::{symbol_short, testutils::Address as _, Address, Env, Symbol, Vec};
 
 use crate::{Error, LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreSubmission};
 
@@ -304,7 +304,6 @@ fn test_get_pending_admin_cleared_after_accept() {
 
     let _ = client.get_pending_admin();
 }
-
 
 #[test]
 #[should_panic(expected = "Error(Contract, #8)")]
