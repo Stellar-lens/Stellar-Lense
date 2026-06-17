@@ -124,4 +124,8 @@ pub enum DataKey {
     /// The M-of-N threshold: minimum number of service-set members that must
     /// sign a `submit_score` call for it to be accepted.
     ServiceThreshold,
+    /// Admin-configured staleness window (seconds). Scores older than this
+    /// are considered stale by `is_score_stale`. Defaults to
+    /// `DEFAULT_STALENESS_WINDOW_SECS` when unset.
+    StalenessWindow,
 }

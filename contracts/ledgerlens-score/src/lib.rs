@@ -1030,6 +1030,46 @@ impl LedgerLensScoreContract {
         storage::get_risk_threshold(&env)
     }
 
+    // ── Staleness window ──────────────────────────────────────────────────────
+
+    /// Returns `true` when no score exists for this pair, or when the stored
+    /// score's `timestamp` is older than `env.ledger().timestamp() - staleness_window`.
+    ///
+    /// Uses `saturating_sub` so a future score timestamp (clock skew) or a zero
+    /// ledger timestamp never causes an arithmetic panic — in that edge case the
+    /// age is treated as 0 and the score is considered fresh.
+    pub fn is_score_stale(env: Env, wallet: Address, asset_pair: Symbol) -> bool {
+        match storage::get_score(&env, &wallet, &asset_pair) {
+            None => true,
+            Some(score) => {
+                let window = storage::get_staleness_window(&env);
+                let ledger_ts = env.ledger().timestamp();
+                ledger_ts.saturating_sub(score.timestamp) > window
+            }
+        }
+    }
+
+    /// Set the staleness window in seconds. A value of `0` is rejected with
+    /// `InvalidStalenessWindow`. Admin only.
+    pub fn set_staleness_window(env: Env, window_secs: u64) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        if window_secs == 0 {
+            return Err(Error::InvalidStalenessWindow);
+        }
+        let admin = storage::get_admin(&env);
+        admin.require_auth();
+        storage::set_staleness_window(&env, window_secs);
+        Ok(())
+    }
+
+    /// Returns the current staleness window in seconds. Defaults to
+    /// `DEFAULT_STALENESS_WINDOW_SECS` (7 days) until configured.
+    pub fn get_staleness_window(env: Env) -> u64 {
+        storage::get_staleness_window(&env)
+    }
+
     // ── Read-only admin / service ─────────────────────────────────────────────
 
     /// Returns the current admin address.

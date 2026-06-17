@@ -47,4 +47,6 @@ pub enum Error {
     UpgradeNotReady = 20,
     /// `set_upgrade_delay` called with a value outside the allowed bounds.
     InvalidUpgradeDelay = 21,
+    /// Returned when a staleness window value of 0 is provided.
+    InvalidStalenessWindow = 22,
 }
