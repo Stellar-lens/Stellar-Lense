@@ -108,6 +108,8 @@ impl LedgerLensScoreContract {
     /// elapsed since the last accepted one, returning `RateLimitExceeded`.
     /// See the README's Rate Limiting section.
     ///
+    /// `timestamp` must be non-zero; `0` is rejected with `InvalidTimestamp`.
+    ///
     /// # Examples
     ///
     /// ```
@@ -175,6 +177,9 @@ impl LedgerLensScoreContract {
         }
         if confidence > 100 {
             return Err(Error::InvalidConfidence);
+        }
+        if timestamp == 0 {
+            return Err(Error::InvalidTimestamp);
         }
 
         let last_submit = storage::get_last_submit_time(&env, &wallet, &asset_pair);
@@ -263,7 +268,7 @@ impl LedgerLensScoreContract {
         for i in 0..submissions.len() {
             let sub = submissions.get(i).unwrap();
 
-            if sub.score > 100 || sub.confidence > 100 {
+            if sub.score > 100 || sub.confidence > 100 || sub.timestamp == 0 {
                 continue;
             }
 
