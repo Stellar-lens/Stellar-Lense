@@ -84,7 +84,7 @@ class Config:
                 errors.append("LEDGERLENS_SUBMITTER_SECRET is not set.")
 
         if errors:
-            raise EnvironmentError(
+            raise OSError(
                 "LedgerLens configuration errors:\n- "
                 + "\n- ".join(errors)
             )
