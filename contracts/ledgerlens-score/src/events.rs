@@ -1,4 +1,4 @@
-use soroban_sdk::{symbol_short, Address, BytesN, Env, Symbol};
+use soroban_sdk::{symbol_short, Address, Bytes, BytesN, Env, Symbol};
 
 use crate::types::RiskScore;
 
@@ -119,4 +119,12 @@ pub fn cooldown_updated(env: &Env, cooldown_secs: u64) {
 pub fn rate_limit_overridden(env: &Env, by: &Address, wallet: &Address, asset_pair: &Symbol) {
     env.events()
         .publish((symbol_short!("rl_ovrd"), wallet.clone(), asset_pair.clone()), by.clone());
+}
+
+// ── Score attestation ──────────────────────────────────────────────────────
+
+/// Emitted when the admin sets/rotates the off-chain attestation pubkey via
+/// `set_service_pubkey`.
+pub fn service_pubkey_updated(env: &Env, pubkey: &Bytes) {
+    env.events().publish((symbol_short!("pk_upd"),), pubkey.clone());
 }

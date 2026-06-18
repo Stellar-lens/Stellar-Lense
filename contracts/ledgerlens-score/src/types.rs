@@ -60,6 +60,27 @@ pub struct AggregateRiskScore {
     pub last_updated: u64,
 }
 
+/// A cryptographic attestation over a score payload, produced by the
+/// off-chain detection pipeline's secp256k1 signing key.
+///
+/// See `docs/attestation-spec.md` for the exact commitment serialization
+/// this is checked against. Passed to `submit_score` only when the admin
+/// has configured a service public key via `set_service_pubkey` — see that
+/// function's rustdoc for the opt-in enforcement model.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ScoreAttestation {
+    /// SHA-256 commitment over the canonical score payload. The contract
+    /// always recomputes this independently from the call's actual
+    /// arguments and rejects the call if it disagrees with this field — the
+    /// field exists so a mismatch surfaces as `InvalidAttestation` instead
+    /// of a confusing signature-recovery failure, not as a trusted input.
+    pub commitment: BytesN<32>,
+    /// 65-byte secp256k1 ECDSA signature over `commitment`: 32-byte `r`,
+    /// 32-byte `s`, then a 1-byte recovery id which must be `0` or `1`.
+    pub signature: BytesN<65>,
+}
+
 /// Result for a single entry in a batch score submission.
 /// Returned as part of `BatchResult` from `submit_scores_batch` so the
 /// caller knows exactly which entries succeeded and why any failed,
@@ -169,4 +190,8 @@ pub enum DataKey {
     /// at `HISTORY_MAX_DEPTH`), this counter is never truncated — it tracks
     /// every submission since the first.
     ScoreCount(Address, Symbol),
+    /// The off-chain detection pipeline's secp256k1 public key (33-byte
+    /// compressed or 65-byte uncompressed SEC-1 encoding), used to verify
+    /// `ScoreAttestation`s. Unset until `set_service_pubkey` is called.
+    ServicePubKey,
 }
