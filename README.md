@@ -58,8 +58,8 @@ LedgerLens detects wash trading and artificial volume on the Stellar Decentralis
 ### `initialize(admin: Address, service: Address)`
 One-time setup. Sets the admin (who can rotate the service address) and the LedgerLens off-chain service account authorised to submit scores.
 
-### `submit_score(wallet: Address, asset_pair: Symbol, score: u32, benford_flag: bool, ml_flag: bool, timestamp: u64, confidence: u32)`
-Called by the authorised LedgerLens off-chain service to register a computed risk score on-chain. Requires authorization from the configured LedgerLens service account. `score` and `confidence` must be in the range 0-100.
+### `submit_score(signers: Vec<Address>, wallet: Address, asset_pair: Symbol, score: u32, benford_flag: bool, ml_flag: bool, timestamp: u64, confidence: u32, model_version: u32, attestation: Option<ScoreAttestation>)`
+Called by the authorised LedgerLens off-chain service to register a computed risk score on-chain. Requires authorization from the configured LedgerLens service account (or, under the M-of-N multisig model, from `threshold` of the listed `signers`). `score` and `confidence` must be in the range 0-100. `attestation` is required once `set_service_pubkey` has been configured — see [Score Attestation](#score-attestation).
 
 ### `get_score(wallet: Address, asset_pair: Symbol) -> RiskScore`
 Read-only function callable by any Soroban contract. Returns the most recent LedgerLens risk score and metadata for a given wallet and asset pair.
@@ -84,6 +84,14 @@ Sets the weight used for `asset_pair` in the aggregate risk computation. Default
 
 ### `get_pair_weight(asset_pair: Symbol) -> u32`
 Read-only lookup of the configured weight for `asset_pair`.
+
+### `submit_scores_batch(submissions: Vec<ScoreSubmission>) -> BatchResult`
+
+Called by the authorised LedgerLens off-chain service to register multiple risk scores in a single invocation. The service account authorises once for the whole batch.
+
+Returns a `BatchResult` containing per-entry outcomes so the caller knows exactly which entries succeeded and why any failed. Entries with out-of-range `score` (>100) or `confidence` (>100), zero `timestamp`, or that arrive before the submission cooldown has elapsed, are recorded as rejected with an appropriate `rejection_code`.
+
+**ABI change in contract version 2:** The return type changed from `u32` (count of accepted entries) to the structured `BatchResult`. Callers built against the old ABI must regenerate their client bindings.
 
 ### `query_risk_gate(wallet: Address, asset_pair: Symbol, gate_threshold: u32) -> bool`
 The cross-contract integration primitive. Returns `true` when the wallet's score is **strictly below** `gate_threshold` (safe to proceed), and `false` when the score is `>= gate_threshold` **or no score exists**. It is **infallible** (returns `bool`, never an error), **never panics**, and is **side-effect free** — designed to be called directly from inside another protocol's guard clause. See [Composability](#composability) and [`docs/interface-spec.md`](docs/interface-spec.md).
@@ -115,6 +123,9 @@ Admin-only emergency escape hatch. Immediately clears the stored cooldown deadli
 ### `get_last_submit_time(wallet: Address, asset_pair: Symbol) -> u64`
 Read-only lookup of the ledger timestamp of the last accepted submission for `(wallet, asset_pair)`, or `0` if none has ever been accepted (or it was cleared by `override_rate_limit`).
 
+### `set_service_pubkey(pubkey: Bytes)` / `get_service_pubkey() -> Bytes`
+Admin sets (or rotates) the off-chain detection pipeline's secp256k1 public key — 33 bytes compressed or 65 bytes uncompressed, rejected otherwise with `InvalidPubkeyLength` — used to verify `ScoreAttestation`s. Once set it cannot be unset, only rotated. `get_service_pubkey` returns `ServicePubkeyNotSet` before one has been configured. See [Score Attestation](#score-attestation).
+
 ### `RiskScore` Structure
 
 ```rust
@@ -143,6 +154,33 @@ pub struct AggregateRiskScore {
     pub last_updated: u64,        // timestamp of the most recently updated pair score
 }
 ```
+
+### `BatchResult` and `BatchEntryResult` Structures
+
+`submit_scores_batch` returns a `BatchResult` that the off-chain API service can inspect to learn which entries succeeded and which were rejected:
+
+```rust
+pub struct BatchEntryResult {
+    pub index: u32,           // zero-based position in the submitted batch
+    pub accepted: bool,       // true if written to storage
+    pub rejection_code: u32,  // 0 if accepted; Error discriminant if rejected
+}
+
+pub struct BatchResult {
+    pub accepted_count: u32,                      // number of entries written to storage
+    pub rejected_count: u32,                      // number of entries rejected
+    pub results: Vec<BatchEntryResult>,            // per-entry outcomes, same order as input
+}
+```
+
+Possible `rejection_code` values (from the `Error` enum):
+
+| Code | Meaning |
+|-----:|---------|
+| 4 | `InvalidScore` — score > 100 |
+| 5 | `InvalidConfidence` — confidence > 100 |
+| 23 | `RateLimitExceeded` — submission cooldown not yet elapsed |
+| 25 | `InvalidTimestamp` — timestamp == 0 |
 
 The weighted average is:
 
@@ -226,6 +264,19 @@ The cooldown defaults to **1 hour** and is admin-configurable via `set_cooldown`
 
 Like the upgrade time-lock, the cooldown deadline is computed from `env.ledger().timestamp()` — deterministic and not caller-settable — so it cannot be bypassed by manipulating submission metadata such as the `timestamp` field on `RiskScore` itself.
 
+## Score Attestation
+
+The service account's `require_auth` proves a transaction was sent by the authorised key, but says nothing about whether the score payload inside that transaction matches what the off-chain detection pipeline actually computed — relevant when the service key is held by infrastructure (a relayer, a batching service, a multisig signer) that's trusted to submit transactions but shouldn't be able to silently alter scores in transit.
+
+`submit_score`'s optional `attestation: Option<ScoreAttestation>` closes that gap with a secp256k1 signature over the exact payload:
+
+1. The admin registers the off-chain pipeline's public key via `set_service_pubkey`. Until this is called, `attestation` is ignored entirely and every existing integration keeps working unchanged.
+2. Once a pubkey is configured, every `submit_score` call must carry a valid `ScoreAttestation` — a missing or invalid one is rejected with `InvalidAttestation`. There is no way to turn this back off short of a contract upgrade.
+3. On each call, the contract independently recomputes the SHA-256 commitment over the wallet, asset pair, score fields, this contract's address, and the network id (binding the signature to one deployment on one network), and rejects the call if it disagrees with the attestation's `commitment` field — that field is never trusted as input, only checked.
+4. The signature is then verified via `secp256k1_recover` against the registered pubkey, supporting both compressed and uncompressed key formats.
+
+The full byte layout and verification algorithm are specified in [`docs/attestation-spec.md`](docs/attestation-spec.md).
+
 ## Composability
 
 LedgerLens is only useful if other protocols can actually *act* on its scores. A risk score that lives in isolation is a dashboard widget; a risk score that an AMM, a lending market, or a DEX aggregator can read mid-transaction is a shared fraud-prevention layer for the entire Stellar DeFi ecosystem.
@@ -276,6 +327,7 @@ A complete, compiling reference contract lives in [`examples/amm_gate.rs`](examp
 4. **Overflow Protection**: Safe math operations with overflow checks
 5. **Time-Locked Upgrades**: Contract WASM upgrades require a mandatory delay (≥48 h) with a public proposal anyone can inspect and an admin veto — see [Upgrade Governance](#upgrade-governance)
 6. **Submission Rate Limiting**: A configurable per-`(wallet, asset_pair)` cooldown (default 1 h) bounds how often the service account can overwrite a score — see [Rate Limiting](#rate-limiting)
+7. **Score Attestation**: An opt-in secp256k1 signature over the score payload lets the off-chain pipeline vouch for its contents independent of `require_auth` — see [Score Attestation](#score-attestation)
 
 ## Testing
 

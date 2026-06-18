@@ -6,7 +6,9 @@ use soroban_sdk::{
     Address, Env, Symbol, Vec,
 };
 
-use crate::{Error, LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreSubmission};
+use crate::{
+    BatchResult, Error, LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreSubmission,
+};
 
 // ── Test helpers ──────────────────────────────────────────────────────────────
 
@@ -67,6 +69,7 @@ fn test_submit_and_get_score() {
         &1_700_000_000,
         &92,
         &1,
+        &None,
     );
 
     let score = client.get_score(&wallet, &asset_pair);
@@ -108,6 +111,7 @@ fn test_submit_score_invalid_score_range_rejected() {
         &0,
         &50,
         &1,
+        &None,
     );
     assert_eq!(result, Err(Ok(Error::InvalidScore)));
 }
@@ -130,6 +134,7 @@ fn test_submit_score_invalid_confidence_range_rejected() {
         &0,
         &101,
         &1,
+        &None,
     );
     assert_eq!(result, Err(Ok(Error::InvalidConfidence)));
 }
@@ -142,9 +147,31 @@ fn test_submit_score_overwrites_previous() {
     let wallet = Address::generate(&env);
     let asset_pair = symbol_short!("XLM_USDC");
 
-    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &40, &false, &false, &1000, &70, &1);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &asset_pair,
+        &40,
+        &false,
+        &false,
+        &1000,
+        &70,
+        &1,
+        &None,
+    );
     env.ledger().with_mut(|l| l.timestamp += 3_601); // past the default cooldown
-    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &80, &true, &true, &2000, &90, &2);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &asset_pair,
+        &80,
+        &true,
+        &true,
+        &2000,
+        &90,
+        &2,
+        &None,
+    );
 
     let score = client.get_score(&wallet, &asset_pair);
     assert_eq!(score.score, 80);
@@ -160,8 +187,8 @@ fn test_scores_are_independent_across_pairs() {
     let pair1 = symbol_short!("XLM_USDC");
     let pair2 = symbol_short!("XLM_BTC");
 
-    client.submit_score(&Vec::new(&env), &wallet, &pair1, &30, &false, &false, &1, &60, &1);
-    client.submit_score(&Vec::new(&env), &wallet, &pair2, &90, &true, &true, &2, &95, &1);
+    client.submit_score(&Vec::new(&env), &wallet, &pair1, &30, &false, &false, &1, &60, &1, &None);
+    client.submit_score(&Vec::new(&env), &wallet, &pair2, &90, &true, &true, &2, &95, &1, &None);
 
     assert_eq!(client.get_score(&wallet, &pair1).score, 30);
     assert_eq!(client.get_score(&wallet, &pair2).score, 90);
@@ -181,7 +208,18 @@ fn test_set_service_rotates_authorised_account() {
 
     let wallet = Address::generate(&env);
     let asset_pair = symbol_short!("XLM_USDC");
-    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &10, &false, &false, &0, &10, &1);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &asset_pair,
+        &10,
+        &false,
+        &false,
+        &0,
+        &10,
+        &1,
+        &None,
+    );
 }
 
 // ── Pause circuit breaker ─────────────────────────────────────────────────────
@@ -215,6 +253,7 @@ fn test_submit_score_blocked_when_paused() {
         &0,
         &50,
         &1,
+        &None,
     );
     assert_eq!(result, Err(Ok(Error::ContractPaused)));
 }
@@ -251,7 +290,18 @@ fn test_submit_succeeds_after_unpause() {
 
     let wallet = Address::generate(&env);
     let asset_pair = symbol_short!("XLM_USDC");
-    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &55, &false, &true, &999, &80, &1);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &asset_pair,
+        &55,
+        &false,
+        &true,
+        &999,
+        &80,
+        &1,
+        &None,
+    );
     assert_eq!(client.get_score(&wallet, &asset_pair).score, 55);
 }
 
@@ -486,11 +536,44 @@ fn test_score_history_accumulates_in_order() {
     let wallet = Address::generate(&env);
     let asset_pair = symbol_short!("XLM_USDC");
 
-    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &10, &false, &false, &1, &50, &1);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &asset_pair,
+        &10,
+        &false,
+        &false,
+        &1,
+        &50,
+        &1,
+        &None,
+    );
     env.ledger().with_mut(|l| l.timestamp += 3_601);
-    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &20, &false, &false, &2, &60, &1);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &asset_pair,
+        &20,
+        &false,
+        &false,
+        &2,
+        &60,
+        &1,
+        &None,
+    );
     env.ledger().with_mut(|l| l.timestamp += 3_601);
-    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &30, &false, &false, &3, &70, &1);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &asset_pair,
+        &30,
+        &false,
+        &false,
+        &3,
+        &70,
+        &1,
+        &None,
+    );
 
     let history = client.get_score_history(&wallet, &asset_pair);
     assert_eq!(history.len(), 3);
@@ -519,6 +602,7 @@ fn test_score_history_max_depth_enforced() {
             &(i as u64),
             &50,
             &1,
+            &None,
         );
     }
 
@@ -538,8 +622,8 @@ fn test_score_history_is_per_pair() {
     let pair1 = symbol_short!("XLM_USDC");
     let pair2 = symbol_short!("XLM_BTC");
 
-    client.submit_score(&Vec::new(&env), &wallet, &pair1, &10, &false, &false, &1, &50, &1);
-    client.submit_score(&Vec::new(&env), &wallet, &pair2, &90, &true, &true, &2, &95, &1);
+    client.submit_score(&Vec::new(&env), &wallet, &pair1, &10, &false, &false, &1, &50, &1, &None);
+    client.submit_score(&Vec::new(&env), &wallet, &pair2, &90, &true, &true, &2, &95, &1, &None);
 
     assert_eq!(client.get_score_history(&wallet, &pair1).len(), 1);
     assert_eq!(client.get_score_history(&wallet, &pair2).len(), 1);
@@ -579,8 +663,14 @@ fn test_submit_scores_batch_writes_all_entries() {
         model_version: 2,
     });
 
-    let accepted = client.submit_scores_batch(&batch);
-    assert_eq!(accepted, 2);
+    let result: BatchResult = client.submit_scores_batch(&batch);
+    assert_eq!(result.accepted_count, 2);
+    assert_eq!(result.rejected_count, 0);
+    assert_eq!(result.results.len(), 2);
+    for i in 0..2 {
+        assert!(result.results.get(i).unwrap().accepted);
+        assert_eq!(result.results.get(i).unwrap().rejection_code, 0);
+    }
 
     assert_eq!(client.get_score(&wallet1, &asset_pair).score, 45);
     assert_eq!(client.get_score(&wallet2, &asset_pair).score, 85);
@@ -616,8 +706,20 @@ fn test_submit_scores_batch_skips_invalid_entries() {
         model_version: 1,
     });
 
-    let accepted = client.submit_scores_batch(&batch);
-    assert_eq!(accepted, 1);
+    let result: BatchResult = client.submit_scores_batch(&batch);
+    assert_eq!(result.accepted_count, 1);
+    assert_eq!(result.rejected_count, 1);
+    assert_eq!(result.results.len(), 2);
+
+    // First entry (invalid score) — rejected with code 4 (InvalidScore).
+    let r0 = result.results.get(0).unwrap();
+    assert!(!r0.accepted);
+    assert_eq!(r0.rejection_code, 4);
+
+    // Second entry — accepted.
+    let r1 = result.results.get(1).unwrap();
+    assert!(r1.accepted);
+    assert_eq!(r1.rejection_code, 0);
 
     assert_eq!(client.get_score(&wallet_ok, &asset_pair).score, 60);
     assert_eq!(client.try_get_score(&wallet_bad, &asset_pair), Err(Ok(Error::ScoreNotFound)));
@@ -680,19 +782,293 @@ fn test_batch_also_populates_score_history() {
         model_version: 1,
     });
 
-    client.submit_scores_batch(&batch);
+    let result: BatchResult = client.submit_scores_batch(&batch);
+    assert!(result.accepted_count >= 1);
 
     let history = client.get_score_history(&wallet, &asset_pair);
     assert_eq!(history.len(), 1);
     assert_eq!(history.get(0).unwrap().score, 55);
 }
 
+// ── Batch structured result ───────────────────────────────────────────────────
+
+#[test]
+fn test_batch_result_all_accepted() {
+    let (env, client, _admin, _service) = initialized();
+
+    let wallet1 = Address::generate(&env);
+    let wallet2 = Address::generate(&env);
+    let wallet3 = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+
+    let mut batch: Vec<ScoreSubmission> = Vec::new(&env);
+    batch.push_back(ScoreSubmission {
+        wallet: wallet1,
+        asset_pair: pair.clone(),
+        score: 10,
+        benford_flag: false,
+        ml_flag: false,
+        timestamp: 1,
+        confidence: 50,
+        model_version: 1,
+    });
+    batch.push_back(ScoreSubmission {
+        wallet: wallet2,
+        asset_pair: pair.clone(),
+        score: 50,
+        benford_flag: false,
+        ml_flag: false,
+        timestamp: 2,
+        confidence: 70,
+        model_version: 1,
+    });
+    batch.push_back(ScoreSubmission {
+        wallet: wallet3,
+        asset_pair: pair.clone(),
+        score: 90,
+        benford_flag: true,
+        ml_flag: true,
+        timestamp: 3,
+        confidence: 95,
+        model_version: 2,
+    });
+
+    let result: BatchResult = client.submit_scores_batch(&batch);
+    assert_eq!(result.accepted_count, 3);
+    assert_eq!(result.rejected_count, 0);
+    assert_eq!(result.results.len(), 3);
+    for i in 0..3 {
+        assert!(result.results.get(i).unwrap().accepted);
+        assert_eq!(result.results.get(i).unwrap().rejection_code, 0);
+    }
+}
+
+#[test]
+fn test_batch_result_mixed() {
+    let (env, client, _admin, _service) = initialized();
+
+    let wallet_ok = Address::generate(&env);
+    let wallet_bad = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+
+    let mut batch: Vec<ScoreSubmission> = Vec::new(&env);
+    batch.push_back(ScoreSubmission {
+        wallet: wallet_ok.clone(),
+        asset_pair: pair.clone(),
+        score: 50,
+        benford_flag: false,
+        ml_flag: false,
+        timestamp: 1,
+        confidence: 70,
+        model_version: 1,
+    });
+    batch.push_back(ScoreSubmission {
+        wallet: wallet_bad.clone(),
+        asset_pair: pair.clone(),
+        score: 101, // invalid — > 100
+        benford_flag: false,
+        ml_flag: false,
+        timestamp: 2,
+        confidence: 70,
+        model_version: 1,
+    });
+
+    let result: BatchResult = client.submit_scores_batch(&batch);
+    assert_eq!(result.accepted_count, 1);
+    assert_eq!(result.rejected_count, 1);
+    assert_eq!(result.results.len(), 2);
+
+    let r0 = result.results.get(0).unwrap();
+    assert!(r0.accepted);
+    assert_eq!(r0.rejection_code, 0);
+
+    let r1 = result.results.get(1).unwrap();
+    assert!(!r1.accepted);
+    assert_eq!(r1.rejection_code, 4); // InvalidScore
+}
+
+#[test]
+fn test_batch_result_index_correct() {
+    let (env, client, _admin, _service) = initialized();
+
+    let wallet1 = Address::generate(&env);
+    let wallet2 = Address::generate(&env);
+    let wallet3 = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+
+    let mut batch: Vec<ScoreSubmission> = Vec::new(&env);
+    batch.push_back(ScoreSubmission {
+        wallet: wallet1,
+        asset_pair: pair.clone(),
+        score: 50,
+        benford_flag: false,
+        ml_flag: false,
+        timestamp: 1,
+        confidence: 70,
+        model_version: 1,
+    });
+    batch.push_back(ScoreSubmission {
+        wallet: wallet2,
+        asset_pair: pair.clone(),
+        score: 200, // invalid — will be rejected at index 1
+        benford_flag: false,
+        ml_flag: false,
+        timestamp: 2,
+        confidence: 70,
+        model_version: 1,
+    });
+    batch.push_back(ScoreSubmission {
+        wallet: wallet3,
+        asset_pair: pair.clone(),
+        score: 60,
+        benford_flag: false,
+        ml_flag: false,
+        timestamp: 3,
+        confidence: 80,
+        model_version: 1,
+    });
+
+    let result: BatchResult = client.submit_scores_batch(&batch);
+    assert_eq!(result.accepted_count, 2);
+    assert_eq!(result.rejected_count, 1);
+    assert_eq!(result.results.len(), 3);
+
+    assert_eq!(result.results.get(0).unwrap().index, 0);
+    assert_eq!(result.results.get(1).unwrap().index, 1);
+    assert_eq!(result.results.get(2).unwrap().index, 2);
+
+    // The rejected entry is at index 1.
+    assert!(result.results.get(0).unwrap().accepted);
+    assert!(!result.results.get(1).unwrap().accepted);
+    assert!(result.results.get(2).unwrap().accepted);
+    assert_eq!(result.results.get(1).unwrap().rejection_code, 4); // InvalidScore
+}
+
+#[test]
+fn test_batch_result_all_rejected() {
+    let (env, client, _admin, _service) = initialized();
+
+    let wallet1 = Address::generate(&env);
+    let wallet2 = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+
+    let mut batch: Vec<ScoreSubmission> = Vec::new(&env);
+    // Score > 100
+    batch.push_back(ScoreSubmission {
+        wallet: wallet1,
+        asset_pair: pair.clone(),
+        score: 200,
+        benford_flag: false,
+        ml_flag: false,
+        timestamp: 1,
+        confidence: 50,
+        model_version: 1,
+    });
+    // Confidence > 100
+    batch.push_back(ScoreSubmission {
+        wallet: wallet2,
+        asset_pair: pair.clone(),
+        score: 50,
+        benford_flag: false,
+        ml_flag: false,
+        timestamp: 2,
+        confidence: 200,
+        model_version: 1,
+    });
+
+    let result: BatchResult = client.submit_scores_batch(&batch);
+    assert_eq!(result.accepted_count, 0);
+    assert_eq!(result.rejected_count, 2);
+    assert_eq!(result.results.len(), 2);
+    for i in 0..2 {
+        assert!(!result.results.get(i).unwrap().accepted);
+    }
+}
+
+#[test]
+fn test_batch_result_vec_length_matches_input() {
+    let (env, client, _admin, _service) = initialized();
+
+    let wallet = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+
+    // Single entry.
+    let mut batch1: Vec<ScoreSubmission> = Vec::new(&env);
+    batch1.push_back(ScoreSubmission {
+        wallet: wallet.clone(),
+        asset_pair: pair.clone(),
+        score: 50,
+        benford_flag: false,
+        ml_flag: false,
+        timestamp: 1,
+        confidence: 70,
+        model_version: 1,
+    });
+    let result1: BatchResult = client.submit_scores_batch(&batch1);
+    assert_eq!(result1.results.len(), 1);
+
+    // Multiple entries.
+    let mut batch5: Vec<ScoreSubmission> = Vec::new(&env);
+    batch5.push_back(ScoreSubmission {
+        wallet: Address::generate(&env),
+        asset_pair: pair.clone(),
+        score: 10,
+        benford_flag: false,
+        ml_flag: false,
+        timestamp: 1,
+        confidence: 50,
+        model_version: 1,
+    });
+    batch5.push_back(ScoreSubmission {
+        wallet: Address::generate(&env),
+        asset_pair: pair.clone(),
+        score: 20,
+        benford_flag: false,
+        ml_flag: false,
+        timestamp: 2,
+        confidence: 60,
+        model_version: 1,
+    });
+    batch5.push_back(ScoreSubmission {
+        wallet: Address::generate(&env),
+        asset_pair: pair.clone(),
+        score: 30,
+        benford_flag: false,
+        ml_flag: false,
+        timestamp: 3,
+        confidence: 70,
+        model_version: 1,
+    });
+    batch5.push_back(ScoreSubmission {
+        wallet: Address::generate(&env),
+        asset_pair: pair.clone(),
+        score: 40,
+        benford_flag: false,
+        ml_flag: false,
+        timestamp: 4,
+        confidence: 80,
+        model_version: 1,
+    });
+    batch5.push_back(ScoreSubmission {
+        wallet: Address::generate(&env),
+        asset_pair: pair.clone(),
+        score: 50,
+        benford_flag: false,
+        ml_flag: false,
+        timestamp: 5,
+        confidence: 90,
+        model_version: 1,
+    });
+    let result5: BatchResult = client.submit_scores_batch(&batch5);
+    assert_eq!(result5.results.len(), 5);
+}
+
 // ── Contract version ──────────────────────────────────────────────────────────
 
 #[test]
-fn test_get_version_returns_one() {
+fn test_get_version_returns_two() {
     let (_env, client, _admin, _service) = initialized();
-    assert_eq!(client.get_version(), 1);
+    assert_eq!(client.get_version(), 2);
 }
 
 // ── Not-initialized guards ────────────────────────────────────────────────────
@@ -719,6 +1095,7 @@ fn test_submit_score_before_init_fails() {
         &0,
         &50,
         &1,
+        &None,
     );
     assert_eq!(result, Err(Ok(Error::NotInitialized)));
 }
@@ -738,7 +1115,7 @@ fn test_aggregate_single_pair() {
 
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
-    client.submit_score(&Vec::new(&env), &wallet, &pair, &60, &false, &false, &1, &90, &1);
+    client.submit_score(&Vec::new(&env), &wallet, &pair, &60, &false, &false, &1, &90, &1, &None);
 
     let aggregate = client.get_aggregate_score(&wallet);
     assert_eq!(aggregate.aggregate_score, 60);
@@ -754,9 +1131,9 @@ fn test_aggregate_equal_weights() {
     let pair2 = symbol_short!("XLM_BTC");
     let pair3 = symbol_short!("XLM_ETH");
 
-    client.submit_score(&Vec::new(&env), &wallet, &pair1, &30, &false, &false, &1, &90, &1);
-    client.submit_score(&Vec::new(&env), &wallet, &pair2, &60, &false, &false, &2, &90, &1);
-    client.submit_score(&Vec::new(&env), &wallet, &pair3, &90, &false, &false, &3, &90, &1);
+    client.submit_score(&Vec::new(&env), &wallet, &pair1, &30, &false, &false, &1, &90, &1, &None);
+    client.submit_score(&Vec::new(&env), &wallet, &pair2, &60, &false, &false, &2, &90, &1, &None);
+    client.submit_score(&Vec::new(&env), &wallet, &pair3, &90, &false, &false, &3, &90, &1, &None);
 
     // (30 + 60 + 90) / 3 = 60
     assert_eq!(client.get_aggregate_score(&wallet).aggregate_score, 60);
@@ -775,9 +1152,9 @@ fn test_aggregate_weighted() {
     client.set_pair_weight(&pair_b, &2);
     client.set_pair_weight(&pair_c, &1);
 
-    client.submit_score(&Vec::new(&env), &wallet, &pair_a, &20, &false, &false, &1, &90, &1);
-    client.submit_score(&Vec::new(&env), &wallet, &pair_b, &80, &false, &false, &2, &90, &1);
-    client.submit_score(&Vec::new(&env), &wallet, &pair_c, &40, &false, &false, &3, &90, &1);
+    client.submit_score(&Vec::new(&env), &wallet, &pair_a, &20, &false, &false, &1, &90, &1, &None);
+    client.submit_score(&Vec::new(&env), &wallet, &pair_b, &80, &false, &false, &2, &90, &1, &None);
+    client.submit_score(&Vec::new(&env), &wallet, &pair_c, &40, &false, &false, &3, &90, &1, &None);
 
     // (20*1 + 80*2 + 40*1) / (1 + 2 + 1) = 220 / 4 = 55
     assert_eq!(client.get_aggregate_score(&wallet).aggregate_score, 55);
@@ -791,8 +1168,8 @@ fn test_aggregate_max_pair_tracked() {
     let pair1 = symbol_short!("XLM_USDC");
     let pair2 = symbol_short!("XLM_BTC");
 
-    client.submit_score(&Vec::new(&env), &wallet, &pair1, &30, &false, &false, &1, &90, &1);
-    client.submit_score(&Vec::new(&env), &wallet, &pair2, &90, &false, &false, &2, &90, &1);
+    client.submit_score(&Vec::new(&env), &wallet, &pair1, &30, &false, &false, &1, &90, &1, &None);
+    client.submit_score(&Vec::new(&env), &wallet, &pair2, &90, &false, &false, &2, &90, &1, &None);
 
     let aggregate = client.get_aggregate_score(&wallet);
     assert_eq!(aggregate.max_pair_score, 90);
@@ -808,9 +1185,9 @@ fn test_aggregate_flag_counts() {
     let pair2 = symbol_short!("XLM_BTC");
     let pair3 = symbol_short!("XLM_ETH");
 
-    client.submit_score(&Vec::new(&env), &wallet, &pair1, &30, &true, &false, &1, &90, &1);
-    client.submit_score(&Vec::new(&env), &wallet, &pair2, &60, &true, &true, &2, &90, &1);
-    client.submit_score(&Vec::new(&env), &wallet, &pair3, &90, &false, &false, &3, &90, &1);
+    client.submit_score(&Vec::new(&env), &wallet, &pair1, &30, &true, &false, &1, &90, &1, &None);
+    client.submit_score(&Vec::new(&env), &wallet, &pair2, &60, &true, &true, &2, &90, &1, &None);
+    client.submit_score(&Vec::new(&env), &wallet, &pair3, &90, &false, &false, &3, &90, &1, &None);
 
     let aggregate = client.get_aggregate_score(&wallet);
     assert_eq!(aggregate.benford_flag_count, 2);
@@ -825,13 +1202,13 @@ fn test_aggregate_updates_on_rescore() {
     let pair_a = symbol_short!("XLM_USDC");
     let pair_b = symbol_short!("XLM_BTC");
 
-    client.submit_score(&Vec::new(&env), &wallet, &pair_a, &20, &false, &false, &1, &90, &1);
-    client.submit_score(&Vec::new(&env), &wallet, &pair_b, &40, &false, &false, &2, &90, &1);
+    client.submit_score(&Vec::new(&env), &wallet, &pair_a, &20, &false, &false, &1, &90, &1, &None);
+    client.submit_score(&Vec::new(&env), &wallet, &pair_b, &40, &false, &false, &2, &90, &1, &None);
     assert_eq!(client.get_aggregate_score(&wallet).aggregate_score, 30);
 
     // Re-submitting pair A with a higher score must shift the aggregate.
     env.ledger().with_mut(|l| l.timestamp += 3_601); // past the default cooldown
-    client.submit_score(&Vec::new(&env), &wallet, &pair_a, &80, &false, &false, &3, &90, &1);
+    client.submit_score(&Vec::new(&env), &wallet, &pair_a, &80, &false, &false, &3, &90, &1, &None);
     assert_eq!(client.get_aggregate_score(&wallet).aggregate_score, 60);
 }
 
@@ -863,6 +1240,7 @@ fn test_aggregate_pair_deduplication() {
             &i,
             &90,
             &1,
+            &None,
         );
     }
 
@@ -881,8 +1259,8 @@ fn test_aggregate_weight_zero_excluded() {
 
     client.set_pair_weight(&pair_b, &0);
 
-    client.submit_score(&Vec::new(&env), &wallet, &pair_a, &70, &false, &false, &1, &90, &1);
-    client.submit_score(&Vec::new(&env), &wallet, &pair_b, &10, &false, &false, &2, &90, &1);
+    client.submit_score(&Vec::new(&env), &wallet, &pair_a, &70, &false, &false, &1, &90, &1, &None);
+    client.submit_score(&Vec::new(&env), &wallet, &pair_b, &10, &false, &false, &2, &90, &1, &None);
 
     // pair_b's weight is 0, so only pair_a contributes to the average.
     let aggregate = client.get_aggregate_score(&wallet);
@@ -915,6 +1293,7 @@ fn test_aggregate_overflow_protection() {
             &(i as u64),
             &90,
             &1,
+            &None,
         );
     }
 
@@ -972,7 +1351,7 @@ fn test_multisig_submit_exactly_threshold() {
     two.push_back(signers.get(0).unwrap());
     two.push_back(signers.get(1).unwrap());
 
-    client.submit_score(&two, &wallet, &pair, &55, &false, &false, &1, &80, &1);
+    client.submit_score(&two, &wallet, &pair, &55, &false, &false, &1, &80, &1, &None);
     assert_eq!(client.get_score(&wallet, &pair).score, 55);
 }
 
@@ -986,7 +1365,7 @@ fn test_multisig_submit_above_threshold() {
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
 
-    client.submit_score(&signers, &wallet, &pair, &70, &false, &false, &1, &80, &1);
+    client.submit_score(&signers, &wallet, &pair, &70, &false, &false, &1, &80, &1, &None);
     assert_eq!(client.get_score(&wallet, &pair).score, 70);
 }
 
@@ -1003,7 +1382,8 @@ fn test_multisig_submit_below_threshold() {
     let mut one: Vec<Address> = Vec::new(&env);
     one.push_back(signers.get(0).unwrap());
 
-    let result = client.try_submit_score(&one, &wallet, &pair, &55, &false, &false, &1, &80, &1);
+    let result =
+        client.try_submit_score(&one, &wallet, &pair, &55, &false, &false, &1, &80, &1, &None);
     assert_eq!(result, Err(Ok(Error::InsufficientSigners)));
 }
 
@@ -1023,7 +1403,7 @@ fn test_multisig_unauthorized_signer_rejected() {
     signers.push_back(Address::generate(&env)); // also not in set
 
     let result =
-        client.try_submit_score(&signers, &wallet, &pair, &55, &false, &false, &1, &80, &1);
+        client.try_submit_score(&signers, &wallet, &pair, &55, &false, &false, &1, &80, &1, &None);
     assert_eq!(result, Err(Ok(Error::UnauthorizedSigner)));
 }
 
@@ -1099,7 +1479,7 @@ fn test_1_of_1_behaves_like_original() {
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
 
-    client.submit_score(&signers, &wallet, &pair, &42, &false, &true, &100, &90, &1);
+    client.submit_score(&signers, &wallet, &pair, &42, &false, &true, &100, &90, &1, &None);
     assert_eq!(client.get_score(&wallet, &pair).score, 42);
 }
 
@@ -1128,7 +1508,7 @@ fn test_remove_signer_reduces_set() {
     let pair = symbol_short!("XLM_USDC");
     let mut one: Vec<Address> = Vec::new(&env);
     one.push_back(s1);
-    client.submit_score(&one, &wallet, &pair, &33, &false, &false, &1, &70, &1);
+    client.submit_score(&one, &wallet, &pair, &33, &false, &false, &1, &70, &1, &None);
     assert_eq!(client.get_score(&wallet, &pair).score, 33);
 }
 
@@ -1150,7 +1530,7 @@ fn test_is_score_stale_fresh_score() {
 
     let ts: u64 = 1_700_000_000;
     env.ledger().with_mut(|l| l.timestamp = ts);
-    client.submit_score(&Vec::new(&env), &wallet, &pair, &50, &false, &false, &ts, &80, &1);
+    client.submit_score(&Vec::new(&env), &wallet, &pair, &50, &false, &false, &ts, &80, &1, &None);
 
     assert!(!client.is_score_stale(&wallet, &pair));
 }
@@ -1165,7 +1545,7 @@ fn test_is_score_stale_after_window() {
     let window = client.get_staleness_window();
 
     env.ledger().with_mut(|l| l.timestamp = ts);
-    client.submit_score(&Vec::new(&env), &wallet, &pair, &50, &false, &false, &ts, &80, &1);
+    client.submit_score(&Vec::new(&env), &wallet, &pair, &50, &false, &false, &ts, &80, &1, &None);
 
     // Advance ledger past the window boundary.
     env.ledger().with_mut(|l| l.timestamp = ts + window + 1);
@@ -1182,7 +1562,7 @@ fn test_is_score_stale_exactly_at_window() {
     let window = client.get_staleness_window();
 
     env.ledger().with_mut(|l| l.timestamp = ts);
-    client.submit_score(&Vec::new(&env), &wallet, &pair, &50, &false, &false, &ts, &80, &1);
+    client.submit_score(&Vec::new(&env), &wallet, &pair, &50, &false, &false, &ts, &80, &1, &None);
 
     // Exactly at the window boundary: age == window, not > window → fresh.
     env.ledger().with_mut(|l| l.timestamp = ts + window);
@@ -1221,10 +1601,32 @@ fn test_score_count_increments_on_submit() {
     let wallet = Address::generate(&env);
     let asset_pair = symbol_short!("XLM_USDC");
 
-    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &30, &false, &false, &1, &60, &1);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &asset_pair,
+        &30,
+        &false,
+        &false,
+        &1,
+        &60,
+        &1,
+        &None,
+    );
     assert_eq!(client.get_score_count(&wallet, &asset_pair), 1);
 
-    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &50, &false, &false, &2, &70, &1);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &asset_pair,
+        &50,
+        &false,
+        &false,
+        &2,
+        &70,
+        &1,
+        &None,
+    );
     assert_eq!(client.get_score_count(&wallet, &asset_pair), 2);
 }
 
@@ -1247,6 +1649,7 @@ fn test_score_count_exceeds_history_depth() {
             &(i as u64),
             &50,
             &1,
+            &None,
         );
     }
 
@@ -1287,8 +1690,8 @@ fn test_score_count_increments_via_batch() {
         model_version: 1,
     });
 
-    let accepted = client.submit_scores_batch(&batch);
-    assert_eq!(accepted, 2);
+    let result: BatchResult = client.submit_scores_batch(&batch);
+    assert_eq!(result.accepted_count, 2);
 
     assert_eq!(client.get_score_count(&wallet1, &asset_pair), 1);
     assert_eq!(client.get_score_count(&wallet2, &asset_pair), 1);
@@ -1302,9 +1705,9 @@ fn test_score_count_is_per_pair() {
     let pair1 = symbol_short!("XLM_USDC");
     let pair2 = symbol_short!("XLM_BTC");
 
-    client.submit_score(&Vec::new(&env), &wallet, &pair1, &30, &false, &false, &1, &60, &1);
-    client.submit_score(&Vec::new(&env), &wallet, &pair1, &40, &false, &false, &2, &70, &1);
-    client.submit_score(&Vec::new(&env), &wallet, &pair2, &90, &true, &true, &3, &95, &1);
+    client.submit_score(&Vec::new(&env), &wallet, &pair1, &30, &false, &false, &1, &60, &1, &None);
+    client.submit_score(&Vec::new(&env), &wallet, &pair1, &40, &false, &false, &2, &70, &1, &None);
+    client.submit_score(&Vec::new(&env), &wallet, &pair2, &90, &true, &true, &3, &95, &1, &None);
 
     assert_eq!(client.get_score_count(&wallet, &pair1), 2);
     assert_eq!(client.get_score_count(&wallet, &pair2), 1);
@@ -1318,7 +1721,7 @@ fn test_set_staleness_window_updates_stale_check() {
 
     let ts: u64 = 1_700_000_000;
     env.ledger().with_mut(|l| l.timestamp = ts);
-    client.submit_score(&Vec::new(&env), &wallet, &pair, &50, &false, &false, &ts, &80, &1);
+    client.submit_score(&Vec::new(&env), &wallet, &pair, &50, &false, &false, &ts, &80, &1, &None);
 
     // Set a very narrow window (10 seconds).
     client.set_staleness_window(&10);

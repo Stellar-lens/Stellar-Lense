@@ -59,13 +59,24 @@ pub enum Error {
     /// Returned when `set_cooldown` is given a value below
     /// `MIN_COOLDOWN_SECS` or above `MAX_COOLDOWN_SECS`.
     InvalidCooldown = 24,
-    /// Returned by `withdraw_fees` when another withdrawal is already in
-    /// progress (the `WithdrawalLock` key is set). Prevents concurrent or
-    /// duplicate withdrawal requests.
-    WithdrawalInProgress = 25,
-    /// Returned by `withdraw_fees` when the requested amount is zero.
-    InvalidWithdrawalAmount = 26,
-    /// Returned by `withdraw_fees` when no fee token has been configured via
-    /// `set_fee_token`.
-    FeeTokenNotSet = 27,
+    /// Returned when a timestamp of 0 is submitted (zero is reserved and
+    /// indicates an uninitialised / invalid timestamp).
+    InvalidTimestamp = 25,
+
+    // ── Score attestation ───────────────────────────────────────────────────
+    /// Returned by `submit_score` when a `ScoreAttestation` is supplied but
+    /// `set_service_pubkey` has never been called — there is no key to
+    /// verify the signature against. Also returned by `get_service_pubkey`
+    /// before one has been configured.
+    ServicePubkeyNotSet = 26,
+    /// Returned by `submit_score` when an attestation is required (a
+    /// service pubkey is configured) but missing, or when a supplied
+    /// `ScoreAttestation` fails verification: the recomputed commitment
+    /// disagrees with the supplied one, the signature's recovery id is not
+    /// `0`/`1`, or the recovered public key does not match the registered
+    /// service pubkey.
+    InvalidAttestation = 27,
+    /// `set_service_pubkey` was called with a pubkey whose length is
+    /// neither 33 (compressed) nor 65 (uncompressed) bytes.
+    InvalidPubkeyLength = 28,
 }
