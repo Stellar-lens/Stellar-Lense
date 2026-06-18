@@ -56,6 +56,7 @@ We follow [Responsible Disclosure](https://en.wikipedia.org/wiki/Coordinated_vul
 | Large batch denial of service        | Batch size capped at `MAX_BATCH_SIZE` (20) per invocation        |
 | Compromised service floods a pair with submissions | Per-`(wallet, asset_pair)` cooldown (`RateLimitExceeded`); admin-bounded `[MIN_COOLDOWN_SECS, MAX_COOLDOWN_SECS]`, with `override_rate_limit` as an audited emergency escape hatch |
 | Silent malicious contract upgrade    | Time-locked upgrade governance (see below): mandatory delay + on-chain proposal anyone can inspect, plus admin veto |
+| Data-residency / GDPR erasure request | `clear_score_history` and `clear_score` (admin-only) permanently remove scoring data from persistent storage; `clr_hist` / `clr_scr` events provide an on-chain audit trail of every erasure |
 
 ## Upgrade Governance & Threat Model
 

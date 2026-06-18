@@ -295,6 +295,22 @@ pub fn set_cooldown_secs(env: &Env, secs: u64) {
     env.storage().instance().set(&DataKey::CooldownSecs, &secs);
 }
 
+// ── GDPR / data-erasure ───────────────────────────────────────────────────────
+
+/// Removes the score history ring buffer for `wallet` / `asset_pair`.
+/// No-op when no history exists.
+pub fn clear_score_history(env: &Env, wallet: &Address, asset_pair: &Symbol) {
+    let key = DataKey::ScoreHistory(wallet.clone(), asset_pair.clone());
+    env.storage().persistent().remove(&key);
+}
+
+/// Removes the latest score entry for `wallet` / `asset_pair`.
+/// No-op when no score exists.
+pub fn clear_score(env: &Env, wallet: &Address, asset_pair: &Symbol) {
+    let key = DataKey::Score(wallet.clone(), asset_pair.clone());
+    env.storage().persistent().remove(&key);
+}
+
 // ── Score count ──────────────────────────────────────────────────────────────
 
 /// Increments the monotonically increasing submission counter for a
