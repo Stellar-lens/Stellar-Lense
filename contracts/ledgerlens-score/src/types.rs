@@ -156,8 +156,9 @@ pub enum DataKey {
     /// submissions for the same (wallet, asset_pair). Defaults to
     /// `DEFAULT_COOLDOWN_SECS` when unset.
     CooldownSecs,
-    /// The off-chain detection pipeline's secp256k1 public key (33-byte
-    /// compressed or 65-byte uncompressed SEC-1 encoding), used to verify
-    /// `ScoreAttestation`s. Unset until `set_service_pubkey` is called.
-    ServicePubKey,
+    /// Monotonically increasing count of total score submissions for a
+    /// (wallet, asset_pair) combination. Unlike `ScoreHistory` (which caps
+    /// at `HISTORY_MAX_DEPTH`), this counter is never truncated — it tracks
+    /// every submission since the first.
+    ScoreCount(Address, Symbol),
 }
