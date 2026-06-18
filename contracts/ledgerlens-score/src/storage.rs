@@ -1,4 +1,4 @@
-use soroban_sdk::{Address, Env, Symbol, Vec};
+use soroban_sdk::{Address, Bytes, Env, Symbol, Vec};
 
 use crate::constants::{
     DEFAULT_COOLDOWN_SECS, DEFAULT_RISK_THRESHOLD, DEFAULT_UPGRADE_DELAY_SECS, HISTORY_MAX_DEPTH,
@@ -293,4 +293,16 @@ pub fn get_cooldown_secs(env: &Env) -> u64 {
 
 pub fn set_cooldown_secs(env: &Env, secs: u64) {
     env.storage().instance().set(&DataKey::CooldownSecs, &secs);
+}
+
+// ── Score attestation ─────────────────────────────────────────────────────
+
+/// Returns the off-chain detection pipeline's secp256k1 public key, or
+/// `None` if `set_service_pubkey` has never been called.
+pub fn get_service_pubkey(env: &Env) -> Option<Bytes> {
+    env.storage().instance().get(&DataKey::ServicePubKey)
+}
+
+pub fn set_service_pubkey(env: &Env, pubkey: &Bytes) {
+    env.storage().instance().set(&DataKey::ServicePubKey, pubkey);
 }

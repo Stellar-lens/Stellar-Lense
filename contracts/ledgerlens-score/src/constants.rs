@@ -12,7 +12,10 @@ pub const MAX_BATCH_SIZE: u32 = 20;
 pub const DEFAULT_RISK_THRESHOLD: u32 = 75;
 
 /// Semantic contract version; bump on breaking ABI changes.
-pub const CONTRACT_VERSION: u32 = 1;
+///
+/// Bumped to 2 when `submit_score` gained its `attestation` parameter (see
+/// `docs/attestation-spec.md`).
+pub const CONTRACT_VERSION: u32 = 2;
 
 /// Practical upper bound on the number of distinct asset pairs tracked per
 /// wallet. `get_aggregate_score` iterates the wallet's full `AssetPairs`

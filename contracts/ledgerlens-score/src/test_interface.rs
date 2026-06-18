@@ -50,6 +50,7 @@ fn test_query_risk_gate_safe_wallet() {
         &1_700_000_000,
         &90,
         &1,
+        &None,
     );
 
     assert!(client.query_risk_gate(&wallet, &pair, &75));
@@ -72,6 +73,7 @@ fn test_query_risk_gate_risky_wallet() {
         &1_700_000_000,
         &90,
         &1,
+        &None,
     );
 
     assert!(!client.query_risk_gate(&wallet, &pair, &75));
@@ -94,6 +96,7 @@ fn test_query_risk_gate_at_threshold() {
         &1_700_000_000,
         &90,
         &1,
+        &None,
     );
 
     assert!(!client.query_risk_gate(&wallet, &pair, &75));
@@ -155,6 +158,7 @@ fn test_query_risk_gate_never_panics() {
             &1_700_000_000,
             &50,
             &1,
+            &None,
         );
 
         let threshold = next() % 200; // intentionally also exceeds the 0-100 range
