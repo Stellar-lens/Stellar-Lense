@@ -67,6 +67,14 @@ Read-only function callable by any Soroban contract. Returns the most recent Led
 ### `get_score_count(wallet: Address, asset_pair: Symbol) -> u32`
 Read-only function callable by any account or contract. Returns the total number of score submissions ever recorded for `wallet` / `asset_pair`. Unlike `get_score_history` (which caps at `HISTORY_MAX_DEPTH`), this counter is never truncated, giving off-chain services a cheap O(1) signal to distinguish newly monitored wallets from those with a long history.
 
+### `set_history_max_depth(depth: u32)`
+Admin-only. Sets the maximum number of entries retained in the per-wallet / per-asset-pair score history ring buffer. `depth` must be in the range `[1, 50]`; values outside this range are rejected with `InvalidHistoryDepth`. Defaults to `10` until configured.
+
+**Lazy-truncation behaviour:** reducing the depth does not remove existing entries immediately. Entries beyond the new cap remain in the ring until the next `submit_score` (or `submit_scores_batch`) call for that pair triggers the eviction loop, at which point the ring is trimmed in a single pass. Off-chain consumers reading `get_score_history` between the depth change and the next submission may temporarily observe more entries than the new cap.
+
+### `get_history_max_depth() -> u32`
+Read-only. Returns the current ring-buffer depth. Defaults to `10` until the admin sets one explicitly.
+
 ### `set_service(new_service: Address)`
 Rotates the authorised off-chain scoring service address. Admin only.
 

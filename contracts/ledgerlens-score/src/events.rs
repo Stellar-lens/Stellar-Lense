@@ -128,3 +128,11 @@ pub fn rate_limit_overridden(env: &Env, by: &Address, wallet: &Address, asset_pa
 pub fn service_pubkey_updated(env: &Env, pubkey: &Bytes) {
     env.events().publish((symbol_short!("pk_upd"),), pubkey.clone());
 }
+
+// ── History depth ─────────────────────────────────────────────────────────────
+
+/// Emitted when the admin changes the ring-buffer depth via
+/// `set_history_max_depth`.
+pub fn history_depth_updated(env: &Env, depth: u32) {
+    env.events().publish((symbol_short!("hd_upd"),), depth);
+}

@@ -1,7 +1,7 @@
 use soroban_sdk::{Address, Bytes, Env, Symbol, Vec};
 
 use crate::constants::{
-    DEFAULT_COOLDOWN_SECS, DEFAULT_RISK_THRESHOLD, DEFAULT_UPGRADE_DELAY_SECS, HISTORY_MAX_DEPTH,
+    DEFAULT_COOLDOWN_SECS, DEFAULT_RISK_THRESHOLD, DEFAULT_UPGRADE_DELAY_SECS,
     SCORE_TTL_EXTEND_TO, SCORE_TTL_THRESHOLD,
 };
 use crate::types::{AggregateRiskScore, DataKey, RiskScore, UpgradeProposal};
@@ -120,8 +120,12 @@ pub fn push_score_history(env: &Env, wallet: &Address, asset_pair: &Symbol, scor
 
     history.push_back(score.clone());
 
-    // Evict oldest entry when the ring exceeds the depth cap.
-    while history.len() > HISTORY_MAX_DEPTH {
+    // Evict oldest entry when the ring exceeds the configured depth cap.
+    // Note: if the admin has *reduced* the depth since the last write, this
+    // loop will evict multiple entries in one pass, trimming the ring down to
+    // the new depth on the very next submission.
+    let depth = get_history_max_depth(env);
+    while history.len() > depth {
         history.remove(0);
     }
 
@@ -137,6 +141,21 @@ pub fn get_score_history(env: &Env, wallet: &Address, asset_pair: &Symbol) -> Ve
         env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
     }
     history
+}
+
+// ── Configurable history ring depth ──────────────────────────────────────────
+
+/// Returns the admin-configured ring-buffer depth, or
+/// [`DEFAULT_HISTORY_MAX_DEPTH`] when no value has been set yet.
+pub fn get_history_max_depth(env: &Env) -> u32 {
+    let result: Option<u32> = env.storage().instance().get(&DataKey::HistoryMaxDepth);
+    result.unwrap_or(crate::constants::DEFAULT_HISTORY_MAX_DEPTH)
+}
+
+/// Persists `depth` as the ring-buffer cap for all future
+/// `push_score_history` calls.
+pub fn set_history_max_depth(env: &Env, depth: u32) {
+    env.storage().instance().set(&DataKey::HistoryMaxDepth, &depth);
 }
 
 // ── Contract version ─────────────────────────────────────────────────────────
