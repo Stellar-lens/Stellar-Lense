@@ -14,7 +14,7 @@ use soroban_sdk::{
 
 use crate::{
     constants::{DEFAULT_COOLDOWN_SECS, MAX_COOLDOWN_SECS, MIN_COOLDOWN_SECS},
-    Error, LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreSubmission,
+    BatchResult, Error, LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreSubmission,
 };
 
 /// Ledger timestamp the tests start from (an arbitrary fixed instant).
@@ -188,8 +188,15 @@ fn test_batch_rate_limited_entry_skipped() {
         model_version: 1,
     });
 
-    let accepted = client.submit_scores_batch(&batch);
-    assert_eq!(accepted, 1);
+    let result: BatchResult = client.submit_scores_batch(&batch);
+    assert_eq!(result.accepted_count, 1);
+    assert_eq!(result.rejected_count, 1);
+    // First entry (rate-limited) — rejected with code 23 (RateLimitExceeded).
+    assert!(!result.results.get(0).unwrap().accepted);
+    assert_eq!(result.results.get(0).unwrap().rejection_code, 23);
+    // Second entry — accepted.
+    assert!(result.results.get(1).unwrap().accepted);
+    assert_eq!(result.results.get(1).unwrap().rejection_code, 0);
 
     // limited_wallet's entry was skipped — its score is unchanged.
     assert_eq!(client.get_score(&limited_wallet, &pair).score, 10);
@@ -227,8 +234,14 @@ fn test_batch_second_entry_for_same_pair_rate_limited() {
 
     // Both entries share the same ledger timestamp, so the second is rejected
     // by the cooldown the first entry just set.
-    let accepted = client.submit_scores_batch(&batch);
-    assert_eq!(accepted, 1);
+    let result: BatchResult = client.submit_scores_batch(&batch);
+    assert_eq!(result.accepted_count, 1);
+    assert_eq!(result.rejected_count, 1);
+    // First entry — accepted.
+    assert!(result.results.get(0).unwrap().accepted);
+    // Second entry — rate-limited.
+    assert!(!result.results.get(1).unwrap().accepted);
+    assert_eq!(result.results.get(1).unwrap().rejection_code, 23);
     assert_eq!(client.get_score(&wallet, &pair).score, 10);
 }
 

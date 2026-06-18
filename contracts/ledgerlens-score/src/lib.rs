@@ -22,7 +22,9 @@ mod test_rate_limit;
 use soroban_sdk::{contract, contractimpl, symbol_short, Address, BytesN, Env, Symbol, Vec};
 
 pub use errors::Error;
-pub use types::{AggregateRiskScore, RiskScore, ScoreSubmission, UpgradeProposal};
+pub use types::{
+    AggregateRiskScore, BatchEntryResult, BatchResult, RiskScore, ScoreSubmission, UpgradeProposal,
+};
 
 /// On-chain truth layer for LedgerLens risk scores.
 ///
@@ -82,7 +84,7 @@ impl LedgerLensScoreContract {
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
-    /// assert_eq!(client.get_version(), 1);
+    /// assert_eq!(client.get_version(), 2);
     /// ```
     pub fn get_version(env: Env) -> u32 {
         storage::get_contract_version(&env)
@@ -206,13 +208,17 @@ impl LedgerLensScoreContract {
     }
 
     /// Submit multiple risk scores in a single invocation.  The service
-    /// account authorises once for the whole batch.  Entries with
-    /// out-of-range `score` or `confidence`, or that arrive before their
-    /// `(wallet, asset_pair)`'s submission cooldown has elapsed, are silently
-    /// skipped; the function returns the count of successfully written
-    /// entries. Two entries for the same pair within one batch are subject to
-    /// the same cooldown — the second is skipped, since both share the same
-    /// ledger timestamp.
+    /// account authorises once for the whole batch.  Returns a `BatchResult`
+    /// that lists every entry's outcome so the caller knows exactly which
+    /// entries succeeded and why any failed, without needing to re-query
+    /// each (wallet, pair) individually.
+    ///
+    /// Entries with out-of-range `score` or `confidence`, zero `timestamp`,
+    /// or that arrive before their `(wallet, asset_pair)`'s submission
+    /// cooldown has elapsed, are recorded as rejected in the result with an
+    /// appropriate `rejection_code`. Two entries for the same pair within
+    /// one batch are subject to the same cooldown — the second is rejected,
+    /// since both share the same ledger timestamp.
     ///
     /// # Examples
     ///
@@ -233,12 +239,17 @@ impl LedgerLensScoreContract {
     /// let mut batch: Vec<ScoreSubmission> = Vec::new(&env);
     /// batch.push_back(ScoreSubmission { wallet: wallet1.clone(), asset_pair: asset_pair.clone(), score: 45, benford_flag: false, ml_flag: false, timestamp: 1000, confidence: 80, model_version: 2 });
     /// batch.push_back(ScoreSubmission { wallet: wallet2.clone(), asset_pair: asset_pair.clone(), score: 85, benford_flag: true, ml_flag: true, timestamp: 2000, confidence: 90, model_version: 2 });
-    /// let accepted = client.submit_scores_batch(&batch);
-    /// assert_eq!(accepted, 2);
+    /// let result = client.submit_scores_batch(&batch);
+    /// assert_eq!(result.accepted_count, 2);
+    /// assert_eq!(result.rejected_count, 0);
+    /// assert_eq!(result.results.len(), 2);
     /// assert_eq!(client.get_score(&wallet1, &asset_pair).unwrap().score, 45);
     /// assert_eq!(client.get_score(&wallet2, &asset_pair).unwrap().score, 85);
     /// ```
-    pub fn submit_scores_batch(env: Env, submissions: Vec<ScoreSubmission>) -> Result<u32, Error> {
+    pub fn submit_scores_batch(
+        env: Env,
+        submissions: Vec<ScoreSubmission>,
+    ) -> Result<BatchResult, Error> {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
@@ -259,51 +270,69 @@ impl LedgerLensScoreContract {
         let threshold = storage::get_risk_threshold(&env);
         let cooldown = storage::get_cooldown_secs(&env);
         let now = env.ledger().timestamp();
-        let mut accepted: u32 = 0;
+        let mut accepted_count: u32 = 0;
+        let mut results: Vec<BatchEntryResult> = Vec::new(&env);
 
         for i in 0..submissions.len() {
             let sub = submissions.get(i).unwrap();
+            let mut accepted = false;
+            let mut rejection_code: u32 = 0;
 
-            if sub.score > 100 || sub.confidence > 100 {
-                continue;
+            if sub.score > 100 {
+                rejection_code = Error::InvalidScore as u32;
+            } else if sub.confidence > 100 {
+                rejection_code = Error::InvalidConfidence as u32;
+            } else if sub.timestamp == 0 {
+                rejection_code = Error::InvalidTimestamp as u32;
+            } else {
+                let last_submit =
+                    storage::get_last_submit_time(&env, &sub.wallet, &sub.asset_pair);
+                if last_submit != 0 && now < last_submit.saturating_add(cooldown) {
+                    rejection_code = Error::RateLimitExceeded as u32;
+                } else {
+                    storage::set_last_submit_time(&env, &sub.wallet, &sub.asset_pair, now);
+
+                    let risk_score = RiskScore {
+                        score: sub.score,
+                        benford_flag: sub.benford_flag,
+                        ml_flag: sub.ml_flag,
+                        timestamp: sub.timestamp,
+                        confidence: sub.confidence,
+                        model_version: sub.model_version,
+                    };
+
+                    storage::set_score(&env, &sub.wallet, &sub.asset_pair, &risk_score);
+                    storage::push_score_history(
+                        &env,
+                        &sub.wallet,
+                        &sub.asset_pair,
+                        &risk_score,
+                    );
+                    storage::register_pair_for_wallet(&env, &sub.wallet, &sub.asset_pair);
+                    storage::increment_score_count(&env, &sub.wallet, &sub.asset_pair);
+                    Self::refresh_aggregate_cache(&env, &sub.wallet);
+
+                    if sub.score >= threshold {
+                        events::threshold_breached(
+                            &env,
+                            &sub.wallet,
+                            &sub.asset_pair,
+                            sub.score,
+                            threshold,
+                        );
+                    }
+
+                    events::score_submitted(&env, &sub.wallet, &sub.asset_pair, &risk_score);
+                    accepted = true;
+                    accepted_count += 1;
+                }
             }
 
-            let last_submit = storage::get_last_submit_time(&env, &sub.wallet, &sub.asset_pair);
-            if last_submit != 0 && now < last_submit.saturating_add(cooldown) {
-                continue;
-            }
-            storage::set_last_submit_time(&env, &sub.wallet, &sub.asset_pair, now);
-
-            let risk_score = RiskScore {
-                score: sub.score,
-                benford_flag: sub.benford_flag,
-                ml_flag: sub.ml_flag,
-                timestamp: sub.timestamp,
-                confidence: sub.confidence,
-                model_version: sub.model_version,
-            };
-
-            storage::set_score(&env, &sub.wallet, &sub.asset_pair, &risk_score);
-            storage::push_score_history(&env, &sub.wallet, &sub.asset_pair, &risk_score);
-            storage::register_pair_for_wallet(&env, &sub.wallet, &sub.asset_pair);
-            storage::increment_score_count(&env, &sub.wallet, &sub.asset_pair);
-            Self::refresh_aggregate_cache(&env, &sub.wallet);
-
-            if sub.score >= threshold {
-                events::threshold_breached(
-                    &env,
-                    &sub.wallet,
-                    &sub.asset_pair,
-                    sub.score,
-                    threshold,
-                );
-            }
-
-            events::score_submitted(&env, &sub.wallet, &sub.asset_pair, &risk_score);
-            accepted += 1;
+            results.push_back(BatchEntryResult { index: i, accepted, rejection_code });
         }
 
-        Ok(accepted)
+        let rejected_count = submissions.len() - accepted_count;
+        Ok(BatchResult { accepted_count, rejected_count, results })
     }
 
     // ── Score retrieval ──────────────────────────────────────────────────────

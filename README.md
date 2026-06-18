@@ -85,6 +85,14 @@ Sets the weight used for `asset_pair` in the aggregate risk computation. Default
 ### `get_pair_weight(asset_pair: Symbol) -> u32`
 Read-only lookup of the configured weight for `asset_pair`.
 
+### `submit_scores_batch(submissions: Vec<ScoreSubmission>) -> BatchResult`
+
+Called by the authorised LedgerLens off-chain service to register multiple risk scores in a single invocation. The service account authorises once for the whole batch.
+
+Returns a `BatchResult` containing per-entry outcomes so the caller knows exactly which entries succeeded and why any failed. Entries with out-of-range `score` (>100) or `confidence` (>100), zero `timestamp`, or that arrive before the submission cooldown has elapsed, are recorded as rejected with an appropriate `rejection_code`.
+
+**ABI change in contract version 2:** The return type changed from `u32` (count of accepted entries) to the structured `BatchResult`. Callers built against the old ABI must regenerate their client bindings.
+
 ### `query_risk_gate(wallet: Address, asset_pair: Symbol, gate_threshold: u32) -> bool`
 The cross-contract integration primitive. Returns `true` when the wallet's score is **strictly below** `gate_threshold` (safe to proceed), and `false` when the score is `>= gate_threshold` **or no score exists**. It is **infallible** (returns `bool`, never an error), **never panics**, and is **side-effect free** — designed to be called directly from inside another protocol's guard clause. See [Composability](#composability) and [`docs/interface-spec.md`](docs/interface-spec.md).
 
@@ -143,6 +151,33 @@ pub struct AggregateRiskScore {
     pub last_updated: u64,        // timestamp of the most recently updated pair score
 }
 ```
+
+### `BatchResult` and `BatchEntryResult` Structures
+
+`submit_scores_batch` returns a `BatchResult` that the off-chain API service can inspect to learn which entries succeeded and which were rejected:
+
+```rust
+pub struct BatchEntryResult {
+    pub index: u32,           // zero-based position in the submitted batch
+    pub accepted: bool,       // true if written to storage
+    pub rejection_code: u32,  // 0 if accepted; Error discriminant if rejected
+}
+
+pub struct BatchResult {
+    pub accepted_count: u32,                      // number of entries written to storage
+    pub rejected_count: u32,                      // number of entries rejected
+    pub results: Vec<BatchEntryResult>,            // per-entry outcomes, same order as input
+}
+```
+
+Possible `rejection_code` values (from the `Error` enum):
+
+| Code | Meaning |
+|-----:|---------|
+| 4 | `InvalidScore` — score > 100 |
+| 5 | `InvalidConfidence` — confidence > 100 |
+| 23 | `RateLimitExceeded` — submission cooldown not yet elapsed |
+| 25 | `InvalidTimestamp` — timestamp == 0 |
 
 The weighted average is:
 

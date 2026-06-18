@@ -60,6 +60,35 @@ pub struct AggregateRiskScore {
     pub last_updated: u64,
 }
 
+/// Result for a single entry in a batch score submission.
+/// Returned as part of `BatchResult` from `submit_scores_batch` so the
+/// caller knows exactly which entries succeeded and why any failed,
+/// without needing to re-query each (wallet, pair) individually.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BatchEntryResult {
+    /// Zero-based index of this entry in the submitted batch.
+    pub index: u32,
+    /// True if the entry was written to storage.
+    pub accepted: bool,
+    /// Set to the Error code if rejected; 0 if accepted.
+    pub rejection_code: u32,
+}
+
+/// Structured result from `submit_scores_batch` containing per-entry
+/// outcomes so the caller knows exactly which entries succeeded and why
+/// any failed, without needing to re-query each (wallet, pair) individually.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BatchResult {
+    /// Number of entries that were successfully written to storage.
+    pub accepted_count: u32,
+    /// Number of entries that were rejected.
+    pub rejected_count: u32,
+    /// Per-entry results in the same order as the submitted batch.
+    pub results: soroban_sdk::Vec<BatchEntryResult>,
+}
+
 /// A pending, time-locked contract WASM upgrade.
 ///
 /// Created by `propose_upgrade` and cleared by `execute_upgrade` /

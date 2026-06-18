@@ -6,7 +6,10 @@ use soroban_sdk::{
     Address, Env, Symbol, Vec,
 };
 
-use crate::{Error, LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreSubmission};
+use crate::{
+    Error, LedgerLensScoreContract, LedgerLensScoreContractClient,
+    BatchResult, ScoreSubmission,
+};
 
 // ── Test helpers ──────────────────────────────────────────────────────────────
 
@@ -579,8 +582,14 @@ fn test_submit_scores_batch_writes_all_entries() {
         model_version: 2,
     });
 
-    let accepted = client.submit_scores_batch(&batch);
-    assert_eq!(accepted, 2);
+    let result: BatchResult = client.submit_scores_batch(&batch);
+    assert_eq!(result.accepted_count, 2);
+    assert_eq!(result.rejected_count, 0);
+    assert_eq!(result.results.len(), 2);
+    for i in 0..2 {
+        assert!(result.results.get(i).unwrap().accepted);
+        assert_eq!(result.results.get(i).unwrap().rejection_code, 0);
+    }
 
     assert_eq!(client.get_score(&wallet1, &asset_pair).score, 45);
     assert_eq!(client.get_score(&wallet2, &asset_pair).score, 85);
@@ -616,8 +625,20 @@ fn test_submit_scores_batch_skips_invalid_entries() {
         model_version: 1,
     });
 
-    let accepted = client.submit_scores_batch(&batch);
-    assert_eq!(accepted, 1);
+    let result: BatchResult = client.submit_scores_batch(&batch);
+    assert_eq!(result.accepted_count, 1);
+    assert_eq!(result.rejected_count, 1);
+    assert_eq!(result.results.len(), 2);
+
+    // First entry (invalid score) — rejected with code 4 (InvalidScore).
+    let r0 = result.results.get(0).unwrap();
+    assert!(!r0.accepted);
+    assert_eq!(r0.rejection_code, 4);
+
+    // Second entry — accepted.
+    let r1 = result.results.get(1).unwrap();
+    assert!(r1.accepted);
+    assert_eq!(r1.rejection_code, 0);
 
     assert_eq!(client.get_score(&wallet_ok, &asset_pair).score, 60);
     assert_eq!(client.try_get_score(&wallet_bad, &asset_pair), Err(Ok(Error::ScoreNotFound)));
@@ -680,19 +701,295 @@ fn test_batch_also_populates_score_history() {
         model_version: 1,
     });
 
-    client.submit_scores_batch(&batch);
+    let result: BatchResult = client.submit_scores_batch(&batch);
+    assert!(result.accepted_count >= 1);
 
     let history = client.get_score_history(&wallet, &asset_pair);
     assert_eq!(history.len(), 1);
     assert_eq!(history.get(0).unwrap().score, 55);
 }
 
+// ── Batch structured result ───────────────────────────────────────────────────
+
+#[test]
+fn test_batch_result_all_accepted() {
+    let (env, client, _admin, _service) = initialized();
+
+    let wallet1 = Address::generate(&env);
+    let wallet2 = Address::generate(&env);
+    let wallet3 = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+
+    let mut batch: Vec<ScoreSubmission> = Vec::new(&env);
+    batch.push_back(ScoreSubmission {
+        wallet: wallet1,
+        asset_pair: pair.clone(),
+        score: 10,
+        benford_flag: false,
+        ml_flag: false,
+        timestamp: 1,
+        confidence: 50,
+        model_version: 1,
+    });
+    batch.push_back(ScoreSubmission {
+        wallet: wallet2,
+        asset_pair: pair.clone(),
+        score: 50,
+        benford_flag: false,
+        ml_flag: false,
+        timestamp: 2,
+        confidence: 70,
+        model_version: 1,
+    });
+    batch.push_back(ScoreSubmission {
+        wallet: wallet3,
+        asset_pair: pair.clone(),
+        score: 90,
+        benford_flag: true,
+        ml_flag: true,
+        timestamp: 3,
+        confidence: 95,
+        model_version: 2,
+    });
+
+    let result: BatchResult = client.submit_scores_batch(&batch);
+    assert_eq!(result.accepted_count, 3);
+    assert_eq!(result.rejected_count, 0);
+    assert_eq!(result.results.len(), 3);
+    for i in 0..3 {
+        assert!(result.results.get(i).unwrap().accepted);
+        assert_eq!(result.results.get(i).unwrap().rejection_code, 0);
+    }
+}
+
+#[test]
+fn test_batch_result_mixed() {
+    let (env, client, _admin, _service) = initialized();
+
+    let wallet_ok = Address::generate(&env);
+    let wallet_bad = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+
+    let mut batch: Vec<ScoreSubmission> = Vec::new(&env);
+    batch.push_back(ScoreSubmission {
+        wallet: wallet_ok.clone(),
+        asset_pair: pair.clone(),
+        score: 50,
+        benford_flag: false,
+        ml_flag: false,
+        timestamp: 1,
+        confidence: 70,
+        model_version: 1,
+    });
+    batch.push_back(ScoreSubmission {
+        wallet: wallet_bad.clone(),
+        asset_pair: pair.clone(),
+        score: 101, // invalid — > 100
+        benford_flag: false,
+        ml_flag: false,
+        timestamp: 2,
+        confidence: 70,
+        model_version: 1,
+    });
+
+    let result: BatchResult = client.submit_scores_batch(&batch);
+    assert_eq!(result.accepted_count, 1);
+    assert_eq!(result.rejected_count, 1);
+    assert_eq!(result.results.len(), 2);
+
+    let r0 = result.results.get(0).unwrap();
+    assert!(r0.accepted);
+    assert_eq!(r0.rejection_code, 0);
+
+    let r1 = result.results.get(1).unwrap();
+    assert!(!r1.accepted);
+    assert_eq!(r1.rejection_code, 4); // InvalidScore
+}
+
+#[test]
+fn test_batch_result_index_correct() {
+    let (env, client, _admin, _service) = initialized();
+
+    let wallet1 = Address::generate(&env);
+    let wallet2 = Address::generate(&env);
+    let wallet3 = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+
+    let mut batch: Vec<ScoreSubmission> = Vec::new(&env);
+    batch.push_back(ScoreSubmission {
+        wallet: wallet1,
+        asset_pair: pair.clone(),
+        score: 50,
+        benford_flag: false,
+        ml_flag: false,
+        timestamp: 1,
+        confidence: 70,
+        model_version: 1,
+    });
+    batch.push_back(ScoreSubmission {
+        wallet: wallet2,
+        asset_pair: pair.clone(),
+        score: 200, // invalid — will be rejected at index 1
+        benford_flag: false,
+        ml_flag: false,
+        timestamp: 2,
+        confidence: 70,
+        model_version: 1,
+    });
+    batch.push_back(ScoreSubmission {
+        wallet: wallet3,
+        asset_pair: pair.clone(),
+        score: 60,
+        benford_flag: false,
+        ml_flag: false,
+        timestamp: 3,
+        confidence: 80,
+        model_version: 1,
+    });
+
+    let result: BatchResult = client.submit_scores_batch(&batch);
+    assert_eq!(result.accepted_count, 2);
+    assert_eq!(result.rejected_count, 1);
+    assert_eq!(result.results.len(), 3);
+
+    assert_eq!(result.results.get(0).unwrap().index, 0);
+    assert_eq!(result.results.get(1).unwrap().index, 1);
+    assert_eq!(result.results.get(2).unwrap().index, 2);
+
+    // The rejected entry is at index 1.
+    assert!(result.results.get(0).unwrap().accepted);
+    assert!(!result.results.get(1).unwrap().accepted);
+    assert!(result.results.get(2).unwrap().accepted);
+    assert_eq!(result.results.get(1).unwrap().rejection_code, 4); // InvalidScore
+}
+
+#[test]
+fn test_batch_result_all_rejected() {
+    let (env, client, _admin, _service) = initialized();
+
+    let wallet1 = Address::generate(&env);
+    let wallet2 = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+
+    let mut batch: Vec<ScoreSubmission> = Vec::new(&env);
+    // Score > 100
+    batch.push_back(ScoreSubmission {
+        wallet: wallet1,
+        asset_pair: pair.clone(),
+        score: 200,
+        benford_flag: false,
+        ml_flag: false,
+        timestamp: 1,
+        confidence: 50,
+        model_version: 1,
+    });
+    // Confidence > 100
+    batch.push_back(ScoreSubmission {
+        wallet: wallet2,
+        asset_pair: pair.clone(),
+        score: 50,
+        benford_flag: false,
+        ml_flag: false,
+        timestamp: 2,
+        confidence: 200,
+        model_version: 1,
+    });
+
+    let result: BatchResult = client.submit_scores_batch(&batch);
+    assert_eq!(result.accepted_count, 0);
+    assert_eq!(result.rejected_count, 2);
+    assert_eq!(result.results.len(), 2);
+    for i in 0..2 {
+        assert!(!result.results.get(i).unwrap().accepted);
+    }
+}
+
+#[test]
+fn test_batch_result_vec_length_matches_input() {
+    let (env, client, _admin, _service) = initialized();
+
+    let wallet = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+
+    // Single entry.
+    let mut batch1: Vec<ScoreSubmission> = Vec::new(&env);
+    batch1.push_back(ScoreSubmission {
+        wallet: wallet.clone(),
+        asset_pair: pair.clone(),
+        score: 50,
+        benford_flag: false,
+        ml_flag: false,
+        timestamp: 1,
+        confidence: 70,
+        model_version: 1,
+    });
+    let result1: BatchResult = client.submit_scores_batch(&batch1);
+    assert_eq!(result1.results.len(), 1);
+
+    // Multiple entries.
+    let wallet2 = Address::generate(&env);
+    let wallet3 = Address::generate(&env);
+    let mut batch5: Vec<ScoreSubmission> = Vec::new(&env);
+    batch5.push_back(ScoreSubmission {
+        wallet: Address::generate(&env),
+        asset_pair: pair.clone(),
+        score: 10,
+        benford_flag: false,
+        ml_flag: false,
+        timestamp: 1,
+        confidence: 50,
+        model_version: 1,
+    });
+    batch5.push_back(ScoreSubmission {
+        wallet: Address::generate(&env),
+        asset_pair: pair.clone(),
+        score: 20,
+        benford_flag: false,
+        ml_flag: false,
+        timestamp: 2,
+        confidence: 60,
+        model_version: 1,
+    });
+    batch5.push_back(ScoreSubmission {
+        wallet: Address::generate(&env),
+        asset_pair: pair.clone(),
+        score: 30,
+        benford_flag: false,
+        ml_flag: false,
+        timestamp: 3,
+        confidence: 70,
+        model_version: 1,
+    });
+    batch5.push_back(ScoreSubmission {
+        wallet: Address::generate(&env),
+        asset_pair: pair.clone(),
+        score: 40,
+        benford_flag: false,
+        ml_flag: false,
+        timestamp: 4,
+        confidence: 80,
+        model_version: 1,
+    });
+    batch5.push_back(ScoreSubmission {
+        wallet: Address::generate(&env),
+        asset_pair: pair.clone(),
+        score: 50,
+        benford_flag: false,
+        ml_flag: false,
+        timestamp: 5,
+        confidence: 90,
+        model_version: 1,
+    });
+    let result5: BatchResult = client.submit_scores_batch(&batch5);
+    assert_eq!(result5.results.len(), 5);
+}
+
 // ── Contract version ──────────────────────────────────────────────────────────
 
 #[test]
-fn test_get_version_returns_one() {
+fn test_get_version_returns_two() {
     let (_env, client, _admin, _service) = initialized();
-    assert_eq!(client.get_version(), 1);
+    assert_eq!(client.get_version(), 2);
 }
 
 // ── Not-initialized guards ────────────────────────────────────────────────────
@@ -1287,8 +1584,8 @@ fn test_score_count_increments_via_batch() {
         model_version: 1,
     });
 
-    let accepted = client.submit_scores_batch(&batch);
-    assert_eq!(accepted, 2);
+    let result: BatchResult = client.submit_scores_batch(&batch);
+    assert_eq!(result.accepted_count, 2);
 
     assert_eq!(client.get_score_count(&wallet1, &asset_pair), 1);
     assert_eq!(client.get_score_count(&wallet2, &asset_pair), 1);
