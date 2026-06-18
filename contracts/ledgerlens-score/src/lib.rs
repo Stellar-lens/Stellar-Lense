@@ -285,8 +285,7 @@ impl LedgerLensScoreContract {
             } else if sub.timestamp == 0 {
                 rejection_code = Error::InvalidTimestamp as u32;
             } else {
-                let last_submit =
-                    storage::get_last_submit_time(&env, &sub.wallet, &sub.asset_pair);
+                let last_submit = storage::get_last_submit_time(&env, &sub.wallet, &sub.asset_pair);
                 if last_submit != 0 && now < last_submit.saturating_add(cooldown) {
                     rejection_code = Error::RateLimitExceeded as u32;
                 } else {
@@ -302,12 +301,7 @@ impl LedgerLensScoreContract {
                     };
 
                     storage::set_score(&env, &sub.wallet, &sub.asset_pair, &risk_score);
-                    storage::push_score_history(
-                        &env,
-                        &sub.wallet,
-                        &sub.asset_pair,
-                        &risk_score,
-                    );
+                    storage::push_score_history(&env, &sub.wallet, &sub.asset_pair, &risk_score);
                     storage::register_pair_for_wallet(&env, &sub.wallet, &sub.asset_pair);
                     storage::increment_score_count(&env, &sub.wallet, &sub.asset_pair);
                     Self::refresh_aggregate_cache(&env, &sub.wallet);

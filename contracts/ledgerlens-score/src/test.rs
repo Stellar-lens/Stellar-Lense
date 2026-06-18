@@ -7,8 +7,7 @@ use soroban_sdk::{
 };
 
 use crate::{
-    Error, LedgerLensScoreContract, LedgerLensScoreContractClient,
-    BatchResult, ScoreSubmission,
+    BatchResult, Error, LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreSubmission,
 };
 
 // ── Test helpers ──────────────────────────────────────────────────────────────
@@ -927,8 +926,6 @@ fn test_batch_result_vec_length_matches_input() {
     assert_eq!(result1.results.len(), 1);
 
     // Multiple entries.
-    let wallet2 = Address::generate(&env);
-    let wallet3 = Address::generate(&env);
     let mut batch5: Vec<ScoreSubmission> = Vec::new(&env);
     batch5.push_back(ScoreSubmission {
         wallet: Address::generate(&env),
