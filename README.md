@@ -419,10 +419,11 @@ Mirrors `ledgerlens-contract`'s `submit_score` payload and
 
 #### Asset pair identifier
 
-Format: `CODE:ISSUER` (e.g. `USDC:GA5Z...`), or `XLM:native` for the native
-asset. See `ingestion/data_models.py::Asset.pair_id()`. Used consistently
-across the API path parameters, contract `Symbol` arguments, and dashboard
-routing.
+Format: `CODE:ISSUER/CODE:ISSUER` (e.g. `USDC:GA5Z.../XLM:native`). The
+pipeline enforces this format as the canonical `pair_id` string in every
+`RiskScore` record — one record per `(wallet, pair_id)` tuple. See
+`ingestion/data_models.py::Asset.pair_id()`. Used consistently across the
+API path parameters, contract `Symbol` arguments, and dashboard routing.
 
 #### Risk thresholds
 
@@ -479,11 +480,6 @@ ledgerlens-data/
 - `model_training.py` trains on `scripts/generate_synthetic_dataset.py`'s
   synthetic data by default; the real labelled wash-trade dataset is still
   the "Open dataset release" roadmap item.
-- `run_pipeline.py`'s persisted `asset_pair` is a combined label across all
-  `WATCHED_ASSET_PAIRS` (`watched_pairs_label()`), not a per-pair
-  attribution — the feature matrix is currently built across all pairs
-  together. Per-pair feature matrices would need per-pair trade filtering
-  upstream of `build_feature_matrix`.
 - `--submit-onchain` assumes a deployed `ledgerlens-score` contract and a
   funded `LEDGERLENS_SUBMITTER_SECRET`; it has unit test coverage via mocks
   but hasn't been exercised against a live Soroban network from this repo.
