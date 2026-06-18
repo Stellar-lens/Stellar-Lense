@@ -1518,7 +1518,7 @@ impl LedgerLensScoreContract {
             33 => {
                 let recovered_arr = recovered.to_array();
                 let mut compressed = [0u8; 33];
-                compressed[0] = if recovered_arr[64] % 2 == 0 { 0x02 } else { 0x03 };
+                compressed[0] = if recovered_arr[64].is_multiple_of(2) { 0x02 } else { 0x03 };
                 compressed[1..33].copy_from_slice(&recovered_arr[1..33]);
                 let mut stored = [0u8; 33];
                 pubkey.copy_into_slice(&mut stored);
