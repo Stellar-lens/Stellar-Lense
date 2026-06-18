@@ -43,7 +43,10 @@ def trained_models_and_data():
     """Train models on synthetic data and return (models_dict, wash_row, feature_cols)."""
     df = generate_synthetic_dataset(n_wallets=400, seed=RANDOM_SEED)
     results = train_models(df, test_size=0.2, random_state=RANDOM_SEED)
-    models = {name: r["model"] for name, r in results.items()}
+    models = {
+        name: r["model"] if isinstance(r, dict) and "model" in r else r
+        for name, r in results.items()
+    }
 
     wash_rows = df[df["label"] == 1]
     feature_cols = [c for c in df.columns if c not in FEATURE_COLUMNS_EXCLUDE]
