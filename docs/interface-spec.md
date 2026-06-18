@@ -1,6 +1,6 @@
 # `ILedgerLensScore` — Composability Interface Specification
 
-**Status:** Stable · **Interface version:** 1 · **Contract:** `LedgerLensScoreContract`
+**Status:** Stable · **Interface version:** 2 · **Contract:** `LedgerLensScoreContract`
 
 LedgerLens turns off-chain fraud signals (Benford's-Law analysis + an ML
 ensemble) into an on-chain, 0–100 risk score per `(wallet, asset_pair)`. The
@@ -83,7 +83,7 @@ Unrecognised capabilities return `false`.
 | `get_score(env, wallet, asset_pair) -> Result<RiskScore, Error>` | latest score | `Err(ScoreNotFound)` if absent |
 | `get_score_history(env, wallet, asset_pair) -> Vec<RiskScore>` | up to 10 entries, oldest first | empty `Vec` if none |
 | `get_aggregate_score(env, wallet) -> Result<AggregateRiskScore, Error>` | cross-asset weighted view | `Err(ScoreNotFound)` if the wallet has no scores |
-| `get_version(env) -> u32` | contract build version | currently `1` |
+| `get_version(env) -> u32` | contract build version | currently `2` (was `1` prior to the `BatchResult` ABI change) |
 
 `get_score` is the right call when you need the full struct (confidence, model
 version, flags) rather than a yes/no gate decision. Prefer `query_risk_gate`
@@ -141,7 +141,7 @@ when `model_version` advances.
 There are two independent version numbers:
 
 1. **Contract version** — `get_version()` (backed by `CONTRACT_VERSION`,
-   currently `1`). Bumped on any breaking ABI change.
+   currently `2`). Bumped on any breaking ABI change.
 2. **Interface version** — the number at the top of this document. It tracks
    the `ILedgerLensScore` surface specifically.
 
