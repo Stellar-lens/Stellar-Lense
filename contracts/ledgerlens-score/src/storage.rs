@@ -318,3 +318,15 @@ pub fn get_score_count(env: &Env, wallet: &Address, asset_pair: &Symbol) -> u32 
     let key = DataKey::ScoreCount(wallet.clone(), asset_pair.clone());
     env.storage().persistent().get(&key).unwrap_or(0)
 }
+
+// ── Score attestation ─────────────────────────────────────────────────────
+
+/// Returns the off-chain detection pipeline's secp256k1 public key, or
+/// `None` if `set_service_pubkey` has never been called.
+pub fn get_service_pubkey(env: &Env) -> Option<Bytes> {
+    env.storage().instance().get(&DataKey::ServicePubKey)
+}
+
+pub fn set_service_pubkey(env: &Env, pubkey: &Bytes) {
+    env.storage().instance().set(&DataKey::ServicePubKey, pubkey);
+}

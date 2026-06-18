@@ -1307,10 +1307,32 @@ fn test_score_count_increments_on_submit() {
     let wallet = Address::generate(&env);
     let asset_pair = symbol_short!("XLM_USDC");
 
-    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &30, &false, &false, &1, &60, &1);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &asset_pair,
+        &30,
+        &false,
+        &false,
+        &1,
+        &60,
+        &1,
+        &None,
+    );
     assert_eq!(client.get_score_count(&wallet, &asset_pair), 1);
 
-    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &50, &false, &false, &2, &70, &1);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &asset_pair,
+        &50,
+        &false,
+        &false,
+        &2,
+        &70,
+        &1,
+        &None,
+    );
     assert_eq!(client.get_score_count(&wallet, &asset_pair), 2);
 }
 
@@ -1333,6 +1355,7 @@ fn test_score_count_exceeds_history_depth() {
             &(i as u64),
             &50,
             &1,
+            &None,
         );
     }
 
@@ -1388,9 +1411,9 @@ fn test_score_count_is_per_pair() {
     let pair1 = symbol_short!("XLM_USDC");
     let pair2 = symbol_short!("XLM_BTC");
 
-    client.submit_score(&Vec::new(&env), &wallet, &pair1, &30, &false, &false, &1, &60, &1);
-    client.submit_score(&Vec::new(&env), &wallet, &pair1, &40, &false, &false, &2, &70, &1);
-    client.submit_score(&Vec::new(&env), &wallet, &pair2, &90, &true, &true, &3, &95, &1);
+    client.submit_score(&Vec::new(&env), &wallet, &pair1, &30, &false, &false, &1, &60, &1, &None);
+    client.submit_score(&Vec::new(&env), &wallet, &pair1, &40, &false, &false, &2, &70, &1, &None);
+    client.submit_score(&Vec::new(&env), &wallet, &pair2, &90, &true, &true, &3, &95, &1, &None);
 
     assert_eq!(client.get_score_count(&wallet, &pair1), 2);
     assert_eq!(client.get_score_count(&wallet, &pair2), 1);

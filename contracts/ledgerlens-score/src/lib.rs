@@ -350,7 +350,7 @@ impl LedgerLensScoreContract {
     ///
     /// ```
     /// # use ledgerlens_score::LedgerLensScoreContractClient;
-    /// # use soroban_sdk::{testutils::Address as _, Env, Address};
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
     /// # use ledgerlens_score::LedgerLensScoreContract;
     /// # use soroban_sdk::symbol_short;
     /// let env = Env::default();
@@ -362,7 +362,7 @@ impl LedgerLensScoreContract {
     /// client.initialize(&admin, &service);
     /// let wallet = Address::generate(&env);
     /// let asset_pair = symbol_short!("XLM_USDC");
-    /// client.submit_score(&wallet, &asset_pair, &10, &false, &false, &1, &50, &1).unwrap();
+    /// client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &10, &false, &false, &1, &50, &1, &None).unwrap();
     /// let score = client.get_score(&wallet, &asset_pair);
     /// assert_eq!(score.score, 10);
     /// ```
@@ -378,7 +378,7 @@ impl LedgerLensScoreContract {
     ///
     /// ```
     /// # use ledgerlens_score::LedgerLensScoreContractClient;
-    /// # use soroban_sdk::{testutils::{Address as _, Ledger as _}, Env, Address};
+    /// # use soroban_sdk::{testutils::{Address as _, Ledger as _}, Env, Address, Vec};
     /// # use ledgerlens_score::LedgerLensScoreContract;
     /// # use soroban_sdk::symbol_short;
     /// let env = Env::default();
@@ -390,10 +390,10 @@ impl LedgerLensScoreContract {
     /// client.initialize(&admin, &service);
     /// let wallet = Address::generate(&env);
     /// let asset_pair = symbol_short!("XLM_USDC");
-    /// client.submit_score(&wallet, &asset_pair, &10, &false, &false, &1, &50, &1).unwrap();
+    /// client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &10, &false, &false, &1, &50, &1, &None).unwrap();
     /// // Advance past the default 1-hour cooldown before re-scoring the same pair.
     /// env.ledger().with_mut(|l| l.timestamp += 3_601);
-    /// client.submit_score(&wallet, &asset_pair, &20, &false, &false, &2, &60, &1).unwrap();
+    /// client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &20, &false, &false, &2, &60, &1, &None).unwrap();
     /// let history = client.get_score_history(&wallet, &asset_pair);
     /// assert_eq!(history.len(), 2);
     /// assert_eq!(history.get(0).unwrap().score, 10);
@@ -419,7 +419,7 @@ impl LedgerLensScoreContract {
     ///
     /// ```
     /// # use ledgerlens_score::LedgerLensScoreContractClient;
-    /// # use soroban_sdk::{testutils::Address as _, Env, Address};
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
     /// # use ledgerlens_score::LedgerLensScoreContract;
     /// # use soroban_sdk::symbol_short;
     /// let env = Env::default();
@@ -432,7 +432,7 @@ impl LedgerLensScoreContract {
     /// let wallet = Address::generate(&env);
     /// let asset_pair = symbol_short!("XLM_USDC");
     /// assert_eq!(client.get_score_count(&wallet, &asset_pair), 0);
-    /// client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &50, &false, &false, &1, &90, &1);
+    /// client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &50, &false, &false, &1, &90, &1, &None).unwrap();
     /// assert_eq!(client.get_score_count(&wallet, &asset_pair), 1);
     /// ```
     pub fn get_score_count(env: Env, wallet: Address, asset_pair: Symbol) -> u32 {

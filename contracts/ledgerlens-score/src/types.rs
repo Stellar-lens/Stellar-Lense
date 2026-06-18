@@ -161,4 +161,8 @@ pub enum DataKey {
     /// at `HISTORY_MAX_DEPTH`), this counter is never truncated — it tracks
     /// every submission since the first.
     ScoreCount(Address, Symbol),
+    /// The off-chain detection pipeline's secp256k1 public key (33-byte
+    /// compressed or 65-byte uncompressed SEC-1 encoding), used to verify
+    /// `ScoreAttestation`s. Unset until `set_service_pubkey` is called.
+    ServicePubKey,
 }
