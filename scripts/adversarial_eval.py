@@ -39,17 +39,20 @@ def _build_feature_bounds(feature_cols: list[str]) -> dict[str, tuple[float, flo
     """Return (lower, upper) bounds for each feature column."""
     bounds = {}
     for col in feature_cols:
-        if any(col.startswith(p) for p in [
-            "counterparty_concentration_ratio",
-            "round_trip_frequency",
-            "self_matching_rate",
-            "order_cancellation_rate",
-            "off_hours_activity_ratio",
-            "volume_spike_frequency",
-            "funding_source_similarity",
-            "network_centrality",
-            "intra_minute_clustering",
-        ]):
+        if any(
+            col.startswith(p)
+            for p in [
+                "counterparty_concentration_ratio",
+                "round_trip_frequency",
+                "self_matching_rate",
+                "order_cancellation_rate",
+                "off_hours_activity_ratio",
+                "volume_spike_frequency",
+                "funding_source_similarity",
+                "network_centrality",
+                "intra_minute_clustering",
+            ]
+        ):
             bounds[col] = (0.0, 1.0)
         elif col.startswith("benford_mad_"):
             bounds[col] = (0.0, 1.0)
@@ -68,8 +71,7 @@ def _build_feature_bounds(feature_cols: list[str]) -> dict[str, tuple[float, flo
 
 def _ensemble_prob(feature_row: pd.Series, models: dict) -> float:
     """Compute ensemble average probability of wash trading (label=1)."""
-    feature_cols = [
-        c for c in feature_row.index if c not in FEATURE_COLUMNS_EXCLUDE]
+    feature_cols = [c for c in feature_row.index if c not in FEATURE_COLUMNS_EXCLUDE]
     X = feature_row[feature_cols].to_frame().T.astype(float)
     probs = [model.predict_proba(X)[0, 1] for model in models.values()]
     return float(np.mean(probs))
@@ -91,8 +93,7 @@ def gradient_feature_attack(
     Returns:
         (perturbed_row, l1_distance_from_original)
     """
-    feature_cols = [
-        c for c in feature_row.index if c not in FEATURE_COLUMNS_EXCLUDE]
+    feature_cols = [c for c in feature_row.index if c not in FEATURE_COLUMNS_EXCLUDE]
     bounds = _build_feature_bounds(feature_cols)
 
     x = feature_row.copy()
@@ -112,7 +113,8 @@ def gradient_feature_attack(
             # clip to bounds
             lo, hi = bounds[col]
             x_plus[col] = float(
-                np.clip(x_plus[col], lo, hi if hi != float("inf") else x_plus[col] + 1))
+                np.clip(x_plus[col], lo, hi if hi != float("inf") else x_plus[col] + 1)
+            )
             prob_plus = _ensemble_prob(x_plus, models)
             grad[i] = (prob_plus - prob) / eps
 
@@ -125,9 +127,7 @@ def gradient_feature_attack(
             else:
                 x[col] = float(np.clip(new_val, lo, hi))
 
-    l1_dist = float(
-        sum(abs(x[col] - original[col]) for col in feature_cols)
-    )
+    l1_dist = float(sum(abs(x[col] - original[col]) for col in feature_cols))
     return x, l1_dist
 
 
@@ -149,7 +149,7 @@ def benford_conforming_amounts(
     log_min = np.log10(base_amount / 10.0) if base_amount > 0 else 0.0
     log_max = np.log10(base_amount * 10.0) if base_amount > 0 else 1.0
     log_amounts = rng.uniform(log_min, log_max, size=n_trades)
-    amounts = 10.0 ** log_amounts
+    amounts = 10.0**log_amounts
     return pd.Series(amounts, name="amount")
 
 
@@ -171,12 +171,15 @@ def diversified_counterparty_simulation(
     for cp_idx in range(n_counterparties):
         counterparty = f"GCOUNTERPARTY{cp_idx:04d}"
         for t_idx in range(trades_per_counterparty):
-            rows.append({
-                "base_account": wallet,
-                "counter_account": counterparty,
-                "amount": float(rng.uniform(100, 1000)),
-                "ledger_close_time": base_time + pd.Timedelta(minutes=cp_idx * trades_per_counterparty + t_idx),
-            })
+            rows.append(
+                {
+                    "base_account": wallet,
+                    "counter_account": counterparty,
+                    "amount": float(rng.uniform(100, 1000)),
+                    "ledger_close_time": base_time
+                    + pd.Timedelta(minutes=cp_idx * trades_per_counterparty + t_idx),
+                }
+            )
 
     return pd.DataFrame(rows)
 
@@ -184,6 +187,7 @@ def diversified_counterparty_simulation(
 # ---------------------------------------------------------------------------
 # Hardening measures
 # ---------------------------------------------------------------------------
+
 
 def compute_benford_temporal_divergence(
     wallet_trades: pd.DataFrame,
@@ -227,8 +231,7 @@ def compute_ensemble_disagreement(feature_row: pd.Series, models: dict) -> dict:
     Returns:
         dict with 'high_disagreement_flag' (bool) and 'max_disagreement' (float)
     """
-    feature_cols = [
-        c for c in feature_row.index if c not in FEATURE_COLUMNS_EXCLUDE]
+    feature_cols = [c for c in feature_row.index if c not in FEATURE_COLUMNS_EXCLUDE]
     X = feature_row[feature_cols].to_frame().T.astype(float)
     probs = [model.predict_proba(X)[0, 1] for model in models.values()]
 
@@ -245,12 +248,14 @@ def compute_ensemble_disagreement(feature_row: pd.Series, models: dict) -> dict:
 # Benchmark runner
 # ---------------------------------------------------------------------------
 
+
 def run_benchmark(model_dir: str | None = None) -> dict:
     """Run the full adversarial benchmark and return results dict."""
     scorer = RiskScorer(model_dir=model_dir)
     if not scorer.models:
         raise RuntimeError(
-            f"No trained models found in {model_dir or config.MODEL_DIR}. Run model_training first.")
+            f"No trained models found in {model_dir or config.MODEL_DIR}. Run model_training first."
+        )
 
     # Generate synthetic test set and get wash-trading rows (label=1)
     df = generate_synthetic_dataset(n_wallets=200, seed=RANDOM_SEED)
@@ -267,8 +272,7 @@ def run_benchmark(model_dir: str | None = None) -> dict:
     for _, row in wash_df.iterrows():
         feature_row = row[feature_cols + ["wallet"]]
         original_score = scorer.score(feature_row)["score"]
-        perturbed_row, l1_dist = gradient_feature_attack(
-            feature_row, scorer.models)
+        perturbed_row, l1_dist = gradient_feature_attack(feature_row, scorer.models)
         perturbed_score = scorer.score(perturbed_row)["score"]
 
         if perturbed_score < config.RISK_SCORE_FLAG_THRESHOLD:
@@ -289,8 +293,7 @@ def run_benchmark(model_dir: str | None = None) -> dict:
         feature_row = row[feature_cols + ["wallet"]].copy()
 
         # Generate conforming amounts and recompute benford_mad features
-        amounts = benford_conforming_amounts(
-            n_trades=200, base_amount=500.0, seed=RANDOM_SEED)
+        amounts = benford_conforming_amounts(n_trades=200, base_amount=500.0, seed=RANDOM_SEED)
         conforming_mad = mad_score(amounts)
 
         # Override all benford_mad features with conforming MAD
@@ -323,6 +326,7 @@ def run_benchmark(model_dir: str | None = None) -> dict:
             wallet="GWASHTEST0001",
         )
         from detection.feature_engineering import compute_trade_pattern_features
+
         features = compute_trade_pattern_features("GWASHTEST0001", sim_df)
         cp_scores[n_cp] = features["counterparty_concentration_ratio"]
 
@@ -333,21 +337,20 @@ def run_benchmark(model_dir: str | None = None) -> dict:
     for _, row in wash_df.iterrows():
         feature_row = row[feature_cols + ["wallet"]]
         perturbed_row, _ = gradient_feature_attack(feature_row, scorer.models)
-        disagreement = compute_ensemble_disagreement(
-            perturbed_row, scorer.models)
-        disagreement_flags_before.append(
-            disagreement["high_disagreement_flag"])
+        disagreement = compute_ensemble_disagreement(perturbed_row, scorer.models)
+        disagreement_flags_before.append(disagreement["high_disagreement_flag"])
 
     # With Option C: any wallet with high_disagreement_flag is flagged for review
     # → counts as detected even if score < threshold
     hardened_evasions = sum(
-        1 for i, (_, row) in enumerate(wash_df.iterrows())
+        1
+        for i, (_, row) in enumerate(wash_df.iterrows())
         # evaded AND not flagged by disagreement
         if not disagreement_flags_before[i]
-        and scorer.score(
-            gradient_feature_attack(
-                row[feature_cols + ["wallet"]], scorer.models)[0]
-        )["score"] < config.RISK_SCORE_FLAG_THRESHOLD
+        and scorer.score(gradient_feature_attack(row[feature_cols + ["wallet"]], scorer.models)[0])[
+            "score"
+        ]
+        < config.RISK_SCORE_FLAG_THRESHOLD
     )
     hardened_evasion_rate = hardened_evasions / len(wash_df)
 
@@ -371,7 +374,9 @@ def run_benchmark(model_dir: str | None = None) -> dict:
             "mean_score_nonconforming": round(float(np.mean(benford_scores_nonconforming)), 2),
         },
         "counterparty_diversification_attack": {
-            "concentration_by_n_counterparties": {str(k): round(v, 4) for k, v in cp_scores.items()},
+            "concentration_by_n_counterparties": {
+                str(k): round(v, 4) for k, v in cp_scores.items()
+            },
         },
         "hardening_results": {
             "option_c_ensemble_disagreement": {
@@ -387,8 +392,9 @@ def run_benchmark(model_dir: str | None = None) -> dict:
 
 def main() -> None:
     args = parse_args()
-    os.makedirs(os.path.dirname(args.output) if os.path.dirname(
-        args.output) else ".", exist_ok=True)
+    os.makedirs(
+        os.path.dirname(args.output) if os.path.dirname(args.output) else ".", exist_ok=True
+    )
 
     print("Running adversarial benchmark...")
     benchmark = run_benchmark(model_dir=args.model_dir)
@@ -404,8 +410,7 @@ def main() -> None:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model-dir", default=None)
-    parser.add_argument(
-        "--output", default="reports/adversarial_benchmark.json")
+    parser.add_argument("--output", default="reports/adversarial_benchmark.json")
     return parser.parse_args()
 
 

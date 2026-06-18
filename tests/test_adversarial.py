@@ -68,6 +68,7 @@ def trained_model_dir(trained_models_and_data):
 # Test 1: Gradient attack reduces the score
 # ---------------------------------------------------------------------------
 
+
 def test_gradient_attack_reduces_score(trained_models_and_data):
     """Gradient attack on a label=1 row must produce a lower ensemble score."""
     models, _, feature_cols = trained_models_and_data
@@ -92,9 +93,11 @@ def test_gradient_attack_reduces_score(trained_models_and_data):
     )
     perturbed_prob = _ensemble_prob(perturbed_row, models)
 
-    assert perturbed_prob <= original_prob, (
-        f"Expected perturbed prob {perturbed_prob:.4f} <= original {original_prob:.4f}"
-    )
+    assert (
+        perturbed_prob <= original_prob
+    ), f"Expected perturbed prob {perturbed_prob:.4f} <= original {original_prob:.4f}"
+
+
 # ---------------------------------------------------------------------------
 # Test 2: Gradient attack respects feature bounds
 # ---------------------------------------------------------------------------
@@ -104,10 +107,7 @@ def test_gradient_attack_respects_feature_bounds(trained_models_and_data):
     """After gradient attack, all feature values must remain in valid ranges."""
     models, wash_row, feature_cols = trained_models_and_data
 
-    perturbed_row, _ = gradient_feature_attack(
-        wash_row, models, max_iterations=50, step_size=0.
-
-    )
+    perturbed_row, _ = gradient_feature_attack(wash_row, models, max_iterations=50, step_size=0.0)
 
     bounds = _build_feature_bounds(feature_cols)
 
@@ -132,9 +132,9 @@ def test_gradient_attack_respects_feature_bounds(trained_models_and_data):
     ]
     for feat in proportion_features:
         if feat in perturbed_row.index:
-            assert 0.0 <= perturbed_row[feat] <= 1.0, (
-                f"Proportion feature {feat} = {perturbed_row[feat]:.4f} out of [0,1]"
-            )
+            assert (
+                0.0 <= perturbed_row[feat] <= 1.0
+            ), f"Proportion feature {feat} = {perturbed_row[feat]:.4f} out of [0,1]"
 
     # Counts/ratios must be non-negative
     for col in feature_cols:
@@ -145,10 +145,10 @@ def test_gradient_attack_respects_feature_bounds(trained_models_and_data):
 # Test 3: Benford-conforming amounts pass MAD test
 # ---------------------------------------------------------------------------
 
+
 def test_benford_conforming_amounts_pass_mad_test():
     """1000 Benford-conforming amounts must have MAD < MAD_NONCONFORMITY_THRESHOLD."""
-    amounts = benford_conforming_amounts(
-        n_trades=1000, base_amount=500.0, seed=RANDOM_SEED)
+    amounts = benford_conforming_amounts(n_trades=1000, base_amount=500.0, seed=RANDOM_SEED)
 
     assert len(amounts) == 1000
     assert (amounts > 0).all(), "All amounts must be positive"
@@ -164,6 +164,7 @@ def test_benford_conforming_amounts_pass_mad_test():
 # Test 4: Diversified counterparties reduce concentration ratio
 # ---------------------------------------------------------------------------
 
+
 def test_diversified_counterparty_reduces_concentration():
     """concentration_ratio must decrease monotonically as counterparties increase."""
     wallet = "GWASHTEST0001"
@@ -177,8 +178,7 @@ def test_diversified_counterparty_reduces_concentration():
             wallet=wallet,
         )
         features = compute_trade_pattern_features(wallet, sim_df)
-        concentration_ratios.append(
-            features["counterparty_concentration_ratio"])
+        concentration_ratios.append(features["counterparty_concentration_ratio"])
 
     # Must be monotonically non-increasing
     for i in range(len(concentration_ratios) - 1):
@@ -189,19 +189,20 @@ def test_diversified_counterparty_reduces_concentration():
         )
 
     # 1 counterparty should give max concentration (1.0)
-    assert concentration_ratios[0] == pytest.approx(1.0), (
-        f"Single counterparty should give concentration 1.0, got {concentration_ratios[0]}"
-    )
+    assert concentration_ratios[0] == pytest.approx(
+        1.0
+    ), f"Single counterparty should give concentration 1.0, got {concentration_ratios[0]}"
 
     # 10 counterparties should give significantly lower concentration than 1
-    assert concentration_ratios[-1] < concentration_ratios[0], (
-        "10 counterparties must produce lower concentration than 1 counterparty"
-    )
+    assert (
+        concentration_ratios[-1] < concentration_ratios[0]
+    ), "10 counterparties must produce lower concentration than 1 counterparty"
 
 
 # ---------------------------------------------------------------------------
 # Test 5: Hardening (Option C) reduces evasion rate
 # ---------------------------------------------------------------------------
+
 
 def test_hardening_reduces_evasion_rate(trained_models_and_data):
     """Option C (ensemble disagreement flag) must reduce evasion rate by > 5pp."""
@@ -251,6 +252,7 @@ def test_hardening_reduces_evasion_rate(trained_models_and_data):
         f"Baseline: {baseline_rate:.1%}, Hardened: {hardened_rate:.1%}"
     )
 
+
 # ---------------------------------------------------------------------------
 # Test 6: Benchmark JSON schema
 # ---------------------------------------------------------------------------
@@ -267,9 +269,9 @@ def test_adversarial_benchmark_json_schema(trained_model_dir):
         with open(benchmark_path, "w") as f:
             json.dump(benchmark, f, indent=2)
 
-    assert os.path.exists(benchmark_path), (
-        f"reports/adversarial_benchmark.json not found at {benchmark_path}"
-    )
+    assert os.path.exists(
+        benchmark_path
+    ), f"reports/adversarial_benchmark.json not found at {benchmark_path}"
 
     with open(benchmark_path) as f:
         data = json.load(f)
@@ -278,11 +280,7 @@ def test_adversarial_benchmark_json_schema(trained_model_dir):
     missing = required_keys - set(data.keys())
     assert not missing, f"Benchmark JSON missing required keys: {missing}"
 
-    assert isinstance(data["evasion_rate"], (int, float)
-                      ), "evasion_rate must be numeric"
-    assert isinstance(data["median_l1_cost"], (int, float)
-                      ), "median_l1_cost must be numeric"
-    assert isinstance(data["hardening_results"],
-                      dict), "hardening_results must be a dict"
-    assert len(data["hardening_results"]
-               ) > 0, "hardening_results must not be empty"
+    assert isinstance(data["evasion_rate"], (int, float)), "evasion_rate must be numeric"
+    assert isinstance(data["median_l1_cost"], (int, float)), "median_l1_cost must be numeric"
+    assert isinstance(data["hardening_results"], dict), "hardening_results must be a dict"
+    assert len(data["hardening_results"]) > 0, "hardening_results must not be empty"
