@@ -30,10 +30,9 @@ from scripts.adversarial_eval import (
     gradient_feature_attack,
     run_benchmark,
 )
-
-# ---------------------------------------------------------------------------
 from scripts.generate_synthetic_dataset import generate_synthetic_dataset
 
+# ---------------------------------------------------------------------------
 # Shared fixtures
 # ---------------------------------------------------------------------------
 
@@ -42,11 +41,10 @@ from scripts.generate_synthetic_dataset import generate_synthetic_dataset
 def trained_models_and_data():
     """Train models on synthetic data and return (models_dict, wash_row, feature_cols)."""
     df = generate_synthetic_dataset(n_wallets=400, seed=RANDOM_SEED)
-    results = train_models(df, test_size=0.2, random_state=RANDOM_SEED)
-    models = {
-        name: r["model"] if isinstance(r, dict) and "model" in r else r
-        for name, r in results.items()
-    }
+    raw = train_models(df, test_size=0.2, random_state=RANDOM_SEED)
+    # train_models may return {"results": {...}} or directly {"model_name": {...}}
+    results = raw.get("results", raw)
+    models = {name: r["model"] for name, r in results.items()}
 
     wash_rows = df[df["label"] == 1]
     feature_cols = [c for c in df.columns if c not in FEATURE_COLUMNS_EXCLUDE]
@@ -188,7 +186,7 @@ def test_diversified_counterparty_reduces_concentration():
         assert concentration_ratios[i] >= concentration_ratios[i + 1], (
             f"Concentration ratio did not decrease: "
             f"n={n_counterparty_values[i]} → {concentration_ratios[i]:.4f}, "
-            f"n={n_counterparty_values[i+1]} → {concentration_ratios[i+1]:.4f}"
+            f"n={n_counterparty_values[i + 1]} → {concentration_ratios[i + 1]:.4f}"
         )
 
     # 1 counterparty should give max concentration (1.0)
