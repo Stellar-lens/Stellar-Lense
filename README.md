@@ -133,6 +133,7 @@ ledgerlens-data/
 │   ├── wallet_graph.py               ← Funding-graph similarity/centrality features
 │   ├── model_training.py             ← Train ensemble classifiers (CLI)
 │   ├── model_inference.py            ← Real-time risk scoring
+│   ├── drift_monitor.py              ← PSI-based feature drift detection
 │   ├── shap_explainer.py             ← SHAP interpretability layer
 │   ├── persistence.py                ← SQLAlchemy RiskScore model + engine
 │   └── risk_score_store.py           ← RiskScore upsert/read repository
@@ -148,24 +149,29 @@ ledgerlens-data/
 │
 ├── scripts/
 │   ├── stream.py                     ← Real-time pipeline CLI (python -m scripts.stream)
-│   └── generate_synthetic_dataset.py ← Synthetic labelled dataset for local training/demo
+│   ├── generate_synthetic_dataset.py ← Synthetic labelled dataset for local training/demo
+│   ├── retrain_if_drifted.py         ← Automated drift detection + retraining trigger
+│   └── list_model_versions.py        ← List archived model versions with metrics
 │
 ├── docs/
-│   └── streaming_architecture.md     ← Real-time pipeline diagram and component docs
+│   ├── streaming_architecture.md     ← Real-time pipeline diagram and component docs
+│   └── drift_detection.md           ← PSI drift detection methodology and retraining docs
 │
 ├── utils/
 │   ├── logging.py                    ← Shared logger setup
 │   └── retry.py                      ← Retry/backoff decorator for Horizon calls
 │
-└── tests/
-    ├── test_benford.py
-    ├── test_features.py
-    ├── test_orderbook.py
-    ├── test_wallet_graph.py
-    ├── test_persistence.py
-    ├── test_contract_client.py
-    ├── test_model_training.py
-    └── test_inference_shap.py
+├── tests/
+│   ├── test_benford.py
+│   ├── test_features.py
+│   ├── test_orderbook.py
+│   ├── test_wallet_graph.py
+│   ├── test_persistence.py
+│   ├── test_contract_client.py
+│   ├── test_model_training.py
+│   ├── test_inference_shap.py
+│   ├── test_drift_monitor.py
+│   └── test_retrain_trigger.py
 ```
 
 ## Quick Start
@@ -260,11 +266,56 @@ Every training run produces a `model_metadata.json` sidecar file. This is used b
 
 If the `feature_schema_hash` computed from the input feature row does not match the hash in the metadata, `RiskScorer.score()` will raise a `RuntimeError` detailing the mismatched columns.
 
+## Continuous Retraining Pipeline
+
+LedgerLens includes an automated retraining pipeline that detects feature drift
+using the **Population Stability Index (PSI)** and safely promotes new models
+without disrupting production.
+
+### Drift Detection
+
+The `DriftMonitor` class (`detection/drift_monitor.py`) computes PSI for every
+feature column by comparing the current production distribution (from recent
+Horizon data) against the training-time reference distribution stored in
+`model_metadata.json`. PSI ≥ 0.25 triggers automatic retraining.
+
+### Retraining Workflow
+
+The `scripts/retrain_if_drifted.py` script:
+
+1. Loads the reference distribution from `model_metadata.json`
+2. Builds a feature matrix from recent Horizon data (`--lookback-days`)
+3. Computes PSI drift via `DriftMonitor`
+4. If drift is detected: archives old models, trains new ones, evaluates
+   against old metrics, and promotes only if all models meet AUC-ROC/F1
+   tolerance (≥ old - 0.01)
+5. Writes detailed reports to `reports/`
+
+### Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| 0 | No drift — no action |
+| 2 | Retrained and promoted |
+| 3 | Retrained but not promoted (regression) |
+| 1 | Fatal error |
+
+### Scheduled Execution
+
+A GitHub Actions workflow (`.github/workflows/retrain.yml`) runs weekly
+(Monday 02:00 UTC) or on-demand via `workflow_dispatch`. It uses OIDC for
+artifact store authentication — no long-lived secrets.
+
+See [docs/drift_detection.md](docs/drift_detection.md) for full methodology,
+thresholds, and architecture diagrams.
+
 ### `scripts/`
 
-See [`scripts/README.md`](scripts/README.md) for `generate_synthetic_dataset.py` usage —
-a synthetic labelled feature matrix matching `build_feature_matrix`'s schema, useful for
-local training/demo/tests without live Horizon data.
+See [`scripts/README.md`](scripts/README.md) for detailed usage of:
+- `generate_synthetic_dataset.py` — synthetic labelled feature matrix for
+  local training/demo/tests without live Horizon data
+- `retrain_if_drifted.py` — automated drift detection and retraining trigger
+- `list_model_versions.py` — list archived models with training dates and metrics
 
 ## Development
 
