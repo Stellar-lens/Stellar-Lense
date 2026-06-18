@@ -59,4 +59,7 @@ pub enum Error {
     /// Returned when `set_cooldown` is given a value below
     /// `MIN_COOLDOWN_SECS` or above `MAX_COOLDOWN_SECS`.
     InvalidCooldown = 24,
+    /// Returned when a timestamp of 0 is submitted (zero is reserved and
+    /// indicates an uninitialised / invalid timestamp).
+    InvalidTimestamp = 25,
 }

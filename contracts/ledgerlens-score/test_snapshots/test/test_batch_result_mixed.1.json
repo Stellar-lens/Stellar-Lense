@@ -1,6 +1,6 @@
 {
   "generators": {
-    "address": 4,
+    "address": 5,
     "nonce": 0
   },
   "auth": [
@@ -39,7 +39,7 @@
                             "symbol": "confidence"
                           },
                           "val": {
-                            "u32": 50
+                            "u32": 70
                           }
                         },
                         {
@@ -63,7 +63,7 @@
                             "symbol": "score"
                           },
                           "val": {
-                            "u32": 10
+                            "u32": 50
                           }
                         },
                         {
@@ -71,7 +71,7 @@
                             "symbol": "timestamp"
                           },
                           "val": {
-                            "u64": 1700000000
+                            "u64": 1
                           }
                         },
                         {
@@ -107,7 +107,7 @@
                             "symbol": "confidence"
                           },
                           "val": {
-                            "u32": 50
+                            "u32": 70
                           }
                         },
                         {
@@ -131,7 +131,7 @@
                             "symbol": "score"
                           },
                           "val": {
-                            "u32": 20
+                            "u32": 101
                           }
                         },
                         {
@@ -139,7 +139,7 @@
                             "symbol": "timestamp"
                           },
                           "val": {
-                            "u64": 1700000000
+                            "u64": 2
                           }
                         },
                         {
@@ -147,7 +147,7 @@
                             "symbol": "wallet"
                           },
                           "val": {
-                            "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                            "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
                           }
                         }
                       ]
@@ -160,13 +160,12 @@
           "sub_invocations": []
         }
       ]
-    ],
-    []
+    ]
   ],
   "ledger": {
     "protocol_version": 21,
     "sequence_number": 0,
-    "timestamp": 1700000000,
+    "timestamp": 0,
     "network_id": "0000000000000000000000000000000000000000000000000000000000000000",
     "base_reserve": 0,
     "min_persistent_entry_ttl": 4096,
@@ -215,7 +214,7 @@
                         "symbol": "aggregate_score"
                       },
                       "val": {
-                        "u32": 10
+                        "u32": 50
                       }
                     },
                     {
@@ -231,7 +230,7 @@
                         "symbol": "last_updated"
                       },
                       "val": {
-                        "u64": 1700000000
+                        "u64": 1
                       }
                     },
                     {
@@ -247,7 +246,7 @@
                         "symbol": "max_pair_score"
                       },
                       "val": {
-                        "u32": 10
+                        "u32": 50
                       }
                     },
                     {
@@ -366,7 +365,7 @@
                 },
                 "durability": "persistent",
                 "val": {
-                  "u64": 1700000000
+                  "u64": 0
                 }
               }
             },
@@ -431,7 +430,7 @@
                         "symbol": "confidence"
                       },
                       "val": {
-                        "u32": 50
+                        "u32": 70
                       }
                     },
                     {
@@ -455,7 +454,7 @@
                         "symbol": "score"
                       },
                       "val": {
-                        "u32": 10
+                        "u32": 50
                       }
                     },
                     {
@@ -463,7 +462,7 @@
                         "symbol": "timestamp"
                       },
                       "val": {
-                        "u64": 1700000000
+                        "u64": 1
                       }
                     }
                   ]
@@ -584,7 +583,7 @@
                             "symbol": "confidence"
                           },
                           "val": {
-                            "u32": 50
+                            "u32": 70
                           }
                         },
                         {
@@ -608,7 +607,7 @@
                             "symbol": "score"
                           },
                           "val": {
-                            "u32": 10
+                            "u32": 50
                           }
                         },
                         {
@@ -616,7 +615,7 @@
                             "symbol": "timestamp"
                           },
                           "val": {
-                            "u64": 1700000000
+                            "u64": 1
                           }
                         }
                       ]
@@ -841,7 +840,7 @@
                         "symbol": "confidence"
                       },
                       "val": {
-                        "u32": 50
+                        "u32": 70
                       }
                     },
                     {
@@ -865,7 +864,7 @@
                         "symbol": "score"
                       },
                       "val": {
-                        "u32": 10
+                        "u32": 50
                       }
                     },
                     {
@@ -873,7 +872,7 @@
                         "symbol": "timestamp"
                       },
                       "val": {
-                        "u64": 1700000000
+                        "u64": 1
                       }
                     },
                     {
@@ -909,7 +908,7 @@
                         "symbol": "confidence"
                       },
                       "val": {
-                        "u32": 50
+                        "u32": 70
                       }
                     },
                     {
@@ -933,7 +932,7 @@
                         "symbol": "score"
                       },
                       "val": {
-                        "u32": 20
+                        "u32": 101
                       }
                     },
                     {
@@ -941,7 +940,7 @@
                         "symbol": "timestamp"
                       },
                       "val": {
-                        "u64": 1700000000
+                        "u64": 2
                       }
                     },
                     {
@@ -949,7 +948,7 @@
                         "symbol": "wallet"
                       },
                       "val": {
-                        "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                        "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
                       }
                     }
                   ]
@@ -982,19 +981,19 @@
             "data": {
               "vec": [
                 {
-                  "u32": 10
-                },
-                {
-                  "bool": false
-                },
-                {
-                  "bool": false
-                },
-                {
                   "u32": 50
                 },
                 {
-                  "u64": 1700000000
+                  "bool": false
+                },
+                {
+                  "bool": false
+                },
+                {
+                  "u32": 70
+                },
+                {
+                  "u64": 1
                 }
               ]
             }
@@ -1093,117 +1092,12 @@
                               "symbol": "rejection_code"
                             },
                             "val": {
-                              "u32": 23
+                              "u32": 4
                             }
                           }
                         ]
                       }
                     ]
-                  }
-                }
-              ]
-            }
-          }
-        }
-      },
-      "failed_call": false
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": null,
-        "type_": "diagnostic",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "fn_call"
-              },
-              {
-                "bytes": "0000000000000000000000000000000000000000000000000000000000000001"
-              },
-              {
-                "symbol": "get_score"
-              }
-            ],
-            "data": {
-              "vec": [
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
-                },
-                {
-                  "symbol": "XLM_USDC"
-                }
-              ]
-            }
-          }
-        }
-      },
-      "failed_call": false
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
-        "type_": "diagnostic",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "fn_return"
-              },
-              {
-                "symbol": "get_score"
-              }
-            ],
-            "data": {
-              "map": [
-                {
-                  "key": {
-                    "symbol": "benford_flag"
-                  },
-                  "val": {
-                    "bool": false
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "confidence"
-                  },
-                  "val": {
-                    "u32": 50
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "ml_flag"
-                  },
-                  "val": {
-                    "bool": false
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "model_version"
-                  },
-                  "val": {
-                    "u32": 1
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "score"
-                  },
-                  "val": {
-                    "u32": 10
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "timestamp"
-                  },
-                  "val": {
-                    "u64": 1700000000
                   }
                 }
               ]
