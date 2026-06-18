@@ -55,8 +55,6 @@ class Config:
     WS_BIND_HOST: str = os.getenv("WS_BIND_HOST", "127.0.0.1")
     WS_ALLOW_EXTERNAL: bool = os.getenv("WS_ALLOW_EXTERNAL", "") == "1"
 
-
-
     @classmethod
     def validate(cls, require_onchain: bool = False):
         errors = []
@@ -78,8 +76,7 @@ class Config:
                 errors.append("LEDGERLENS_SUBMITTER_SECRET is not set.")
 
         if errors:
-            raise OSError(
-                "LedgerLens configuration errors:\n- "
-                + "\n- ".join(errors)
-            )
+            raise OSError("LedgerLens configuration errors:\n- " + "\n- ".join(errors))
+
+
 config = Config()
