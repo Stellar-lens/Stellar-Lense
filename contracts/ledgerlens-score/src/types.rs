@@ -135,4 +135,9 @@ pub enum DataKey {
     /// submissions for the same (wallet, asset_pair). Defaults to
     /// `DEFAULT_COOLDOWN_SECS` when unset.
     CooldownSecs,
+    /// Monotonically increasing count of total score submissions for a
+    /// (wallet, asset_pair) combination. Unlike `ScoreHistory` (which caps
+    /// at `HISTORY_MAX_DEPTH`), this counter is never truncated — it tracks
+    /// every submission since the first.
+    ScoreCount(Address, Symbol),
 }

@@ -621,6 +621,10 @@ fn test_submit_scores_batch_skips_invalid_entries() {
 
     assert_eq!(client.get_score(&wallet_ok, &asset_pair).score, 60);
     assert_eq!(client.try_get_score(&wallet_bad, &asset_pair), Err(Ok(Error::ScoreNotFound)));
+
+    // Score count must reflect only the accepted entry, not the skipped one.
+    assert_eq!(client.get_score_count(&wallet_ok, &asset_pair), 1);
+    assert_eq!(client.get_score_count(&wallet_bad, &asset_pair), 0);
 }
 
 #[test]
@@ -1196,6 +1200,114 @@ fn test_set_staleness_window_zero_rejected() {
 fn test_default_staleness_window_is_7_days() {
     let (_env, client, _admin, _service) = initialized();
     assert_eq!(client.get_staleness_window(), 604_800);
+}
+
+// ── Score count ───────────────────────────────────────────────────────────────
+
+#[test]
+fn test_score_count_starts_at_zero() {
+    let (env, client, _admin, _service) = initialized();
+
+    let wallet = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+
+    assert_eq!(client.get_score_count(&wallet, &asset_pair), 0);
+}
+
+#[test]
+fn test_score_count_increments_on_submit() {
+    let (env, client, _admin, _service) = initialized();
+
+    let wallet = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+
+    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &30, &false, &false, &1, &60, &1);
+    assert_eq!(client.get_score_count(&wallet, &asset_pair), 1);
+
+    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &50, &false, &false, &2, &70, &1);
+    assert_eq!(client.get_score_count(&wallet, &asset_pair), 2);
+}
+
+#[test]
+fn test_score_count_exceeds_history_depth() {
+    let (env, client, _admin, _service) = initialized();
+
+    let wallet = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+
+    // Submit 15 scores — the ring buffer caps at 10, but count should be 15.
+    for i in 0u32..15 {
+        client.submit_score(
+            &Vec::new(&env),
+            &wallet,
+            &asset_pair,
+            &(i * 5),
+            &false,
+            &false,
+            &(i as u64),
+            &50,
+            &1,
+        );
+    }
+
+    assert_eq!(client.get_score_count(&wallet, &asset_pair), 15);
+
+    // Confirm the history ring is capped at 10.
+    let history = client.get_score_history(&wallet, &asset_pair);
+    assert_eq!(history.len(), 10);
+}
+
+#[test]
+fn test_score_count_increments_via_batch() {
+    let (env, client, _admin, _service) = initialized();
+
+    let wallet1 = Address::generate(&env);
+    let wallet2 = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+
+    let mut batch: Vec<ScoreSubmission> = Vec::new(&env);
+    batch.push_back(ScoreSubmission {
+        wallet: wallet1.clone(),
+        asset_pair: asset_pair.clone(),
+        score: 30,
+        benford_flag: false,
+        ml_flag: false,
+        timestamp: 1,
+        confidence: 60,
+        model_version: 1,
+    });
+    batch.push_back(ScoreSubmission {
+        wallet: wallet2.clone(),
+        asset_pair: asset_pair.clone(),
+        score: 70,
+        benford_flag: false,
+        ml_flag: false,
+        timestamp: 2,
+        confidence: 80,
+        model_version: 1,
+    });
+
+    let accepted = client.submit_scores_batch(&batch);
+    assert_eq!(accepted, 2);
+
+    assert_eq!(client.get_score_count(&wallet1, &asset_pair), 1);
+    assert_eq!(client.get_score_count(&wallet2, &asset_pair), 1);
+}
+
+#[test]
+fn test_score_count_is_per_pair() {
+    let (env, client, _admin, _service) = initialized();
+
+    let wallet = Address::generate(&env);
+    let pair1 = symbol_short!("XLM_USDC");
+    let pair2 = symbol_short!("XLM_BTC");
+
+    client.submit_score(&Vec::new(&env), &wallet, &pair1, &30, &false, &false, &1, &60, &1);
+    client.submit_score(&Vec::new(&env), &wallet, &pair1, &40, &false, &false, &2, &70, &1);
+    client.submit_score(&Vec::new(&env), &wallet, &pair2, &90, &true, &true, &3, &95, &1);
+
+    assert_eq!(client.get_score_count(&wallet, &pair1), 2);
+    assert_eq!(client.get_score_count(&wallet, &pair2), 1);
 }
 
 #[test]

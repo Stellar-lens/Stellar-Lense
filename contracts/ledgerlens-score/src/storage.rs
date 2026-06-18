@@ -294,3 +294,27 @@ pub fn get_cooldown_secs(env: &Env) -> u64 {
 pub fn set_cooldown_secs(env: &Env, secs: u64) {
     env.storage().instance().set(&DataKey::CooldownSecs, &secs);
 }
+
+// ── Score count ──────────────────────────────────────────────────────────────
+
+/// Increments the monotonically increasing submission counter for a
+/// (wallet, asset_pair) pair. Called by `submit_score` and
+/// `submit_scores_batch` after each successful write.
+pub fn increment_score_count(env: &Env, wallet: &Address, asset_pair: &Symbol) {
+    let key = DataKey::ScoreCount(wallet.clone(), asset_pair.clone());
+    let current: u32 = env.storage().persistent().get(&key).unwrap_or(0);
+    env.storage().persistent().set(&key, &(current + 1));
+    env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+}
+
+/// Returns the total number of score submissions for a (wallet, asset_pair)
+/// pair. Unlike `get_score_history` (which caps at `HISTORY_MAX_DEPTH`), this
+/// counter is never truncated, so it can distinguish between a newly monitored
+/// wallet (count = 1) and one with a long scoring history (count > 10 after
+/// ring-buffer overflow).
+///
+/// Returns 0 when no scores have ever been submitted for this pair.
+pub fn get_score_count(env: &Env, wallet: &Address, asset_pair: &Symbol) -> u32 {
+    let key = DataKey::ScoreCount(wallet.clone(), asset_pair.clone());
+    env.storage().persistent().get(&key).unwrap_or(0)
+}
