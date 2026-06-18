@@ -64,6 +64,9 @@ Called by the authorised LedgerLens off-chain service to register a computed ris
 ### `get_score(wallet: Address, asset_pair: Symbol) -> RiskScore`
 Read-only function callable by any Soroban contract. Returns the most recent LedgerLens risk score and metadata for a given wallet and asset pair.
 
+### `get_score_count(wallet: Address, asset_pair: Symbol) -> u32`
+Read-only function callable by any account or contract. Returns the total number of score submissions ever recorded for `wallet` / `asset_pair`. Unlike `get_score_history` (which caps at `HISTORY_MAX_DEPTH`), this counter is never truncated, giving off-chain services a cheap O(1) signal to distinguish newly monitored wallets from those with a long history.
+
 ### `set_service(new_service: Address)`
 Rotates the authorised off-chain scoring service address. Admin only.
 
@@ -433,6 +436,7 @@ pub struct RiskScore {
 | `initialize(admin, service)` | deployer | admin (one-time) | deployment tooling only |
 | `submit_score(wallet, asset_pair, score, benford_flag, ml_flag, timestamp, confidence)` | LedgerLens service account | `service.require_auth()` | **`api`** — writes scores produced by `core` |
 | `get_score(wallet, asset_pair)` | anyone | none (read-only) | **`api`**, **`dashboard`** (via api), and any third-party Soroban contract that wants to gate on LedgerLens risk |
+| `get_score_count(wallet, asset_pair)` | anyone | none (read-only) | **`api`** — detects newly monitored vs. long-history wallets |
 | `set_service(new_service)` | admin | `admin.require_auth()` | ops/admin tooling for key rotation |
 | `get_admin()` / `get_service()` | anyone | none (read-only) | ops tooling, `api` health checks |
 

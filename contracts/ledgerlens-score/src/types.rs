@@ -135,10 +135,9 @@ pub enum DataKey {
     /// submissions for the same (wallet, asset_pair). Defaults to
     /// `DEFAULT_COOLDOWN_SECS` when unset.
     CooldownSecs,
-    /// Boolean flag set while a fee withdrawal is in-flight to prevent
-    /// concurrent or duplicate withdrawal requests.
-    WithdrawalLock,
-    /// The token contract address used for fee withdrawals.  Must be set
-    /// via `set_fee_token` before `withdraw_fees` can be called.
-    FeeToken,
+    /// Monotonically increasing count of total score submissions for a
+    /// (wallet, asset_pair) combination. Unlike `ScoreHistory` (which caps
+    /// at `HISTORY_MAX_DEPTH`), this counter is never truncated — it tracks
+    /// every submission since the first.
+    ScoreCount(Address, Symbol),
 }
