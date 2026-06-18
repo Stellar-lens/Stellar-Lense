@@ -239,9 +239,7 @@ def compute_cross_asset_features(
         if len(other_pairs) > 1:
             synchrony_count += 1
 
-    features["cross_pair_trade_synchrony"] = (
-        float(synchrony_count / len(wallet_trades)) if wallet_trades else 0.0
-    )
+    features["cross_pair_trade_synchrony"] = float(synchrony_count / len(wallet_trades))
 
     # Feature 2: net_asset_flow_deviation
     # Compute net flow for each asset; deviation = max(|net_flow|) / total_volume
