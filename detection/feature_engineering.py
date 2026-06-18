@@ -210,6 +210,8 @@ def compute_cross_asset_features(
 
     # Ensure we have a pair_id column; if not, infer from base/counter assets
     if "pair_id" not in wallet_trades.columns:
+        if "base_asset" not in wallet_trades.columns or "counter_asset" not in wallet_trades.columns:
+            return default_features
         wallet_trades["pair_id"] = (
             wallet_trades["base_asset"].astype(str)
             + "/"
