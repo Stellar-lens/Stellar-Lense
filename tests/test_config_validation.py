@@ -10,10 +10,8 @@ from contextlib import ExitStack
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
-import pytest
 
 from config import Config
-
 import run_pipeline
 
 
