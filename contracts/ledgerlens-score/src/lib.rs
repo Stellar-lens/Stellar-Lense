@@ -1322,6 +1322,44 @@ impl LedgerLensScoreContract {
         Ok(())
     }
 
+    /// Erase the score history ring buffer for `wallet` / `asset_pair`.
+    ///
+    /// Does nothing (returns `Ok`) if no history exists. After this call,
+    /// `get_score_history` returns an empty Vec. This operation is
+    /// **irreversible on-chain** — keep off-chain backups before erasing.
+    /// Admin only.
+    ///
+    /// Emits `clr_hist` for the on-chain audit trail.
+    pub fn clear_score_history(env: Env, wallet: Address, asset_pair: Symbol) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        let admin = storage::get_admin(&env);
+        admin.require_auth();
+        storage::clear_score_history(&env, &wallet, &asset_pair);
+        events::score_history_cleared(&env, &wallet, &asset_pair);
+        Ok(())
+    }
+
+    /// Erase the latest score entry for `wallet` / `asset_pair`.
+    ///
+    /// Does nothing (returns `Ok`) if no score exists. After this call,
+    /// `get_score` returns `ScoreNotFound`. This operation is
+    /// **irreversible on-chain** — keep off-chain backups before erasing.
+    /// Admin only.
+    ///
+    /// Emits `clr_scr` for the on-chain audit trail.
+    pub fn clear_score(env: Env, wallet: Address, asset_pair: Symbol) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        let admin = storage::get_admin(&env);
+        admin.require_auth();
+        storage::clear_score(&env, &wallet, &asset_pair);
+        events::score_cleared(&env, &wallet, &asset_pair);
+        Ok(())
+    }
+
     /// Returns the ledger timestamp of the last accepted submission for
     /// `(wallet, asset_pair)`, or `0` if none has ever been accepted (or it
     /// was cleared by `override_rate_limit`).

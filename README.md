@@ -123,6 +123,11 @@ Admin-only emergency escape hatch. Immediately clears the stored cooldown deadli
 ### `get_last_submit_time(wallet: Address, asset_pair: Symbol) -> u64`
 Read-only lookup of the ledger timestamp of the last accepted submission for `(wallet, asset_pair)`, or `0` if none has ever been accepted (or it was cleared by `override_rate_limit`).
 
+### `clear_score_history(wallet: Address, asset_pair: Symbol)` ⚠️ irreversible
+Admin only. Permanently erases the score history ring buffer for `wallet` / `asset_pair`. No-op if no history exists. Emits `clr_hist` for the on-chain audit trail. **Keep off-chain backups before calling — this cannot be undone on-chain.**
+
+### `clear_score(wallet: Address, asset_pair: Symbol)` ⚠️ irreversible
+Admin only. Permanently erases the latest score entry for `wallet` / `asset_pair`. After this call, `get_score` returns `ScoreNotFound`. No-op if no score exists. Emits `clr_scr` for the on-chain audit trail. **Keep off-chain backups before calling — this cannot be undone on-chain.**
 ### `set_service_pubkey(pubkey: Bytes)` / `get_service_pubkey() -> Bytes`
 Admin sets (or rotates) the off-chain detection pipeline's secp256k1 public key — 33 bytes compressed or 65 bytes uncompressed, rejected otherwise with `InvalidPubkeyLength` — used to verify `ScoreAttestation`s. Once set it cannot be unset, only rotated. `get_service_pubkey` returns `ServicePubkeyNotSet` before one has been configured. See [Score Attestation](#score-attestation).
 
