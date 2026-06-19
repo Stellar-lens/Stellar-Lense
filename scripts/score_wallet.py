@@ -14,13 +14,14 @@ SHAP feature attributions, and prints the result to stdout.
 import argparse
 import json
 import sys
-from datetime import datetime
+from datetime import UTC, datetime
 
 import pandas as pd
 from stellar_sdk import Asset as SdkAsset
 
 from config import config
 from detection.feature_engineering import build_feature_vector
+from detection.forensic_report import ForensicReportGenerator, write_report_secure
 from detection.model_inference import RiskScorer
 from detection.shap_explainer import ShapExplainer
 from ingestion.historical_loader import load_trades, trades_to_dataframe
@@ -83,6 +84,22 @@ def parse_args() -> argparse.Namespace:
         help="Skip loading order-book events",
     )
     parser.add_argument("--json", action="store_true", help="Output result as JSON")
+    parser.add_argument(
+        "--report",
+        action="store_true",
+        help="Generate a forensic report alongside the score",
+    )
+    parser.add_argument(
+        "--report-format",
+        choices=["json", "markdown", "pdf"],
+        default="json",
+        help="Format for the forensic report (default: json)",
+    )
+    parser.add_argument(
+        "--anchor",
+        action="store_true",
+        help="Anchor the report SHA-256 to Soroban after generation",
+    )
     return parser.parse_args()
 
 
@@ -172,6 +189,65 @@ def main() -> None:
             contrib = f"{exp['contribution']:+.2f}"
             print(f"  {i}. {exp['feature']:<25} {contrib:>6}  (value: {exp['value']:.4g})")
 
+    # 7. Forensic report (optional)
+    if args.report:
+        _generate_report(args, result, shap_explanations, trades_df, feature_row, scorer)
+
 
 if __name__ == "__main__":
     main()
+
+
+def _generate_report(args, result, shap_explanations, trades_df, feature_row, scorer) -> None:
+    """Generate and optionally anchor a forensic report."""
+    from pathlib import Path
+
+    generator = ForensicReportGenerator()
+
+    model_metadata = {}
+    if scorer.metadata:
+        model_metadata = {
+            "name": "LedgerLens Ensemble",
+            "version": scorer.metadata.get("model_version", "unknown"),
+            "training_dataset_sha256": scorer.metadata.get("training_dataset_sha256", "unknown"),
+            "feature_schema_version": scorer.metadata.get("feature_schema_hash", "unknown"),
+        }
+
+    report = generator.generate(
+        wallet=args.wallet,
+        wallet_trades=trades_df,
+        risk_score_dict=result,
+        shap_values=shap_explanations,
+        asset_pair=args.pair,
+        model_metadata=model_metadata or None,
+    )
+
+    # Optional on-chain anchoring — only when --anchor is set
+    if args.anchor:
+        try:
+            from integrations.contract_client import LedgerLensContractClient
+
+            client = LedgerLensContractClient()
+            tx_hash = client.anchor_report(report)
+            print(f"Anchored to Soroban: {tx_hash}", file=sys.stderr)
+        except Exception as e:
+            print(f"Warning: on-chain anchoring failed: {e}", file=sys.stderr)
+
+    # Determine output path and format
+    ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    safe_wallet = args.wallet[:12]
+    out_dir = Path("reports/forensic")
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    fmt = args.report_format
+    if fmt == "json":
+        out_path = out_dir / f"{safe_wallet}_{ts}.json"
+        write_report_secure(str(out_path), json.dumps(report.to_dict(), indent=2))
+    elif fmt == "markdown":
+        out_path = out_dir / f"{safe_wallet}_{ts}.md"
+        write_report_secure(str(out_path), report.to_markdown())
+    elif fmt == "pdf":
+        out_path = out_dir / f"{safe_wallet}_{ts}.pdf"
+        report.to_pdf(str(out_path))
+
+    print(f"Forensic report written to: {out_path}", file=sys.stderr)

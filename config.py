@@ -49,6 +49,9 @@ class Config:
 
     MIN_TRADES_FOR_SCORING: int = int(os.getenv("MIN_TRADES_FOR_SCORING", "20"))
 
+    # Forensic reporting
+    REPORT_CONCURRENCY: int = int(os.getenv("REPORT_CONCURRENCY", "4"))
+
     # Real-time streaming / alerting
     ALERT_CHANNEL: str = os.getenv("ALERT_CHANNEL", "stdout")
     ALERT_WEBHOOK_URL: str | None = os.getenv("ALERT_WEBHOOK_URL")

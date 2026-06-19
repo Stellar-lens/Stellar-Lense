@@ -518,6 +518,41 @@ defines the relevant shared type before inventing a new one.
 
 A DEX where volume figures cannot be trusted is one that institutional participants and serious traders will avoid. LedgerLens is an **open-source public good** — its scores, methodology, and training data are fully transparent and auditable, and will always be free to query.
 
+## Compliance & Forensic Reporting
+
+LedgerLens risk scores are designed to support regulatory compliance workflows
+including FATF Travel Rule reviews, SEC market-manipulation investigations, and
+FinCEN Suspicious Activity Report (SAR) filings.
+
+Every risk score can be accompanied by a **tamper-evident forensic report** that
+documents exactly how the score was computed:
+
+- The 20 most anomalous trades with direct Horizon URLs for independent verification.
+- SHAP feature attributions with plain-English descriptions of each risk factor.
+- Benford's Law analysis across five time windows.
+- A SHA-256 fingerprint of the entire report, optionally anchored to the Stellar
+  ledger via Soroban for a non-repudiable timestamp.
+
+**Generating a report:**
+
+```bash
+# Markdown report for human review
+python -m scripts.score_wallet \
+  --wallet G... \
+  --pair "USDC:GA5Z.../XLM:native" \
+  --report --report-format markdown
+
+# JSON report anchored on-chain
+python -m scripts.score_wallet ... --report --anchor
+
+# Bulk report generation from a CSV of wallets
+python -m scripts.generate_reports --input wallets.csv --anchor
+```
+
+Reports are written to `reports/forensic/` with mode `0o600` (owner-readable
+only). See [`docs/forensic_reporting.md`](docs/forensic_reporting.md) for the
+full schema, anchoring workflow, and the three-step regulator verification guide.
+
 ## Contributing
 
 We're actively looking for collaborators with experience in:

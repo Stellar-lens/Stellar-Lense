@@ -84,3 +84,35 @@ class LedgerLensContractClient:
         params = [scval.to_address(wallet), scval.to_string(asset_pair)]
         tx = self._client.invoke("get_score", params, simulate=True)
         return scval.to_native(tx.result())
+
+    def anchor_report(self, report: object) -> str:
+        """Submit a forensic report's SHA-256 fingerprint to Soroban.
+
+        Calls the contract's `anchor_report(report_id, sha256)` function and
+        returns the Stellar transaction hash.  The hash is also stored on
+        `report.soroban_anchor_tx` so the caller has it immediately.
+
+        Anyone can verify the anchor independently:
+            GET {HORIZON_URL}/transactions/{tx_hash}
+        and compare the embedded SHA-256 to the report on disk.
+        """
+        if not self.submitter_secret:
+            raise ValueError("LEDGERLENS_SUBMITTER_SECRET is not configured")
+
+        signer = Keypair.from_secret(self.submitter_secret)
+
+        params = [
+            scval.to_string(report.report_id),
+            scval.to_string(report.report_sha256),
+        ]
+
+        tx = self._client.invoke(
+            "anchor_report",
+            params,
+            source=signer.public_key,
+            signer=signer,
+        )
+        result = tx.sign_and_submit()
+        tx_hash: str = str(result.hash)
+        report.soroban_anchor_tx = tx_hash
+        return tx_hash

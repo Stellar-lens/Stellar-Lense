@@ -113,3 +113,50 @@ def test_score_wallet_missing_models_exits_1(capsys, mock_ingestion):
         assert excinfo.value.code == 1
         _, err = capsys.readouterr()
         assert "model_training.py" in err
+
+
+def test_score_wallet_report_json_produces_valid_report(
+    tmp_path, capsys, mock_scorer, mock_ingestion, mock_explainer
+):
+    """--report --report-format json must write a valid JSON forensic report."""
+    test_wallet = "GABC1234567890123456789012345678901234567890123456789012"
+    # Ensure metadata is None so _generate_report uses default model metadata
+    mock_scorer.metadata = None
+
+    with (
+        patch(
+            "sys.argv",
+            [
+                "score_wallet.py",
+                "--wallet",
+                test_wallet,
+                "--pair",
+                "USDC:G...",
+                "--report",
+                "--report-format",
+                "json",
+            ],
+        ),
+        patch("scripts.score_wallet.write_report_secure") as mock_write,
+        patch("scripts.score_wallet.ForensicReportGenerator") as MockGen,
+    ):
+        from detection.forensic_report import ForensicReportGenerator as _FRG
+
+        # Use the real generator so we exercise the actual code path
+        real_gen = _FRG()
+        MockGen.return_value = real_gen
+
+        main()
+
+    # The report JSON must have been written somewhere
+    mock_write.assert_called_once()
+    written_content = mock_write.call_args[0][1]
+    data = json.loads(written_content)
+
+    assert data["wallet"] == test_wallet
+    assert "report_id" in data
+    assert "report_sha256" in data
+    assert "risk_score" in data
+    assert "verdict" in data
+    assert isinstance(data["trade_evidence"], list)
+    assert isinstance(data["top_shap_features"], list)
