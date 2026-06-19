@@ -148,7 +148,9 @@ ledgerlens-data/
 │
 ├── scripts/
 │   ├── stream.py                     ← Real-time pipeline CLI (python -m scripts.stream)
-│   └── generate_synthetic_dataset.py ← Synthetic labelled dataset for local training/demo
+│   ├── generate_synthetic_dataset.py ← Synthetic labelled dataset for local training/demo
+│   ├── mine_roundtrips.py            ← Detect round-trip wash trades from raw trade history
+│   └── build_labelled_dataset.py     ← Build ground-truth labelled dataset from on-chain data
 │
 ├── docs/
 │   └── streaming_architecture.md     ← Real-time pipeline diagram and component docs
@@ -458,7 +460,7 @@ defines the relevant shared type before inventing a new one.
 ### Phase 3 — Ecosystem Integration
 - [ ] Mainnet deployment
 - [ ] SDK for protocol integrations (Python + JavaScript)
-- [ ] Open dataset release: labelled SDEX wash trade patterns
+- [x] Open dataset release: labelled SDEX wash trade patterns — see [`data/dataset_card.md`](data/dataset_card.md)
 
 ## Why This Matters
 
