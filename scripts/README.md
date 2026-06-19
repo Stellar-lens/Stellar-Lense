@@ -132,3 +132,71 @@ Top 5 SHAP contributors:
   2. counterparty_concentration_ratio  +0.29  (value: 0.98)
   ...
 ```
+
+---
+
+## `mine_roundtrips.py`
+
+Detects round-trip trade pairs in a raw trades Parquet file. A round-trip is
+a wallet pair `(A, B)` where A sells asset X to B and B sells asset X back to
+A within `--max-ledger-window` ledger closes (~5 s each), with amounts within
+`--amount-tolerance` of each other.
+
+### Usage
+
+```bash
+python -m scripts.mine_roundtrips \
+    --input data/raw_trades.parquet \
+    --output data/roundtrip_pairs.parquet \
+    --max-ledger-window 100 \
+    --amount-tolerance 0.05
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--input` | *(required)* | Input trades Parquet file |
+| `--output` | `data/roundtrip_pairs.parquet` | Output Parquet path |
+| `--max-ledger-window` | `100` | Max ledger closes between forward and return leg (~8 min) |
+| `--amount-tolerance` | `0.05` | Max fractional amount difference (±5%) |
+
+The output Parquet has columns:
+`wallet_a`, `wallet_b`, `forward_trade_id`, `return_trade_id`,
+`forward_time`, `return_time`, `forward_amount`, `return_amount`,
+`asset`, `elapsed_seconds`.
+
+---
+
+## `build_labelled_dataset.py`
+
+Orchestrates all three labelling signals (round-trip detection, funding-graph
+clustering, and manual review) into a single ground-truth labelled Parquet
+file for ML model training.
+
+### Usage
+
+```bash
+python -m scripts.build_labelled_dataset \
+    --trades data/raw_trades.parquet \
+    --output data/labelled_dataset.parquet \
+    --config data/build_config.json
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--trades` | *(required)* | Raw trades Parquet file |
+| `--output` | `data/labelled_dataset.parquet` | Output labelled Parquet path |
+| `--config` | `data/build_config.json` | Build configuration JSON |
+| `--max-ledger-window` | `100` | Passed to round-trip detector |
+| `--amount-tolerance` | `0.05` | Passed to round-trip detector |
+
+### Labelling rule
+
+| Condition | Label |
+|---|---|
+| Flagged by round-trip **AND** funding-graph | `1` (wash trading) |
+| No flags, > 50 trades, > 5 counterparties | `0` (legitimate) |
+| Only one signal or insufficient data | `NaN` (excluded) |
+
+Grey-zone rows (`label = NaN`) are dropped from the released file.
+See `data/labelling_notes.md` for full methodology and `data/dataset_card.md`
+for schema documentation.

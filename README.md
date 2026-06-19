@@ -512,7 +512,7 @@ defines the relevant shared type before inventing a new one.
 ### Phase 3 — Ecosystem Integration
 - [ ] Mainnet deployment
 - [ ] SDK for protocol integrations (Python + JavaScript)
-- [ ] Open dataset release: labelled SDEX wash trade patterns
+- [x] Open dataset release: labelled SDEX wash trade patterns — see [`data/dataset_card.md`](data/dataset_card.md)
 
 ## Why This Matters
 
