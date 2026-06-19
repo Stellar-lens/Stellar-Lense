@@ -194,4 +194,8 @@ pub enum DataKey {
     /// compressed or 65-byte uncompressed SEC-1 encoding), used to verify
     /// `ScoreAttestation`s. Unset until `set_service_pubkey` is called.
     ServicePubKey,
+    /// Admin-configured ring-buffer depth for `ScoreHistory`. Defaults to
+    /// `DEFAULT_HISTORY_MAX_DEPTH` when unset; bounded above by
+    /// `MAX_HISTORY_DEPTH`.
+    HistoryMaxDepth,
 }
