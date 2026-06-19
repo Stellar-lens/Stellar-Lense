@@ -109,18 +109,12 @@ pub fn upgrade_vetoed(env: &Env, by: &Address) {
 
 /// Emitted by `clear_score_history` after the history ring buffer is removed.
 pub fn score_history_cleared(env: &Env, wallet: &Address, asset_pair: &Symbol) {
-    env.events().publish(
-        (symbol_short!("clr_hist"), wallet.clone()),
-        asset_pair.clone(),
-    );
+    env.events().publish((symbol_short!("clr_hist"), wallet.clone()), asset_pair.clone());
 }
 
 /// Emitted by `clear_score` after the latest score entry is removed.
 pub fn score_cleared(env: &Env, wallet: &Address, asset_pair: &Symbol) {
-    env.events().publish(
-        (symbol_short!("clr_scr"), wallet.clone()),
-        asset_pair.clone(),
-    );
+    env.events().publish((symbol_short!("clr_scr"), wallet.clone()), asset_pair.clone());
 }
 
 // ── Per-wallet/pair submission rate limiting ──────────────────────────────────

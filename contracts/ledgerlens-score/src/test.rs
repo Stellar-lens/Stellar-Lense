@@ -1739,12 +1739,12 @@ fn test_clear_score_history_removes_all_entries() {
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
 
-    client.submit_score(&Vec::new(&env), &wallet, &pair, &10, &false, &false, &1, &50, &1);
+    client.submit_score(&Vec::new(&env), &wallet, &pair, &10, &false, &false, &1, &50, &1, &None);
     env.ledger().with_mut(|l| l.timestamp += 3_601);
-    client.submit_score(&Vec::new(&env), &wallet, &pair, &20, &false, &false, &2, &60, &1);
+    client.submit_score(&Vec::new(&env), &wallet, &pair, &20, &false, &false, &2, &60, &1, &None);
 
     assert_eq!(client.get_score_history(&wallet, &pair).len(), 2);
-    client.clear_score_history(&wallet, &pair).unwrap();
+    client.clear_score_history(&wallet, &pair);
     assert_eq!(client.get_score_history(&wallet, &pair).len(), 0);
 }
 
@@ -1755,7 +1755,7 @@ fn test_clear_score_history_on_empty_is_noop() {
     let pair = symbol_short!("XLM_USDC");
 
     // Should not panic when no history exists.
-    client.clear_score_history(&wallet, &pair).unwrap();
+    client.clear_score_history(&wallet, &pair);
     assert_eq!(client.get_score_history(&wallet, &pair).len(), 0);
 }
 
@@ -1765,8 +1765,8 @@ fn test_clear_score_removes_latest_score() {
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
 
-    client.submit_score(&Vec::new(&env), &wallet, &pair, &42, &false, &false, &1, &80, &1);
-    client.clear_score(&wallet, &pair).unwrap();
+    client.submit_score(&Vec::new(&env), &wallet, &pair, &42, &false, &false, &1, &80, &1, &None);
+    client.clear_score(&wallet, &pair);
 
     let result = client.try_get_score(&wallet, &pair);
     assert_eq!(result, Err(Ok(Error::ScoreNotFound)));
@@ -1779,7 +1779,7 @@ fn test_clear_score_on_nonexistent_is_noop() {
     let pair = symbol_short!("XLM_USDC");
 
     // Should not panic when no score exists.
-    client.clear_score(&wallet, &pair).unwrap();
+    client.clear_score(&wallet, &pair);
     let result = client.try_get_score(&wallet, &pair);
     assert_eq!(result, Err(Ok(Error::ScoreNotFound)));
 }
@@ -1791,10 +1791,10 @@ fn test_clear_score_does_not_affect_other_pairs() {
     let pair_a = symbol_short!("XLM_USDC");
     let pair_b = symbol_short!("XLM_BTC");
 
-    client.submit_score(&Vec::new(&env), &wallet, &pair_a, &10, &false, &false, &1, &50, &1);
-    client.submit_score(&Vec::new(&env), &wallet, &pair_b, &20, &false, &false, &1, &60, &1);
+    client.submit_score(&Vec::new(&env), &wallet, &pair_a, &10, &false, &false, &1, &50, &1, &None);
+    client.submit_score(&Vec::new(&env), &wallet, &pair_b, &20, &false, &false, &1, &60, &1, &None);
 
-    client.clear_score(&wallet, &pair_a).unwrap();
+    client.clear_score(&wallet, &pair_a);
 
     assert_eq!(client.try_get_score(&wallet, &pair_a), Err(Ok(Error::ScoreNotFound)));
     assert_eq!(client.get_score(&wallet, &pair_b).score, 20);
@@ -1806,8 +1806,8 @@ fn test_clear_history_does_not_affect_latest_score() {
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
 
-    client.submit_score(&Vec::new(&env), &wallet, &pair, &55, &false, &false, &1, &70, &1);
-    client.clear_score_history(&wallet, &pair).unwrap();
+    client.submit_score(&Vec::new(&env), &wallet, &pair, &55, &false, &false, &1, &70, &1, &None);
+    client.clear_score_history(&wallet, &pair);
 
     // Latest score must still be retrievable.
     assert_eq!(client.get_score(&wallet, &pair).score, 55);
@@ -1821,8 +1821,8 @@ fn test_clear_score_does_not_affect_history() {
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
 
-    client.submit_score(&Vec::new(&env), &wallet, &pair, &33, &false, &false, &1, &80, &1);
-    client.clear_score(&wallet, &pair).unwrap();
+    client.submit_score(&Vec::new(&env), &wallet, &pair, &33, &false, &false, &1, &80, &1, &None);
+    client.clear_score(&wallet, &pair);
 
     // History ring must still contain the entry.
     assert_eq!(client.get_score_history(&wallet, &pair).len(), 1);

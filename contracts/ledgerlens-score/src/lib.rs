@@ -1330,11 +1330,7 @@ impl LedgerLensScoreContract {
     /// Admin only.
     ///
     /// Emits `clr_hist` for the on-chain audit trail.
-    pub fn clear_score_history(
-        env: Env,
-        wallet: Address,
-        asset_pair: Symbol,
-    ) -> Result<(), Error> {
+    pub fn clear_score_history(env: Env, wallet: Address, asset_pair: Symbol) -> Result<(), Error> {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
@@ -1353,11 +1349,7 @@ impl LedgerLensScoreContract {
     /// Admin only.
     ///
     /// Emits `clr_scr` for the on-chain audit trail.
-    pub fn clear_score(
-        env: Env,
-        wallet: Address,
-        asset_pair: Symbol,
-    ) -> Result<(), Error> {
+    pub fn clear_score(env: Env, wallet: Address, asset_pair: Symbol) -> Result<(), Error> {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
