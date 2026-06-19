@@ -228,6 +228,36 @@ A wallet scoring 60-70 on three pairs individually might not breach the per-pair
 
 `get_aggregate_score` iterates the wallet's full pair list, so its cost is O(N) in the number of distinct pairs the wallet has scores for. The contract is designed around a practical maximum of `MAX_WALLET_PAIRS` (20) pairs per wallet; this is documented as a constant but not enforced on-chain.
 
+## Error Codes
+
+| Code | Name | When returned |
+|------|------|---------------|
+| 1 | `AlreadyInitialized` | `initialize` called more than once |
+| 2 | `NotInitialized` | Any state-mutating call before `initialize` |
+| 3 | `Unauthorized` | Caller is not the authorised service or admin |
+| 4 | `InvalidScore` | `score` outside 0-100 |
+| 5 | `InvalidConfidence` | `confidence` outside 0-100 |
+| 6 | `ScoreNotFound` | `get_score` / `get_aggregate_score` for an unknown pair |
+| 7 | `ContractPaused` | Submission attempted while admin circuit-breaker is active |
+| 8 | `NoPendingAdminTransfer` | `accept_admin` / `cancel_admin_transfer` with no transfer in flight |
+| 9 | `EmptyBatch` | `submit_scores_batch` called with zero entries |
+| 10 | `BatchTooLarge` | Batch exceeds `MAX_BATCH_SIZE` (20) |
+| 11 | `ArithmeticOverflow` | Weighted aggregate computation overflows |
+| 12 | `UpgradeAlreadyPending` | `propose_upgrade` while a proposal is already pending |
+| 13 | `NoPendingUpgrade` | `execute_upgrade` / `veto_upgrade` / `get_pending_upgrade` with no proposal |
+| 14 | `InsufficientSigners` | Fewer than threshold signers supplied to `submit_score` |
+| 15 | `UnauthorizedSigner` | A supplied signer is not in the service set |
+| 16 | `InvalidThreshold` | `set_service_threshold` given `0` or a value > set size |
+| 17 | `ServiceSetFull` | `add_service_signer` when set already has `MAX_SERVICE_SIGNERS` members |
+| 18 | `SignerAlreadyInSet` | `add_service_signer` with an address already present |
+| 19 | `SignerNotInSet` | `remove_service_signer` with an address not in the set |
+| 20 | `UpgradeNotReady` | `execute_upgrade` before the time-lock has elapsed |
+| 21 | `InvalidUpgradeDelay` | `set_upgrade_delay` value outside `[MIN, MAX]` bounds |
+| 22 | `InvalidStalenessWindow` | `set_staleness_window` called with `0` |
+| 23 | `RateLimitExceeded` | Submission before the per-pair cooldown has elapsed |
+| 24 | `InvalidCooldown` | `set_cooldown` value outside `[MIN_COOLDOWN_SECS, MAX_COOLDOWN_SECS]` |
+| 25 | `InvalidTimestamp` | `submit_score` called with `timestamp = 0` |
+
 ## Upgrade Governance
 
 Soroban contracts can be upgraded by the admin via `update_current_contract_wasm`, which replaces the **entire** contract logic in a single transaction. Without governance, one admin key — or a compromised one — could silently install a backdoor or disable a security check with no warning. LedgerLens gates every upgrade behind an on-chain **time-lock** so the community always gets a mandatory window to inspect and react.

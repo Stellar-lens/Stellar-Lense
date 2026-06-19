@@ -212,6 +212,9 @@ impl LedgerLensScoreContract {
         if confidence > 100 {
             return Err(Error::InvalidConfidence);
         }
+        if timestamp == 0 {
+            return Err(Error::InvalidTimestamp);
+        }
 
         let last_submit = storage::get_last_submit_time(&env, &wallet, &asset_pair);
         let cooldown = storage::get_cooldown_secs(&env);
