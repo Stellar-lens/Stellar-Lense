@@ -40,7 +40,8 @@
                 },
                 {
                   "u32": 1
-                }
+                },
+                "void"
               ]
             }
           },
@@ -370,6 +371,57 @@
             "key": {
               "vec": [
                 {
+                  "symbol": "ScoreCount"
+                },
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                },
+                {
+                  "symbol": "XLM_USDC"
+                }
+              ]
+            },
+            "durability": "persistent"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+                "key": {
+                  "vec": [
+                    {
+                      "symbol": "ScoreCount"
+                    },
+                    {
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                    },
+                    {
+                      "symbol": "XLM_USDC"
+                    }
+                  ]
+                },
+                "durability": "persistent",
+                "val": {
+                  "u32": 1
+                }
+              }
+            },
+            "ext": "v0"
+          },
+          777600
+        ]
+      ],
+      [
+        {
+          "contract_data": {
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+            "key": {
+              "vec": [
+                {
                   "symbol": "ScoreHistory"
                 },
                 {
@@ -681,7 +733,8 @@
                 },
                 {
                   "u32": 1
-                }
+                },
+                "void"
               ]
             }
           }
@@ -798,7 +851,8 @@
                 },
                 {
                   "u32": 1
-                }
+                },
+                "void"
               ]
             }
           }
@@ -909,7 +963,8 @@
                     },
                     {
                       "u32": 1
-                    }
+                    },
+                    "void"
                   ]
                 }
               ]

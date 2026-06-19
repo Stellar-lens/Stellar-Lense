@@ -14,7 +14,7 @@ use soroban_sdk::{
 
 use crate::{
     constants::{DEFAULT_COOLDOWN_SECS, MAX_COOLDOWN_SECS, MIN_COOLDOWN_SECS},
-    Error, LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreSubmission,
+    BatchResult, Error, LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreSubmission,
 };
 
 /// Ledger timestamp the tests start from (an arbitrary fixed instant).
@@ -74,6 +74,7 @@ fn test_first_submit_always_accepted() {
         &START_TS,
         &90,
         &1,
+        &None,
     );
     assert!(result.is_ok());
     assert_eq!(client.get_last_submit_time(&wallet, &pair), START_TS);
@@ -85,7 +86,18 @@ fn test_second_submit_within_cooldown_rejected() {
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
 
-    client.submit_score(&Vec::new(&env), &wallet, &pair, &50, &false, &false, &START_TS, &90, &1);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &50,
+        &false,
+        &false,
+        &START_TS,
+        &90,
+        &1,
+        &None,
+    );
 
     advance_to(&env, START_TS + DEFAULT_COOLDOWN_SECS - 1);
     let result = client.try_submit_score(
@@ -98,6 +110,7 @@ fn test_second_submit_within_cooldown_rejected() {
         &START_TS,
         &90,
         &1,
+        &None,
     );
     assert_eq!(result, Err(Ok(Error::RateLimitExceeded)));
 
@@ -111,10 +124,32 @@ fn test_second_submit_after_cooldown_accepted() {
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
 
-    client.submit_score(&Vec::new(&env), &wallet, &pair, &50, &false, &false, &START_TS, &90, &1);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &50,
+        &false,
+        &false,
+        &START_TS,
+        &90,
+        &1,
+        &None,
+    );
 
     advance_to(&env, START_TS + DEFAULT_COOLDOWN_SECS + 1);
-    client.submit_score(&Vec::new(&env), &wallet, &pair, &60, &false, &false, &START_TS, &90, &1);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &60,
+        &false,
+        &false,
+        &START_TS,
+        &90,
+        &1,
+        &None,
+    );
     assert_eq!(client.get_score(&wallet, &pair).score, 60);
 }
 
@@ -124,7 +159,18 @@ fn test_cooldown_exactly_at_boundary() {
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
 
-    client.submit_score(&Vec::new(&env), &wallet, &pair, &50, &false, &false, &START_TS, &90, &1);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &50,
+        &false,
+        &false,
+        &START_TS,
+        &90,
+        &1,
+        &None,
+    );
 
     // now == last_submit + cooldown exactly — must be accepted (strict `<` rejects).
     advance_to(&env, START_TS + DEFAULT_COOLDOWN_SECS);
@@ -138,6 +184,7 @@ fn test_cooldown_exactly_at_boundary() {
         &START_TS,
         &90,
         &1,
+        &None,
     );
     assert!(result.is_ok());
     assert_eq!(client.get_score(&wallet, &pair).score, 60);
@@ -162,6 +209,7 @@ fn test_batch_rate_limited_entry_skipped() {
         &START_TS,
         &50,
         &1,
+        &None,
     );
 
     advance_to(&env, START_TS + 10); // still well within the default cooldown
@@ -188,8 +236,15 @@ fn test_batch_rate_limited_entry_skipped() {
         model_version: 1,
     });
 
-    let accepted = client.submit_scores_batch(&batch);
-    assert_eq!(accepted, 1);
+    let result: BatchResult = client.submit_scores_batch(&batch);
+    assert_eq!(result.accepted_count, 1);
+    assert_eq!(result.rejected_count, 1);
+    // First entry (rate-limited) — rejected with code 23 (RateLimitExceeded).
+    assert!(!result.results.get(0).unwrap().accepted);
+    assert_eq!(result.results.get(0).unwrap().rejection_code, 23);
+    // Second entry — accepted.
+    assert!(result.results.get(1).unwrap().accepted);
+    assert_eq!(result.results.get(1).unwrap().rejection_code, 0);
 
     // limited_wallet's entry was skipped — its score is unchanged.
     assert_eq!(client.get_score(&limited_wallet, &pair).score, 10);
@@ -227,8 +282,14 @@ fn test_batch_second_entry_for_same_pair_rate_limited() {
 
     // Both entries share the same ledger timestamp, so the second is rejected
     // by the cooldown the first entry just set.
-    let accepted = client.submit_scores_batch(&batch);
-    assert_eq!(accepted, 1);
+    let result: BatchResult = client.submit_scores_batch(&batch);
+    assert_eq!(result.accepted_count, 1);
+    assert_eq!(result.rejected_count, 1);
+    // First entry — accepted.
+    assert!(result.results.get(0).unwrap().accepted);
+    // Second entry — rate-limited.
+    assert!(!result.results.get(1).unwrap().accepted);
+    assert_eq!(result.results.get(1).unwrap().rejection_code, 23);
     assert_eq!(client.get_score(&wallet, &pair).score, 10);
 }
 
@@ -240,13 +301,35 @@ fn test_admin_override_clears_cooldown() {
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
 
-    client.submit_score(&Vec::new(&env), &wallet, &pair, &50, &false, &false, &START_TS, &90, &1);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &50,
+        &false,
+        &false,
+        &START_TS,
+        &90,
+        &1,
+        &None,
+    );
 
     client.override_rate_limit(&wallet, &pair);
     assert_eq!(client.get_last_submit_time(&wallet, &pair), 0);
 
     // Still at START_TS, but immediately accepted since the cooldown was cleared.
-    client.submit_score(&Vec::new(&env), &wallet, &pair, &70, &false, &false, &START_TS, &90, &1);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &70,
+        &false,
+        &false,
+        &START_TS,
+        &90,
+        &1,
+        &None,
+    );
     assert_eq!(client.get_score(&wallet, &pair).score, 70);
 }
 
@@ -287,10 +370,32 @@ fn test_set_cooldown_within_bounds_applied() {
 
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
-    client.submit_score(&Vec::new(&env), &wallet, &pair, &50, &false, &false, &START_TS, &90, &1);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &50,
+        &false,
+        &false,
+        &START_TS,
+        &90,
+        &1,
+        &None,
+    );
 
     advance_to(&env, START_TS + MIN_COOLDOWN_SECS);
-    client.submit_score(&Vec::new(&env), &wallet, &pair, &60, &false, &false, &START_TS, &90, &1);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &60,
+        &false,
+        &false,
+        &START_TS,
+        &90,
+        &1,
+        &None,
+    );
     assert_eq!(client.get_score(&wallet, &pair).score, 60);
 }
 
@@ -314,7 +419,18 @@ fn test_cooldown_is_per_pair() {
     let pair_a = symbol_short!("XLM_USDC");
     let pair_b = symbol_short!("XLM_BTC");
 
-    client.submit_score(&Vec::new(&env), &wallet, &pair_a, &50, &false, &false, &START_TS, &90, &1);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair_a,
+        &50,
+        &false,
+        &false,
+        &START_TS,
+        &90,
+        &1,
+        &None,
+    );
 
     // Still within pair_a's cooldown, but pair_b has never been submitted.
     let result = client.try_submit_score(
@@ -327,6 +443,7 @@ fn test_cooldown_is_per_pair() {
         &START_TS,
         &90,
         &1,
+        &None,
     );
     assert!(result.is_ok());
 }
@@ -338,7 +455,18 @@ fn test_cooldown_is_per_wallet() {
     let wallet_b = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
 
-    client.submit_score(&Vec::new(&env), &wallet_a, &pair, &50, &false, &false, &START_TS, &90, &1);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet_a,
+        &pair,
+        &50,
+        &false,
+        &false,
+        &START_TS,
+        &90,
+        &1,
+        &None,
+    );
 
     let result = client.try_submit_score(
         &Vec::new(&env),
@@ -350,6 +478,7 @@ fn test_cooldown_is_per_wallet() {
         &START_TS,
         &90,
         &1,
+        &None,
     );
     assert!(result.is_ok());
 }

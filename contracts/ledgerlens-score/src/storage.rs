@@ -1,8 +1,8 @@
-use soroban_sdk::{Address, Env, Symbol, Vec};
+use soroban_sdk::{Address, Bytes, Env, Symbol, Vec};
 
 use crate::constants::{
-    DEFAULT_COOLDOWN_SECS, DEFAULT_RISK_THRESHOLD, DEFAULT_UPGRADE_DELAY_SECS, HISTORY_MAX_DEPTH,
-    SCORE_TTL_EXTEND_TO, SCORE_TTL_THRESHOLD,
+    DEFAULT_COOLDOWN_SECS, DEFAULT_RISK_THRESHOLD, DEFAULT_UPGRADE_DELAY_SECS, SCORE_TTL_EXTEND_TO,
+    SCORE_TTL_THRESHOLD,
 };
 use crate::types::{AggregateRiskScore, DataKey, RiskScore, UpgradeProposal};
 
@@ -120,8 +120,12 @@ pub fn push_score_history(env: &Env, wallet: &Address, asset_pair: &Symbol, scor
 
     history.push_back(score.clone());
 
-    // Evict oldest entry when the ring exceeds the depth cap.
-    while history.len() > HISTORY_MAX_DEPTH {
+    // Evict oldest entry when the ring exceeds the configured depth cap.
+    // Note: if the admin has *reduced* the depth since the last write, this
+    // loop will evict multiple entries in one pass, trimming the ring down to
+    // the new depth on the very next submission.
+    let depth = get_history_max_depth(env);
+    while history.len() > depth {
         history.remove(0);
     }
 
@@ -137,6 +141,21 @@ pub fn get_score_history(env: &Env, wallet: &Address, asset_pair: &Symbol) -> Ve
         env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
     }
     history
+}
+
+// ── Configurable history ring depth ──────────────────────────────────────────
+
+/// Returns the admin-configured ring-buffer depth, or
+/// [`DEFAULT_HISTORY_MAX_DEPTH`] when no value has been set yet.
+pub fn get_history_max_depth(env: &Env) -> u32 {
+    let result: Option<u32> = env.storage().instance().get(&DataKey::HistoryMaxDepth);
+    result.unwrap_or(crate::constants::DEFAULT_HISTORY_MAX_DEPTH)
+}
+
+/// Persists `depth` as the ring-buffer cap for all future
+/// `push_score_history` calls.
+pub fn set_history_max_depth(env: &Env, depth: u32) {
+    env.storage().instance().set(&DataKey::HistoryMaxDepth, &depth);
 }
 
 // ── Contract version ─────────────────────────────────────────────────────────
@@ -293,4 +312,56 @@ pub fn get_cooldown_secs(env: &Env) -> u64 {
 
 pub fn set_cooldown_secs(env: &Env, secs: u64) {
     env.storage().instance().set(&DataKey::CooldownSecs, &secs);
+}
+
+// ── GDPR / data-erasure ───────────────────────────────────────────────────────
+
+/// Removes the score history ring buffer for `wallet` / `asset_pair`.
+/// No-op when no history exists.
+pub fn clear_score_history(env: &Env, wallet: &Address, asset_pair: &Symbol) {
+    let key = DataKey::ScoreHistory(wallet.clone(), asset_pair.clone());
+    env.storage().persistent().remove(&key);
+}
+
+/// Removes the latest score entry for `wallet` / `asset_pair`.
+/// No-op when no score exists.
+pub fn clear_score(env: &Env, wallet: &Address, asset_pair: &Symbol) {
+    let key = DataKey::Score(wallet.clone(), asset_pair.clone());
+    env.storage().persistent().remove(&key);
+}
+
+// ── Score count ──────────────────────────────────────────────────────────────
+
+/// Increments the monotonically increasing submission counter for a
+/// (wallet, asset_pair) pair. Called by `submit_score` and
+/// `submit_scores_batch` after each successful write.
+pub fn increment_score_count(env: &Env, wallet: &Address, asset_pair: &Symbol) {
+    let key = DataKey::ScoreCount(wallet.clone(), asset_pair.clone());
+    let current: u32 = env.storage().persistent().get(&key).unwrap_or(0);
+    env.storage().persistent().set(&key, &(current + 1));
+    env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+}
+
+/// Returns the total number of score submissions for a (wallet, asset_pair)
+/// pair. Unlike `get_score_history` (which caps at `HISTORY_MAX_DEPTH`), this
+/// counter is never truncated, so it can distinguish between a newly monitored
+/// wallet (count = 1) and one with a long scoring history (count > 10 after
+/// ring-buffer overflow).
+///
+/// Returns 0 when no scores have ever been submitted for this pair.
+pub fn get_score_count(env: &Env, wallet: &Address, asset_pair: &Symbol) -> u32 {
+    let key = DataKey::ScoreCount(wallet.clone(), asset_pair.clone());
+    env.storage().persistent().get(&key).unwrap_or(0)
+}
+
+// ── Score attestation ─────────────────────────────────────────────────────
+
+/// Returns the off-chain detection pipeline's secp256k1 public key, or
+/// `None` if `set_service_pubkey` has never been called.
+pub fn get_service_pubkey(env: &Env) -> Option<Bytes> {
+    env.storage().instance().get(&DataKey::ServicePubKey)
+}
+
+pub fn set_service_pubkey(env: &Env, pubkey: &Bytes) {
+    env.storage().instance().set(&DataKey::ServicePubKey, pubkey);
 }

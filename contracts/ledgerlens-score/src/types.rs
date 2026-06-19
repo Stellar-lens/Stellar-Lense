@@ -60,6 +60,56 @@ pub struct AggregateRiskScore {
     pub last_updated: u64,
 }
 
+/// A cryptographic attestation over a score payload, produced by the
+/// off-chain detection pipeline's secp256k1 signing key.
+///
+/// See `docs/attestation-spec.md` for the exact commitment serialization
+/// this is checked against. Passed to `submit_score` only when the admin
+/// has configured a service public key via `set_service_pubkey` — see that
+/// function's rustdoc for the opt-in enforcement model.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ScoreAttestation {
+    /// SHA-256 commitment over the canonical score payload. The contract
+    /// always recomputes this independently from the call's actual
+    /// arguments and rejects the call if it disagrees with this field — the
+    /// field exists so a mismatch surfaces as `InvalidAttestation` instead
+    /// of a confusing signature-recovery failure, not as a trusted input.
+    pub commitment: BytesN<32>,
+    /// 65-byte secp256k1 ECDSA signature over `commitment`: 32-byte `r`,
+    /// 32-byte `s`, then a 1-byte recovery id which must be `0` or `1`.
+    pub signature: BytesN<65>,
+}
+
+/// Result for a single entry in a batch score submission.
+/// Returned as part of `BatchResult` from `submit_scores_batch` so the
+/// caller knows exactly which entries succeeded and why any failed,
+/// without needing to re-query each (wallet, pair) individually.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BatchEntryResult {
+    /// Zero-based index of this entry in the submitted batch.
+    pub index: u32,
+    /// True if the entry was written to storage.
+    pub accepted: bool,
+    /// Set to the Error code if rejected; 0 if accepted.
+    pub rejection_code: u32,
+}
+
+/// Structured result from `submit_scores_batch` containing per-entry
+/// outcomes so the caller knows exactly which entries succeeded and why
+/// any failed, without needing to re-query each (wallet, pair) individually.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BatchResult {
+    /// Number of entries that were successfully written to storage.
+    pub accepted_count: u32,
+    /// Number of entries that were rejected.
+    pub rejected_count: u32,
+    /// Per-entry results in the same order as the submitted batch.
+    pub results: soroban_sdk::Vec<BatchEntryResult>,
+}
+
 /// A pending, time-locked contract WASM upgrade.
 ///
 /// Created by `propose_upgrade` and cleared by `execute_upgrade` /
@@ -135,4 +185,17 @@ pub enum DataKey {
     /// submissions for the same (wallet, asset_pair). Defaults to
     /// `DEFAULT_COOLDOWN_SECS` when unset.
     CooldownSecs,
+    /// Monotonically increasing count of total score submissions for a
+    /// (wallet, asset_pair) combination. Unlike `ScoreHistory` (which caps
+    /// at `HISTORY_MAX_DEPTH`), this counter is never truncated — it tracks
+    /// every submission since the first.
+    ScoreCount(Address, Symbol),
+    /// The off-chain detection pipeline's secp256k1 public key (33-byte
+    /// compressed or 65-byte uncompressed SEC-1 encoding), used to verify
+    /// `ScoreAttestation`s. Unset until `set_service_pubkey` is called.
+    ServicePubKey,
+    /// Admin-configured ring-buffer depth for `ScoreHistory`. Defaults to
+    /// `DEFAULT_HISTORY_MAX_DEPTH` when unset; bounded above by
+    /// `MAX_HISTORY_DEPTH`.
+    HistoryMaxDepth,
 }

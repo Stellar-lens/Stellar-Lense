@@ -2,8 +2,12 @@
 pub const SCORE_TTL_THRESHOLD: u32 = 518_400; // ~30 days
 pub const SCORE_TTL_EXTEND_TO: u32 = 777_600; // ~45 days
 
-/// Maximum score-history entries retained per wallet/asset-pair ring buffer.
-pub const HISTORY_MAX_DEPTH: u32 = 10;
+/// Hard ceiling on the ring-buffer depth to bound storage costs.
+/// The admin cannot configure a depth above this value.
+pub const MAX_HISTORY_DEPTH: u32 = 50;
+
+/// Default depth used when no admin configuration exists.
+pub const DEFAULT_HISTORY_MAX_DEPTH: u32 = 10;
 
 /// Maximum number of entries accepted in a single batch submission call.
 pub const MAX_BATCH_SIZE: u32 = 20;
@@ -12,7 +16,10 @@ pub const MAX_BATCH_SIZE: u32 = 20;
 pub const DEFAULT_RISK_THRESHOLD: u32 = 75;
 
 /// Semantic contract version; bump on breaking ABI changes.
-pub const CONTRACT_VERSION: u32 = 1;
+///
+/// Bumped to 2 when `submit_score` gained its `attestation` parameter (see
+/// `docs/attestation-spec.md`).
+pub const CONTRACT_VERSION: u32 = 2;
 
 /// Practical upper bound on the number of distinct asset pairs tracked per
 /// wallet. `get_aggregate_score` iterates the wallet's full `AssetPairs`

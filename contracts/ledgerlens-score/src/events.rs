@@ -1,4 +1,4 @@
-use soroban_sdk::{symbol_short, Address, BytesN, Env, Symbol};
+use soroban_sdk::{symbol_short, Address, Bytes, BytesN, Env, Symbol};
 
 use crate::types::RiskScore;
 
@@ -105,6 +105,18 @@ pub fn upgrade_vetoed(env: &Env, by: &Address) {
     env.events().publish((symbol_short!("upg_veto"),), by.clone());
 }
 
+// ── GDPR / data-erasure audit trail ──────────────────────────────────────────
+
+/// Emitted by `clear_score_history` after the history ring buffer is removed.
+pub fn score_history_cleared(env: &Env, wallet: &Address, asset_pair: &Symbol) {
+    env.events().publish((symbol_short!("clr_hist"), wallet.clone()), asset_pair.clone());
+}
+
+/// Emitted by `clear_score` after the latest score entry is removed.
+pub fn score_cleared(env: &Env, wallet: &Address, asset_pair: &Symbol) {
+    env.events().publish((symbol_short!("clr_scr"), wallet.clone()), asset_pair.clone());
+}
+
 // ── Per-wallet/pair submission rate limiting ──────────────────────────────────
 
 /// Emitted when the admin sets the global submission cooldown via
@@ -119,4 +131,20 @@ pub fn cooldown_updated(env: &Env, cooldown_secs: u64) {
 pub fn rate_limit_overridden(env: &Env, by: &Address, wallet: &Address, asset_pair: &Symbol) {
     env.events()
         .publish((symbol_short!("rl_ovrd"), wallet.clone(), asset_pair.clone()), by.clone());
+}
+
+// ── Score attestation ──────────────────────────────────────────────────────
+
+/// Emitted when the admin sets/rotates the off-chain attestation pubkey via
+/// `set_service_pubkey`.
+pub fn service_pubkey_updated(env: &Env, pubkey: &Bytes) {
+    env.events().publish((symbol_short!("pk_upd"),), pubkey.clone());
+}
+
+// ── History depth ─────────────────────────────────────────────────────────────
+
+/// Emitted when the admin changes the ring-buffer depth via
+/// `set_history_max_depth`.
+pub fn history_depth_updated(env: &Env, depth: u32) {
+    env.events().publish((symbol_short!("hd_upd"),), depth);
 }
