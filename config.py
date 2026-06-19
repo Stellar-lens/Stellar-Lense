@@ -57,6 +57,13 @@ class Config:
     WS_BIND_HOST: str = os.getenv("WS_BIND_HOST", "127.0.0.1")
     WS_ALLOW_EXTERNAL: bool = os.getenv("WS_ALLOW_EXTERNAL", "") == "1"
 
+    # WebSocket pub/sub server (streaming/ws_server.py)
+    JWT_PUBLIC_KEY_PATH: str = os.getenv("JWT_PUBLIC_KEY_PATH", "./jwt_public_key.pem")
+    WS_MAX_CLIENTS: int = int(os.getenv("WS_MAX_CLIENTS", "200"))
+    WS_CLIENT_QUEUE_DEPTH: int = int(os.getenv("WS_CLIENT_QUEUE_DEPTH", "100"))
+    WS_REPLAY_BUFFER_SIZE: int = int(os.getenv("WS_REPLAY_BUFFER_SIZE", "1000"))
+    WS_RATE_LIMIT_MSGS_PER_SECOND: int = int(os.getenv("WS_RATE_LIMIT_MSGS_PER_SECOND", "100"))
+
     def validate(self, require_onchain: bool = True) -> None:
         """Raise ValueError if required config is missing."""
         if not self.WATCHED_ASSET_PAIRS:
