@@ -1,18 +1,23 @@
-use soroban_sdk::{Env, Vec, Address};
-use crate::types::GateDataKey;
+use soroban_sdk::{Env, Address};
+use crate::types::{DataKey, TierBounds};
+use crate::errors::Error;
 
-pub fn get_gate_open(env: &Env) -> bool {
-    env.storage().instance().get(&GateDataKey::GateOpen).unwrap_or(true)
+pub fn set_signer_tier(env: &Env, signer: &Address, min_score: u32, max_score: u32) -> Result<(), Error> {
+    if min_score > max_score || max_score > 100 {
+        return Err(Error::InvalidSignerTier);
+    }
+    let bounds = TierBounds { min_score, max_score };
+    env.storage().instance().set(&DataKey::SignerTier(signer.clone()), &bounds);
+    Ok(())
 }
 
-pub fn set_gate_open(env: &Env, open: bool) {
-    env.storage().instance().set(&GateDataKey::GateOpen, &open);
+pub fn get_signer_tier(env: &Env, signer: &Address) -> TierBounds {
+    env.storage()
+        .instance()
+        .get(&DataKey::SignerTier(signer.clone()))
+        .unwrap_or(TierBounds { min_score: 0, max_score: 100 })
 }
 
-pub fn get_gate_callers(env: &Env) -> Vec<Address> {
-    env.storage().instance().get(&GateDataKey::GateCallers).unwrap_or_else(|| Vec::new(env))
-}
-
-pub fn set_gate_callers(env: &Env, callers: &Vec<Address>) {
-    env.storage().instance().set(&GateDataKey::GateCallers, callers);
+pub fn remove_signer_tier(env: &Env, signer: &Address) {
+    env.storage().instance().remove(&DataKey::SignerTier(signer.clone()));
 }
