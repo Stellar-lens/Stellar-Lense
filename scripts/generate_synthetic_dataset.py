@@ -20,10 +20,17 @@ from config import config
 BENFORD_FEATURE_TEMPLATE = ["benford_chi_square_{h}h", "benford_mad_{h}h", "benford_z_max_{h}h"]
 
 
-def generate_synthetic_dataset(n_wallets: int = 500, seed: int = 42) -> pd.DataFrame:
+def generate_synthetic_dataset(
+    n_wallets: int = 500,
+    seed: int = 42,
+    wash_offset: float = 0.0,
+    wash_noise: float = 1.0,
+) -> pd.DataFrame:
     """Generate `n_wallets` rows, roughly half legitimate (label 0) and half
     wash-trading-like (label 1) with systematically different feature
     distributions.
+
+    wash_offset and wash_noise allow varying the wash-trading pattern for meta-learning.
     """
     rng = np.random.default_rng(seed)
     n_legit = n_wallets // 2
@@ -36,9 +43,9 @@ def generate_synthetic_dataset(n_wallets: int = 500, seed: int = 42) -> pd.DataF
         # Raw Benford features — one group per window (matches compute_benford_features order)
         for hours in config.BENFORD_WINDOWS_HOURS:
             if is_wash:
-                row[f"benford_chi_square_{hours}h"] = rng.uniform(20, 100)
-                row[f"benford_mad_{hours}h"] = rng.uniform(0.02, 0.08)
-                row[f"benford_z_max_{hours}h"] = rng.uniform(3, 10)
+                row[f"benford_chi_square_{hours}h"] = rng.uniform(20, 100) * wash_noise + wash_offset
+                row[f"benford_mad_{hours}h"] = rng.uniform(0.02, 0.08) * wash_noise + (wash_offset / 1000)
+                row[f"benford_z_max_{hours}h"] = rng.uniform(3, 10) * wash_noise + (wash_offset / 10)
             else:
                 row[f"benford_chi_square_{hours}h"] = rng.uniform(0, 10)
                 row[f"benford_mad_{hours}h"] = rng.uniform(0.0, 0.014)
@@ -48,36 +55,36 @@ def generate_synthetic_dataset(n_wallets: int = 500, seed: int = 42) -> pd.DataF
         # after all raw features to match build_feature_vector column order.
         for hours in config.BENFORD_WINDOWS_HOURS:
             if is_wash:
-                row[f"benford_residual_chi_square_{hours}h"] = rng.uniform(15, 80)
-                row[f"benford_residual_mad_{hours}h"] = rng.uniform(0.018, 0.07)
+                row[f"benford_residual_chi_square_{hours}h"] = rng.uniform(15, 80) * wash_noise + wash_offset
+                row[f"benford_residual_mad_{hours}h"] = rng.uniform(0.018, 0.07) * wash_noise + (wash_offset / 1000)
             else:
                 row[f"benford_residual_chi_square_{hours}h"] = rng.uniform(0, 8)
                 row[f"benford_residual_mad_{hours}h"] = rng.uniform(0.0, 0.012)
 
         if is_wash:
-            row["counterparty_concentration_ratio"] = rng.uniform(0.7, 1.0)
-            row["round_trip_frequency"] = rng.uniform(0.3, 1.0)
-            row["net_roundtrip_ratio"] = rng.uniform(0.3, 1.0)
-            row["self_matching_rate"] = rng.uniform(0.3, 1.0)
-            row["order_cancellation_rate"] = rng.uniform(0.4, 0.9)
-            row["volume_per_counterparty_ratio"] = rng.uniform(1000, 10000)
-            row["intra_minute_clustering"] = rng.uniform(0.3, 1.0)
-            row["off_hours_activity_ratio"] = rng.uniform(0.2, 0.8)
-            row["volume_spike_frequency"] = rng.uniform(0.2, 0.6)
-            row["funding_source_similarity"] = rng.uniform(0.5, 1.0)
-            row["network_centrality"] = rng.uniform(0.3, 1.0)
-            row["account_age_days"] = rng.uniform(0, 30)
+            row["counterparty_concentration_ratio"] = rng.uniform(0.7, 1.0) * wash_noise
+            row["round_trip_frequency"] = rng.uniform(0.3, 1.0) * wash_noise
+            row["net_roundtrip_ratio"] = rng.uniform(0.3, 1.0) * wash_noise
+            row["self_matching_rate"] = rng.uniform(0.3, 1.0) * wash_noise
+            row["order_cancellation_rate"] = rng.uniform(0.4, 0.9) * wash_noise
+            row["volume_per_counterparty_ratio"] = rng.uniform(1000, 10000) * wash_noise
+            row["intra_minute_clustering"] = rng.uniform(0.3, 1.0) * wash_noise
+            row["off_hours_activity_ratio"] = rng.uniform(0.2, 0.8) * wash_noise
+            row["volume_spike_frequency"] = rng.uniform(0.2, 0.6) * wash_noise
+            row["funding_source_similarity"] = rng.uniform(0.5, 1.0) * wash_noise
+            row["network_centrality"] = rng.uniform(0.3, 1.0) * wash_noise
+            row["account_age_days"] = rng.uniform(0, 30) * wash_noise
             # Cross-asset features for wash traders (coordinated across pairs)
-            row["cross_pair_trade_synchrony"] = rng.uniform(0.4, 1.0)
-            row["net_asset_flow_deviation"] = rng.uniform(0.0, 0.3)
-            row["cross_pair_counterparty_overlap"] = rng.uniform(0.5, 1.0)
-            row["cross_pair_volume_correlation"] = rng.uniform(0.4, 1.0)
-            row["pair_diversity_score"] = rng.uniform(0.0, 0.3)
-            row["cross_pair_mad_std"] = rng.uniform(0.01, 0.05)
+            row["cross_pair_trade_synchrony"] = rng.uniform(0.4, 1.0) * wash_noise
+            row["net_asset_flow_deviation"] = rng.uniform(0.0, 0.3) * wash_noise
+            row["cross_pair_counterparty_overlap"] = rng.uniform(0.5, 1.0) * wash_noise
+            row["cross_pair_volume_correlation"] = rng.uniform(0.4, 1.0) * wash_noise
+            row["pair_diversity_score"] = rng.uniform(0.0, 0.3) * wash_noise
+            row["cross_pair_mad_std"] = rng.uniform(0.01, 0.05) * wash_noise
             # Hardening features (wash: low entropy, low CV, high correlation)
-            row["inter_arrival_cv"] = rng.uniform(0.0, 0.2)
-            row["entropy_of_amounts"] = rng.uniform(0.0, 1.0)
-            row["cross_wallet_volume_corr"] = rng.uniform(0.5, 1.0)
+            row["inter_arrival_cv"] = rng.uniform(0.0, 0.2) * wash_noise
+            row["entropy_of_amounts"] = rng.uniform(0.0, 1.0) * wash_noise
+            row["cross_wallet_volume_corr"] = rng.uniform(0.5, 1.0) * wash_noise
         else:
             row["counterparty_concentration_ratio"] = rng.uniform(0.0, 0.5)
             row["round_trip_frequency"] = rng.uniform(0.0, 0.1)
@@ -114,13 +121,20 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--n-wallets", type=int, default=500)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--wash-offset", type=float, default=0.0)
+    parser.add_argument("--wash-noise", type=float, default=1.0)
     parser.add_argument("--output", default="data/synthetic_dataset.parquet")
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
-    df = generate_synthetic_dataset(n_wallets=args.n_wallets, seed=args.seed)
+    df = generate_synthetic_dataset(
+        n_wallets=args.n_wallets,
+        seed=args.seed,
+        wash_offset=args.wash_offset,
+        wash_noise=args.wash_noise,
+    )
     df.to_parquet(args.output)
     print(f"Wrote {len(df)} rows to {args.output}")
 
