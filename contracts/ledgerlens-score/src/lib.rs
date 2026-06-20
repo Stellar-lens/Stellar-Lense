@@ -1371,11 +1371,7 @@ impl LedgerLensScoreContract {
     /// - [`Error::InvalidWithdrawalAmount`] — `amount` is zero.
     /// - [`Error::FeeTokenNotSet`] — `set_fee_token` has not been called.
     /// - [`Error::WithdrawalInProgress`] — a concurrent withdrawal is running.
-    pub fn withdraw_fees(
-        env: Env,
-        recipient: Address,
-        amount: i128,
-    ) -> Result<(), Error> {
+    pub fn withdraw_fees(env: Env, recipient: Address, amount: i128) -> Result<(), Error> {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }

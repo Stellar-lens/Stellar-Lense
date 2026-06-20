@@ -109,8 +109,7 @@ fn test_withdraw_fees_success() {
     let contract_balance: i128 = 1_000_000;
     let withdraw_amount: i128 = 400_000;
 
-    let (env, client, _admin, token_address, contract_id) =
-        setup_with_token(contract_balance);
+    let (env, client, _admin, token_address, contract_id) = setup_with_token(contract_balance);
     client.set_fee_token(&token_address);
 
     let recipient = Address::generate(&env);

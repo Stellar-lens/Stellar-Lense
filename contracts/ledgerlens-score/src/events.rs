@@ -128,3 +128,30 @@ pub fn rate_limit_overridden(env: &Env, by: &Address, wallet: &Address, asset_pa
 pub fn service_pubkey_updated(env: &Env, pubkey: &Bytes) {
     env.events().publish((symbol_short!("pk_upd"),), pubkey.clone());
 }
+
+// ── Fee withdrawal ────────────────────────────────────────────────────────────
+
+/// Emitted on a successful fee withdrawal.
+/// Payload: (admin, recipient, token, amount)
+pub fn fee_withdrawn(
+    env: &Env,
+    admin: &Address,
+    recipient: &Address,
+    token: &Address,
+    amount: i128,
+) {
+    env.events().publish(
+        (symbol_short!("fee_wdrw"),),
+        (admin.clone(), recipient.clone(), token.clone(), amount),
+    );
+}
+
+/// Emitted when `withdraw_fees` is rejected because a lock is already held.
+pub fn withdrawal_locked(env: &Env, admin: &Address) {
+    env.events().publish((symbol_short!("wdr_lock"),), admin.clone());
+}
+
+/// Emitted when the fee token is configured by the admin.
+pub fn fee_token_set(env: &Env, token: &Address) {
+    env.events().publish((symbol_short!("fee_tok"),), token.clone());
+}
