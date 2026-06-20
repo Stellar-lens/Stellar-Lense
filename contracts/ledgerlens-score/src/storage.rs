@@ -365,3 +365,25 @@ pub fn get_service_pubkey(env: &Env) -> Option<Bytes> {
 pub fn set_service_pubkey(env: &Env, pubkey: &Bytes) {
     env.storage().instance().set(&DataKey::ServicePubKey, pubkey);
 }
+
+// ── Fee withdrawal ────────────────────────────────────────────────────────────
+
+pub fn get_fee_token(env: &Env) -> Option<Address> {
+    env.storage().instance().get(&DataKey::FeeToken)
+}
+
+pub fn set_fee_token(env: &Env, token: &Address) {
+    env.storage().instance().set(&DataKey::FeeToken, token);
+}
+
+pub fn is_withdrawal_locked(env: &Env) -> bool {
+    env.storage().instance().get::<_, bool>(&DataKey::WithdrawalLock).unwrap_or(false)
+}
+
+pub fn set_withdrawal_lock(env: &Env) {
+    env.storage().instance().set(&DataKey::WithdrawalLock, &true);
+}
+
+pub fn clear_withdrawal_lock(env: &Env) {
+    env.storage().instance().remove(&DataKey::WithdrawalLock);
+}

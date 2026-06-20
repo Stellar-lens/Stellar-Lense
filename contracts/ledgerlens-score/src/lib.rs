@@ -22,8 +22,11 @@ mod test_rate_limit;
 #[cfg(test)]
 mod test_attestation;
 
+#[cfg(test)]
+mod test_fee_withdrawal;
+
 use soroban_sdk::{
-    contract, contractimpl, crypto::Hash, symbol_short, Address, Bytes, BytesN, Env, Symbol,
+    contract, contractimpl, crypto::Hash, symbol_short, token, Address, Bytes, BytesN, Env, Symbol,
     SymbolStr, TryFromVal, Vec,
 };
 
@@ -1448,6 +1451,87 @@ impl LedgerLensScoreContract {
     /// was cleared by `override_rate_limit`).
     pub fn get_last_submit_time(env: Env, wallet: Address, asset_pair: Symbol) -> u64 {
         storage::get_last_submit_time(&env, &wallet, &asset_pair)
+    }
+
+    // ── Fee withdrawal ────────────────────────────────────────────────────────
+
+    /// Sets the SEP-41 token contract address from which fees are withdrawn.
+    /// Must be called before `withdraw_fees` can succeed.  Admin only.
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if the contract has no admin yet.
+    pub fn set_fee_token(env: Env, token: Address) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        let admin = storage::get_admin(&env);
+        admin.require_auth();
+        storage::set_fee_token(&env, &token);
+        events::fee_token_set(&env, &token);
+        Ok(())
+    }
+
+    /// Returns the configured fee token address, or `FeeTokenNotSet` if none.
+    pub fn get_fee_token(env: Env) -> Result<Address, Error> {
+        storage::get_fee_token(&env).ok_or(Error::FeeTokenNotSet)
+    }
+
+    /// Withdraw accumulated fees from the contract to `recipient`.
+    ///
+    /// Guards:
+    /// - Admin-only: `admin.require_auth()` must be satisfied.
+    /// - Early validation: `amount` must be > 0 and `recipient` must not be
+    ///   the zero address (enforced by Soroban's `Address` type — any invalid
+    ///   address will fail deserialization before reaching this function).
+    /// - Concurrency lock: rejects with [`Error::WithdrawalInProgress`] if
+    ///   another withdrawal is already in-flight for this contract.
+    /// - Fee token must be configured via `set_fee_token`.
+    /// - Emits [`fee_withdrawn`] on success; [`withdrawal_locked`] if the
+    ///   lock is already held.
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] — contract has no admin.
+    /// - [`Error::ContractPaused`] — admin has activated the circuit breaker.
+    /// - [`Error::InvalidWithdrawalAmount`] — `amount` is zero.
+    /// - [`Error::FeeTokenNotSet`] — `set_fee_token` has not been called.
+    /// - [`Error::WithdrawalInProgress`] — a concurrent withdrawal is running.
+    pub fn withdraw_fees(env: Env, recipient: Address, amount: i128) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        if storage::is_paused(&env) {
+            return Err(Error::ContractPaused);
+        }
+
+        let admin = storage::get_admin(&env);
+        admin.require_auth();
+
+        // Reject zero-amount withdrawals early.
+        if amount == 0 {
+            return Err(Error::InvalidWithdrawalAmount);
+        }
+
+        // Fee token must be configured.
+        let fee_token = storage::get_fee_token(&env).ok_or(Error::FeeTokenNotSet)?;
+
+        // Acquire the concurrency lock — prevents duplicate in-flight calls.
+        if storage::is_withdrawal_locked(&env) {
+            events::withdrawal_locked(&env, &admin);
+            return Err(Error::WithdrawalInProgress);
+        }
+        storage::set_withdrawal_lock(&env);
+
+        // Execute the SEP-41 token transfer from the contract to the recipient.
+        // The contract authorises itself as the `from` party.
+        let contract_address = env.current_contract_address();
+        let token_client = token::TokenClient::new(&env, &fee_token);
+        token_client.transfer(&contract_address, &recipient, &amount);
+
+        // Release the lock and emit the audit event.
+        storage::clear_withdrawal_lock(&env);
+        events::fee_withdrawn(&env, &admin, &recipient, &fee_token, amount);
+
+        Ok(())
     }
 
     // ── Read-only admin / service ─────────────────────────────────────────────
