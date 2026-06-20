@@ -94,7 +94,7 @@ impl LedgerLensScoreContract {
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
-    /// assert_eq!(client.get_version(), 2);
+    /// assert_eq!(client.get_version(), 3);
     /// ```
     pub fn get_version(env: Env) -> u32 {
         storage::get_contract_version(&env)
@@ -503,7 +503,7 @@ impl LedgerLensScoreContract {
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
-    /// client.set_history_max_depth(&20).unwrap();
+    /// client.set_history_max_depth(&Vec::new(&env), &20).unwrap();
     /// assert_eq!(client.get_history_max_depth(), 20);
     /// ```
     ///
@@ -511,15 +511,18 @@ impl LedgerLensScoreContract {
     /// - [`Error::NotInitialized`] if the contract has no admin yet.
     /// - [`Error::InvalidHistoryDepth`] if `depth` is `0` or above
     ///   `MAX_HISTORY_DEPTH` (50).
-    pub fn set_history_max_depth(env: Env, depth: u32) -> Result<(), Error> {
+    pub fn set_history_max_depth(
+        env: Env,
+        admin_signers: Vec<Address>,
+        depth: u32,
+    ) -> Result<(), Error> {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
         if depth == 0 || depth > constants::MAX_HISTORY_DEPTH {
             return Err(Error::InvalidHistoryDepth);
         }
-        let admin = storage::get_admin(&env);
-        admin.require_auth();
+        Self::require_admin_auth(&env, &admin_signers)?;
         storage::set_history_max_depth(&env, depth);
         events::history_depth_updated(&env, depth);
         Ok(())
@@ -601,14 +604,19 @@ impl LedgerLensScoreContract {
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
     /// let pair = symbol_short!("XLM_USDC");
-    /// client.set_pair_weight(&pair, &3).unwrap();
+    /// client.set_pair_weight(&Vec::new(&env), &pair, &3).unwrap();
     /// assert_eq!(client.get_pair_weight(&pair), 3);
     /// ```
-    pub fn set_pair_weight(env: Env, asset_pair: Symbol, weight: u32) -> Result<(), Error> {
+    pub fn set_pair_weight(
+        env: Env,
+        admin_signers: Vec<Address>,
+        asset_pair: Symbol,
+        weight: u32,
+    ) -> Result<(), Error> {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
-        storage::get_admin(&env).require_auth();
+        Self::require_admin_auth(&env, &admin_signers)?;
         storage::set_pair_weight(&env, &asset_pair, weight);
         events::pair_weight_updated(&env, &asset_pair, weight);
         Ok(())
@@ -705,11 +713,15 @@ impl LedgerLensScoreContract {
     /// Returns [`Error::ServiceSetFull`] when the set already contains
     /// `MAX_SERVICE_SIGNERS` members, [`Error::SignerAlreadyInSet`] when
     /// `signer` is already present.
-    pub fn add_service_signer(env: Env, signer: Address) -> Result<(), Error> {
+    pub fn add_service_signer(
+        env: Env,
+        admin_signers: Vec<Address>,
+        signer: Address,
+    ) -> Result<(), Error> {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
-        storage::get_admin(&env).require_auth();
+        Self::require_admin_auth(&env, &admin_signers)?;
 
         let mut set = storage::get_service_set(&env);
         if set.len() >= constants::MAX_SERVICE_SIGNERS {
@@ -729,11 +741,15 @@ impl LedgerLensScoreContract {
     /// Returns [`Error::SignerNotInSet`] when `signer` is not in the set.
     /// If removing the signer would make the set smaller than the current
     /// threshold, the threshold is automatically reduced to the new set size.
-    pub fn remove_service_signer(env: Env, signer: Address) -> Result<(), Error> {
+    pub fn remove_service_signer(
+        env: Env,
+        admin_signers: Vec<Address>,
+        signer: Address,
+    ) -> Result<(), Error> {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
-        storage::get_admin(&env).require_auth();
+        Self::require_admin_auth(&env, &admin_signers)?;
 
         let mut set = storage::get_service_set(&env);
         let pos = set.first_index_of(&signer);
@@ -759,11 +775,15 @@ impl LedgerLensScoreContract {
     ///
     /// Returns [`Error::InvalidThreshold`] when `threshold` is `0` or exceeds
     /// the current service-set size.
-    pub fn set_service_threshold(env: Env, threshold: u32) -> Result<(), Error> {
+    pub fn set_service_threshold(
+        env: Env,
+        admin_signers: Vec<Address>,
+        threshold: u32,
+    ) -> Result<(), Error> {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
-        storage::get_admin(&env).require_auth();
+        Self::require_admin_auth(&env, &admin_signers)?;
 
         let set = storage::get_service_set(&env);
         if threshold == 0 || threshold > set.len() {
@@ -821,14 +841,18 @@ impl LedgerLensScoreContract {
     /// # Errors
     /// - [`Error::NotInitialized`] if the contract has no admin yet.
     /// - [`Error::InvalidPubkeyLength`] if `pubkey` is not 33 or 65 bytes.
-    pub fn set_service_pubkey(env: Env, pubkey: Bytes) -> Result<(), Error> {
+    pub fn set_service_pubkey(
+        env: Env,
+        admin_signers: Vec<Address>,
+        pubkey: Bytes,
+    ) -> Result<(), Error> {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
         if pubkey.len() != 33 && pubkey.len() != 65 {
             return Err(Error::InvalidPubkeyLength);
         }
-        storage::get_admin(&env).require_auth();
+        Self::require_admin_auth(&env, &admin_signers)?;
         storage::set_service_pubkey(&env, &pubkey);
         events::service_pubkey_updated(&env, &pubkey);
         Ok(())
@@ -849,12 +873,16 @@ impl LedgerLensScoreContract {
     /// nominate `new_admin`; `new_admin` must then call `accept_admin` to
     /// complete the handoff.  This prevents accidental loss of admin access.
     /// get_pending_admin() returns the nominate new_admin.
-    pub fn transfer_admin(env: Env, new_admin: Address) -> Result<(), Error> {
+    pub fn transfer_admin(
+        env: Env,
+        admin_signers: Vec<Address>,
+        new_admin: Address,
+    ) -> Result<(), Error> {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
+        Self::require_admin_auth(&env, &admin_signers)?;
         let admin = storage::get_admin(&env);
-        admin.require_auth();
         storage::set_pending_admin(&env, &new_admin);
         events::admin_transfer_initiated(&env, &admin, &new_admin);
         Ok(())
@@ -877,7 +905,7 @@ impl LedgerLensScoreContract {
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
     /// let new_admin = Address::generate(&env);
-    /// client.transfer_admin(&new_admin);
+    /// client.transfer_admin(&Vec::new(&env), &new_admin);
     /// client.accept_admin();
     /// assert_eq!(client.get_admin(), new_admin);
     /// ```
@@ -909,19 +937,19 @@ impl LedgerLensScoreContract {
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
     /// let new_admin = Address::generate(&env);
-    /// client.transfer_admin(&new_admin);
-    /// client.cancel_admin_transfer();
+    /// client.transfer_admin(&Vec::new(&env), &new_admin);
+    /// client.cancel_admin_transfer(&Vec::new(&env));
     /// assert_eq!(client.get_admin(), admin);
     /// ```
-    pub fn cancel_admin_transfer(env: Env) -> Result<(), Error> {
+    pub fn cancel_admin_transfer(env: Env, admin_signers: Vec<Address>) -> Result<(), Error> {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
         if !storage::has_pending_admin(&env) {
             return Err(Error::NoPendingAdminTransfer);
         }
+        Self::require_admin_auth(&env, &admin_signers)?;
         let admin = storage::get_admin(&env);
-        admin.require_auth();
         storage::clear_pending_admin(&env);
         events::admin_transfer_cancelled(&env, &admin);
         Ok(())
@@ -945,15 +973,15 @@ impl LedgerLensScoreContract {
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
     /// assert!(!client.is_paused());
-    /// client.pause();
+    /// client.pause(&Vec::new(&env));
     /// assert!(client.is_paused());
     /// ```
-    pub fn pause(env: Env) -> Result<(), Error> {
+    pub fn pause(env: Env, admin_signers: Vec<Address>) -> Result<(), Error> {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
+        Self::require_admin_auth(&env, &admin_signers)?;
         let admin = storage::get_admin(&env);
-        admin.require_auth();
         storage::set_paused(&env, true);
         events::contract_paused(&env, &admin);
         Ok(())
@@ -974,17 +1002,17 @@ impl LedgerLensScoreContract {
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
-    /// client.pause();
+    /// client.pause(&Vec::new(&env));
     /// assert!(client.is_paused());
-    /// client.unpause();
+    /// client.unpause(&Vec::new(&env));
     /// assert!(!client.is_paused());
     /// ```
-    pub fn unpause(env: Env) -> Result<(), Error> {
+    pub fn unpause(env: Env, admin_signers: Vec<Address>) -> Result<(), Error> {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
+        Self::require_admin_auth(&env, &admin_signers)?;
         let admin = storage::get_admin(&env);
-        admin.require_auth();
         storage::set_paused(&env, false);
         events::contract_unpaused(&env, &admin);
         Ok(())
@@ -1030,12 +1058,16 @@ impl LedgerLensScoreContract {
     /// - [`Error::NotInitialized`] if the contract has no admin yet.
     /// - [`Error::UpgradeAlreadyPending`] if a proposal already exists — veto
     ///   or execute it first (one in-flight proposal at a time).
-    pub fn propose_upgrade(env: Env, new_wasm_hash: BytesN<32>) -> Result<(), Error> {
+    pub fn propose_upgrade(
+        env: Env,
+        admin_signers: Vec<Address>,
+        new_wasm_hash: BytesN<32>,
+    ) -> Result<(), Error> {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
+        Self::require_admin_auth(&env, &admin_signers)?;
         let admin = storage::get_admin(&env);
-        admin.require_auth();
 
         if storage::has_pending_upgrade(&env) {
             return Err(Error::UpgradeAlreadyPending);
@@ -1073,12 +1105,11 @@ impl LedgerLensScoreContract {
     /// - [`Error::NotInitialized`] if the contract has no admin yet.
     /// - [`Error::NoPendingUpgrade`] if there is no proposal to execute.
     /// - [`Error::UpgradeNotReady`] if the time-lock has not yet elapsed.
-    pub fn execute_upgrade(env: Env) -> Result<(), Error> {
+    pub fn execute_upgrade(env: Env, admin_signers: Vec<Address>) -> Result<(), Error> {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
-        let admin = storage::get_admin(&env);
-        admin.require_auth();
+        Self::require_admin_auth(&env, &admin_signers)?;
 
         let proposal = storage::get_pending_upgrade(&env).ok_or(Error::NoPendingUpgrade)?;
 
@@ -1110,12 +1141,12 @@ impl LedgerLensScoreContract {
     /// # Errors
     /// - [`Error::NotInitialized`] if the contract has no admin yet.
     /// - [`Error::NoPendingUpgrade`] if there is no proposal to veto.
-    pub fn veto_upgrade(env: Env) -> Result<(), Error> {
+    pub fn veto_upgrade(env: Env, admin_signers: Vec<Address>) -> Result<(), Error> {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
+        Self::require_admin_auth(&env, &admin_signers)?;
         let admin = storage::get_admin(&env);
-        admin.require_auth();
 
         if !storage::has_pending_upgrade(&env) {
             return Err(Error::NoPendingUpgrade);
@@ -1149,7 +1180,11 @@ impl LedgerLensScoreContract {
     /// # Errors
     /// - [`Error::NotInitialized`] if the contract has no admin yet.
     /// - [`Error::InvalidUpgradeDelay`] if `delay_secs` is outside the bounds.
-    pub fn set_upgrade_delay(env: Env, delay_secs: u64) -> Result<(), Error> {
+    pub fn set_upgrade_delay(
+        env: Env,
+        admin_signers: Vec<Address>,
+        delay_secs: u64,
+    ) -> Result<(), Error> {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
@@ -1158,8 +1193,7 @@ impl LedgerLensScoreContract {
         {
             return Err(Error::InvalidUpgradeDelay);
         }
-        let admin = storage::get_admin(&env);
-        admin.require_auth();
+        Self::require_admin_auth(&env, &admin_signers)?;
         storage::set_upgrade_delay(&env, delay_secs);
         Ok(())
     }
@@ -1191,14 +1225,19 @@ impl LedgerLensScoreContract {
     /// client.initialize(&admin, &service);
     /// let wallet = Address::generate(&env);
     /// assert!(!client.is_watchlisted(&wallet));
-    /// client.set_watchlist(&wallet, &true);
+    /// client.set_watchlist(&Vec::new(&env), &wallet, &true);
     /// assert!(client.is_watchlisted(&wallet));
     /// ```
-    pub fn set_watchlist(env: Env, wallet: Address, flagged: bool) -> Result<(), Error> {
+    pub fn set_watchlist(
+        env: Env,
+        admin_signers: Vec<Address>,
+        wallet: Address,
+        flagged: bool,
+    ) -> Result<(), Error> {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
-        storage::get_admin(&env).require_auth();
+        Self::require_admin_auth(&env, &admin_signers)?;
         storage::set_watchlist(&env, &wallet, flagged);
         events::watchlist_updated(&env, &wallet, flagged);
         Ok(())
@@ -1245,18 +1284,21 @@ impl LedgerLensScoreContract {
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
-    /// client.set_risk_threshold(&80);
+    /// client.set_risk_threshold(&Vec::new(&env), &80);
     /// assert_eq!(client.get_risk_threshold(), 80);
     /// ```
-    pub fn set_risk_threshold(env: Env, threshold: u32) -> Result<(), Error> {
+    pub fn set_risk_threshold(
+        env: Env,
+        admin_signers: Vec<Address>,
+        threshold: u32,
+    ) -> Result<(), Error> {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
         if threshold > 100 {
             return Err(Error::InvalidScore);
         }
-        let admin = storage::get_admin(&env);
-        admin.require_auth();
+        Self::require_admin_auth(&env, &admin_signers)?;
         let old = storage::get_risk_threshold(&env);
         storage::set_risk_threshold(&env, threshold);
         events::threshold_updated(&env, old, threshold);
@@ -1305,15 +1347,18 @@ impl LedgerLensScoreContract {
 
     /// Set the staleness window in seconds. A value of `0` is rejected with
     /// `InvalidStalenessWindow`. Admin only.
-    pub fn set_staleness_window(env: Env, window_secs: u64) -> Result<(), Error> {
+    pub fn set_staleness_window(
+        env: Env,
+        admin_signers: Vec<Address>,
+        window_secs: u64,
+    ) -> Result<(), Error> {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
         if window_secs == 0 {
             return Err(Error::InvalidStalenessWindow);
         }
-        let admin = storage::get_admin(&env);
-        admin.require_auth();
+        Self::require_admin_auth(&env, &admin_signers)?;
         storage::set_staleness_window(&env, window_secs);
         Ok(())
     }
@@ -1344,22 +1389,21 @@ impl LedgerLensScoreContract {
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
-    /// client.set_cooldown(&120);
+    /// client.set_cooldown(&Vec::new(&env), &120);
     /// assert_eq!(client.get_cooldown(), 120);
     /// ```
     ///
     /// # Errors
     /// - [`Error::NotInitialized`] if the contract has no admin yet.
     /// - [`Error::InvalidCooldown`] if `secs` is outside the bounds.
-    pub fn set_cooldown(env: Env, secs: u64) -> Result<(), Error> {
+    pub fn set_cooldown(env: Env, admin_signers: Vec<Address>, secs: u64) -> Result<(), Error> {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
         if !(constants::MIN_COOLDOWN_SECS..=constants::MAX_COOLDOWN_SECS).contains(&secs) {
             return Err(Error::InvalidCooldown);
         }
-        let admin = storage::get_admin(&env);
-        admin.require_auth();
+        Self::require_admin_auth(&env, &admin_signers)?;
         storage::set_cooldown_secs(&env, secs);
         events::cooldown_updated(&env, secs);
         Ok(())
@@ -1397,12 +1441,17 @@ impl LedgerLensScoreContract {
     ///
     /// # Errors
     /// - [`Error::NotInitialized`] if the contract has no admin yet.
-    pub fn override_rate_limit(env: Env, wallet: Address, asset_pair: Symbol) -> Result<(), Error> {
+    pub fn override_rate_limit(
+        env: Env,
+        admin_signers: Vec<Address>,
+        wallet: Address,
+        asset_pair: Symbol,
+    ) -> Result<(), Error> {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
+        Self::require_admin_auth(&env, &admin_signers)?;
         let admin = storage::get_admin(&env);
-        admin.require_auth();
         storage::clear_last_submit_time(&env, &wallet, &asset_pair);
         events::rate_limit_overridden(&env, &admin, &wallet, &asset_pair);
         Ok(())
@@ -1416,12 +1465,16 @@ impl LedgerLensScoreContract {
     /// Admin only.
     ///
     /// Emits `clr_hist` for the on-chain audit trail.
-    pub fn clear_score_history(env: Env, wallet: Address, asset_pair: Symbol) -> Result<(), Error> {
+    pub fn clear_score_history(
+        env: Env,
+        admin_signers: Vec<Address>,
+        wallet: Address,
+        asset_pair: Symbol,
+    ) -> Result<(), Error> {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
-        let admin = storage::get_admin(&env);
-        admin.require_auth();
+        Self::require_admin_auth(&env, &admin_signers)?;
         storage::clear_score_history(&env, &wallet, &asset_pair);
         events::score_history_cleared(&env, &wallet, &asset_pair);
         Ok(())
@@ -1435,12 +1488,16 @@ impl LedgerLensScoreContract {
     /// Admin only.
     ///
     /// Emits `clr_scr` for the on-chain audit trail.
-    pub fn clear_score(env: Env, wallet: Address, asset_pair: Symbol) -> Result<(), Error> {
+    pub fn clear_score(
+        env: Env,
+        admin_signers: Vec<Address>,
+        wallet: Address,
+        asset_pair: Symbol,
+    ) -> Result<(), Error> {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
-        let admin = storage::get_admin(&env);
-        admin.require_auth();
+        Self::require_admin_auth(&env, &admin_signers)?;
         storage::clear_score(&env, &wallet, &asset_pair);
         events::score_cleared(&env, &wallet, &asset_pair);
         Ok(())
@@ -1592,7 +1649,124 @@ impl LedgerLensScoreContract {
         storage::has_pending_admin(&env)
     }
 
+    // ── Admin M-of-N multi-sig management ───────────────────────────────────
+
+    /// Add `signer` to the M-of-N admin signer set. In legacy mode (empty
+    /// admin set) the call is gated by the single admin key; once the set is
+    /// populated it requires M-of-N approval via `require_admin_auth`.
+    ///
+    /// Returns [`Error::AdminSetFull`] when the set is already at
+    /// `MAX_ADMIN_SIGNERS` (5), or [`Error::SignerAlreadyInSet`] when
+    /// `signer` is already present.
+    pub fn add_admin_signer(
+        env: Env,
+        admin_signers: Vec<Address>,
+        signer: Address,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+        let mut set = storage::get_admin_set(&env);
+        if set.len() >= constants::MAX_ADMIN_SIGNERS {
+            return Err(Error::AdminSetFull);
+        }
+        if set.contains(&signer) {
+            return Err(Error::SignerAlreadyInSet);
+        }
+        set.push_back(signer);
+        storage::set_admin_set(&env, &set);
+        Ok(())
+    }
+
+    /// Remove `signer` from the M-of-N admin signer set. Requires M-of-N
+    /// approval in multisig mode. Auto-reduces the threshold when the removal
+    /// would make it exceed the new set size.
+    ///
+    /// Returns [`Error::AdminSignerNotInSet`] when `signer` is not in the set.
+    pub fn remove_admin_signer(
+        env: Env,
+        admin_signers: Vec<Address>,
+        signer: Address,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+        let mut set = storage::get_admin_set(&env);
+        let pos = set.first_index_of(&signer);
+        let idx = pos.ok_or(Error::AdminSignerNotInSet)?;
+        set.remove(idx);
+        storage::set_admin_set(&env, &set);
+        let threshold = storage::get_admin_threshold(&env);
+        if set.is_empty() {
+            storage::set_admin_threshold(&env, 0);
+        } else if threshold > set.len() {
+            storage::set_admin_threshold(&env, set.len());
+        }
+        Ok(())
+    }
+
+    /// Set the admin signing threshold M. Requires M-of-N approval in
+    /// multisig mode (or single-admin in legacy mode).
+    ///
+    /// Returns [`Error::InvalidThreshold`] when `threshold` is `0` or
+    /// exceeds the current admin-set size.
+    pub fn set_admin_threshold(
+        env: Env,
+        admin_signers: Vec<Address>,
+        threshold: u32,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+        let set = storage::get_admin_set(&env);
+        if threshold == 0 || threshold > set.len() {
+            return Err(Error::InvalidThreshold);
+        }
+        storage::set_admin_threshold(&env, threshold);
+        Ok(())
+    }
+
+    /// Returns the current M-of-N admin signer set. Empty until
+    /// `add_admin_signer` is called (legacy mode).
+    pub fn get_admin_signers(env: Env) -> Vec<Address> {
+        storage::get_admin_set(&env)
+    }
+
+    /// Returns the current admin signing threshold. Zero until
+    /// `set_admin_threshold` is called (legacy mode).
+    pub fn get_admin_threshold(env: Env) -> u32 {
+        storage::get_admin_threshold(&env)
+    }
+
     // ── Internal helpers ──────────────────────────────────────────────────────
+
+    /// In multisig mode (AdminSet non-empty and AdminThreshold > 0): verifies
+    /// that `admin_signers` contains at least `threshold` addresses, each of
+    /// which is a member of the admin set, and calls `require_auth()` on each.
+    /// In legacy mode (AdminSet empty or threshold == 0): falls back to
+    /// requiring the single stored admin key.
+    fn require_admin_auth(env: &Env, admin_signers: &Vec<Address>) -> Result<(), Error> {
+        let admin_set = storage::get_admin_set(env);
+        let threshold = storage::get_admin_threshold(env);
+        if !admin_set.is_empty() && threshold > 0 {
+            if admin_signers.len() < threshold {
+                return Err(Error::InsufficientAdminSigners);
+            }
+            for i in 0..admin_signers.len() {
+                let signer = admin_signers.get(i).unwrap();
+                if !admin_set.contains(&signer) {
+                    return Err(Error::AdminSignerNotInSet);
+                }
+                signer.require_auth();
+            }
+        } else {
+            storage::get_admin(env).require_auth();
+        }
+        Ok(())
+    }
 
     /// Shared implementation behind `get_aggregate_score`. Iterates the
     /// wallet's registered pairs once, accumulating the weighted sum and

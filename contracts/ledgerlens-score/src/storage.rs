@@ -245,6 +245,24 @@ pub fn set_upgrade_delay(env: &Env, delay_secs: u64) {
     env.storage().instance().set(&DataKey::UpgradeDelay, &delay_secs);
 }
 
+// ── Multi-sig admin set ──────────────────────────────────────────────────────
+
+pub fn get_admin_set(env: &Env) -> Vec<Address> {
+    env.storage().instance().get(&DataKey::AdminSet).unwrap_or_else(|| Vec::new(env))
+}
+
+pub fn set_admin_set(env: &Env, set: &Vec<Address>) {
+    env.storage().instance().set(&DataKey::AdminSet, set);
+}
+
+pub fn get_admin_threshold(env: &Env) -> u32 {
+    env.storage().instance().get(&DataKey::AdminThreshold).unwrap_or(0)
+}
+
+pub fn set_admin_threshold(env: &Env, threshold: u32) {
+    env.storage().instance().set(&DataKey::AdminThreshold, &threshold);
+}
+
 // ── Multi-sig service set ─────────────────────────────────────────────────────
 
 pub fn get_service_set(env: &Env) -> Vec<Address> {
