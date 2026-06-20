@@ -245,6 +245,24 @@ pub fn set_upgrade_delay(env: &Env, delay_secs: u64) {
     env.storage().instance().set(&DataKey::UpgradeDelay, &delay_secs);
 }
 
+// ── Multi-sig admin set ──────────────────────────────────────────────────────
+
+pub fn get_admin_set(env: &Env) -> Vec<Address> {
+    env.storage().instance().get(&DataKey::AdminSet).unwrap_or_else(|| Vec::new(env))
+}
+
+pub fn set_admin_set(env: &Env, set: &Vec<Address>) {
+    env.storage().instance().set(&DataKey::AdminSet, set);
+}
+
+pub fn get_admin_threshold(env: &Env) -> u32 {
+    env.storage().instance().get(&DataKey::AdminThreshold).unwrap_or(0)
+}
+
+pub fn set_admin_threshold(env: &Env, threshold: u32) {
+    env.storage().instance().set(&DataKey::AdminThreshold, &threshold);
+}
+
 // ── Multi-sig service set ─────────────────────────────────────────────────────
 
 pub fn get_service_set(env: &Env) -> Vec<Address> {
@@ -366,29 +384,24 @@ pub fn set_service_pubkey(env: &Env, pubkey: &Bytes) {
     env.storage().instance().set(&DataKey::ServicePubKey, pubkey);
 }
 
-// ── Wallet Score Delegation ───────────────────────────────────────────────────
+// ── Fee withdrawal ────────────────────────────────────────────────────────────
 
-pub fn get_score_delegate(env: &Env, sub_wallet: &Address) -> Option<Address> {
-    let key = DataKey::ScoreDelegate(sub_wallet.clone());
-    let delegate: Option<Address> = env.storage().persistent().get(&key);
-    if delegate.is_some() {
-        env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
-    }
-    delegate
+pub fn get_fee_token(env: &Env) -> Option<Address> {
+    env.storage().instance().get(&DataKey::FeeToken)
 }
 
-pub fn peek_score_delegate(env: &Env, sub_wallet: &Address) -> Option<Address> {
-    let key = DataKey::ScoreDelegate(sub_wallet.clone());
-    env.storage().persistent().get(&key)
+pub fn set_fee_token(env: &Env, token: &Address) {
+    env.storage().instance().set(&DataKey::FeeToken, token);
 }
 
-pub fn set_score_delegate(env: &Env, sub_wallet: &Address, custodian: &Address) {
-    let key = DataKey::ScoreDelegate(sub_wallet.clone());
-    env.storage().persistent().set(&key, custodian);
-    env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+pub fn is_withdrawal_locked(env: &Env) -> bool {
+    env.storage().instance().get::<_, bool>(&DataKey::WithdrawalLock).unwrap_or(false)
 }
 
-pub fn remove_score_delegate(env: &Env, sub_wallet: &Address) {
-    let key = DataKey::ScoreDelegate(sub_wallet.clone());
-    env.storage().persistent().remove(&key);
+pub fn set_withdrawal_lock(env: &Env) {
+    env.storage().instance().set(&DataKey::WithdrawalLock, &true);
+}
+
+pub fn clear_withdrawal_lock(env: &Env) {
+    env.storage().instance().remove(&DataKey::WithdrawalLock);
 }
