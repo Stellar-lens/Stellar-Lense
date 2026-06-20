@@ -170,6 +170,29 @@ pub fn batch_attested(
     );
 }
 
+// ── Multi-model consensus scoring ─────────────────────────────────────────────
+
+/// Emitted when a consensus score is accepted and stored.
+pub fn consensus_score_submitted(
+    env: &Env,
+    wallet: &Address,
+    asset_pair: &Symbol,
+    median_score: u32,
+    agreeing_model_count: u32,
+    epsilon: u32,
+) {
+    env.events().publish(
+        (symbol_short!("cons_scr"), wallet.clone(), asset_pair.clone()),
+        (median_score, agreeing_model_count, epsilon),
+    );
+}
+
+/// Emitted when the admin updates the consensus configuration.
+pub fn consensus_config_updated(env: &Env, k: u32, epsilon: u32) {
+    env.events().publish((symbol_short!("cons_cfg"),), (k, epsilon));
+}
+
+
 // ── History depth ─────────────────────────────────────────────────────────────
 
 /// Emitted when the admin changes the ring-buffer depth via

@@ -187,3 +187,11 @@ pub const EMBARGO_TTL_THRESHOLD: u32 = 1_555_200;
 
 /// Target TTL for embargo entries on creation or refresh (~180 days at 5 s/ledger).
 pub const EMBARGO_TTL_EXTEND_TO: u32 = 3_110_400;
+
+// ── Multi-model consensus scoring ─────────────────────────────────────────────
+
+/// Default minimum number of models that must agree for consensus.
+pub const DEFAULT_CONSENSUS_THRESHOLD_K: u32 = 2;
+
+/// Default maximum allowed absolute deviation from the provisional median.
+pub const DEFAULT_CONSENSUS_EPSILON: u32 = 5;

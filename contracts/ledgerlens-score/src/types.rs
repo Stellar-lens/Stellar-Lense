@@ -97,6 +97,18 @@ pub struct ScoreAttestation {
     pub signature: BytesN<65>,
 }
 
+/// A single model's contribution to an ensemble consensus submission.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ModelSubmission {
+    pub model_version: u32,
+    pub score: u32,
+    pub confidence: u32,
+    pub benford_flag: bool,
+    pub ml_flag: bool,
+    pub attestation: ScoreAttestation,
+}
+
 /// Result for a single entry in a batch score submission.
 /// Returned as part of `BatchResult` from `submit_scores_batch` so the
 /// caller knows exactly which entries succeeded and why any failed,
@@ -368,10 +380,6 @@ pub enum DataKey {
     AdminThreshold,
     /// Score delegation: maps a sub-wallet to its custodian wallet.
     ScoreDelegate(Address),
-    /// Per-wallet regulatory hold. Stores `Option<u64>` (expiry timestamp);
-    /// `None` means indefinite. While active, read-path functions return
-    /// `ScoreEmbargoed` / conservative denials; writes are unaffected.
-    ScoreEmbargo(Address),
     /// Per-(wallet, asset_pair) trend state: current trend direction (+1/0/-1)
     /// and consecutive submission count in that direction. Updated by every
     /// successful `submit_score` / `submit_scores_batch` write.
@@ -406,6 +414,12 @@ pub enum DataKey {
     /// the embargo is indefinite or expires at a specific ledger timestamp.
     /// Absent key means no embargo. Stored in temporary TTL-bounded storage.
     ScoreEmbargo(Address),
+    /// Minimum number of model submissions that must agree for a consensus
+    /// score to be accepted.
+    ConsensusThresholdK,
+    /// Maximum allowed score deviation from the provisional median when
+    /// building the consensus set.
+    ConsensusEpsilon,
 }
 
 #[contracttype]

@@ -163,6 +163,15 @@ feat/confidence-gated-risk-gate
     /// Returned when `set_hysteresis_margin` is called with a value above
     /// `MAX_HYSTERESIS_MARGIN` (50).
     InvalidHysteresisMargin = 48,
+
+    // ── Multi-model consensus scoring ──────────────────────────────────────
+    /// Fewer than the configured consensus threshold of models agreed on a
+    /// score within the configured epsilon window.
+    InsufficientConsensus = 49,
+    /// `submit_consensus_score` was called with zero model submissions.
+    ConsensusInputEmpty = 50,
+    /// `set_consensus_config` was called with `k == 0` or `epsilon > 100`.
+    InvalidConsensusConfig = 51,
 }
 
 // Gate caller tracking error variants for structural protection

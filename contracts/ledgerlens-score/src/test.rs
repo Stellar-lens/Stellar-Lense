@@ -1179,7 +1179,7 @@ fn test_batch_result_vec_length_matches_input() {
 // ── Contract version ──────────────────────────────────────────────────────────
 
 #[test]
-fn test_get_version_returns_two() {
+fn test_get_version_returns_three() {
     let (_env, client, _admin, _service) = initialized();
     assert_eq!(client.get_version(), 3);
 }
@@ -1752,6 +1752,7 @@ fn test_score_count_exceeds_history_depth() {
 
     // Submit 15 scores — the ring buffer caps at 10, but count should be 15.
     for i in 0u32..15 {
+        env.ledger().with_mut(|l| l.timestamp += 3_601); // past the default cooldown
         client.submit_score(
             &Vec::new(&env),
             &wallet,
