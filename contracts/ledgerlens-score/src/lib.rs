@@ -212,6 +212,9 @@ impl LedgerLensScoreContract {
         if confidence > 100 {
             return Err(Error::InvalidConfidence);
         }
+        if timestamp == 0 {
+            return Err(Error::InvalidTimestamp);
+        }
 
         let last_submit = storage::get_last_submit_time(&env, &wallet, &asset_pair);
         let cooldown = storage::get_cooldown_secs(&env);
@@ -459,6 +462,86 @@ impl LedgerLensScoreContract {
     /// ```
     pub fn get_score_count(env: Env, wallet: Address, asset_pair: Symbol) -> u32 {
         storage::get_score_count(&env, &wallet, &asset_pair)
+    }
+
+    // ── History ring-buffer depth ────────────────────────────────────────────
+
+    /// Sets the maximum number of history entries retained in the per-wallet /
+    /// per-asset-pair ring buffer.  Admin only.
+    ///
+    /// `depth` must be in the range `[1, MAX_HISTORY_DEPTH]` (currently 1–50);
+    /// passing `0` or a value above the ceiling returns
+    /// [`Error::InvalidHistoryDepth`].
+    ///
+    /// # Lazy-truncation behaviour on depth decrease
+    ///
+    /// Reducing the depth does **not** retroactively remove existing entries
+    /// from storage immediately.  Entries that exceed the new cap remain in the
+    /// ring until the next `submit_score` (or `submit_scores_batch`) call for
+    /// that `(wallet, asset_pair)` triggers the eviction loop inside
+    /// `push_score_history`.  On that next write the ring is trimmed to the new
+    /// depth in a single pass, so the transition is bounded and deterministic —
+    /// it just isn't instantaneous.  Off-chain consumers that read
+    /// `get_score_history` between the depth change and the next submission may
+    /// temporarily observe more entries than the new cap; they should treat the
+    /// returned length as authoritative rather than assuming it equals the
+    /// configured depth.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// client.set_history_max_depth(&20).unwrap();
+    /// assert_eq!(client.get_history_max_depth(), 20);
+    /// ```
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if the contract has no admin yet.
+    /// - [`Error::InvalidHistoryDepth`] if `depth` is `0` or above
+    ///   `MAX_HISTORY_DEPTH` (50).
+    pub fn set_history_max_depth(env: Env, depth: u32) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        if depth == 0 || depth > constants::MAX_HISTORY_DEPTH {
+            return Err(Error::InvalidHistoryDepth);
+        }
+        let admin = storage::get_admin(&env);
+        admin.require_auth();
+        storage::set_history_max_depth(&env, depth);
+        events::history_depth_updated(&env, depth);
+        Ok(())
+    }
+
+    /// Returns the current history ring-buffer depth.  Defaults to
+    /// `DEFAULT_HISTORY_MAX_DEPTH` (10) until the admin sets one explicitly.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// assert_eq!(client.get_history_max_depth(), 10);
+    /// ```
+    pub fn get_history_max_depth(env: Env) -> u32 {
+        storage::get_history_max_depth(&env)
     }
 
     // ── Cross-asset aggregate risk ───────────────────────────────────────────
@@ -1319,6 +1402,44 @@ impl LedgerLensScoreContract {
         admin.require_auth();
         storage::clear_last_submit_time(&env, &wallet, &asset_pair);
         events::rate_limit_overridden(&env, &admin, &wallet, &asset_pair);
+        Ok(())
+    }
+
+    /// Erase the score history ring buffer for `wallet` / `asset_pair`.
+    ///
+    /// Does nothing (returns `Ok`) if no history exists. After this call,
+    /// `get_score_history` returns an empty Vec. This operation is
+    /// **irreversible on-chain** — keep off-chain backups before erasing.
+    /// Admin only.
+    ///
+    /// Emits `clr_hist` for the on-chain audit trail.
+    pub fn clear_score_history(env: Env, wallet: Address, asset_pair: Symbol) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        let admin = storage::get_admin(&env);
+        admin.require_auth();
+        storage::clear_score_history(&env, &wallet, &asset_pair);
+        events::score_history_cleared(&env, &wallet, &asset_pair);
+        Ok(())
+    }
+
+    /// Erase the latest score entry for `wallet` / `asset_pair`.
+    ///
+    /// Does nothing (returns `Ok`) if no score exists. After this call,
+    /// `get_score` returns `ScoreNotFound`. This operation is
+    /// **irreversible on-chain** — keep off-chain backups before erasing.
+    /// Admin only.
+    ///
+    /// Emits `clr_scr` for the on-chain audit trail.
+    pub fn clear_score(env: Env, wallet: Address, asset_pair: Symbol) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        let admin = storage::get_admin(&env);
+        admin.require_auth();
+        storage::clear_score(&env, &wallet, &asset_pair);
+        events::score_cleared(&env, &wallet, &asset_pair);
         Ok(())
     }
 

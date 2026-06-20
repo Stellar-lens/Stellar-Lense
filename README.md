@@ -67,6 +67,14 @@ Read-only function callable by any Soroban contract. Returns the most recent Led
 ### `get_score_count(wallet: Address, asset_pair: Symbol) -> u32`
 Read-only function callable by any account or contract. Returns the total number of score submissions ever recorded for `wallet` / `asset_pair`. Unlike `get_score_history` (which caps at `HISTORY_MAX_DEPTH`), this counter is never truncated, giving off-chain services a cheap O(1) signal to distinguish newly monitored wallets from those with a long history.
 
+### `set_history_max_depth(depth: u32)`
+Admin-only. Sets the maximum number of entries retained in the per-wallet / per-asset-pair score history ring buffer. `depth` must be in the range `[1, 50]`; values outside this range are rejected with `InvalidHistoryDepth`. Defaults to `10` until configured.
+
+**Lazy-truncation behaviour:** reducing the depth does not remove existing entries immediately. Entries beyond the new cap remain in the ring until the next `submit_score` (or `submit_scores_batch`) call for that pair triggers the eviction loop, at which point the ring is trimmed in a single pass. Off-chain consumers reading `get_score_history` between the depth change and the next submission may temporarily observe more entries than the new cap.
+
+### `get_history_max_depth() -> u32`
+Read-only. Returns the current ring-buffer depth. Defaults to `10` until the admin sets one explicitly.
+
 ### `set_service(new_service: Address)`
 Rotates the authorised off-chain scoring service address. Admin only.
 
@@ -123,6 +131,11 @@ Admin-only emergency escape hatch. Immediately clears the stored cooldown deadli
 ### `get_last_submit_time(wallet: Address, asset_pair: Symbol) -> u64`
 Read-only lookup of the ledger timestamp of the last accepted submission for `(wallet, asset_pair)`, or `0` if none has ever been accepted (or it was cleared by `override_rate_limit`).
 
+### `clear_score_history(wallet: Address, asset_pair: Symbol)` ⚠️ irreversible
+Admin only. Permanently erases the score history ring buffer for `wallet` / `asset_pair`. No-op if no history exists. Emits `clr_hist` for the on-chain audit trail. **Keep off-chain backups before calling — this cannot be undone on-chain.**
+
+### `clear_score(wallet: Address, asset_pair: Symbol)` ⚠️ irreversible
+Admin only. Permanently erases the latest score entry for `wallet` / `asset_pair`. After this call, `get_score` returns `ScoreNotFound`. No-op if no score exists. Emits `clr_scr` for the on-chain audit trail. **Keep off-chain backups before calling — this cannot be undone on-chain.**
 ### `set_service_pubkey(pubkey: Bytes)` / `get_service_pubkey() -> Bytes`
 Admin sets (or rotates) the off-chain detection pipeline's secp256k1 public key — 33 bytes compressed or 65 bytes uncompressed, rejected otherwise with `InvalidPubkeyLength` — used to verify `ScoreAttestation`s. Once set it cannot be unset, only rotated. `get_service_pubkey` returns `ServicePubkeyNotSet` before one has been configured. See [Score Attestation](#score-attestation).
 
@@ -214,6 +227,36 @@ aggregate_score = (60*1 + 65*2 + 70*1) / (1 + 2 + 1)
 A wallet scoring 60-70 on three pairs individually might not breach the per-pair `RiskThreshold` (default 75), but the aggregate view makes the *combined* exposure visible to any contract or dashboard that queries `get_aggregate_score` — without needing to fetch and average every pair manually.
 
 `get_aggregate_score` iterates the wallet's full pair list, so its cost is O(N) in the number of distinct pairs the wallet has scores for. The contract is designed around a practical maximum of `MAX_WALLET_PAIRS` (20) pairs per wallet; this is documented as a constant but not enforced on-chain.
+
+## Error Codes
+
+| Code | Name | When returned |
+|------|------|---------------|
+| 1 | `AlreadyInitialized` | `initialize` called more than once |
+| 2 | `NotInitialized` | Any state-mutating call before `initialize` |
+| 3 | `Unauthorized` | Caller is not the authorised service or admin |
+| 4 | `InvalidScore` | `score` outside 0-100 |
+| 5 | `InvalidConfidence` | `confidence` outside 0-100 |
+| 6 | `ScoreNotFound` | `get_score` / `get_aggregate_score` for an unknown pair |
+| 7 | `ContractPaused` | Submission attempted while admin circuit-breaker is active |
+| 8 | `NoPendingAdminTransfer` | `accept_admin` / `cancel_admin_transfer` with no transfer in flight |
+| 9 | `EmptyBatch` | `submit_scores_batch` called with zero entries |
+| 10 | `BatchTooLarge` | Batch exceeds `MAX_BATCH_SIZE` (20) |
+| 11 | `ArithmeticOverflow` | Weighted aggregate computation overflows |
+| 12 | `UpgradeAlreadyPending` | `propose_upgrade` while a proposal is already pending |
+| 13 | `NoPendingUpgrade` | `execute_upgrade` / `veto_upgrade` / `get_pending_upgrade` with no proposal |
+| 14 | `InsufficientSigners` | Fewer than threshold signers supplied to `submit_score` |
+| 15 | `UnauthorizedSigner` | A supplied signer is not in the service set |
+| 16 | `InvalidThreshold` | `set_service_threshold` given `0` or a value > set size |
+| 17 | `ServiceSetFull` | `add_service_signer` when set already has `MAX_SERVICE_SIGNERS` members |
+| 18 | `SignerAlreadyInSet` | `add_service_signer` with an address already present |
+| 19 | `SignerNotInSet` | `remove_service_signer` with an address not in the set |
+| 20 | `UpgradeNotReady` | `execute_upgrade` before the time-lock has elapsed |
+| 21 | `InvalidUpgradeDelay` | `set_upgrade_delay` value outside `[MIN, MAX]` bounds |
+| 22 | `InvalidStalenessWindow` | `set_staleness_window` called with `0` |
+| 23 | `RateLimitExceeded` | Submission before the per-pair cooldown has elapsed |
+| 24 | `InvalidCooldown` | `set_cooldown` value outside `[MIN_COOLDOWN_SECS, MAX_COOLDOWN_SECS]` |
+| 25 | `InvalidTimestamp` | `submit_score` called with `timestamp = 0` |
 
 ## Upgrade Governance
 

@@ -79,4 +79,7 @@ pub enum Error {
     /// `set_service_pubkey` was called with a pubkey whose length is
     /// neither 33 (compressed) nor 65 (uncompressed) bytes.
     InvalidPubkeyLength = 28,
+    /// Returned when `set_history_max_depth` is called with `0` or a value
+    /// above `MAX_HISTORY_DEPTH`.
+    InvalidHistoryDepth = 29,
 }

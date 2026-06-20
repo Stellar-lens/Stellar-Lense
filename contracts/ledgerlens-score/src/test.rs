@@ -631,6 +631,121 @@ fn test_score_history_is_per_pair() {
     assert_eq!(client.get_score_history(&wallet, &pair2).get(0).unwrap().score, 90);
 }
 
+// ── Configurable history depth ────────────────────────────────────────────────
+
+#[test]
+fn test_default_history_depth_is_10() {
+    let (_env, client, _admin, _service) = initialized();
+    assert_eq!(client.get_history_max_depth(), 10);
+}
+
+#[test]
+fn test_set_history_max_depth_increases_ring() {
+    // Set depth to 20, submit 15 entries — all 15 should be retained.
+    let (env, client, _admin, _service) = initialized();
+
+    let wallet = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+
+    client.set_history_max_depth(&20);
+
+    for i in 0u32..15 {
+        env.ledger().with_mut(|l| l.timestamp += 3_601);
+        client.submit_score(
+            &Vec::new(&env),
+            &wallet,
+            &asset_pair,
+            &(i * 5),
+            &false,
+            &false,
+            &(i as u64 + 1),
+            &50,
+            &1,
+            &None,
+        );
+    }
+
+    let history = client.get_score_history(&wallet, &asset_pair);
+    assert_eq!(history.len(), 15);
+    // Oldest retained is entry 0 (score = 0).
+    assert_eq!(history.get(0).unwrap().score, 0);
+    // Newest is entry 14 (score = 70).
+    assert_eq!(history.get(14).unwrap().score, 70);
+}
+
+#[test]
+fn test_set_history_max_depth_decreases_ring_on_next_write() {
+    // Submit 5 entries at the default depth (10), then reduce to 3.
+    // The next submission must trigger eviction down to 3.
+    let (env, client, _admin, _service) = initialized();
+
+    let wallet = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+
+    for i in 0u32..5 {
+        env.ledger().with_mut(|l| l.timestamp += 3_601);
+        client.submit_score(
+            &Vec::new(&env),
+            &wallet,
+            &asset_pair,
+            &(i * 10),
+            &false,
+            &false,
+            &(i as u64 + 1),
+            &50,
+            &1,
+            &None,
+        );
+    }
+    assert_eq!(client.get_score_history(&wallet, &asset_pair).len(), 5);
+
+    // Reduce depth to 3.
+    client.set_history_max_depth(&3);
+
+    // One more submission triggers the eviction pass.
+    env.ledger().with_mut(|l| l.timestamp += 3_601);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &asset_pair,
+        &99,
+        &false,
+        &false,
+        &100,
+        &50,
+        &1,
+        &None,
+    );
+
+    let history = client.get_score_history(&wallet, &asset_pair);
+    assert_eq!(history.len(), 3);
+    // Newest entry must be the one just submitted (score = 99).
+    assert_eq!(history.get(2).unwrap().score, 99);
+}
+
+#[test]
+fn test_history_depth_zero_rejected() {
+    let (_env, client, _admin, _service) = initialized();
+    let result = client.try_set_history_max_depth(&0);
+    assert_eq!(result, Err(Ok(Error::InvalidHistoryDepth)));
+}
+
+#[test]
+fn test_history_depth_above_ceiling_rejected() {
+    let (_env, client, _admin, _service) = initialized();
+    // MAX_HISTORY_DEPTH is 50; 51 must be rejected.
+    let result = client.try_set_history_max_depth(&51);
+    assert_eq!(result, Err(Ok(Error::InvalidHistoryDepth)));
+}
+
+#[test]
+fn test_history_depth_at_ceiling_accepted() {
+    let (_env, client, _admin, _service) = initialized();
+    // Exactly 50 is the ceiling — must succeed.
+    client.set_history_max_depth(&50);
+    assert_eq!(client.get_history_max_depth(), 50);
+}
+
 // ── Batch submission ──────────────────────────────────────────────────────────
 
 #[test]
@@ -1729,4 +1844,102 @@ fn test_set_staleness_window_updates_stale_check() {
     // Advance by 11 seconds — should be stale now.
     env.ledger().with_mut(|l| l.timestamp = ts + 11);
     assert!(client.is_score_stale(&wallet, &pair));
+}
+
+// ── GDPR / data-erasure ───────────────────────────────────────────────────────
+
+#[test]
+fn test_clear_score_history_removes_all_entries() {
+    let (env, client, _admin, _service) = initialized();
+    let wallet = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+
+    client.submit_score(&Vec::new(&env), &wallet, &pair, &10, &false, &false, &1, &50, &1, &None);
+    env.ledger().with_mut(|l| l.timestamp += 3_601);
+    client.submit_score(&Vec::new(&env), &wallet, &pair, &20, &false, &false, &2, &60, &1, &None);
+
+    assert_eq!(client.get_score_history(&wallet, &pair).len(), 2);
+    client.clear_score_history(&wallet, &pair);
+    assert_eq!(client.get_score_history(&wallet, &pair).len(), 0);
+}
+
+#[test]
+fn test_clear_score_history_on_empty_is_noop() {
+    let (env, client, _admin, _service) = initialized();
+    let wallet = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+
+    // Should not panic when no history exists.
+    client.clear_score_history(&wallet, &pair);
+    assert_eq!(client.get_score_history(&wallet, &pair).len(), 0);
+}
+
+#[test]
+fn test_clear_score_removes_latest_score() {
+    let (env, client, _admin, _service) = initialized();
+    let wallet = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+
+    client.submit_score(&Vec::new(&env), &wallet, &pair, &42, &false, &false, &1, &80, &1, &None);
+    client.clear_score(&wallet, &pair);
+
+    let result = client.try_get_score(&wallet, &pair);
+    assert_eq!(result, Err(Ok(Error::ScoreNotFound)));
+}
+
+#[test]
+fn test_clear_score_on_nonexistent_is_noop() {
+    let (env, client, _admin, _service) = initialized();
+    let wallet = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+
+    // Should not panic when no score exists.
+    client.clear_score(&wallet, &pair);
+    let result = client.try_get_score(&wallet, &pair);
+    assert_eq!(result, Err(Ok(Error::ScoreNotFound)));
+}
+
+#[test]
+fn test_clear_score_does_not_affect_other_pairs() {
+    let (env, client, _admin, _service) = initialized();
+    let wallet = Address::generate(&env);
+    let pair_a = symbol_short!("XLM_USDC");
+    let pair_b = symbol_short!("XLM_BTC");
+
+    client.submit_score(&Vec::new(&env), &wallet, &pair_a, &10, &false, &false, &1, &50, &1, &None);
+    client.submit_score(&Vec::new(&env), &wallet, &pair_b, &20, &false, &false, &1, &60, &1, &None);
+
+    client.clear_score(&wallet, &pair_a);
+
+    assert_eq!(client.try_get_score(&wallet, &pair_a), Err(Ok(Error::ScoreNotFound)));
+    assert_eq!(client.get_score(&wallet, &pair_b).score, 20);
+}
+
+#[test]
+fn test_clear_history_does_not_affect_latest_score() {
+    let (env, client, _admin, _service) = initialized();
+    let wallet = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+
+    client.submit_score(&Vec::new(&env), &wallet, &pair, &55, &false, &false, &1, &70, &1, &None);
+    client.clear_score_history(&wallet, &pair);
+
+    // Latest score must still be retrievable.
+    assert_eq!(client.get_score(&wallet, &pair).score, 55);
+    // History is gone.
+    assert_eq!(client.get_score_history(&wallet, &pair).len(), 0);
+}
+
+#[test]
+fn test_clear_score_does_not_affect_history() {
+    let (env, client, _admin, _service) = initialized();
+    let wallet = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+
+    client.submit_score(&Vec::new(&env), &wallet, &pair, &33, &false, &false, &1, &80, &1, &None);
+    client.clear_score(&wallet, &pair);
+
+    // History ring must still contain the entry.
+    assert_eq!(client.get_score_history(&wallet, &pair).len(), 1);
+    assert_eq!(client.get_score_history(&wallet, &pair).get(0).unwrap().score, 33);
 }
