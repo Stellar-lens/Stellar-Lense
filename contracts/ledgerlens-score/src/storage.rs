@@ -65,6 +65,90 @@ pub fn set_paused(env: &Env, paused: bool) {
     env.storage().instance().set(&DataKey::Paused, &paused);
 }
 
+// ── Per-asset-pair circuit breaker ───────────────────────────────────────────
+
+/// Returns `true` only if `asset_pair` has been explicitly paused and not
+/// since unpaused. This is the hot path consulted on every `submit_score` /
+/// `submit_scores_batch` entry, so it is a direct key lookup — it never
+/// touches `PausedPairIndex`.
+pub fn is_pair_paused(env: &Env, asset_pair: &Symbol) -> bool {
+    let key = DataKey::PairPaused(asset_pair.clone());
+    let result: Option<bool> = env.storage().persistent().get(&key);
+    if result.is_some() {
+        env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    }
+    result.unwrap_or(false)
+}
+
+/// Raw flag setter, mirroring `set_watchlist`'s pattern: stores `true` (and
+/// bumps TTL) when paused, removes the key entirely when unpaused so an
+/// unpaused pair costs nothing in storage. Does **not** touch
+/// `PausedPairIndex` — callers (`set_pair_paused`) are responsible for
+/// keeping the index consistent via `add_to_paused_index` /
+/// `remove_from_paused_index`.
+pub fn set_pair_paused_flag(env: &Env, asset_pair: &Symbol, paused: bool) {
+    let key = DataKey::PairPaused(asset_pair.clone());
+    if paused {
+        env.storage().persistent().set(&key, &true);
+        env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    } else {
+        env.storage().persistent().remove(&key);
+    }
+}
+
+/// Returns every currently paused asset pair. O(1) storage read — the index
+/// is maintained incrementally by `add_to_paused_index` /
+/// `remove_from_paused_index` rather than rebuilt by scanning.
+pub fn get_paused_pairs(env: &Env) -> Vec<Symbol> {
+    let pairs: Vec<Symbol> =
+        env.storage().persistent().get(&DataKey::PausedPairIndex).unwrap_or_else(|| Vec::new(env));
+    if !pairs.is_empty() {
+        env.storage().persistent().extend_ttl(
+            &DataKey::PausedPairIndex,
+            SCORE_TTL_THRESHOLD,
+            SCORE_TTL_EXTEND_TO,
+        );
+    }
+    pairs
+}
+
+/// Adds `asset_pair` to `PausedPairIndex` if it isn't already present.
+/// Returns `false` (without modifying the index) if the pair is new *and*
+/// the index is already at `MAX_PAUSED_PAIRS` — the caller turns that into
+/// `Error::PausedPairIndexFull`. Re-adding a pair already in the index is a
+/// no-op that returns `true`, so this is safe to call unconditionally.
+///
+/// O(N) in the number of currently paused pairs, but only on this
+/// infrequent admin-only path — the per-submission hot path
+/// (`is_pair_paused`) never iterates the index.
+pub fn add_to_paused_index(env: &Env, asset_pair: &Symbol) -> bool {
+    let mut pairs = get_paused_pairs(env);
+    if pairs.contains(asset_pair) {
+        return true;
+    }
+    if pairs.len() >= crate::constants::MAX_PAUSED_PAIRS {
+        return false;
+    }
+    pairs.push_back(asset_pair.clone());
+    env.storage().persistent().set(&DataKey::PausedPairIndex, &pairs);
+    env.storage().persistent().extend_ttl(
+        &DataKey::PausedPairIndex,
+        SCORE_TTL_THRESHOLD,
+        SCORE_TTL_EXTEND_TO,
+    );
+    true
+}
+
+/// Removes `asset_pair` from `PausedPairIndex`. No-op if it isn't present.
+/// Same O(N) admin-only-path tradeoff as `add_to_paused_index`.
+pub fn remove_from_paused_index(env: &Env, asset_pair: &Symbol) {
+    let mut pairs = get_paused_pairs(env);
+    if let Some(idx) = pairs.first_index_of(asset_pair) {
+        pairs.remove(idx);
+        env.storage().persistent().set(&DataKey::PausedPairIndex, &pairs);
+    }
+}
+
 // ── Two-step admin transfer ──────────────────────────────────────────────────
 
 pub fn has_pending_admin(env: &Env) -> bool {
