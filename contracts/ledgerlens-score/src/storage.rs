@@ -4,7 +4,7 @@ use crate::constants::{
     DEFAULT_COOLDOWN_SECS, DEFAULT_RISK_THRESHOLD, DEFAULT_UPGRADE_DELAY_SECS, SCORE_TTL_EXTEND_TO,
     SCORE_TTL_THRESHOLD,
 };
-use crate::types::{AggregateRiskScore, DataKey, RiskScore, UpgradeProposal};
+use crate::types::{AggregateRiskScore, DataKey, RiskScore, ScoreTrend, UpgradeProposal};
 
 // ── Admin / Service ─────────────────────────────────────────────────────────
 
@@ -514,6 +514,23 @@ pub fn is_embargoed(env: &Env, wallet: &Address) -> bool {
         Some(None) => true, // indefinite embargo
         Some(Some(expiry)) => env.ledger().timestamp() < expiry,
     }
+}
+
+// ── Score trend state ─────────────────────────────────────────────────────────
+
+pub fn get_trend_state(env: &Env, wallet: &Address, asset_pair: &Symbol) -> ScoreTrend {
+    let key = DataKey::TrendState(wallet.clone(), asset_pair.clone());
+    let result: Option<ScoreTrend> = env.storage().persistent().get(&key);
+    if result.is_some() {
+        env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    }
+    result.unwrap_or(ScoreTrend { trend: 0, consecutive: 0 })
+}
+
+pub fn set_trend_state(env: &Env, wallet: &Address, asset_pair: &Symbol, state: &ScoreTrend) {
+    let key = DataKey::TrendState(wallet.clone(), asset_pair.clone());
+    env.storage().persistent().set(&key, state);
+    env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
 }
 
 // ── Score attestation ─────────────────────────────────────────────────────
