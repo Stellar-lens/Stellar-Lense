@@ -2116,27 +2116,25 @@ impl LedgerLensScoreContract {
         result -= x;
 
         // Term 2: +x²/2
-        if let Ok(x2) = i128::try_from(x.checked_mul(x).ok_or(()).unwrap_or(0)) {
-            result += x2 / (2 * s);
-        }
+        let x2 = i128::try_from(x.checked_mul(x).ok_or(()).unwrap_or(0)).unwrap_or(0);
+        result += x2 / (2 * s);
 
         // Term 3: -x³/6
-        if let Ok(x3) =
+        let x3 =
             i128::try_from(x.checked_mul(x).and_then(|v| v.checked_mul(x)).ok_or(()).unwrap_or(0))
-        {
-            result -= x3 / (6 * s * s);
-        }
+                .unwrap_or(0);
+        result -= x3 / (6 * s * s);
 
         // Term 4: +x⁴/24
-        if let Ok(x4) = i128::try_from(
+        let x4 = i128::try_from(
             x.checked_mul(x)
                 .and_then(|v| v.checked_mul(x))
                 .and_then(|v| v.checked_mul(x))
                 .ok_or(())
                 .unwrap_or(0),
-        ) {
-            result += x4 / (24 * s * s * s);
-        }
+        )
+        .unwrap_or(0);
+        result += x4 / (24 * s * s * s);
 
         // Clamp to [0, SCALE] and convert back to u64
         if result < 0 {
