@@ -1,5 +1,3 @@
-#![cfg(test)]
-
 //! Tests for the score-attestation feature: `set_service_pubkey` /
 //! `get_service_pubkey`, and the `attestation` parameter on `submit_score`.
 //!

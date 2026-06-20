@@ -74,3 +74,11 @@ pub const MAX_SERVICE_SIGNERS: u32 = 10;
 
 /// Default staleness window: 7 days in seconds.
 pub const DEFAULT_STALENESS_WINDOW_SECS: u64 = 604_800;
+
+// ── Per-asset-pair circuit breaker ────────────────────────────────────────────
+
+/// Hard ceiling on the number of distinct asset pairs that may be paused at
+/// once. Bounds `PausedPairIndex`'s storage cost and the O(N) work done on
+/// the rare admin pause/unpause path; the hot `is_pair_paused` read used by
+/// every submission never touches the index. See `set_pair_paused`.
+pub const MAX_PAUSED_PAIRS: u32 = 50;

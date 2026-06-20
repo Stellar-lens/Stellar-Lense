@@ -82,4 +82,18 @@ pub enum Error {
     /// Returned when `set_history_max_depth` is called with `0` or a value
     /// above `MAX_HISTORY_DEPTH`.
     InvalidHistoryDepth = 29,
+
+    // ── Per-asset-pair circuit breaker ──────────────────────────────────────
+    /// Returned by `submit_score` when the targeted `(wallet, asset_pair)`'s
+    /// pair is paused via `set_pair_paused`. In `submit_scores_batch` the
+    /// offending entry is skipped (recorded with this code) instead of
+    /// failing the whole batch. Superseded by `ContractPaused` when the
+    /// global circuit breaker is also active — see `submit_score`'s rustdoc
+    /// for the precedence order.
+    PairPaused = 30,
+    /// Returned by `set_pair_paused` when pausing a pair that is not already
+    /// paused would grow `PausedPairIndex` beyond `MAX_PAUSED_PAIRS` (50).
+    /// Unpausing an existing entry (or pausing one already paused) never
+    /// triggers this.
+    PausedPairIndexFull = 31,
 }

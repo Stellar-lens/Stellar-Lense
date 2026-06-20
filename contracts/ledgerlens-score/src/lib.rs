@@ -22,6 +22,9 @@ mod test_rate_limit;
 #[cfg(test)]
 mod test_attestation;
 
+#[cfg(test)]
+mod test_pair_pause;
+
 use soroban_sdk::{
     contract, contractimpl, crypto::Hash, symbol_short, Address, Bytes, BytesN, Env, Symbol,
     SymbolStr, TryFromVal, Vec,
@@ -110,7 +113,13 @@ impl LedgerLensScoreContract {
     /// When no multi-sig set has been configured (legacy mode) the function
     /// falls back to the original single-service authorization path.
     ///
-    /// Returns `ContractPaused` if the admin has activated the circuit breaker.
+    /// Returns `ContractPaused` if the admin has activated the global circuit
+    /// breaker, checked *before* the per-pair one below — a globally paused
+    /// contract rejects every submission regardless of per-pair state.
+    ///
+    /// Returns `PairPaused` if `asset_pair` has been individually frozen via
+    /// `set_pair_paused`, even while the global circuit breaker is off. See
+    /// that function's rustdoc for the surgical-freeze use case.
     ///
     /// Rejects submissions for the same `(wallet, asset_pair)` that arrive
     /// before the configured cooldown (`get_cooldown`, 1 hour by default) has
@@ -164,6 +173,9 @@ impl LedgerLensScoreContract {
         }
         if storage::is_paused(&env) {
             return Err(Error::ContractPaused);
+        }
+        if storage::is_pair_paused(&env, &asset_pair) {
+            return Err(Error::PairPaused);
         }
 
         let service_set = storage::get_service_set(&env);
@@ -250,10 +262,14 @@ impl LedgerLensScoreContract {
     /// entries succeeded and why any failed, without needing to re-query
     /// each (wallet, pair) individually.
     ///
-    /// Entries with out-of-range `score` or `confidence`, zero `timestamp`,
-    /// or that arrive before their `(wallet, asset_pair)`'s submission
-    /// cooldown has elapsed, are recorded as rejected in the result with an
-    /// appropriate `rejection_code`. Two entries for the same pair within
+    /// Entries targeting a paused pair (`PairPaused`), with out-of-range
+    /// `score` or `confidence`, a zero `timestamp`, or that arrive before
+    /// their `(wallet, asset_pair)`'s submission cooldown has elapsed, are
+    /// recorded as rejected in the result with an appropriate
+    /// `rejection_code` — the rest of the batch is still processed. The
+    /// whole call instead fails outright with `ContractPaused` if the
+    /// *global* circuit breaker is active, checked once up front. Two
+    /// entries for the same pair within
     /// one batch are subject to the same cooldown — the second is rejected,
     /// since both share the same ledger timestamp.
     ///
@@ -315,7 +331,9 @@ impl LedgerLensScoreContract {
             let mut accepted = false;
             let mut rejection_code: u32 = 0;
 
-            if sub.score > 100 {
+            if storage::is_pair_paused(&env, &sub.asset_pair) {
+                rejection_code = Error::PairPaused as u32;
+            } else if sub.score > 100 {
                 rejection_code = Error::InvalidScore as u32;
             } else if sub.confidence > 100 {
                 rejection_code = Error::InvalidConfidence as u32;
@@ -1006,6 +1024,131 @@ impl LedgerLensScoreContract {
     /// ```
     pub fn is_paused(env: Env) -> bool {
         storage::is_paused(&env)
+    }
+
+    // ── Per-asset-pair circuit breaker ────────────────────────────────────────
+
+    /// Freeze or unfreeze score submissions for a single `asset_pair`, without
+    /// touching any other pair or the global circuit breaker.  Admin only.
+    ///
+    /// This is the surgical alternative to [`pause`](Self::pause): if a
+    /// detection signal for one pair (e.g. a bad `XLM_USDC` model run) is
+    /// compromised or malfunctioning, the admin can freeze writes for just
+    /// that pair while every other pair keeps accepting submissions normally.
+    /// Reads (`get_score`, `get_score_history`, `query_risk_gate`,
+    /// `get_aggregate_score`) are never affected — only `submit_score` and
+    /// `submit_scores_batch` consult this flag. See those functions'
+    /// rustdoc for the exact precedence against the global pause.
+    ///
+    /// Pausing a pair that is not already paused adds it to the bounded
+    /// `PausedPairIndex` (see [`get_paused_pairs`](Self::get_paused_pairs));
+    /// pausing an already-paused pair, or unpausing one, never grows it.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use soroban_sdk::symbol_short;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// let pair = symbol_short!("XLM_USDC");
+    /// assert!(!client.is_pair_paused(&pair));
+    /// client.set_pair_paused(&pair, &true);
+    /// assert!(client.is_pair_paused(&pair));
+    /// // submit_score for this pair now returns Error::PairPaused, while
+    /// // every other pair is unaffected.
+    /// client.set_pair_paused(&pair, &false);
+    /// assert!(!client.is_pair_paused(&pair));
+    /// ```
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if the contract has no admin yet.
+    /// - [`Error::PausedPairIndexFull`] if `asset_pair` is not already paused
+    ///   and `PausedPairIndex` already holds `MAX_PAUSED_PAIRS` (50) entries.
+    pub fn set_pair_paused(env: Env, asset_pair: Symbol, paused: bool) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        let admin = storage::get_admin(&env);
+        admin.require_auth();
+
+        if paused {
+            if !storage::is_pair_paused(&env, &asset_pair)
+                && !storage::add_to_paused_index(&env, &asset_pair)
+            {
+                return Err(Error::PausedPairIndexFull);
+            }
+            storage::set_pair_paused_flag(&env, &asset_pair, true);
+        } else {
+            storage::set_pair_paused_flag(&env, &asset_pair, false);
+            storage::remove_from_paused_index(&env, &asset_pair);
+        }
+
+        events::pair_paused(&env, &asset_pair, paused);
+        Ok(())
+    }
+
+    /// Returns `true` only while `asset_pair` is individually paused via
+    /// [`set_pair_paused`](Self::set_pair_paused). Returns `false` for any
+    /// pair that has never been paused, callable by any account or contract.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use soroban_sdk::symbol_short;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// let pair = symbol_short!("XLM_USDC");
+    /// assert!(!client.is_pair_paused(&pair));
+    /// ```
+    pub fn is_pair_paused(env: Env, asset_pair: Symbol) -> bool {
+        storage::is_pair_paused(&env, &asset_pair)
+    }
+
+    /// Returns every asset pair currently paused via
+    /// [`set_pair_paused`](Self::set_pair_paused), in no particular order.
+    /// Returns an empty `Vec` when nothing is paused. Backed by the
+    /// incrementally-maintained `PausedPairIndex`, so this is an O(1)
+    /// storage read regardless of how many pairs exist in the system overall
+    /// — it is bounded by `MAX_PAUSED_PAIRS` (50), not by the total number of
+    /// pairs ever scored.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use soroban_sdk::symbol_short;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// assert!(client.get_paused_pairs().is_empty());
+    /// let pair = symbol_short!("XLM_USDC");
+    /// client.set_pair_paused(&pair, &true);
+    /// assert_eq!(client.get_paused_pairs().len(), 1);
+    /// ```
+    pub fn get_paused_pairs(env: Env) -> Vec<Symbol> {
+        storage::get_paused_pairs(&env)
     }
 
     // ── Time-locked upgrade governance ────────────────────────────────────────

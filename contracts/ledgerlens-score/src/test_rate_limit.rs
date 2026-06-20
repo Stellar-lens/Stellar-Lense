@@ -1,5 +1,3 @@
-#![cfg(test)]
-
 //! Tests for the per-wallet/pair submission rate limiting (cooldown) mechanism.
 //!
 //! Time is simulated with `env.ledger().with_mut(|l| l.timestamp = ...)`; the

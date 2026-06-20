@@ -34,6 +34,15 @@ pub fn contract_unpaused(env: &Env, by: &Address) {
     env.events().publish((symbol_short!("unpaused"),), by.clone());
 }
 
+// ── Per-asset-pair circuit breaker ──────────────────────────────────────────
+
+/// Emitted by `set_pair_paused` for both the pause and unpause direction —
+/// a single event type distinguished by the `paused` field, rather than two
+/// separate event names, so off-chain indexers can subscribe once.
+pub fn pair_paused(env: &Env, asset_pair: &Symbol, paused: bool) {
+    env.events().publish((symbol_short!("pr_pause"), asset_pair.clone()), paused);
+}
+
 // ── Two-step admin transfer ──────────────────────────────────────────────────
 
 pub fn admin_transfer_initiated(env: &Env, from: &Address, to: &Address) {
