@@ -9,11 +9,16 @@ Run as a script against a labelled feature matrix (see
 This trains each model in `MODEL_REGISTRY` with SMOTE-balanced training
 data, evaluates AUC-ROC / PR-AUC / F1 on a held-out split, writes the
 artifacts to `config.MODEL_DIR`, and writes `metrics.json` alongside them.
+
+After every training run, `metrics.json` is signed with the Ed25519 private
+key at `MODEL_SIGNING_PRIVATE_KEY_PATH` (if configured).
 """
 
 import argparse
+import hashlib
 import json
 import os
+from datetime import UTC, datetime
 
 import joblib
 import pandas as pd
@@ -37,6 +42,10 @@ MODEL_REGISTRY = {
 
 FEATURE_COLUMNS_EXCLUDE = {"wallet", "label"}
 
+LABEL_DISTRIBUTION_BASELINE_PATH = os.path.join(
+    config.MODEL_DIR, "label_distribution_baseline.json"
+)
+
 
 def load_training_data(path: str) -> pd.DataFrame:
     """Load a labelled feature matrix (output of `build_feature_matrix` plus
@@ -49,17 +58,47 @@ def split_features_labels(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:
     return df[feature_cols], df["label"]
 
 
+def sha256_dataframe(df: pd.DataFrame) -> str:
+    """Return a deterministic SHA-256 of *df* (row-sorted for reproducibility)."""
+    sorted_df = df.sort_values(by=list(df.columns)).reset_index(drop=True)
+    h = hashlib.sha256(sorted_df.to_csv(index=False).encode()).hexdigest()
+    return h
+
+
+def detect_label_poisoning(
+    label_distribution: dict,
+    baseline_path: str | None = None,
+    threshold: float | None = None,
+) -> bool:
+    """Return True if the wash-trade label ratio has shifted beyond *threshold*
+    compared with the stored baseline.
+
+    If no baseline file exists yet, one is written and False is returned.
+    """
+    baseline_path = baseline_path or LABEL_DISTRIBUTION_BASELINE_PATH
+    threshold = threshold if threshold is not None else config.POISON_LABEL_RATIO_THRESHOLD
+
+    total = sum(label_distribution.values())
+    if total == 0:
+        return False
+    current_ratio = label_distribution.get(1, 0) / total
+
+    if not os.path.exists(baseline_path):
+        os.makedirs(os.path.dirname(baseline_path), exist_ok=True)
+        with open(baseline_path, "w") as f:
+            json.dump({"wash_trade_ratio": current_ratio}, f)
+        return False
+
+    with open(baseline_path) as f:
+        baseline = json.load(f)
+
+    baseline_ratio = baseline.get("wash_trade_ratio", current_ratio)
+    return abs(current_ratio - baseline_ratio) > threshold
+
+
 def train_models(df: pd.DataFrame, test_size: float = 0.2, random_state: int = 42) -> dict:
     """Train all models in `MODEL_REGISTRY` and return fitted estimators
-    plus evaluation metrics.
-
-    Returns:
-        {
-          "random_forest": {"model": ..., "metrics": {...}},
-          "xgboost": {...},
-          "lightgbm": {...},
-        }
-    """
+    plus evaluation metrics."""
     X, y = split_features_labels(df)
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=test_size, random_state=random_state, stratify=y
@@ -97,29 +136,40 @@ def save_models(results: dict, model_dir: str | None = None) -> None:
         joblib.dump(result["model"], os.path.join(model_dir, f"{name}.joblib"))
 
 
-def save_metrics_report(results: dict, model_dir: str | None = None) -> str:
-    """Write `{model_name: metrics}` to `<model_dir>/metrics.json` and return
-    the path written."""
+def save_metrics_report(
+    results: dict,
+    model_dir: str | None = None,
+    extra: dict | None = None,
+) -> str:
+    """Write metrics (plus optional *extra* provenance fields) to metrics.json."""
     model_dir = model_dir or config.MODEL_DIR
     os.makedirs(model_dir, exist_ok=True)
     path = os.path.join(model_dir, "metrics.json")
+
+    payload: dict = {name: result["metrics"] for name, result in results.items()}
+
+    # Embed artifact SHA-256 for each saved model
+    for name in results:
+        artifact_path = os.path.join(model_dir, f"{name}.joblib")
+        if os.path.exists(artifact_path):
+            sha = hashlib.sha256()
+            with open(artifact_path, "rb") as f:
+                for chunk in iter(lambda: f.read(65536), b""):
+                    sha.update(chunk)
+            payload[name]["artifact_sha256"] = sha.hexdigest()
+
+    if extra:
+        payload.update(extra)
+
     with open(path, "w") as f:
-        json.dump({name: result["metrics"] for name, result in results.items()}, f, indent=2)
+        json.dump(payload, f, indent=2)
     return path
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train the LedgerLens ensemble classifiers")
-    parser.add_argument(
-        "--data-path",
-        required=True,
-        help="Path to a labelled feature matrix (parquet) with a 'label' column",
-    )
-    parser.add_argument(
-        "--model-dir",
-        default=None,
-        help="Directory to write trained model artifacts and metrics.json (default: MODEL_DIR)",
-    )
+    parser.add_argument("--data-path", required=True)
+    parser.add_argument("--model-dir", default=None)
     parser.add_argument("--test-size", type=float, default=0.2)
     parser.add_argument("--random-state", type=int, default=42)
     return parser.parse_args()
@@ -127,19 +177,59 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    model_dir = args.model_dir or config.MODEL_DIR
 
     logger.info("Loading training data from %s", args.data_path)
     df = load_training_data(args.data_path)
     logger.info("Loaded %d rows", len(df))
 
+    # Provenance
+    data_sha = sha256_dataframe(df)
+    label_dist = df["label"].value_counts().to_dict()
+    logger.info("training_data_sha256=%s  label_distribution=%s", data_sha, label_dist)
+
+    if detect_label_poisoning(label_dist):
+        ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%S")
+        os.makedirs("reports", exist_ok=True)
+        alert_path = f"reports/poisoning_alert_{ts}.json"
+        with open(alert_path, "w") as f:
+            json.dump(
+                {
+                    "detected_at": ts,
+                    "label_distribution": label_dist,
+                    "training_data_sha256": data_sha,
+                },
+                f,
+                indent=2,
+            )
+        logger.critical(
+            "LABEL POISONING DETECTED — wash-trade ratio shifted beyond threshold. "
+            "Training aborted. Alert written to %s",
+            alert_path,
+        )
+        return
+
     results = train_models(df, test_size=args.test_size, random_state=args.random_state)
     for name, result in results.items():
         logger.info("%s metrics: %s", name, result["metrics"])
 
-    save_models(results, args.model_dir)
-    metrics_path = save_metrics_report(results, args.model_dir)
-    logger.info("Saved models and metrics to %s", args.model_dir or config.MODEL_DIR)
-    logger.info("Metrics report: %s", metrics_path)
+    save_models(results, model_dir)
+    metrics_path = save_metrics_report(
+        results,
+        model_dir,
+        extra={"training_data_sha256": data_sha, "label_distribution": label_dist},
+    )
+    logger.info("Saved models and metrics to %s", model_dir)
+
+    # Sign metrics.json if a signing key is configured
+    key_path = config.MODEL_SIGNING_PRIVATE_KEY_PATH
+    if key_path:
+        from detection.persistence import sign_metrics
+
+        sig_path = sign_metrics(metrics_path, key_path)
+        logger.info("Signed metrics.json → %s", sig_path)
+    else:
+        logger.warning("MODEL_SIGNING_PRIVATE_KEY_PATH not set — metrics.json not signed")
 
 
 if __name__ == "__main__":
