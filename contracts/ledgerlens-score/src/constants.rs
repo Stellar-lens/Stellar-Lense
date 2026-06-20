@@ -20,6 +20,9 @@ pub const DEFAULT_RISK_THRESHOLD: u32 = 75;
 /// Bumped to 2 when `submit_score` gained its `attestation` parameter (see
 /// `docs/attestation-spec.md`).
 /// Bumped to 3 when `AggregateRiskScore` gained `decay_lambda_applied` field.
+/// Bumped to 3 when all admin-tier functions gained `admin_signers: Vec<Address>`
+/// for M-of-N governance and the `AdminSet` / `AdminThreshold` storage keys
+/// were introduced.
 pub const CONTRACT_VERSION: u32 = 3;
 
 /// Practical upper bound on the number of distinct asset pairs tracked per
@@ -73,27 +76,16 @@ pub const DEFAULT_UPGRADE_DELAY_SECS: u64 = 172_800; // 48 hours
 /// Maximum number of addresses in the M-of-N service signer set.
 pub const MAX_SERVICE_SIGNERS: u32 = 10;
 
+/// Maximum number of addresses in the M-of-N admin signer set.
+pub const MAX_ADMIN_SIGNERS: u32 = 5;
+
 /// Default staleness window: 7 days in seconds.
 pub const DEFAULT_STALENESS_WINDOW_SECS: u64 = 604_800;
 
-// ── Time-weighted exponential decay ──────────────────────────────────────────
-//
-// The decay function applies an age-based multiplier to per-pair scores
-// in the aggregate computation. The formula is:
-//   decay_factor(age_seconds) = e^(-λ * age_seconds)
-// where λ is the admin-configurable decay rate. When λ = 0, no decay occurs.
+// ── Per-asset-pair circuit breaker ────────────────────────────────────────────
 
-/// Maximum allowed decay rate (numerator / denominator).
-/// Bounded at 0.01 per second to prevent misconfiguration from
-/// driving all scores toward zero within the staleness window.
-/// Corresponds to a half-life of ~69 seconds.
-pub const MAX_DECAY_LAMBDA_NUM: u32 = 1;
-pub const MAX_DECAY_LAMBDA_DEN: u32 = 100;
-
-/// Default decay rate: 0 (no decay), for backward compatibility.
-pub const DEFAULT_DECAY_LAMBDA_NUM: u32 = 0;
-pub const DEFAULT_DECAY_LAMBDA_DEN: u32 = 1;
-
-/// Scaling factor for fixed-point decay approximation.
-/// Using 1e6 for 6 decimal places of precision in integer math.
-pub const DECAY_FIXED_POINT_SCALE: u64 = 1_000_000;
+/// Hard ceiling on the number of distinct asset pairs that may be paused at
+/// once. Bounds `PausedPairIndex`'s storage cost and the O(N) work done on
+/// the rare admin pause/unpause path; the hot `is_pair_paused` read used by
+/// every submission never touches the index. See `set_pair_paused`.
+pub const MAX_PAUSED_PAIRS: u32 = 50;
