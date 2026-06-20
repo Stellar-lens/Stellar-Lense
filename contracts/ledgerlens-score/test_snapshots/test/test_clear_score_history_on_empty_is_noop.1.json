@@ -15,9 +15,6 @@
               "function_name": "clear_score_history",
               "args": [
                 {
-                  "vec": []
-                },
-                {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                 },
                 {
@@ -230,9 +227,6 @@
             ],
             "data": {
               "vec": [
-                {
-                  "vec": []
-                },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                 },

@@ -103,9 +103,6 @@
               "function_name": "clear_score",
               "args": [
                 {
-                  "vec": []
-                },
-                {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                 },
                 {
@@ -1287,9 +1284,6 @@
             ],
             "data": {
               "vec": [
-                {
-                  "vec": []
-                },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                 },
