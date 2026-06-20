@@ -34,6 +34,15 @@ pub fn contract_unpaused(env: &Env, by: &Address) {
     env.events().publish((symbol_short!("unpaused"),), by.clone());
 }
 
+// ── Per-asset-pair circuit breaker ──────────────────────────────────────────
+
+/// Emitted by `set_pair_paused` for both the pause and unpause direction —
+/// a single event type distinguished by the `paused` field, rather than two
+/// separate event names, so off-chain indexers can subscribe once.
+pub fn pair_paused(env: &Env, asset_pair: &Symbol, paused: bool) {
+    env.events().publish((symbol_short!("pr_pause"), asset_pair.clone()), paused);
+}
+
 // ── Two-step admin transfer ──────────────────────────────────────────────────
 
 pub fn admin_transfer_initiated(env: &Env, from: &Address, to: &Address) {
@@ -147,4 +156,30 @@ pub fn service_pubkey_updated(env: &Env, pubkey: &Bytes) {
 /// `set_history_max_depth`.
 pub fn history_depth_updated(env: &Env, depth: u32) {
     env.events().publish((symbol_short!("hd_upd"),), depth);
+}
+
+// ── Fee withdrawal ────────────────────────────────────────────────────────────
+
+/// Emitted when the admin configures or rotates the fee token via
+/// `set_fee_token`.
+pub fn fee_token_set(env: &Env, token: &Address) {
+    env.events().publish((symbol_short!("ft_set"),), token.clone());
+}
+
+/// Emitted on successful completion of `withdraw_fees`.
+pub fn fee_withdrawn(
+    env: &Env,
+    admin: &Address,
+    recipient: &Address,
+    fee_token: &Address,
+    amount: i128,
+) {
+    env.events()
+        .publish((symbol_short!("fee_out"),), (admin.clone(), recipient.clone(), fee_token.clone(), amount));
+}
+
+/// Emitted when `withdraw_fees` is rejected because the concurrency lock is
+/// already held by an in-flight call.
+pub fn withdrawal_locked(env: &Env, admin: &Address) {
+    env.events().publish((symbol_short!("wdl_lck"),), admin.clone());
 }
