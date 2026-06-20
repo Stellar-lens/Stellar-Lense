@@ -204,4 +204,23 @@ pub enum DataKey {
     /// Boolean flag set for the duration of a `withdraw_fees` call to
     /// prevent concurrent duplicate withdrawals.
     WithdrawalLock,
+    /// Per-asset-pair paused flag — `true` while the pair is individually
+    /// frozen via `set_pair_paused`. The key is absent (not `false`) when
+    /// unpaused, saving storage rent on the common unpaused case.
+    PairPaused(Symbol),
+    /// Ordered list of all currently paused asset pairs, maintained
+    /// incrementally by `set_pair_paused` so `get_paused_pairs` is O(1).
+    PausedPairIndex,
+    /// M-of-N admin signer set. Empty until `add_admin_signer` is called.
+    AdminSet,
+    /// Admin signing threshold M. Zero until `set_admin_threshold` is called.
+    AdminThreshold,
+    /// Fallback score-source delegation for a sub-wallet: maps the sub-wallet
+    /// to its custodian wallet so `get_score` / `get_aggregate_score` can
+    /// fall through to the custodian when the sub-wallet has no direct score.
+    ScoreDelegate(Address),
+    /// Per-wallet regulatory hold. Stores `Option<u64>` (expiry timestamp);
+    /// `None` means indefinite. While active, read-path functions return
+    /// `ScoreEmbargoed` / conservative denials; writes are unaffected.
+    ScoreEmbargo(Address),
 }

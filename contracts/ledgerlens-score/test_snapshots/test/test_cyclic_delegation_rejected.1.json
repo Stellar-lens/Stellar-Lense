@@ -303,7 +303,7 @@
             ],
             "data": {
               "error": {
-                "contract": 30
+                "contract": 34
               }
             }
           }
@@ -324,7 +324,7 @@
               },
               {
                 "error": {
-                  "contract": 30
+                  "contract": 34
                 }
               }
             ],
@@ -349,7 +349,7 @@
               },
               {
                 "error": {
-                  "contract": 30
+                  "contract": 34
                 }
               }
             ],
@@ -421,13 +421,17 @@
             "topics": [
               {
                 "symbol": "del_set"
-              },
-              {
-                "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
               }
             ],
             "data": {
-              "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
+              "vec": [
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                },
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
+                }
+              ]
             }
           }
         }
@@ -505,7 +509,7 @@
             ],
             "data": {
               "error": {
-                "contract": 30
+                "contract": 34
               }
             }
           }
@@ -526,7 +530,7 @@
               },
               {
                 "error": {
-                  "contract": 30
+                  "contract": 34
                 }
               }
             ],
@@ -551,7 +555,7 @@
               },
               {
                 "error": {
-                  "contract": 30
+                  "contract": 34
                 }
               }
             ],

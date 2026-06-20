@@ -158,6 +158,26 @@ pub fn history_depth_updated(env: &Env, depth: u32) {
     env.events().publish((symbol_short!("hd_upd"),), depth);
 }
 
+// ── Wallet score delegation ───────────────────────────────────────────────────
+
+pub fn delegate_set(env: &Env, sub_wallet: &Address, custodian: &Address) {
+    env.events().publish((symbol_short!("del_set"),), (sub_wallet.clone(), custodian.clone()));
+}
+
+pub fn delegate_removed(env: &Env, sub_wallet: &Address) {
+    env.events().publish((symbol_short!("del_rem"),), sub_wallet.clone());
+}
+
+// ── Score embargo (regulatory hold) ──────────────────────────────────────────
+
+pub fn embargo_set(env: &Env, wallet: &Address, expiry: &Option<u64>) {
+    env.events().publish((symbol_short!("emb_set"),), (wallet.clone(), *expiry));
+}
+
+pub fn embargo_lifted(env: &Env, wallet: &Address, lifted_by: &Address) {
+    env.events().publish((symbol_short!("emb_lift"),), (wallet.clone(), lifted_by.clone()));
+}
+
 // ── Fee withdrawal ────────────────────────────────────────────────────────────
 
 /// Emitted when the admin configures or rotates the fee token via
@@ -174,8 +194,10 @@ pub fn fee_withdrawn(
     fee_token: &Address,
     amount: i128,
 ) {
-    env.events()
-        .publish((symbol_short!("fee_out"),), (admin.clone(), recipient.clone(), fee_token.clone(), amount));
+    env.events().publish(
+        (symbol_short!("fee_out"),),
+        (admin.clone(), recipient.clone(), fee_token.clone(), amount),
+    );
 }
 
 /// Emitted when `withdraw_fees` is rejected because the concurrency lock is

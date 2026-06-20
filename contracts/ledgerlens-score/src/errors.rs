@@ -92,4 +92,31 @@ pub enum Error {
     /// Returned by `withdraw_fees` when another withdrawal call is already
     /// in-flight (concurrency lock held).
     WithdrawalInProgress = 32,
+
+    // ── Per-asset-pair circuit breaker ─────────────────────────────────────
+    /// Returned when a score submission targets an individually paused pair.
+    PairPaused = 33,
+    /// `set_pair_paused` was called and the `PausedPairIndex` is already full
+    /// (`MAX_PAUSED_PAIRS` entries).
+    PausedPairIndexFull = 36,
+
+    // ── Wallet score delegation ────────────────────────────────────────────
+    /// `set_score_delegate` was called with a wallet that delegates to itself,
+    /// or would form a delegation cycle.
+    CyclicDelegation = 34,
+    /// `remove_score_delegate` was called for a wallet with no delegation.
+    DelegateNotFound = 35,
+
+    // ── Admin M-of-N multi-sig ─────────────────────────────────────────────
+    /// `add_admin_signer` was called when the admin set is already at capacity.
+    AdminSetFull = 37,
+    /// A signer passed to an admin function is not a member of the admin set.
+    AdminSignerNotInSet = 38,
+    /// Fewer than the configured threshold of admin signers were provided.
+    InsufficientAdminSigners = 39,
+
+    // ── Score embargo (regulatory hold) ───────────────────────────────────
+    /// Returned by `get_score` and `get_aggregate_score` when the wallet is
+    /// under an active score embargo set by `set_score_embargo`.
+    ScoreEmbargoed = 40,
 }
