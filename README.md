@@ -328,6 +328,36 @@ See [`scripts/README.md`](scripts/README.md) for detailed usage of:
 - `retrain_if_drifted.py` — automated drift detection and retraining trigger
 - `list_model_versions.py` — list archived models with training dates and metrics
 
+## Active Learning
+
+LedgerLens includes an active learning pipeline that intelligently selects the most informative
+wallets for analyst annotation, minimising labelling effort while maximising model improvement.
+
+```bash
+# Populate the annotation queue (selects 20 wallets by committee disagreement):
+python -m scripts.run_active_learning --pool data/unscored_wallets.parquet
+
+# Annotate wallets interactively:
+python -m scripts.annotate --annotator-id yourname
+
+# Export annotations and update models:
+python -m scripts.annotate --export data/annotated.parquet
+python -m scripts.run_active_learning \
+    --pool data/unscored_wallets.parquet \
+    --update data/annotated.parquet
+```
+
+The pipeline runs automatically every Monday at 08:00 UTC via
+`.github/workflows/active_learning.yml`. See [`docs/active_learning.md`](docs/active_learning.md)
+for the full query strategy comparison, annotation workflow, and incremental update policy.
+
+| Variable | Default | Description |
+|---|---|---|
+| `AL_QUERY_STRATEGY` | `committee_disagreement` | Query strategy |
+| `AL_BATCH_SIZE` | `20` | Wallets selected per run |
+| `AL_RETRAIN_THRESHOLD` | `50` | Min labels for full retrain |
+| `AL_ROLLBACK_AUC_DROP` | `0.01` | Max AUC drop before rollback |
+
 ## Development
 
 ```bash
@@ -513,6 +543,33 @@ defines the relevant shared type before inventing a new one.
 - [ ] Mainnet deployment
 - [ ] SDK for protocol integrations (Python + JavaScript)
 - [x] Open dataset release: labelled SDEX wash trade patterns — see [`data/dataset_card.md`](data/dataset_card.md)
+
+## Security
+
+LedgerLens includes a hardened inference stack to protect against adversarial attacks on the model layer itself. See [`docs/security.md`](docs/security.md) for full details.
+
+### Artifact Integrity (Ed25519 Trust Chain)
+
+Every trained model artifact is verified through a four-step chain before loading:
+
+1. SHA-256 of the `.joblib` file matches the value recorded in `metrics.json`
+2. `metrics.json` carries a valid Ed25519 detached signature (`metrics.json.sig`)
+3. The signing key fingerprint matches `TRUSTED_SIGNING_KEY_FINGERPRINT`
+4. The training dataset SHA-256 matches the recorded provenance (optional)
+
+`ModelIntegrityError` is raised on any failure. A CI grep check enforces that every `joblib.load` in `detection/` is immediately followed by `verify_chain`.
+
+### Byzantine-Fault-Tolerant Ensemble Voting
+
+The three models (RF, XGBoost, LightGBM) vote using a **trimmed mean / median** scheme. If the spread across model scores exceeds `BFT_SCORE_DIVERGENCE_THRESHOLD` (default 30 points), the outlier scores are trimmed and the median is used — ensuring a single compromised model cannot shift the final score by more than ~17 points. Divergence events are logged, counted in a Prometheus counter (`bft_divergence_detected_total`), and surfaced in the score response as `bft_divergence: true`.
+
+### Label Poisoning Detection
+
+Each training run records the SHA-256 of the input dataset and the label distribution. If the wash-trade ratio has shifted more than `POISON_LABEL_RATIO_THRESHOLD` (default 15%) from the stored baseline, training is aborted and an alert is written to `reports/poisoning_alert_{timestamp}.json`.
+
+### Annotation Queue Integrity
+
+Each annotation in `data/annotation_queue.json` is protected by an HMAC-SHA256 computed over `wallet|label|annotator_id|annotated_at`, keyed by `ANNOTATION_HMAC_SECRET`. Tampered annotations are rejected before they can influence a training run.
 
 ## Why This Matters
 
