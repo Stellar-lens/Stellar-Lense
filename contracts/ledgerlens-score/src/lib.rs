@@ -22,8 +22,11 @@ mod test_rate_limit;
 #[cfg(test)]
 mod test_attestation;
 
+#[cfg(test)]
+mod test_fee_withdrawal;
+
 use soroban_sdk::{
-    contract, contractimpl, crypto::Hash, symbol_short, Address, Bytes, BytesN, Env, Symbol,
+    contract, contractimpl, crypto::Hash, symbol_short, token, Address, Bytes, BytesN, Env, Symbol,
     SymbolStr, TryFromVal, Vec,
 };
 

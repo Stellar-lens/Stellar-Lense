@@ -198,4 +198,10 @@ pub enum DataKey {
     /// `DEFAULT_HISTORY_MAX_DEPTH` when unset; bounded above by
     /// `MAX_HISTORY_DEPTH`.
     HistoryMaxDepth,
+    /// The SEP-41 token contract address from which fees are withdrawn.
+    /// Unset until `set_fee_token` is called.
+    FeeToken,
+    /// Boolean flag set for the duration of a `withdraw_fees` call to
+    /// prevent concurrent duplicate withdrawals.
+    WithdrawalLock,
 }
