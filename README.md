@@ -328,6 +328,36 @@ See [`scripts/README.md`](scripts/README.md) for detailed usage of:
 - `retrain_if_drifted.py` — automated drift detection and retraining trigger
 - `list_model_versions.py` — list archived models with training dates and metrics
 
+## Active Learning
+
+LedgerLens includes an active learning pipeline that intelligently selects the most informative
+wallets for analyst annotation, minimising labelling effort while maximising model improvement.
+
+```bash
+# Populate the annotation queue (selects 20 wallets by committee disagreement):
+python -m scripts.run_active_learning --pool data/unscored_wallets.parquet
+
+# Annotate wallets interactively:
+python -m scripts.annotate --annotator-id yourname
+
+# Export annotations and update models:
+python -m scripts.annotate --export data/annotated.parquet
+python -m scripts.run_active_learning \
+    --pool data/unscored_wallets.parquet \
+    --update data/annotated.parquet
+```
+
+The pipeline runs automatically every Monday at 08:00 UTC via
+`.github/workflows/active_learning.yml`. See [`docs/active_learning.md`](docs/active_learning.md)
+for the full query strategy comparison, annotation workflow, and incremental update policy.
+
+| Variable | Default | Description |
+|---|---|---|
+| `AL_QUERY_STRATEGY` | `committee_disagreement` | Query strategy |
+| `AL_BATCH_SIZE` | `20` | Wallets selected per run |
+| `AL_RETRAIN_THRESHOLD` | `50` | Min labels for full retrain |
+| `AL_ROLLBACK_AUC_DROP` | `0.01` | Max AUC drop before rollback |
+
 ## Development
 
 ```bash
