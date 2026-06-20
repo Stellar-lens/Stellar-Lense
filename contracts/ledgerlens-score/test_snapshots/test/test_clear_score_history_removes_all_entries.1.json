@@ -24,7 +24,7 @@
                   "symbol": "XLM_USDC"
                 },
                 {
-                  "u32": 50
+                  "u32": 10
                 },
                 {
                   "bool": false
@@ -36,7 +36,7 @@
                   "u64": 1
                 },
                 {
-                  "u32": 90
+                  "u32": 50
                 },
                 {
                   "u32": 1
@@ -68,7 +68,7 @@
                   "symbol": "XLM_USDC"
                 },
                 {
-                  "u32": 51
+                  "u32": 20
                 },
                 {
                   "bool": false
@@ -80,7 +80,7 @@
                   "u64": 2
                 },
                 {
-                  "u32": 90
+                  "u32": 60
                 },
                 {
                   "u32": 1
@@ -93,131 +93,22 @@
         }
       ]
     ],
+    [],
     [
       [
-        "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
+        "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
         {
           "function": {
             "contract_fn": {
               "contract_address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-              "function_name": "submit_score",
+              "function_name": "clear_score_history",
               "args": [
-                {
-                  "vec": []
-                },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                 },
                 {
                   "symbol": "XLM_USDC"
-                },
-                {
-                  "u32": 52
-                },
-                {
-                  "bool": false
-                },
-                {
-                  "bool": false
-                },
-                {
-                  "u64": 3
-                },
-                {
-                  "u32": 90
-                },
-                {
-                  "u32": 1
-                },
-                "void"
-              ]
-            }
-          },
-          "sub_invocations": []
-        }
-      ]
-    ],
-    [
-      [
-        "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
-        {
-          "function": {
-            "contract_fn": {
-              "contract_address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-              "function_name": "submit_score",
-              "args": [
-                {
-                  "vec": []
-                },
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
-                },
-                {
-                  "symbol": "XLM_USDC"
-                },
-                {
-                  "u32": 53
-                },
-                {
-                  "bool": false
-                },
-                {
-                  "bool": false
-                },
-                {
-                  "u64": 4
-                },
-                {
-                  "u32": 90
-                },
-                {
-                  "u32": 1
-                },
-                "void"
-              ]
-            }
-          },
-          "sub_invocations": []
-        }
-      ]
-    ],
-    [
-      [
-        "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
-        {
-          "function": {
-            "contract_fn": {
-              "contract_address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-              "function_name": "submit_score",
-              "args": [
-                {
-                  "vec": []
-                },
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
-                },
-                {
-                  "symbol": "XLM_USDC"
-                },
-                {
-                  "u32": 54
-                },
-                {
-                  "bool": false
-                },
-                {
-                  "bool": false
-                },
-                {
-                  "u64": 5
-                },
-                {
-                  "u32": 90
-                },
-                {
-                  "u32": 1
-                },
-                "void"
+                }
               ]
             }
           },
@@ -230,7 +121,7 @@
   "ledger": {
     "protocol_version": 21,
     "sequence_number": 0,
-    "timestamp": 18005,
+    "timestamp": 3601,
     "network_id": "0000000000000000000000000000000000000000000000000000000000000000",
     "base_reserve": 0,
     "min_persistent_entry_ttl": 4096,
@@ -279,7 +170,7 @@
                         "symbol": "aggregate_score"
                       },
                       "val": {
-                        "u32": 54
+                        "u32": 20
                       }
                     },
                     {
@@ -295,7 +186,7 @@
                         "symbol": "last_updated"
                       },
                       "val": {
-                        "u64": 5
+                        "u64": 2
                       }
                     },
                     {
@@ -311,7 +202,7 @@
                         "symbol": "max_pair_score"
                       },
                       "val": {
-                        "u32": 54
+                        "u32": 20
                       }
                     },
                     {
@@ -430,7 +321,7 @@
                 },
                 "durability": "persistent",
                 "val": {
-                  "u64": 18005
+                  "u64": 3601
                 }
               }
             },
@@ -495,7 +386,7 @@
                         "symbol": "confidence"
                       },
                       "val": {
-                        "u32": 90
+                        "u32": 60
                       }
                     },
                     {
@@ -519,7 +410,7 @@
                         "symbol": "score"
                       },
                       "val": {
-                        "u32": 54
+                        "u32": 20
                       }
                     },
                     {
@@ -527,7 +418,7 @@
                         "symbol": "timestamp"
                       },
                       "val": {
-                        "u64": 5
+                        "u64": 2
                       }
                     }
                   ]
@@ -581,319 +472,7 @@
                 },
                 "durability": "persistent",
                 "val": {
-                  "u32": 5
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          777600
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-            "key": {
-              "vec": [
-                {
-                  "symbol": "ScoreHistory"
-                },
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
-                },
-                {
-                  "symbol": "XLM_USDC"
-                }
-              ]
-            },
-            "durability": "persistent"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-                "key": {
-                  "vec": [
-                    {
-                      "symbol": "ScoreHistory"
-                    },
-                    {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
-                    },
-                    {
-                      "symbol": "XLM_USDC"
-                    }
-                  ]
-                },
-                "durability": "persistent",
-                "val": {
-                  "vec": [
-                    {
-                      "map": [
-                        {
-                          "key": {
-                            "symbol": "benford_flag"
-                          },
-                          "val": {
-                            "bool": false
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "confidence"
-                          },
-                          "val": {
-                            "u32": 90
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "ml_flag"
-                          },
-                          "val": {
-                            "bool": false
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "model_version"
-                          },
-                          "val": {
-                            "u32": 1
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "score"
-                          },
-                          "val": {
-                            "u32": 50
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "timestamp"
-                          },
-                          "val": {
-                            "u64": 1
-                          }
-                        }
-                      ]
-                    },
-                    {
-                      "map": [
-                        {
-                          "key": {
-                            "symbol": "benford_flag"
-                          },
-                          "val": {
-                            "bool": false
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "confidence"
-                          },
-                          "val": {
-                            "u32": 90
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "ml_flag"
-                          },
-                          "val": {
-                            "bool": false
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "model_version"
-                          },
-                          "val": {
-                            "u32": 1
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "score"
-                          },
-                          "val": {
-                            "u32": 51
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "timestamp"
-                          },
-                          "val": {
-                            "u64": 2
-                          }
-                        }
-                      ]
-                    },
-                    {
-                      "map": [
-                        {
-                          "key": {
-                            "symbol": "benford_flag"
-                          },
-                          "val": {
-                            "bool": false
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "confidence"
-                          },
-                          "val": {
-                            "u32": 90
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "ml_flag"
-                          },
-                          "val": {
-                            "bool": false
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "model_version"
-                          },
-                          "val": {
-                            "u32": 1
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "score"
-                          },
-                          "val": {
-                            "u32": 52
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "timestamp"
-                          },
-                          "val": {
-                            "u64": 3
-                          }
-                        }
-                      ]
-                    },
-                    {
-                      "map": [
-                        {
-                          "key": {
-                            "symbol": "benford_flag"
-                          },
-                          "val": {
-                            "bool": false
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "confidence"
-                          },
-                          "val": {
-                            "u32": 90
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "ml_flag"
-                          },
-                          "val": {
-                            "bool": false
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "model_version"
-                          },
-                          "val": {
-                            "u32": 1
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "score"
-                          },
-                          "val": {
-                            "u32": 53
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "timestamp"
-                          },
-                          "val": {
-                            "u64": 4
-                          }
-                        }
-                      ]
-                    },
-                    {
-                      "map": [
-                        {
-                          "key": {
-                            "symbol": "benford_flag"
-                          },
-                          "val": {
-                            "bool": false
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "confidence"
-                          },
-                          "val": {
-                            "u32": 90
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "ml_flag"
-                          },
-                          "val": {
-                            "bool": false
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "model_version"
-                          },
-                          "val": {
-                            "u32": 1
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "score"
-                          },
-                          "val": {
-                            "u32": 54
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "timestamp"
-                          },
-                          "val": {
-                            "u64": 5
-                          }
-                        }
-                      ]
-                    }
-                  ]
+                  "u32": 2
                 }
               }
             },
@@ -962,40 +541,7 @@
       [
         {
           "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
-            "key": {
-              "ledger_key_nonce": {
-                "nonce": 801925984706572462
-              }
-            },
-            "durability": "temporary"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
-                "key": {
-                  "ledger_key_nonce": {
-                    "nonce": 801925984706572462
-                  }
-                },
-                "durability": "temporary",
-                "val": "void"
-              }
-            },
-            "ext": "v0"
-          },
-          6311999
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
             "key": {
               "ledger_key_nonce": {
                 "nonce": 1033654523790656264
@@ -1010,7 +556,7 @@
             "data": {
               "contract_data": {
                 "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
                 "key": {
                   "ledger_key_nonce": {
                     "nonce": 1033654523790656264
@@ -1031,7 +577,7 @@
             "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
             "key": {
               "ledger_key_nonce": {
-                "nonce": 2032731177588607455
+                "nonce": 801925984706572462
               }
             },
             "durability": "temporary"
@@ -1046,40 +592,7 @@
                 "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
                 "key": {
                   "ledger_key_nonce": {
-                    "nonce": 2032731177588607455
-                  }
-                },
-                "durability": "temporary",
-                "val": "void"
-              }
-            },
-            "ext": "v0"
-          },
-          6311999
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
-            "key": {
-              "ledger_key_nonce": {
-                "nonce": 4837995959683129791
-              }
-            },
-            "durability": "temporary"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
-                "key": {
-                  "ledger_key_nonce": {
-                    "nonce": 4837995959683129791
+                    "nonce": 801925984706572462
                   }
                 },
                 "durability": "temporary",
@@ -1232,7 +745,7 @@
                   "symbol": "XLM_USDC"
                 },
                 {
-                  "u32": 50
+                  "u32": 10
                 },
                 {
                   "bool": false
@@ -1244,7 +757,7 @@
                   "u64": 1
                 },
                 {
-                  "u32": 90
+                  "u32": 50
                 },
                 {
                   "u32": 1
@@ -1278,16 +791,16 @@
             "data": {
               "vec": [
                 {
+                  "u32": 10
+                },
+                {
+                  "bool": false
+                },
+                {
+                  "bool": false
+                },
+                {
                   "u32": 50
-                },
-                {
-                  "bool": false
-                },
-                {
-                  "bool": false
-                },
-                {
-                  "u32": 90
                 },
                 {
                   "u64": 1
@@ -1350,7 +863,7 @@
                   "symbol": "XLM_USDC"
                 },
                 {
-                  "u32": 51
+                  "u32": 20
                 },
                 {
                   "bool": false
@@ -1362,7 +875,7 @@
                   "u64": 2
                 },
                 {
-                  "u32": 90
+                  "u32": 60
                 },
                 {
                   "u32": 1
@@ -1396,7 +909,7 @@
             "data": {
               "vec": [
                 {
-                  "u32": 51
+                  "u32": 20
                 },
                 {
                   "bool": false
@@ -1405,7 +918,7 @@
                   "bool": false
                 },
                 {
-                  "u32": 90
+                  "u32": 60
                 },
                 {
                   "u64": 2
@@ -1453,80 +966,16 @@
                 "bytes": "0000000000000000000000000000000000000000000000000000000000000001"
               },
               {
-                "symbol": "submit_score"
+                "symbol": "get_score_history"
               }
             ],
             "data": {
               "vec": [
-                {
-                  "vec": []
-                },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                 },
                 {
                   "symbol": "XLM_USDC"
-                },
-                {
-                  "u32": 52
-                },
-                {
-                  "bool": false
-                },
-                {
-                  "bool": false
-                },
-                {
-                  "u64": 3
-                },
-                {
-                  "u32": 90
-                },
-                {
-                  "u32": 1
-                },
-                "void"
-              ]
-            }
-          }
-        }
-      },
-      "failed_call": false
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
-        "type_": "contract",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "score"
-              },
-              {
-                "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
-              },
-              {
-                "symbol": "XLM_USDC"
-              }
-            ],
-            "data": {
-              "vec": [
-                {
-                  "u32": 52
-                },
-                {
-                  "bool": false
-                },
-                {
-                  "bool": false
-                },
-                {
-                  "u32": 90
-                },
-                {
-                  "u64": 3
                 }
               ]
             }
@@ -1547,7 +996,191 @@
                 "symbol": "fn_return"
               },
               {
-                "symbol": "submit_score"
+                "symbol": "get_score_history"
+              }
+            ],
+            "data": {
+              "vec": [
+                {
+                  "map": [
+                    {
+                      "key": {
+                        "symbol": "benford_flag"
+                      },
+                      "val": {
+                        "bool": false
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "confidence"
+                      },
+                      "val": {
+                        "u32": 50
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "ml_flag"
+                      },
+                      "val": {
+                        "bool": false
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "model_version"
+                      },
+                      "val": {
+                        "u32": 1
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "score"
+                      },
+                      "val": {
+                        "u32": 10
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "timestamp"
+                      },
+                      "val": {
+                        "u64": 1
+                      }
+                    }
+                  ]
+                },
+                {
+                  "map": [
+                    {
+                      "key": {
+                        "symbol": "benford_flag"
+                      },
+                      "val": {
+                        "bool": false
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "confidence"
+                      },
+                      "val": {
+                        "u32": 60
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "ml_flag"
+                      },
+                      "val": {
+                        "bool": false
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "model_version"
+                      },
+                      "val": {
+                        "u32": 1
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "score"
+                      },
+                      "val": {
+                        "u32": 20
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "timestamp"
+                      },
+                      "val": {
+                        "u64": 2
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      },
+      "failed_call": false
+    },
+    {
+      "event": {
+        "ext": "v0",
+        "contract_id": null,
+        "type_": "diagnostic",
+        "body": {
+          "v0": {
+            "topics": [
+              {
+                "symbol": "fn_call"
+              },
+              {
+                "bytes": "0000000000000000000000000000000000000000000000000000000000000001"
+              },
+              {
+                "symbol": "clear_score_history"
+              }
+            ],
+            "data": {
+              "vec": [
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                },
+                {
+                  "symbol": "XLM_USDC"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "failed_call": false
+    },
+    {
+      "event": {
+        "ext": "v0",
+        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
+        "type_": "contract",
+        "body": {
+          "v0": {
+            "topics": [
+              {
+                "symbol": "clr_hist"
+              },
+              {
+                "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+              }
+            ],
+            "data": {
+              "symbol": "XLM_USDC"
+            }
+          }
+        }
+      },
+      "failed_call": false
+    },
+    {
+      "event": {
+        "ext": "v0",
+        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
+        "type_": "diagnostic",
+        "body": {
+          "v0": {
+            "topics": [
+              {
+                "symbol": "fn_return"
+              },
+              {
+                "symbol": "clear_score_history"
               }
             ],
             "data": "void"
@@ -1571,80 +1204,16 @@
                 "bytes": "0000000000000000000000000000000000000000000000000000000000000001"
               },
               {
-                "symbol": "submit_score"
+                "symbol": "get_score_history"
               }
             ],
             "data": {
               "vec": [
-                {
-                  "vec": []
-                },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                 },
                 {
                   "symbol": "XLM_USDC"
-                },
-                {
-                  "u32": 53
-                },
-                {
-                  "bool": false
-                },
-                {
-                  "bool": false
-                },
-                {
-                  "u64": 4
-                },
-                {
-                  "u32": 90
-                },
-                {
-                  "u32": 1
-                },
-                "void"
-              ]
-            }
-          }
-        }
-      },
-      "failed_call": false
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
-        "type_": "contract",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "score"
-              },
-              {
-                "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
-              },
-              {
-                "symbol": "XLM_USDC"
-              }
-            ],
-            "data": {
-              "vec": [
-                {
-                  "u32": 53
-                },
-                {
-                  "bool": false
-                },
-                {
-                  "bool": false
-                },
-                {
-                  "u32": 90
-                },
-                {
-                  "u64": 4
                 }
               ]
             }
@@ -1665,233 +1234,11 @@
                 "symbol": "fn_return"
               },
               {
-                "symbol": "submit_score"
-              }
-            ],
-            "data": "void"
-          }
-        }
-      },
-      "failed_call": false
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": null,
-        "type_": "diagnostic",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "fn_call"
-              },
-              {
-                "bytes": "0000000000000000000000000000000000000000000000000000000000000001"
-              },
-              {
-                "symbol": "submit_score"
+                "symbol": "get_score_history"
               }
             ],
             "data": {
-              "vec": [
-                {
-                  "vec": []
-                },
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
-                },
-                {
-                  "symbol": "XLM_USDC"
-                },
-                {
-                  "u32": 54
-                },
-                {
-                  "bool": false
-                },
-                {
-                  "bool": false
-                },
-                {
-                  "u64": 5
-                },
-                {
-                  "u32": 90
-                },
-                {
-                  "u32": 1
-                },
-                "void"
-              ]
-            }
-          }
-        }
-      },
-      "failed_call": false
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
-        "type_": "contract",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "score"
-              },
-              {
-                "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
-              },
-              {
-                "symbol": "XLM_USDC"
-              }
-            ],
-            "data": {
-              "vec": [
-                {
-                  "u32": 54
-                },
-                {
-                  "bool": false
-                },
-                {
-                  "bool": false
-                },
-                {
-                  "u32": 90
-                },
-                {
-                  "u64": 5
-                }
-              ]
-            }
-          }
-        }
-      },
-      "failed_call": false
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
-        "type_": "diagnostic",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "fn_return"
-              },
-              {
-                "symbol": "submit_score"
-              }
-            ],
-            "data": "void"
-          }
-        }
-      },
-      "failed_call": false
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": null,
-        "type_": "diagnostic",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "fn_call"
-              },
-              {
-                "bytes": "0000000000000000000000000000000000000000000000000000000000000001"
-              },
-              {
-                "symbol": "get_aggregate_score"
-              }
-            ],
-            "data": {
-              "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
-            }
-          }
-        }
-      },
-      "failed_call": false
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
-        "type_": "diagnostic",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "fn_return"
-              },
-              {
-                "symbol": "get_aggregate_score"
-              }
-            ],
-            "data": {
-              "map": [
-                {
-                  "key": {
-                    "symbol": "aggregate_score"
-                  },
-                  "val": {
-                    "u32": 54
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "benford_flag_count"
-                  },
-                  "val": {
-                    "u32": 0
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "last_updated"
-                  },
-                  "val": {
-                    "u64": 5
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "max_pair"
-                  },
-                  "val": {
-                    "symbol": "XLM_USDC"
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "max_pair_score"
-                  },
-                  "val": {
-                    "u32": 54
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "ml_flag_count"
-                  },
-                  "val": {
-                    "u32": 0
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "pair_count"
-                  },
-                  "val": {
-                    "u32": 1
-                  }
-                }
-              ]
+              "vec": []
             }
           }
         }

@@ -807,7 +807,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "fee_tok"
+                "symbol": "ft_set"
               }
             ],
             "data": {
@@ -994,7 +994,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "fee_tok"
+                "symbol": "ft_set"
               }
             ],
             "data": {

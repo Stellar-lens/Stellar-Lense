@@ -796,7 +796,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "fee_tok"
+                "symbol": "ft_set"
               }
             ],
             "data": {
@@ -873,7 +873,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "wdr_lock"
+                "symbol": "wdl_lck"
               }
             ],
             "data": {
@@ -901,7 +901,7 @@
             ],
             "data": {
               "error": {
-                "contract": 25
+                "contract": 32
               }
             }
           }
@@ -922,7 +922,7 @@
               },
               {
                 "error": {
-                  "contract": 25
+                  "contract": 32
                 }
               }
             ],
@@ -947,7 +947,7 @@
               },
               {
                 "error": {
-                  "contract": 25
+                  "contract": 32
                 }
               }
             ],
