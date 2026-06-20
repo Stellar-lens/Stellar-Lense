@@ -92,4 +92,38 @@ pub enum Error {
     /// Returned by `withdraw_fees` when another withdrawal call is already
     /// in-flight (concurrency lock held).
     WithdrawalInProgress = 32,
+
+    // ── Per-pair circuit breaker ───────────────────────────────────────────
+    /// Returned by `submit_score` / `submit_scores_batch` when the target
+    /// `asset_pair` has been individually paused via `set_pair_paused`.
+    PairPaused = 33,
+    /// Returned by `set_pair_paused` when trying to pause a new pair but the
+    /// `PausedPairIndex` already holds `MAX_PAUSED_PAIRS` entries.
+    PausedPairIndexFull = 34,
+
+    // ── Admin M-of-N multi-sig ─────────────────────────────────────────────
+    /// `add_admin_signer` called when the admin set is already at
+    /// `MAX_ADMIN_SIGNERS`.
+    AdminSetFull = 35,
+    /// A signer in `admin_signers` is not a member of the admin set.
+    AdminSignerNotInSet = 36,
+    /// Fewer than the configured threshold of admin signers were supplied.
+    InsufficientAdminSigners = 37,
+
+    // ── Wallet-score delegation ────────────────────────────────────────────
+    /// `set_score_delegate` would create a cycle (wallet → custodian →
+    /// wallet).
+    CyclicDelegation = 38,
+    /// `remove_score_delegate` called for a wallet that has no delegate.
+    DelegateNotFound = 39,
+
+    // ── Cross-contract gate ────────────────────────────────────────────────
+    /// Returned by an integrating contract (e.g. AMM) when `query_risk_gate`
+    /// returns `false`. Not returned by the LedgerLens contract itself.
+    HighRiskWallet = 40,
+
+    // ── Time-weighted exponential decay ───────────────────────────────────
+    /// `set_decay_rate` called with a denominator of 0, or with a
+    /// numerator/denominator ratio exceeding `MAX_DECAY_LAMBDA`.
+    InvalidDecayRate = 41,
 }

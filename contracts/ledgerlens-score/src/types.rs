@@ -208,4 +208,23 @@ pub enum DataKey {
     /// Denominator of the fixed-point decay rate λ = numerator / denominator.
     /// Defaults to 1 when unset.
     DecayRateDenominator,
+    /// The SEP-41 token contract address from which fees are withdrawn.
+    /// Unset until `set_fee_token` is called.
+    FeeToken,
+    /// Boolean flag set for the duration of a `withdraw_fees` call to
+    /// prevent concurrent duplicate withdrawals.
+    WithdrawalLock,
+    /// Per-asset-pair pause flag. True when `set_pair_paused(pair, true)` has
+    /// been called and not yet reversed. Hot-path key: looked up on every
+    /// submission — never touches `PausedPairIndex`.
+    PairPaused(Symbol),
+    /// Ordered list of all currently paused asset pairs — an incrementally
+    /// maintained index so `get_paused_pairs` is O(1).
+    PausedPairIndex,
+    /// Ordered set of M-of-N admin co-signers.
+    AdminSet,
+    /// Minimum number of admin-set members that must sign an admin call.
+    AdminThreshold,
+    /// Score delegation: maps a sub-wallet to its custodian wallet.
+    ScoreDelegate(Address),
 }

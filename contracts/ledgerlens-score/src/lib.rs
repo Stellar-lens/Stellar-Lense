@@ -2298,6 +2298,31 @@ impl LedgerLensScoreContract {
         Ok(env.crypto().sha256(&preimage))
     }
 
+    /// Verifies admin authorization. In multisig mode (AdminSet non-empty and
+    /// AdminThreshold > 0): verifies that `admin_signers` contains at least
+    /// `threshold` addresses, each a member of the admin set, and calls
+    /// `require_auth()` on each. In legacy mode falls back to the single
+    /// stored admin key.
+    fn require_admin_auth(env: &Env, admin_signers: &Vec<Address>) -> Result<(), Error> {
+        let admin_set = storage::get_admin_set(env);
+        let threshold = storage::get_admin_threshold(env);
+        if !admin_set.is_empty() && threshold > 0 {
+            if admin_signers.len() < threshold {
+                return Err(Error::InsufficientAdminSigners);
+            }
+            for i in 0..admin_signers.len() {
+                let signer = admin_signers.get(i).unwrap();
+                if !admin_set.contains(&signer) {
+                    return Err(Error::AdminSignerNotInSet);
+                }
+                signer.require_auth();
+            }
+        } else {
+            storage::get_admin(env).require_auth();
+        }
+        Ok(())
+    }
+
     /// Verifies `attestation` (recomputing the commitment independently
     /// rather than trusting its `commitment` field — see
     /// [`ScoreAttestation`]) against the registered service pubkey, then
