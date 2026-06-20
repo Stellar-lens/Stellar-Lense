@@ -13,6 +13,8 @@ xgboost>=2.0.0
 lightgbm>=4.3.0
 imbalanced-learn>=0.12.0
 shap>=0.45.0
+torch>=2.2.0
+torch-geometric>=2.5.0
 
 # Persistence / config
 python-dotenv>=1.0.0

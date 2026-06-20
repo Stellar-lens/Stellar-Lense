@@ -369,6 +369,7 @@ def build_feature_vector(
     orderbook_events: pd.DataFrame | None = None,
     funding_graph: nx.DiGraph | None = None,
     all_pairs_df: pd.DataFrame | None = None,
+    gnn_embeddings: dict[str, dict[str, float]] | None = None,
 ) -> dict:
     """Assemble the full feature row for a single wallet.
 
@@ -378,7 +379,8 @@ def build_feature_vector(
     compute `order_cancellation_rate`. `funding_graph` (optional) is the
     output of `detection.wallet_graph.build_funding_graph`, used for the
     wallet graph features. `all_pairs_df` (optional) enables cross-asset
-    coordination features.
+    coordination features. ``gnn_embeddings`` may provide precomputed
+    ``gnn_embedding_*`` columns keyed by wallet for ensemble training.
     """
     reference_time = (
         pd.to_datetime(wallet_trades["ledger_close_time"], utc=True).max()
@@ -394,6 +396,8 @@ def build_feature_vector(
     if all_pairs_df is not None:
         features.update(compute_cross_asset_features(wallet, all_pairs_df))
     features.update(compute_hardening_features(wallet_trades))
+    if gnn_embeddings is not None:
+        features.update(gnn_embeddings.get(wallet, {}))
 
     return features
 
@@ -457,6 +461,7 @@ def build_feature_matrix(
     orderbook_events: pd.DataFrame | None = None,
     funding_graph: nx.DiGraph | None = None,
     all_pairs_df: pd.DataFrame | None = None,
+    gnn_embeddings: dict[str, dict[str, float]] | None = None,
 ) -> pd.DataFrame:
     """Build a feature matrix with one row per wallet observed in `trades_df`.
 
@@ -464,7 +469,9 @@ def build_feature_matrix(
     through to `build_feature_vector` for `order_cancellation_rate` and the
     wallet graph features respectively. `all_pairs_df` (optional, should be
     the same as `trades_df` or a superset with a `pair_id` column) enables
-    cross-asset coordination features.
+    cross-asset coordination features. ``gnn_embeddings`` is the output of
+    ``detection.gnn_embedder.embedding_feature_map`` when learned graph
+    embeddings should be included in the ensemble.
     """
     if trades_df.empty:
         return pd.DataFrame()
@@ -481,6 +488,7 @@ def build_feature_matrix(
                 orderbook_events=orderbook_events,
                 funding_graph=funding_graph,
                 all_pairs_df=all_pairs_df if all_pairs_df is not None else trades_df,
+                gnn_embeddings=gnn_embeddings,
             )
         )
 
