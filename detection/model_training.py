@@ -21,6 +21,7 @@ import os
 from datetime import UTC, datetime
 
 import joblib
+import numpy as np
 import pandas as pd
 from imblearn.over_sampling import SMOTE
 from lightgbm import LGBMClassifier
@@ -41,6 +42,61 @@ MODEL_REGISTRY = {
 }
 
 FEATURE_COLUMNS_EXCLUDE = {"wallet", "label"}
+PSI_N_BINS = 10
+PSI_EPSILON = 1e-4
+
+
+def compute_feature_distributions(
+    X: pd.DataFrame,
+    n_bins: int = PSI_N_BINS,
+) -> dict[str, dict]:
+    """Compute per-feature bin edges and expected proportions from training data.
+
+    Each feature is discretised into `n_bins` quantile-based bins. If there are
+    insufficient unique values for quantile binning, uniform-width bins are used
+    as a fallback. Expected proportions are clipped to >= PSI_EPSILON to prevent
+    log(0) errors in downstream PSI computation.
+
+    Returns:
+        {feature_name: {"bin_edges": list[float], "expected_proportions": list[float]}}
+    """
+    distributions = {}
+    for col in X.columns:
+        col_data = X[col].dropna().values
+        if len(col_data) == 0:
+            distributions[col] = {
+                "bin_edges": [0.0, 1.0],
+                "expected_proportions": [1.0],
+            }
+            continue
+
+        if len(np.unique(col_data)) >= n_bins:
+            try:
+                _, bin_edges = pd.qcut(col_data, q=n_bins, retbins=True, duplicates="drop")
+            except ValueError:
+                bin_edges = np.histogram_bin_edges(col_data, bins=n_bins)
+        else:
+            bin_edges = np.histogram_bin_edges(col_data, bins=min(n_bins, len(np.unique(col_data))))
+
+        bin_edges = np.unique(bin_edges)
+        counts, _ = np.histogram(col_data, bins=bin_edges)
+        total = counts.sum()
+        expected = np.maximum(counts / total, PSI_EPSILON) if total > 0 else np.ones_like(counts)
+        expected = expected / expected.sum()
+
+        distributions[col] = {
+            "bin_edges": bin_edges.tolist(),
+            "expected_proportions": expected.tolist(),
+        }
+
+    return distributions
+
+
+def compute_feature_schema_hash(feature_columns: list[str]) -> str:
+    """Compute a SHA-256 hash of the sorted feature column names."""
+    sorted_cols = sorted(feature_columns)
+    schema_str = "\n".join(sorted_cols)
+    return f"sha256:{hashlib.sha256(schema_str.encode()).hexdigest()}"
 
 LABEL_DISTRIBUTION_BASELINE_PATH = os.path.join(
     config.MODEL_DIR, "label_distribution_baseline.json"
@@ -126,7 +182,13 @@ def train_models(df: pd.DataFrame, test_size: float = 0.2, random_state: int = 4
             },
         }
 
-    return results
+    return {
+        "results": results,
+        "feature_columns": list(X.columns),
+        "feature_distributions": compute_feature_distributions(X),
+        "n_train": len(X_train),
+        "n_test": len(X_test),
+    }
 
 
 def save_models(results: dict, model_dir: str | None = None) -> None:

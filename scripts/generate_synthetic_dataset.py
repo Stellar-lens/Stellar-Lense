@@ -20,28 +20,6 @@ from config import config
 BENFORD_FEATURE_TEMPLATE = ["benford_chi_square_{h}h", "benford_mad_{h}h", "benford_z_max_{h}h"]
 
 
-def feature_columns() -> list[str]:
-    columns = []
-    for hours in config.BENFORD_WINDOWS_HOURS:
-        columns.extend(t.format(h=hours) for t in BENFORD_FEATURE_TEMPLATE)
-    columns.extend(
-        [
-            "counterparty_concentration_ratio",
-            "round_trip_frequency",
-            "self_matching_rate",
-            "order_cancellation_rate",
-            "volume_per_counterparty_ratio",
-            "intra_minute_clustering",
-            "off_hours_activity_ratio",
-            "volume_spike_frequency",
-            "funding_source_similarity",
-            "network_centrality",
-            "account_age_days",
-        ]
-    )
-    return columns
-
-
 def generate_synthetic_dataset(n_wallets: int = 500, seed: int = 42) -> pd.DataFrame:
     """Generate `n_wallets` rows, roughly half legitimate (label 0) and half
     wash-trading-like (label 1) with systematically different feature
@@ -68,6 +46,7 @@ def generate_synthetic_dataset(n_wallets: int = 500, seed: int = 42) -> pd.DataF
         if is_wash:
             row["counterparty_concentration_ratio"] = rng.uniform(0.7, 1.0)
             row["round_trip_frequency"] = rng.uniform(0.3, 1.0)
+            row["net_roundtrip_ratio"] = rng.uniform(0.3, 1.0)
             row["self_matching_rate"] = rng.uniform(0.3, 1.0)
             row["order_cancellation_rate"] = rng.uniform(0.4, 0.9)
             row["volume_per_counterparty_ratio"] = rng.uniform(1000, 10000)
@@ -77,9 +56,17 @@ def generate_synthetic_dataset(n_wallets: int = 500, seed: int = 42) -> pd.DataF
             row["funding_source_similarity"] = rng.uniform(0.5, 1.0)
             row["network_centrality"] = rng.uniform(0.3, 1.0)
             row["account_age_days"] = rng.uniform(0, 30)
+            # Cross-asset features for wash traders (coordinated across pairs)
+            row["cross_pair_trade_synchrony"] = rng.uniform(0.4, 1.0)
+            row["net_asset_flow_deviation"] = rng.uniform(0.0, 0.3)
+            row["cross_pair_counterparty_overlap"] = rng.uniform(0.5, 1.0)
+            row["cross_pair_volume_correlation"] = rng.uniform(0.4, 1.0)
+            row["pair_diversity_score"] = rng.uniform(0.0, 0.3)
+            row["cross_pair_mad_std"] = rng.uniform(0.01, 0.05)
         else:
             row["counterparty_concentration_ratio"] = rng.uniform(0.0, 0.5)
             row["round_trip_frequency"] = rng.uniform(0.0, 0.1)
+            row["net_roundtrip_ratio"] = rng.uniform(0.0, 0.1)
             row["self_matching_rate"] = rng.uniform(0.0, 0.1)
             row["order_cancellation_rate"] = rng.uniform(0.0, 0.3)
             row["volume_per_counterparty_ratio"] = rng.uniform(10, 1000)
@@ -89,6 +76,13 @@ def generate_synthetic_dataset(n_wallets: int = 500, seed: int = 42) -> pd.DataF
             row["funding_source_similarity"] = rng.uniform(0.0, 0.3)
             row["network_centrality"] = rng.uniform(0.0, 0.2)
             row["account_age_days"] = rng.uniform(30, 1000)
+            # Cross-asset features for legitimate traders (diverse activity)
+            row["cross_pair_trade_synchrony"] = rng.uniform(0.0, 0.2)
+            row["net_asset_flow_deviation"] = rng.uniform(0.5, 1.0)
+            row["cross_pair_counterparty_overlap"] = rng.uniform(0.0, 0.3)
+            row["cross_pair_volume_correlation"] = rng.uniform(-0.5, 0.3)
+            row["pair_diversity_score"] = rng.uniform(0.5, 1.0)
+            row["cross_pair_mad_std"] = rng.uniform(0.0, 0.01)
 
         row["label"] = int(is_wash)
         rows.append(row)

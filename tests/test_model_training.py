@@ -19,7 +19,7 @@ from scripts.generate_synthetic_dataset import generate_synthetic_dataset
 
 
 @pytest.fixture(scope="module")
-def trained_results():
+def trained_output():
     df = generate_synthetic_dataset(n_wallets=60, seed=1)
     return train_models(df, test_size=0.3, random_state=1), df
 
@@ -32,26 +32,29 @@ def test_split_features_labels_excludes_wallet_and_label():
     assert len(X) == len(y)
 
 
-def test_train_models_returns_metrics_for_each_model(trained_results):
-    results, _ = trained_results
+def test_train_models_returns_metrics_for_each_model(trained_output):
+    output, _ = trained_output
+    results = output["results"]
     assert set(results) == set(MODEL_REGISTRY)
     for result in results.values():
         assert set(result["metrics"]) == {"auc_roc", "pr_auc", "f1"}
         assert 0.0 <= result["metrics"]["auc_roc"] <= 1.0
 
 
-def test_save_models_and_metrics_report(tmp_path, trained_results):
-    results, _ = trained_results
+def test_save_models_and_training_artifacts(tmp_path, trained_output):
+    output, _ = trained_output
+    results = output["results"]
     model_dir = str(tmp_path)
 
     save_models(results, model_dir)
     for name in MODEL_REGISTRY:
         assert os.path.exists(os.path.join(model_dir, f"{name}.joblib"))
 
-    metrics_path = save_metrics_report(results, model_dir)
-    assert os.path.exists(metrics_path)
+    save_training_artifacts(output, "data/synthetic.parquet", model_dir)
+    assert os.path.exists(os.path.join(model_dir, "metrics.json"))
+    assert os.path.exists(os.path.join(model_dir, "model_metadata.json"))
 
-    with open(metrics_path) as f:
+    with open(os.path.join(model_dir, "metrics.json")) as f:
         metrics = json.load(f)
     assert set(MODEL_REGISTRY).issubset(set(metrics))
 
