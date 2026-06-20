@@ -365,3 +365,30 @@ pub fn get_service_pubkey(env: &Env) -> Option<Bytes> {
 pub fn set_service_pubkey(env: &Env, pubkey: &Bytes) {
     env.storage().instance().set(&DataKey::ServicePubKey, pubkey);
 }
+
+// ── Wallet Score Delegation ───────────────────────────────────────────────────
+
+pub fn get_score_delegate(env: &Env, sub_wallet: &Address) -> Option<Address> {
+    let key = DataKey::ScoreDelegate(sub_wallet.clone());
+    let delegate: Option<Address> = env.storage().persistent().get(&key);
+    if delegate.is_some() {
+        env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    }
+    delegate
+}
+
+pub fn peek_score_delegate(env: &Env, sub_wallet: &Address) -> Option<Address> {
+    let key = DataKey::ScoreDelegate(sub_wallet.clone());
+    env.storage().persistent().get(&key)
+}
+
+pub fn set_score_delegate(env: &Env, sub_wallet: &Address, custodian: &Address) {
+    let key = DataKey::ScoreDelegate(sub_wallet.clone());
+    env.storage().persistent().set(&key, custodian);
+    env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+}
+
+pub fn remove_score_delegate(env: &Env, sub_wallet: &Address) {
+    let key = DataKey::ScoreDelegate(sub_wallet.clone());
+    env.storage().persistent().remove(&key);
+}

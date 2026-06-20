@@ -198,4 +198,6 @@ pub enum DataKey {
     /// `DEFAULT_HISTORY_MAX_DEPTH` when unset; bounded above by
     /// `MAX_HISTORY_DEPTH`.
     HistoryMaxDepth,
+    /// Wallet Score Delegation link. Points a sub-wallet to a custodian wallet.
+    ScoreDelegate(Address),
 }

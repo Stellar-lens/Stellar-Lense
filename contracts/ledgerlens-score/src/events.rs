@@ -148,3 +148,15 @@ pub fn service_pubkey_updated(env: &Env, pubkey: &Bytes) {
 pub fn history_depth_updated(env: &Env, depth: u32) {
     env.events().publish((symbol_short!("hd_upd"),), depth);
 }
+
+// ── Wallet Score Delegation ───────────────────────────────────────────────────
+
+/// Emitted when a sub-wallet is delegated to a custodian for score fallback.
+pub fn delegate_set(env: &Env, sub_wallet: &Address, custodian: &Address) {
+    env.events().publish((symbol_short!("del_set"), sub_wallet.clone()), custodian.clone());
+}
+
+/// Emitted when a sub-wallet's score delegation is removed.
+pub fn delegate_removed(env: &Env, sub_wallet: &Address) {
+    env.events().publish((symbol_short!("del_rem"), sub_wallet.clone()), ());
+}

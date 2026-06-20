@@ -82,4 +82,8 @@ pub enum Error {
     /// Returned when `set_history_max_depth` is called with `0` or a value
     /// above `MAX_HISTORY_DEPTH`.
     InvalidHistoryDepth = 29,
+    /// Returned when `set_score_delegate` would create a delegation cycle.
+    CyclicDelegation = 30,
+    /// Returned when `remove_score_delegate` is called for a wallet with no delegate.
+    DelegateNotFound = 31,
 }
