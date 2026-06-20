@@ -86,4 +86,3 @@ pub enum Error {
     /// exceeds `MAX_DECAY_LAMBDA` or denominator is 0.
     InvalidDecayRate = 30,
 }
-

@@ -371,11 +371,13 @@ pub fn set_service_pubkey(env: &Env, pubkey: &Bytes) {
 /// Returns the numerator and denominator of the configured decay rate λ.
 /// Defaults to (0, 1) when unset, representing no decay.
 pub fn get_decay_rate(env: &Env) -> (u32, u32) {
-    let num = env.storage()
+    let num = env
+        .storage()
         .instance()
         .get(&DataKey::DecayRateNumerator)
         .unwrap_or(crate::constants::DEFAULT_DECAY_LAMBDA_NUM);
-    let den = env.storage()
+    let den = env
+        .storage()
         .instance()
         .get(&DataKey::DecayRateDenominator)
         .unwrap_or(crate::constants::DEFAULT_DECAY_LAMBDA_DEN);

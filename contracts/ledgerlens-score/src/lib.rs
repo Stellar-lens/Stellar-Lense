@@ -25,7 +25,6 @@ mod test_attestation;
 #[cfg(test)]
 mod test_decay;
 
-
 use soroban_sdk::{
     contract, contractimpl, crypto::Hash, symbol_short, Address, Bytes, BytesN, Env, Symbol,
     SymbolStr, TryFromVal, Vec,
@@ -1676,12 +1675,9 @@ impl LedgerLensScoreContract {
         }
 
         // Term 3: -x³/6
-        if let Ok(x3) = i128::try_from(
-            x.checked_mul(x)
-                .and_then(|v| v.checked_mul(x))
-                .ok_or(())
-                .unwrap_or(0),
-        ) {
+        if let Ok(x3) =
+            i128::try_from(x.checked_mul(x).and_then(|v| v.checked_mul(x)).ok_or(()).unwrap_or(0))
+        {
             result -= x3 / (6 * s * s);
         }
 
