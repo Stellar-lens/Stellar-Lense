@@ -941,10 +941,7 @@ impl LedgerLensScoreContract {
     /// client.cancel_admin_transfer(&Vec::new(&env));
     /// assert_eq!(client.get_admin(), admin);
     /// ```
-    pub fn cancel_admin_transfer(
-        env: Env,
-        admin_signers: Vec<Address>,
-    ) -> Result<(), Error> {
+    pub fn cancel_admin_transfer(env: Env, admin_signers: Vec<Address>) -> Result<(), Error> {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
@@ -1399,11 +1396,7 @@ impl LedgerLensScoreContract {
     /// # Errors
     /// - [`Error::NotInitialized`] if the contract has no admin yet.
     /// - [`Error::InvalidCooldown`] if `secs` is outside the bounds.
-    pub fn set_cooldown(
-        env: Env,
-        admin_signers: Vec<Address>,
-        secs: u64,
-    ) -> Result<(), Error> {
+    pub fn set_cooldown(env: Env, admin_signers: Vec<Address>, secs: u64) -> Result<(), Error> {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
@@ -1678,7 +1671,7 @@ impl LedgerLensScoreContract {
         let admin_set = storage::get_admin_set(env);
         let threshold = storage::get_admin_threshold(env);
         if !admin_set.is_empty() && threshold > 0 {
-            if (admin_signers.len() as u32) < threshold {
+            if admin_signers.len() < threshold {
                 return Err(Error::InsufficientAdminSigners);
             }
             for i in 0..admin_signers.len() {

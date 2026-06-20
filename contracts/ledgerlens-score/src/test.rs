@@ -1444,10 +1444,10 @@ fn setup_multisig<'a>(
     let mut signers: Vec<Address> = Vec::new(env);
     for _ in 0..n {
         let s = Address::generate(env);
-        client.add_service_signer(&Vec::new(&env), &s);
+        client.add_service_signer(&Vec::new(env), &s);
         signers.push_back(s);
     }
-    client.set_service_threshold(&Vec::new(&env), &m);
+    client.set_service_threshold(&Vec::new(env), &m);
     signers
 }
 

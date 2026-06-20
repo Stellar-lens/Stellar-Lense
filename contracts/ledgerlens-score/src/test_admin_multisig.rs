@@ -7,10 +7,7 @@
 //! added and a threshold set, every admin call must supply at least M valid
 //! admin-set members.
 
-use soroban_sdk::{
-    testutils::Address as _,
-    Address, Env, Vec,
-};
+use soroban_sdk::{testutils::Address as _, Address, Env, Vec};
 
 use crate::{Error, LedgerLensScoreContract, LedgerLensScoreContractClient};
 
@@ -117,7 +114,7 @@ fn test_require_admin_auth_insufficient_signers() {
     client.set_admin_threshold(&Vec::new(&env), &2);
 
     // Supplying only 1 signer when threshold is 2.
-    let one_signer = signers_vec(&env, &[s1.clone()]);
+    let one_signer = signers_vec(&env, core::slice::from_ref(&s1));
     let result = client.try_set_risk_threshold(&one_signer, &50);
     assert_eq!(result, Err(Ok(Error::InsufficientAdminSigners)));
 }
@@ -181,7 +178,7 @@ fn test_remove_admin_signer_not_in_set() {
     client.set_admin_threshold(&Vec::new(&env), &1);
 
     let outsider = Address::generate(&env);
-    let signer_vec = signers_vec(&env, &[s1.clone()]);
+    let signer_vec = signers_vec(&env, core::slice::from_ref(&s1));
     let result = client.try_remove_admin_signer(&signer_vec, &outsider);
     assert_eq!(result, Err(Ok(Error::AdminSignerNotInSet)));
 }
