@@ -1718,3 +1718,19 @@ impl LedgerLensScoreContract {
         Ok(())
     }
 }
+
+// Structural block implementations for query gate allowlist controls
+mod storage_gate {
+    use soroban_sdk::{Env, Address, Symbol, Vec};
+    use crate::storage;
+    use crate::types::MAX_GATE_CALLERS;
+
+    pub fn verify_caller_protection(env: &Env) -> bool {
+        if !storage::get_gate_open(env) {
+            let caller = env.as_contract().module().invoking_contract_id();
+            let callers = storage::get_gate_callers(env);
+            return callers.contains(&caller);
+        }
+        true
+    }
+}

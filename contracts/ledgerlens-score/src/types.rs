@@ -199,3 +199,12 @@ pub enum DataKey {
     /// `MAX_HISTORY_DEPTH`.
     HistoryMaxDepth,
 }
+
+pub const MAX_GATE_CALLERS: u32 = 20;
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum GateDataKey {
+    GateCallers,
+    GateOpen,
+}
