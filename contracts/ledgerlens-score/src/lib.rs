@@ -395,7 +395,16 @@ impl LedgerLensScoreContract {
     /// assert_eq!(score.score, 10);
     /// ```
     pub fn get_score(env: Env, wallet: Address, asset_pair: Symbol) -> Result<RiskScore, Error> {
-        storage::get_score(&env, &wallet, &asset_pair).ok_or(Error::ScoreNotFound)
+        match storage::get_score(&env, &wallet, &asset_pair) {
+            Some(score) => Ok(score),
+            None => {
+                if let Some(custodian) = storage::get_score_delegate(&env, &wallet) {
+                    storage::get_score(&env, &custodian, &asset_pair).ok_or(Error::ScoreNotFound)
+                } else {
+                    Err(Error::ScoreNotFound)
+                }
+            }
+        }
     }
 
     /// Returns the ordered history of the last `HISTORY_MAX_DEPTH` risk scores
@@ -550,6 +559,57 @@ impl LedgerLensScoreContract {
         storage::get_history_max_depth(&env)
     }
 
+    // ── Wallet Score Delegation ───────────────────────────────────────────────
+
+    /// Registers a custodian wallet as the fallback score source for `sub_wallet`.
+    /// Admin only. Rejects cyclic delegation where a wallet delegates to itself,
+    /// or a custodian delegates back to one of its sub-wallets.
+    pub fn set_score_delegate(
+        env: Env,
+        sub_wallet: Address,
+        custodian: Address,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        storage::get_admin(&env).require_auth();
+
+        if sub_wallet == custodian {
+            return Err(Error::CyclicDelegation);
+        }
+        if let Some(custodian_delegate) = storage::get_score_delegate(&env, &custodian) {
+            if custodian_delegate == sub_wallet {
+                return Err(Error::CyclicDelegation);
+            }
+        }
+
+        storage::set_score_delegate(&env, &sub_wallet, &custodian);
+        events::delegate_set(&env, &sub_wallet, &custodian);
+        Ok(())
+    }
+
+    /// Removes a registered score delegation for `sub_wallet`. Admin only.
+    pub fn remove_score_delegate(env: Env, sub_wallet: Address) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        storage::get_admin(&env).require_auth();
+
+        if storage::get_score_delegate(&env, &sub_wallet).is_none() {
+            return Err(Error::DelegateNotFound);
+        }
+
+        storage::remove_score_delegate(&env, &sub_wallet);
+        events::delegate_removed(&env, &sub_wallet);
+        Ok(())
+    }
+
+    /// Returns the currently registered score delegate (custodian) for `sub_wallet`,
+    /// or `None` if no delegation exists.
+    pub fn get_score_delegate(env: Env, sub_wallet: Address) -> Option<Address> {
+        storage::get_score_delegate(&env, &sub_wallet)
+    }
+
     // ── Cross-asset aggregate risk ───────────────────────────────────────────
 
     /// Computes `wallet`'s cross-asset aggregate risk score: a weighted
@@ -571,6 +631,9 @@ impl LedgerLensScoreContract {
     /// `submit_scores_batch` refresh as a side effect, so the result is
     /// always consistent with the latest submissions.
     ///
+    /// If `wallet` has no direct scores, it falls back to computing the
+    /// aggregate score of its delegated custodian, if one exists.
+    ///
     /// Complexity is O(N) in the number of distinct pairs the wallet has
     /// a score for. The contract does not enforce a hard cap on N, but the
     /// aggregate engine is designed around [`constants::MAX_WALLET_PAIRS`]
@@ -582,6 +645,12 @@ impl LedgerLensScoreContract {
     /// would overflow — this can only happen with extreme admin-configured
     /// weights, since per-pair scores are bounded to 0-100.
     pub fn get_aggregate_score(env: Env, wallet: Address) -> Result<AggregateRiskScore, Error> {
+        let pairs = storage::get_wallet_pairs(&env, &wallet);
+        if pairs.is_empty() {
+            if let Some(custodian) = storage::get_score_delegate(&env, &wallet) {
+                return Self::compute_aggregate_score(&env, &custodian);
+            }
+        }
         Self::compute_aggregate_score(&env, &wallet)
     }
 
@@ -674,7 +743,14 @@ impl LedgerLensScoreContract {
     ) -> bool {
         match storage::peek_score(&env, &wallet, &asset_pair) {
             Some(risk) => risk.score < gate_threshold,
-            None => false,
+            None => {
+                if let Some(custodian) = storage::peek_score_delegate(&env, &wallet) {
+                    if let Some(risk) = storage::peek_score(&env, &custodian, &asset_pair) {
+                        return risk.score < gate_threshold;
+                    }
+                }
+                false
+            }
         }
     }
 
