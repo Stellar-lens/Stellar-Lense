@@ -365,3 +365,24 @@ pub fn get_service_pubkey(env: &Env) -> Option<Bytes> {
 pub fn set_service_pubkey(env: &Env, pubkey: &Bytes) {
     env.storage().instance().set(&DataKey::ServicePubKey, pubkey);
 }
+
+// ── Global minimum confidence floor ──────────────────────────────────────────
+
+/// Returns the admin-configured global minimum confidence floor (0–100).
+/// Defaults to `0` (no floor) when unset.
+///
+/// This value is combined with the per-call `min_confidence` parameter in
+/// `query_risk_gate_with_confidence` using `max(param, global)` so the admin
+/// can enforce a system-wide floor without requiring every integrating protocol
+/// to specify one. Both values are bounded to 0–100, so the `max` cannot
+/// overflow.
+pub fn get_global_min_confidence(env: &Env) -> u32 {
+    let result: Option<u32> = env.storage().instance().get(&DataKey::GlobalMinConfidence);
+    result.unwrap_or(0)
+}
+
+/// Persists `min_confidence` as the global confidence floor.
+/// Caller is responsible for validating the range (0–100) before calling.
+pub fn set_global_min_confidence(env: &Env, min_confidence: u32) {
+    env.storage().instance().set(&DataKey::GlobalMinConfidence, &min_confidence);
+}

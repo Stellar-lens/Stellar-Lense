@@ -22,6 +22,9 @@ mod test_rate_limit;
 #[cfg(test)]
 mod test_attestation;
 
+#[cfg(test)]
+mod test_confidence_gate;
+
 use soroban_sdk::{
     contract, contractimpl, crypto::Hash, symbol_short, Address, Bytes, BytesN, Env, Symbol,
     SymbolStr, TryFromVal, Vec,
@@ -617,6 +620,67 @@ impl LedgerLensScoreContract {
         storage::get_pair_weight(&env, &asset_pair)
     }
 
+    // ── Global minimum confidence floor ──────────────────────────────────────
+
+    /// Set the admin-configured global minimum confidence floor (0–100).
+    ///
+    /// When set, every call to [`query_risk_gate_with_confidence`] uses
+    /// `max(min_confidence_param, global_min_confidence)` as the effective
+    /// floor. This lets the contract operator enforce a system-wide minimum
+    /// confidence without requiring every integrating protocol to specify one.
+    ///
+    /// Using `max` ensures the stricter of the two floors always wins —
+    /// neither the admin nor the caller can unilaterally weaken the other's
+    /// floor. Both values are bounded to `0..=100`, so overflow is impossible:
+    /// `max(a, b)` where `a, b ≤ 100` is at most `100`.
+    ///
+    /// Admin only. Valid range: `0..=100`.
+    ///
+    /// # Examples
+    ///
+    /// Set a floor of 60 — calls with `min_confidence < 60` will still use 60:
+    /// ```ignore
+    /// client.set_global_min_confidence(&60).unwrap();
+    /// assert_eq!(client.get_global_min_confidence(), 60);
+    /// // query with min_confidence=30 → effective floor = max(30, 60) = 60
+    /// ```
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if the contract has no admin yet.
+    /// - [`Error::InvalidMinConfidence`] if `min_confidence > 100`.
+    pub fn set_global_min_confidence(env: Env, min_confidence: u32) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        if min_confidence > 100 {
+            return Err(Error::InvalidMinConfidence);
+        }
+        let admin = storage::get_admin(&env);
+        admin.require_auth();
+        storage::set_global_min_confidence(&env, min_confidence);
+        Ok(())
+    }
+
+    /// Returns the admin-configured global minimum confidence floor.
+    /// Defaults to `0` (no global floor) until [`set_global_min_confidence`]
+    /// is called.
+    ///
+    /// This value is combined with the per-call `min_confidence` parameter in
+    /// [`query_risk_gate_with_confidence`] using `max(param, global)` so the
+    /// stricter of the two floors always applies.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// // Before any admin configuration → 0 (no floor).
+    /// assert_eq!(client.get_global_min_confidence(), 0);
+    /// client.set_global_min_confidence(&70).unwrap();
+    /// assert_eq!(client.get_global_min_confidence(), 70);
+    /// ```
+    pub fn get_global_min_confidence(env: Env) -> u32 {
+        storage::get_global_min_confidence(&env)
+    }
+
     // ── Composability interface (stable ABI) ─────────────────────────────────
     //
     // The functions below form the `ILedgerLensScore` composability surface
@@ -647,6 +711,10 @@ impl LedgerLensScoreContract {
     /// can never propagate an `Error` back into the caller, so it cannot be
     /// used to grief the calling protocol's gas or disable its security guard.
     ///
+    /// This function delegates to [`query_risk_gate_with_confidence`] with
+    /// `min_confidence = 0`, meaning no confidence floor is applied. All
+    /// logic lives in one place to eliminate duplication.
+    ///
     /// # Example (caller side)
     ///
     /// ```ignore
@@ -661,8 +729,109 @@ impl LedgerLensScoreContract {
         asset_pair: Symbol,
         gate_threshold: u32,
     ) -> bool {
+        // Delegate to the confidence-aware variant with min_confidence = 0
+        // (no confidence floor). This is a non-breaking change: callers see
+        // identical semantics while all logic lives in one place.
+        Self::query_risk_gate_with_confidence(env, wallet, asset_pair, gate_threshold, 0)
+    }
+
+    /// Confidence-gated infallible cross-contract risk gate.
+    ///
+    /// An extended version of [`query_risk_gate`] that enforces **both** a
+    /// maximum risk score threshold *and* a minimum confidence floor. A score
+    /// whose confidence falls below the floor is treated as epistemically
+    /// equivalent to "no data" — the gate returns `false` (the conservative
+    /// default), regardless of the risk score value.
+    ///
+    /// # Semantics
+    ///
+    /// Returns `true` **only** when all three conditions hold:
+    ///
+    /// 1. A score exists for `(wallet, asset_pair)`.
+    /// 2. `score.score < gate_threshold` — the wallet is not too risky.
+    /// 3. `score.confidence >= effective_min_confidence` — the model had
+    ///    enough data to make a meaningful determination.
+    ///
+    /// Returns `false` in every other case:
+    /// - No score exists (unknown wallet — fail closed).
+    /// - Score is at or above the threshold (too risky).
+    /// - Confidence is below the effective floor (insufficient data — treated
+    ///   as unknown, not as evidence of safety).
+    /// - `gate_threshold > 100` — no wallet can have a score above 100, so
+    ///   no wallet can pass a threshold of 101+. Returns `false` immediately.
+    /// - `min_confidence > 100` — no wallet can have confidence above 100,
+    ///   so no wallet can meet a floor above 100. Returns `false` immediately.
+    ///
+    /// # Effective confidence floor
+    ///
+    /// The effective floor is `max(min_confidence, global_min_confidence)`,
+    /// where `global_min_confidence` is the admin-configured value from
+    /// [`set_global_min_confidence`] (defaults to `0`). Using `max` means
+    /// the stricter of the two floors always wins: neither the admin nor the
+    /// caller can unilaterally weaken the other's floor. Both values are
+    /// bounded to `0..=100`, so this `max` cannot overflow — the sum of two
+    /// `u32` values each ≤ 100 is at most 200, well within `u32::MAX`.
+    ///
+    /// # Infallibility and side-effect freedom
+    ///
+    /// Like `query_risk_gate`, this function:
+    /// - Returns `bool`, never `Result` — it cannot propagate errors.
+    /// - Never panics under any `u32` input (including `u32::MAX`).
+    /// - Uses [`storage::peek_score`] which does **not** call
+    ///   `extend_ttl` — the function has zero observable side effects.
+    ///
+    /// # Examples
+    ///
+    /// High confidence, low risk → passes:
+    /// ```ignore
+    /// // score=30, confidence=80, gate_threshold=75, min_confidence=50
+    /// assert!(client.query_risk_gate_with_confidence(&wallet, &pair, &75, &50));
+    /// ```
+    ///
+    /// Low confidence → fails even though risk is low:
+    /// ```ignore
+    /// // score=30, confidence=20, gate_threshold=75, min_confidence=50
+    /// // confidence(20) < floor(50) → treated as "no data" → false
+    /// assert!(!client.query_risk_gate_with_confidence(&wallet, &pair, &75, &50));
+    /// ```
+    ///
+    /// Admin-set global floor overrides caller floor:
+    /// ```ignore
+    /// // global_min_confidence=70, min_confidence_param=30
+    /// // effective floor = max(30, 70) = 70
+    /// assert!(!client.query_risk_gate_with_confidence(&wallet, &pair, &75, &30));
+    /// ```
+    pub fn query_risk_gate_with_confidence(
+        env: Env,
+        wallet: Address,
+        asset_pair: Symbol,
+        gate_threshold: u32,
+        min_confidence: u32,
+    ) -> bool {
+        // Short-circuit: gate_threshold > 100 — scores are bounded to 0–100,
+        // so score < gate_threshold would only ever be true for thresholds in
+        // 0..=100. Anything above is effectively "nothing can pass".
+        if gate_threshold > 100 {
+            return false;
+        }
+
+        // Short-circuit: min_confidence > 100 — confidence is bounded to
+        // 0–100. No stored score can ever satisfy confidence >= 101+.
+        if min_confidence > 100 {
+            return false;
+        }
+
+        // Compute the effective confidence floor: max(caller param, global floor).
+        // Both values are bounded to 0–100 (validated above / by set_global_min_confidence),
+        // so their max is at most 100 — no overflow is possible.
+        let global_floor = storage::get_global_min_confidence(&env);
+        // global_floor is stored only after validation (0..=100), so it is
+        // also ≤ 100. The max of two values each ≤ 100 is ≤ 100: no overflow.
+        let effective_floor = if global_floor > min_confidence { global_floor } else { min_confidence };
+
+        // peek_score: pure storage read, no extend_ttl — side-effect free.
         match storage::peek_score(&env, &wallet, &asset_pair) {
-            Some(risk) => risk.score < gate_threshold,
+            Some(risk) => risk.score < gate_threshold && risk.confidence >= effective_floor,
             None => false,
         }
     }
@@ -676,14 +845,15 @@ impl LedgerLensScoreContract {
     ///
     /// Recognised capabilities:
     ///
-    /// | Symbol      | Backing functionality                              |
-    /// |-------------|----------------------------------------------------|
-    /// | `score`     | `get_score` / `submit_score`                       |
-    /// | `history`   | `get_score_history`                                |
-    /// | `batch`     | `submit_scores_batch`                              |
-    /// | `gate`      | `query_risk_gate`                                  |
-    /// | `aggr`      | `get_aggregate_score` (cross-asset aggregate risk) |
-    /// | `count`     | `get_score_count`                                  |
+    /// | Symbol      | Backing functionality                                    |
+    /// |-------------|----------------------------------------------------------|
+    /// | `score`     | `get_score` / `submit_score`                             |
+    /// | `history`   | `get_score_history`                                      |
+    /// | `batch`     | `submit_scores_batch`                                    |
+    /// | `gate`      | `query_risk_gate`                                        |
+    /// | `aggr`      | `get_aggregate_score` (cross-asset aggregate risk)       |
+    /// | `count`     | `get_score_count`                                        |
+    /// | `cgate`     | `query_risk_gate_with_confidence` (confidence-gated gate) |
     ///
     /// Any unrecognised `capability` returns `false`.
     pub fn supports_interface(_env: Env, capability: Symbol) -> bool {
@@ -693,6 +863,7 @@ impl LedgerLensScoreContract {
             || capability == symbol_short!("gate")
             || capability == symbol_short!("aggr")
             || capability == symbol_short!("count")
+            || capability == symbol_short!("cgate")
     }
 
     // ── Service management ───────────────────────────────────────────────────

@@ -198,4 +198,9 @@ pub enum DataKey {
     /// `DEFAULT_HISTORY_MAX_DEPTH` when unset; bounded above by
     /// `MAX_HISTORY_DEPTH`.
     HistoryMaxDepth,
+    /// Admin-configured global minimum confidence floor (0–100).
+    /// When set, `query_risk_gate_with_confidence` uses
+    /// `max(caller_param, global_floor)` as the effective floor.
+    /// Defaults to `0` (no global floor) when unset.
+    GlobalMinConfidence,
 }
