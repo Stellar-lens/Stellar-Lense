@@ -82,4 +82,12 @@ pub enum Error {
     /// Returned when `set_history_max_depth` is called with `0` or a value
     /// above `MAX_HISTORY_DEPTH`.
     InvalidHistoryDepth = 29,
+    /// `add_admin_signer` was called when the admin set already contains
+    /// `MAX_ADMIN_SIGNERS` members.
+    AdminSetFull = 31,
+    /// A signer passed to an admin function is not a member of the admin set.
+    AdminSignerNotInSet = 32,
+    /// Fewer than the configured admin threshold of signers were provided to
+    /// an admin-gated function.
+    InsufficientAdminSigners = 33,
 }

@@ -198,4 +198,9 @@ pub enum DataKey {
     /// `DEFAULT_HISTORY_MAX_DEPTH` when unset; bounded above by
     /// `MAX_HISTORY_DEPTH`.
     HistoryMaxDepth,
+    /// Ordered set of N addresses authorised to co-sign admin operations.
+    AdminSet,
+    /// The M-of-N threshold: minimum number of admin-set members that must
+    /// co-sign any admin-tier operation.
+    AdminThreshold,
 }
