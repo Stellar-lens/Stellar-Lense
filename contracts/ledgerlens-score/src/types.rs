@@ -198,13 +198,10 @@ pub enum DataKey {
     /// `DEFAULT_HISTORY_MAX_DEPTH` when unset; bounded above by
     /// `MAX_HISTORY_DEPTH`.
     HistoryMaxDepth,
-    /// Per-asset-pair circuit breaker. Present (and `true`) only while the
-    /// pair is paused; absent means never paused / currently unpaused. See
-    /// `set_pair_paused` / `is_pair_paused`.
-    PairPaused(Symbol),
-    /// Ordered, de-duplicated list of every asset pair currently paused via
-    /// `set_pair_paused`. Bounded at `MAX_PAUSED_PAIRS` entries. Kept in sync
-    /// with every `set_pair_paused` call so `get_paused_pairs` is an O(1)
-    /// storage read rather than a scan.
-    PausedPairIndex,
+    /// The SEP-41 token contract address from which fees are withdrawn.
+    /// Unset until `set_fee_token` is called.
+    FeeToken,
+    /// Boolean flag set for the duration of a `withdraw_fees` call to
+    /// prevent concurrent duplicate withdrawals.
+    WithdrawalLock,
 }

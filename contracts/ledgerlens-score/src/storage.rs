@@ -329,6 +329,24 @@ pub fn set_upgrade_delay(env: &Env, delay_secs: u64) {
     env.storage().instance().set(&DataKey::UpgradeDelay, &delay_secs);
 }
 
+// ── Multi-sig admin set ──────────────────────────────────────────────────────
+
+pub fn get_admin_set(env: &Env) -> Vec<Address> {
+    env.storage().instance().get(&DataKey::AdminSet).unwrap_or_else(|| Vec::new(env))
+}
+
+pub fn set_admin_set(env: &Env, set: &Vec<Address>) {
+    env.storage().instance().set(&DataKey::AdminSet, set);
+}
+
+pub fn get_admin_threshold(env: &Env) -> u32 {
+    env.storage().instance().get(&DataKey::AdminThreshold).unwrap_or(0)
+}
+
+pub fn set_admin_threshold(env: &Env, threshold: u32) {
+    env.storage().instance().set(&DataKey::AdminThreshold, &threshold);
+}
+
 // ── Multi-sig service set ─────────────────────────────────────────────────────
 
 pub fn get_service_set(env: &Env) -> Vec<Address> {
@@ -448,4 +466,26 @@ pub fn get_service_pubkey(env: &Env) -> Option<Bytes> {
 
 pub fn set_service_pubkey(env: &Env, pubkey: &Bytes) {
     env.storage().instance().set(&DataKey::ServicePubKey, pubkey);
+}
+
+// ── Fee withdrawal ────────────────────────────────────────────────────────────
+
+pub fn get_fee_token(env: &Env) -> Option<Address> {
+    env.storage().instance().get(&DataKey::FeeToken)
+}
+
+pub fn set_fee_token(env: &Env, token: &Address) {
+    env.storage().instance().set(&DataKey::FeeToken, token);
+}
+
+pub fn is_withdrawal_locked(env: &Env) -> bool {
+    env.storage().instance().get::<_, bool>(&DataKey::WithdrawalLock).unwrap_or(false)
+}
+
+pub fn set_withdrawal_lock(env: &Env) {
+    env.storage().instance().set(&DataKey::WithdrawalLock, &true);
+}
+
+pub fn clear_withdrawal_lock(env: &Env) {
+    env.storage().instance().remove(&DataKey::WithdrawalLock);
 }

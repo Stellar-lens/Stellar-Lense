@@ -17,9 +17,10 @@ pub const DEFAULT_RISK_THRESHOLD: u32 = 75;
 
 /// Semantic contract version; bump on breaking ABI changes.
 ///
-/// Bumped to 2 when `submit_score` gained its `attestation` parameter (see
-/// `docs/attestation-spec.md`).
-pub const CONTRACT_VERSION: u32 = 2;
+/// Bumped to 3 when all admin-tier functions gained `admin_signers: Vec<Address>`
+/// for M-of-N governance and the `AdminSet` / `AdminThreshold` storage keys
+/// were introduced.
+pub const CONTRACT_VERSION: u32 = 3;
 
 /// Practical upper bound on the number of distinct asset pairs tracked per
 /// wallet. `get_aggregate_score` iterates the wallet's full `AssetPairs`
@@ -71,6 +72,9 @@ pub const DEFAULT_UPGRADE_DELAY_SECS: u64 = 172_800; // 48 hours
 
 /// Maximum number of addresses in the M-of-N service signer set.
 pub const MAX_SERVICE_SIGNERS: u32 = 10;
+
+/// Maximum number of addresses in the M-of-N admin signer set.
+pub const MAX_ADMIN_SIGNERS: u32 = 5;
 
 /// Default staleness window: 7 days in seconds.
 pub const DEFAULT_STALENESS_WINDOW_SECS: u64 = 604_800;
