@@ -38,8 +38,8 @@ use soroban_sdk::{
 
 pub use errors::Error;
 pub use types::{
-    AggregateRiskScore, BatchEntryResult, BatchResult, RiskScore, ScoreAttestation,
-    ScoreSubmission, ScoreTrend, UpgradeProposal,
+    AdaptiveThresholdConfig, AggregateRiskScore, BatchEntryResult, BatchResult, RiskScore,
+    ScoreAttestation, ScoreSubmission, ScoreTrend, UpgradeProposal,
 };
 
 /// On-chain truth layer for LedgerLens risk scores.
@@ -255,7 +255,7 @@ impl LedgerLensScoreContract {
         storage::increment_score_count(&env, &wallet, &asset_pair);
         Self::refresh_aggregate_cache(&env, &wallet);
 
-        let score_threshold = storage::get_risk_threshold(&env);
+        let score_threshold = Self::get_effective_threshold(&env);
         if score >= score_threshold {
             events::threshold_breached(&env, &wallet, &asset_pair, score, score_threshold);
         }
@@ -329,7 +329,7 @@ impl LedgerLensScoreContract {
             return Err(Error::BatchTooLarge);
         }
 
-        let threshold = storage::get_risk_threshold(&env);
+        let threshold = Self::get_effective_threshold(&env);
         let cooldown = storage::get_cooldown_secs(&env);
         let now = env.ledger().timestamp();
         let mut accepted_count: u32 = 0;
@@ -826,6 +826,177 @@ impl LedgerLensScoreContract {
             || capability == symbol_short!("gate")
             || capability == symbol_short!("aggr")
             || capability == symbol_short!("count")
+    }
+
+    /// Returns the current effective threshold. If adaptive threshold mode is
+    /// enabled and a threshold has been computed, returns that; otherwise,
+    /// returns the static risk threshold.
+    fn get_effective_threshold(env: &Env) -> u32 {
+        if storage::is_adaptive_threshold_enabled(env) {
+            let last_computed = storage::get_last_computed_threshold(env);
+            if last_computed != 0 {
+                return last_computed;
+            }
+        }
+        storage::get_risk_threshold(env)
+    }
+
+    // ── Adaptive Threshold ──────────────────────────────────────────────────
+
+    /// Enables adaptive threshold mode. Requires admin authorization.
+    ///
+    /// # Parameters
+    /// - `admin_signers`: Admin signers for authorization
+    /// - `target_percentile`: Target percentile (must be between 50 and 99)
+    /// - `min_value`: Minimum threshold value (adaptive will not go below this)
+    /// - `max_value`: Maximum threshold value (adaptive will not go above this)
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use soroban_sdk::symbol_short;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// client.enable_adaptive_threshold(&Vec::new(&env), &90, &50, &95).unwrap();
+    /// let config = client.get_adaptive_threshold_config();
+    /// assert!(config.enabled);
+    /// assert_eq!(config.target_percentile, 90);
+    /// assert_eq!(config.min_value, 50);
+    /// assert_eq!(config.max_value, 95);
+    /// ```
+    pub fn enable_adaptive_threshold(
+        env: Env,
+        admin_signers: Vec<Address>,
+        target_percentile: u32,
+        min_value: u32,
+        max_value: u32,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        if target_percentile < 50 || target_percentile > 99 {
+            return Err(Error::InvalidPercentile);
+        }
+        if min_value > max_value {
+            return Err(Error::InvalidThreshold);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+
+        storage::set_adaptive_threshold_enabled(&env, true);
+        storage::set_adaptive_threshold_target_percentile(&env, target_percentile);
+        storage::set_adaptive_threshold_min_value(&env, min_value);
+        storage::set_adaptive_threshold_max_value(&env, max_value);
+
+        Ok(())
+    }
+
+    /// Disables adaptive threshold mode. Requires admin authorization.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// client.enable_adaptive_threshold(&Vec::new(&env), &90, &50, &95).unwrap();
+    /// client.disable_adaptive_threshold(&Vec::new(&env)).unwrap();
+    /// let config = client.get_adaptive_threshold_config();
+    /// assert!(!config.enabled);
+    /// ```
+    pub fn disable_adaptive_threshold(
+        env: Env,
+        admin_signers: Vec<Address>,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+
+        storage::set_adaptive_threshold_enabled(&env, false);
+
+        Ok(())
+    }
+
+    /// Recomputes the adaptive threshold based on the current histogram (if
+    /// available) and stores it. Emits an event if the threshold changes.
+    ///
+    /// Returns the newly computed threshold value.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// client.enable_adaptive_threshold(&Vec::new(&env), &90, &50, &95).unwrap();
+    /// let threshold = client.recompute_adaptive_threshold();
+    /// assert_eq!(threshold, 50); // Falls back to min since no histogram
+    /// ```
+    pub fn recompute_adaptive_threshold(env: Env) -> Result<u32, Error> {
+        // TODO: Once histogram feature (issue #81) is implemented, use that here
+        // For now, fall back to min_value (or static if no config)
+        let min_value = storage::get_adaptive_threshold_min_value(&env);
+        let max_value = storage::get_adaptive_threshold_max_value(&env);
+        let mut new_threshold = min_value;
+
+        // Clamp to min/max
+        new_threshold = new_threshold.max(min_value).min(max_value);
+
+        let old_threshold = storage::get_last_computed_threshold(&env);
+        if new_threshold != old_threshold {
+            storage::set_last_computed_threshold(&env, new_threshold);
+            events::adaptive_threshold_updated(&env, new_threshold);
+        }
+
+        Ok(new_threshold)
+    }
+
+    /// Returns the current adaptive threshold configuration.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// let config = client.get_adaptive_threshold_config();
+    /// assert!(!config.enabled);
+    /// assert_eq!(config.target_percentile, 0);
+    /// assert_eq!(config.min_value, 0);
+    /// assert_eq!(config.max_value, 100);
+    /// assert_eq!(config.last_computed, 0);
+    /// ```
+    pub fn get_adaptive_threshold_config(env: Env) -> AdaptiveThresholdConfig {
+        storage::get_adaptive_threshold_config(&env)
     }
 
     // ── Service management ───────────────────────────────────────────────────

@@ -239,3 +239,8 @@ pub fn delegate_set(env: &Env, sub_wallet: &Address, custodian: &Address) {
 pub fn delegate_removed(env: &Env, sub_wallet: &Address) {
     env.events().publish((symbol_short!("dlg_rem"),), sub_wallet.clone());
 }
+
+/// Emitted when the adaptive threshold is recomputed and changes.
+pub fn adaptive_threshold_updated(env: &Env, new_threshold: u32) {
+    env.events().publish((symbol_short!("at_upd"),), new_threshold);
+}
