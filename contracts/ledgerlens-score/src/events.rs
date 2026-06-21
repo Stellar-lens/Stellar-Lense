@@ -158,6 +158,13 @@ pub fn history_depth_updated(env: &Env, depth: u32) {
     env.events().publish((symbol_short!("hd_upd"),), depth);
 }
 
+// ── Time-weighted exponential decay ────────────────────────────────────────
+
+/// Emitted when the admin sets the exponential decay rate via `set_decay_rate`.
+pub fn decay_rate_updated(env: &Env, numerator: u32, denominator: u32) {
+    env.events().publish((symbol_short!("decay_upd"),), (numerator, denominator));
+}
+
 // ── Fee withdrawal ────────────────────────────────────────────────────────────
 
 /// Emitted when the admin configures or rotates the fee token via
@@ -174,12 +181,26 @@ pub fn fee_withdrawn(
     fee_token: &Address,
     amount: i128,
 ) {
-    env.events()
-        .publish((symbol_short!("fee_out"),), (admin.clone(), recipient.clone(), fee_token.clone(), amount));
+    env.events().publish(
+        (symbol_short!("fee_out"),),
+        (admin.clone(), recipient.clone(), fee_token.clone(), amount),
+    );
 }
 
 /// Emitted when `withdraw_fees` is rejected because the concurrency lock is
 /// already held by an in-flight call.
 pub fn withdrawal_locked(env: &Env, admin: &Address) {
     env.events().publish((symbol_short!("wdl_lck"),), admin.clone());
+}
+
+// ── Wallet-score delegation ───────────────────────────────────────────────────
+
+/// Emitted when `set_score_delegate` registers or updates a delegation.
+pub fn delegate_set(env: &Env, sub_wallet: &Address, custodian: &Address) {
+    env.events().publish((symbol_short!("dlg_set"),), (sub_wallet.clone(), custodian.clone()));
+}
+
+/// Emitted when `remove_score_delegate` removes a delegation.
+pub fn delegate_removed(env: &Env, sub_wallet: &Address) {
+    env.events().publish((symbol_short!("dlg_rem"),), sub_wallet.clone());
 }

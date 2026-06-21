@@ -468,6 +468,30 @@ pub fn set_service_pubkey(env: &Env, pubkey: &Bytes) {
     env.storage().instance().set(&DataKey::ServicePubKey, pubkey);
 }
 
+// ── Time-weighted exponential decay ──────────────────────────────────────
+
+/// Returns the numerator and denominator of the configured decay rate λ.
+/// Defaults to (0, 1) when unset, representing no decay.
+pub fn get_decay_rate(env: &Env) -> (u32, u32) {
+    let num = env
+        .storage()
+        .instance()
+        .get(&DataKey::DecayRateNumerator)
+        .unwrap_or(crate::constants::DEFAULT_DECAY_LAMBDA_NUM);
+    let den = env
+        .storage()
+        .instance()
+        .get(&DataKey::DecayRateDenominator)
+        .unwrap_or(crate::constants::DEFAULT_DECAY_LAMBDA_DEN);
+    (num, den)
+}
+
+/// Sets the decay rate to numerator/denominator.
+pub fn set_decay_rate(env: &Env, numerator: u32, denominator: u32) {
+    env.storage().instance().set(&DataKey::DecayRateNumerator, &numerator);
+    env.storage().instance().set(&DataKey::DecayRateDenominator, &denominator);
+}
+
 // ── Fee withdrawal ────────────────────────────────────────────────────────────
 
 pub fn get_fee_token(env: &Env) -> Option<Address> {
@@ -488,4 +512,35 @@ pub fn set_withdrawal_lock(env: &Env) {
 
 pub fn clear_withdrawal_lock(env: &Env) {
     env.storage().instance().remove(&DataKey::WithdrawalLock);
+}
+
+// ── Score delegation ──────────────────────────────────────────────────────────
+
+/// Returns the custodian wallet delegated for `sub_wallet`, if any.
+/// Extends TTL on read.
+pub fn get_score_delegate(env: &Env, sub_wallet: &Address) -> Option<Address> {
+    let key = DataKey::ScoreDelegate(sub_wallet.clone());
+    let result: Option<Address> = env.storage().persistent().get(&key);
+    if result.is_some() {
+        env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    }
+    result
+}
+
+/// Read-only delegate lookup that does **not** extend TTL — used by the
+/// infallible cross-contract gate path.
+pub fn peek_score_delegate(env: &Env, sub_wallet: &Address) -> Option<Address> {
+    let key = DataKey::ScoreDelegate(sub_wallet.clone());
+    env.storage().persistent().get(&key)
+}
+
+pub fn set_score_delegate(env: &Env, sub_wallet: &Address, custodian: &Address) {
+    let key = DataKey::ScoreDelegate(sub_wallet.clone());
+    env.storage().persistent().set(&key, custodian);
+    env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+}
+
+pub fn remove_score_delegate(env: &Env, sub_wallet: &Address) {
+    let key = DataKey::ScoreDelegate(sub_wallet.clone());
+    env.storage().persistent().remove(&key);
 }

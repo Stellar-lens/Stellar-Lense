@@ -58,6 +58,9 @@ pub struct AggregateRiskScore {
     pub ml_flag_count: u32,
     /// Ledger timestamp of the most recently updated component score.
     pub last_updated: u64,
+    /// True when the aggregate was computed with a non-zero decay rate applied.
+    /// Allows callers to detect whether aging has affected the aggregate score.
+    pub decay_lambda_applied: bool,
 }
 
 /// A cryptographic attestation over a score payload, produced by the
@@ -198,10 +201,30 @@ pub enum DataKey {
     /// `DEFAULT_HISTORY_MAX_DEPTH` when unset; bounded above by
     /// `MAX_HISTORY_DEPTH`.
     HistoryMaxDepth,
+    /// Numerator of the fixed-point decay rate λ = numerator / denominator.
+    /// Stored separately to support fractional λ values in fixed-point arithmetic.
+    /// Defaults to 0 (no decay) when unset.
+    DecayRateNumerator,
+    /// Denominator of the fixed-point decay rate λ = numerator / denominator.
+    /// Defaults to 1 when unset.
+    DecayRateDenominator,
     /// The SEP-41 token contract address from which fees are withdrawn.
     /// Unset until `set_fee_token` is called.
     FeeToken,
     /// Boolean flag set for the duration of a `withdraw_fees` call to
     /// prevent concurrent duplicate withdrawals.
     WithdrawalLock,
+    /// Per-asset-pair pause flag. True when `set_pair_paused(pair, true)` has
+    /// been called and not yet reversed. Hot-path key: looked up on every
+    /// submission — never touches `PausedPairIndex`.
+    PairPaused(Symbol),
+    /// Ordered list of all currently paused asset pairs — an incrementally
+    /// maintained index so `get_paused_pairs` is O(1).
+    PausedPairIndex,
+    /// Ordered set of M-of-N admin co-signers.
+    AdminSet,
+    /// Minimum number of admin-set members that must sign an admin call.
+    AdminThreshold,
+    /// Score delegation: maps a sub-wallet to its custodian wallet.
+    ScoreDelegate(Address),
 }
