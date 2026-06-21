@@ -131,4 +131,12 @@ pub enum Error {
     /// Returned by read-path functions (`get_score`, `get_aggregate_score`)
     /// when the requested wallet is under an active regulatory embargo.
     ScoreEmbargoed = 42,
+
+    // ── Wallet Relationship Graph ──────────────────────────────────────────
+    /// Returned when `add_counterparty_link` would exceed the max links per wallet.
+    CounterpartyLinkFull = 43,
+    /// Returned when `remove_counterparty_link` is called for a non-existent link.
+    CounterpartyNotFound = 44,
+    /// Returned when `add_counterparty_link` is called with the same wallet twice.
+    SelfLink = 45,
 }
