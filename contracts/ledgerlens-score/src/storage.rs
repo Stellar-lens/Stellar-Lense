@@ -65,6 +65,90 @@ pub fn set_paused(env: &Env, paused: bool) {
     env.storage().instance().set(&DataKey::Paused, &paused);
 }
 
+// ── Per-asset-pair circuit breaker ───────────────────────────────────────────
+
+/// Returns `true` only if `asset_pair` has been explicitly paused and not
+/// since unpaused. This is the hot path consulted on every `submit_score` /
+/// `submit_scores_batch` entry, so it is a direct key lookup — it never
+/// touches `PausedPairIndex`.
+pub fn is_pair_paused(env: &Env, asset_pair: &Symbol) -> bool {
+    let key = DataKey::PairPaused(asset_pair.clone());
+    let result: Option<bool> = env.storage().persistent().get(&key);
+    if result.is_some() {
+        env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    }
+    result.unwrap_or(false)
+}
+
+/// Raw flag setter, mirroring `set_watchlist`'s pattern: stores `true` (and
+/// bumps TTL) when paused, removes the key entirely when unpaused so an
+/// unpaused pair costs nothing in storage. Does **not** touch
+/// `PausedPairIndex` — callers (`set_pair_paused`) are responsible for
+/// keeping the index consistent via `add_to_paused_index` /
+/// `remove_from_paused_index`.
+pub fn set_pair_paused_flag(env: &Env, asset_pair: &Symbol, paused: bool) {
+    let key = DataKey::PairPaused(asset_pair.clone());
+    if paused {
+        env.storage().persistent().set(&key, &true);
+        env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    } else {
+        env.storage().persistent().remove(&key);
+    }
+}
+
+/// Returns every currently paused asset pair. O(1) storage read — the index
+/// is maintained incrementally by `add_to_paused_index` /
+/// `remove_from_paused_index` rather than rebuilt by scanning.
+pub fn get_paused_pairs(env: &Env) -> Vec<Symbol> {
+    let pairs: Vec<Symbol> =
+        env.storage().persistent().get(&DataKey::PausedPairIndex).unwrap_or_else(|| Vec::new(env));
+    if !pairs.is_empty() {
+        env.storage().persistent().extend_ttl(
+            &DataKey::PausedPairIndex,
+            SCORE_TTL_THRESHOLD,
+            SCORE_TTL_EXTEND_TO,
+        );
+    }
+    pairs
+}
+
+/// Adds `asset_pair` to `PausedPairIndex` if it isn't already present.
+/// Returns `false` (without modifying the index) if the pair is new *and*
+/// the index is already at `MAX_PAUSED_PAIRS` — the caller turns that into
+/// `Error::PausedPairIndexFull`. Re-adding a pair already in the index is a
+/// no-op that returns `true`, so this is safe to call unconditionally.
+///
+/// O(N) in the number of currently paused pairs, but only on this
+/// infrequent admin-only path — the per-submission hot path
+/// (`is_pair_paused`) never iterates the index.
+pub fn add_to_paused_index(env: &Env, asset_pair: &Symbol) -> bool {
+    let mut pairs = get_paused_pairs(env);
+    if pairs.contains(asset_pair) {
+        return true;
+    }
+    if pairs.len() >= crate::constants::MAX_PAUSED_PAIRS {
+        return false;
+    }
+    pairs.push_back(asset_pair.clone());
+    env.storage().persistent().set(&DataKey::PausedPairIndex, &pairs);
+    env.storage().persistent().extend_ttl(
+        &DataKey::PausedPairIndex,
+        SCORE_TTL_THRESHOLD,
+        SCORE_TTL_EXTEND_TO,
+    );
+    true
+}
+
+/// Removes `asset_pair` from `PausedPairIndex`. No-op if it isn't present.
+/// Same O(N) admin-only-path tradeoff as `add_to_paused_index`.
+pub fn remove_from_paused_index(env: &Env, asset_pair: &Symbol) {
+    let mut pairs = get_paused_pairs(env);
+    if let Some(idx) = pairs.first_index_of(asset_pair) {
+        pairs.remove(idx);
+        env.storage().persistent().set(&DataKey::PausedPairIndex, &pairs);
+    }
+}
+
 // ── Two-step admin transfer ──────────────────────────────────────────────────
 
 pub fn has_pending_admin(env: &Env) -> bool {
@@ -245,6 +329,24 @@ pub fn set_upgrade_delay(env: &Env, delay_secs: u64) {
     env.storage().instance().set(&DataKey::UpgradeDelay, &delay_secs);
 }
 
+// ── Multi-sig admin set ──────────────────────────────────────────────────────
+
+pub fn get_admin_set(env: &Env) -> Vec<Address> {
+    env.storage().instance().get(&DataKey::AdminSet).unwrap_or_else(|| Vec::new(env))
+}
+
+pub fn set_admin_set(env: &Env, set: &Vec<Address>) {
+    env.storage().instance().set(&DataKey::AdminSet, set);
+}
+
+pub fn get_admin_threshold(env: &Env) -> u32 {
+    env.storage().instance().get(&DataKey::AdminThreshold).unwrap_or(0)
+}
+
+pub fn set_admin_threshold(env: &Env, threshold: u32) {
+    env.storage().instance().set(&DataKey::AdminThreshold, &threshold);
+}
+
 // ── Multi-sig service set ─────────────────────────────────────────────────────
 
 pub fn get_service_set(env: &Env) -> Vec<Address> {
@@ -354,6 +456,66 @@ pub fn get_score_count(env: &Env, wallet: &Address, asset_pair: &Symbol) -> u32 
     env.storage().persistent().get(&key).unwrap_or(0)
 }
 
+// ── Wallet score delegation ───────────────────────────────────────────────────
+
+pub fn get_score_delegate(env: &Env, wallet: &Address) -> Option<Address> {
+    let key = DataKey::ScoreDelegate(wallet.clone());
+    let result: Option<Address> = env.storage().persistent().get(&key);
+    if result.is_some() {
+        env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    }
+    result
+}
+
+pub fn set_score_delegate(env: &Env, wallet: &Address, custodian: &Address) {
+    let key = DataKey::ScoreDelegate(wallet.clone());
+    env.storage().persistent().set(&key, custodian);
+    env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+}
+
+pub fn remove_score_delegate(env: &Env, wallet: &Address) {
+    let key = DataKey::ScoreDelegate(wallet.clone());
+    env.storage().persistent().remove(&key);
+}
+
+/// Read-only delegate lookup that does not extend TTL. Used by the infallible
+/// `query_risk_gate` path so it has no observable side effects.
+pub fn peek_score_delegate(env: &Env, wallet: &Address) -> Option<Address> {
+    env.storage().persistent().get(&DataKey::ScoreDelegate(wallet.clone()))
+}
+
+// ── Score embargo (regulatory hold) ──────────────────────────────────────────
+
+pub fn set_score_embargo(env: &Env, wallet: &Address, expiry: &Option<u64>) {
+    let key = DataKey::ScoreEmbargo(wallet.clone());
+    env.storage().persistent().set(&key, expiry);
+    env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+}
+
+#[allow(dead_code)]
+pub fn get_score_embargo(env: &Env, wallet: &Address) -> Option<Option<u64>> {
+    let key = DataKey::ScoreEmbargo(wallet.clone());
+    let result: Option<Option<u64>> = env.storage().persistent().get(&key);
+    if result.is_some() {
+        env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    }
+    result
+}
+
+pub fn remove_score_embargo(env: &Env, wallet: &Address) {
+    let key = DataKey::ScoreEmbargo(wallet.clone());
+    env.storage().persistent().remove(&key);
+}
+
+/// Returns `true` when the wallet is under an active, non-expired embargo.
+pub fn is_embargoed(env: &Env, wallet: &Address) -> bool {
+    match env.storage().persistent().get::<_, Option<u64>>(&DataKey::ScoreEmbargo(wallet.clone())) {
+        None => false,
+        Some(None) => true, // indefinite embargo
+        Some(Some(expiry)) => env.ledger().timestamp() < expiry,
+    }
+}
+
 // ── Score attestation ─────────────────────────────────────────────────────
 
 /// Returns the off-chain detection pipeline's secp256k1 public key, or
@@ -364,4 +526,81 @@ pub fn get_service_pubkey(env: &Env) -> Option<Bytes> {
 
 pub fn set_service_pubkey(env: &Env, pubkey: &Bytes) {
     env.storage().instance().set(&DataKey::ServicePubKey, pubkey);
+}
+
+// ── Time-weighted exponential decay ──────────────────────────────────────
+
+/// Returns the numerator and denominator of the configured decay rate λ.
+/// Defaults to (0, 1) when unset, representing no decay.
+pub fn get_decay_rate(env: &Env) -> (u32, u32) {
+    let num = env
+        .storage()
+        .instance()
+        .get(&DataKey::DecayRateNumerator)
+        .unwrap_or(crate::constants::DEFAULT_DECAY_LAMBDA_NUM);
+    let den = env
+        .storage()
+        .instance()
+        .get(&DataKey::DecayRateDenominator)
+        .unwrap_or(crate::constants::DEFAULT_DECAY_LAMBDA_DEN);
+    (num, den)
+}
+
+/// Sets the decay rate to numerator/denominator.
+pub fn set_decay_rate(env: &Env, numerator: u32, denominator: u32) {
+    env.storage().instance().set(&DataKey::DecayRateNumerator, &numerator);
+    env.storage().instance().set(&DataKey::DecayRateDenominator, &denominator);
+}
+
+// ── Fee withdrawal ────────────────────────────────────────────────────────────
+
+pub fn get_fee_token(env: &Env) -> Option<Address> {
+    env.storage().instance().get(&DataKey::FeeToken)
+}
+
+pub fn set_fee_token(env: &Env, token: &Address) {
+    env.storage().instance().set(&DataKey::FeeToken, token);
+}
+
+pub fn is_withdrawal_locked(env: &Env) -> bool {
+    env.storage().instance().get::<_, bool>(&DataKey::WithdrawalLock).unwrap_or(false)
+}
+
+pub fn set_withdrawal_lock(env: &Env) {
+    env.storage().instance().set(&DataKey::WithdrawalLock, &true);
+}
+
+pub fn clear_withdrawal_lock(env: &Env) {
+    env.storage().instance().remove(&DataKey::WithdrawalLock);
+}
+
+// ── Score delegation ──────────────────────────────────────────────────────────
+
+/// Returns the custodian wallet delegated for `sub_wallet`, if any.
+/// Extends TTL on read.
+pub fn get_score_delegate(env: &Env, sub_wallet: &Address) -> Option<Address> {
+    let key = DataKey::ScoreDelegate(sub_wallet.clone());
+    let result: Option<Address> = env.storage().persistent().get(&key);
+    if result.is_some() {
+        env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    }
+    result
+}
+
+/// Read-only delegate lookup that does **not** extend TTL — used by the
+/// infallible cross-contract gate path.
+pub fn peek_score_delegate(env: &Env, sub_wallet: &Address) -> Option<Address> {
+    let key = DataKey::ScoreDelegate(sub_wallet.clone());
+    env.storage().persistent().get(&key)
+}
+
+pub fn set_score_delegate(env: &Env, sub_wallet: &Address, custodian: &Address) {
+    let key = DataKey::ScoreDelegate(sub_wallet.clone());
+    env.storage().persistent().set(&key, custodian);
+    env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+}
+
+pub fn remove_score_delegate(env: &Env, sub_wallet: &Address) {
+    let key = DataKey::ScoreDelegate(sub_wallet.clone());
+    env.storage().persistent().remove(&key);
 }
