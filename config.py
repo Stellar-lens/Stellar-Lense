@@ -22,11 +22,31 @@ def _parse_int_list(raw: str) -> list[int]:
     return [int(v.strip()) for v in raw.split(",") if v.strip()]
 
 
+def _parse_pool_ids(raw: str) -> list[str]:
+    import re
+
+    pool_id_re = re.compile(r"^[0-9a-f]{64}$")
+    ids = []
+    for entry in raw.split(","):
+        entry = entry.strip()
+        if not entry:
+            continue
+        if not pool_id_re.match(entry):
+            raise ValueError(
+                f"WATCHED_AMM_POOLS contains invalid pool ID {entry!r} — "
+                "must be a 64-character lowercase hex string"
+            )
+        ids.append(entry)
+    return ids
+
+
 class Config:
     HORIZON_URL: str = os.getenv("HORIZON_URL", "https://horizon.stellar.org")
     STELLAR_NETWORK: str = os.getenv("STELLAR_NETWORK", "PUBLIC")
 
     WATCHED_ASSET_PAIRS: list[tuple[str, str]] = _parse_pairs(os.getenv("WATCHED_ASSET_PAIRS", ""))
+
+    WATCHED_AMM_POOLS: list[str] = _parse_pool_ids(os.getenv("WATCHED_AMM_POOLS", ""))
 
     BENFORD_WINDOWS_HOURS: list[int] = _parse_int_list(
         os.getenv("BENFORD_WINDOWS_HOURS", "1,4,24,168,720")
