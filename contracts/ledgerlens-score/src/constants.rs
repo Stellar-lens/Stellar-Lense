@@ -17,6 +17,9 @@ pub const DEFAULT_RISK_THRESHOLD: u32 = 75;
 
 /// Semantic contract version; bump on breaking ABI changes.
 ///
+/// Bumped to 2 when `submit_score` gained its `attestation` parameter (see
+/// `docs/attestation-spec.md`).
+/// Bumped to 3 when `AggregateRiskScore` gained `decay_lambda_applied` field.
 /// Bumped to 3 when all admin-tier functions gained `admin_signers: Vec<Address>`
 /// for M-of-N governance and the `AdminSet` / `AdminThreshold` storage keys
 /// were introduced.
@@ -86,3 +89,24 @@ pub const DEFAULT_STALENESS_WINDOW_SECS: u64 = 604_800;
 /// the rare admin pause/unpause path; the hot `is_pair_paused` read used by
 /// every submission never touches the index. See `set_pair_paused`.
 pub const MAX_PAUSED_PAIRS: u32 = 50;
+
+// ── Time-weighted exponential decay ───────────────────────────────────────────
+
+/// Fixed-point scale factor used in decay computations (1_000_000 = 6 decimal
+/// places of precision). Decay factors are computed as fixed-point integers
+/// in the range [0, DECAY_FIXED_POINT_SCALE].
+pub const DECAY_FIXED_POINT_SCALE: u64 = 1_000_000;
+
+/// Default decay rate numerator — 0 means no decay until configured.
+pub const DEFAULT_DECAY_LAMBDA_NUM: u32 = 0;
+
+/// Default decay rate denominator — 1 avoids division-by-zero in the default.
+pub const DEFAULT_DECAY_LAMBDA_DEN: u32 = 1;
+
+/// Maximum allowed decay rate numerator. Caps λ at 1/1 (full decay per
+/// unit time), preventing scores from being instantly zeroed by a
+/// misconfigured rate.
+pub const MAX_DECAY_LAMBDA_NUM: u32 = 1;
+
+/// Maximum allowed decay rate denominator (paired with MAX_DECAY_LAMBDA_NUM).
+pub const MAX_DECAY_LAMBDA_DEN: u32 = 1;

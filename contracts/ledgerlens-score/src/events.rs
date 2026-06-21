@@ -158,24 +158,11 @@ pub fn history_depth_updated(env: &Env, depth: u32) {
     env.events().publish((symbol_short!("hd_upd"),), depth);
 }
 
-// ── Wallet score delegation ───────────────────────────────────────────────────
+// ── Time-weighted exponential decay ────────────────────────────────────────
 
-pub fn delegate_set(env: &Env, sub_wallet: &Address, custodian: &Address) {
-    env.events().publish((symbol_short!("del_set"),), (sub_wallet.clone(), custodian.clone()));
-}
-
-pub fn delegate_removed(env: &Env, sub_wallet: &Address) {
-    env.events().publish((symbol_short!("del_rem"),), sub_wallet.clone());
-}
-
-// ── Score embargo (regulatory hold) ──────────────────────────────────────────
-
-pub fn embargo_set(env: &Env, wallet: &Address, expiry: &Option<u64>) {
-    env.events().publish((symbol_short!("emb_set"),), (wallet.clone(), *expiry));
-}
-
-pub fn embargo_lifted(env: &Env, wallet: &Address, lifted_by: &Address) {
-    env.events().publish((symbol_short!("emb_lift"),), (wallet.clone(), lifted_by.clone()));
+/// Emitted when the admin sets the exponential decay rate via `set_decay_rate`.
+pub fn decay_rate_updated(env: &Env, numerator: u32, denominator: u32) {
+    env.events().publish((symbol_short!("decay_upd"),), (numerator, denominator));
 }
 
 // ── Fee withdrawal ────────────────────────────────────────────────────────────
@@ -204,4 +191,16 @@ pub fn fee_withdrawn(
 /// already held by an in-flight call.
 pub fn withdrawal_locked(env: &Env, admin: &Address) {
     env.events().publish((symbol_short!("wdl_lck"),), admin.clone());
+}
+
+// ── Wallet-score delegation ───────────────────────────────────────────────────
+
+/// Emitted when `set_score_delegate` registers or updates a delegation.
+pub fn delegate_set(env: &Env, sub_wallet: &Address, custodian: &Address) {
+    env.events().publish((symbol_short!("dlg_set"),), (sub_wallet.clone(), custodian.clone()));
+}
+
+/// Emitted when `remove_score_delegate` removes a delegation.
+pub fn delegate_removed(env: &Env, sub_wallet: &Address) {
+    env.events().publish((symbol_short!("dlg_rem"),), sub_wallet.clone());
 }

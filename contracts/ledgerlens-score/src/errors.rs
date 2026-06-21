@@ -93,30 +93,37 @@ pub enum Error {
     /// in-flight (concurrency lock held).
     WithdrawalInProgress = 32,
 
-    // ── Per-asset-pair circuit breaker ─────────────────────────────────────
-    /// Returned when a score submission targets an individually paused pair.
+    // ── Per-pair circuit breaker ───────────────────────────────────────────
+    /// Returned by `submit_score` / `submit_scores_batch` when the target
+    /// `asset_pair` has been individually paused via `set_pair_paused`.
     PairPaused = 33,
-    /// `set_pair_paused` was called and the `PausedPairIndex` is already full
-    /// (`MAX_PAUSED_PAIRS` entries).
-    PausedPairIndexFull = 36,
-
-    // ── Wallet score delegation ────────────────────────────────────────────
-    /// `set_score_delegate` was called with a wallet that delegates to itself,
-    /// or would form a delegation cycle.
-    CyclicDelegation = 34,
-    /// `remove_score_delegate` was called for a wallet with no delegation.
-    DelegateNotFound = 35,
+    /// Returned by `set_pair_paused` when trying to pause a new pair but the
+    /// `PausedPairIndex` already holds `MAX_PAUSED_PAIRS` entries.
+    PausedPairIndexFull = 34,
 
     // ── Admin M-of-N multi-sig ─────────────────────────────────────────────
-    /// `add_admin_signer` was called when the admin set is already at capacity.
-    AdminSetFull = 37,
-    /// A signer passed to an admin function is not a member of the admin set.
-    AdminSignerNotInSet = 38,
-    /// Fewer than the configured threshold of admin signers were provided.
-    InsufficientAdminSigners = 39,
+    /// `add_admin_signer` called when the admin set is already at
+    /// `MAX_ADMIN_SIGNERS`.
+    AdminSetFull = 35,
+    /// A signer in `admin_signers` is not a member of the admin set.
+    AdminSignerNotInSet = 36,
+    /// Fewer than the configured threshold of admin signers were supplied.
+    InsufficientAdminSigners = 37,
 
-    // ── Score embargo (regulatory hold) ───────────────────────────────────
-    /// Returned by `get_score` and `get_aggregate_score` when the wallet is
-    /// under an active score embargo set by `set_score_embargo`.
-    ScoreEmbargoed = 40,
+    // ── Wallet-score delegation ────────────────────────────────────────────
+    /// `set_score_delegate` would create a cycle (wallet → custodian →
+    /// wallet).
+    CyclicDelegation = 38,
+    /// `remove_score_delegate` called for a wallet that has no delegate.
+    DelegateNotFound = 39,
+
+    // ── Cross-contract gate ────────────────────────────────────────────────
+    /// Returned by an integrating contract (e.g. AMM) when `query_risk_gate`
+    /// returns `false`. Not returned by the LedgerLens contract itself.
+    HighRiskWallet = 40,
+
+    // ── Time-weighted exponential decay ───────────────────────────────────
+    /// `set_decay_rate` called with a denominator of 0, or with a
+    /// numerator/denominator ratio exceeding `MAX_DECAY_LAMBDA`.
+    InvalidDecayRate = 41,
 }
