@@ -217,6 +217,14 @@
                     },
                     {
                       "key": {
+                        "symbol": "decay_lambda_applied"
+                      },
+                      "val": {
+                        "bool": false
+                      }
+                    },
+                    {
+                      "key": {
                         "symbol": "last_updated"
                       },
                       "val": {

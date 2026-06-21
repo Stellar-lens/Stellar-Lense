@@ -183,6 +183,14 @@
                     },
                     {
                       "key": {
+                        "symbol": "decay_lambda_applied"
+                      },
+                      "val": {
+                        "bool": false
+                      }
+                    },
+                    {
+                      "key": {
                         "symbol": "last_updated"
                       },
                       "val": {
@@ -1026,7 +1034,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "del_set"
+                "symbol": "dlg_set"
               }
             ],
             "data": {

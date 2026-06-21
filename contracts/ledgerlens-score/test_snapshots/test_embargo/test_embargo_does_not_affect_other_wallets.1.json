@@ -181,6 +181,14 @@
                     },
                     {
                       "key": {
+                        "symbol": "decay_lambda_applied"
+                      },
+                      "val": {
+                        "bool": false
+                      }
+                    },
+                    {
+                      "key": {
                         "symbol": "last_updated"
                       },
                       "val": {
@@ -279,6 +287,14 @@
                       },
                       "val": {
                         "u32": 0
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "decay_lambda_applied"
+                      },
+                      "val": {
+                        "bool": false
                       }
                     },
                     {
@@ -1900,7 +1916,7 @@
             ],
             "data": {
               "error": {
-                "contract": 40
+                "contract": 42
               }
             }
           }
@@ -1921,7 +1937,7 @@
               },
               {
                 "error": {
-                  "contract": 40
+                  "contract": 42
                 }
               }
             ],
@@ -1946,7 +1962,7 @@
               },
               {
                 "error": {
-                  "contract": 40
+                  "contract": 42
                 }
               }
             ],

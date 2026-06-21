@@ -1768,7 +1768,7 @@ impl LedgerLensScoreContract {
 
         if num
             .checked_mul(max_den)
-            .map(|v| v > max_num.checked_mul(den).unwrap_or(u64::MAX))
+            .map(|v| v > max_num.saturating_mul(den))
             .unwrap_or(true)
         {
             return Err(Error::InvalidDecayRate);
@@ -2270,24 +2270,19 @@ impl LedgerLensScoreContract {
         result -= x;
 
         // Term 2: +x²/2
-        let x2 = i128::try_from(x.checked_mul(x).ok_or(()).unwrap_or(0)).unwrap_or(0);
+        let x2 = x.checked_mul(x).unwrap_or(0);
         result += x2 / (2 * s);
 
         // Term 3: -x³/6
-        let x3 =
-            i128::try_from(x.checked_mul(x).and_then(|v| v.checked_mul(x)).ok_or(()).unwrap_or(0))
-                .unwrap_or(0);
+        let x3 = x.checked_mul(x).and_then(|v| v.checked_mul(x)).unwrap_or(0);
         result -= x3 / (6 * s * s);
 
         // Term 4: +x⁴/24
-        let x4 = i128::try_from(
-            x.checked_mul(x)
-                .and_then(|v| v.checked_mul(x))
-                .and_then(|v| v.checked_mul(x))
-                .ok_or(())
-                .unwrap_or(0),
-        )
-        .unwrap_or(0);
+        let x4 = x
+            .checked_mul(x)
+            .and_then(|v| v.checked_mul(x))
+            .and_then(|v| v.checked_mul(x))
+            .unwrap_or(0);
         result += x4 / (24 * s * s * s);
 
         // Clamp to [0, SCALE] and convert back to u64
