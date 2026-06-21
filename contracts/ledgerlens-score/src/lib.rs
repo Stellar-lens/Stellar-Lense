@@ -1766,11 +1766,7 @@ impl LedgerLensScoreContract {
         let num = numerator as u64;
         let den = denominator as u64;
 
-        if num
-            .checked_mul(max_den)
-            .map(|v| v > max_num.saturating_mul(den))
-            .unwrap_or(true)
-        {
+        if num.checked_mul(max_den).map(|v| v > max_num.saturating_mul(den)).unwrap_or(true) {
             return Err(Error::InvalidDecayRate);
         }
 

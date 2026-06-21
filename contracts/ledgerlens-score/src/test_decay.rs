@@ -28,9 +28,7 @@ fn submit_pair(
     score: u32,
     ts: u64,
 ) {
-    client.submit_score(
-        &Vec::new(env), wallet, pair, &score, &false, &false, &ts, &90, &1, &None,
-    );
+    client.submit_score(&Vec::new(env), wallet, pair, &score, &false, &false, &ts, &90, &1, &None);
 }
 
 #[test]
