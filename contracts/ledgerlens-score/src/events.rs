@@ -243,7 +243,12 @@ pub fn delegate_removed(env: &Env, sub_wallet: &Address) {
 // ── Wallet Relationship Graph ───────────────────────────────────────────────
 
 /// Emitted when a counterparty link is added between two wallets.
-pub fn counterparty_link_added(env: &Env, wallet_a: &Address, wallet_b: &Address, asset_pair: &Symbol) {
+pub fn counterparty_link_added(
+    env: &Env,
+    wallet_a: &Address,
+    wallet_b: &Address,
+    asset_pair: &Symbol,
+) {
     env.events().publish(
         (symbol_short!("cpl_add"), wallet_a.clone(), wallet_b.clone()),
         asset_pair.clone(),
@@ -251,7 +256,12 @@ pub fn counterparty_link_added(env: &Env, wallet_a: &Address, wallet_b: &Address
 }
 
 /// Emitted when a counterparty link is removed.
-pub fn counterparty_link_removed(env: &Env, wallet_a: &Address, wallet_b: &Address, asset_pair: &Symbol) {
+pub fn counterparty_link_removed(
+    env: &Env,
+    wallet_a: &Address,
+    wallet_b: &Address,
+    asset_pair: &Symbol,
+) {
     env.events().publish(
         (symbol_short!("cpl_rem"), wallet_a.clone(), wallet_b.clone()),
         asset_pair.clone(),

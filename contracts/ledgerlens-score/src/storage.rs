@@ -6,6 +6,8 @@ use crate::constants::{
 };
 use crate::types::{AggregateRiskScore, DataKey, RiskScore, ScoreTrend, UpgradeProposal};
 
+use crate::Error;
+
 // ── Admin / Service ─────────────────────────────────────────────────────────
 
 pub fn has_admin(env: &Env) -> bool {
@@ -692,5 +694,5 @@ pub fn remove_counterparty_link(
 pub fn get_contagion_depth(env: &Env, wallet: &Address, asset_pair: &Symbol) -> u32 {
     let key = DataKey::Counterparties(wallet.clone(), asset_pair.clone());
     let links: Vec<Address> = env.storage().persistent().get(&key).unwrap_or_else(|| Vec::new(env));
-    links.len() as u32
+    links.len()
 }

@@ -2271,7 +2271,7 @@ fn test_counterparty_link_cap_enforced() {
     let asset_pair = symbol_short!("XLM_USDC");
 
     // Add 50 counterparties (MAX_COUNTERPARTY_LINKS_PER_WALLET = 50)
-    for i in 0..50 {
+    for _i in 0..50 {
         let counterparty = Address::generate(&env);
         client.add_counterparty_link(&wallet_a, &counterparty, &asset_pair);
     }

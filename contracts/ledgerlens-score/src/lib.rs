@@ -2589,7 +2589,6 @@ impl LedgerLensScoreContract {
         Ok(())
     }
 
-
     // ── Wallet Relationship Graph ───────────────────────────────────────────────
 
     /// Adds a bidirectional trading relationship between two wallets for an asset pair.
@@ -2745,7 +2744,8 @@ impl LedgerLensScoreContract {
                 .unwrap_or(0);
 
             // Apply boost, capped at 100
-            let new_score = core::cmp::min(current_score.saturating_add(contagion_score_boost), 100);
+            let new_score =
+                core::cmp::min(current_score.saturating_add(contagion_score_boost), 100);
 
             // Only update if the score actually changes
             if new_score != current_score {
