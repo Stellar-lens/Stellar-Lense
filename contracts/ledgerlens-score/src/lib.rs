@@ -2588,4 +2588,212 @@ impl LedgerLensScoreContract {
         }
         Ok(())
     }
+
+
+    // ── Wallet Relationship Graph ───────────────────────────────────────────────
+
+    /// Adds a bidirectional trading relationship between two wallets for an asset pair.
+    ///
+    /// Service-authorized. Records the relationship bidirectionally so that
+    /// querying counterparties for either wallet returns the other.
+    ///
+    /// # Enforcement
+    /// - `MAX_COUNTERPARTY_LINKS_PER_WALLET` cap is enforced per wallet per asset pair
+    /// - Self-links (wallet_a == wallet_b) are rejected with `Error::SelfLink`
+    ///
+    /// # Events
+    /// Emits `counterparty_link_added` on success.
+    ///
+    /// # Errors
+    /// - `Error::NotInitialized` if contract has no admin
+    /// - `Error::SelfLink` if wallet_a == wallet_b
+    /// - `Error::CounterpartyLinkFull` if either wallet exceeds the max links cap
+    pub fn add_counterparty_link(
+        env: Env,
+        wallet_a: Address,
+        wallet_b: Address,
+        asset_pair: Symbol,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+
+        // Authorise: only the service account (or multi-sig signers) can add links
+        let service_set = storage::get_service_set(&env);
+        let threshold = storage::get_service_threshold(&env);
+
+        if !service_set.is_empty() && threshold > 0 {
+            // Multi-sig path — signers passed as empty since we're using service auth
+            let service = storage::get_service(&env);
+            service.require_auth();
+        } else {
+            let service = storage::get_service(&env);
+            service.require_auth();
+        }
+
+        storage::add_counterparty_link(&env, &wallet_a, &wallet_b, &asset_pair)?;
+        events::counterparty_link_added(&env, &wallet_a, &wallet_b, &asset_pair);
+
+        Ok(())
+    }
+
+    /// Removes a bidirectional trading relationship between two wallets for an asset pair.
+    ///
+    /// Service-authorized. Removes the link from both wallets' counterparty lists.
+    ///
+    /// # Events
+    /// Emits `counterparty_link_removed` on success.
+    ///
+    /// # Errors
+    /// - `Error::NotInitialized` if contract has no admin
+    /// - `Error::CounterpartyNotFound` if the link does not exist
+    pub fn remove_counterparty_link(
+        env: Env,
+        wallet_a: Address,
+        wallet_b: Address,
+        asset_pair: Symbol,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+
+        let service = storage::get_service(&env);
+        service.require_auth();
+
+        storage::remove_counterparty_link(&env, &wallet_a, &wallet_b, &asset_pair)?;
+        events::counterparty_link_removed(&env, &wallet_a, &wallet_b, &asset_pair);
+
+        Ok(())
+    }
+
+    /// Returns all registered trading counterparties for a wallet on an asset pair.
+    ///
+    /// Read-only, callable by any account or contract.
+    pub fn get_counterparties(env: Env, wallet: Address, asset_pair: Symbol) -> Vec<Address> {
+        storage::get_counterparties(&env, &wallet, &asset_pair)
+    }
+
+    /// Propagates a contagion score boost from an anchor wallet to all its registered counterparties.
+    ///
+    /// Service-authorized. For each registered counterparty of `anchor_wallet` on `asset_pair`:
+    ///   new_score = min(current_score + boost, 100)
+    ///
+    /// Writes the boosted score WITHOUT going through `submit_score` validation
+    /// (rate limits, cooldowns, attestation) — this is an explicit contagion path.
+    ///
+    /// Wallets with no current score are treated as having score 0 for the addition.
+    ///
+    /// # Intent
+    /// This is the contagion propagation path that allows a high-risk anchor wallet
+    /// to influence its known trading counterparties. The score boost is applied
+    /// directly to each counterparty's current score, capped at 100.
+    ///
+    /// # Contagion bypass
+    /// Contagion explicitly bypasses rate limits and cooldowns — this is intentional
+    /// and documented, not a bug. If an anchor is flagged, its counterparties should
+    /// be boosted immediately regardless of when they were last scored.
+    ///
+    /// # Events
+    /// Emits `contagion_propagated` per affected wallet with old and new scores.
+    ///
+    /// # Errors
+    /// - `Error::NotInitialized` if contract has no admin
+    /// - `Error::ScoreEmbargoed` if the anchor wallet is embargoed
+    ///
+    /// # Returns
+    /// The number of wallets affected (counterparties that were boosted).
+    pub fn propagate_contagion(
+        env: Env,
+        anchor_wallet: Address,
+        asset_pair: Symbol,
+        contagion_score_boost: u32,
+    ) -> Result<u32, Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+
+        // Check if anchor is embargoed
+        if storage::is_embargoed(&env, &anchor_wallet) {
+            return Err(Error::ScoreEmbargoed);
+        }
+
+        // Authorise: only the service account can propagate contagion
+        let service = storage::get_service(&env);
+        service.require_auth();
+
+        // Get all counterparties of the anchor wallet
+        let counterparties = storage::get_counterparties(&env, &anchor_wallet, &asset_pair);
+
+        if counterparties.is_empty() {
+            return Ok(0);
+        }
+
+        let mut affected_count: u32 = 0;
+
+        // For each counterparty, apply the contagion boost
+        for i in 0..counterparties.len() {
+            let affected_wallet = counterparties.get(i).unwrap();
+
+            // Skip if affected wallet is embargoed
+            if storage::is_embargoed(&env, &affected_wallet) {
+                continue;
+            }
+
+            // Get current score (treat missing as 0)
+            let current_score = storage::peek_score(&env, &affected_wallet, &asset_pair)
+                .map(|s| s.score)
+                .unwrap_or(0);
+
+            // Apply boost, capped at 100
+            let new_score = core::cmp::min(current_score.saturating_add(contagion_score_boost), 100);
+
+            // Only update if the score actually changes
+            if new_score != current_score {
+                // Create a new RiskScore with the boosted value
+                // Preserve existing fields where possible, or use defaults
+                let existing = storage::peek_score(&env, &affected_wallet, &asset_pair);
+                let boosted_score = RiskScore {
+                    score: new_score,
+                    benford_flag: existing.as_ref().map(|s| s.benford_flag).unwrap_or(false),
+                    ml_flag: existing.as_ref().map(|s| s.ml_flag).unwrap_or(false),
+                    timestamp: env.ledger().timestamp(),
+                    confidence: existing.as_ref().map(|s| s.confidence).unwrap_or(50),
+                    model_version: existing.as_ref().map(|s| s.model_version).unwrap_or(0),
+                };
+
+                // Write the boosted score directly (bypassing rate limits and cooldowns)
+                storage::set_score(&env, &affected_wallet, &asset_pair, &boosted_score);
+                // Update history and aggregate cache
+                storage::push_score_history(&env, &affected_wallet, &asset_pair, &boosted_score);
+                storage::register_pair_for_wallet(&env, &affected_wallet, &asset_pair);
+                storage::increment_score_count(&env, &affected_wallet, &asset_pair);
+
+                // Refresh aggregate cache for the affected wallet
+                if let Ok(aggregate) = Self::compute_aggregate_score(&env, &affected_wallet) {
+                    storage::set_aggregate_score(&env, &affected_wallet, &aggregate);
+                }
+
+                // Emit contagion event
+                events::contagion_propagated(
+                    &env,
+                    &anchor_wallet,
+                    &asset_pair,
+                    &affected_wallet,
+                    current_score,
+                    new_score,
+                );
+
+                affected_count += 1;
+            }
+        }
+
+        Ok(affected_count)
+    }
+
+    /// Returns the number of registered counterparties (graph degree) for a wallet/pair.
+    ///
+    /// Read-only, callable by any account or contract.
+    pub fn get_contagion_depth(env: Env, wallet: Address, asset_pair: Symbol) -> u32 {
+        storage::get_contagion_depth(&env, &wallet, &asset_pair)
+    }
 }
