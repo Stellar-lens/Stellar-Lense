@@ -12,16 +12,13 @@
           "function": {
             "contract_fn": {
               "contract_address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-              "function_name": "clear_score_history",
+              "function_name": "set_score_embargo",
               "args": [
-                {
-                  "vec": []
-                },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                 },
                 {
-                  "symbol": "XLM_USDC"
+                  "u64": 1700003600
                 }
               ]
             }
@@ -35,13 +32,58 @@
   "ledger": {
     "protocol_version": 21,
     "sequence_number": 0,
-    "timestamp": 0,
+    "timestamp": 1700000000,
     "network_id": "0000000000000000000000000000000000000000000000000000000000000000",
     "base_reserve": 0,
     "min_persistent_entry_ttl": 4096,
     "min_temp_entry_ttl": 16,
     "max_entry_ttl": 6312000,
     "ledger_entries": [
+      [
+        {
+          "contract_data": {
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+            "key": {
+              "vec": [
+                {
+                  "symbol": "ScoreEmbargo"
+                },
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                }
+              ]
+            },
+            "durability": "persistent"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+                "key": {
+                  "vec": [
+                    {
+                      "symbol": "ScoreEmbargo"
+                    },
+                    {
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                    }
+                  ]
+                },
+                "durability": "persistent",
+                "val": {
+                  "u64": 1700003600
+                }
+              }
+            },
+            "ext": "v0"
+          },
+          777600
+        ]
+      ],
       [
         {
           "contract_data": {
@@ -225,19 +267,16 @@
                 "bytes": "0000000000000000000000000000000000000000000000000000000000000001"
               },
               {
-                "symbol": "clear_score_history"
+                "symbol": "set_score_embargo"
               }
             ],
             "data": {
               "vec": [
                 {
-                  "vec": []
-                },
-                {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                 },
                 {
-                  "symbol": "XLM_USDC"
+                  "u64": 1700003600
                 }
               ]
             }
@@ -255,14 +294,18 @@
           "v0": {
             "topics": [
               {
-                "symbol": "clr_hist"
-              },
-              {
-                "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                "symbol": "emb_set"
               }
             ],
             "data": {
-              "symbol": "XLM_USDC"
+              "vec": [
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                },
+                {
+                  "u64": 1700003600
+                }
+              ]
             }
           }
         }
@@ -281,7 +324,7 @@
                 "symbol": "fn_return"
               },
               {
-                "symbol": "clear_score_history"
+                "symbol": "set_score_embargo"
               }
             ],
             "data": "void"
@@ -305,18 +348,11 @@
                 "bytes": "0000000000000000000000000000000000000000000000000000000000000001"
               },
               {
-                "symbol": "get_score_history"
+                "symbol": "is_embargoed"
               }
             ],
             "data": {
-              "vec": [
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
-                },
-                {
-                  "symbol": "XLM_USDC"
-                }
-              ]
+              "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
             }
           }
         }
@@ -335,11 +371,11 @@
                 "symbol": "fn_return"
               },
               {
-                "symbol": "get_score_history"
+                "symbol": "is_embargoed"
               }
             ],
             "data": {
-              "vec": []
+              "bool": true
             }
           }
         }

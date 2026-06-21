@@ -25,6 +25,9 @@ mod test_attestation;
 #[cfg(test)]
 mod test_decay;
 
+#[cfg(test)]
+mod test_embargo;
+
 use soroban_sdk::{
     contract, contractimpl, crypto::Hash, symbol_short, token, Address, Bytes, BytesN, Env, Symbol,
     SymbolStr, TryFromVal, Vec,
@@ -410,6 +413,9 @@ impl LedgerLensScoreContract {
     /// assert_eq!(score.score, 10);
     /// ```
     pub fn get_score(env: Env, wallet: Address, asset_pair: Symbol) -> Result<RiskScore, Error> {
+        if storage::is_embargoed(&env, &wallet) {
+            return Err(Error::ScoreEmbargoed);
+        }
         match storage::get_score(&env, &wallet, &asset_pair) {
             Some(score) => Ok(score),
             None => {
@@ -452,6 +458,9 @@ impl LedgerLensScoreContract {
     /// assert_eq!(history.get(1).unwrap().score, 20);
     /// ```
     pub fn get_score_history(env: Env, wallet: Address, asset_pair: Symbol) -> Vec<RiskScore> {
+        if storage::is_embargoed(&env, &wallet) {
+            return Vec::new(&env);
+        }
         storage::get_score_history(&env, &wallet, &asset_pair)
     }
 
@@ -660,6 +669,9 @@ impl LedgerLensScoreContract {
     /// would overflow — this can only happen with extreme admin-configured
     /// weights, since per-pair scores are bounded to 0-100.
     pub fn get_aggregate_score(env: Env, wallet: Address) -> Result<AggregateRiskScore, Error> {
+        if storage::is_embargoed(&env, &wallet) {
+            return Err(Error::ScoreEmbargoed);
+        }
         let pairs = storage::get_wallet_pairs(&env, &wallet);
         if pairs.is_empty() {
             if let Some(custodian) = storage::get_score_delegate(&env, &wallet) {
@@ -756,6 +768,9 @@ impl LedgerLensScoreContract {
         asset_pair: Symbol,
         gate_threshold: u32,
     ) -> bool {
+        if storage::is_embargoed(&env, &wallet) {
+            return false;
+        }
         match storage::peek_score(&env, &wallet, &asset_pair) {
             Some(risk) => risk.score < gate_threshold,
             None => {
@@ -1479,6 +1494,96 @@ impl LedgerLensScoreContract {
     /// ```
     pub fn is_watchlisted(env: Env, wallet: Address) -> bool {
         storage::is_watchlisted(&env, &wallet)
+    }
+
+    // ── Score embargo (regulatory hold) ─────────────────────────────────────
+
+    /// Place a per-wallet score embargo, blocking all read-path access to the
+    /// wallet's scores without erasing any data.  Admin only.
+    ///
+    /// `expiry` sets the automatic lift time as a ledger timestamp:
+    /// - `None` — indefinite; only `lift_score_embargo` can remove it.
+    /// - `Some(ts)` — auto-lifted once `env.ledger().timestamp() >= ts`.
+    ///
+    /// While active:
+    /// - `get_score` → `Err(ScoreEmbargoed)`
+    /// - `query_risk_gate` → `false` (conservative deny, no error)
+    /// - `get_score_history` → empty `Vec`
+    /// - `get_aggregate_score` → `Err(ScoreEmbargoed)`
+    /// - `submit_score` / `submit_scores_batch` → unaffected (writes succeed)
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient, Error};
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
+    /// # use soroban_sdk::symbol_short;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// let wallet = Address::generate(&env);
+    /// assert!(!client.is_embargoed(&wallet));
+    /// client.set_score_embargo(&wallet, &None).unwrap();
+    /// assert!(client.is_embargoed(&wallet));
+    /// ```
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if the contract has no admin yet.
+    pub fn set_score_embargo(env: Env, wallet: Address, expiry: Option<u64>) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        storage::get_admin(&env).require_auth();
+        storage::set_score_embargo(&env, &wallet, &expiry);
+        events::embargo_set(&env, &wallet, &expiry);
+        Ok(())
+    }
+
+    /// Explicitly lift a per-wallet score embargo.  Admin only.
+    ///
+    /// This is required for indefinite embargoes (`expiry = None`). For
+    /// time-limited embargoes it is also available as an early-lift mechanism.
+    /// After this call `is_embargoed` returns `false` and all read-path
+    /// functions resume their normal behaviour.
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if the contract has no admin yet.
+    pub fn lift_score_embargo(env: Env, wallet: Address) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        let admin = storage::get_admin(&env);
+        admin.require_auth();
+        storage::remove_score_embargo(&env, &wallet);
+        events::embargo_lifted(&env, &wallet, &admin);
+        Ok(())
+    }
+
+    /// Returns `true` when `wallet` is under an active, non-expired embargo.
+    /// Returns `false` when no embargo exists or when a time-limited embargo
+    /// has passed its expiry timestamp.  Read-only, callable by any account.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address};
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// let wallet = Address::generate(&env);
+    /// assert!(!client.is_embargoed(&wallet));
+    /// ```
+    pub fn is_embargoed(env: Env, wallet: Address) -> bool {
+        storage::is_embargoed(&env, &wallet)
     }
 
     // ── Risk threshold ───────────────────────────────────────────────────────
