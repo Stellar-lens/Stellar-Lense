@@ -73,6 +73,9 @@ class Config:
 
     MIN_TRADES_FOR_SCORING: int = int(os.getenv("MIN_TRADES_FOR_SCORING", "20"))
 
+    # Forensic reporting
+    REPORT_CONCURRENCY: int = int(os.getenv("REPORT_CONCURRENCY", "4"))
+
     # Real-time streaming / alerting
     # STREAMING_BACKEND selects the ingestion transport:
     #   "sse"   — existing thread-per-pair Horizon SSE pipeline (default, no Kafka)

@@ -26,6 +26,121 @@ from detection.benford_engine import (
 from detection.wallet_graph import compute_wallet_graph_metrics
 from ingestion.data_models import AccountActivity
 
+FEATURE_DESCRIPTIONS: dict[str, str] = {
+    # Benford features — 5 windows (1h, 4h, 24h, 168h, 720h)
+    **{
+        f"benford_chi_square_{h}h": (
+            f"Chi-square goodness-of-fit of trade amounts against Benford's Law "
+            f"over the trailing {h}-hour window. High values indicate the digit "
+            f"distribution is statistically inconsistent with natural trading."
+        )
+        for h in [1, 4, 24, 168, 720]
+    },
+    **{
+        f"benford_mad_{h}h": (
+            f"Mean Absolute Deviation between observed and expected Benford digit "
+            f"frequencies over the trailing {h}-hour window. Values above 0.015 "
+            f"indicate non-conformity (Nigrini, 2012)."
+        )
+        for h in [1, 4, 24, 168, 720]
+    },
+    **{
+        f"benford_z_max_{h}h": (
+            f"Maximum per-digit Z-score against the Benford expected proportion "
+            f"over the trailing {h}-hour window. Highlights the single most "
+            f"anomalous digit in the distribution."
+        )
+        for h in [1, 4, 24, 168, 720]
+    },
+    # Trade pattern features
+    "counterparty_concentration_ratio": (
+        "Fraction of total trade volume transacted with a single counterparty. "
+        "Values near 1.0 indicate the wallet trades almost exclusively with one "
+        "other account, a hallmark of wash-trading arrangements."
+    ),
+    "round_trip_frequency": (
+        "Proportion of trades where the base and counter account are identical, "
+        "indicating the wallet is trading with itself. Any non-zero value is a "
+        "strong wash-trade signal."
+    ),
+    "self_matching_rate": (
+        "Rate at which the wallet appears on both sides of a trade. Identical to "
+        "round_trip_frequency in the current implementation; included as a "
+        "separate signal for ensemble diversity."
+    ),
+    "order_cancellation_rate": (
+        "Fraction of the wallet's manage-offer operations that were cancellations "
+        "rather than fills or updates. High cancellation rates can indicate "
+        "layering or spoofing strategies."
+    ),
+    # Volume and timing features
+    "volume_per_counterparty_ratio": (
+        "Total traded volume divided by the number of unique counterparties. "
+        "Very high values suggest concentrated wash trading with few accounts."
+    ),
+    "intra_minute_clustering": (
+        "Fraction of time-buckets (1-minute resolution) containing more than one "
+        "trade. High clustering indicates burst activity consistent with "
+        "automated wash-trade scripts."
+    ),
+    "off_hours_activity_ratio": (
+        "Fraction of trades executed between UTC 00:00 and 05:00. Legitimate "
+        "retail activity tends to follow business-hours patterns; sustained "
+        "off-hours activity may indicate bot-driven manipulation."
+    ),
+    "volume_spike_frequency": (
+        "Fraction of trades whose amount exceeds 3× the 10-trade rolling mean. "
+        "Frequent spikes can indicate pump-and-dump volume inflation."
+    ),
+    # Wallet graph features
+    "funding_source_similarity": (
+        "Cosine similarity between this wallet's funding-source fingerprint and "
+        "known wash-trade clusters in the funding graph. High values suggest the "
+        "wallet shares infrastructure with flagged accounts."
+    ),
+    "network_centrality": (
+        "Betweenness centrality of the wallet in the funding graph. High "
+        "centrality indicates the wallet acts as a hub routing funds between "
+        "multiple suspicious accounts."
+    ),
+    "account_age_days": (
+        "Age of the Stellar account in days at the time of scoring. "
+        "Very young accounts (< 7 days) combined with high risk scores are a "
+        "strong indicator of throwaway wash-trade accounts."
+    ),
+    # Cross-asset coordination features
+    "cross_pair_trade_synchrony": (
+        "Fraction of trades where the wallet also transacted on a different asset "
+        "pair within the synchrony window. Simultaneous multi-pair activity is "
+        "difficult to explain by normal market-making behaviour."
+    ),
+    "net_asset_flow_deviation": (
+        "Maximum absolute net asset flow (normalised by total volume) across all "
+        "assets. Values near 0 indicate a fully closed cycle — the defining "
+        "characteristic of wash trading where no real economic transfer occurs."
+    ),
+    "cross_pair_counterparty_overlap": (
+        "Jaccard similarity of counterparty sets across asset pairs. High overlap "
+        "means the wallet uses the same small set of counterparties on every pair, "
+        "consistent with a coordinated wash-trade network."
+    ),
+    "cross_pair_volume_correlation": (
+        "Pearson correlation of per-minute trade volumes across asset pairs. "
+        "Strong positive correlation indicates the wallet inflates volume on "
+        "multiple pairs simultaneously."
+    ),
+    "pair_diversity_score": (
+        "Shannon entropy of volume distribution across traded asset pairs, "
+        "normalised to [0, 1]. Low values indicate concentration on a single pair; "
+        "high values indicate diversified (potentially synthetic) activity."
+    ),
+    "cross_pair_mad_std": (
+        "Standard deviation of per-pair Benford MAD scores. Low values mean "
+        "Benford non-conformity is equally distributed across all pairs — "
+        "consistent with a systematic automated trading pattern."
+    ),
+}
+
 
 def compute_benford_features(
     wallet_trades: pd.DataFrame,
