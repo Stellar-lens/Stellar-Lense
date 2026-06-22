@@ -1,4 +1,17 @@
-use soroban_sdk::{contracttype, Address, BytesN, Symbol};
+use soroban_sdk::{contracttype, Address};
+
+/// Embargo expiry configuration stored per wallet in temporary storage.
+///
+/// - `Indefinite` — embargo has no built-in expiry; only `lift_score_embargo`
+///   removes it.
+/// - `Until(ts)` — embargo auto-expires when `ledger_timestamp > ts`; no
+///   admin action needed once the timestamp is reached.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum EmbargoExpiry {
+    Indefinite,
+    Until(u64),
+}
 
 /// On-chain record of the latest LedgerLens risk assessment for a
 /// wallet / asset-pair combination. Written by `submit_score` and
@@ -84,6 +97,18 @@ pub struct ScoreAttestation {
     pub signature: BytesN<65>,
 }
 
+/// A single model's contribution to an ensemble consensus submission.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ModelSubmission {
+    pub model_version: u32,
+    pub score: u32,
+    pub confidence: u32,
+    pub benford_flag: bool,
+    pub ml_flag: bool,
+    pub attestation: ScoreAttestation,
+}
+
 /// Result for a single entry in a batch score submission.
 /// Returned as part of `BatchResult` from `submit_scores_batch` so the
 /// caller knows exactly which entries succeeded and why any failed,
@@ -111,6 +136,83 @@ pub struct BatchResult {
     pub rejected_count: u32,
     /// Per-entry results in the same order as the submitted batch.
     pub results: soroban_sdk::Vec<BatchEntryResult>,
+}
+
+/// Merkle-root attestation for an entire `submit_scores_batch_attested`
+/// call: a single secp256k1 signature over the Merkle root of every entry
+/// in the batch. See `docs/batch-attestation-spec.md` for the off-chain
+/// tree-construction algorithm, the on-chain verification path, and the
+/// rationale for choosing domain-separated prefix hashing (RFC 9162 style,
+/// `0x00` for leaves / `0x01` for internal nodes) over the alternative
+/// sorted-pair scheme.
+///
+/// The signature format is intentionally byte-identical to that of
+/// [`ScoreAttestation`] — 65 bytes: 32-byte `r`, 32-byte `s`, 1-byte
+/// recovery id — so the same off-chain signing key can be reused for both
+/// per-score and per-batch paths, and so `verify_signature` can be a
+/// single shared helper.
+///
+/// # Verified-digest convention
+///
+/// `signature` is over `SHA256(merkle_root)`, **not** over `merkle_root`
+/// directly. This is a one-extra-hash convention forced by the soroban-sdk
+/// 21.x API: `env.crypto().secp256k1_recover` takes an opaque `Hash<32>`,
+/// and `Hash<32>` has no public constructor — it can only be built via a
+/// host crypto function call. Both sides wrap through SHA-256 once:
+///
+/// * **Off-chain** (`api`/`core` pipeline): build `root`, then sign
+///   `SHA256(root)`.
+/// * **On-chain** (`submit_scores_batch_attested`): wrap
+///   `attestation.merkle_root` through `env.crypto().sha256` once before
+///   calling `verify_signature`.
+///
+/// The pipeline produces exactly the same merkle_root as the verifier
+/// recomputes from the entry commitments — the SHA-256 wrap is purely a
+/// soroban-sdk compatibility shim, not a security downgrade.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BatchAttestation {
+    /// `SHA-256(0x01 || SHA-256(0x00 || commit_i) || SHA-256(0x00 || commit_{i+1}))`
+    /// (recursively, until the 32-byte root). Bound to one specific
+    /// deployment on one specific network by including the contract
+    /// address and `network_id` inside every leaf's underlying commitment
+    /// (see [`ScoreAttestation`]'s preimage layout for context).
+    ///
+    /// The contract does **not** sign this value directly — see the struct
+    /// rustdoc's "Verified-digest convention" above for the SHA-256 wrap.
+    pub merkle_root: BytesN<32>,
+    /// 65-byte secp256k1 ECDSA signature over `SHA256(merkle_root)`: 32-byte `r`,
+    /// 32-byte `s`, then a 1-byte recovery id which must be `0` or `1`.
+    pub signature: BytesN<65>,
+}
+
+/// A single entry in an attested batch score submission. Mirrors
+/// [`ScoreSubmission`] so the service can submit many scores in one call,
+/// and carries its own Merkle inclusion proof against the
+/// [`BatchAttestation`]'s `merkle_root`.
+///
+/// # `proof_flags` bit layout
+///
+/// `proof_flags` is a `u32` bit field that records, for every level of the
+/// Merkle tree from the leaf (`i == 0`) upward, whether the sibling at that
+/// level sits to the **left** (1) or right (0) of the current node being
+/// walked up. So an attestation for leaf index `5` in an 8-leaf tree will
+/// typically produce three flag bits; a single-entry batch produces
+/// `proof_flags == 0` and an empty `proof` ([`verify_merkle_proof`] handles
+/// this case explicitly).
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ScoreSubmissionWithProof {
+    pub submission: ScoreSubmission,
+    /// Sibling hashes from leaf to root, left-to-right (ordered to match
+    /// `proof_flags`'s LSB-first indexing). Length must be in
+    /// `[0, MAX_MERKLE_PROOF_DEPTH]` — anything longer is rejected with
+    /// `Error::InvalidAttestation`.
+    pub proof: soroban_sdk::Vec<BytesN<32>>,
+    /// Bit-field encoding the left/right direction at each level. Bit `i`
+    /// (LSB = 0) is `0` if the sibling at level `i` is to the right, `1` if
+    /// to the left.
+    pub proof_flags: u32,
 }
 
 /// A pending, time-locked contract WASM upgrade.
@@ -152,12 +254,41 @@ pub struct ScoreTrend {
     pub consecutive: u32,
 }
 
+/// Global configuration for the per-wallet score submission floor.
+///
+/// Returned by `get_score_floor_policy` and configured by
+/// `set_score_floor_policy`. When `enabled`, any `(wallet, asset_pair)`
+/// whose historical peak score has reached `high_water_mark` can no longer
+/// receive a submission below `floor_value` — a second line of defence
+/// against a compromised or colluding signer laundering a known high-risk
+/// wallet's reputation by zeroing its score. Disabled by default.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ScoreFloorPolicy {
+    /// Kill-switch: when `false`, no floor is enforced for any wallet.
+    pub enabled: bool,
+    /// Historical peak score at or above which the floor begins to apply for
+    /// a given `(wallet, asset_pair)`. Bounded to `[50, 100]`.
+    pub high_water_mark: u32,
+    /// Minimum score a high-risk wallet may be assigned while the floor
+    /// applies. Submissions below this are rejected with `BelowScoreFloor`.
+    /// Bounded to `[0, high_water_mark - 1]`.
+    pub floor_value: u32,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SnapshotRecord {
+    pub root: BytesN<32>,
+    pub leaf_count: u64,
+    pub committed_at: u64,      // ledger timestamp
+    pub committed_by: Address,  // who called commit_snapshot
+}
+
 #[contracttype]
 #[derive(Clone)]
 pub enum DataKey {
-    /// Address allowed to call admin-only functions.
     Admin,
-    /// Address of the authorised LedgerLens off-chain scoring service.
     Service,
     /// Latest risk score for a (wallet, asset_pair) pair.
     Score(Address, Symbol),
@@ -169,6 +300,11 @@ pub enum DataKey {
     Watchlist(Address),
     /// Global risk-score threshold; scores ≥ threshold emit a breach event.
     RiskThreshold,
+    /// Admin-configurable score jump anomaly detection threshold. When the
+    /// absolute delta between consecutive scores exceeds this value, a
+    /// `ScoreJumpAnomalyEvent` is emitted. Defaults to
+    /// `DEFAULT_JUMP_THRESHOLD` (30) when unset.
+    JumpThreshold,
     /// Ordered ring buffer of the last N risk scores for a wallet/pair.
     ScoreHistory(Address, Symbol),
     /// Baked-in contract version number.
@@ -244,20 +380,50 @@ pub enum DataKey {
     AdminThreshold,
     /// Score delegation: maps a sub-wallet to its custodian wallet.
     ScoreDelegate(Address),
-    /// Per-wallet regulatory hold. Stores `Option<u64>` (expiry timestamp);
-    /// `None` means indefinite. While active, read-path functions return
-    /// `ScoreEmbargoed` / conservative denials; writes are unaffected.
-    ScoreEmbargo(Address),
     /// Per-(wallet, asset_pair) trend state: current trend direction (+1/0/-1)
     /// and consecutive submission count in that direction. Updated by every
     /// successful `submit_score` / `submit_scores_batch` write.
     TrendState(Address, Symbol),
-    /// Ordered list of every registered model version (active + deprecated).
-    /// Instance storage; a missing key is equivalent to an empty registry.
-    ModelVersionSet,
-    /// Per-version deprecation flag.  Stored as `bool` (always `true` when
-    /// present — the key is removed rather than set to `false` on re-activation,
-    /// but re-activation is intentionally unsupported, so the flag is
-    /// write-once).
-    ModelVersionDeprecated(u32),
+    // ── Wallet Relationship Graph ──────────────────────────────────────────
+    /// List of counterparty addresses for a wallet on a specific asset pair.
+    /// Key: Counterparties(wallet, asset_pair) -> Vec<Address>
+    Counterparties(Address, Symbol),
+    /// Score-floor policy: historical peak (high-water mark) at or above which
+    /// the floor applies. Global config, `u32`, defaults to
+    /// `DEFAULT_SCORE_FLOOR_HWM` (80) when unset.
+    ScoreFloorHighWaterMark,
+    /// Score-floor policy: minimum score permitted for high-risk wallets.
+    /// Global config, `u32`, defaults to `DEFAULT_SCORE_FLOOR_MIN` (20).
+    ScoreFloorMinValue,
+    /// Score-floor policy kill-switch. Global config, `bool`, defaults to
+    /// `false` (floor disabled) until the admin opts in.
+    ScoreFloorEnabled,
+    /// Per-(wallet, asset_pair) running maximum of every score ever accepted,
+    /// used to decide whether the submission floor applies. Updated on every
+    /// accepted `submit_score` / `submit_scores_batch` write.
+    HistoricalMaxScore(Address, Symbol),
+    /// Admin-configured hysteresis margin (u32). Used to widen the exit
+    /// threshold below the entry threshold so scores must drop further to
+    /// leave the high-risk band. Stored in instance storage; defaults to 0.
+    HysteresisMargin,
+    /// Per-(wallet, asset_pair) risk band state. `true` means the wallet is
+    /// currently inside the high-risk band for this pair. Stored in
+    /// temporary TTL-bounded storage so stale states expire automatically.
+    RiskBandState(Address, Symbol),
+    /// Per-wallet score embargo. Stores an `EmbargoExpiry` describing whether
+    /// the embargo is indefinite or expires at a specific ledger timestamp.
+    /// Absent key means no embargo. Stored in temporary TTL-bounded storage.
+    ScoreEmbargo(Address),
+    /// Minimum number of model submissions that must agree for a consensus
+    /// score to be accepted.
+    ConsensusThresholdK,
+    /// Maximum allowed score deviation from the provisional median when
+    /// building the consensus set.
+    ConsensusEpsilon,
 }
+
+#[contracttype]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub struct TierBounds {
+    pub min_score: u32,
+    pub max_score: u32,

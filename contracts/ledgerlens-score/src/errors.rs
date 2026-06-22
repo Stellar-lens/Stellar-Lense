@@ -9,7 +9,8 @@ pub enum Error {
     Unauthorized = 3,
     InvalidScore = 4,
     InvalidConfidence = 5,
-    ScoreNotFound = 6,
+   SignerTierViolation = 26,
+    InvalidSignerTier = 27, ScoreNotFound = 6,
     /// Returned when any state-mutating call is attempted while the
     /// contract is paused by the admin.
     ContractPaused = 7,
@@ -82,6 +83,11 @@ pub enum Error {
     /// Returned when `set_history_max_depth` is called with `0` or a value
     /// above `MAX_HISTORY_DEPTH`.
     InvalidHistoryDepth = 29,
+feat/confidence-gated-risk-gate
+    /// Returned when `set_global_min_confidence` is called with a value
+    /// above 100 (confidence is bounded to 0–100).
+    InvalidMinConfidence = 30,
+
 
     // ── Fee withdrawal ─────────────────────────────────────────────────────
     /// Returned by `get_fee_token` and `withdraw_fees` when `set_fee_token`
@@ -132,21 +138,43 @@ pub enum Error {
     /// when the requested wallet is under an active regulatory embargo.
     ScoreEmbargoed = 42,
 
-    // ── Model version registry ─────────────────────────────────────────────
-    /// Returned by `submit_score` / `submit_scores_batch` when the registry is
-    /// non-empty and the submitted `model_version` has never been registered.
-    ModelVersionNotRegistered = 43,
-    /// Returned by `submit_score` / `submit_scores_batch` when the submitted
-    /// `model_version` has been registered but subsequently deprecated.
-    /// Also used as `rejection_code` in `BatchEntryResult`.
-    ModelVersionDeprecated = 44,
-    /// Returned by `register_model_version` when the given version number is
-    /// already present in the registry (active or deprecated).
-    ModelVersionAlreadyRegistered = 45,
-    /// Returned by `deprecate_model_version` when the given version has already
-    /// been deprecated.  Re-activation is intentionally unsupported.
-    ModelVersionAlreadyDeprecated = 46,
-    /// Returned by `register_model_version` when the total number of registered
-    /// versions (active + deprecated) would exceed `MAX_MODEL_VERSIONS`.
-    ModelVersionRegistryFull = 47,
+    // ── Wallet Relationship Graph ──────────────────────────────────────────
+    /// Returned when `add_counterparty_link` would exceed the max links per wallet.
+    CounterpartyLinkFull = 43,
+    /// Returned when `remove_counterparty_link` is called for a non-existent link.
+    CounterpartyNotFound = 44,
+    /// Returned when `add_counterparty_link` is called with the same wallet twice.
+    SelfLink = 45,
+
+    // ── Score submission floor ─────────────────────────────────────────────
+    /// Returned by `submit_score` (and recorded as a `rejection_code` in
+    /// `submit_scores_batch`) when the score-floor policy is enabled, the
+    /// `(wallet, asset_pair)`'s historical peak score is at or above the
+    /// configured high-water mark, and the submitted score is below the
+    /// configured floor value — blocking an attempt to launder a known
+    /// high-risk wallet's reputation by zeroing its score.
+    BelowScoreFloor = 46,
+    /// Returned by `set_score_floor_policy` when `high_water_mark` is outside
+    /// `[MIN_SCORE_FLOOR_HWM, MAX_SCORE_FLOOR_HWM]` (50–100), or when
+    /// `floor_value` is not strictly below `high_water_mark`.
+    InvalidScoreFloorPolicy = 47,
+
+    // ── Hysteresis layer ───────────────────────────────────────────────────
+    /// Returned when `set_hysteresis_margin` is called with a value above
+    /// `MAX_HYSTERESIS_MARGIN` (50).
+    InvalidHysteresisMargin = 48,
+
+    // ── Multi-model consensus scoring ──────────────────────────────────────
+    /// Fewer than the configured consensus threshold of models agreed on a
+    /// score within the configured epsilon window.
+    InsufficientConsensus = 49,
+    /// `submit_consensus_score` was called with zero model submissions.
+    ConsensusInputEmpty = 50,
+    /// `set_consensus_config` was called with `k == 0` or `epsilon > 100`.
+    InvalidConsensusConfig = 51,
 }
+
+// Gate caller tracking error variants for structural protection
+pub const GATE_CALLER_ALREADY_ALLOWED: u32 = 26;
+pub const GATE_CALLER_NOT_FOUND: u32 = 27;
+pub const GATE_CALLER_LIST_FULL: u32 = 28;

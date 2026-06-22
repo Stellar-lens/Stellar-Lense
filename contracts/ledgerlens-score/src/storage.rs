@@ -1,10 +1,16 @@
-use soroban_sdk::{Address, Bytes, Env, Symbol, Vec};
+use soroban_sdk::{Env, Address};
+use crate::types::{DataKey, TierBounds};
+use crate::errors::Error;
 
 use crate::constants::{
-    DEFAULT_COOLDOWN_SECS, DEFAULT_RISK_THRESHOLD, DEFAULT_UPGRADE_DELAY_SECS, SCORE_TTL_EXTEND_TO,
-    SCORE_TTL_THRESHOLD,
+    BAND_STATE_TTL_EXTEND_TO, BAND_STATE_TTL_THRESHOLD, DEFAULT_CONSENSUS_EPSILON,
+    DEFAULT_CONSENSUS_THRESHOLD_K, DEFAULT_COOLDOWN_SECS, DEFAULT_ESCALATION_THRESHOLD,
+    DEFAULT_RISK_THRESHOLD, DEFAULT_UPGRADE_DELAY_SECS, EMBARGO_TTL_EXTEND_TO,
+    EMBARGO_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO, SCORE_TTL_THRESHOLD,
 };
-use crate::types::{AggregateRiskScore, DataKey, RiskScore, ScoreTrend, UpgradeProposal};
+use crate::types::{AggregateRiskScore, DataKey, EmbargoExpiry, RiskScore, ScoreFloorPolicy, ScoreTrend, UpgradeProposal, SnapshotRecord};
+
+use crate::Error;
 
 // ── Admin / Service ─────────────────────────────────────────────────────────
 
@@ -195,6 +201,17 @@ pub fn set_risk_threshold(env: &Env, threshold: u32) {
     env.storage().instance().set(&DataKey::RiskThreshold, &threshold);
 }
 
+// ── Score jump anomaly detection ──────────────────────────────────────────────
+
+pub fn get_jump_threshold(env: &Env) -> u32 {
+    let result: Option<u32> = env.storage().instance().get(&DataKey::JumpThreshold);
+    result.unwrap_or(DEFAULT_JUMP_THRESHOLD)
+}
+
+pub fn set_jump_threshold(env: &Env, threshold: u32) {
+    env.storage().instance().set(&DataKey::JumpThreshold, &threshold);
+}
+
 // ── Score history ring buffer ────────────────────────────────────────────────
 
 pub fn push_score_history(env: &Env, wallet: &Address, asset_pair: &Symbol, score: &RiskScore) {
@@ -357,8 +374,11 @@ pub fn set_service_set(env: &Env, set: &Vec<Address>) {
     env.storage().instance().set(&DataKey::ServiceSet, set);
 }
 
-pub fn get_service_threshold(env: &Env) -> u32 {
-    env.storage().instance().get(&DataKey::ServiceThreshold).unwrap_or(0)
+pub fn get_signer_tier(env: &Env, signer: &Address) -> TierBounds {
+    env.storage()
+        .instance()
+        .get(&DataKey::SignerTier(signer.clone()))
+        .unwrap_or(TierBounds { min_score: 0, max_score: 100 })
 }
 
 pub fn set_service_threshold(env: &Env, threshold: u32) {
@@ -456,38 +476,6 @@ pub fn get_score_count(env: &Env, wallet: &Address, asset_pair: &Symbol) -> u32 
     env.storage().persistent().get(&key).unwrap_or(0)
 }
 
-// ── Score embargo (regulatory hold) ──────────────────────────────────────────
-
-pub fn set_score_embargo(env: &Env, wallet: &Address, expiry: &Option<u64>) {
-    let key = DataKey::ScoreEmbargo(wallet.clone());
-    env.storage().persistent().set(&key, expiry);
-    env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
-}
-
-#[allow(dead_code)]
-pub fn get_score_embargo(env: &Env, wallet: &Address) -> Option<Option<u64>> {
-    let key = DataKey::ScoreEmbargo(wallet.clone());
-    let result: Option<Option<u64>> = env.storage().persistent().get(&key);
-    if result.is_some() {
-        env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
-    }
-    result
-}
-
-pub fn remove_score_embargo(env: &Env, wallet: &Address) {
-    let key = DataKey::ScoreEmbargo(wallet.clone());
-    env.storage().persistent().remove(&key);
-}
-
-/// Returns `true` when the wallet is under an active, non-expired embargo.
-pub fn is_embargoed(env: &Env, wallet: &Address) -> bool {
-    match env.storage().persistent().get::<_, Option<u64>>(&DataKey::ScoreEmbargo(wallet.clone())) {
-        None => false,
-        Some(None) => true, // indefinite embargo
-        Some(Some(expiry)) => env.ledger().timestamp() < expiry,
-    }
-}
-
 // ── Score trend state ─────────────────────────────────────────────────────────
 
 pub fn get_trend_state(env: &Env, wallet: &Address, asset_pair: &Symbol) -> ScoreTrend {
@@ -513,8 +501,8 @@ pub fn get_service_pubkey(env: &Env) -> Option<Bytes> {
     env.storage().instance().get(&DataKey::ServicePubKey)
 }
 
-pub fn set_service_pubkey(env: &Env, pubkey: &Bytes) {
-    env.storage().instance().set(&DataKey::ServicePubKey, pubkey);
+pub fn set_gate_callers(env: &Env, callers: &Vec<Address>) {
+    env.storage().instance().set(&GateDataKey::GateCallers, callers);
 }
 
 // ── Time-weighted exponential decay ──────────────────────────────────────
@@ -541,6 +529,27 @@ pub fn set_decay_rate(env: &Env, numerator: u32, denominator: u32) {
     env.storage().instance().set(&DataKey::DecayRateDenominator, &denominator);
 }
 
+ feat/confidence-gated-risk-gate
+// ── Global minimum confidence floor ──────────────────────────────────────────
+
+/// Returns the admin-configured global minimum confidence floor (0–100).
+/// Defaults to `0` (no floor) when unset.
+///
+/// This value is combined with the per-call `min_confidence` parameter in
+/// `query_risk_gate_with_confidence` using `max(param, global)` so the admin
+/// can enforce a system-wide floor without requiring every integrating protocol
+/// to specify one. Both values are bounded to 0–100, so the `max` cannot
+/// overflow.
+pub fn get_global_min_confidence(env: &Env) -> u32 {
+    let result: Option<u32> = env.storage().instance().get(&DataKey::GlobalMinConfidence);
+    result.unwrap_or(0)
+}
+
+/// Persists `min_confidence` as the global confidence floor.
+/// Caller is responsible for validating the range (0–100) before calling.
+pub fn set_global_min_confidence(env: &Env, min_confidence: u32) {
+    env.storage().instance().set(&DataKey::GlobalMinConfidence, &min_confidence);
+
 // ── Fee withdrawal ────────────────────────────────────────────────────────────
 
 pub fn get_fee_token(env: &Env) -> Option<Address> {
@@ -561,6 +570,7 @@ pub fn set_withdrawal_lock(env: &Env) {
 
 pub fn clear_withdrawal_lock(env: &Env) {
     env.storage().instance().remove(&DataKey::WithdrawalLock);
+ main
 }
 
 // ── Score delegation ──────────────────────────────────────────────────────────
@@ -594,47 +604,308 @@ pub fn remove_score_delegate(env: &Env, sub_wallet: &Address) {
     env.storage().persistent().remove(&key);
 }
 
-// ── Model version registry ────────────────────────────────────────────────────
-//
-// The registry is stored in instance storage (contract lifetime) because model
-// version metadata is global and must outlive any individual score entry's TTL.
-// An absent `ModelVersionSet` key is treated as an empty registry, which
-// preserves backward compatibility for deployments that never call
-// `register_model_version`.
+// ── Wallet Relationship Graph ───────────────────────────────────────────────
 
-/// Returns the ordered list of all registered model versions (active +
-/// deprecated).  An absent key returns an empty `Vec` — callers must treat
-/// an empty return as "registry not yet initialised → no version checks".
-pub fn get_model_version_set(env: &Env) -> Vec<u32> {
-    env.storage()
+/// Returns the list of counterparties for a wallet on a specific asset pair.
+/// Returns an empty Vec if no links exist.
+pub fn get_counterparties(env: &Env, wallet: &Address, asset_pair: &Symbol) -> Vec<Address> {
+    let key = DataKey::Counterparties(wallet.clone(), asset_pair.clone());
+    env.storage().persistent().get(&key).unwrap_or_else(|| Vec::new(env))
+}
+
+/// Adds a bidirectional counterparty link between wallet_a and wallet_b.
+///
+/// # Errors
+/// - Returns `Error::SelfLink` if wallet_a == wallet_b
+/// - Returns `Error::CounterpartyLinkFull` if wallet_a or wallet_b would exceed MAX_COUNTERPARTY_LINKS_PER_WALLET
+pub fn add_counterparty_link(
+    env: &Env,
+    wallet_a: &Address,
+    wallet_b: &Address,
+    asset_pair: &Symbol,
+) -> Result<(), Error> {
+    if wallet_a == wallet_b {
+        return Err(Error::SelfLink);
+    }
+
+    // Check and update wallet_a's counterparties
+    let mut links_a = get_counterparties(env, wallet_a, asset_pair);
+    if !links_a.contains(wallet_b) {
+        if links_a.len() >= crate::constants::MAX_COUNTERPARTY_LINKS_PER_WALLET {
+            return Err(Error::CounterpartyLinkFull);
+        }
+        links_a.push_back(wallet_b.clone());
+        let key_a = DataKey::Counterparties(wallet_a.clone(), asset_pair.clone());
+        env.storage().persistent().set(&key_a, &links_a);
+        env.storage().persistent().extend_ttl(&key_a, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    }
+
+    // Check and update wallet_b's counterparties
+    let mut links_b = get_counterparties(env, wallet_b, asset_pair);
+    if !links_b.contains(wallet_a) {
+        if links_b.len() >= crate::constants::MAX_COUNTERPARTY_LINKS_PER_WALLET {
+            return Err(Error::CounterpartyLinkFull);
+        }
+        links_b.push_back(wallet_a.clone());
+        let key_b = DataKey::Counterparties(wallet_b.clone(), asset_pair.clone());
+        env.storage().persistent().set(&key_b, &links_b);
+        env.storage().persistent().extend_ttl(&key_b, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    }
+
+    Ok(())
+}
+
+/// Removes a bidirectional counterparty link between wallet_a and wallet_b.
+///
+/// # Errors
+/// - Returns `Error::CounterpartyNotFound` if the link does not exist in either direction
+pub fn remove_counterparty_link(
+    env: &Env,
+    wallet_a: &Address,
+    wallet_b: &Address,
+    asset_pair: &Symbol,
+) -> Result<(), Error> {
+    let mut links_a = get_counterparties(env, wallet_a, asset_pair);
+    let pos_a = links_a.first_index_of(wallet_b);
+    if let Some(idx) = pos_a {
+        links_a.remove(idx);
+        let key_a = DataKey::Counterparties(wallet_a.clone(), asset_pair.clone());
+        if links_a.is_empty() {
+            env.storage().persistent().remove(&key_a);
+        } else {
+            env.storage().persistent().set(&key_a, &links_a);
+            env.storage().persistent().extend_ttl(&key_a, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+        }
+    }
+
+    let mut links_b = get_counterparties(env, wallet_b, asset_pair);
+    let pos_b = links_b.first_index_of(wallet_a);
+    if let Some(idx) = pos_b {
+        links_b.remove(idx);
+        let key_b = DataKey::Counterparties(wallet_b.clone(), asset_pair.clone());
+        if links_b.is_empty() {
+            env.storage().persistent().remove(&key_b);
+        } else {
+            env.storage().persistent().set(&key_b, &links_b);
+            env.storage().persistent().extend_ttl(&key_b, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+        }
+    }
+
+    if pos_a.is_none() && pos_b.is_none() {
+        return Err(Error::CounterpartyNotFound);
+    }
+
+    Ok(())
+}
+
+/// Returns the number of registered counterparties (graph degree) for a wallet/pair.
+pub fn get_contagion_depth(env: &Env, wallet: &Address, asset_pair: &Symbol) -> u32 {
+    let key = DataKey::Counterparties(wallet.clone(), asset_pair.clone());
+    let links: Vec<Address> = env.storage().persistent().get(&key).unwrap_or_else(|| Vec::new(env));
+    links.len()
+}
+
+// ── Score submission floor ────────────────────────────────────────────────────
+
+/// Returns the current score-floor policy, falling back to the compiled-in
+/// defaults (disabled, HWM 80, floor 20) for any field the admin has not set.
+pub fn get_score_floor_policy(env: &Env) -> ScoreFloorPolicy {
+    let enabled: bool = env.storage().instance().get(&DataKey::ScoreFloorEnabled).unwrap_or(false);
+    let high_water_mark: u32 = env
+        .storage()
         .instance()
-        .get(&DataKey::ModelVersionSet)
-        .unwrap_or_else(|| Vec::new(env))
+        .get(&DataKey::ScoreFloorHighWaterMark)
+        .unwrap_or(crate::constants::DEFAULT_SCORE_FLOOR_HWM);
+    let floor_value: u32 = env
+        .storage()
+        .instance()
+        .get(&DataKey::ScoreFloorMinValue)
+        .unwrap_or(crate::constants::DEFAULT_SCORE_FLOOR_MIN);
+    ScoreFloorPolicy { enabled, high_water_mark, floor_value }
 }
 
-pub fn set_model_version_set(env: &Env, versions: &Vec<u32>) {
-    env.storage().instance().set(&DataKey::ModelVersionSet, versions);
+/// Persists the score-floor policy. Validation of the bounds is the caller's
+/// responsibility (see `set_score_floor_policy`).
+pub fn set_score_floor_policy(env: &Env, enabled: bool, high_water_mark: u32, floor_value: u32) {
+    env.storage().instance().set(&DataKey::ScoreFloorEnabled, &enabled);
+    env.storage().instance().set(&DataKey::ScoreFloorHighWaterMark, &high_water_mark);
+    env.storage().instance().set(&DataKey::ScoreFloorMinValue, &floor_value);
 }
 
-/// Returns `true` when `version` appears in the registered set (regardless of
-/// whether it has been deprecated).
-pub fn is_model_version_registered(env: &Env, version: u32) -> bool {
-    get_model_version_set(env).contains(&version)
+/// Returns the highest score ever recorded for `(wallet, asset_pair)`, or `0`
+/// if none has been recorded yet.
+pub fn get_historical_max_score(env: &Env, wallet: &Address, asset_pair: &Symbol) -> u32 {
+    let key = DataKey::HistoricalMaxScore(wallet.clone(), asset_pair.clone());
+    let result: Option<u32> = env.storage().persistent().get(&key);
+    if result.is_some() {
+        env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    }
+    result.unwrap_or(0)
 }
 
-/// Returns `true` when `version` has been explicitly deprecated via
-/// `deprecate_model_version`.  An absent key — including versions that were
-/// never registered — returns `false`.
-pub fn is_model_version_deprecated(env: &Env, version: u32) -> bool {
-    let key = DataKey::ModelVersionDeprecated(version);
-    let result: Option<bool> = env.storage().instance().get(&key);
+/// Raises the historical maximum for `(wallet, asset_pair)` to `score` when it
+/// exceeds the current maximum. When `score` is not a new peak the stored
+/// value is left untouched, but its TTL is refreshed so the peak never expires
+/// before the score it protects. Writes nothing when no peak has ever been
+/// recorded and `score` is `0`, so a first-ever zero submission costs no
+/// storage.
+pub fn update_historical_max_score(env: &Env, wallet: &Address, asset_pair: &Symbol, score: u32) {
+    let key = DataKey::HistoricalMaxScore(wallet.clone(), asset_pair.clone());
+    let current: Option<u32> = env.storage().persistent().get(&key);
+    if score > current.unwrap_or(0) {
+        env.storage().persistent().set(&key, &score);
+        env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    } else if current.is_some() {
+        env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    }
+}
+
+/// Clears the historical maximum for `(wallet, asset_pair)`, dropping it back
+/// to `0` so the next submission is no longer gated by the floor. Used by the
+/// admin emergency path `override_score_floor`.
+pub fn clear_historical_max_score(env: &Env, wallet: &Address, asset_pair: &Symbol) {
+    let key = DataKey::HistoricalMaxScore(wallet.clone(), asset_pair.clone());
+    env.storage().persistent().remove(&key);
+}
+
+// ── Hysteresis margin ─────────────────────────────────────────────────────────
+
+/// Returns the admin-configured hysteresis margin, defaulting to 0 (no
+/// hysteresis — entry and exit thresholds are identical).
+pub fn get_hysteresis_margin(env: &Env) -> u32 {
+    let result: Option<u32> = env.storage().instance().get(&DataKey::HysteresisMargin);
+    result.unwrap_or(0)
+}
+
+pub fn set_hysteresis_margin(env: &Env, margin: u32) {
+    env.storage().instance().set(&DataKey::HysteresisMargin, &margin);
+}
+
+// ── Per-(wallet, asset_pair) risk band state ──────────────────────────────────
+
+/// Returns `true` when `wallet` is currently inside the high-risk band for
+/// `asset_pair`. Defaults to `false` when no state exists (first evaluation
+/// or after TTL expiry). Extends the TTL on each read so active wallets keep
+/// their state alive.
+pub fn get_risk_band_state(env: &Env, wallet: &Address, asset_pair: &Symbol) -> bool {
+    let key = DataKey::RiskBandState(wallet.clone(), asset_pair.clone());
+    let result: Option<bool> = env.storage().temporary().get(&key);
+    if result.is_some() {
+        env.storage()
+            .temporary()
+            .extend_ttl(&key, BAND_STATE_TTL_THRESHOLD, BAND_STATE_TTL_EXTEND_TO);
+    }
     result.unwrap_or(false)
 }
 
-/// Marks `version` as deprecated.  This is a write-once operation: there is
-/// no function to clear this flag, enforcing the irreversibility guarantee.
-pub fn set_model_version_deprecated(env: &Env, version: u32) {
+/// Strictly read-only band state lookup that, unlike [`get_risk_band_state`],
+/// does **not** extend the entry's TTL. Used by the infallible cross-contract
+/// gate (`query_risk_gate`) so that calling it from another contract's guard
+/// clause has no observable side effect on this contract's storage.
+pub fn peek_risk_band_state(env: &Env, wallet: &Address, asset_pair: &Symbol) -> bool {
+    let key = DataKey::RiskBandState(wallet.clone(), asset_pair.clone());
+    let result: Option<bool> = env.storage().temporary().get(&key);
+    result.unwrap_or(false)
+}
+
+// ── Score embargo ─────────────────────────────────────────────────────────────
+
+/// Writes an embargo entry for `wallet` and sets (or refreshes) its TTL.
+/// Calling this again on an already-embargoed wallet replaces the existing
+/// expiry configuration.
+pub fn set_embargo(env: &Env, wallet: &Address, expiry: &EmbargoExpiry) {
+    let key = DataKey::ScoreEmbargo(wallet.clone());
+    env.storage().temporary().set(&key, expiry);
+    env.storage()
+        .temporary()
+        .extend_ttl(&key, EMBARGO_TTL_THRESHOLD, EMBARGO_TTL_EXTEND_TO);
+}
+
+/// Removes the embargo entry for `wallet`, immediately lifting any embargo.
+/// No-op when no embargo exists.
+pub fn remove_embargo(env: &Env, wallet: &Address) {
+    let key = DataKey::ScoreEmbargo(wallet.clone());
+    env.storage().temporary().remove(&key);
+}
+
+/// Returns `true` when `wallet` is currently under an active embargo.
+///
+/// - No entry → `false`.
+/// - `Indefinite` entry → `true`; TTL is extended to keep the entry alive.
+/// - `Until(ts)` entry where `ledger_ts <= ts` → `true`; TTL extended.
+/// - `Until(ts)` entry where `ledger_ts > ts` → `false` (auto-expired).
+pub fn is_embargoed(env: &Env, wallet: &Address) -> bool {
+    let key = DataKey::ScoreEmbargo(wallet.clone());
+    let expiry: Option<EmbargoExpiry> = env.storage().temporary().get(&key);
+    match expiry {
+        None => false,
+        Some(EmbargoExpiry::Indefinite) => {
+            env.storage()
+                .temporary()
+                .extend_ttl(&key, EMBARGO_TTL_THRESHOLD, EMBARGO_TTL_EXTEND_TO);
+            true
+        }
+        Some(EmbargoExpiry::Until(ts)) => {
+            let now = env.ledger().timestamp();
+            let active = now <= ts;
+            if active {
+                env.storage()
+                    .temporary()
+                    .extend_ttl(&key, EMBARGO_TTL_THRESHOLD, EMBARGO_TTL_EXTEND_TO);
+            }
+            active
+        }
+    }
+}
+
+/// Side-effect-free embargo check — no TTL extension. Used by the infallible
+/// `query_risk_gate` function so it remains observable-state-free.
+pub fn peek_is_embargoed(env: &Env, wallet: &Address) -> bool {
+    let key = DataKey::ScoreEmbargo(wallet.clone());
+    let expiry: Option<EmbargoExpiry> = env.storage().temporary().get(&key);
+    match expiry {
+        None => false,
+        Some(EmbargoExpiry::Indefinite) => true,
+        Some(EmbargoExpiry::Until(ts)) => env.ledger().timestamp() <= ts,
+    }
+}
+
+/// Sets the risk band state for `(wallet, asset_pair)`. Passing `true`
+/// records that the wallet has entered the high-risk band; passing `false`
+/// removes the entry (equivalent to `false`, the default) so storage is not
+/// wasted on cleared state.
+pub fn set_risk_band_state(env: &Env, wallet: &Address, asset_pair: &Symbol, in_band: bool) {
+    let key = DataKey::RiskBandState(wallet.clone(), asset_pair.clone());
+    if in_band {
+        env.storage().temporary().set(&key, &true);
+        env.storage()
+            .temporary()
+            .extend_ttl(&key, BAND_STATE_TTL_THRESHOLD, BAND_STATE_TTL_EXTEND_TO);
+    } else {
+        env.storage().temporary().remove(&key);
+    }
+}
+
+// ── Consensus configuration ─────────────────────────────────────────────────
+
+pub fn get_consensus_threshold_k(env: &Env) -> u32 {
     env.storage()
         .instance()
-        .set(&DataKey::ModelVersionDeprecated(version), &true);
+        .get(&DataKey::ConsensusThresholdK)
+        .unwrap_or(DEFAULT_CONSENSUS_THRESHOLD_K)
+}
+
+pub fn set_consensus_threshold_k(env: &Env, k: u32) {
+    env.storage().instance().set(&DataKey::ConsensusThresholdK, &k);
+}
+
+pub fn get_consensus_epsilon(env: &Env) -> u32 {
+    env.storage()
+        .instance()
+        .get(&DataKey::ConsensusEpsilon)
+        .unwrap_or(DEFAULT_CONSENSUS_EPSILON)
+}
+
+pub fn set_consensus_epsilon(env: &Env, epsilon: u32) {
+    env.storage().instance().set(&DataKey::ConsensusEpsilon, &epsilon);
 }

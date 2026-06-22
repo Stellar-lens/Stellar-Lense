@@ -17,13 +17,25 @@ pub const DEFAULT_RISK_THRESHOLD: u32 = 75;
 
 /// Semantic contract version; bump on breaking ABI changes.
 ///
-/// Bumped to 2 when `submit_score` gained its `attestation` parameter (see
-/// `docs/attestation-spec.md`).
-/// Bumped to 3 when `AggregateRiskScore` gained `decay_lambda_applied` field.
-/// Bumped to 3 when all admin-tier functions gained `admin_signers: Vec<Address>`
-/// for M-of-N governance and the `AdminSet` / `AdminThreshold` storage keys
-/// were introduced.
+/// History:
+///
+/// * `1` — initial release (`submit_score` / `get_score`).
+/// * `2` — `submit_score` gained the `attestation: Option<ScoreAttestation>`
+///   parameter and `set_service_pubkey` / `get_service_pubkey` were added
+///   (see `docs/attestation-spec.md`).
+/// * `3` — `submit_scores_batch_attested` and the `batch_attested`
+///   `supports_interface` capability were added (see
+///   `docs/batch-attestation-spec.md`).
 pub const CONTRACT_VERSION: u32 = 3;
+
+/// Hard upper bound on Merkle proof length accepted by
+/// `submit_scores_batch_attested`. Thirty levels of a binary tree can
+/// accommodate up to 2^30 ≈ 1.07 billion leaves — well above the
+/// `MAX_BATCH_SIZE` of 20 today, but large enough that the field cannot be
+/// exploited as an unbounded loop budget. Beyond this, the contract
+/// rejects the call with `Error::InvalidAttestation` (see
+/// `docs/batch-attestation-spec.md` for the rationale).
+pub const MAX_MERKLE_PROOF_DEPTH: u32 = 30;
 
 /// Practical upper bound on the number of distinct asset pairs tracked per
 /// wallet. `get_aggregate_score` iterates the wallet's full `AssetPairs`
@@ -111,12 +123,75 @@ pub const MAX_DECAY_LAMBDA_NUM: u32 = 1;
 /// Maximum allowed decay rate denominator (paired with MAX_DECAY_LAMBDA_NUM).
 pub const MAX_DECAY_LAMBDA_DEN: u32 = 1;
 
-// ── Model version registry ─────────────────────────────────────────────────────
-//
-// Bounds the number of version entries in `ModelVersionSet` so storage cost
-// stays predictable. The admin can register up to this many distinct model
-// version numbers; attempting to exceed it returns `ModelVersionRegistryFull`.
+// ── Wallet Relationship Graph ───────────────────────────────────────────────
 
-/// Maximum number of model versions that may be registered across the
-/// Active + Deprecated states combined.
-pub const MAX_MODEL_VERSIONS: u32 = 20;
+/// Maximum number of counterparty links allowed per wallet per asset pair.
+/// Prevents unbounded storage growth and gas exhaustion.
+pub const MAX_COUNTERPARTY_LINKS_PER_WALLET: u32 = 50;
+
+// ── Score submission floor ─────────────────────────────────────────────────────
+//
+// A compromised or colluding signer could otherwise submit an artificially low
+// score for a wallet that has historically carried a high risk score, laundering
+// its on-chain reputation. The configurable floor blocks sudden large downward
+// revisions for wallets whose historical peak crossed a danger level. See
+// `set_score_floor_policy` and the README's Score Submission Floor section.
+
+/// Default high-water mark used until the admin configures the policy — a
+/// `(wallet, asset_pair)` whose historical peak reached this score is treated
+/// as high-risk and subject to the floor.
+pub const DEFAULT_SCORE_FLOOR_HWM: u32 = 80;
+
+/// Default minimum score permitted for a high-risk wallet until the admin
+/// configures the policy.
+pub const DEFAULT_SCORE_FLOOR_MIN: u32 = 20;
+
+/// Minimum configurable high-water mark. Keeps the floor from applying to
+/// merely-moderate wallets — it only protects scores that crossed a genuine
+/// danger level.
+pub const MIN_SCORE_FLOOR_HWM: u32 = 50;
+
+/// Maximum configurable high-water mark — the top of the score range.
+pub const MAX_SCORE_FLOOR_HWM: u32 = 100;
+
+// ── Hysteresis layer ───────────────────────────────────────────────────────────
+//
+// Prevents event oscillation at the risk threshold boundary. Once a wallet
+// enters the high-risk band (score >= threshold), it only exits when the score
+// drops below (threshold - hysteresis_margin), requiring a more significant
+// recovery before the band is cleared.
+
+/// Maximum value the admin may configure for the hysteresis margin.
+/// Bounded so the effective exit threshold stays non-negative and
+/// the margin cannot be set to a value that makes the system unusable.
+pub const MAX_HYSTERESIS_MARGIN: u32 = 50;
+
+/// TTL threshold for risk band state entries: re-extend when remaining TTL
+/// drops below this many ledgers (~30 days at 5 s/ledger).
+pub const BAND_STATE_TTL_THRESHOLD: u32 = 518_400;
+
+/// TTL value to extend risk band state entries to when refreshing
+/// (~45 days at 5 s/ledger).
+pub const BAND_STATE_TTL_EXTEND_TO: u32 = 777_600;
+
+// ── Score embargo ─────────────────────────────────────────────────────────────
+//
+// Per-wallet embargo state is kept in temporary storage. The TTL is intentionally
+// much longer than the band-state TTL so that indefinite embargoes survive without
+// constant admin intervention, while still being subject to Soroban's TTL
+// mechanics and expirable if the wallet goes completely dormant.
+
+/// Re-extend embargo TTL when remaining lifetime falls below this many ledgers
+/// (~90 days at 5 s/ledger).
+pub const EMBARGO_TTL_THRESHOLD: u32 = 1_555_200;
+
+/// Target TTL for embargo entries on creation or refresh (~180 days at 5 s/ledger).
+pub const EMBARGO_TTL_EXTEND_TO: u32 = 3_110_400;
+
+// ── Multi-model consensus scoring ─────────────────────────────────────────────
+
+/// Default minimum number of models that must agree for consensus.
+pub const DEFAULT_CONSENSUS_THRESHOLD_K: u32 = 2;
+
+/// Default maximum allowed absolute deviation from the provisional median.
+pub const DEFAULT_CONSENSUS_EPSILON: u32 = 5;
