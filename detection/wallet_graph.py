@@ -19,6 +19,8 @@ Also provides:
   same asset pair within a configurable time window.
 """
 
+import re
+import warnings
 from collections.abc import Iterable, Mapping, Sequence
 from itertools import combinations
 from typing import Literal
@@ -40,14 +42,9 @@ def _validate_account_id(account_id: str) -> bool:
 
 def build_funding_graph(
     activities: Iterable[AccountActivity],
-    validate_account_ids: bool = False,
-) -> nx.DiGraph:
-    """Build a directed graph with edges ``funding_account -> account_id``.
-
-def build_funding_graph(
-    activities: Iterable[AccountActivity],
     trades: pd.DataFrame | None = None,
     *,
+    validate_account_ids: bool = False,
     co_trade_window: str | pd.Timedelta = "5min",
     output_format: Literal["networkx", "pyg"] = "networkx",
     node_features: pd.DataFrame | Mapping[str, Sequence[float]] | None = None,
@@ -172,7 +169,7 @@ def to_pyg_data(
 
 
 def funding_source_similarity(wallet: str, graph: nx.DiGraph) -> float:
-    """Highest Jaccard similarity between ``wallet``'s funding ancestors and
+    r"""Highest Jaccard similarity between ``wallet`` funding ancestors and
     any other node's funding ancestors in ``graph``.
 
     Returns ``0.0`` if ``wallet`` isn't in the graph or has no funding

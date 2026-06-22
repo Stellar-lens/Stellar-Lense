@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+import hashlib
+import json
+import os
+from dataclasses import asdict, dataclass, field
 
 import networkx as nx
 import pandas as pd
@@ -48,6 +51,26 @@ class ForensicReport:
     shap_explanations: list[dict] = field(default_factory=list)
     causal_attribution: CausalAttribution | None = None
     propagation_path: PropagationPath | None = None
+
+    def to_dict(self) -> dict:
+        body = asdict(self)
+        if body.get("causal_attribution") is None:
+            body.pop("causal_attribution", None)
+        if body.get("propagation_path") is None:
+            body.pop("propagation_path", None)
+        digest = hashlib.sha256(json.dumps(body, sort_keys=True).encode()).hexdigest()
+        body["report_sha256"] = digest
+        return body
+
+    @property
+    def report_sha256(self) -> str:
+        return self.to_dict()["report_sha256"]
+
+    def verify_integrity(self) -> bool:
+        payload = self.to_dict()
+        stored = payload.pop("report_sha256")
+        recomputed = hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
+        return stored == recomputed
 
 
 class ForensicReportGenerator:
@@ -193,3 +216,14 @@ class ForensicReportGenerator:
             causal_attribution=causal_attribution,
             propagation_path=propagation_path,
         )
+
+
+def write_report_secure(path: str, content: str) -> None:
+    """Write report content with owner-only permissions (0o600)."""
+    parent = os.path.dirname(path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+    fd = os.open(path, flags, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        handle.write(content)
