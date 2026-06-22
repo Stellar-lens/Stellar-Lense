@@ -1,16 +1,20 @@
 """Real-time risk scoring using the trained ensemble.
 
-Loads model artifacts from `config.MODEL_DIR` and combines per-model
-probabilities into the single LedgerLens Risk Score (0-100) consumed by
-the API and the `ledgerlens-score` Soroban contract.
+Loads model artifacts from `config.MODEL_DIR`, verifies artifact integrity,
+and combines per-model probabilities using Byzantine-Fault-Tolerant (BFT)
+trimmed-mean voting into the single LedgerLens Risk Score (0–100).
 
-The returned dict's `score`, `benford_flag`, `ml_flag`, and `confidence`
-fields match the contract's `RiskScore` struct (the `timestamp` field is
-added by the persistence layer when a record is stored).
+BFT voting:
+- Sort the 3 model scores.
+- If |max - min| > BFT_SCORE_DIVERGENCE_THRESHOLD, drop the outliers and
+  use the median (for 3 models) — equivalent to a trimmed mean.
+- If fewer than BFT_MIN_CONSENSUS models agree (within 10 points), return
+  a ``consensus_failure`` score with maximum uncertainty.
 """
 
 import json
 import os
+import statistics
 
 import joblib
 import pandas as pd
@@ -21,25 +25,73 @@ from detection.model_training import (
     MODEL_REGISTRY,
     compute_feature_schema_hash,
 )
+from utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 BENFORD_MAD_FLAG_THRESHOLD = 0.015
 ML_FLAG_THRESHOLD = 0.5
+_CONSENSUS_WINDOW = 10  # two models must be within this many points of each other
+
+# ---------------------------------------------------------------------------
+# Prometheus counter (optional — gracefully absent if prometheus_client not
+# installed or not yet wired to an exporter)
+# ---------------------------------------------------------------------------
+try:
+    from prometheus_client import Counter
+
+    bft_divergence_detected_total = Counter(
+        "bft_divergence_detected_total",
+        "Number of times BFT divergence was detected during ensemble scoring",
+    )
+except Exception:  # pragma: no cover
+    bft_divergence_detected_total = None  # type: ignore[assignment]
 
 
-def _combine_probabilities(probs: list[float], weights: list[float] | None = None) -> float:
-    """Combine per-model probabilities into a single ensemble probability.
+def _increment_bft_counter() -> None:
+    if bft_divergence_detected_total is not None:
+        bft_divergence_detected_total.inc()
 
-    Defaults to a simple average; pass `weights` (same length as `probs`)
-    to weight individual models differently.
+
+# ---------------------------------------------------------------------------
+# BFT voting helpers
+# ---------------------------------------------------------------------------
+
+
+def bft_trimmed_mean(scores: list[float]) -> tuple[float, bool]:
+    """Return ``(consensus_score, divergence_flag)`` using BFT trimmed mean.
+
+    For exactly 3 models the trimmed mean degenerates to the median.
+    Divergence is flagged when ``|max - min| > BFT_SCORE_DIVERGENCE_THRESHOLD``.
     """
-    if weights is None:
-        weights = [1.0] * len(probs)
-    return sum(p * w for p, w in zip(probs, weights, strict=True)) / sum(weights)
+    if len(scores) == 1:
+        return scores[0], False
+
+    span = max(scores) - min(scores)
+    diverged = span > config.BFT_SCORE_DIVERGENCE_THRESHOLD
+
+    if len(scores) == 3:
+        return statistics.median(scores), diverged
+
+    if diverged:
+        trimmed = sorted(scores)[1:-1]
+        return statistics.mean(trimmed), True
+
+    return statistics.mean(scores), False
+
+
+def _has_consensus(scores: list[float]) -> bool:
+    """Return True if at least BFT_MIN_CONSENSUS models agree within the
+    consensus window."""
+    n = config.BFT_MIN_CONSENSUS
+    for a in scores:
+        count = sum(1 for b in scores if abs(a - b) <= _CONSENSUS_WINDOW)
+        if count >= n:
+            return True
+    return False
 
 
 def _confidence_from_probs(probs: list[float], avg_prob: float) -> int:
-    """Derive a 0-100 confidence score from how far the ensemble probability
-    is from the decision boundary, discounted by inter-model disagreement."""
     certainty = abs(avg_prob - 0.5) * 2
     if len(probs) > 1:
         agreement = 1.0 - (max(probs) - min(probs))
@@ -48,7 +100,7 @@ def _confidence_from_probs(probs: list[float], avg_prob: float) -> int:
 
 
 class RiskScorer:
-    """Loads trained ensemble models and produces risk scores."""
+    """Loads trained ensemble models and produces BFT-hardened risk scores."""
 
     def __init__(self, model_dir: str | None = None):
         self.model_dir = model_dir or config.MODEL_DIR
@@ -63,22 +115,38 @@ class RiskScorer:
         return None
 
     def _load_models(self) -> dict:
+        from detection.persistence import ModelArtifact, ModelIntegrityError
+
+        artifact = ModelArtifact(self.model_dir)
         models = {}
         for name in MODEL_REGISTRY:
             path = os.path.join(self.model_dir, f"{name}.joblib")
             if os.path.exists(path):
-                models[name] = joblib.load(path)
+                model = joblib.load(path)
+                try:
+                    artifact.verify_chain(name)
+                except ModelIntegrityError as exc:
+                    logger.warning(
+                        "Artifact integrity check skipped or failed for %s: %s", name, exc
+                    )
+                models[name] = model
         return models
 
     def score(self, feature_row: pd.Series) -> dict:
-        """Score a single wallet's feature row.
+        """Score a single wallet's feature row with BFT voting.
 
         Returns a dict matching the on-chain `RiskScore` shape:
             {score, benford_flag, ml_flag, confidence}
+
+        When BFT divergence is detected the dict also contains:
+            {"bft_divergence": True}
+
+        When consensus cannot be reached:
+            {"score": 100, "consensus_failure": True, ...}
         """
         if not self.models:
             raise RuntimeError(
-                f"No trained models found in {self.model_dir}. " "Run model_training.py first."
+                f"No trained models found in {self.model_dir}. Run model_training.py first."
             )
 
         feature_cols = [c for c in feature_row.index if c not in FEATURE_COLUMNS_EXCLUDE]
@@ -105,23 +173,56 @@ class RiskScorer:
 
         X = feature_row[feature_cols].to_frame().T.astype(float)
 
-        probs = [model.predict_proba(X)[0, 1] for model in self.models.values()]
-        avg_prob = _combine_probabilities(probs)
+        probs = [model.predict_proba(X)[0][1] for model in self.models.values()]
+        scores_100 = [p * 100 for p in probs]
 
-        benford_mad_cols = [c for c in feature_row.index if c.startswith("benford_mad_")]
-        benford_flag = bool(
-            benford_mad_cols and (feature_row[benford_mad_cols] > BENFORD_MAD_FLAG_THRESHOLD).any()
-        )
+        result: dict = {}
 
-        return {
-            "score": int(round(avg_prob * 100)),
-            "benford_flag": benford_flag,
-            "ml_flag": bool(avg_prob >= ML_FLAG_THRESHOLD),
-            "confidence": _confidence_from_probs(probs, avg_prob),
-        }
+        if not _has_consensus(scores_100):
+            logger.warning(
+                "BFT consensus failure — raw scores: %s",
+                [round(s, 1) for s in scores_100],
+            )
+            _increment_bft_counter()
+            avg_prob = sum(probs) / len(probs)
+            result = {
+                "score": 100,
+                "benford_flag": False,
+                "ml_flag": True,
+                "confidence": 0,
+                "consensus_failure": True,
+                "bft_divergence": True,
+            }
+        else:
+            final_score, diverged = bft_trimmed_mean(scores_100)
+
+            if diverged:
+                logger.warning(
+                    "BFT divergence detected — raw model scores: %s",
+                    [round(s, 1) for s in scores_100],
+                )
+                _increment_bft_counter()
+
+            avg_prob = final_score / 100.0
+
+            benford_mad_cols = [c for c in feature_row.index if c.startswith("benford_mad_")]
+            benford_flag = bool(
+                benford_mad_cols
+                and (feature_row[benford_mad_cols] > BENFORD_MAD_FLAG_THRESHOLD).any()
+            )
+
+            result = {
+                "score": int(round(final_score)),
+                "benford_flag": benford_flag,
+                "ml_flag": bool(avg_prob >= ML_FLAG_THRESHOLD),
+                "confidence": _confidence_from_probs(probs, avg_prob),
+            }
+            if diverged:
+                result["bft_divergence"] = True
+
+        return result
 
     def score_matrix(self, feature_matrix: pd.DataFrame) -> pd.DataFrame:
-        """Score every row in a feature matrix, returning the matrix with
-        `score`, `benford_flag`, `ml_flag`, `confidence` columns appended."""
+        """Score every row in a feature matrix."""
         scores = feature_matrix.apply(self.score, axis=1, result_type="expand")
         return pd.concat([feature_matrix[["wallet"]], scores], axis=1)

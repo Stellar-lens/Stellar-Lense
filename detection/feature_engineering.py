@@ -27,21 +27,124 @@ from detection.wallet_graph import compute_wallet_graph_metrics
 from ingestion.data_models import AccountActivity
 
 
-def compute_benford_features(wallet_trades: pd.DataFrame) -> dict:
+def compute_benford_features(
+    wallet_trades: pd.DataFrame,
+    decompose: bool = True,
+    liquidity_profiler=None,
+    asset: str | None = None,
+) -> dict:
     """Flatten per-window Benford metrics into a feature row.
 
-    Produces `benford_chi_square_{h}h`, `benford_mad_{h}h`, and
-    `benford_z_max_{h}h` for each configured window.
+    Produces ``benford_chi_square_{h}h``, ``benford_mad_{h}h``, and
+    ``benford_z_max_{h}h`` for each configured window (preserved for backward
+    compatibility).  When ``liquidity_profiler`` and ``asset`` are provided,
+    also adds calibrated variants:
+
+    - ``benford_calibrated_chi_{h}h`` — chi-square vs. regime baseline
+    - ``benford_calibrated_mad_{h}h`` — MAD vs. regime baseline
+    - ``benford_regime_id`` — which liquidity cluster this asset belongs to
+    - ``benford_regime_baseline_mad`` — the regime's expected MAD
+    - ``benford_deviation_from_regime`` — calibrated MAD / regime baseline MAD
+
+    When ``decompose=True``, also adds ``benford_residual_chi_square_{h}h``
+    and ``benford_residual_mad_{h}h`` — Benford metrics on STL residuals.
+    Residual features are set to ``NaN`` for insufficient-data windows.
     """
     per_window = compute_benford_metrics_for_windows(wallet_trades)
 
-    features = {}
+    features: dict = {}
     for hours, metrics in per_window.items():
         features[f"benford_chi_square_{hours}h"] = metrics["chi_square"]
         features[f"benford_mad_{hours}h"] = metrics["mad"]
         features[f"benford_z_max_{hours}h"] = max(metrics["z_scores"].values(), default=0.0)
 
+    if decompose and not wallet_trades.empty:
+        for hours, res_metrics in _compute_residual_benford_for_windows(wallet_trades).items():
+            features[f"benford_residual_chi_square_{hours}h"] = res_metrics.get(
+                "chi_square", float("nan")
+            )
+            features[f"benford_residual_mad_{hours}h"] = res_metrics.get("mad", float("nan"))
+
+    if liquidity_profiler is not None and asset is not None:
+        _add_calibrated_benford_features(
+            features, wallet_trades, per_window, liquidity_profiler, asset
+        )
+
     return features
+
+
+def _add_calibrated_benford_features(
+    features: dict,
+    wallet_trades: pd.DataFrame,
+    per_window: dict,
+    liquidity_profiler,
+    asset: str,
+) -> None:
+    """Mutate *features* in-place, adding calibrated Benford features."""
+    from config import config
+
+    regime_id = liquidity_profiler.get_regime_id(asset)
+    baseline_mad = liquidity_profiler.get_baseline_mad(asset)
+    features["benford_regime_id"] = regime_id
+    features["benford_regime_baseline_mad"] = baseline_mad
+
+    timestamps = (
+        pd.to_datetime(wallet_trades["ledger_close_time"])
+        if not wallet_trades.empty
+        else pd.Series(dtype="datetime64[ns]")
+    )
+    ref = timestamps.max() if not timestamps.empty else pd.Timestamp.now(tz="UTC")
+
+    cal_mads: list[float] = []
+    for hours in config.BENFORD_WINDOWS_HOURS:
+        if not wallet_trades.empty:
+            window_start = ref - pd.Timedelta(hours=hours)
+            window_amounts = wallet_trades.loc[
+                (timestamps > window_start) & (timestamps <= ref), "amount"
+            ]
+        else:
+            window_amounts = pd.Series(dtype=float)
+
+        cal_chi = liquidity_profiler.calibrated_chi_square(window_amounts, asset)
+        cal_mad = liquidity_profiler.calibrated_mad(window_amounts, asset)
+        features[f"benford_calibrated_chi_{hours}h"] = cal_chi
+        features[f"benford_calibrated_mad_{hours}h"] = cal_mad
+        cal_mads.append(cal_mad)
+
+    mean_cal_mad = float(np.mean(cal_mads)) if cal_mads else 0.0
+    features["benford_deviation_from_regime"] = (
+        mean_cal_mad / baseline_mad if baseline_mad > 0 else 0.0
+    )
+
+
+def _compute_residual_benford_for_windows(wallet_trades: pd.DataFrame) -> dict[int, dict]:
+    """Compute Benford metrics on STL residuals for each configured window.
+
+    For each window, the trade sub-frame is decomposed via STL and Benford
+    metrics are computed on the absolute residuals.  Returns NaN entries for
+    windows where decomposition is not possible (insufficient data).
+    """
+    from detection.benford_engine import compute_benford_metrics
+    from detection.ts_decomposition import decompose_trade_amounts
+
+    windows_hours = config.BENFORD_WINDOWS_HOURS
+    timestamps = pd.to_datetime(wallet_trades["ledger_close_time"])
+    ref = timestamps.max()
+
+    results: dict[int, dict] = {}
+    for hours in windows_hours:
+        window_start = ref - pd.Timedelta(hours=hours)
+        window_df = wallet_trades[(timestamps > window_start) & (timestamps <= ref)]
+
+        residuals = decompose_trade_amounts(window_df)
+        if residuals is None:
+            results[hours] = {"chi_square": float("nan"), "mad": float("nan")}
+        else:
+            pos_residuals = residuals.abs()
+            pos_residuals = pos_residuals[pos_residuals > 0]
+            results[hours] = compute_benford_metrics(pos_residuals)
+
+    return results
 
 
 def compute_order_cancellation_rate(wallet: str, orderbook_events: pd.DataFrame | None) -> float:
@@ -362,6 +465,24 @@ def compute_cross_asset_features(
     return features
 
 
+def compute_cross_venue_features(
+    wallet: str,
+    sdex_trades: pd.DataFrame,
+    amm_trades: pd.DataFrame,
+) -> dict:
+    """Compute 7 cross-venue coordination features for a wallet.
+
+    Delegates to ``detection.cross_venue_features`` and returns a dict with
+    keys: venue_trade_ratio, cross_venue_volume_correlation,
+    cross_venue_timing_synchrony, cross_venue_net_flow,
+    counterparty_venue_overlap, simultaneous_order_pair,
+    cross_venue_cluster_score.
+    """
+    from detection.cross_venue_features import compute_cross_venue_features as _cvf
+
+    return _cvf(wallet, sdex_trades, amm_trades)
+
+
 def build_feature_vector(
     wallet: str,
     wallet_trades: pd.DataFrame,
@@ -369,7 +490,7 @@ def build_feature_vector(
     orderbook_events: pd.DataFrame | None = None,
     funding_graph: nx.DiGraph | None = None,
     all_pairs_df: pd.DataFrame | None = None,
-    gnn_embeddings: dict[str, dict[str, float]] | None = None,
+    amm_trades: pd.DataFrame | None = None,
 ) -> dict:
     """Assemble the full feature row for a single wallet.
 
@@ -379,8 +500,8 @@ def build_feature_vector(
     compute `order_cancellation_rate`. `funding_graph` (optional) is the
     output of `detection.wallet_graph.build_funding_graph`, used for the
     wallet graph features. `all_pairs_df` (optional) enables cross-asset
-    coordination features. ``gnn_embeddings`` may provide precomputed
-    ``gnn_embedding_*`` columns keyed by wallet for ensemble training.
+    coordination features. `amm_trades` (optional) enables cross-venue
+    coordination features.
     """
     reference_time = (
         pd.to_datetime(wallet_trades["ledger_close_time"], utc=True).max()
@@ -396,8 +517,8 @@ def build_feature_vector(
     if all_pairs_df is not None:
         features.update(compute_cross_asset_features(wallet, all_pairs_df))
     features.update(compute_hardening_features(wallet_trades))
-    if gnn_embeddings is not None:
-        features.update(gnn_embeddings.get(wallet, {}))
+    if amm_trades is not None:
+        features.update(compute_cross_venue_features(wallet, wallet_trades, amm_trades))
 
     return features
 
@@ -461,7 +582,7 @@ def build_feature_matrix(
     orderbook_events: pd.DataFrame | None = None,
     funding_graph: nx.DiGraph | None = None,
     all_pairs_df: pd.DataFrame | None = None,
-    gnn_embeddings: dict[str, dict[str, float]] | None = None,
+    amm_trades: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Build a feature matrix with one row per wallet observed in `trades_df`.
 
@@ -469,9 +590,8 @@ def build_feature_matrix(
     through to `build_feature_vector` for `order_cancellation_rate` and the
     wallet graph features respectively. `all_pairs_df` (optional, should be
     the same as `trades_df` or a superset with a `pair_id` column) enables
-    cross-asset coordination features. ``gnn_embeddings`` is the output of
-    ``detection.gnn_embedder.embedding_feature_map`` when learned graph
-    embeddings should be included in the ensemble.
+    cross-asset coordination features. `amm_trades` (optional) enables
+    cross-venue coordination features.
     """
     if trades_df.empty:
         return pd.DataFrame()
@@ -488,7 +608,7 @@ def build_feature_matrix(
                 orderbook_events=orderbook_events,
                 funding_graph=funding_graph,
                 all_pairs_df=all_pairs_df if all_pairs_df is not None else trades_df,
-                gnn_embeddings=gnn_embeddings,
+                amm_trades=amm_trades,
             )
         )
 

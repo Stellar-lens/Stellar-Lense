@@ -9,6 +9,9 @@ Run as a script against a labelled feature matrix (see
 This trains each model in `MODEL_REGISTRY` with SMOTE-balanced training
 data, evaluates AUC-ROC / PR-AUC / F1 on a held-out split, writes the
 artifacts to `config.MODEL_DIR`, and writes `metrics.json` alongside them.
+
+After every training run, `metrics.json` is signed with the Ed25519 private
+key at `MODEL_SIGNING_PRIVATE_KEY_PATH` (if configured).
 """
 
 import argparse
@@ -97,6 +100,11 @@ def compute_feature_schema_hash(feature_columns: list[str]) -> str:
     return f"sha256:{hashlib.sha256(schema_str.encode()).hexdigest()}"
 
 
+LABEL_DISTRIBUTION_BASELINE_PATH = os.path.join(
+    config.MODEL_DIR, "label_distribution_baseline.json"
+)
+
+
 def load_training_data(path: str) -> pd.DataFrame:
     """Load a labelled feature matrix (output of `build_feature_matrix` plus
     a `label` column: 1 = wash trading, 0 = legitimate)."""
@@ -113,11 +121,6 @@ def sha256_dataframe(df: pd.DataFrame) -> str:
     sorted_df = df.sort_values(by=list(df.columns)).reset_index(drop=True)
     h = hashlib.sha256(sorted_df.to_csv(index=False).encode()).hexdigest()
     return h
-
-
-LABEL_DISTRIBUTION_BASELINE_PATH = os.path.join(
-    config.MODEL_DIR, "label_distribution_baseline.json"
-)
 
 
 def detect_label_poisoning(
@@ -194,14 +197,14 @@ def train_models(
             ...
           },
           "feature_columns": [...],
+          "feature_distributions": {...},
           "n_train": int,
-          "n_test": int
+          "n_test": int,
         }
 
     If ``adversarial_augmentation`` is True, ``auc_roc_adversarial`` is also
     included in each model's metrics dict.
     """
-
     X, y = split_features_labels(df)
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=test_size, random_state=random_state, stratify=y
@@ -220,7 +223,6 @@ def train_models(
     smote = SMOTE(random_state=random_state)
     X_train_res, y_train_res = smote.fit_resample(X_train, y_train)
 
-    # Build an adversarially-perturbed test set for adv. AUC-ROC measurement
     rng = np.random.default_rng(random_state)
     noise = rng.normal(1.0, 0.005, size=X_test.shape)
     X_test_adv = X_test * noise
@@ -283,12 +285,10 @@ def save_training_artifacts(
     feature_columns = training_output["feature_columns"]
     feature_distributions = training_output.get("feature_distributions")
 
-    # metrics.json
     metrics_path = os.path.join(model_dir, "metrics.json")
     with open(metrics_path, "w") as f:
         json.dump({name: result["metrics"] for name, result in results.items()}, f, indent=2)
 
-    # model_metadata.json
     metadata = {
         "trained_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "data_path": data_path,
@@ -310,18 +310,39 @@ def save_training_artifacts(
     logger.info("Saved model metadata to %s", metadata_path)
 
 
+def save_metrics_report(
+    results: dict,
+    model_dir: str | None = None,
+    extra: dict | None = None,
+) -> str:
+    """Write metrics (plus optional *extra* provenance fields) to metrics.json."""
+    model_dir = model_dir or config.MODEL_DIR
+    os.makedirs(model_dir, exist_ok=True)
+    path = os.path.join(model_dir, "metrics.json")
+
+    payload: dict = {name: result["metrics"] for name, result in results.items()}
+
+    for name in results:
+        artifact_path = os.path.join(model_dir, f"{name}.joblib")
+        if os.path.exists(artifact_path):
+            sha = hashlib.sha256()
+            with open(artifact_path, "rb") as f:
+                for chunk in iter(lambda: f.read(65536), b""):
+                    sha.update(chunk)
+            payload[name]["artifact_sha256"] = sha.hexdigest()
+
+    if extra:
+        payload.update(extra)
+
+    with open(path, "w") as f:
+        json.dump(payload, f, indent=2)
+    return path
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train the LedgerLens ensemble classifiers")
-    parser.add_argument(
-        "--data-path",
-        required=True,
-        help="Path to a labelled feature matrix (parquet) with a 'label' column",
-    )
-    parser.add_argument(
-        "--model-dir",
-        default=None,
-        help="Directory to write trained model artifacts and metrics.json (default: MODEL_DIR)",
-    )
+    parser.add_argument("--data-path", required=True)
+    parser.add_argument("--model-dir", default=None)
     parser.add_argument("--test-size", type=float, default=0.2)
     parser.add_argument("--random-state", type=int, default=42)
     parser.add_argument(
@@ -339,12 +360,12 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    model_dir = args.model_dir or config.MODEL_DIR
 
     logger.info("Loading training data from %s", args.data_path)
     df = load_training_data(args.data_path)
     logger.info("Loaded %d rows", len(df))
 
-    # Provenance
     data_sha = sha256_dataframe(df)
     label_dist = df["label"].value_counts().to_dict()
     logger.info("training_data_sha256=%s  label_distribution=%s", data_sha, label_dist)
@@ -380,9 +401,19 @@ def main() -> None:
     for name, result in results.items():
         logger.info("%s metrics: %s", name, result["metrics"])
 
-    save_models(results, args.model_dir)
-    save_training_artifacts(training_output, args.data_path, args.model_dir)
-    logger.info("Saved models and artifacts to %s", args.model_dir or config.MODEL_DIR)
+    save_models(results, model_dir)
+    save_training_artifacts(training_output, args.data_path, model_dir)
+
+    if config.MODEL_SIGNING_PRIVATE_KEY_PATH:
+        from detection.persistence import sign_metrics
+
+        metrics_path = os.path.join(model_dir, "metrics.json")
+        sig_path = sign_metrics(metrics_path, config.MODEL_SIGNING_PRIVATE_KEY_PATH)
+        logger.info("Signed metrics.json → %s", sig_path)
+    else:
+        logger.warning("MODEL_SIGNING_PRIVATE_KEY_PATH not set — metrics.json not signed")
+
+    logger.info("Saved models and artifacts to %s", model_dir)
 
 
 if __name__ == "__main__":
