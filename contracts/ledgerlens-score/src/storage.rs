@@ -4,7 +4,9 @@ use crate::constants::{
     DEFAULT_COOLDOWN_SECS, DEFAULT_RISK_THRESHOLD, DEFAULT_UPGRADE_DELAY_SECS, SCORE_TTL_EXTEND_TO,
     SCORE_TTL_THRESHOLD,
 };
-use crate::types::{AggregateRiskScore, DataKey, RiskScore, ScoreTrend, UpgradeProposal};
+use crate::types::{
+    AggregateRiskScore, DataKey, ModelVersionStats, RiskScore, ScoreTrend, UpgradeProposal,
+};
 
 // ── Admin / Service ─────────────────────────────────────────────────────────
 
@@ -592,4 +594,86 @@ pub fn set_score_delegate(env: &Env, sub_wallet: &Address, custodian: &Address) 
 pub fn remove_score_delegate(env: &Env, sub_wallet: &Address) {
     let key = DataKey::ScoreDelegate(sub_wallet.clone());
     env.storage().persistent().remove(&key);
+}
+
+// ── Model-version statistics ────────────────────────────────────────────────
+
+pub fn get_model_stats(env: &Env, model_version: u32) -> Option<ModelVersionStats> {
+    let key = DataKey::ModelVersionStats(model_version);
+    let stats: Option<ModelVersionStats> = env.storage().persistent().get(&key);
+    if stats.is_some() {
+        env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    }
+    stats
+}
+
+pub fn get_all_model_versions(env: &Env) -> Vec<u32> {
+    let key = DataKey::ModelVersionIndex;
+    let versions: Vec<u32> =
+        env.storage().persistent().get(&key).unwrap_or_else(|| Vec::new(env));
+    if !versions.is_empty() {
+        env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    }
+    versions
+}
+
+/// Updates the running performance statistics for `model_version`.
+///
+/// If this is the first time the contract has seen this version, it is
+/// added to the `ModelVersionIndex` (maintaining sort order) and a new
+/// `ModelVersionStats` record is initialized.
+pub fn update_model_stats(env: &Env, model_version: u32, score: u32) {
+    let stats_key = DataKey::ModelVersionStats(model_version);
+    let now = env.ledger().timestamp();
+
+    let mut stats = env.storage().persistent().get(&stats_key).unwrap_or_else(|| {
+        // New version seen: update the index.
+        let index_key = DataKey::ModelVersionIndex;
+        let mut index: Vec<u32> =
+            env.storage().persistent().get(&index_key).unwrap_or_else(|| Vec::new(env));
+
+        if !index.contains(&model_version) {
+            // Maintain sorted order for get_all_model_versions.
+            let mut inserted = false;
+            for i in 0..index.len() {
+                if model_version < index.get(i).unwrap() {
+                    index.insert(i, model_version);
+                    inserted = true;
+                    break;
+                }
+            }
+            if !inserted {
+                index.push_back(model_version);
+            }
+            env.storage().persistent().set(&index_key, &index);
+            env.storage().persistent().extend_ttl(
+                &index_key,
+                SCORE_TTL_THRESHOLD,
+                SCORE_TTL_EXTEND_TO,
+            );
+        }
+
+        ModelVersionStats {
+            model_version,
+            submission_count: 0,
+            score_sum: 0,
+            score_max: 0,
+            score_min: u32::MAX,
+            first_seen: now,
+            last_seen: now,
+        }
+    });
+
+    stats.submission_count = stats.submission_count.saturating_add(1);
+    stats.score_sum = stats.score_sum.saturating_add(score as u64);
+    if score > stats.score_max {
+        stats.score_max = score;
+    }
+    if score < stats.score_min {
+        stats.score_min = score;
+    }
+    stats.last_seen = now;
+
+    env.storage().persistent().set(&stats_key, &stats);
+    env.storage().persistent().extend_ttl(&stats_key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
 }
