@@ -226,6 +226,28 @@ pub struct ScoreTrend {
     pub consecutive: u32,
 }
 
+/// Global configuration for the per-wallet score submission floor.
+///
+/// Returned by `get_score_floor_policy` and configured by
+/// `set_score_floor_policy`. When `enabled`, any `(wallet, asset_pair)`
+/// whose historical peak score has reached `high_water_mark` can no longer
+/// receive a submission below `floor_value` — a second line of defence
+/// against a compromised or colluding signer laundering a known high-risk
+/// wallet's reputation by zeroing its score. Disabled by default.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ScoreFloorPolicy {
+    /// Kill-switch: when `false`, no floor is enforced for any wallet.
+    pub enabled: bool,
+    /// Historical peak score at or above which the floor begins to apply for
+    /// a given `(wallet, asset_pair)`. Bounded to `[50, 100]`.
+    pub high_water_mark: u32,
+    /// Minimum score a high-risk wallet may be assigned while the floor
+    /// applies. Submissions below this are rejected with `BelowScoreFloor`.
+    /// Bounded to `[0, high_water_mark - 1]`.
+    pub floor_value: u32,
+}
+
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SnapshotRecord {
@@ -342,6 +364,20 @@ pub enum DataKey {
     /// List of counterparty addresses for a wallet on a specific asset pair.
     /// Key: Counterparties(wallet, asset_pair) -> Vec<Address>
     Counterparties(Address, Symbol),
+    /// Score-floor policy: historical peak (high-water mark) at or above which
+    /// the floor applies. Global config, `u32`, defaults to
+    /// `DEFAULT_SCORE_FLOOR_HWM` (80) when unset.
+    ScoreFloorHighWaterMark,
+    /// Score-floor policy: minimum score permitted for high-risk wallets.
+    /// Global config, `u32`, defaults to `DEFAULT_SCORE_FLOOR_MIN` (20).
+    ScoreFloorMinValue,
+    /// Score-floor policy kill-switch. Global config, `bool`, defaults to
+    /// `false` (floor disabled) until the admin opts in.
+    ScoreFloorEnabled,
+    /// Per-(wallet, asset_pair) running maximum of every score ever accepted,
+    /// used to decide whether the submission floor applies. Updated on every
+    /// accepted `submit_score` / `submit_scores_batch` write.
+    HistoricalMaxScore(Address, Symbol),
 }
 
 #[contracttype]
@@ -349,4 +385,3 @@ pub enum DataKey {
 pub struct TierBounds {
     pub min_score: u32,
     pub max_score: u32,
-}

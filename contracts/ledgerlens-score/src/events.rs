@@ -302,3 +302,24 @@ pub fn contagion_propagated(
         (affected_wallet.clone(), old_score, new_score),
     );
 }
+
+// ── Score submission floor ────────────────────────────────────────────────────
+
+/// Emitted when the admin configures the score-floor policy via
+/// `set_score_floor_policy`.
+pub fn score_floor_policy_updated(
+    env: &Env,
+    enabled: bool,
+    high_water_mark: u32,
+    floor_value: u32,
+) {
+    env.events().publish((symbol_short!("sf_upd"),), (enabled, high_water_mark, floor_value));
+}
+
+/// Emitted by `override_score_floor`. `by` is the admin that authorised a
+/// one-shot bypass of the floor for `(wallet, asset_pair)` — an emergency
+/// path, not a routine operation, so it carries its own audit-trail event.
+pub fn score_floor_overridden(env: &Env, by: &Address, wallet: &Address, asset_pair: &Symbol) {
+    env.events()
+        .publish((symbol_short!("sf_ovrd"), wallet.clone(), asset_pair.clone()), by.clone());
+}
