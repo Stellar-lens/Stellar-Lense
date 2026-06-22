@@ -95,9 +95,13 @@ Benford signals alone aren't definitive — legitimate high-frequency market mak
 - Volume spike frequency relative to rolling baseline
 
 **Wallet Graph Features**
-- Funding source similarity score
-- Network centrality within trading cluster graphs
+- Funding source similarity score *(legacy scalar — kept for model backwards compat)*
+- Network centrality within trading cluster graphs *(legacy scalar — kept for model backwards compat)*
 - Account age at time of trading activity
+
+**GNN Embedding Features (default 32 dims)**
+- `gnn_0` … `gnn_31`: GraphSAGE embedding of the wallet node in the combined funding + co-trade graph, capturing multi-hop ring structure that pairwise Jaccard similarity misses.  Computed by `detection/gnn_encoder.py`; defaults to all-zeros before the first training run.
+- See [`docs/gnn_architecture.md`](docs/gnn_architecture.md) for the full architecture, training procedure, and edge schema.
 
 **Cross-Asset Coordination Features (6)**
 - **Cross-pair trade synchrony** (0–1): Fraction of trades where the wallet simultaneously trades on other pairs within a configurable synchrony window (default: 30 seconds). High values indicate coordinated multi-pair activity — a strong wash-trading signal.

@@ -5,14 +5,19 @@ Feature groups (see README):
   - Trade pattern features
   - Volume and timing features
   - Wallet graph features
-  - Cross-asset coordination features (6): synchrony, net flow, counterparty overlap, volume correlation, pair diversity, Benford MAD std
+  - Cross-asset coordination features (6): synchrony, net flow, counterparty overlap, volume
+    correlation, pair diversity, Benford MAD std
+  - GNN embedding features (GNN_EMBEDDING_DIM, default 32): gnn_0 … gnn_31
 
 Each `compute_*_features` function operates on the trade DataFrame produced
 by `ingestion.historical_loader.trades_to_dataframe` (or the streamer,
 buffered into a DataFrame) for a single wallet.
 """
 
+from __future__ import annotations
+
 import math
+from typing import TYPE_CHECKING, Optional
 
 import networkx as nx
 import numpy as np
@@ -25,6 +30,9 @@ from detection.benford_engine import (
 )
 from detection.wallet_graph import compute_wallet_graph_metrics
 from ingestion.data_models import AccountActivity
+
+if TYPE_CHECKING:
+    from detection.gnn_encoder import GNNEncoder
 
 
 def compute_benford_features(
@@ -465,6 +473,43 @@ def compute_cross_asset_features(
     return features
 
 
+def compute_graph_embedding_features(
+    wallet: str,
+    graph: nx.DiGraph,
+    encoder: "GNNEncoder",
+) -> dict:
+    """Return GNN embedding features for *wallet* as a flat dict.
+
+    If the encoder is unavailable or *wallet* is not in the graph, returns
+    a dict of zeros (``{f"gnn_{i}": 0.0 for i in range(GNN_EMBEDDING_DIM)}``).
+
+    Parameters
+    ----------
+    wallet:
+        Stellar account ID.
+    graph:
+        The wallet funding/co-trade graph.
+    encoder:
+        A :class:`~detection.gnn_encoder.GNNEncoder` instance (may or may not
+        have a trained artifact loaded).
+
+    Returns
+    -------
+    dict
+        Keys ``gnn_0`` … ``gnn_{GNN_EMBEDDING_DIM - 1}``, values ``float``.
+    """
+    dim = config.GNN_EMBEDDING_DIM
+    zero_features = {f"gnn_{i}": 0.0 for i in range(dim)}
+
+    try:
+        if wallet not in graph:
+            return zero_features
+        embedding = encoder.encode(graph, wallet)
+        return {f"gnn_{i}": float(embedding[i]) for i in range(len(embedding))}
+    except Exception:
+        return zero_features
+
+
 def build_feature_vector(
     wallet: str,
     wallet_trades: pd.DataFrame,
@@ -472,16 +517,19 @@ def build_feature_vector(
     orderbook_events: pd.DataFrame | None = None,
     funding_graph: nx.DiGraph | None = None,
     all_pairs_df: pd.DataFrame | None = None,
+    gnn_encoder: Optional["GNNEncoder"] = None,
 ) -> dict:
     """Assemble the full feature row for a single wallet.
 
-    `wallet_trades` should already be filtered to trades involving `wallet`
-    as base or counter account. `orderbook_events` (optional) is the output
-    of `ingestion.orderbook_loader.load_accounts_orderbook_events`, used to
-    compute `order_cancellation_rate`. `funding_graph` (optional) is the
-    output of `detection.wallet_graph.build_funding_graph`, used for the
-    wallet graph features. `all_pairs_df` (optional) enables cross-asset
-    coordination features.
+    ``wallet_trades`` should already be filtered to trades involving ``wallet``
+    as base or counter account. ``orderbook_events`` (optional) is the output
+    of ``ingestion.orderbook_loader.load_accounts_orderbook_events``, used to
+    compute ``order_cancellation_rate``. ``funding_graph`` (optional) is the
+    output of ``detection.wallet_graph.build_funding_graph``, used for the
+    wallet graph features. ``all_pairs_df`` (optional) enables cross-asset
+    coordination features. ``gnn_encoder`` (optional) appends GNN embedding
+    features (``gnn_0`` … ``gnn_{GNN_EMBEDDING_DIM-1}``); when ``None`` or
+    when the encoder artifact is absent the GNN columns default to ``0.0``.
     """
     reference_time = (
         pd.to_datetime(wallet_trades["ledger_close_time"], utc=True).max()
@@ -497,6 +545,12 @@ def build_feature_vector(
     if all_pairs_df is not None:
         features.update(compute_cross_asset_features(wallet, all_pairs_df))
     features.update(compute_hardening_features(wallet_trades))
+
+    # GNN embedding features — graceful zero-fallback when encoder is absent
+    if gnn_encoder is not None and funding_graph is not None:
+        features.update(compute_graph_embedding_features(wallet, funding_graph, gnn_encoder))
+    else:
+        features.update({f"gnn_{i}": 0.0 for i in range(config.GNN_EMBEDDING_DIM)})
 
     return features
 
@@ -560,14 +614,16 @@ def build_feature_matrix(
     orderbook_events: pd.DataFrame | None = None,
     funding_graph: nx.DiGraph | None = None,
     all_pairs_df: pd.DataFrame | None = None,
+    gnn_encoder: Optional["GNNEncoder"] = None,
 ) -> pd.DataFrame:
-    """Build a feature matrix with one row per wallet observed in `trades_df`.
+    """Build a feature matrix with one row per wallet observed in ``trades_df``.
 
-    `orderbook_events` and `funding_graph` (both optional) are threaded
-    through to `build_feature_vector` for `order_cancellation_rate` and the
-    wallet graph features respectively. `all_pairs_df` (optional, should be
-    the same as `trades_df` or a superset with a `pair_id` column) enables
-    cross-asset coordination features.
+    ``orderbook_events`` and ``funding_graph`` (both optional) are threaded
+    through to ``build_feature_vector`` for ``order_cancellation_rate`` and the
+    wallet graph features respectively. ``all_pairs_df`` (optional, should be
+    the same as ``trades_df`` or a superset with a ``pair_id`` column) enables
+    cross-asset coordination features. ``gnn_encoder`` (optional) appends GNN
+    embedding features; columns default to ``0.0`` when ``None``.
     """
     if trades_df.empty:
         return pd.DataFrame()
@@ -584,6 +640,7 @@ def build_feature_matrix(
                 orderbook_events=orderbook_events,
                 funding_graph=funding_graph,
                 all_pairs_df=all_pairs_df if all_pairs_df is not None else trades_df,
+                gnn_encoder=gnn_encoder,
             )
         )
 

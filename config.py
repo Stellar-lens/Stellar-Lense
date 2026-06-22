@@ -84,5 +84,13 @@ class Config:
     AL_ROLLBACK_AUC_DROP: float = float(os.getenv("AL_ROLLBACK_AUC_DROP", "0.01"))
     AL_QUEUE_PATH: str = os.getenv("AL_QUEUE_PATH", "data/annotation_queue.json")
 
+    # GNN encoder
+    GNN_EMBEDDING_DIM: int = int(os.getenv("GNN_EMBEDDING_DIM", "32"))
+    GNN_HIDDEN_DIM: int = int(os.getenv("GNN_HIDDEN_DIM", "64"))
+    GNN_NUM_LAYERS: int = int(os.getenv("GNN_NUM_LAYERS", "2"))
+    # Co-trade graph window: two wallets trading the same asset pair within
+    # this many hours get a co_trade edge.
+    GRAPH_CO_TRADE_WINDOW_HOURS: int = int(os.getenv("GRAPH_CO_TRADE_WINDOW_HOURS", "24"))
+
 
 config = Config()
