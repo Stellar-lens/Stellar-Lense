@@ -132,3 +132,8 @@ pub enum Error {
     /// when the requested wallet is under an active regulatory embargo.
     ScoreEmbargoed = 42,
 }
+
+// Gate caller tracking error variants for structural protection
+pub const GATE_CALLER_ALREADY_ALLOWED: u32 = 26;
+pub const GATE_CALLER_NOT_FOUND: u32 = 27;
+pub const GATE_CALLER_LIST_FULL: u32 = 28;

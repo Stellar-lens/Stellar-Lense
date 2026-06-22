@@ -330,3 +330,12 @@ pub enum DataKey {
     /// successful `submit_score` / `submit_scores_batch` write.
     TrendState(Address, Symbol),
 }
+
+pub const MAX_GATE_CALLERS: u32 = 20;
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum GateDataKey {
+    GateCallers,
+    GateOpen,
+}
