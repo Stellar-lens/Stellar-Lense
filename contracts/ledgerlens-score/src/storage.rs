@@ -1,5 +1,6 @@
-use soroban_sdk::{Env, Vec, Address};
-use crate::types::GateDataKey;
+use soroban_sdk::{Env, Address};
+use crate::types::{DataKey, TierBounds};
+use crate::errors::Error;
 
 use crate::constants::{
     DEFAULT_COOLDOWN_SECS, DEFAULT_RISK_THRESHOLD, DEFAULT_UPGRADE_DELAY_SECS, SCORE_TTL_EXTEND_TO,
@@ -358,8 +359,11 @@ pub fn set_service_set(env: &Env, set: &Vec<Address>) {
     env.storage().instance().set(&DataKey::ServiceSet, set);
 }
 
-pub fn set_gate_open(env: &Env, open: bool) {
-    env.storage().instance().set(&GateDataKey::GateOpen, &open);
+pub fn get_signer_tier(env: &Env, signer: &Address) -> TierBounds {
+    env.storage()
+        .instance()
+        .get(&DataKey::SignerTier(signer.clone()))
+        .unwrap_or(TierBounds { min_score: 0, max_score: 100 })
 }
 
 pub fn set_service_threshold(env: &Env, threshold: u32) {

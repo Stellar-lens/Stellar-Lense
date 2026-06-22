@@ -9,7 +9,8 @@ pub enum Error {
     Unauthorized = 3,
     InvalidScore = 4,
     InvalidConfidence = 5,
-    ScoreNotFound = 6,
+   SignerTierViolation = 26,
+    InvalidSignerTier = 27, ScoreNotFound = 6,
     /// Returned when any state-mutating call is attempted while the
     /// contract is paused by the admin.
     ContractPaused = 7,
