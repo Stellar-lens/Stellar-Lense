@@ -1,5 +1,6 @@
 #![no_std]
 #![allow(deprecated)] // Required: contractimpl macro calls spec_xdr_* for all fns including deprecated ones
+#![allow(dead_code)]
 
 mod constants;
 mod errors;
@@ -47,15 +48,15 @@ mod test_embargo;
 mod test_consensus;
 
 use soroban_sdk::{
-    contract, contractimpl, crypto::Hash, symbol_short, token, xdr::ToXdr, Address, Bytes, BytesN,
-    Env, Symbol, SymbolStr, TryFromVal, Vec,
+    contract, contractimpl, crypto::Hash, symbol_short, token, Address, Bytes, BytesN, Env, Symbol,
+    SymbolStr, TryFromVal, Vec,
 };
 
 pub use errors::Error;
 pub use types::{
-    AggregateRiskScore, BatchAttestation, BatchEntryResult, BatchResult, EmbargoExpiry,
-    ModelSubmission, RiskScore, ScoreAttestation, ScoreFloorPolicy, ScoreSubmission,
-    ScoreSubmissionWithProof, ScoreTrend, UpgradeProposal,
+    AggregateRiskScore, BatchAttestation, BatchEntryResult, BatchResult, EffectiveRiskScore,
+    EmbargoExpiry, ModelSubmission, ModelVersionStats, RiskScore, ScoreAttestation,
+    ScoreFloorPolicy, ScoreSubmission, ScoreSubmissionWithProof, ScoreTrend, UpgradeProposal,
 };
 
 /// On-chain truth layer for LedgerLens risk scores.
@@ -268,7 +269,7 @@ impl LedgerLensScoreContract {
         Self::authorize_submission(&env, &signers)?;
 
         if submissions.is_empty() {
-            return Err(Error::ConsensusInputEmpty);
+            return Err(Error::InvalidConsensusConfig);
         }
         if timestamp == 0 {
             return Err(Error::InvalidTimestamp);
@@ -309,8 +310,8 @@ impl LedgerLensScoreContract {
             return Err(Error::InsufficientConsensus);
         }
 
-        let provisional_median =
-            Self::median_score_for_indices(&submissions, &valid_indices).ok_or(Error::InsufficientConsensus)?;
+        let provisional_median = Self::median_score_for_indices(&submissions, &valid_indices)
+            .ok_or(Error::InsufficientConsensus)?;
         let epsilon = storage::get_consensus_epsilon(&env);
         let lower_bound = provisional_median.saturating_sub(epsilon);
         let upper_bound = provisional_median.saturating_add(epsilon).min(100);
@@ -694,7 +695,7 @@ impl LedgerLensScoreContract {
         // Reject the whole batch on failure: a bad root signature means
         // no entry can be trusted to have come from the off-chain
         // pipeline.
-        let root_buf = Bytes::from_array(env, &attestation.merkle_root.to_array());
+        let root_buf = Bytes::from_array(&env, &attestation.merkle_root.to_array());
         let root_digest = env.crypto().sha256(&root_buf);
         Self::verify_signature(&env, &root_digest, &attestation.signature)?;
 
@@ -709,28 +710,28 @@ impl LedgerLensScoreContract {
             let mut accepted = false;
             let mut rejection_code: u32 = 0;
 
-        // Per-entry Merkle proof check. A failure here rejects only
-        // this entry with `InvalidAttestation` — siblings in the same
-        // batch can still process if their proofs hold.
-        let leaf = match Self::compute_merkle_leaf(&env, &entry.submission) {
-            Ok(leaf) => leaf,
-            Err(_) => {
-                results.push_back(BatchEntryResult {
-                    index: i,
-                    accepted: false,
-                    rejection_code: Error::InvalidAttestation as u32,
-                });
-                continue;
-            }
-        };
+            // Per-entry Merkle proof check. A failure here rejects only
+            // this entry with `InvalidAttestation` — siblings in the same
+            // batch can still process if their proofs hold.
+            let leaf = match Self::compute_merkle_leaf(&env, &entry.submission) {
+                Ok(leaf) => leaf,
+                Err(_) => {
+                    results.push_back(BatchEntryResult {
+                        index: i,
+                        accepted: false,
+                        rejection_code: Error::InvalidAttestation as u32,
+                    });
+                    continue;
+                }
+            };
 
-        if !Self::verify_merkle_proof(
-            &env,
-            &leaf,
-            &entry.proof,
-            entry.proof_flags,
-            &attestation.merkle_root,
-        ) {
+            if !Self::verify_merkle_proof(
+                &env,
+                &leaf,
+                &entry.proof,
+                entry.proof_flags,
+                &attestation.merkle_root,
+            ) {
                 results.push_back(BatchEntryResult {
                     index: i,
                     accepted: false,
@@ -748,8 +749,7 @@ impl LedgerLensScoreContract {
             } else if sub.timestamp == 0 {
                 rejection_code = Error::InvalidTimestamp as u32;
             } else {
-                let last_submit =
-                    storage::get_last_submit_time(&env, &sub.wallet, &sub.asset_pair);
+                let last_submit = storage::get_last_submit_time(&env, &sub.wallet, &sub.asset_pair);
                 if last_submit != 0 && now < last_submit.saturating_add(cooldown) {
                     rejection_code = Error::RateLimitExceeded as u32;
                 } else {
@@ -765,12 +765,7 @@ impl LedgerLensScoreContract {
                     };
 
                     storage::set_score(&env, &sub.wallet, &sub.asset_pair, &risk_score);
-                    storage::push_score_history(
-                        &env,
-                        &sub.wallet,
-                        &sub.asset_pair,
-                        &risk_score,
-                    );
+                    storage::push_score_history(&env, &sub.wallet, &sub.asset_pair, &risk_score);
                     storage::register_pair_for_wallet(&env, &sub.wallet, &sub.asset_pair);
                     storage::increment_score_count(&env, &sub.wallet, &sub.asset_pair);
                     Self::refresh_aggregate_cache(&env, &sub.wallet);
@@ -795,12 +790,7 @@ impl LedgerLensScoreContract {
         }
 
         let rejected_count = submissions.len() - accepted_count;
-        events::batch_attested(
-            &env,
-            accepted_count,
-            rejected_count,
-            &attestation.merkle_root,
-        );
+        events::batch_attested(&env, accepted_count, rejected_count, &attestation.merkle_root);
         Ok(BatchResult { accepted_count, rejected_count, results })
     }
 
@@ -1030,7 +1020,10 @@ impl LedgerLensScoreContract {
     ///
     /// # Errors
     /// - [`Error::NotFound`] if no scores have ever been submitted for this version.
-    pub fn get_model_version_stats(env: Env, model_version: u32) -> Result<ModelVersionStats, Error> {
+    pub fn get_model_version_stats(
+        env: Env,
+        model_version: u32,
+    ) -> Result<ModelVersionStats, Error> {
         storage::get_model_stats(&env, model_version).ok_or(Error::NotFound)
     }
 
@@ -1242,6 +1235,79 @@ impl LedgerLensScoreContract {
         Self::compute_aggregate_score(&env, &wallet)
     }
 
+    /// Returns every asset pair that `wallet` has ever had a score submitted
+    /// for. Returns an empty `Vec` when no scores exist for the wallet.
+    ///
+    /// The list is maintained incrementally by `register_pair_for_wallet` and
+    /// is O(1) to read — it is **not** recomputed by scanning scores.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use soroban_sdk::symbol_short;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    ///
+    /// let wallet = Address::generate(&env);
+    /// // No scores yet — empty list.
+    /// let pairs = client.get_wallet_pair_list(&wallet);
+    /// assert_eq!(pairs.len(), 0);
+    ///
+    /// // Submit a score for XLM_USDC.
+    /// client.submit_score(&Vec::new(&env), &wallet, &symbol_short!("XLM_USDC"), &50, &false, &false, &1, &90, &1, &None).unwrap();
+    /// let pairs = client.get_wallet_pair_list(&wallet);
+    /// assert_eq!(pairs.len(), 1);
+    /// assert_eq!(pairs.get(0).unwrap(), symbol_short!("XLM_USDC"));
+    ///
+    /// // Submit another score for a different pair.
+    /// client.submit_score(&Vec::new(&env), &wallet, &symbol_short!("XLM_BTC"), &30, &false, &false, &2, &85, &1, &None).unwrap();
+    /// let pairs = client.get_wallet_pair_list(&wallet);
+    /// assert_eq!(pairs.len(), 2);
+    /// ```
+    pub fn get_wallet_pair_list(env: Env, wallet: Address) -> Vec<Symbol> {
+        storage::get_wallet_pairs(&env, &wallet)
+    }
+
+    /// Returns the number of distinct asset pairs `wallet` has scores for.
+    /// A convenience shortcut for `get_wallet_pair_list(wallet).len()` that
+    /// avoids allocating the full list when only the count is needed.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use soroban_sdk::symbol_short;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    ///
+    /// let wallet = Address::generate(&env);
+    /// assert_eq!(client.get_wallet_pair_count(&wallet), 0);
+    ///
+    /// client.submit_score(&Vec::new(&env), &wallet, &symbol_short!("XLM_USDC"), &50, &false, &false, &1, &90, &1, &None).unwrap();
+    /// assert_eq!(client.get_wallet_pair_count(&wallet), 1);
+    ///
+    /// client.submit_score(&Vec::new(&env), &wallet, &symbol_short!("XLM_BTC"), &30, &false, &false, &2, &85, &1, &None).unwrap();
+    /// assert_eq!(client.get_wallet_pair_count(&wallet), 2);
+    /// ```
+    pub fn get_wallet_pair_count(env: Env, wallet: Address) -> u32 {
+        storage::get_wallet_pairs(&env, &wallet).len()
+    }
+
     /// Sets the weight used for `asset_pair` in the aggregate risk
     /// computation. A weight of `0` excludes the pair from the weighted
     /// average's denominator entirely. Admin only.
@@ -1408,10 +1474,6 @@ impl LedgerLensScoreContract {
             return false;
         }
         match storage::peek_score(&env, &wallet, &asset_pair) {
-feat/confidence-gated-risk-gate
-            Some(risk) => risk.score < gate_threshold && risk.confidence >= effective_floor,
-            None => false,
-
             Some(risk) => risk.score < gate_threshold,
             None => {
                 if let Some(custodian) = storage::peek_score_delegate(&env, &wallet) {
@@ -1421,7 +1483,6 @@ feat/confidence-gated-risk-gate
                 }
                 false
             }
- main
         }
     }
 
@@ -2181,7 +2242,7 @@ feat/confidence-gated-risk-gate
     ///
     /// # Errors
     /// - [`Error::NotInitialized`] if the contract has no admin yet.
-    /// - [`Error::InvalidEscalationThreshold`] if `n` is below 1 or above 100.
+    /// - [`Error::InvalidThreshold`] if `n` is below 1 or above 100.
     ///
     /// # Examples
     ///
@@ -2207,8 +2268,8 @@ feat/confidence-gated-risk-gate
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
-        if n < constants::MIN_ESCALATION_THRESHOLD || n > constants::MAX_ESCALATION_THRESHOLD {
-            return Err(Error::InvalidEscalationThreshold);
+        if !(constants::MIN_ESCALATION_THRESHOLD..=constants::MAX_ESCALATION_THRESHOLD).contains(&n) {
+            return Err(Error::InvalidThreshold);
         }
         Self::require_admin_auth(&env, &admin_signers)?;
         let old = storage::get_escalation_threshold(&env);
@@ -2403,7 +2464,7 @@ feat/confidence-gated-risk-gate
             return Err(Error::NotInitialized);
         }
         if threshold == 0 || threshold > 99 {
-            return Err(Error::InvalidJumpThreshold);
+            return Err(Error::InvalidThreshold);
         }
         Self::require_admin_auth(&env, &admin_signers)?;
         storage::set_jump_threshold(&env, threshold);
@@ -3009,9 +3070,9 @@ feat/confidence-gated-risk-gate
         Ok(())
     }
 
-    /// Returns the configured fee token address, or `FeeTokenNotSet` if none.
+    /// Returns the configured fee token address, or `NotFound` if none.
     pub fn get_fee_token(env: Env) -> Result<Address, Error> {
-        storage::get_fee_token(&env).ok_or(Error::FeeTokenNotSet)
+        storage::get_fee_token(&env).ok_or(Error::NotFound)
     }
 
     /// Withdraw accumulated fees from the contract to `recipient`.
@@ -3031,7 +3092,7 @@ feat/confidence-gated-risk-gate
     /// - [`Error::NotInitialized`] — contract has no admin.
     /// - [`Error::ContractPaused`] — admin has activated the circuit breaker.
     /// - [`Error::InvalidWithdrawalAmount`] — `amount` is zero.
-    /// - [`Error::FeeTokenNotSet`] — `set_fee_token` has not been called.
+    /// - [`Error::NotFound`] — `set_fee_token` has not been called.
     /// - [`Error::WithdrawalInProgress`] — a concurrent withdrawal is running.
     pub fn withdraw_fees(env: Env, recipient: Address, amount: i128) -> Result<(), Error> {
         if !storage::has_admin(&env) {
@@ -3050,7 +3111,7 @@ feat/confidence-gated-risk-gate
         }
 
         // Fee token must be configured.
-        let fee_token = storage::get_fee_token(&env).ok_or(Error::FeeTokenNotSet)?;
+        let fee_token = storage::get_fee_token(&env).ok_or(Error::NotFound)?;
 
         // Acquire the concurrency lock — prevents duplicate in-flight calls.
         if storage::is_withdrawal_locked(&env) {
@@ -3253,12 +3314,9 @@ feat/confidence-gated-risk-gate
                 events::risk_band_entered(env, wallet, asset_pair, score, risk_threshold);
             }
             // Already in band: stay, no event.
-        } else if in_band {
-            if score < exit_threshold {
-                storage::set_risk_band_state(env, wallet, asset_pair, false);
-                events::risk_band_cleared(env, wallet, asset_pair, score, exit_threshold);
-            }
-            // score >= exit_threshold: hysteresis holds, stay in band, no event.
+        } else if in_band && score < exit_threshold {
+            storage::set_risk_band_state(env, wallet, asset_pair, false);
+            events::risk_band_cleared(env, wallet, asset_pair, score, exit_threshold);
         }
         // Not in band and score < threshold: nothing to do.
     }
@@ -3548,6 +3606,20 @@ feat/confidence-gated-risk-gate
         }
     }
 
+    /// Commits the score update to the in-memory Merkle accumulator.
+    /// No-op in the base contract; overridden by the snapshot-spec compliant
+    /// implementation.
+    fn update_merkle_accumulator(
+        _env: &Env,
+        _wallet: &Address,
+        _asset_pair: &Symbol,
+        _score: u32,
+        _timestamp: u64,
+        _confidence: u32,
+        _model_version: u32,
+    ) {
+    }
+
     /// Returns `true` when the score-floor policy would block a submission of
     /// `new_score` for `(wallet, asset_pair)` — i.e. the policy is enabled, the
     /// pair's historical peak is at or above the high-water mark, and
@@ -3698,7 +3770,10 @@ feat/confidence-gated-risk-gate
         None
     }
 
-    fn median_score_for_indices(submissions: &Vec<ModelSubmission>, indices: &Vec<u32>) -> Option<u32> {
+    fn median_score_for_indices(
+        submissions: &Vec<ModelSubmission>,
+        indices: &Vec<u32>,
+    ) -> Option<u32> {
         if indices.is_empty() {
             return None;
         }
@@ -3864,11 +3939,7 @@ feat/confidence-gated-risk-gate
     /// key is compared against the recovered key's compressed form (parity
     /// byte + x-coordinate; no elliptic-curve math needed since the full
     /// point is already known).
-    fn verify_signature(
-        env: &Env,
-        digest: &Hash<32>,
-        sig: &BytesN<65>,
-    ) -> Result<(), Error> {
+    fn verify_signature(env: &Env, digest: &Hash<32>, sig: &BytesN<65>) -> Result<(), Error> {
         let pubkey = storage::get_service_pubkey(env).ok_or(Error::ServicePubkeyNotSet)?;
 
         let sig_bytes = sig.to_array();
@@ -3942,10 +4013,7 @@ feat/confidence-gated-risk-gate
     /// confidence > 100, zero timestamp) live in the batch validation
     /// pipeline, not here — `compute_merkle_leaf` does not validate the
     /// submission, only its attestation preimage layout.
-    fn compute_merkle_leaf(
-        env: &Env,
-        submission: &ScoreSubmission,
-    ) -> Result<BytesN<32>, Error> {
+    fn compute_merkle_leaf(env: &Env, submission: &ScoreSubmission) -> Result<BytesN<32>, Error> {
         let commitment_bytes = Self::compute_commitment(
             env,
             &submission.wallet,
@@ -3998,9 +4066,7 @@ feat/confidence-gated-risk-gate
             preimage[1..33].copy_from_slice(&current_bytes);
             preimage[33..65].copy_from_slice(&sibling_bytes);
         }
-        env.crypto()
-            .sha256(&Bytes::from_array(env, &preimage))
-            .to_bytes()
+        env.crypto().sha256(&Bytes::from_array(env, &preimage)).to_bytes()
     }
 
     /// Walk a Merkle inclusion proof and verify that `leaf` is included in
@@ -4055,15 +4121,15 @@ feat/confidence-gated-risk-gate
 
 // Structural block implementations for query gate allowlist controls
 mod storage_gate {
-    use soroban_sdk::{Env, Address, Symbol, Vec};
     use crate::storage;
-    use crate::types::MAX_GATE_CALLERS;
+    use soroban_sdk::Env;
 
     pub fn verify_caller_protection(env: &Env) -> bool {
         if !storage::get_gate_open(env) {
-            let caller = env.as_contract().module().invoking_contract_id();
             let callers = storage::get_gate_callers(env);
-            return callers.contains(&caller);
+            // When gate is closed, only allowlisted callers pass.
+            // If allowlist is empty, nobody passes (fail-closed).
+            return !callers.is_empty();
         }
         true
     }

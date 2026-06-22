@@ -2,6 +2,9 @@
 pub const SCORE_TTL_THRESHOLD: u32 = 518_400; // ~30 days
 pub const SCORE_TTL_EXTEND_TO: u32 = 777_600; // ~45 days
 
+/// Maximum number of allowed gate callers in the allowlist.
+pub const MAX_GATE_CALLERS: u32 = 20;
+
 /// Hard ceiling on the ring-buffer depth to bound storage costs.
 /// The admin cannot configure a depth above this value.
 pub const MAX_HISTORY_DEPTH: u32 = 50;
@@ -14,6 +17,11 @@ pub const MAX_BATCH_SIZE: u32 = 20;
 
 /// Default risk threshold used when no threshold has been configured by admin.
 pub const DEFAULT_RISK_THRESHOLD: u32 = 75;
+
+/// Default threshold for score jump anomaly detection, used when no
+/// threshold has been configured by admin. When the absolute delta
+/// between consecutive scores exceeds this value, a jump event is emitted.
+pub const DEFAULT_JUMP_THRESHOLD: u32 = 30;
 
 /// Semantic contract version; bump on breaking ABI changes.
 ///
@@ -122,6 +130,11 @@ pub const MAX_DECAY_LAMBDA_NUM: u32 = 1;
 
 /// Maximum allowed decay rate denominator (paired with MAX_DECAY_LAMBDA_NUM).
 pub const MAX_DECAY_LAMBDA_DEN: u32 = 1;
+
+/// Minimum configurable escalation threshold (consecutive breaches).
+pub const MIN_ESCALATION_THRESHOLD: u32 = 1;
+/// Maximum configurable escalation threshold.
+pub const MAX_ESCALATION_THRESHOLD: u32 = 100;
 
 // ── Wallet Relationship Graph ───────────────────────────────────────────────
 

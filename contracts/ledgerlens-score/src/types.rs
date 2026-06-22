@@ -1,4 +1,29 @@
-use soroban_sdk::{contracttype, Address};
+use soroban_sdk::{contracttype, Address, BytesN, Symbol};
+
+/// Result of applying time-weighted decay to a raw `RiskScore`.
+/// Returned by `get_effective_score`.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EffectiveRiskScore {
+    pub raw_score: u32,
+    pub effective_score: u32,
+    pub decay_applied: bool,
+    pub elapsed_secs: u64,
+    pub timestamp: u64,
+    pub confidence: u32,
+    pub model_version: u32,
+    pub benford_flag: bool,
+    pub ml_flag: bool,
+}
+
+/// Per-model-version submission statistics aggregated on-chain.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ModelVersionStats {
+    pub model_version: u32,
+    pub submission_count: u32,
+    pub score_sum: u32,
+}
 
 /// Embargo expiry configuration stored per wallet in temporary storage.
 ///
@@ -281,8 +306,15 @@ pub struct ScoreFloorPolicy {
 pub struct SnapshotRecord {
     pub root: BytesN<32>,
     pub leaf_count: u64,
-    pub committed_at: u64,      // ledger timestamp
-    pub committed_by: Address,  // who called commit_snapshot
+    pub committed_at: u64,     // ledger timestamp
+    pub committed_by: Address, // who called commit_snapshot
+}
+
+#[contracttype]
+#[derive(Clone)]
+pub enum GateDataKey {
+    GateCallers,
+    GateOpen,
 }
 
 #[contracttype]
@@ -325,6 +357,9 @@ pub enum DataKey {
     /// Admin-configured delay (seconds) between proposing and executing an
     /// upgrade. Defaults to `DEFAULT_UPGRADE_DELAY_SECS` when unset.
     UpgradeDelay,
+    /// Per-signer score range restriction. Maps a service signer address to
+    /// its allowed `TierBounds`.
+    SignerTier(Address),
     /// Ordered set of N addresses authorised to co-sign score submissions.
     ServiceSet,
     /// The M-of-N threshold: minimum number of service-set members that must
@@ -361,6 +396,10 @@ pub enum DataKey {
     /// Denominator of the fixed-point decay rate λ = numerator / denominator.
     /// Defaults to 1 when unset.
     DecayRateDenominator,
+    /// Global minimum confidence floor (0–100) enforced by
+    /// `query_risk_gate_with_confidence`. The effective floor is
+    /// `max(caller_param, global_floor)`. Defaults to 0 (no floor) when unset.
+    GlobalMinConfidence,
     /// The SEP-41 token contract address from which fees are withdrawn.
     /// Unset until `set_fee_token` is called.
     FeeToken,
@@ -420,6 +459,15 @@ pub enum DataKey {
     /// Maximum allowed score deviation from the provisional median when
     /// building the consensus set.
     ConsensusEpsilon,
+    /// Admin-configured escalation threshold: number of consecutive high-risk
+    /// breaches that trigger an escalation event.
+    EscalationThreshold,
+    /// Per-(wallet, asset_pair) consecutive breach counter.
+    BreachCount(Address, Symbol),
+    /// Per-model-version aggregated submission statistics.
+    ModelStats(u32),
+    /// Sorted list of every model version the contract has ever seen.
+    AllModelVersions,
 }
 
 #[contracttype]
@@ -427,3 +475,4 @@ pub enum DataKey {
 pub struct TierBounds {
     pub min_score: u32,
     pub max_score: u32,
+}

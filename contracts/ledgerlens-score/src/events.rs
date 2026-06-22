@@ -158,16 +158,8 @@ pub fn service_pubkey_updated(env: &Env, pubkey: &Bytes) {
 /// signature was produced over, so an off-chain indexer can reconcile
 /// on-chain outcomes against the originally-signed batch without
 /// re-reading the per-entry proofs.
-pub fn batch_attested(
-    env: &Env,
-    accepted: u32,
-    rejected: u32,
-    merkle_root: &BytesN<32>,
-) {
-    env.events().publish(
-        (symbol_short!("bat_ok"), merkle_root.clone()),
-        (accepted, rejected),
-    );
+pub fn batch_attested(env: &Env, accepted: u32, rejected: u32, merkle_root: &BytesN<32>) {
+    env.events().publish((symbol_short!("bat_ok"), merkle_root.clone()), (accepted, rejected));
 }
 
 // ── Multi-model consensus scoring ─────────────────────────────────────────────
@@ -191,7 +183,6 @@ pub fn consensus_score_submitted(
 pub fn consensus_config_updated(env: &Env, k: u32, epsilon: u32) {
     env.events().publish((symbol_short!("cons_cfg"),), (k, epsilon));
 }
-
 
 // ── History depth ─────────────────────────────────────────────────────────────
 
@@ -382,13 +373,67 @@ pub fn hysteresis_margin_updated(env: &Env, old_margin: u32, new_margin: u32) {
 /// Emitted when an embargo is created or updated via `set_score_embargo`.
 /// `expiry` is `None` for an indefinite embargo, or `Some(ts)` for a timed one.
 pub fn embargo_set(env: &Env, wallet: &Address, expiry: Option<u64>) {
-    env.events().publish(
-        (symbol_short!("emb_set"), wallet.clone()),
-        expiry,
-    );
+    env.events().publish((symbol_short!("emb_set"), wallet.clone()), expiry);
 }
 
 /// Emitted when an embargo is explicitly lifted via `lift_score_embargo`.
 pub fn embargo_lifted(env: &Env, wallet: &Address) {
     env.events().publish((symbol_short!("emb_lift"), wallet.clone()), ());
+}
+
+// ── Escalation / consecutive breach ───────────────────────────────────────────
+
+/// Emitted when the admin sets the escalation threshold.
+pub fn escalation_threshold_updated(env: &Env, old: u32, new: u32) {
+    env.events().publish((symbol_short!("esc_thr"),), (old, new));
+}
+
+/// Emitted when a wallet's consecutive breach count crosses the escalation
+/// threshold.
+pub fn escalation_triggered(
+    env: &Env,
+    wallet: &Address,
+    asset_pair: &Symbol,
+    count: u32,
+    score: u32,
+    threshold: u32,
+) {
+    env.events().publish(
+        (symbol_short!("esc_trg"), wallet.clone(), asset_pair.clone()),
+        (count, score, threshold),
+    );
+}
+
+/// Emitted when a wallet's score drops back below the risk threshold,
+/// resolving the escalation state.
+pub fn escalation_resolved(
+    env: &Env,
+    wallet: &Address,
+    asset_pair: &Symbol,
+    count: u32,
+    score: u32,
+) {
+    env.events()
+        .publish((symbol_short!("esc_rsl"), wallet.clone(), asset_pair.clone()), (count, score));
+}
+
+// ── Score jump anomaly ────────────────────────────────────────────────────────
+
+/// Emitted when a new score differs from the previous score by more than the
+/// configured jump threshold.
+#[allow(clippy::too_many_arguments)]
+pub fn score_jump_anomaly(
+    env: &Env,
+    wallet: &Address,
+    asset_pair: &Symbol,
+    old_score: u32,
+    new_score: u32,
+    jump: i64,
+    model_version: u32,
+    timestamp: u64,
+) {
+    env.events().publish(
+        (symbol_short!("jump"), wallet.clone(), asset_pair.clone()),
+        (old_score, new_score, jump, model_version, timestamp),
+    );
 }

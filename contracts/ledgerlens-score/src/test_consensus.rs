@@ -8,7 +8,8 @@ use soroban_sdk::{
 };
 
 use crate::{
-    Error, LedgerLensScoreContract, LedgerLensScoreContractClient, ModelSubmission, ScoreAttestation,
+    Error, LedgerLensScoreContract, LedgerLensScoreContractClient, ModelSubmission,
+    ScoreAttestation,
 };
 
 const START_TS: u64 = 1_700_000_000;
