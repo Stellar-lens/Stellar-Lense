@@ -1,7 +1,7 @@
 use soroban_sdk::{
     symbol_short,
-    testutils::{Address as _, Ledger as _},
-    Address, Env, Symbol, Vec,
+    testutils::{Address as _, Events as _, Ledger as _},
+    Address, Env, IntoVal, Symbol, Vec,
 };
 
 use crate::{

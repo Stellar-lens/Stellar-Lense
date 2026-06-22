@@ -256,6 +256,7 @@ impl LedgerLensScoreContract {
         if score >= score_threshold {
             events::threshold_breached(&env, &wallet, &asset_pair, score, score_threshold);
         }
+        Self::update_breach_counter(&env, &wallet, &asset_pair, score, score_threshold);
 
         Self::emit_score_delta(&env, &wallet, &asset_pair, previous_score, score);
         events::score_submitted(&env, &wallet, &asset_pair, &risk_score);
@@ -379,6 +380,13 @@ impl LedgerLensScoreContract {
                             threshold,
                         );
                     }
+                    Self::update_breach_counter(
+                        &env,
+                        &sub.wallet,
+                        &sub.asset_pair,
+                        sub.score,
+                        threshold,
+                    );
 
                     Self::emit_score_delta(
                         &env,
@@ -1951,6 +1959,146 @@ feat/confidence-gated-risk-gate
         storage::is_embargoed(&env, &wallet)
     }
 
+    // ── Consecutive-breach auto-escalation ─────────────────────────────────────
+
+    /// Set the escalation threshold N: after N consecutive high-risk
+    /// submissions for a (wallet, asset_pair), an `escalation_triggered`
+    /// event is emitted. Admin only.
+    ///
+    /// `n` must be in the range `[1, 100]`. A value of `1` causes
+    /// `escalation_triggered` to fire on every single threshold breach.
+    /// The default is 5.
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if the contract has no admin yet.
+    /// - [`Error::InvalidEscalationThreshold`] if `n` is below 1 or above 100.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// client.set_escalation_threshold(&Vec::new(&env), &3).unwrap();
+    /// assert_eq!(client.get_escalation_threshold(), 3);
+    /// ```
+    pub fn set_escalation_threshold(
+        env: Env,
+        admin_signers: Vec<Address>,
+        n: u32,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        if n < constants::MIN_ESCALATION_THRESHOLD || n > constants::MAX_ESCALATION_THRESHOLD {
+            return Err(Error::InvalidEscalationThreshold);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+        let old = storage::get_escalation_threshold(&env);
+        storage::set_escalation_threshold(&env, n);
+        events::escalation_threshold_updated(&env, old, n);
+        Ok(())
+    }
+
+    /// Returns the current escalation threshold. Defaults to 5 until
+    /// configured.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// assert_eq!(client.get_escalation_threshold(), 5);
+    /// ```
+    pub fn get_escalation_threshold(env: Env) -> u32 {
+        storage::get_escalation_threshold(&env)
+    }
+
+    /// Returns the current consecutive breach count for `(wallet, asset_pair)`.
+    /// Read-only, callable by any account. Returns 0 when no breaches have
+    /// occurred.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use soroban_sdk::symbol_short;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// let wallet = Address::generate(&env);
+    /// let asset_pair = symbol_short!("XLM_USDC");
+    /// assert_eq!(client.get_breach_count(&wallet, &asset_pair), 0);
+    /// client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &90, &true, &true, &1, &95, &1, &None).unwrap();
+    /// assert_eq!(client.get_breach_count(&wallet, &asset_pair), 1);
+    /// ```
+    pub fn get_breach_count(env: Env, wallet: Address, asset_pair: Symbol) -> u32 {
+        storage::get_breach_count(&env, &wallet, &asset_pair)
+    }
+
+    /// Emergency override: clears the consecutive breach counter for
+    /// `(wallet, asset_pair)` without emitting `escalation_resolved`.
+    /// Admin only. Intended for use after a false-positive bust.
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if the contract has no admin yet.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use soroban_sdk::symbol_short;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// let wallet = Address::generate(&env);
+    /// let asset_pair = symbol_short!("XLM_USDC");
+    /// client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &90, &true, &true, &1, &95, &1, &None).unwrap();
+    /// assert_eq!(client.get_breach_count(&wallet, &asset_pair), 1);
+    /// client.reset_breach_count(&Vec::new(&env), &wallet, &asset_pair).unwrap();
+    /// assert_eq!(client.get_breach_count(&wallet, &asset_pair), 0);
+    /// ```
+    pub fn reset_breach_count(
+        env: Env,
+        admin_signers: Vec<Address>,
+        wallet: Address,
+        asset_pair: Symbol,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+        storage::clear_breach_count(&env, &wallet, &asset_pair);
+        Ok(())
+    }
+
     // ── Risk threshold ───────────────────────────────────────────────────────
 
     /// Set the global risk threshold (0-100).  Scores at or above this
@@ -2769,6 +2917,38 @@ feat/confidence-gated-risk-gate
             last_updated,
             decay_lambda_applied,
         })
+    }
+
+    /// Update the consecutive breach counter for `(wallet, asset_pair)` after
+    /// a score submission and emit the appropriate auto-escalation events.
+    ///
+    /// * If `score >= risk_threshold`: increments the counter. If the counter
+    ///   reaches `escalation_threshold_n` (exactly equals it), emits
+    ///   `escalation_triggered` — fires only once, not on every subsequent breach.
+    /// * If `score < risk_threshold`: if the counter was at or above the
+    ///   escalation threshold, emits `escalation_resolved`. Resets counter to 0.
+    fn update_breach_counter(
+        env: &Env,
+        wallet: &Address,
+        asset_pair: &Symbol,
+        score: u32,
+        risk_threshold: u32,
+    ) {
+        let escalation_n = storage::get_escalation_threshold(env);
+        let mut count = storage::get_breach_count(env, wallet, asset_pair);
+
+        if score >= risk_threshold {
+            count = count.saturating_add(1);
+            storage::set_breach_count(env, wallet, asset_pair, count);
+            if count == escalation_n {
+                events::escalation_triggered(env, wallet, asset_pair, count, score, escalation_n);
+            }
+        } else {
+            if count >= escalation_n && escalation_n > 0 {
+                events::escalation_resolved(env, wallet, asset_pair, count, score);
+            }
+            storage::set_breach_count(env, wallet, asset_pair, 0);
+        }
     }
 
     /// Best-effort refresh of the `AggregateScore(wallet)` cache after a
