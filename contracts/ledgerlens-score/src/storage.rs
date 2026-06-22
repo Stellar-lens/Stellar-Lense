@@ -5,9 +5,9 @@ use crate::errors::Error;
 use crate::constants::{
     BAND_STATE_TTL_EXTEND_TO, BAND_STATE_TTL_THRESHOLD, DEFAULT_COOLDOWN_SECS,
     DEFAULT_ESCALATION_THRESHOLD, DEFAULT_RISK_THRESHOLD, DEFAULT_UPGRADE_DELAY_SECS,
-    SCORE_TTL_EXTEND_TO, SCORE_TTL_THRESHOLD,
+    EMBARGO_TTL_EXTEND_TO, EMBARGO_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO, SCORE_TTL_THRESHOLD,
 };
-use crate::types::{AggregateRiskScore, DataKey, RiskScore, ScoreFloorPolicy, ScoreTrend, UpgradeProposal, SnapshotRecord};
+use crate::types::{AggregateRiskScore, DataKey, EmbargoExpiry, RiskScore, ScoreFloorPolicy, ScoreTrend, UpgradeProposal, SnapshotRecord};
 
 use crate::Error;
 
@@ -475,38 +475,6 @@ pub fn get_score_count(env: &Env, wallet: &Address, asset_pair: &Symbol) -> u32 
     env.storage().persistent().get(&key).unwrap_or(0)
 }
 
-// ── Score embargo (regulatory hold) ──────────────────────────────────────────
-
-pub fn set_score_embargo(env: &Env, wallet: &Address, expiry: &Option<u64>) {
-    let key = DataKey::ScoreEmbargo(wallet.clone());
-    env.storage().persistent().set(&key, expiry);
-    env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
-}
-
-#[allow(dead_code)]
-pub fn get_score_embargo(env: &Env, wallet: &Address) -> Option<Option<u64>> {
-    let key = DataKey::ScoreEmbargo(wallet.clone());
-    let result: Option<Option<u64>> = env.storage().persistent().get(&key);
-    if result.is_some() {
-        env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
-    }
-    result
-}
-
-pub fn remove_score_embargo(env: &Env, wallet: &Address) {
-    let key = DataKey::ScoreEmbargo(wallet.clone());
-    env.storage().persistent().remove(&key);
-}
-
-/// Returns `true` when the wallet is under an active, non-expired embargo.
-pub fn is_embargoed(env: &Env, wallet: &Address) -> bool {
-    match env.storage().persistent().get::<_, Option<u64>>(&DataKey::ScoreEmbargo(wallet.clone())) {
-        None => false,
-        Some(None) => true, // indefinite embargo
-        Some(Some(expiry)) => env.ledger().timestamp() < expiry,
-    }
-}
-
 // ── Score trend state ─────────────────────────────────────────────────────────
 
 pub fn get_trend_state(env: &Env, wallet: &Address, asset_pair: &Symbol) -> ScoreTrend {
@@ -837,6 +805,68 @@ pub fn peek_risk_band_state(env: &Env, wallet: &Address, asset_pair: &Symbol) ->
     let key = DataKey::RiskBandState(wallet.clone(), asset_pair.clone());
     let result: Option<bool> = env.storage().temporary().get(&key);
     result.unwrap_or(false)
+}
+
+// ── Score embargo ─────────────────────────────────────────────────────────────
+
+/// Writes an embargo entry for `wallet` and sets (or refreshes) its TTL.
+/// Calling this again on an already-embargoed wallet replaces the existing
+/// expiry configuration.
+pub fn set_embargo(env: &Env, wallet: &Address, expiry: &EmbargoExpiry) {
+    let key = DataKey::ScoreEmbargo(wallet.clone());
+    env.storage().temporary().set(&key, expiry);
+    env.storage()
+        .temporary()
+        .extend_ttl(&key, EMBARGO_TTL_THRESHOLD, EMBARGO_TTL_EXTEND_TO);
+}
+
+/// Removes the embargo entry for `wallet`, immediately lifting any embargo.
+/// No-op when no embargo exists.
+pub fn remove_embargo(env: &Env, wallet: &Address) {
+    let key = DataKey::ScoreEmbargo(wallet.clone());
+    env.storage().temporary().remove(&key);
+}
+
+/// Returns `true` when `wallet` is currently under an active embargo.
+///
+/// - No entry → `false`.
+/// - `Indefinite` entry → `true`; TTL is extended to keep the entry alive.
+/// - `Until(ts)` entry where `ledger_ts <= ts` → `true`; TTL extended.
+/// - `Until(ts)` entry where `ledger_ts > ts` → `false` (auto-expired).
+pub fn is_embargoed(env: &Env, wallet: &Address) -> bool {
+    let key = DataKey::ScoreEmbargo(wallet.clone());
+    let expiry: Option<EmbargoExpiry> = env.storage().temporary().get(&key);
+    match expiry {
+        None => false,
+        Some(EmbargoExpiry::Indefinite) => {
+            env.storage()
+                .temporary()
+                .extend_ttl(&key, EMBARGO_TTL_THRESHOLD, EMBARGO_TTL_EXTEND_TO);
+            true
+        }
+        Some(EmbargoExpiry::Until(ts)) => {
+            let now = env.ledger().timestamp();
+            let active = now <= ts;
+            if active {
+                env.storage()
+                    .temporary()
+                    .extend_ttl(&key, EMBARGO_TTL_THRESHOLD, EMBARGO_TTL_EXTEND_TO);
+            }
+            active
+        }
+    }
+}
+
+/// Side-effect-free embargo check — no TTL extension. Used by the infallible
+/// `query_risk_gate` function so it remains observable-state-free.
+pub fn peek_is_embargoed(env: &Env, wallet: &Address) -> bool {
+    let key = DataKey::ScoreEmbargo(wallet.clone());
+    let expiry: Option<EmbargoExpiry> = env.storage().temporary().get(&key);
+    match expiry {
+        None => false,
+        Some(EmbargoExpiry::Indefinite) => true,
+        Some(EmbargoExpiry::Until(ts)) => env.ledger().timestamp() <= ts,
+    }
 }
 
 /// Sets the risk band state for `(wallet, asset_pair)`. Passing `true`

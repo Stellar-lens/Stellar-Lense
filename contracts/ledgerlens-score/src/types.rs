@@ -1,5 +1,21 @@
 use soroban_sdk::{contracttype, Address};
 
+/// Embargo expiry configuration stored per wallet in temporary storage.
+///
+/// - `Indefinite` — embargo has no built-in expiry; only `lift_score_embargo`
+///   removes it.
+/// - `Until(ts)` — embargo auto-expires when `ledger_timestamp > ts`; no
+///   admin action needed once the timestamp is reached.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum EmbargoExpiry {
+    Indefinite,
+    Until(u64),
+}
+
+/// On-chain record of the latest LedgerLens risk assessment for a
+/// wallet / asset-pair combination. Written by `submit_score` and
+/// read by `get_score`.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RiskScore {
@@ -386,6 +402,10 @@ pub enum DataKey {
     /// currently inside the high-risk band for this pair. Stored in
     /// temporary TTL-bounded storage so stale states expire automatically.
     RiskBandState(Address, Symbol),
+    /// Per-wallet score embargo. Stores an `EmbargoExpiry` describing whether
+    /// the embargo is indefinite or expires at a specific ledger timestamp.
+    /// Absent key means no embargo. Stored in temporary TTL-bounded storage.
+    ScoreEmbargo(Address),
 }
 
 #[contracttype]

@@ -238,16 +238,6 @@ pub fn withdrawal_locked(env: &Env, admin: &Address) {
     env.events().publish((symbol_short!("wdl_lck"),), admin.clone());
 }
 
-// ── Score embargo (regulatory hold) ──────────────────────────────────────────
-
-pub fn embargo_set(env: &Env, wallet: &Address, expiry: &Option<u64>) {
-    env.events().publish((symbol_short!("emb_set"),), (wallet.clone(), *expiry));
-}
-
-pub fn embargo_lifted(env: &Env, wallet: &Address, lifted_by: &Address) {
-    env.events().publish((symbol_short!("emb_lift"),), (wallet.clone(), lifted_by.clone()));
-}
-
 // ── Wallet-score delegation ───────────────────────────────────────────────────
 
 /// Emitted when `set_score_delegate` registers or updates a delegation.
@@ -362,4 +352,20 @@ pub fn risk_band_cleared(
 /// `set_hysteresis_margin`.
 pub fn hysteresis_margin_updated(env: &Env, old_margin: u32, new_margin: u32) {
     env.events().publish((symbol_short!("hys_upd"),), (old_margin, new_margin));
+}
+
+// ── Score embargo ─────────────────────────────────────────────────────────────
+
+/// Emitted when an embargo is created or updated via `set_score_embargo`.
+/// `expiry` is `None` for an indefinite embargo, or `Some(ts)` for a timed one.
+pub fn embargo_set(env: &Env, wallet: &Address, expiry: Option<u64>) {
+    env.events().publish(
+        (symbol_short!("emb_set"), wallet.clone()),
+        expiry,
+    );
+}
+
+/// Emitted when an embargo is explicitly lifted via `lift_score_embargo`.
+pub fn embargo_lifted(env: &Env, wallet: &Address) {
+    env.events().publish((symbol_short!("emb_lift"), wallet.clone()), ());
 }
