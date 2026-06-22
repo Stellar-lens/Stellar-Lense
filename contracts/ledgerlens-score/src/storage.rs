@@ -1,12 +1,14 @@
-use soroban_sdk::{Address, Bytes, Env, Symbol, Vec};
+use soroban_sdk::{Env, Address};
+use crate::types::{DataKey, TierBounds};
+use crate::errors::Error;
 
 use crate::constants::{
-    DEFAULT_COOLDOWN_SECS, DEFAULT_RISK_THRESHOLD, DEFAULT_UPGRADE_DELAY_SECS, SCORE_TTL_EXTEND_TO,
-    SCORE_TTL_THRESHOLD,
+    DEFAULT_COOLDOWN_SECS, DEFAULT_ESCALATION_THRESHOLD, DEFAULT_RISK_THRESHOLD,
+    DEFAULT_UPGRADE_DELAY_SECS, SCORE_TTL_EXTEND_TO, SCORE_TTL_THRESHOLD,
 };
-use crate::types::{
-    AggregateRiskScore, DataKey, ModelVersionStats, RiskScore, ScoreTrend, UpgradeProposal,
-};
+use crate::types::{AggregateRiskScore, DataKey, RiskScore, ScoreTrend, UpgradeProposal, SnapshotRecord};
+
+use crate::Error;
 
 // ── Admin / Service ─────────────────────────────────────────────────────────
 
@@ -197,6 +199,17 @@ pub fn set_risk_threshold(env: &Env, threshold: u32) {
     env.storage().instance().set(&DataKey::RiskThreshold, &threshold);
 }
 
+// ── Score jump anomaly detection ──────────────────────────────────────────────
+
+pub fn get_jump_threshold(env: &Env) -> u32 {
+    let result: Option<u32> = env.storage().instance().get(&DataKey::JumpThreshold);
+    result.unwrap_or(DEFAULT_JUMP_THRESHOLD)
+}
+
+pub fn set_jump_threshold(env: &Env, threshold: u32) {
+    env.storage().instance().set(&DataKey::JumpThreshold, &threshold);
+}
+
 // ── Score history ring buffer ────────────────────────────────────────────────
 
 pub fn push_score_history(env: &Env, wallet: &Address, asset_pair: &Symbol, score: &RiskScore) {
@@ -359,8 +372,11 @@ pub fn set_service_set(env: &Env, set: &Vec<Address>) {
     env.storage().instance().set(&DataKey::ServiceSet, set);
 }
 
-pub fn get_service_threshold(env: &Env) -> u32 {
-    env.storage().instance().get(&DataKey::ServiceThreshold).unwrap_or(0)
+pub fn get_signer_tier(env: &Env, signer: &Address) -> TierBounds {
+    env.storage()
+        .instance()
+        .get(&DataKey::SignerTier(signer.clone()))
+        .unwrap_or(TierBounds { min_score: 0, max_score: 100 })
 }
 
 pub fn set_service_threshold(env: &Env, threshold: u32) {
@@ -515,8 +531,8 @@ pub fn get_service_pubkey(env: &Env) -> Option<Bytes> {
     env.storage().instance().get(&DataKey::ServicePubKey)
 }
 
-pub fn set_service_pubkey(env: &Env, pubkey: &Bytes) {
-    env.storage().instance().set(&DataKey::ServicePubKey, pubkey);
+pub fn set_gate_callers(env: &Env, callers: &Vec<Address>) {
+    env.storage().instance().set(&GateDataKey::GateCallers, callers);
 }
 
 // ── Time-weighted exponential decay ──────────────────────────────────────
@@ -543,6 +559,27 @@ pub fn set_decay_rate(env: &Env, numerator: u32, denominator: u32) {
     env.storage().instance().set(&DataKey::DecayRateDenominator, &denominator);
 }
 
+ feat/confidence-gated-risk-gate
+// ── Global minimum confidence floor ──────────────────────────────────────────
+
+/// Returns the admin-configured global minimum confidence floor (0–100).
+/// Defaults to `0` (no floor) when unset.
+///
+/// This value is combined with the per-call `min_confidence` parameter in
+/// `query_risk_gate_with_confidence` using `max(param, global)` so the admin
+/// can enforce a system-wide floor without requiring every integrating protocol
+/// to specify one. Both values are bounded to 0–100, so the `max` cannot
+/// overflow.
+pub fn get_global_min_confidence(env: &Env) -> u32 {
+    let result: Option<u32> = env.storage().instance().get(&DataKey::GlobalMinConfidence);
+    result.unwrap_or(0)
+}
+
+/// Persists `min_confidence` as the global confidence floor.
+/// Caller is responsible for validating the range (0–100) before calling.
+pub fn set_global_min_confidence(env: &Env, min_confidence: u32) {
+    env.storage().instance().set(&DataKey::GlobalMinConfidence, &min_confidence);
+
 // ── Fee withdrawal ────────────────────────────────────────────────────────────
 
 pub fn get_fee_token(env: &Env) -> Option<Address> {
@@ -563,6 +600,7 @@ pub fn set_withdrawal_lock(env: &Env) {
 
 pub fn clear_withdrawal_lock(env: &Env) {
     env.storage().instance().remove(&DataKey::WithdrawalLock);
+ main
 }
 
 // ── Score delegation ──────────────────────────────────────────────────────────
@@ -596,84 +634,103 @@ pub fn remove_score_delegate(env: &Env, sub_wallet: &Address) {
     env.storage().persistent().remove(&key);
 }
 
-// ── Model-version statistics ────────────────────────────────────────────────
+// ── Wallet Relationship Graph ───────────────────────────────────────────────
 
-pub fn get_model_stats(env: &Env, model_version: u32) -> Option<ModelVersionStats> {
-    let key = DataKey::ModelVersionStats(model_version);
-    let stats: Option<ModelVersionStats> = env.storage().persistent().get(&key);
-    if stats.is_some() {
-        env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
-    }
-    stats
+/// Returns the list of counterparties for a wallet on a specific asset pair.
+/// Returns an empty Vec if no links exist.
+pub fn get_counterparties(env: &Env, wallet: &Address, asset_pair: &Symbol) -> Vec<Address> {
+    let key = DataKey::Counterparties(wallet.clone(), asset_pair.clone());
+    env.storage().persistent().get(&key).unwrap_or_else(|| Vec::new(env))
 }
 
-pub fn get_all_model_versions(env: &Env) -> Vec<u32> {
-    let key = DataKey::ModelVersionIndex;
-    let versions: Vec<u32> =
-        env.storage().persistent().get(&key).unwrap_or_else(|| Vec::new(env));
-    if !versions.is_empty() {
-        env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
-    }
-    versions
-}
-
-/// Updates the running performance statistics for `model_version`.
+/// Adds a bidirectional counterparty link between wallet_a and wallet_b.
 ///
-/// If this is the first time the contract has seen this version, it is
-/// added to the `ModelVersionIndex` (maintaining sort order) and a new
-/// `ModelVersionStats` record is initialized.
-pub fn update_model_stats(env: &Env, model_version: u32, score: u32) {
-    let stats_key = DataKey::ModelVersionStats(model_version);
-    let now = env.ledger().timestamp();
-
-    let mut stats = env.storage().persistent().get(&stats_key).unwrap_or_else(|| {
-        // New version seen: update the index.
-        let index_key = DataKey::ModelVersionIndex;
-        let mut index: Vec<u32> =
-            env.storage().persistent().get(&index_key).unwrap_or_else(|| Vec::new(env));
-
-        if !index.contains(&model_version) {
-            // Maintain sorted order for get_all_model_versions.
-            let mut inserted = false;
-            for i in 0..index.len() {
-                if model_version < index.get(i).unwrap() {
-                    index.insert(i, model_version);
-                    inserted = true;
-                    break;
-                }
-            }
-            if !inserted {
-                index.push_back(model_version);
-            }
-            env.storage().persistent().set(&index_key, &index);
-            env.storage().persistent().extend_ttl(
-                &index_key,
-                SCORE_TTL_THRESHOLD,
-                SCORE_TTL_EXTEND_TO,
-            );
-        }
-
-        ModelVersionStats {
-            model_version,
-            submission_count: 0,
-            score_sum: 0,
-            score_max: 0,
-            score_min: u32::MAX,
-            first_seen: now,
-            last_seen: now,
-        }
-    });
-
-    stats.submission_count = stats.submission_count.saturating_add(1);
-    stats.score_sum = stats.score_sum.saturating_add(score as u64);
-    if score > stats.score_max {
-        stats.score_max = score;
+/// # Errors
+/// - Returns `Error::SelfLink` if wallet_a == wallet_b
+/// - Returns `Error::CounterpartyLinkFull` if wallet_a or wallet_b would exceed MAX_COUNTERPARTY_LINKS_PER_WALLET
+pub fn add_counterparty_link(
+    env: &Env,
+    wallet_a: &Address,
+    wallet_b: &Address,
+    asset_pair: &Symbol,
+) -> Result<(), Error> {
+    if wallet_a == wallet_b {
+        return Err(Error::SelfLink);
     }
-    if score < stats.score_min {
-        stats.score_min = score;
-    }
-    stats.last_seen = now;
 
-    env.storage().persistent().set(&stats_key, &stats);
-    env.storage().persistent().extend_ttl(&stats_key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    // Check and update wallet_a's counterparties
+    let mut links_a = get_counterparties(env, wallet_a, asset_pair);
+    if !links_a.contains(wallet_b) {
+        if links_a.len() >= crate::constants::MAX_COUNTERPARTY_LINKS_PER_WALLET {
+            return Err(Error::CounterpartyLinkFull);
+        }
+        links_a.push_back(wallet_b.clone());
+        let key_a = DataKey::Counterparties(wallet_a.clone(), asset_pair.clone());
+        env.storage().persistent().set(&key_a, &links_a);
+        env.storage().persistent().extend_ttl(&key_a, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    }
+
+    // Check and update wallet_b's counterparties
+    let mut links_b = get_counterparties(env, wallet_b, asset_pair);
+    if !links_b.contains(wallet_a) {
+        if links_b.len() >= crate::constants::MAX_COUNTERPARTY_LINKS_PER_WALLET {
+            return Err(Error::CounterpartyLinkFull);
+        }
+        links_b.push_back(wallet_a.clone());
+        let key_b = DataKey::Counterparties(wallet_b.clone(), asset_pair.clone());
+        env.storage().persistent().set(&key_b, &links_b);
+        env.storage().persistent().extend_ttl(&key_b, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    }
+
+    Ok(())
+}
+
+/// Removes a bidirectional counterparty link between wallet_a and wallet_b.
+///
+/// # Errors
+/// - Returns `Error::CounterpartyNotFound` if the link does not exist in either direction
+pub fn remove_counterparty_link(
+    env: &Env,
+    wallet_a: &Address,
+    wallet_b: &Address,
+    asset_pair: &Symbol,
+) -> Result<(), Error> {
+    let mut links_a = get_counterparties(env, wallet_a, asset_pair);
+    let pos_a = links_a.first_index_of(wallet_b);
+    if let Some(idx) = pos_a {
+        links_a.remove(idx);
+        let key_a = DataKey::Counterparties(wallet_a.clone(), asset_pair.clone());
+        if links_a.is_empty() {
+            env.storage().persistent().remove(&key_a);
+        } else {
+            env.storage().persistent().set(&key_a, &links_a);
+            env.storage().persistent().extend_ttl(&key_a, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+        }
+    }
+
+    let mut links_b = get_counterparties(env, wallet_b, asset_pair);
+    let pos_b = links_b.first_index_of(wallet_a);
+    if let Some(idx) = pos_b {
+        links_b.remove(idx);
+        let key_b = DataKey::Counterparties(wallet_b.clone(), asset_pair.clone());
+        if links_b.is_empty() {
+            env.storage().persistent().remove(&key_b);
+        } else {
+            env.storage().persistent().set(&key_b, &links_b);
+            env.storage().persistent().extend_ttl(&key_b, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+        }
+    }
+
+    if pos_a.is_none() && pos_b.is_none() {
+        return Err(Error::CounterpartyNotFound);
+    }
+
+    Ok(())
+}
+
+/// Returns the number of registered counterparties (graph degree) for a wallet/pair.
+pub fn get_contagion_depth(env: &Env, wallet: &Address, asset_pair: &Symbol) -> u32 {
+    let key = DataKey::Counterparties(wallet.clone(), asset_pair.clone());
+    let links: Vec<Address> = env.storage().persistent().get(&key).unwrap_or_else(|| Vec::new(env));
+    links.len()
 }
