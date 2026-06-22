@@ -104,28 +104,12 @@ class Config:
     WS_BIND_HOST: str = os.getenv("WS_BIND_HOST", "127.0.0.1")
     WS_ALLOW_EXTERNAL: bool = os.getenv("WS_ALLOW_EXTERNAL", "") == "1"
 
-    @classmethod
-    def validate(cls, require_onchain: bool = False):
-        errors = []
-
-        if not cls.WATCHED_ASSET_PAIRS:
-            errors.append("WATCHED_ASSET_PAIRS is not set.")
-
-        if not cls.RISK_SCORE_DB_URL.strip():
-            errors.append("RISK_SCORE_DB_URL is not set.")
-
-        if not cls.MODEL_DIR.strip():
-            errors.append("MODEL_DIR is not set.")
-
-        if require_onchain:
-            if not cls.LEDGERLENS_CONTRACT_ID.strip():
-                errors.append("LEDGERLENS_CONTRACT_ID is not set.")
-
-            if not cls.LEDGERLENS_SUBMITTER_SECRET.strip():
-                errors.append("LEDGERLENS_SUBMITTER_SECRET is not set.")
-
-        if errors:
-            raise OSError("LedgerLens configuration errors:\n- " + "\n- ".join(errors))
+    # WebSocket pub/sub server (streaming/ws_server.py)
+    JWT_PUBLIC_KEY_PATH: str = os.getenv("JWT_PUBLIC_KEY_PATH", "./jwt_public_key.pem")
+    WS_MAX_CLIENTS: int = int(os.getenv("WS_MAX_CLIENTS", "200"))
+    WS_CLIENT_QUEUE_DEPTH: int = int(os.getenv("WS_CLIENT_QUEUE_DEPTH", "100"))
+    WS_REPLAY_BUFFER_SIZE: int = int(os.getenv("WS_REPLAY_BUFFER_SIZE", "1000"))
+    WS_RATE_LIMIT_MSGS_PER_SECOND: int = int(os.getenv("WS_RATE_LIMIT_MSGS_PER_SECOND", "100"))
 
     # Adversarial training augmentation
     ADVERSARIAL_AUG_RATIO: float = float(os.getenv("ADVERSARIAL_AUG_RATIO", "0.0"))
@@ -152,6 +136,29 @@ class Config:
     GAN_PLATEAU_THRESHOLD: float = float(os.getenv("GAN_PLATEAU_THRESHOLD", "0.005"))
     SIMULATOR_N_WALLETS: int = int(os.getenv("SIMULATOR_N_WALLETS", "50"))
     SIMULATOR_TRADES_PER_WALLET: int = int(os.getenv("SIMULATOR_TRADES_PER_WALLET", "100"))
+
+    @classmethod
+    def validate(cls, require_onchain: bool = False):
+        errors = []
+
+        if not cls.WATCHED_ASSET_PAIRS:
+            errors.append("WATCHED_ASSET_PAIRS is not set.")
+
+        if not cls.RISK_SCORE_DB_URL.strip():
+            errors.append("RISK_SCORE_DB_URL is not set.")
+
+        if not cls.MODEL_DIR.strip():
+            errors.append("MODEL_DIR is not set.")
+
+        if require_onchain:
+            if not cls.LEDGERLENS_CONTRACT_ID.strip():
+                errors.append("LEDGERLENS_CONTRACT_ID is not set.")
+
+            if not cls.LEDGERLENS_SUBMITTER_SECRET.strip():
+                errors.append("LEDGERLENS_SUBMITTER_SECRET is not set.")
+
+        if errors:
+            raise OSError("LedgerLens configuration errors:\n- " + "\n- ".join(errors))
 
 
 config = Config()
