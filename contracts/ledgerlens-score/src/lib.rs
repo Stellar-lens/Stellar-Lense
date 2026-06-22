@@ -38,8 +38,8 @@ use soroban_sdk::{
 
 pub use errors::Error;
 pub use types::{
-    AggregateRiskScore, BatchEntryResult, BatchResult, RiskScore, ScoreAttestation,
-    ScoreSubmission, ScoreTrend, UpgradeProposal,
+    AggregateRiskScore, BatchEntryResult, BatchResult, EffectiveRiskScore, RiskScore,
+    ScoreAttestation, ScoreSubmission, ScoreTrend, UpgradeProposal,
 };
 
 /// On-chain truth layer for LedgerLens risk scores.
@@ -444,6 +444,87 @@ impl LedgerLensScoreContract {
         }
     }
 
+    /// Read-only lookup of the live decay-adjusted score for `wallet` / `asset_pair`.
+    /// Applies the configured exponential decay rate to the stored raw score
+    /// based on elapsed time since submission. A pure read with no state mutation.
+    ///
+    /// When no decay is configured (`λ = 0`), `effective_score == raw_score` and
+    /// `decay_applied == false`.
+    ///
+    /// # Errors
+    /// - [`Error::ScoreNotFound`] if no score exists for this pair (or its delegate).
+    /// - [`Error::ScoreEmbargoed`] if the wallet is under an active embargo.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient, EffectiveRiskScore};
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
+    /// # use soroban_sdk::symbol_short;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// let wallet = Address::generate(&env);
+    /// let asset_pair = symbol_short!("XLM_USDC");
+    /// client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &42, &true, &false, &1, &90, &1, &None).unwrap();
+    /// let eff = client.get_effective_score(&wallet, &asset_pair).unwrap();
+    /// assert_eq!(eff.raw_score, 42);
+    /// assert!(!eff.decay_applied);
+    /// ```
+    pub fn get_effective_score(
+        env: Env,
+        wallet: Address,
+        asset_pair: Symbol,
+    ) -> Result<EffectiveRiskScore, Error> {
+        if storage::is_embargoed(&env, &wallet) {
+            return Err(Error::ScoreEmbargoed);
+        }
+        let score = match storage::get_score(&env, &wallet, &asset_pair) {
+            Some(s) => s,
+            None => {
+                if let Some(custodian) = storage::get_score_delegate(&env, &wallet) {
+                    storage::get_score(&env, &custodian, &asset_pair).ok_or(Error::ScoreNotFound)?
+                } else {
+                    return Err(Error::ScoreNotFound);
+                }
+            }
+        };
+
+        let ledger_ts = env.ledger().timestamp();
+        let elapsed_secs = ledger_ts.saturating_sub(score.timestamp);
+        let (lambda_num, lambda_den) = storage::get_decay_rate(&env);
+        let decay_applied = lambda_num != 0;
+
+        let effective_score = if decay_applied {
+            let decay_factor = Self::decay_fixed(elapsed_secs, lambda_num, lambda_den);
+            let fixed_scale = constants::DECAY_FIXED_POINT_SCALE;
+            let effective = (score.score as u64)
+                .checked_mul(decay_factor)
+                .ok_or(Error::ArithmeticOverflow)?
+                .checked_div(fixed_scale)
+                .ok_or(Error::ArithmeticOverflow)?;
+            effective as u32
+        } else {
+            score.score
+        };
+
+        Ok(EffectiveRiskScore {
+            raw_score: score.score,
+            effective_score,
+            decay_applied,
+            elapsed_secs,
+            timestamp: score.timestamp,
+            confidence: score.confidence,
+            model_version: score.model_version,
+            benford_flag: score.benford_flag,
+            ml_flag: score.ml_flag,
+        })
+    }
+
     /// Returns the ordered history of the last `HISTORY_MAX_DEPTH` risk scores
     /// for `wallet` / `asset_pair`, oldest first.  Returns an empty Vec when no
     /// scores have been submitted yet.
@@ -817,6 +898,7 @@ impl LedgerLensScoreContract {
     /// | `gate`      | `query_risk_gate`                                  |
     /// | `aggr`      | `get_aggregate_score` (cross-asset aggregate risk) |
     /// | `count`     | `get_score_count`                                  |
+    /// | `effective` | `get_effective_score` (decay-adjusted score)       |
     ///
     /// Any unrecognised `capability` returns `false`.
     pub fn supports_interface(_env: Env, capability: Symbol) -> bool {
@@ -826,6 +908,7 @@ impl LedgerLensScoreContract {
             || capability == symbol_short!("gate")
             || capability == symbol_short!("aggr")
             || capability == symbol_short!("count")
+            || capability == symbol_short!("effective")
     }
 
     // ── Service management ───────────────────────────────────────────────────

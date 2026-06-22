@@ -113,6 +113,32 @@ pub struct BatchResult {
     pub results: soroban_sdk::Vec<BatchEntryResult>,
 }
 
+/// Decay-adjusted risk score returned by `get_effective_score`.
+/// Reflects the live decay-adjusted value of a stored `RiskScore`
+/// without requiring a new submission.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EffectiveRiskScore {
+    /// Original stored score (0-100).
+    pub raw_score: u32,
+    /// Decay-adjusted score at current ledger time.
+    pub effective_score: u32,
+    /// True when a non-zero decay rate was configured and applied.
+    pub decay_applied: bool,
+    /// Seconds elapsed since the score's timestamp.
+    pub elapsed_secs: u64,
+    /// Ledger timestamp when this score was computed off-chain.
+    pub timestamp: u64,
+    /// Model confidence for this score, 0-100.
+    pub confidence: u32,
+    /// Integer version of the detection-pipeline model.
+    pub model_version: u32,
+    /// True if the Benford's Law engine flagged this entity.
+    pub benford_flag: bool,
+    /// True if the ML ensemble classifier flagged this entity.
+    pub ml_flag: bool,
+}
+
 /// A pending, time-locked contract WASM upgrade.
 ///
 /// Created by `propose_upgrade` and cleared by `execute_upgrade` /
