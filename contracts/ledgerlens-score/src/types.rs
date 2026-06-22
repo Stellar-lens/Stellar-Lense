@@ -324,6 +324,10 @@ pub enum DataKey {
     /// and consecutive submission count in that direction. Updated by every
     /// successful `submit_score` / `submit_scores_batch` write.
     TrendState(Address, Symbol),
+    // ── Wallet Relationship Graph ──────────────────────────────────────────
+    /// List of counterparty addresses for a wallet on a specific asset pair.
+    /// Key: Counterparties(wallet, asset_pair) -> Vec<Address>
+    Counterparties(Address, Symbol),
 }
 
 #[contracttype]

@@ -122,3 +122,9 @@ pub const MAX_DECAY_LAMBDA_NUM: u32 = 1;
 
 /// Maximum allowed decay rate denominator (paired with MAX_DECAY_LAMBDA_NUM).
 pub const MAX_DECAY_LAMBDA_DEN: u32 = 1;
+
+// ── Wallet Relationship Graph ───────────────────────────────────────────────
+
+/// Maximum number of counterparty links allowed per wallet per asset pair.
+/// Prevents unbounded storage growth and gas exhaustion.
+pub const MAX_COUNTERPARTY_LINKS_PER_WALLET: u32 = 50;

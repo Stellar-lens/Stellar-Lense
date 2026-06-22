@@ -259,3 +259,46 @@ pub fn delegate_set(env: &Env, sub_wallet: &Address, custodian: &Address) {
 pub fn delegate_removed(env: &Env, sub_wallet: &Address) {
     env.events().publish((symbol_short!("dlg_rem"),), sub_wallet.clone());
 }
+
+// ── Wallet Relationship Graph ───────────────────────────────────────────────
+
+/// Emitted when a counterparty link is added between two wallets.
+pub fn counterparty_link_added(
+    env: &Env,
+    wallet_a: &Address,
+    wallet_b: &Address,
+    asset_pair: &Symbol,
+) {
+    env.events().publish(
+        (symbol_short!("cpl_add"), wallet_a.clone(), wallet_b.clone()),
+        asset_pair.clone(),
+    );
+}
+
+/// Emitted when a counterparty link is removed.
+pub fn counterparty_link_removed(
+    env: &Env,
+    wallet_a: &Address,
+    wallet_b: &Address,
+    asset_pair: &Symbol,
+) {
+    env.events().publish(
+        (symbol_short!("cpl_rem"), wallet_a.clone(), wallet_b.clone()),
+        asset_pair.clone(),
+    );
+}
+
+/// Emitted for each wallet affected by `propagate_contagion`.
+pub fn contagion_propagated(
+    env: &Env,
+    anchor: &Address,
+    asset_pair: &Symbol,
+    affected_wallet: &Address,
+    old_score: u32,
+    new_score: u32,
+) {
+    env.events().publish(
+        (symbol_short!("cntag"), anchor.clone(), asset_pair.clone()),
+        (affected_wallet.clone(), old_score, new_score),
+    );
+}
