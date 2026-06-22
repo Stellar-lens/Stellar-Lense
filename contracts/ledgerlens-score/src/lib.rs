@@ -1159,13 +1159,15 @@ impl LedgerLensScoreContract {
         }
         storage::get_admin(&env).require_auth();
 
-        if sub_wallet == custodian {
+        let mut current = custodian.clone();
+        if current == sub_wallet {
             return Err(Error::CyclicDelegation);
         }
-        if let Some(custodian_delegate) = storage::get_score_delegate(&env, &custodian) {
-            if custodian_delegate == sub_wallet {
+        while let Some(next_delegate) = storage::get_score_delegate(&env, &current) {
+            if next_delegate == sub_wallet {
                 return Err(Error::CyclicDelegation);
             }
+            current = next_delegate;
         }
 
         storage::set_score_delegate(&env, &sub_wallet, &custodian);
