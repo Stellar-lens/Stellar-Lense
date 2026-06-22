@@ -9,13 +9,15 @@ Run as a script against a labelled feature matrix (see
 This trains each model in `MODEL_REGISTRY` with SMOTE-balanced training
 data, evaluates AUC-ROC / PR-AUC / F1 on a held-out split, writes the
 artifacts to `config.MODEL_DIR`, and writes `metrics.json` alongside them.
+
+After every training run, `metrics.json` is signed with the Ed25519 private
+key at `MODEL_SIGNING_PRIVATE_KEY_PATH` (if configured).
 """
 
 import argparse
 import hashlib
 import json
 import os
-import sys
 from datetime import UTC, datetime
 
 import joblib
@@ -96,6 +98,15 @@ def compute_feature_schema_hash(feature_columns: list[str]) -> str:
     schema_str = "\n".join(sorted_cols)
     return f"sha256:{hashlib.sha256(schema_str.encode()).hexdigest()}"
 
+LABEL_DISTRIBUTION_BASELINE_PATH = os.path.join(
+    config.MODEL_DIR, "label_distribution_baseline.json"
+)
+
+
+LABEL_DISTRIBUTION_BASELINE_PATH = os.path.join(
+    config.MODEL_DIR, "label_distribution_baseline.json"
+)
+
 
 def load_training_data(path: str) -> pd.DataFrame:
     """Load a labelled feature matrix (output of `build_feature_matrix` plus
@@ -108,7 +119,77 @@ def split_features_labels(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:
     return df[feature_cols], df["label"]
 
 
-def train_models(df: pd.DataFrame, test_size: float = 0.2, random_state: int = 42) -> dict:
+def sha256_dataframe(df: pd.DataFrame) -> str:
+    """Return a deterministic SHA-256 of *df* (row-sorted for reproducibility)."""
+    sorted_df = df.sort_values(by=list(df.columns)).reset_index(drop=True)
+    h = hashlib.sha256(sorted_df.to_csv(index=False).encode()).hexdigest()
+    return h
+
+
+def detect_label_poisoning(
+    label_distribution: dict,
+    baseline_path: str | None = None,
+    threshold: float | None = None,
+) -> bool:
+    """Return True if the wash-trade label ratio has shifted beyond *threshold*
+    compared with the stored baseline.
+
+    If no baseline file exists yet, one is written and False is returned.
+    """
+    baseline_path = baseline_path or LABEL_DISTRIBUTION_BASELINE_PATH
+    threshold = threshold if threshold is not None else config.POISON_LABEL_RATIO_THRESHOLD
+
+    total = sum(label_distribution.values())
+    if total == 0:
+        return False
+    current_ratio = label_distribution.get(1, 0) / total
+
+    if not os.path.exists(baseline_path):
+        os.makedirs(os.path.dirname(baseline_path), exist_ok=True)
+        with open(baseline_path, "w") as f:
+            json.dump({"wash_trade_ratio": current_ratio}, f)
+        return False
+
+    with open(baseline_path) as f:
+        baseline = json.load(f)
+
+    baseline_ratio = baseline.get("wash_trade_ratio", current_ratio)
+    return abs(current_ratio - baseline_ratio) > threshold
+
+
+def _adversarial_augment(
+    X_train: pd.DataFrame,
+    y_train: pd.Series,
+    aug_ratio: float,
+    random_state: int = 42,
+) -> tuple[pd.DataFrame, pd.Series]:
+    """Augment training data with feature-space perturbations mimicking AmountJitter."""
+    if aug_ratio <= 0:
+        return X_train, y_train
+
+    rng = np.random.default_rng(random_state)
+    wash_mask = y_train == 1
+    X_wash = X_train[wash_mask]
+    n_aug = max(1, int(len(X_wash) * aug_ratio))
+
+    idx = rng.choice(len(X_wash), size=n_aug, replace=True)
+    X_aug = X_wash.iloc[idx].copy().reset_index(drop=True)
+    noise = rng.normal(1.0, 0.005, size=X_aug.shape)
+    X_aug = X_aug * noise
+    y_aug = pd.Series([1] * n_aug, name=y_train.name)
+
+    X_out = pd.concat([X_train, X_aug], ignore_index=True)
+    y_out = pd.concat([y_train, y_aug], ignore_index=True)
+    return X_out, y_out
+
+
+def train_models(
+    df: pd.DataFrame,
+    test_size: float = 0.2,
+    random_state: int = 42,
+    adversarial_augmentation: bool = False,
+    aug_ratio: float | None = None,
+) -> dict:
     """Train all models in `MODEL_REGISTRY` and return fitted estimators
     plus evaluation metrics and split info.
 
@@ -119,17 +200,59 @@ def train_models(df: pd.DataFrame, test_size: float = 0.2, random_state: int = 4
             ...
           },
           "feature_columns": [...],
+          "feature_distributions": {...},
           "n_train": int,
-          "n_test": int
+          "n_test": int,
         }
+
+    If ``adversarial_augmentation`` is True, ``auc_roc_adversarial`` is also
+    included in each model's metrics dict.
     """
+    baseline_path = baseline_path or LABEL_DISTRIBUTION_BASELINE_PATH
+    threshold = threshold if threshold is not None else config.POISON_LABEL_RATIO_THRESHOLD
+
+    total = sum(label_distribution.values())
+    if total == 0:
+        return False
+    current_ratio = label_distribution.get(1, 0) / total
+
+    if not os.path.exists(baseline_path):
+        os.makedirs(os.path.dirname(baseline_path), exist_ok=True)
+        with open(baseline_path, "w") as f:
+            json.dump({"wash_trade_ratio": current_ratio}, f)
+        return False
+
+    with open(baseline_path) as f:
+        baseline = json.load(f)
+
+    baseline_ratio = baseline.get("wash_trade_ratio", current_ratio)
+    return abs(current_ratio - baseline_ratio) > threshold
+
+
+def train_models(df: pd.DataFrame, test_size: float = 0.2, random_state: int = 42) -> dict:
+    """Train all models in `MODEL_REGISTRY` and return fitted estimators
+    plus evaluation metrics."""
     X, y = split_features_labels(df)
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=test_size, random_state=random_state, stratify=y
     )
 
+    if adversarial_augmentation:
+        ratio = aug_ratio if aug_ratio is not None else config.ADVERSARIAL_AUG_RATIO
+        if ratio <= 0:
+            logger.warning(
+                "ADVERSARIAL_AUG_RATIO is 0 — augmentation requested but ratio is 0. "
+                "Set ADVERSARIAL_AUG_RATIO > 0 in config/.env to enable."
+            )
+        X_train, y_train = _adversarial_augment(X_train, y_train, ratio, random_state)
+        logger.info("Adversarial augmentation: training set expanded to %d rows", len(X_train))
+
     smote = SMOTE(random_state=random_state)
     X_train_res, y_train_res = smote.fit_resample(X_train, y_train)
+
+    rng = np.random.default_rng(random_state)
+    noise = rng.normal(1.0, 0.005, size=X_test.shape)
+    X_test_adv = X_test * noise
 
     results = {}
     for name, model_cls in MODEL_REGISTRY.items():
@@ -138,16 +261,21 @@ def train_models(df: pd.DataFrame, test_size: float = 0.2, random_state: int = 4
 
         probs = model.predict_proba(X_test)[:, 1]
         preds = model.predict(X_test)
+        probs_adv = model.predict_proba(X_test_adv)[:, 1]
 
         precision, recall, _ = precision_recall_curve(y_test, probs)
 
+        metrics = {
+            "auc_roc": float(roc_auc_score(y_test, probs)),
+            "pr_auc": float(auc(recall, precision)),
+            "f1": float(f1_score(y_test, preds)),
+        }
+        if adversarial_augmentation:
+            metrics["auc_roc_adversarial"] = float(roc_auc_score(y_test, probs_adv))
+
         results[name] = {
             "model": model,
-            "metrics": {
-                "auc_roc": float(roc_auc_score(y_test, probs)),
-                "pr_auc": float(auc(recall, precision)),
-                "f1": float(f1_score(y_test, preds)),
-            },
+            "metrics": metrics,
         }
 
     return {
@@ -162,34 +290,30 @@ def train_models(df: pd.DataFrame, test_size: float = 0.2, random_state: int = 4
 def save_models(results: dict, model_dir: str | None = None) -> None:
     model_dir = model_dir or config.MODEL_DIR
     os.makedirs(model_dir, exist_ok=True)
-    for name, result in results.items():
+    # results can be the full training_output dict or just the "results" inner dict
+    to_save = results.get("results", results) if isinstance(results, dict) else results
+    for name, result in to_save.items():
         joblib.dump(result["model"], os.path.join(model_dir, f"{name}.joblib"))
 
 
-def save_training_artifacts(
-    training_output: dict,
-    data_path: str,
+def save_metrics_report(
+    results: dict,
     model_dir: str | None = None,
-) -> None:
-    """Write metrics.json and model_metadata.json to the model directory.
-
-    NOTE: data_path is stored as-is from the CLI. If this path contains
-    sensitive information (e.g. S3 credentials), it will be persisted
-    in the metadata file.
-    """
+    extra: dict | None = None,
+) -> str:
+    """Write metrics (plus optional *extra* provenance fields) to metrics.json."""
     model_dir = model_dir or config.MODEL_DIR
     os.makedirs(model_dir, exist_ok=True)
+    path = os.path.join(model_dir, "metrics.json")
 
     results = training_output["results"]
     feature_columns = training_output["feature_columns"]
     feature_distributions = training_output.get("feature_distributions")
 
-    # metrics.json
     metrics_path = os.path.join(model_dir, "metrics.json")
     with open(metrics_path, "w") as f:
         json.dump({name: result["metrics"] for name, result in results.items()}, f, indent=2)
 
-    # model_metadata.json
     metadata = {
         "trained_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "data_path": data_path,
@@ -203,46 +327,128 @@ def save_training_artifacts(
         "feature_distributions": feature_distributions,
     }
 
-    metadata_path = os.path.join(model_dir, "model_metadata.json")
-    with open(metadata_path, "w") as f:
-        json.dump(metadata, f, indent=2)
+    # Embed artifact SHA-256 for each saved model
+    for name in results:
+        artifact_path = os.path.join(model_dir, f"{name}.joblib")
+        if os.path.exists(artifact_path):
+            sha = hashlib.sha256()
+            with open(artifact_path, "rb") as f:
+                for chunk in iter(lambda: f.read(65536), b""):
+                    sha.update(chunk)
+            payload[name]["artifact_sha256"] = sha.hexdigest()
 
-    logger.info("Saved metrics to %s", metrics_path)
-    logger.info("Saved model metadata to %s", metadata_path)
+    if extra:
+        payload.update(extra)
+
+    with open(path, "w") as f:
+        json.dump(payload, f, indent=2)
+    return path
+
+
+def save_metrics_report(
+    results: dict,
+    model_dir: str | None = None,
+    extra: dict | None = None,
+) -> str:
+    """Write metrics (plus optional *extra* provenance fields) to metrics.json."""
+    model_dir = model_dir or config.MODEL_DIR
+    os.makedirs(model_dir, exist_ok=True)
+    path = os.path.join(model_dir, "metrics.json")
+
+    payload: dict = {name: result["metrics"] for name, result in results.items()}
+
+    for name in results:
+        artifact_path = os.path.join(model_dir, f"{name}.joblib")
+        if os.path.exists(artifact_path):
+            sha = hashlib.sha256()
+            with open(artifact_path, "rb") as f:
+                for chunk in iter(lambda: f.read(65536), b""):
+                    sha.update(chunk)
+            payload[name]["artifact_sha256"] = sha.hexdigest()
+
+    if extra:
+        payload.update(extra)
+
+    with open(path, "w") as f:
+        json.dump(payload, f, indent=2)
+    return path
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train the LedgerLens ensemble classifiers")
-    parser.add_argument(
-        "--data-path",
-        required=True,
-        help="Path to a labelled feature matrix (parquet) with a 'label' column",
-    )
-    parser.add_argument(
-        "--model-dir",
-        default=None,
-        help="Directory to write trained model artifacts and metrics.json (default: MODEL_DIR)",
-    )
+    parser.add_argument("--data-path", required=True)
+    parser.add_argument("--model-dir", default=None)
     parser.add_argument("--test-size", type=float, default=0.2)
     parser.add_argument("--random-state", type=int, default=42)
+    parser.add_argument(
+        "--adversarial-augmentation",
+        action="store_true",
+        default=False,
+        help=(
+            "Augment training data with AmountJitter / TemporalSpreading-style "
+            "perturbed copies of wash-trade rows. Augmentation ratio is controlled "
+            "by ADVERSARIAL_AUG_RATIO in config / .env (default 0.0 = disabled)."
+        ),
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
+    model_dir = args.model_dir or config.MODEL_DIR
 
     logger.info("Loading training data from %s", args.data_path)
     df = load_training_data(args.data_path)
     logger.info("Loaded %d rows", len(df))
 
-    training_output = train_models(df, test_size=args.test_size, random_state=args.random_state)
+    data_sha = sha256_dataframe(df)
+    label_dist = df["label"].value_counts().to_dict()
+    logger.info("training_data_sha256=%s  label_distribution=%s", data_sha, label_dist)
+
+    if detect_label_poisoning(label_dist):
+        ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%S")
+        os.makedirs("reports", exist_ok=True)
+        alert_path = f"reports/poisoning_alert_{ts}.json"
+        with open(alert_path, "w") as f:
+            json.dump(
+                {
+                    "detected_at": ts,
+                    "label_distribution": label_dist,
+                    "training_data_sha256": data_sha,
+                },
+                f,
+                indent=2,
+            )
+        logger.critical(
+            "LABEL POISONING DETECTED — wash-trade ratio shifted beyond threshold. "
+            "Training aborted. Alert written to %s",
+            alert_path,
+        )
+        return
+
+    training_output = train_models(
+        df,
+        test_size=args.test_size,
+        random_state=args.random_state,
+        adversarial_augmentation=args.adversarial_augmentation,
+    )
     results = training_output["results"]
     for name, result in results.items():
         logger.info("%s metrics: %s", name, result["metrics"])
 
-    save_models(results, args.model_dir)
-    save_training_artifacts(training_output, args.data_path, args.model_dir)
-    logger.info("Saved models and artifacts to %s", args.model_dir or config.MODEL_DIR)
+    save_models(results, model_dir)
+    save_training_artifacts(training_output, args.data_path, model_dir)
+
+    if config.MODEL_SIGNING_PRIVATE_KEY_PATH:
+        from detection.persistence import sign_metrics
+
+        metrics_path = os.path.join(model_dir, "metrics.json")
+        sig_path = sign_metrics(metrics_path, config.MODEL_SIGNING_PRIVATE_KEY_PATH)
+        logger.info("Signed metrics.json → %s", sig_path)
+    else:
+        logger.warning("MODEL_SIGNING_PRIVATE_KEY_PATH not set — metrics.json not signed")
+
+    logger.info("Saved models and artifacts to %s", model_dir)
 
 
 if __name__ == "__main__":
