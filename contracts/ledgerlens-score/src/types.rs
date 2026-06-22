@@ -227,6 +227,15 @@ pub struct ScoreTrend {
 }
 
 #[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SnapshotRecord {
+    pub root: BytesN<32>,
+    pub leaf_count: u64,
+    pub committed_at: u64,      // ledger timestamp
+    pub committed_by: Address,  // who called commit_snapshot
+}
+
+#[contracttype]
 #[derive(Clone)]
 pub enum DataKey {
     Admin,

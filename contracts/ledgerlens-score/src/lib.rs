@@ -29,8 +29,8 @@ mod test_batch_attestation;
 mod test_score_delta;
 
 use soroban_sdk::{
-    contract, contractimpl, crypto::Hash, symbol_short, token, Address, Bytes, BytesN, Env, Symbol,
-    SymbolStr, TryFromVal, Vec,
+    contract, contractimpl, crypto::Hash, symbol_short, token, xdr::ToXdr, Address, Bytes, BytesN,
+    Env, Symbol, SymbolStr, TryFromVal, Vec,
 };
 
 pub use errors::Error;
@@ -251,6 +251,15 @@ impl LedgerLensScoreContract {
         storage::register_pair_for_wallet(&env, &wallet, &asset_pair);
         storage::increment_score_count(&env, &wallet, &asset_pair);
         Self::refresh_aggregate_cache(&env, &wallet);
+        Self::update_merkle_accumulator(
+            &env,
+            &wallet,
+            &asset_pair,
+            score,
+            timestamp,
+            confidence,
+            model_version,
+        );
 
         let score_threshold = storage::get_risk_threshold(&env);
         if score >= score_threshold {
@@ -370,6 +379,15 @@ impl LedgerLensScoreContract {
                     storage::register_pair_for_wallet(&env, &sub.wallet, &sub.asset_pair);
                     storage::increment_score_count(&env, &sub.wallet, &sub.asset_pair);
                     Self::refresh_aggregate_cache(&env, &sub.wallet);
+                    Self::update_merkle_accumulator(
+                        &env,
+                        &sub.wallet,
+                        &sub.asset_pair,
+                        sub.score,
+                        sub.timestamp,
+                        sub.confidence,
+                        sub.model_version,
+                    );
 
                     if sub.score >= threshold {
                         events::threshold_breached(
