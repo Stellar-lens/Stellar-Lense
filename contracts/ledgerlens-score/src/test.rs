@@ -1,7 +1,7 @@
 use soroban_sdk::{
     symbol_short,
-    testutils::{Address as _, Ledger as _},
-    Address, Env, Symbol, Vec,
+    testutils::{Address as _, Events as _, Ledger as _},
+    Address, Env, IntoVal, Symbol, Vec,
 };
 
 use crate::{
@@ -2136,4 +2136,323 @@ fn test_delegate_snapshot() {
 
     // Sub-wallet immediately sees the new score without any update to itself
     assert_eq!(client.get_score(&sub_wallet, &pair).score, 50);
+}
+
+// ── Consecutive-breach auto-escalation ─────────────────────────────────────────
+
+#[test]
+fn test_breach_count_increments_on_high_risk() {
+    let (env, client, _admin, _service) = initialized();
+
+    let wallet = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+
+    assert_eq!(client.get_breach_count(&wallet, &asset_pair), 0);
+
+    // Low-risk score (below default threshold of 75) — no increment.
+    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &50, &false, &false, &1, &80, &1, &None);
+    assert_eq!(client.get_breach_count(&wallet, &asset_pair), 0);
+
+    // High-risk score (>= 75) — must increment.
+    env.ledger().with_mut(|l| l.timestamp += 3_601);
+    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &90, &true, &true, &2, &95, &1, &None);
+    assert_eq!(client.get_breach_count(&wallet, &asset_pair), 1);
+
+    // Another high-risk score — must increment again.
+    env.ledger().with_mut(|l| l.timestamp += 3_601);
+    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &85, &true, &true, &3, &95, &1, &None);
+    assert_eq!(client.get_breach_count(&wallet, &asset_pair), 2);
+}
+
+#[test]
+fn test_breach_count_resets_on_low_risk() {
+    let (env, client, _admin, _service) = initialized();
+
+    let wallet = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+
+    // Submit two high-risk scores to build up the counter.
+    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &90, &true, &true, &1, &95, &1, &None);
+    env.ledger().with_mut(|l| l.timestamp += 3_601);
+    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &80, &true, &true, &2, &95, &1, &None);
+    assert_eq!(client.get_breach_count(&wallet, &asset_pair), 2);
+
+    // Low-risk score — must reset to 0.
+    env.ledger().with_mut(|l| l.timestamp += 3_601);
+    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &30, &false, &false, &3, &80, &1, &None);
+    assert_eq!(client.get_breach_count(&wallet, &asset_pair), 0);
+}
+
+fn setup_fresh<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address) {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().with_mut(|l| l.timestamp = 1_000_000);
+    let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let admin = Address::generate(&env);
+    let service = Address::generate(&env);
+    client.initialize(&admin, &service);
+    (env, client, contract_id)
+}
+
+#[test]
+fn test_escalation_triggered_at_n_breaches() {
+    let (env, client, contract_id) = setup_fresh();
+
+    let wallet = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+
+    // Set threshold to 3.
+    client.set_escalation_threshold(&Vec::new(&env), &3);
+
+    // 2 high-risk scores — no escalation yet.
+    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &90, &true, &true, &1, &95, &1, &None);
+    env.ledger().with_mut(|l| l.timestamp += 3_601);
+    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &85, &true, &true, &2, &95, &1, &None);
+    assert_eq!(client.get_breach_count(&wallet, &asset_pair), 2);
+
+    // 3rd high-risk score — escalation_triggered fires.
+    env.ledger().with_mut(|l| l.timestamp += 3_601);
+    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &95, &true, &true, &3, &95, &1, &None);
+    assert_eq!(client.get_breach_count(&wallet, &asset_pair), 3);
+
+    let expected_topic: soroban_sdk::Vec<soroban_sdk::Val> =
+        (symbol_short!("esc_trig"), wallet.clone(), asset_pair.clone()).into_val(&env);
+    let mut found = false;
+    for (addr, topics, _data) in env.events().all().iter() {
+        if addr != contract_id {
+            continue;
+        }
+        if topics == expected_topic {
+            found = true;
+            break;
+        }
+    }
+    assert!(found, "escalation_triggered event was not emitted");
+}
+
+#[test]
+fn test_escalation_triggered_fires_only_once() {
+    let (env, client, contract_id) = setup_fresh();
+
+    let wallet = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+
+    client.set_escalation_threshold(&Vec::new(&env), &2);
+
+    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &90, &true, &true, &1, &95, &1, &None);
+    env.ledger().with_mut(|l| l.timestamp += 3_601);
+    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &85, &true, &true, &2, &95, &1, &None);
+    env.ledger().with_mut(|l| l.timestamp += 3_601);
+    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &95, &true, &true, &3, &95, &1, &None);
+    env.ledger().with_mut(|l| l.timestamp += 3_601);
+    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &80, &true, &true, &4, &95, &1, &None);
+
+    let expected_topic: soroban_sdk::Vec<soroban_sdk::Val> =
+        (symbol_short!("esc_trig"), wallet, asset_pair).into_val(&env);
+    let mut esc_trig_count = 0;
+    for (addr, topics, _data) in env.events().all().iter() {
+        if addr != contract_id {
+            continue;
+        }
+        if topics == expected_topic {
+            esc_trig_count += 1;
+        }
+    }
+    assert_eq!(esc_trig_count, 1, "escalation_triggered must fire exactly once");
+}
+
+#[test]
+fn test_escalation_resolved_after_low_risk() {
+    let (env, client, contract_id) = setup_fresh();
+
+    let wallet = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+
+    client.set_escalation_threshold(&Vec::new(&env), &2);
+
+    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &90, &true, &true, &1, &95, &1, &None);
+    env.ledger().with_mut(|l| l.timestamp += 3_601);
+    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &85, &true, &true, &2, &95, &1, &None);
+
+    // Low-risk score should emit escalation_resolved.
+    env.ledger().with_mut(|l| l.timestamp += 3_601);
+    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &30, &false, &false, &3, &80, &1, &None);
+    assert_eq!(client.get_breach_count(&wallet, &asset_pair), 0);
+
+    let expected_topic: soroban_sdk::Vec<soroban_sdk::Val> =
+        (symbol_short!("esc_res"), wallet, asset_pair).into_val(&env);
+    let mut found = false;
+    for (addr, topics, _data) in env.events().all().iter() {
+        if addr != contract_id {
+            continue;
+        }
+        if topics == expected_topic {
+            found = true;
+            break;
+        }
+    }
+    assert!(found, "escalation_resolved event was not emitted");
+}
+
+#[test]
+fn test_escalation_resolved_not_emitted_below_threshold() {
+    let (env, client, contract_id) = setup_fresh();
+
+    let wallet = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+
+    // 2 high-risk (below default threshold 5).
+    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &90, &true, &true, &1, &95, &1, &None);
+    env.ledger().with_mut(|l| l.timestamp += 3_601);
+    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &85, &true, &true, &2, &95, &1, &None);
+
+    // Low-risk — counter = 2 < 5, no escalation_resolved.
+    env.ledger().with_mut(|l| l.timestamp += 3_601);
+    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &30, &false, &false, &3, &80, &1, &None);
+
+    let expected_topic: soroban_sdk::Vec<soroban_sdk::Val> =
+        (symbol_short!("esc_res"), wallet, asset_pair).into_val(&env);
+    for (addr, topics, _data) in env.events().all().iter() {
+        if addr != contract_id {
+            continue;
+        }
+        assert_ne!(
+            topics, expected_topic,
+            "escalation_resolved must not fire when counter < threshold"
+        );
+    }
+}
+
+#[test]
+fn test_escalation_threshold_bounds_enforced() {
+    let (env, client, _admin, _service) = initialized();
+
+    // Setting threshold to 0 must be rejected.
+    let result = client.try_set_escalation_threshold(&Vec::new(&env), &0);
+    assert_eq!(result, Err(Ok(Error::InvalidEscalationThreshold)));
+
+    // Setting threshold to 101 must be rejected.
+    let result = client.try_set_escalation_threshold(&Vec::new(&env), &101);
+    assert_eq!(result, Err(Ok(Error::InvalidEscalationThreshold)));
+
+    // Setting threshold to 1 must be accepted (fires on every breach).
+    client.set_escalation_threshold(&Vec::new(&env), &1);
+    assert_eq!(client.get_escalation_threshold(), 1);
+
+    // Setting threshold to 100 must be accepted.
+    client.set_escalation_threshold(&Vec::new(&env), &100);
+    assert_eq!(client.get_escalation_threshold(), 100);
+}
+
+#[test]
+fn test_admin_reset_clears_without_resolved_event() {
+    let (env, client, contract_id) = setup_fresh();
+
+    let wallet = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+
+    // Set threshold to 2 and trigger escalation.
+    client.set_escalation_threshold(&Vec::new(&env), &2);
+    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &90, &true, &true, &1, &95, &1, &None);
+    env.ledger().with_mut(|l| l.timestamp += 3_601);
+    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &85, &true, &true, &2, &95, &1, &None);
+    assert_eq!(client.get_breach_count(&wallet, &asset_pair), 2);
+
+    // Admin resets — no escalation_resolved.
+    client.reset_breach_count(&Vec::new(&env), &wallet, &asset_pair);
+    assert_eq!(client.get_breach_count(&wallet, &asset_pair), 0);
+
+    let expected_topic: soroban_sdk::Vec<soroban_sdk::Val> =
+        (symbol_short!("esc_res"), wallet, asset_pair).into_val(&env);
+    for (addr, topics, _data) in env.events().all().iter() {
+        if addr != contract_id {
+            continue;
+        }
+        assert_ne!(topics, expected_topic, "admin reset must not emit escalation_resolved");
+    }
+}
+
+#[test]
+fn test_breach_count_is_per_pair() {
+    let (env, client, _admin, _service) = initialized();
+
+    let wallet = Address::generate(&env);
+    let pair1 = symbol_short!("XLM_USDC");
+    let pair2 = symbol_short!("XLM_BTC");
+
+    // High-risk score for pair1 only.
+    client.submit_score(&Vec::new(&env), &wallet, &pair1, &90, &true, &true, &1, &95, &1, &None);
+    env.ledger().with_mut(|l| l.timestamp += 3_601);
+    client.submit_score(&Vec::new(&env), &wallet, &pair1, &85, &true, &true, &2, &95, &1, &None);
+
+    assert_eq!(client.get_breach_count(&wallet, &pair1), 2);
+    assert_eq!(client.get_breach_count(&wallet, &pair2), 0);
+
+    // High-risk score for pair2 — must be isolated.
+    client.submit_score(&Vec::new(&env), &wallet, &pair2, &80, &true, &true, &3, &95, &1, &None);
+
+    assert_eq!(client.get_breach_count(&wallet, &pair1), 2);
+    assert_eq!(client.get_breach_count(&wallet, &pair2), 1);
+}
+
+#[test]
+fn test_default_escalation_threshold_is_5() {
+    let (_env, client, _admin, _service) = initialized();
+    assert_eq!(client.get_escalation_threshold(), 5);
+}
+
+#[test]
+fn test_escalation_threshold_fires_at_5_by_default() {
+    let (env, client, contract_id) = setup_fresh();
+
+    let wallet = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+
+    for i in 0..5 {
+        env.ledger().with_mut(|l| l.timestamp += 3_601);
+        client.submit_score(
+            &Vec::new(&env),
+            &wallet,
+            &asset_pair,
+            &(80 + i),
+            &true,
+            &true,
+            &(i as u64 + 1),
+            &95,
+            &1,
+            &None,
+        );
+    }
+    assert_eq!(client.get_breach_count(&wallet, &asset_pair), 5);
+
+    let expected_topic: soroban_sdk::Vec<soroban_sdk::Val> =
+        (symbol_short!("esc_trig"), wallet, asset_pair).into_val(&env);
+    let mut found = false;
+    for (addr, topics, _data) in env.events().all().iter() {
+        if addr != contract_id {
+            continue;
+        }
+        if topics == expected_topic {
+            found = true;
+            break;
+        }
+    }
+    assert!(found, "escalation_triggered must fire at default threshold of 5");
+}
+
+#[test]
+fn test_set_escalation_threshold_before_init_fails() {
+    let (env, client, _, _) = setup();
+    let result = client.try_set_escalation_threshold(&Vec::new(&env), &3);
+    assert_eq!(result, Err(Ok(Error::NotInitialized)));
+}
+
+#[test]
+fn test_reset_breach_count_before_init_fails() {
+    let (env, client, _, _) = setup();
+    let wallet = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+    let result = client.try_reset_breach_count(&Vec::new(&env), &wallet, &pair);
+    assert_eq!(result, Err(Ok(Error::NotInitialized)));
 }

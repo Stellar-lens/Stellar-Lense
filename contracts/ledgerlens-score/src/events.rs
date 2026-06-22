@@ -239,3 +239,44 @@ pub fn delegate_set(env: &Env, sub_wallet: &Address, custodian: &Address) {
 pub fn delegate_removed(env: &Env, sub_wallet: &Address) {
     env.events().publish((symbol_short!("dlg_rem"),), sub_wallet.clone());
 }
+
+// ── Consecutive-breach auto-escalation ─────────────────────────────────────────
+
+/// Emitted when the consecutive breach counter reaches the escalation
+/// threshold N for a (wallet, asset_pair). Fires exactly once when the
+/// counter reaches N, not on every subsequent breach.
+pub fn escalation_triggered(
+    env: &Env,
+    wallet: &Address,
+    asset_pair: &Symbol,
+    consecutive_count: u32,
+    score: u32,
+    threshold: u32,
+) {
+    env.events().publish(
+        (symbol_short!("esc_trig"), wallet.clone(), asset_pair.clone()),
+        (consecutive_count, score, threshold),
+    );
+}
+
+/// Emitted when a non-breaching score arrives for a (wallet, asset_pair)
+/// whose consecutive breach counter was at or above the escalation threshold.
+/// Indicates the wallet is no longer in an escalated state.
+pub fn escalation_resolved(
+    env: &Env,
+    wallet: &Address,
+    asset_pair: &Symbol,
+    final_breach_count: u32,
+    new_score: u32,
+) {
+    env.events().publish(
+        (symbol_short!("esc_res"), wallet.clone(), asset_pair.clone()),
+        (final_breach_count, new_score),
+    );
+}
+
+/// Emitted when the admin updates the escalation threshold via
+/// `set_escalation_threshold`.
+pub fn escalation_threshold_updated(env: &Env, old_threshold: u32, new_threshold: u32) {
+    env.events().publish((symbol_short!("esc_thr"),), (old_threshold, new_threshold));
+}

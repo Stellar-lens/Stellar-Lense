@@ -131,4 +131,9 @@ pub enum Error {
     /// Returned by read-path functions (`get_score`, `get_aggregate_score`)
     /// when the requested wallet is under an active regulatory embargo.
     ScoreEmbargoed = 42,
+
+    // ── Consecutive-breach auto-escalation ─────────────────────────────────
+    /// Returned when `set_escalation_threshold` is called with a value of `0`
+    /// (the threshold must be ≥ 1). Values above 100 are also rejected.
+    InvalidEscalationThreshold = 43,
 }

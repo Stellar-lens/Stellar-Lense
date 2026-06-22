@@ -1,8 +1,8 @@
 use soroban_sdk::{Address, Bytes, Env, Symbol, Vec};
 
 use crate::constants::{
-    DEFAULT_COOLDOWN_SECS, DEFAULT_RISK_THRESHOLD, DEFAULT_UPGRADE_DELAY_SECS, SCORE_TTL_EXTEND_TO,
-    SCORE_TTL_THRESHOLD,
+    DEFAULT_COOLDOWN_SECS, DEFAULT_ESCALATION_THRESHOLD, DEFAULT_RISK_THRESHOLD,
+    DEFAULT_UPGRADE_DELAY_SECS, SCORE_TTL_EXTEND_TO, SCORE_TTL_THRESHOLD,
 };
 use crate::types::{AggregateRiskScore, DataKey, RiskScore, ScoreTrend, UpgradeProposal};
 
@@ -592,4 +592,42 @@ pub fn set_score_delegate(env: &Env, sub_wallet: &Address, custodian: &Address) 
 pub fn remove_score_delegate(env: &Env, sub_wallet: &Address) {
     let key = DataKey::ScoreDelegate(sub_wallet.clone());
     env.storage().persistent().remove(&key);
+}
+
+// ── Consecutive-breach auto-escalation ─────────────────────────────────────────
+
+/// Returns the current consecutive breach count for `(wallet, asset_pair)`.
+/// Starts at 0 (no breaches).
+pub fn get_breach_count(env: &Env, wallet: &Address, asset_pair: &Symbol) -> u32 {
+    let key = DataKey::ConsecutiveBreachCount(wallet.clone(), asset_pair.clone());
+    let result: Option<u32> = env.storage().temporary().get(&key);
+    result.unwrap_or(0)
+}
+
+/// Sets the consecutive breach count for `(wallet, asset_pair)`.
+pub fn set_breach_count(env: &Env, wallet: &Address, asset_pair: &Symbol, count: u32) {
+    let key = DataKey::ConsecutiveBreachCount(wallet.clone(), asset_pair.clone());
+    env.storage().temporary().set(&key, &count);
+    env.storage()
+        .temporary()
+        .extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+}
+
+/// Clears (resets to 0) the consecutive breach counter. Used by the admin
+/// emergency override `reset_breach_count`.
+pub fn clear_breach_count(env: &Env, wallet: &Address, asset_pair: &Symbol) {
+    let key = DataKey::ConsecutiveBreachCount(wallet.clone(), asset_pair.clone());
+    env.storage().temporary().remove(&key);
+}
+
+/// Returns the configured escalation threshold, defaulting to
+/// `DEFAULT_ESCALATION_THRESHOLD` (5) until configured.
+pub fn get_escalation_threshold(env: &Env) -> u32 {
+    let result: Option<u32> = env.storage().instance().get(&DataKey::EscalationThreshold);
+    result.unwrap_or(DEFAULT_ESCALATION_THRESHOLD)
+}
+
+/// Persists the escalation threshold.
+pub fn set_escalation_threshold(env: &Env, n: u32) {
+    env.storage().instance().set(&DataKey::EscalationThreshold, &n);
 }

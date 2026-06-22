@@ -252,4 +252,11 @@ pub enum DataKey {
     /// and consecutive submission count in that direction. Updated by every
     /// successful `submit_score` / `submit_scores_batch` write.
     TrendState(Address, Symbol),
+    /// Per-(wallet, asset_pair) consecutive breach counter for auto-escalation.
+    /// Incremented on each high-risk submission; reset on low-risk.
+    ConsecutiveBreachCount(Address, Symbol),
+    /// Configurable escalation threshold N: when the consecutive breach counter
+    /// reaches this value, an `escalation_triggered` event is emitted.
+    /// Default: 5. Valid range: [1, 100].
+    EscalationThreshold,
 }

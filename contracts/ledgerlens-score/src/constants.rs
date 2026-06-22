@@ -110,3 +110,15 @@ pub const MAX_DECAY_LAMBDA_NUM: u32 = 1;
 
 /// Maximum allowed decay rate denominator (paired with MAX_DECAY_LAMBDA_NUM).
 pub const MAX_DECAY_LAMBDA_DEN: u32 = 1;
+
+// ── Consecutive-breach auto-escalation ────────────────────────────────────────
+
+/// Default escalation threshold: 5 consecutive high-risk submissions before
+/// an `escalation_triggered` event fires.
+pub const DEFAULT_ESCALATION_THRESHOLD: u32 = 5;
+
+/// Minimum allowed escalation threshold (1 means fire on every breach).
+pub const MIN_ESCALATION_THRESHOLD: u32 = 1;
+
+/// Maximum allowed escalation threshold.
+pub const MAX_ESCALATION_THRESHOLD: u32 = 100;
