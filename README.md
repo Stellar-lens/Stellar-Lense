@@ -20,9 +20,9 @@ Wash trading — simultaneously buying and selling the same asset to artificiall
 
 ## What This Repo Does
 
-- **Ingests** — Streams and bulk-loads trade history, order book events, and account activity from the Stellar Horizon API
-- **Detects** — Computes Benford's Law anomaly metrics (chi-square, per-digit Z-scores, MAD) per wallet, per asset, and per trading pair across rolling time windows
-- **Scores** — Extracts 30+ on-chain features and runs ensemble ML classifiers (Random Forest, XGBoost, LightGBM) to produce a 0–100 risk score per wallet/asset pair
+- **Ingests** — Streams and bulk-loads trade history from both the Stellar SDEX (order book) and AMM liquidity pools, plus order book events and account activity from the Stellar Horizon API
+- **Detects** — Computes Benford's Law anomaly metrics (chi-square, per-digit Z-scores, MAD) per wallet, per asset, and per trading pair across rolling time windows; detects **cross-venue coordination** between SDEX and AMM pool activity
+- **Scores** — Extracts 37+ on-chain features (including 7 cross-venue coordination features) and runs ensemble ML classifiers (Random Forest, XGBoost, LightGBM) to produce a 0–100 risk score per wallet/asset pair
 - **Explains** — Generates SHAP-based interpretability output so every risk score is auditable
 
 ## Architecture
@@ -241,6 +241,42 @@ python -m scripts.stream --alert-channel websocket
 See [docs/streaming_architecture.md](docs/streaming_architecture.md) for the
 full pipeline diagram, threading model, and latency budget.
 
+#### Kafka deployment option (`STREAMING_BACKEND=kafka`)
+
+The default `sse` backend runs one thread per pair in a single process. For
+scale-out, durability, event replay, and backpressure, set
+`STREAMING_BACKEND=kafka` to route trades through Apache Kafka instead. The
+`sse` backend remains the default and is unchanged — operators without Kafka
+need do nothing.
+
+```bash
+# Bring up Zookeeper, Kafka, the producer, 3 scorer replicas, Prometheus + Grafana
+docker-compose up --scale ledgerlens-scorer=3
+```
+
+Architecture: a `HorizonKafkaProducer` serialises each Horizon SSE trade to Avro
+(`data/trade_avro_schema.json`) and produces it to
+`ledgerlens.trades.{asset_pair}`, keyed by `wallet_id` so per-wallet ordering is
+preserved. `KafkaWorker` replicas in the shared `ledgerlens-scorer` consumer
+group consume via a wildcard subscription, score wallets, dispatch alerts, and
+commit offsets only after dispatch (at-least-once). Serialisation failures go to
+a dead-letter queue (`ledgerlens.trades.dlq`); they are never auto-retried.
+
+| Variable | Default | Description |
+|---|---|---|
+| `STREAMING_BACKEND` | `sse` | `sse` (threaded) or `kafka` |
+| `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` | Broker list |
+| `KAFKA_SASL_USERNAME` | — | SASL username (read from env only) |
+| `KAFKA_SASL_PASSWORD` | — | SASL password (read from env only) |
+| `KAFKA_LAG_ALERT_THRESHOLD` | `500` | Consumer lag (messages) that triggers a CRITICAL log |
+
+Each scorer exposes Prometheus metrics (`kafka_lag_by_partition`,
+`scoring_latency_ms`, `alerts_dispatched_total`, `kafka_messages_consumed_total`)
+on `KAFKA_METRICS_PORT` (default `9100`); Grafana ships a pre-configured Kafka
+lag + scoring-latency dashboard. See
+[docs/streaming_architecture.md](docs/streaming_architecture.md#kafka-streaming-backend-issue-36)
+for the Kafka topology, partition strategy, and at-least-once semantics.
+
 ### `run_pipeline.py` flags
 
 | Flag | Effect |
@@ -327,6 +363,36 @@ See [`scripts/README.md`](scripts/README.md) for detailed usage of:
   local training/demo/tests without live Horizon data
 - `retrain_if_drifted.py` — automated drift detection and retraining trigger
 - `list_model_versions.py` — list archived models with training dates and metrics
+
+## Active Learning
+
+LedgerLens includes an active learning pipeline that intelligently selects the most informative
+wallets for analyst annotation, minimising labelling effort while maximising model improvement.
+
+```bash
+# Populate the annotation queue (selects 20 wallets by committee disagreement):
+python -m scripts.run_active_learning --pool data/unscored_wallets.parquet
+
+# Annotate wallets interactively:
+python -m scripts.annotate --annotator-id yourname
+
+# Export annotations and update models:
+python -m scripts.annotate --export data/annotated.parquet
+python -m scripts.run_active_learning \
+    --pool data/unscored_wallets.parquet \
+    --update data/annotated.parquet
+```
+
+The pipeline runs automatically every Monday at 08:00 UTC via
+`.github/workflows/active_learning.yml`. See [`docs/active_learning.md`](docs/active_learning.md)
+for the full query strategy comparison, annotation workflow, and incremental update policy.
+
+| Variable | Default | Description |
+|---|---|---|
+| `AL_QUERY_STRATEGY` | `committee_disagreement` | Query strategy |
+| `AL_BATCH_SIZE` | `20` | Wallets selected per run |
+| `AL_RETRAIN_THRESHOLD` | `50` | Min labels for full retrain |
+| `AL_ROLLBACK_AUC_DROP` | `0.01` | Max AUC drop before rollback |
 
 ## Development
 
@@ -544,6 +610,41 @@ Each annotation in `data/annotation_queue.json` is protected by an HMAC-SHA256 c
 ## Why This Matters
 
 A DEX where volume figures cannot be trusted is one that institutional participants and serious traders will avoid. LedgerLens is an **open-source public good** — its scores, methodology, and training data are fully transparent and auditable, and will always be free to query.
+
+## Compliance & Forensic Reporting
+
+LedgerLens risk scores are designed to support regulatory compliance workflows
+including FATF Travel Rule reviews, SEC market-manipulation investigations, and
+FinCEN Suspicious Activity Report (SAR) filings.
+
+Every risk score can be accompanied by a **tamper-evident forensic report** that
+documents exactly how the score was computed:
+
+- The 20 most anomalous trades with direct Horizon URLs for independent verification.
+- SHAP feature attributions with plain-English descriptions of each risk factor.
+- Benford's Law analysis across five time windows.
+- A SHA-256 fingerprint of the entire report, optionally anchored to the Stellar
+  ledger via Soroban for a non-repudiable timestamp.
+
+**Generating a report:**
+
+```bash
+# Markdown report for human review
+python -m scripts.score_wallet \
+  --wallet G... \
+  --pair "USDC:GA5Z.../XLM:native" \
+  --report --report-format markdown
+
+# JSON report anchored on-chain
+python -m scripts.score_wallet ... --report --anchor
+
+# Bulk report generation from a CSV of wallets
+python -m scripts.generate_reports --input wallets.csv --anchor
+```
+
+Reports are written to `reports/forensic/` with mode `0o600` (owner-readable
+only). See [`docs/forensic_reporting.md`](docs/forensic_reporting.md) for the
+full schema, anchoring workflow, and the three-step regulator verification guide.
 
 ## Contributing
 

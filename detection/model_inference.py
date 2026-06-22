@@ -20,7 +20,11 @@ import joblib
 import pandas as pd
 
 from config import config
-from detection.model_training import FEATURE_COLUMNS_EXCLUDE, MODEL_REGISTRY
+from detection.model_training import (
+    FEATURE_COLUMNS_EXCLUDE,
+    MODEL_REGISTRY,
+    compute_feature_schema_hash,
+)
 from utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -119,7 +123,6 @@ class RiskScorer:
             path = os.path.join(self.model_dir, f"{name}.joblib")
             if os.path.exists(path):
                 model = joblib.load(path)
-                # verify_chain — skipped silently when no public key is configured
                 try:
                     artifact.verify_chain(name)
                 except ModelIntegrityError as exc:
@@ -175,7 +178,6 @@ class RiskScorer:
 
         result: dict = {}
 
-        # Check consensus first
         if not _has_consensus(scores_100):
             logger.warning(
                 "BFT consensus failure — raw scores: %s",

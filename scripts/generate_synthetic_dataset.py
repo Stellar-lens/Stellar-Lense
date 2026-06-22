@@ -33,6 +33,7 @@ def generate_synthetic_dataset(n_wallets: int = 500, seed: int = 42) -> pd.DataF
         is_wash = i >= n_legit
         row = {"wallet": f"GSYNTH{i:06d}"}
 
+        # Raw Benford features — one group per window (matches compute_benford_features order)
         for hours in config.BENFORD_WINDOWS_HOURS:
             if is_wash:
                 row[f"benford_chi_square_{hours}h"] = rng.uniform(20, 100)
@@ -42,6 +43,16 @@ def generate_synthetic_dataset(n_wallets: int = 500, seed: int = 42) -> pd.DataF
                 row[f"benford_chi_square_{hours}h"] = rng.uniform(0, 10)
                 row[f"benford_mad_{hours}h"] = rng.uniform(0.0, 0.014)
                 row[f"benford_z_max_{hours}h"] = rng.uniform(0, 2)
+
+        # Residual Benford features (after STL seasonal stripping) — appended
+        # after all raw features to match build_feature_vector column order.
+        for hours in config.BENFORD_WINDOWS_HOURS:
+            if is_wash:
+                row[f"benford_residual_chi_square_{hours}h"] = rng.uniform(15, 80)
+                row[f"benford_residual_mad_{hours}h"] = rng.uniform(0.018, 0.07)
+            else:
+                row[f"benford_residual_chi_square_{hours}h"] = rng.uniform(0, 8)
+                row[f"benford_residual_mad_{hours}h"] = rng.uniform(0.0, 0.012)
 
         if is_wash:
             row["counterparty_concentration_ratio"] = rng.uniform(0.7, 1.0)
@@ -63,6 +74,10 @@ def generate_synthetic_dataset(n_wallets: int = 500, seed: int = 42) -> pd.DataF
             row["cross_pair_volume_correlation"] = rng.uniform(0.4, 1.0)
             row["pair_diversity_score"] = rng.uniform(0.0, 0.3)
             row["cross_pair_mad_std"] = rng.uniform(0.01, 0.05)
+            # Hardening features (wash: low entropy, low CV, high correlation)
+            row["inter_arrival_cv"] = rng.uniform(0.0, 0.2)
+            row["entropy_of_amounts"] = rng.uniform(0.0, 1.0)
+            row["cross_wallet_volume_corr"] = rng.uniform(0.5, 1.0)
         else:
             row["counterparty_concentration_ratio"] = rng.uniform(0.0, 0.5)
             row["round_trip_frequency"] = rng.uniform(0.0, 0.1)
@@ -83,6 +98,10 @@ def generate_synthetic_dataset(n_wallets: int = 500, seed: int = 42) -> pd.DataF
             row["cross_pair_volume_correlation"] = rng.uniform(-0.5, 0.3)
             row["pair_diversity_score"] = rng.uniform(0.5, 1.0)
             row["cross_pair_mad_std"] = rng.uniform(0.0, 0.01)
+            # Hardening features (legit: higher entropy/CV, lower correlation)
+            row["inter_arrival_cv"] = rng.uniform(0.5, 2.0)
+            row["entropy_of_amounts"] = rng.uniform(3.0, 6.0)
+            row["cross_wallet_volume_corr"] = rng.uniform(-0.3, 0.3)
 
         row["label"] = int(is_wash)
         rows.append(row)
