@@ -593,3 +593,48 @@ pub fn remove_score_delegate(env: &Env, sub_wallet: &Address) {
     let key = DataKey::ScoreDelegate(sub_wallet.clone());
     env.storage().persistent().remove(&key);
 }
+
+// ── Model version registry ────────────────────────────────────────────────────
+//
+// The registry is stored in instance storage (contract lifetime) because model
+// version metadata is global and must outlive any individual score entry's TTL.
+// An absent `ModelVersionSet` key is treated as an empty registry, which
+// preserves backward compatibility for deployments that never call
+// `register_model_version`.
+
+/// Returns the ordered list of all registered model versions (active +
+/// deprecated).  An absent key returns an empty `Vec` — callers must treat
+/// an empty return as "registry not yet initialised → no version checks".
+pub fn get_model_version_set(env: &Env) -> Vec<u32> {
+    env.storage()
+        .instance()
+        .get(&DataKey::ModelVersionSet)
+        .unwrap_or_else(|| Vec::new(env))
+}
+
+pub fn set_model_version_set(env: &Env, versions: &Vec<u32>) {
+    env.storage().instance().set(&DataKey::ModelVersionSet, versions);
+}
+
+/// Returns `true` when `version` appears in the registered set (regardless of
+/// whether it has been deprecated).
+pub fn is_model_version_registered(env: &Env, version: u32) -> bool {
+    get_model_version_set(env).contains(&version)
+}
+
+/// Returns `true` when `version` has been explicitly deprecated via
+/// `deprecate_model_version`.  An absent key — including versions that were
+/// never registered — returns `false`.
+pub fn is_model_version_deprecated(env: &Env, version: u32) -> bool {
+    let key = DataKey::ModelVersionDeprecated(version);
+    let result: Option<bool> = env.storage().instance().get(&key);
+    result.unwrap_or(false)
+}
+
+/// Marks `version` as deprecated.  This is a write-once operation: there is
+/// no function to clear this flag, enforcing the irreversibility guarantee.
+pub fn set_model_version_deprecated(env: &Env, version: u32) {
+    env.storage()
+        .instance()
+        .set(&DataKey::ModelVersionDeprecated(version), &true);
+}

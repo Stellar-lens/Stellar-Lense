@@ -252,4 +252,12 @@ pub enum DataKey {
     /// and consecutive submission count in that direction. Updated by every
     /// successful `submit_score` / `submit_scores_batch` write.
     TrendState(Address, Symbol),
+    /// Ordered list of every registered model version (active + deprecated).
+    /// Instance storage; a missing key is equivalent to an empty registry.
+    ModelVersionSet,
+    /// Per-version deprecation flag.  Stored as `bool` (always `true` when
+    /// present — the key is removed rather than set to `false` on re-activation,
+    /// but re-activation is intentionally unsupported, so the flag is
+    /// write-once).
+    ModelVersionDeprecated(u32),
 }

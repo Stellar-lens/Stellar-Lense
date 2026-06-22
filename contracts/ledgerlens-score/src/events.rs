@@ -239,3 +239,15 @@ pub fn delegate_set(env: &Env, sub_wallet: &Address, custodian: &Address) {
 pub fn delegate_removed(env: &Env, sub_wallet: &Address) {
     env.events().publish((symbol_short!("dlg_rem"),), sub_wallet.clone());
 }
+
+// ── Model version registry ────────────────────────────────────────────────────
+
+/// Emitted when `register_model_version` adds a new version to the active set.
+pub fn model_version_registered(env: &Env, version: u32) {
+    env.events().publish((symbol_short!("mv_reg"),), version);
+}
+
+/// Emitted when `deprecate_model_version` moves a version to the deprecated state.
+pub fn model_version_deprecated(env: &Env, version: u32) {
+    env.events().publish((symbol_short!("mv_dep"),), version);
+}

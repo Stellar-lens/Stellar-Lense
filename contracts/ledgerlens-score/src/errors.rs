@@ -131,4 +131,22 @@ pub enum Error {
     /// Returned by read-path functions (`get_score`, `get_aggregate_score`)
     /// when the requested wallet is under an active regulatory embargo.
     ScoreEmbargoed = 42,
+
+    // ── Model version registry ─────────────────────────────────────────────
+    /// Returned by `submit_score` / `submit_scores_batch` when the registry is
+    /// non-empty and the submitted `model_version` has never been registered.
+    ModelVersionNotRegistered = 43,
+    /// Returned by `submit_score` / `submit_scores_batch` when the submitted
+    /// `model_version` has been registered but subsequently deprecated.
+    /// Also used as `rejection_code` in `BatchEntryResult`.
+    ModelVersionDeprecated = 44,
+    /// Returned by `register_model_version` when the given version number is
+    /// already present in the registry (active or deprecated).
+    ModelVersionAlreadyRegistered = 45,
+    /// Returned by `deprecate_model_version` when the given version has already
+    /// been deprecated.  Re-activation is intentionally unsupported.
+    ModelVersionAlreadyDeprecated = 46,
+    /// Returned by `register_model_version` when the total number of registered
+    /// versions (active + deprecated) would exceed `MAX_MODEL_VERSIONS`.
+    ModelVersionRegistryFull = 47,
 }

@@ -110,3 +110,13 @@ pub const MAX_DECAY_LAMBDA_NUM: u32 = 1;
 
 /// Maximum allowed decay rate denominator (paired with MAX_DECAY_LAMBDA_NUM).
 pub const MAX_DECAY_LAMBDA_DEN: u32 = 1;
+
+// ── Model version registry ─────────────────────────────────────────────────────
+//
+// Bounds the number of version entries in `ModelVersionSet` so storage cost
+// stays predictable. The admin can register up to this many distinct model
+// version numbers; attempting to exceed it returns `ModelVersionRegistryFull`.
+
+/// Maximum number of model versions that may be registered across the
+/// Active + Deprecated states combined.
+pub const MAX_MODEL_VERSIONS: u32 = 20;
