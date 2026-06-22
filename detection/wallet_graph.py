@@ -19,12 +19,12 @@ Also provides:
   same asset pair within a configurable time window.
 """
 
-import re
-import warnings
-from collections.abc import Iterable
-from typing import Optional
+from collections.abc import Iterable, Mapping, Sequence
+from itertools import combinations
+from typing import Literal
 
 import networkx as nx
+import numpy as np
 import pandas as pd
 
 from ingestion.data_models import AccountActivity
@@ -44,139 +44,131 @@ def build_funding_graph(
 ) -> nx.DiGraph:
     """Build a directed graph with edges ``funding_account -> account_id``.
 
-    Parameters
-    ----------
-    activities:
-        Iterable of :class:`~ingestion.data_models.AccountActivity` records.
-    validate_account_ids:
-        When ``True``, edges where either endpoint does not match the Stellar
-        account ID format (``^G[A-Z2-7]{55}$``) are silently dropped.  Set
-        this to ``True`` when feeding data directly from the Horizon API.
-        Defaults to ``False`` for backwards compatibility with test fixtures
-        that use short synthetic identifiers.
+def build_funding_graph(
+    activities: Iterable[AccountActivity],
+    trades: pd.DataFrame | None = None,
+    *,
+    co_trade_window: str | pd.Timedelta = "5min",
+    output_format: Literal["networkx", "pyg"] = "networkx",
+    node_features: pd.DataFrame | Mapping[str, Sequence[float]] | None = None,
+):
+    """Build the wallet graph, preserving the historical NetworkX default.
+
+    Funding edges point from funder to funded account. When ``trades`` is
+    supplied, wallets active in the same asset pair within ``co_trade_window``
+    are connected in both directions. Set ``output_format="pyg"`` to obtain a
+    :class:`torch_geometric.data.Data` object suitable for GraphSAGE.
     """
+    if output_format not in {"networkx", "pyg"}:
+        raise ValueError("output_format must be 'networkx' or 'pyg'")
+
     graph: nx.DiGraph = nx.DiGraph()
     for activity in activities:
         if validate_account_ids and not _validate_account_id(activity.account_id):
             continue
         graph.add_node(activity.account_id)
         if activity.funding_account:
-            if validate_account_ids and not _validate_account_id(activity.funding_account):
-                continue
-            graph.add_edge(
-                activity.funding_account,
-                activity.account_id,
-                edge_type="funding",
-                weight=1,
-            )
+            graph.add_edge(activity.funding_account, activity.account_id, edge_type="funding")
+
+    if trades is not None and not trades.empty:
+        _add_co_trade_edges(graph, trades, pd.Timedelta(co_trade_window))
+
+    if output_format == "pyg":
+        return to_pyg_data(graph, node_features=node_features)
     return graph
 
 
-def build_co_trade_graph(
-    trades_df: pd.DataFrame,
-    window_hours: int,
-) -> nx.DiGraph:
-    """Build a directed co-trade graph from a trades DataFrame.
+def _add_co_trade_edges(graph: nx.DiGraph, trades: pd.DataFrame, window: pd.Timedelta) -> None:
+    """Add bidirectional edges between wallets co-active on an asset pair."""
+    required = {"base_account", "counter_account", "ledger_close_time"}
+    missing = required - set(trades.columns)
+    if missing:
+        raise ValueError(f"trades missing required columns: {sorted(missing)}")
 
-    Two wallets get a bidirectional ``co_trade`` edge when both traded the
-    same asset pair within *window_hours* of each other.
+    frame = trades.copy()
+    if "pair_id" not in frame:
+        if not {"base_asset", "counter_asset"}.issubset(frame.columns):
+            raise ValueError("trades require pair_id or base_asset/counter_asset columns")
+        frame["pair_id"] = (
+            frame["base_asset"].astype(str) + "/" + frame["counter_asset"].astype(str)
+        )
+    frame["ledger_close_time"] = pd.to_datetime(frame["ledger_close_time"], utc=True)
 
-    Parameters
-    ----------
-    trades_df:
-        DataFrame produced by the ingestion layer.  Must contain columns:
-        ``base_account``, ``counter_account``, ``base_asset``,
-        ``counter_asset``, ``ledger_close_time``, ``amount``.
-    window_hours:
-        Maximum time difference (in hours) between two trades on the same
-        pair for the wallets to receive a co-trade edge.
-
-    Returns
-    -------
-    nx.DiGraph
-        Nodes are wallet addresses.  Edges carry:
-        - ``edge_type = "co_trade"``
-        - ``weight``   – number of co-trade events observed
-        - ``timestamp`` – first observed co-trade timestamp (ISO string)
-
-    Notes
-    -----
-    Both endpoints of every edge are validated against the Stellar account-ID
-    regex; invalid IDs are silently dropped.
-    """
-    graph: nx.DiGraph = nx.DiGraph()
-
-    if trades_df.empty:
-        return graph
-
-    required_cols = {
-        "base_account",
-        "counter_account",
-        "base_asset",
-        "counter_asset",
-        "ledger_close_time",
-        "amount",
-    }
-    if not required_cols.issubset(trades_df.columns):
-        return graph
-
-    df = trades_df.copy()
-    df["ledger_close_time"] = pd.to_datetime(df["ledger_close_time"], utc=True, errors="coerce")
-    df = df.dropna(subset=["ledger_close_time"])
-
-    # Canonical pair identifier: sort the two asset legs alphabetically
-    df["pair_id"] = df.apply(
-        lambda r: "/".join(sorted([str(r["base_asset"]), str(r["counter_asset"])])),
-        axis=1,
-    )
-
-    # Collect all wallets observed per (pair_id, time-bucket) grouped by window
-    window_td = pd.Timedelta(hours=window_hours)
-
-    # For each pair, find wallets that traded within the same window
-    for pair_id, pair_df in df.groupby("pair_id"):
-        pair_df = pair_df.sort_values("ledger_close_time")
-
-        # Collect (wallet, timestamp) pairs — each trade contributes both sides
-        events: list[tuple[str, pd.Timestamp]] = []
-        for _, row in pair_df.iterrows():
-            for acct in (row["base_account"], row["counter_account"]):
-                if _validate_account_id(str(acct)):
-                    events.append((str(acct), row["ledger_close_time"]))
-
-        if len(events) < 2:
-            continue
-
-        # Sliding window: for each event find all other wallets within the window
-        events.sort(key=lambda x: x[1])
-        for i, (wallet_a, time_a) in enumerate(events):
-            for j in range(i + 1, len(events)):
-                wallet_b, time_b = events[j]
-                if time_b - time_a > window_td:
+    for _, pair_trades in frame.groupby("pair_id", sort=False):
+        records = pair_trades.sort_values("ledger_close_time").to_dict("records")
+        for left_index, left in enumerate(records):
+            left_time = left["ledger_close_time"]
+            active_wallets = {left["base_account"], left["counter_account"]}
+            for right in records[left_index + 1 :]:
+                if right["ledger_close_time"] - left_time > window:
                     break
-                if wallet_a == wallet_b:
-                    continue
-
-                # Add/update bidirectional edge
-                for src, dst in [(wallet_a, wallet_b), (wallet_b, wallet_a)]:
-                    if graph.has_edge(src, dst):
-                        graph[src][dst]["weight"] += 1
-                    else:
-                        graph.add_edge(
-                            src,
-                            dst,
-                            edge_type="co_trade",
-                            weight=1,
-                            timestamp=time_a.isoformat(),
-                        )
-
-    return graph
+                active_wallets.update((right["base_account"], right["counter_account"]))
+            for source, target in combinations(sorted(active_wallets), 2):
+                graph.add_edge(source, target, edge_type="co_trade")
+                graph.add_edge(target, source, edge_type="co_trade")
 
 
-# ---------------------------------------------------------------------------
-# Legacy feature functions — kept for backwards compatibility with existing
-# tests and the model artifact. New code should use GNNEncoder embeddings.
-# ---------------------------------------------------------------------------
+def to_pyg_data(
+    graph: nx.DiGraph,
+    node_features: pd.DataFrame | Mapping[str, Sequence[float]] | None = None,
+):
+    """Convert a wallet graph to PyG ``Data`` with a stable wallet mapping.
+
+    ``node_features`` may be a feature matrix containing a ``wallet`` column,
+    or a wallet-to-vector mapping. Missing wallets receive zero vectors. With
+    no feature input, a constant feature is used so topology remains usable.
+    """
+    try:
+        import torch
+        from torch_geometric.data import Data
+    except ImportError as exc:  # pragma: no cover - exercised without GNN extra
+        raise ImportError("PyG output requires torch and torch-geometric") from exc
+
+    wallet_ids = list(graph.nodes)
+    node_index = {wallet: index for index, wallet in enumerate(wallet_ids)}
+    feature_map: dict[str, np.ndarray] = {}
+    width = 1
+    if isinstance(node_features, pd.DataFrame):
+        if "wallet" not in node_features:
+            raise ValueError("node feature DataFrame must contain a wallet column")
+        feature_columns = [
+            column
+            for column in node_features.columns
+            if column not in {"wallet", "label"}
+            and pd.api.types.is_numeric_dtype(node_features[column])
+        ]
+        width = len(feature_columns) or 1
+        feature_map = {
+            str(row["wallet"]): row[feature_columns].to_numpy(dtype=np.float32)
+            for _, row in node_features.iterrows()
+        }
+    elif node_features:
+        feature_map = {
+            str(wallet): np.asarray(values, dtype=np.float32)
+            for wallet, values in node_features.items()
+        }
+        widths = {len(values) for values in feature_map.values()}
+        if len(widths) != 1:
+            raise ValueError("all node feature vectors must have equal length")
+        width = widths.pop()
+
+    default = (
+        np.ones(width, dtype=np.float32) if not feature_map else np.zeros(width, dtype=np.float32)
+    )
+    x = (
+        np.stack([feature_map.get(str(wallet), default) for wallet in wallet_ids])
+        if wallet_ids
+        else np.empty((0, width), dtype=np.float32)
+    )
+    edges = [(node_index[source], node_index[target]) for source, target in graph.edges]
+    edge_index = torch.tensor(edges, dtype=torch.long).t().contiguous()
+    if not edges:
+        edge_index = torch.empty((2, 0), dtype=torch.long)
+
+    data = Data(x=torch.tensor(x, dtype=torch.float32), edge_index=edge_index)
+    data.wallet_ids = wallet_ids
+    data.node_index = node_index
+    return data
 
 
 def funding_source_similarity(wallet: str, graph: nx.DiGraph) -> float:

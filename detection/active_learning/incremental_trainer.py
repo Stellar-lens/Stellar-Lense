@@ -121,6 +121,44 @@ def _warm_start_update(
     # Persist updated artifacts
     for name, model in updated.items():
         joblib.dump(model, os.path.join(model_dir, f"{name}.joblib"))
+
+    # Also trigger MAML adaptation if checkpoint exists
+    maml_path = os.path.join(model_dir, "maml_adapter.pt")
+    if os.path.exists(maml_path):
+        try:
+            from detection.meta_learner import LeafEmbeddingExtractor, MAMLAdapter
+            import torch
+
+            extractor = LeafEmbeddingExtractor(updated)
+            X_new, y_new = split_features_labels(new_df)
+            extractor.fit(X_new) # Use new data to fit extractor if needed
+            embeddings = extractor.transform(X_new)
+
+            # Use dummy df to get dimension if needed, or just from embeddings
+            input_dim = embeddings.shape[1]
+            maml = MAMLAdapter(input_dim=input_dim)
+            maml.load_state_dict(torch.load(maml_path, weights_only=True))
+
+            support_x = torch.from_numpy(embeddings).float()
+            support_y = torch.from_numpy(y_new.values).float()
+
+            maml.adapt(support_x, support_y)
+
+            # Save adapted model
+            adapted_path = os.path.join(model_dir, "maml_adapter_adapted.pt")
+            torch.save(maml.state_dict(), adapted_path)
+            logger.info("MAML adapter adapted and saved to %s", adapted_path)
+
+            # Fit PrototypicalClassifier
+            from detection.meta_learner import PrototypicalClassifier
+            proto = PrototypicalClassifier()
+            proto.fit_prototype(embeddings, y_new.values)
+            proto_path = os.path.join(model_dir, "prototypes.joblib")
+            joblib.dump(proto.prototypes, proto_path)
+            logger.info("Prototypical prototypes saved to %s", proto_path)
+        except Exception as e:
+            logger.error("Failed to adapt meta-learners: %s", e)
+
     return updated
 
 
@@ -215,7 +253,8 @@ class IncrementalTrainer:
                 else:
                     combined = new_labelled
                     logger.warning("No historical dataset found — retraining on new data only")
-                results = train_models(combined, random_state=self.random_state)
+                training_output = train_models(combined, random_state=self.random_state)
+                results = training_output["results"]
                 updated_models = {name: res["model"] for name, res in results.items()}
                 save_models(results, model_dir)
 

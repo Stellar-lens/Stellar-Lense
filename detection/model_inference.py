@@ -106,6 +106,47 @@ class RiskScorer:
         self.model_dir = model_dir or config.MODEL_DIR
         self.metadata = self._load_metadata()
         self.models = self._load_models()
+        from detection.meta_learner import LeafEmbeddingExtractor
+        self.extractor = LeafEmbeddingExtractor(self.models)
+        self.maml_adapter, self.proto_classifier = self._load_meta_learners()
+
+    def _load_meta_learners(self):
+        maml = None
+        proto = None
+
+        # Prefer adapted model if available
+        maml_path = os.path.join(self.model_dir, "maml_adapter_adapted.pt")
+        if not os.path.exists(maml_path):
+            maml_path = os.path.join(self.model_dir, "maml_adapter.pt")
+
+        if os.path.exists(maml_path) and self.models:
+            try:
+                from detection.meta_learner import LeafEmbeddingExtractor, MAMLAdapter, PrototypicalClassifier
+                import torch
+
+                # We need to know input_dim. It depends on the leaf indices from base models.
+                # Use metadata if we have it or a dummy row
+                # This is a bit inefficient to do on every init, but usually done once
+                # Let's use a dummy row based on metadata columns
+                if self.metadata:
+                    cols = self.metadata["feature_columns"]
+                    dummy_X = pd.DataFrame(np.zeros((1, len(cols))), columns=cols)
+                    self.extractor.fit(dummy_X)
+                    input_dim = self.extractor.transform(dummy_X).shape[1]
+
+                    maml = MAMLAdapter(input_dim=input_dim)
+                    maml.load_state_dict(torch.load(maml_path, weights_only=True))
+                    maml.eval()
+
+                    # Prototypical classifier
+                    proto_path = os.path.join(self.model_dir, "prototypes.joblib")
+                    if os.path.exists(proto_path):
+                        proto = PrototypicalClassifier()
+                        proto.prototypes = joblib.load(proto_path)
+            except Exception as e:
+                logger.warning("Failed to load meta-learners: %s", e)
+
+        return maml, proto
 
     def _load_metadata(self) -> dict | None:
         path = os.path.join(self.model_dir, "model_metadata.json")
@@ -174,6 +215,28 @@ class RiskScorer:
         X = feature_row[feature_cols].to_frame().T.astype(float)
 
         probs = [model.predict_proba(X)[0][1] for model in self.models.values()]
+
+        # Incorporate MAML adapter if available
+        if self.maml_adapter:
+            try:
+                import torch
+                emb = torch.from_numpy(self.extractor.transform(X)).float()
+                maml_prob = self.maml_adapter.predict_proba(emb)[0]
+                probs.append(float(maml_prob))
+                logger.debug("MAML adapter prediction: %.4f", maml_prob)
+            except Exception as e:
+                logger.warning("MAML scoring failed: %s", e)
+
+        # Incorporate Prototypical classifier if available
+        if self.proto_classifier:
+            try:
+                emb = self.extractor.transform(X)
+                proto_prob = self.proto_classifier.predict_proba(emb)[0]
+                probs.append(float(proto_prob))
+                logger.debug("Prototypical prediction: %.4f", proto_prob)
+            except Exception as e:
+                logger.warning("Prototypical scoring failed: %s", e)
+
         scores_100 = [p * 100 for p in probs]
 
         result: dict = {}

@@ -199,39 +199,14 @@ def test_build_feature_matrix_includes_hardening_features():
     assert "cross_wallet_volume_corr" in matrix.columns
 
 
-# ---------------------------------------------------------------------------
-# GNN embedding column tests
-# ---------------------------------------------------------------------------
-
-
-def test_build_feature_matrix_includes_gnn_columns_when_encoder_absent():
-    """When no GNN encoder is provided, gnn_0…gnn_{N-1} must all be 0.0."""
-    from config import config
-
-    df = _sample_trades()
-    matrix = build_feature_matrix(df, gnn_encoder=None)
-    dim = config.GNN_EMBEDDING_DIM
-    for i in range(dim):
-        col = f"gnn_{i}"
-        assert col in matrix.columns, f"Column {col} missing from feature matrix"
-        assert (matrix[col] == 0.0).all(), f"{col} should be 0.0 when encoder is absent"
-
-
-def test_build_feature_vector_gnn_columns_absent_encoder():
-    """build_feature_vector with gnn_encoder=None must include gnn_ keys set to 0.0."""
-    from config import config
-    from detection.feature_engineering import build_feature_vector
-
-    # Use wallets from _sample_trades
-    wallet = "A"
-    df = _sample_trades()
-    mask = (df["base_account"] == wallet) | (df["counter_account"] == wallet)
-    row = build_feature_vector(wallet, df[mask], gnn_encoder=None)
-
-    dim = config.GNN_EMBEDDING_DIM
-    for i in range(dim):
-        assert f"gnn_{i}" in row
-        assert row[f"gnn_{i}"] == 0.0
+def test_build_feature_matrix_accepts_gnn_embedding_features():
+    embeddings = {
+        "A": {f"gnn_embedding_{i}": float(i) for i in range(64)},
+        "B": {f"gnn_embedding_{i}": float(i + 1) for i in range(64)},
+    }
+    matrix = build_feature_matrix(_sample_trades(), gnn_embeddings=embeddings)
+    assert all(f"gnn_embedding_{i}" in matrix.columns for i in range(64))
+    assert matrix.loc[matrix["wallet"] == "A", "gnn_embedding_63"].iloc[0] == 63.0
 
 
 # Needed for approx assertions
