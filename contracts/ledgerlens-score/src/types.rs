@@ -153,6 +153,15 @@ pub struct ScoreTrend {
 }
 
 #[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SnapshotRecord {
+    pub root: BytesN<32>,
+    pub leaf_count: u64,
+    pub committed_at: u64,      // ledger timestamp
+    pub committed_by: Address,  // who called commit_snapshot
+}
+
+#[contracttype]
 #[derive(Clone)]
 pub enum DataKey {
     /// Address allowed to call admin-only functions.
@@ -252,4 +261,14 @@ pub enum DataKey {
     /// and consecutive submission count in that direction. Updated by every
     /// successful `submit_score` / `submit_scores_batch` write.
     TrendState(Address, Symbol),
+    /// BytesN<32>, current root of the score Merkle accumulator.
+    MerkleRoot,
+    /// u64, total leaves ever inserted (monotonic).
+    MerkleLeafCount,
+    /// bool, kill-switch.
+    MerkleEnabled,
+    /// Vec<SnapshotRecord>, ring buffer of past committed roots.
+    SnapshotHistory,
+    /// u32, max entries in snapshot ring (admin-configured, default 10).
+    SnapshotHistoryDepth,
 }

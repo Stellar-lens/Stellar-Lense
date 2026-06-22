@@ -131,4 +131,7 @@ pub enum Error {
     /// Returned by read-path functions (`get_score`, `get_aggregate_score`)
     /// when the requested wallet is under an active regulatory embargo.
     ScoreEmbargoed = 42,
+    /// Merkle accumulator is disabled.
+    MerkleAccumulatorDisabled = 43,
 }
+

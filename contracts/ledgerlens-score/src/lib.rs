@@ -32,14 +32,14 @@ mod test_embargo;
 mod test_score_delta;
 
 use soroban_sdk::{
-    contract, contractimpl, crypto::Hash, symbol_short, token, Address, Bytes, BytesN, Env, Symbol,
-    SymbolStr, TryFromVal, Vec,
+    contract, contractimpl, crypto::Hash, symbol_short, token, xdr::ToXdr, Address, Bytes, BytesN,
+    Env, Symbol, SymbolStr, TryFromVal, Vec,
 };
 
 pub use errors::Error;
 pub use types::{
     AggregateRiskScore, BatchEntryResult, BatchResult, RiskScore, ScoreAttestation,
-    ScoreSubmission, ScoreTrend, UpgradeProposal,
+    ScoreSubmission, ScoreTrend, UpgradeProposal, SnapshotRecord,
 };
 
 /// On-chain truth layer for LedgerLens risk scores.
@@ -254,6 +254,15 @@ impl LedgerLensScoreContract {
         storage::register_pair_for_wallet(&env, &wallet, &asset_pair);
         storage::increment_score_count(&env, &wallet, &asset_pair);
         Self::refresh_aggregate_cache(&env, &wallet);
+        Self::update_merkle_accumulator(
+            &env,
+            &wallet,
+            &asset_pair,
+            score,
+            timestamp,
+            confidence,
+            model_version,
+        );
 
         let score_threshold = storage::get_risk_threshold(&env);
         if score >= score_threshold {
@@ -372,6 +381,15 @@ impl LedgerLensScoreContract {
                     storage::register_pair_for_wallet(&env, &sub.wallet, &sub.asset_pair);
                     storage::increment_score_count(&env, &sub.wallet, &sub.asset_pair);
                     Self::refresh_aggregate_cache(&env, &sub.wallet);
+                    Self::update_merkle_accumulator(
+                        &env,
+                        &sub.wallet,
+                        &sub.asset_pair,
+                        sub.score,
+                        sub.timestamp,
+                        sub.confidence,
+                        sub.model_version,
+                    );
 
                     if sub.score >= threshold {
                         events::threshold_breached(
@@ -2587,5 +2605,141 @@ impl LedgerLensScoreContract {
             return Err(Error::InvalidAttestation);
         }
         Ok(())
+    }
+
+    /// Enable the Merkle accumulator. Admin-only.
+    pub fn enable_merkle_accumulator(
+        env: Env,
+        admin_signers: Vec<Address>,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+        storage::set_merkle_enabled(&env, true);
+        Ok(())
+    }
+
+    /// Disable the Merkle accumulator. Admin-only.
+    pub fn disable_merkle_accumulator(
+        env: Env,
+        admin_signers: Vec<Address>,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+        storage::set_merkle_enabled(&env, false);
+        Ok(())
+    }
+
+    /// Commit the current Merkle root to the SnapshotHistory ring buffer.
+    /// Public — anyone may call.
+    pub fn commit_snapshot(env: Env) -> Result<BytesN<32>, Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        if !storage::is_merkle_enabled(&env) {
+            return Err(Error::MerkleAccumulatorDisabled);
+        }
+        let root = storage::get_merkle_root(&env)
+            .unwrap_or_else(|| BytesN::from_array(&env, &[0u8; 32]));
+        let leaf_count = storage::get_merkle_leaf_count(&env);
+        let now = env.ledger().timestamp();
+        let committed_by = env.current_contract_address();
+
+        let mut history = storage::get_snapshot_history(&env);
+        let record = SnapshotRecord {
+            root: root.clone(),
+            leaf_count,
+            committed_at: now,
+            committed_by: committed_by.clone(),
+        };
+
+
+        history.push_back(record);
+
+        // history ring buffer depth:
+        let depth = storage::get_snapshot_history_depth(&env);
+        while history.len() > depth {
+            history.remove(0);
+        }
+
+        storage::set_snapshot_history(&env, &history);
+        events::snapshot_committed(&env, &root, leaf_count, now, &committed_by);
+
+        Ok(root)
+    }
+
+    /// Get the current Merkle root of the score accumulator.
+    pub fn get_current_merkle_root(env: Env) -> Result<BytesN<32>, Error> {
+        if !storage::is_merkle_enabled(&env) {
+            return Err(Error::MerkleAccumulatorDisabled);
+        }
+        Ok(storage::get_merkle_root(&env)
+            .unwrap_or_else(|| BytesN::from_array(&env, &[0u8; 32])))
+    }
+
+    /// Get the history of committed score Merkle root snapshots.
+    pub fn get_snapshot_history(env: Env) -> Vec<SnapshotRecord> {
+        storage::get_snapshot_history(&env)
+    }
+
+    /// Set the depth (max capacity) of the snapshot history ring buffer. Admin-only.
+    pub fn set_snapshot_history_depth(
+        env: Env,
+        admin_signers: Vec<Address>,
+        depth: u32,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+        if depth == 0 || depth > 100 {
+            return Err(Error::InvalidHistoryDepth);
+        }
+        storage::set_snapshot_history_depth(&env, depth);
+        Ok(())
+    }
+
+    fn update_merkle_accumulator(
+        env: &Env,
+        wallet: &Address,
+        asset_pair: &Symbol,
+        score: u32,
+        timestamp: u64,
+        confidence: u32,
+        model_version: u32,
+    ) {
+        if !storage::is_merkle_enabled(env) {
+            return;
+        }
+
+        // Compute leaf = sha256(wallet_bytes || asset_pair_bytes || score || timestamp || confidence || model_version)
+        let mut preimage = Bytes::new(env);
+        preimage.append(&wallet.to_xdr(env));
+        preimage.append(&asset_pair.to_xdr(env));
+        preimage.extend_from_array(&score.to_be_bytes());
+        preimage.extend_from_array(&timestamp.to_be_bytes());
+        preimage.extend_from_array(&confidence.to_be_bytes());
+        preimage.extend_from_array(&model_version.to_be_bytes());
+
+        let leaf = env.crypto().sha256(&preimage);
+        let leaf_bytes = leaf.to_bytes();
+
+
+        // new_root = sha256(old_root || leaf)
+        let old_root = storage::get_merkle_root(env)
+            .unwrap_or_else(|| BytesN::from_array(env, &[0u8; 32]));
+        let mut root_preimage = Bytes::new(env);
+        root_preimage.extend_from_array(&old_root.to_array());
+        root_preimage.extend_from_array(&leaf_bytes.to_array());
+
+        let new_root = env.crypto().sha256(&root_preimage);
+
+        let new_root_bytes = new_root.to_bytes();
+        storage::set_merkle_root(env, &new_root_bytes);
+
+        storage::set_merkle_leaf_count(env, storage::get_merkle_leaf_count(env) + 1);
     }
 }

@@ -1,10 +1,11 @@
-use soroban_sdk::{Address, Bytes, Env, Symbol, Vec};
+use soroban_sdk::{Address, Bytes, BytesN, Env, Symbol, Vec};
+
 
 use crate::constants::{
     DEFAULT_COOLDOWN_SECS, DEFAULT_RISK_THRESHOLD, DEFAULT_UPGRADE_DELAY_SECS, SCORE_TTL_EXTEND_TO,
     SCORE_TTL_THRESHOLD,
 };
-use crate::types::{AggregateRiskScore, DataKey, RiskScore, ScoreTrend, UpgradeProposal};
+use crate::types::{AggregateRiskScore, DataKey, RiskScore, ScoreTrend, UpgradeProposal, SnapshotRecord};
 
 // ── Admin / Service ─────────────────────────────────────────────────────────
 
@@ -593,3 +594,47 @@ pub fn remove_score_delegate(env: &Env, sub_wallet: &Address) {
     let key = DataKey::ScoreDelegate(sub_wallet.clone());
     env.storage().persistent().remove(&key);
 }
+
+// ── Merkle root accumulator ──────────────────────────────────────────────────
+
+pub fn get_merkle_root(env: &Env) -> Option<BytesN<32>> {
+    env.storage().instance().get(&DataKey::MerkleRoot)
+}
+
+pub fn set_merkle_root(env: &Env, root: &BytesN<32>) {
+    env.storage().instance().set(&DataKey::MerkleRoot, root);
+}
+
+
+pub fn get_merkle_leaf_count(env: &Env) -> u64 {
+    env.storage().instance().get(&DataKey::MerkleLeafCount).unwrap_or(0)
+}
+
+pub fn set_merkle_leaf_count(env: &Env, count: u64) {
+    env.storage().instance().set(&DataKey::MerkleLeafCount, &count);
+}
+
+pub fn is_merkle_enabled(env: &Env) -> bool {
+    env.storage().instance().get(&DataKey::MerkleEnabled).unwrap_or(false)
+}
+
+pub fn set_merkle_enabled(env: &Env, enabled: bool) {
+    env.storage().instance().set(&DataKey::MerkleEnabled, &enabled);
+}
+
+pub fn get_snapshot_history(env: &Env) -> Vec<SnapshotRecord> {
+    env.storage().instance().get(&DataKey::SnapshotHistory).unwrap_or_else(|| Vec::new(env))
+}
+
+pub fn set_snapshot_history(env: &Env, history: &Vec<SnapshotRecord>) {
+    env.storage().instance().set(&DataKey::SnapshotHistory, history);
+}
+
+pub fn get_snapshot_history_depth(env: &Env) -> u32 {
+    env.storage().instance().get(&DataKey::SnapshotHistoryDepth).unwrap_or(10)
+}
+
+pub fn set_snapshot_history_depth(env: &Env, depth: u32) {
+    env.storage().instance().set(&DataKey::SnapshotHistoryDepth, &depth);
+}
+

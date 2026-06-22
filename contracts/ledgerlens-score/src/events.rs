@@ -239,3 +239,20 @@ pub fn delegate_set(env: &Env, sub_wallet: &Address, custodian: &Address) {
 pub fn delegate_removed(env: &Env, sub_wallet: &Address) {
     env.events().publish((symbol_short!("dlg_rem"),), sub_wallet.clone());
 }
+
+// ── Merkle root accumulator ──────────────────────────────────────────────────
+
+/// Emitted by `commit_snapshot` on successful commitment.
+pub fn snapshot_committed(
+    env: &Env,
+    root: &BytesN<32>,
+    leaf_count: u64,
+    committed_at: u64,
+    committed_by: &Address,
+) {
+    env.events().publish(
+        (symbol_short!("snap_com"),),
+        (root.clone(), leaf_count, committed_at, committed_by.clone()),
+    );
+}
+
