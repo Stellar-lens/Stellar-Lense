@@ -26,6 +26,7 @@ from typing import Literal
 import networkx as nx
 import numpy as np
 import pandas as pd
+import re
 
 from ingestion.data_models import AccountActivity
 
@@ -37,12 +38,6 @@ def _validate_account_id(account_id: str) -> bool:
     """Return True if *account_id* matches the Stellar account ID format."""
     return bool(_STELLAR_ACCOUNT_RE.match(account_id))
 
-
-def build_funding_graph(
-    activities: Iterable[AccountActivity],
-    validate_account_ids: bool = False,
-) -> nx.DiGraph:
-    """Build a directed graph with edges ``funding_account -> account_id``.
 
 def build_funding_graph(
     activities: Iterable[AccountActivity],
