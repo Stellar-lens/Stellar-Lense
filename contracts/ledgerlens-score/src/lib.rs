@@ -31,6 +31,9 @@ mod test_score_delta;
 #[cfg(test)]
 mod test_jump;
 
+#[cfg(test)]
+mod test_model_stats;
+
 use soroban_sdk::{
     contract, contractimpl, crypto::Hash, symbol_short, token, xdr::ToXdr, Address, Bytes, BytesN,
     Env, Symbol, SymbolStr, TryFromVal, Vec,
@@ -253,6 +256,7 @@ impl LedgerLensScoreContract {
         storage::push_score_history(&env, &wallet, &asset_pair, &risk_score);
         storage::register_pair_for_wallet(&env, &wallet, &asset_pair);
         storage::increment_score_count(&env, &wallet, &asset_pair);
+        storage::update_model_stats(&env, model_version, score);
         Self::refresh_aggregate_cache(&env, &wallet);
         Self::update_merkle_accumulator(
             &env,
@@ -389,6 +393,7 @@ impl LedgerLensScoreContract {
                     storage::push_score_history(&env, &sub.wallet, &sub.asset_pair, &risk_score);
                     storage::register_pair_for_wallet(&env, &sub.wallet, &sub.asset_pair);
                     storage::increment_score_count(&env, &sub.wallet, &sub.asset_pair);
+                    storage::update_model_stats(&env, sub.model_version, sub.score);
                     Self::refresh_aggregate_cache(&env, &sub.wallet);
                     Self::update_merkle_accumulator(
                         &env,
@@ -829,6 +834,69 @@ impl LedgerLensScoreContract {
     /// ```
     pub fn get_score_count(env: Env, wallet: Address, asset_pair: Symbol) -> u32 {
         storage::get_score_count(&env, &wallet, &asset_pair)
+    }
+
+    // ── Model-version statistics ────────────────────────────────────────────
+
+    /// Returns the running performance statistics for `model_version`.
+    ///
+    /// Tracked on-chain so operators can detect model drift and distinguish
+    /// between a model that consistently scores 90 and one that has drifted to
+    /// systematically score near the threshold.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use soroban_sdk::symbol_short;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// let wallet = Address::generate(&env);
+    /// let pair = symbol_short!("XLM_USDC");
+    /// client.submit_score(&Vec::new(&env), &wallet, &pair, &50, &false, &false, &1, &90, &1, &None).unwrap();
+    /// let stats = client.get_model_version_stats(&1).unwrap();
+    /// assert_eq!(stats.submission_count, 1);
+    /// assert_eq!(stats.score_sum, 50);
+    /// ```
+    ///
+    /// # Errors
+    /// - [`Error::NotFound`] if no scores have ever been submitted for this version.
+    pub fn get_model_version_stats(env: Env, model_version: u32) -> Result<ModelVersionStats, Error> {
+        storage::get_model_stats(&env, model_version).ok_or(Error::NotFound)
+    }
+
+    /// Returns a sorted list of every model version the contract has seen.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use soroban_sdk::symbol_short;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// let wallet = Address::generate(&env);
+    /// let pair = symbol_short!("XLM_USDC");
+    /// client.submit_score(&Vec::new(&env), &wallet, &pair, &50, &false, &false, &1, &90, &1, &None).unwrap();
+    /// let versions = client.get_all_model_versions();
+    /// assert_eq!(versions.len(), 1);
+    /// assert_eq!(versions.get(0).unwrap(), 1);
+    /// ```
+    pub fn get_all_model_versions(env: Env) -> Vec<u32> {
+        storage::get_all_model_versions(&env)
     }
 
     // ── History ring-buffer depth ────────────────────────────────────────────
