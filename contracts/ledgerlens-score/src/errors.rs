@@ -83,7 +83,6 @@ pub enum Error {
     /// Returned when `set_history_max_depth` is called with `0` or a value
     /// above `MAX_HISTORY_DEPTH`.
     InvalidHistoryDepth = 29,
-feat/confidence-gated-risk-gate
     /// Returned when `set_global_min_confidence` is called with a value
     /// above 100 (confidence is bounded to 0–100).
     InvalidMinConfidence = 30,
@@ -171,7 +170,11 @@ feat/confidence-gated-risk-gate
     /// `submit_consensus_score` was called with zero model submissions.
     ConsensusInputEmpty = 50,
     /// `set_consensus_config` was called with `k == 0` or `epsilon > 100`.
-    InvalidConsensusConfig = 51,
+InvalidConsensusConfig = 51,
+
+    // ── Model version governance ─────────────────────────────────────────
+    /// Returned when submitting a score with a model version that has been deprecated.
+    ModelVersionDeprecated = 52,
 }
 
 // Gate caller tracking error variants for structural protection
