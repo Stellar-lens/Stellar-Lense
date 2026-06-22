@@ -128,3 +128,7 @@ pub const MAX_DECAY_LAMBDA_DEN: u32 = 1;
 /// Maximum number of counterparty links allowed per wallet per asset pair.
 /// Prevents unbounded storage growth and gas exhaustion.
 pub const MAX_COUNTERPARTY_LINKS_PER_WALLET: u32 = 50;
+
+pub const DEFAULT_JUMP_THRESHOLD: u32 = 10;
+pub const MIN_ESCALATION_THRESHOLD: u32 = 1;
+pub const MAX_ESCALATION_THRESHOLD: u32 = 100;
