@@ -173,6 +173,29 @@ pub fn batch_attested(env: &Env, accepted: u32, rejected: u32, merkle_root: &Byt
     env.events().publish((symbol_short!("bat_ok"), merkle_root.clone()), (accepted, rejected));
 }
 
+// ── Multi-model consensus scoring ─────────────────────────────────────────────
+
+/// Emitted when a consensus score is accepted and stored.
+pub fn consensus_score_submitted(
+    env: &Env,
+    wallet: &Address,
+    asset_pair: &Symbol,
+    median_score: u32,
+    agreeing_model_count: u32,
+    epsilon: u32,
+) {
+    env.events().publish(
+        (symbol_short!("cons_scr"), wallet.clone(), asset_pair.clone()),
+        (median_score, agreeing_model_count, epsilon),
+    );
+}
+
+/// Emitted when the admin updates the consensus configuration.
+pub fn consensus_config_updated(env: &Env, k: u32, epsilon: u32) {
+    env.events().publish((symbol_short!("cons_cfg"),), (k, epsilon));
+}
+
+
 // ── History depth ─────────────────────────────────────────────────────────────
 
 /// Emitted when the admin changes the ring-buffer depth via
@@ -239,16 +262,6 @@ pub fn fee_withdrawn(
 /// already held by an in-flight call.
 pub fn withdrawal_locked(env: &Env, admin: &Address) {
     env.events().publish((symbol_short!("wdl_lck"),), admin.clone());
-}
-
-// ── Score embargo (regulatory hold) ──────────────────────────────────────────
-
-pub fn embargo_set(env: &Env, wallet: &Address, expiry: &Option<u64>) {
-    env.events().publish((symbol_short!("emb_set"),), (wallet.clone(), *expiry));
-}
-
-pub fn embargo_lifted(env: &Env, wallet: &Address, lifted_by: &Address) {
-    env.events().publish((symbol_short!("emb_lift"),), (wallet.clone(), lifted_by.clone()));
 }
 
 // ── Wallet-score delegation ───────────────────────────────────────────────────
@@ -340,3 +353,79 @@ pub fn escalation_resolved(
 }
 
 pub fn escalation_threshold_updated(_env: &Env, _old: u32, _new: u32) {}
+// ── Score submission floor ────────────────────────────────────────────────────
+
+/// Emitted when the admin configures the score-floor policy via
+/// `set_score_floor_policy`.
+pub fn score_floor_policy_updated(
+    env: &Env,
+    enabled: bool,
+    high_water_mark: u32,
+    floor_value: u32,
+) {
+    env.events().publish((symbol_short!("sf_upd"),), (enabled, high_water_mark, floor_value));
+}
+
+/// Emitted by `override_score_floor`. `by` is the admin that authorised a
+/// one-shot bypass of the floor for `(wallet, asset_pair)` — an emergency
+/// path, not a routine operation, so it carries its own audit-trail event.
+pub fn score_floor_overridden(env: &Env, by: &Address, wallet: &Address, asset_pair: &Symbol) {
+    env.events()
+        .publish((symbol_short!("sf_ovrd"), wallet.clone(), asset_pair.clone()), by.clone());
+}
+
+// ── Hysteresis / risk band ────────────────────────────────────────────────────
+
+/// Emitted exactly once when a wallet transitions from not-in-band to
+/// in-band (first submission where `score >= risk_threshold`). Never emitted
+/// again while the wallet remains in the high-risk band.
+pub fn risk_band_entered(
+    env: &Env,
+    wallet: &Address,
+    asset_pair: &Symbol,
+    score: u32,
+    threshold: u32,
+) {
+    env.events().publish(
+        (symbol_short!("band_in"), wallet.clone()),
+        (asset_pair.clone(), score, threshold),
+    );
+}
+
+/// Emitted when a wallet exits the high-risk band because its score dropped
+/// below `(risk_threshold - hysteresis_margin)`. `exit_threshold` is the
+/// effective boundary that was crossed (i.e. `risk_threshold - margin`).
+pub fn risk_band_cleared(
+    env: &Env,
+    wallet: &Address,
+    asset_pair: &Symbol,
+    score: u32,
+    exit_threshold: u32,
+) {
+    env.events().publish(
+        (symbol_short!("band_out"), wallet.clone()),
+        (asset_pair.clone(), score, exit_threshold),
+    );
+}
+
+/// Emitted when the admin updates the hysteresis margin via
+/// `set_hysteresis_margin`.
+pub fn hysteresis_margin_updated(env: &Env, old_margin: u32, new_margin: u32) {
+    env.events().publish((symbol_short!("hys_upd"),), (old_margin, new_margin));
+}
+
+// ── Score embargo ─────────────────────────────────────────────────────────────
+
+/// Emitted when an embargo is created or updated via `set_score_embargo`.
+/// `expiry` is `None` for an indefinite embargo, or `Some(ts)` for a timed one.
+pub fn embargo_set(env: &Env, wallet: &Address, expiry: Option<u64>) {
+    env.events().publish(
+        (symbol_short!("emb_set"), wallet.clone()),
+        expiry,
+    );
+}
+
+/// Emitted when an embargo is explicitly lifted via `lift_score_embargo`.
+pub fn embargo_lifted(env: &Env, wallet: &Address) {
+    env.events().publish((symbol_short!("emb_lift"), wallet.clone()), ());
+}

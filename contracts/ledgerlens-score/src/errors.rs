@@ -151,6 +151,32 @@ pub enum Error {
 
     InvalidEscalation = 50,
     InvalidJump = 51,
+    // ── Score submission floor ─────────────────────────────────────────────
+    /// Returned by `submit_score` (and recorded as a `rejection_code` in
+    /// `submit_scores_batch`) when the score-floor policy is enabled, the
+    /// `(wallet, asset_pair)`'s historical peak score is at or above the
+    /// configured high-water mark, and the submitted score is below the
+    /// configured floor value — blocking an attempt to launder a known
+    /// high-risk wallet's reputation by zeroing its score.
+    BelowScoreFloor = 46,
+    /// Returned by `set_score_floor_policy` when `high_water_mark` is outside
+    /// `[MIN_SCORE_FLOOR_HWM, MAX_SCORE_FLOOR_HWM]` (50–100), or when
+    /// `floor_value` is not strictly below `high_water_mark`.
+    InvalidScoreFloorPolicy = 47,
+
+    // ── Hysteresis layer ───────────────────────────────────────────────────
+    /// Returned when `set_hysteresis_margin` is called with a value above
+    /// `MAX_HYSTERESIS_MARGIN` (50).
+    InvalidHysteresisMargin = 48,
+
+    // ── Multi-model consensus scoring ──────────────────────────────────────
+    /// Fewer than the configured consensus threshold of models agreed on a
+    /// score within the configured epsilon window.
+    InsufficientConsensus = 49,
+    /// `submit_consensus_score` was called with zero model submissions.
+    ConsensusInputEmpty = 50,
+    /// `set_consensus_config` was called with `k == 0` or `epsilon > 100`.
+    InvalidConsensusConfig = 51,
 }
 
 // Gate caller tracking error variants for structural protection

@@ -132,3 +132,69 @@ pub const MAX_COUNTERPARTY_LINKS_PER_WALLET: u32 = 50;
 pub const DEFAULT_JUMP_THRESHOLD: u32 = 10;
 pub const MIN_ESCALATION_THRESHOLD: u32 = 1;
 pub const MAX_ESCALATION_THRESHOLD: u32 = 100;
+// ── Score submission floor ─────────────────────────────────────────────────────
+//
+// A compromised or colluding signer could otherwise submit an artificially low
+// score for a wallet that has historically carried a high risk score, laundering
+// its on-chain reputation. The configurable floor blocks sudden large downward
+// revisions for wallets whose historical peak crossed a danger level. See
+// `set_score_floor_policy` and the README's Score Submission Floor section.
+
+/// Default high-water mark used until the admin configures the policy — a
+/// `(wallet, asset_pair)` whose historical peak reached this score is treated
+/// as high-risk and subject to the floor.
+pub const DEFAULT_SCORE_FLOOR_HWM: u32 = 80;
+
+/// Default minimum score permitted for a high-risk wallet until the admin
+/// configures the policy.
+pub const DEFAULT_SCORE_FLOOR_MIN: u32 = 20;
+
+/// Minimum configurable high-water mark. Keeps the floor from applying to
+/// merely-moderate wallets — it only protects scores that crossed a genuine
+/// danger level.
+pub const MIN_SCORE_FLOOR_HWM: u32 = 50;
+
+/// Maximum configurable high-water mark — the top of the score range.
+pub const MAX_SCORE_FLOOR_HWM: u32 = 100;
+
+// ── Hysteresis layer ───────────────────────────────────────────────────────────
+//
+// Prevents event oscillation at the risk threshold boundary. Once a wallet
+// enters the high-risk band (score >= threshold), it only exits when the score
+// drops below (threshold - hysteresis_margin), requiring a more significant
+// recovery before the band is cleared.
+
+/// Maximum value the admin may configure for the hysteresis margin.
+/// Bounded so the effective exit threshold stays non-negative and
+/// the margin cannot be set to a value that makes the system unusable.
+pub const MAX_HYSTERESIS_MARGIN: u32 = 50;
+
+/// TTL threshold for risk band state entries: re-extend when remaining TTL
+/// drops below this many ledgers (~30 days at 5 s/ledger).
+pub const BAND_STATE_TTL_THRESHOLD: u32 = 518_400;
+
+/// TTL value to extend risk band state entries to when refreshing
+/// (~45 days at 5 s/ledger).
+pub const BAND_STATE_TTL_EXTEND_TO: u32 = 777_600;
+
+// ── Score embargo ─────────────────────────────────────────────────────────────
+//
+// Per-wallet embargo state is kept in temporary storage. The TTL is intentionally
+// much longer than the band-state TTL so that indefinite embargoes survive without
+// constant admin intervention, while still being subject to Soroban's TTL
+// mechanics and expirable if the wallet goes completely dormant.
+
+/// Re-extend embargo TTL when remaining lifetime falls below this many ledgers
+/// (~90 days at 5 s/ledger).
+pub const EMBARGO_TTL_THRESHOLD: u32 = 1_555_200;
+
+/// Target TTL for embargo entries on creation or refresh (~180 days at 5 s/ledger).
+pub const EMBARGO_TTL_EXTEND_TO: u32 = 3_110_400;
+
+// ── Multi-model consensus scoring ─────────────────────────────────────────────
+
+/// Default minimum number of models that must agree for consensus.
+pub const DEFAULT_CONSENSUS_THRESHOLD_K: u32 = 2;
+
+/// Default maximum allowed absolute deviation from the provisional median.
+pub const DEFAULT_CONSENSUS_EPSILON: u32 = 5;
