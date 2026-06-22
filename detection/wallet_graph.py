@@ -12,6 +12,11 @@ Builds a directed graph of "funded by" relationships from
 - `network_centrality`: degree centrality of the wallet within the funding
   graph, a proxy for how connected/influential an account is within the
   observed funding network.
+
+Also provides:
+
+- `build_co_trade_graph`: builds edges between wallets that co-traded the
+  same asset pair within a configurable time window.
 """
 
 from collections.abc import Iterable, Mapping, Sequence
@@ -24,6 +29,20 @@ import pandas as pd
 
 from ingestion.data_models import AccountActivity
 
+# Stellar account ID format: G followed by 55 uppercase base-32 chars
+_STELLAR_ACCOUNT_RE = re.compile(r"^G[A-Z2-7]{55}$")
+
+
+def _validate_account_id(account_id: str) -> bool:
+    """Return True if *account_id* matches the Stellar account ID format."""
+    return bool(_STELLAR_ACCOUNT_RE.match(account_id))
+
+
+def build_funding_graph(
+    activities: Iterable[AccountActivity],
+    validate_account_ids: bool = False,
+) -> nx.DiGraph:
+    """Build a directed graph with edges ``funding_account -> account_id``.
 
 def build_funding_graph(
     activities: Iterable[AccountActivity],
@@ -45,6 +64,8 @@ def build_funding_graph(
 
     graph: nx.DiGraph = nx.DiGraph()
     for activity in activities:
+        if validate_account_ids and not _validate_account_id(activity.account_id):
+            continue
         graph.add_node(activity.account_id)
         if activity.funding_account:
             graph.add_edge(activity.funding_account, activity.account_id, edge_type="funding")
@@ -151,11 +172,27 @@ def to_pyg_data(
 
 
 def funding_source_similarity(wallet: str, graph: nx.DiGraph) -> float:
-    """Highest Jaccard similarity between `wallet`'s funding ancestors and
-    any other node's funding ancestors in `graph`.
+    """Highest Jaccard similarity between ``wallet``'s funding ancestors and
+    any other node's funding ancestors in ``graph``.
 
-    Returns `0.0` if `wallet` isn't in the graph or has no funding ancestors.
+    Returns ``0.0`` if ``wallet`` isn't in the graph or has no funding
+    ancestors.
+
+    .. deprecated::
+        Use :class:`detection.gnn_encoder.GNNEncoder` embeddings instead.
+        This scalar feature is preserved for backwards compatibility with the
+        existing model artifact.
     """
+    warnings.warn(
+        "funding_source_similarity is deprecated; use GNNEncoder embeddings instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return _funding_source_similarity(wallet, graph)
+
+
+def _funding_source_similarity(wallet: str, graph: nx.DiGraph) -> float:
+    """Internal (non-deprecated) implementation used by compute_wallet_graph_metrics."""
     if wallet not in graph:
         return 0.0
 
@@ -180,15 +217,35 @@ def funding_source_similarity(wallet: str, graph: nx.DiGraph) -> float:
 
 
 def network_centrality(wallet: str, graph: nx.DiGraph) -> float:
-    """Degree centrality of `wallet` within the funding graph."""
+    """Degree centrality of ``wallet`` within the funding graph.
+
+    .. deprecated::
+        Use :class:`detection.gnn_encoder.GNNEncoder` embeddings instead.
+        This scalar feature is preserved for backwards compatibility with the
+        existing model artifact.
+    """
+    warnings.warn(
+        "network_centrality is deprecated; use GNNEncoder embeddings instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return _network_centrality(wallet, graph)
+
+
+def _network_centrality(wallet: str, graph: nx.DiGraph) -> float:
+    """Internal (non-deprecated) implementation used by compute_wallet_graph_metrics."""
     if wallet not in graph or graph.number_of_nodes() < 2:
         return 0.0
     return float(nx.degree_centrality(graph)[wallet])
 
 
 def compute_wallet_graph_metrics(wallet: str, graph: nx.DiGraph) -> dict:
-    """Return `{funding_source_similarity, network_centrality}` for `wallet`."""
+    """Return ``{funding_source_similarity, network_centrality}`` for *wallet*.
+
+    Calls the internal implementations directly to avoid emitting deprecation
+    warnings from internal code paths.
+    """
     return {
-        "funding_source_similarity": funding_source_similarity(wallet, graph),
-        "network_centrality": network_centrality(wallet, graph),
+        "funding_source_similarity": _funding_source_similarity(wallet, graph),
+        "network_centrality": _network_centrality(wallet, graph),
     }

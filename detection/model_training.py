@@ -390,6 +390,17 @@ def parse_args() -> argparse.Namespace:
             "by ADVERSARIAL_AUG_RATIO in config / .env (default 0.0 = disabled)."
         ),
     )
+    parser.add_argument(
+        "--with-gnn",
+        action="store_true",
+        default=False,
+        help=(
+            "Pre-train a GraphSAGE encoder on the full training graph using "
+            "contrastive link-prediction loss, then append GNN embedding features "
+            "(gnn_0 … gnn_{GNN_EMBEDDING_DIM-1}) to each wallet's feature row. "
+            "Requires torch and torch_geometric to be installed."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -425,6 +436,83 @@ def main() -> None:
             alert_path,
         )
         return
+
+    # --with-gnn: pre-train GNN encoder and append embedding features
+    gnn_encoder = None
+    if args.with_gnn:
+        try:
+            from detection.gnn_encoder import GNNEncoder, pretrain_gnn_contrastive
+
+            import networkx as nx
+
+            logger.info("Building wallet graph for GNN pre-training…")
+            # Build a simple co-occurrence graph from wallet column for pre-training
+            encoder = GNNEncoder(model_dir=model_dir, random_state=args.random_state)
+
+            # Build a minimal funding graph from the training data
+            # (wallets with label=1 form synthetic wash rings for contrastive training)
+            graph = nx.DiGraph()
+            wallets = df["wallet"].tolist() if "wallet" in df.columns else []
+            for w in wallets:
+                graph.add_node(w)
+
+            wash_wallets = (
+                df.loc[df["label"] == 1, "wallet"].tolist()
+                if "wallet" in df.columns and "label" in df.columns
+                else []
+            )
+            # Group labelled wash-trade wallets into a single synthetic ring
+            wash_rings = [wash_wallets] if wash_wallets else []
+
+            logger.info(
+                "GNN pre-training: %d nodes, %d wash-trade wallets in %d ring(s)",
+                graph.number_of_nodes(),
+                len(wash_wallets),
+                len(wash_rings),
+            )
+
+            loss_curve = pretrain_gnn_contrastive(
+                encoder=encoder,
+                graph=graph,
+                wash_ring_wallets=wash_rings,
+                random_state=args.random_state,
+            )
+
+            # Persist pre-trained encoder
+            os.makedirs(model_dir, exist_ok=True)
+            encoder.save()
+            logger.info("GNN encoder saved to %s", model_dir)
+
+            # Log loss curve
+            ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%S")
+            os.makedirs("reports", exist_ok=True)
+            loss_report_path = f"reports/gnn_pretrain_{ts}.json"
+            with open(loss_report_path, "w") as f:
+                json.dump({"loss_curve": loss_curve}, f, indent=2)
+            logger.info("GNN pre-training loss curve written to %s", loss_report_path)
+
+            gnn_encoder = encoder
+
+            # Append GNN embedding features to the training DataFrame
+            logger.info("Appending GNN embedding features to training data…")
+            gnn_features: list[dict] = []
+            for wallet in wallets:
+                try:
+                    emb = encoder.encode(graph, wallet)
+                    gnn_features.append({f"gnn_{i}": float(emb[i]) for i in range(len(emb))})
+                except Exception:
+                    gnn_features.append(
+                        {f"gnn_{i}": 0.0 for i in range(config.GNN_EMBEDDING_DIM)}
+                    )
+            gnn_df = pd.DataFrame(gnn_features, index=df.index)
+            df = pd.concat([df, gnn_df], axis=1)
+            logger.info("GNN embedding columns added: gnn_0 … gnn_%d", config.GNN_EMBEDDING_DIM - 1)
+
+        except ImportError as exc:
+            logger.error(
+                "--with-gnn requested but torch/torch_geometric not available: %s", exc
+            )
+            logger.error("Install torch and torch_geometric to enable GNN training.")
 
     training_output = train_models(
         df,

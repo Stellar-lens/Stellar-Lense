@@ -38,8 +38,8 @@ plus ground-truth labels and provenance metadata.
 | `intra_minute_clustering` | float | Fraction of minute buckets with > 1 trade |
 | `off_hours_activity_ratio` | float | Proportion of trades in UTC 00:00–05:00 |
 | `volume_spike_frequency` | float | Fraction of trades exceeding 3× rolling mean volume |
-| `funding_source_similarity` | float | Max Jaccard similarity of funding ancestors |
-| `network_centrality` | float | Degree centrality in the funding graph |
+| `funding_source_similarity` | float | Max Jaccard similarity of funding ancestors _(legacy scalar — kept for model backwards compat)_ |
+| `network_centrality` | float | Degree centrality in the funding graph _(legacy scalar — kept for model backwards compat)_ |
 | `account_age_days` | float | Account age at the time of last trade in window |
 | `inter_arrival_cv` | float | Coefficient of variation of inter-trade intervals |
 | `entropy_of_amounts` | float | Shannon entropy of the trade amount distribution |
@@ -59,6 +59,24 @@ When AMM data is unavailable, all cross-venue features default to `0.0`.
 | `counterparty_venue_overlap` | float | Fraction of SDEX counterparties also seen as AMM liquidity providers |
 | `simultaneous_order_pair` | float | Binary: 1.0 if wallet has overlapping SDEX and AMM activity windows |
 | `cross_venue_cluster_score` | float | Centrality within Louvain cross-venue coordination cluster |
+
+### GNN Embedding Features
+
+When the GNN encoder artifact (`models/gnn_encoder.pt`) is present, the feature
+vector is extended by **`GNN_EMBEDDING_DIM`** additional columns (default 32):
+
+| Column | Type | Description |
+|---|---|---|
+| `gnn_0` … `gnn_31` | float32 | GraphSAGE embedding dimensions for the wallet node |
+
+These embeddings encode multi-hop structural patterns in the wallet funding and
+co-trade graph (see `docs/gnn_architecture.md`).  When the encoder artifact is
+absent (e.g., before the first training run), all `gnn_*` columns default to
+`0.0`.
+
+**Total feature vector length:** 30+ legacy features + `GNN_EMBEDDING_DIM`
+(default 32) GNN embedding features = **62+ features** when the GNN encoder is
+enabled.
 
 ### Label and provenance columns
 

@@ -5,14 +5,19 @@ Feature groups (see README):
   - Trade pattern features
   - Volume and timing features
   - Wallet graph features
-  - Cross-asset coordination features (6): synchrony, net flow, counterparty overlap, volume correlation, pair diversity, Benford MAD std
+  - Cross-asset coordination features (6): synchrony, net flow, counterparty overlap, volume
+    correlation, pair diversity, Benford MAD std
+  - GNN embedding features (GNN_EMBEDDING_DIM, default 32): gnn_0 … gnn_31
 
 Each `compute_*_features` function operates on the trade DataFrame produced
 by `ingestion.historical_loader.trades_to_dataframe` (or the streamer,
 buffered into a DataFrame) for a single wallet.
 """
 
+from __future__ import annotations
+
 import math
+from typing import TYPE_CHECKING, Optional
 
 import networkx as nx
 import numpy as np
@@ -656,6 +661,12 @@ def build_feature_vector(
     features.update(compute_hardening_features(wallet_trades))
     if amm_trades is not None:
         features.update(compute_cross_venue_features(wallet, wallet_trades, amm_trades))
+
+    # GNN embedding features — graceful zero-fallback when encoder is absent
+    if gnn_encoder is not None and funding_graph is not None:
+        features.update(compute_graph_embedding_features(wallet, funding_graph, gnn_encoder))
+    else:
+        features.update({f"gnn_{i}": 0.0 for i in range(config.GNN_EMBEDDING_DIM)})
 
     return features
 
