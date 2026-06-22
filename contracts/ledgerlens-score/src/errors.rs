@@ -83,6 +83,11 @@ pub enum Error {
     /// Returned when `set_history_max_depth` is called with `0` or a value
     /// above `MAX_HISTORY_DEPTH`.
     InvalidHistoryDepth = 29,
+feat/confidence-gated-risk-gate
+    /// Returned when `set_global_min_confidence` is called with a value
+    /// above 100 (confidence is bounded to 0–100).
+    InvalidMinConfidence = 30,
+
 
     // ── Fee withdrawal ─────────────────────────────────────────────────────
     /// Returned by `get_fee_token` and `withdraw_fees` when `set_fee_token`

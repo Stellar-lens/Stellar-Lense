@@ -1010,6 +1010,67 @@ impl LedgerLensScoreContract {
         storage::get_pair_weight(&env, &asset_pair)
     }
 
+    // ── Global minimum confidence floor ──────────────────────────────────────
+
+    /// Set the admin-configured global minimum confidence floor (0–100).
+    ///
+    /// When set, every call to [`query_risk_gate_with_confidence`] uses
+    /// `max(min_confidence_param, global_min_confidence)` as the effective
+    /// floor. This lets the contract operator enforce a system-wide minimum
+    /// confidence without requiring every integrating protocol to specify one.
+    ///
+    /// Using `max` ensures the stricter of the two floors always wins —
+    /// neither the admin nor the caller can unilaterally weaken the other's
+    /// floor. Both values are bounded to `0..=100`, so overflow is impossible:
+    /// `max(a, b)` where `a, b ≤ 100` is at most `100`.
+    ///
+    /// Admin only. Valid range: `0..=100`.
+    ///
+    /// # Examples
+    ///
+    /// Set a floor of 60 — calls with `min_confidence < 60` will still use 60:
+    /// ```ignore
+    /// client.set_global_min_confidence(&60).unwrap();
+    /// assert_eq!(client.get_global_min_confidence(), 60);
+    /// // query with min_confidence=30 → effective floor = max(30, 60) = 60
+    /// ```
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if the contract has no admin yet.
+    /// - [`Error::InvalidMinConfidence`] if `min_confidence > 100`.
+    pub fn set_global_min_confidence(env: Env, min_confidence: u32) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        if min_confidence > 100 {
+            return Err(Error::InvalidMinConfidence);
+        }
+        let admin = storage::get_admin(&env);
+        admin.require_auth();
+        storage::set_global_min_confidence(&env, min_confidence);
+        Ok(())
+    }
+
+    /// Returns the admin-configured global minimum confidence floor.
+    /// Defaults to `0` (no global floor) until [`set_global_min_confidence`]
+    /// is called.
+    ///
+    /// This value is combined with the per-call `min_confidence` parameter in
+    /// [`query_risk_gate_with_confidence`] using `max(param, global)` so the
+    /// stricter of the two floors always applies.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// // Before any admin configuration → 0 (no floor).
+    /// assert_eq!(client.get_global_min_confidence(), 0);
+    /// client.set_global_min_confidence(&70).unwrap();
+    /// assert_eq!(client.get_global_min_confidence(), 70);
+    /// ```
+    pub fn get_global_min_confidence(env: Env) -> u32 {
+        storage::get_global_min_confidence(&env)
+    }
+
     // ── Composability interface (stable ABI) ─────────────────────────────────
     //
     // The functions below form the `ILedgerLensScore` composability surface
@@ -1040,6 +1101,10 @@ impl LedgerLensScoreContract {
     /// can never propagate an `Error` back into the caller, so it cannot be
     /// used to grief the calling protocol's gas or disable its security guard.
     ///
+    /// This function delegates to [`query_risk_gate_with_confidence`] with
+    /// `min_confidence = 0`, meaning no confidence floor is applied. All
+    /// logic lives in one place to eliminate duplication.
+    ///
     /// # Example (caller side)
     ///
     /// ```ignore
@@ -1058,6 +1123,10 @@ impl LedgerLensScoreContract {
             return false;
         }
         match storage::peek_score(&env, &wallet, &asset_pair) {
+feat/confidence-gated-risk-gate
+            Some(risk) => risk.score < gate_threshold && risk.confidence >= effective_floor,
+            None => false,
+
             Some(risk) => risk.score < gate_threshold,
             None => {
                 if let Some(custodian) = storage::peek_score_delegate(&env, &wallet) {
@@ -1067,6 +1136,7 @@ impl LedgerLensScoreContract {
                 }
                 false
             }
+ main
         }
     }
 
