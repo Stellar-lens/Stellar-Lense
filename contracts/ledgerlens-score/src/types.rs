@@ -378,6 +378,14 @@ pub enum DataKey {
     /// used to decide whether the submission floor applies. Updated on every
     /// accepted `submit_score` / `submit_scores_batch` write.
     HistoricalMaxScore(Address, Symbol),
+    /// Admin-configured hysteresis margin (u32). Used to widen the exit
+    /// threshold below the entry threshold so scores must drop further to
+    /// leave the high-risk band. Stored in instance storage; defaults to 0.
+    HysteresisMargin,
+    /// Per-(wallet, asset_pair) risk band state. `true` means the wallet is
+    /// currently inside the high-risk band for this pair. Stored in
+    /// temporary TTL-bounded storage so stale states expire automatically.
+    RiskBandState(Address, Symbol),
 }
 
 #[contracttype]

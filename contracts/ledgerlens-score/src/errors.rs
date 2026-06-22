@@ -158,6 +158,11 @@ feat/confidence-gated-risk-gate
     /// `[MIN_SCORE_FLOOR_HWM, MAX_SCORE_FLOOR_HWM]` (50–100), or when
     /// `floor_value` is not strictly below `high_water_mark`.
     InvalidScoreFloorPolicy = 47,
+
+    // ── Hysteresis layer ───────────────────────────────────────────────────
+    /// Returned when `set_hysteresis_margin` is called with a value above
+    /// `MAX_HYSTERESIS_MARGIN` (50).
+    InvalidHysteresisMargin = 48,
 }
 
 // Gate caller tracking error variants for structural protection
