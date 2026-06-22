@@ -34,6 +34,15 @@ pub fn contract_unpaused(env: &Env, by: &Address) {
     env.events().publish((symbol_short!("unpaused"),), by.clone());
 }
 
+// ── Per-asset-pair circuit breaker ──────────────────────────────────────────
+
+/// Emitted by `set_pair_paused` for both the pause and unpause direction —
+/// a single event type distinguished by the `paused` field, rather than two
+/// separate event names, so off-chain indexers can subscribe once.
+pub fn pair_paused(env: &Env, asset_pair: &Symbol, paused: bool) {
+    env.events().publish((symbol_short!("pr_pause"), asset_pair.clone()), paused);
+}
+
 // ── Two-step admin transfer ──────────────────────────────────────────────────
 
 pub fn admin_transfer_initiated(env: &Env, from: &Address, to: &Address) {
@@ -141,10 +150,112 @@ pub fn service_pubkey_updated(env: &Env, pubkey: &Bytes) {
     env.events().publish((symbol_short!("pk_upd"),), pubkey.clone());
 }
 
+// ── Merkle-root batch attestation ───────────────────────────────────────────
+
+/// Emitted by `submit_scores_batch_attested` once the batch has been
+/// processed. `accepted` and `rejected` mirror the counts the function
+/// returns in its `BatchResult`; `merkle_root` is the root the secp256k1
+/// signature was produced over, so an off-chain indexer can reconcile
+/// on-chain outcomes against the originally-signed batch without
+/// re-reading the per-entry proofs.
+pub fn batch_attested(
+    env: &Env,
+    accepted: u32,
+    rejected: u32,
+    merkle_root: &BytesN<32>,
+) {
+    env.events().publish(
+        (symbol_short!("bat_ok"), merkle_root.clone()),
+        (accepted, rejected),
+    );
+}
+
 // ── History depth ─────────────────────────────────────────────────────────────
 
 /// Emitted when the admin changes the ring-buffer depth via
 /// `set_history_max_depth`.
 pub fn history_depth_updated(env: &Env, depth: u32) {
     env.events().publish((symbol_short!("hd_upd"),), depth);
+}
+
+// ── Score delta / trend ───────────────────────────────────────────────────────
+
+/// Emitted after every successful score write.
+///
+/// `previous_score` is `0` on the first submission. `trend` is `+1` (rising),
+/// `0` (flat / first submission), or `-1` (falling). `consecutive_trend` counts
+/// how many consecutive submissions have had this trend direction; it is `0` on
+/// the first submission and on flat submissions.
+#[allow(clippy::too_many_arguments)]
+pub fn score_delta(
+    env: &Env,
+    wallet: &Address,
+    asset_pair: &Symbol,
+    previous_score: u32,
+    new_score: u32,
+    delta_abs: u32,
+    trend: i32,
+    consecutive_trend: u32,
+) {
+    env.events().publish(
+        (symbol_short!("scr_dlt"), wallet.clone(), asset_pair.clone()),
+        (previous_score, new_score, delta_abs, trend, consecutive_trend),
+    );
+}
+
+// ── Time-weighted exponential decay ────────────────────────────────────────
+
+/// Emitted when the admin sets the exponential decay rate via `set_decay_rate`.
+pub fn decay_rate_updated(env: &Env, numerator: u32, denominator: u32) {
+    env.events().publish((symbol_short!("decay_upd"),), (numerator, denominator));
+}
+
+// ── Fee withdrawal ────────────────────────────────────────────────────────────
+
+/// Emitted when the admin configures or rotates the fee token via
+/// `set_fee_token`.
+pub fn fee_token_set(env: &Env, token: &Address) {
+    env.events().publish((symbol_short!("ft_set"),), token.clone());
+}
+
+/// Emitted on successful completion of `withdraw_fees`.
+pub fn fee_withdrawn(
+    env: &Env,
+    admin: &Address,
+    recipient: &Address,
+    fee_token: &Address,
+    amount: i128,
+) {
+    env.events().publish(
+        (symbol_short!("fee_out"),),
+        (admin.clone(), recipient.clone(), fee_token.clone(), amount),
+    );
+}
+
+/// Emitted when `withdraw_fees` is rejected because the concurrency lock is
+/// already held by an in-flight call.
+pub fn withdrawal_locked(env: &Env, admin: &Address) {
+    env.events().publish((symbol_short!("wdl_lck"),), admin.clone());
+}
+
+// ── Score embargo (regulatory hold) ──────────────────────────────────────────
+
+pub fn embargo_set(env: &Env, wallet: &Address, expiry: &Option<u64>) {
+    env.events().publish((symbol_short!("emb_set"),), (wallet.clone(), *expiry));
+}
+
+pub fn embargo_lifted(env: &Env, wallet: &Address, lifted_by: &Address) {
+    env.events().publish((symbol_short!("emb_lift"),), (wallet.clone(), lifted_by.clone()));
+}
+
+// ── Wallet-score delegation ───────────────────────────────────────────────────
+
+/// Emitted when `set_score_delegate` registers or updates a delegation.
+pub fn delegate_set(env: &Env, sub_wallet: &Address, custodian: &Address) {
+    env.events().publish((symbol_short!("dlg_set"),), (sub_wallet.clone(), custodian.clone()));
+}
+
+/// Emitted when `remove_score_delegate` removes a delegation.
+pub fn delegate_removed(env: &Env, sub_wallet: &Address) {
+    env.events().publish((symbol_short!("dlg_rem"),), sub_wallet.clone());
 }
