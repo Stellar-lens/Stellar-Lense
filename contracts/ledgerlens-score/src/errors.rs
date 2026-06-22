@@ -131,4 +131,9 @@ pub enum Error {
     /// Returned by read-path functions (`get_score`, `get_aggregate_score`)
     /// when the requested wallet is under an active regulatory embargo.
     ScoreEmbargoed = 42,
+
+    // ── Score jump anomaly detection ───────────────────────────────────────
+    /// Returned when `set_jump_threshold` is called with a value of `0` or
+    /// greater than `99`. The valid range is 1–99 inclusive.
+    InvalidJumpThreshold = 43,
 }

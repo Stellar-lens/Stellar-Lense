@@ -1919,6 +1919,48 @@
           "v0": {
             "topics": [
               {
+                "symbol": "jmp_ano"
+              },
+              {
+                "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+              },
+              {
+                "symbol": "XLM_USDC"
+              }
+            ],
+            "data": {
+              "vec": [
+                {
+                  "u32": 20
+                },
+                {
+                  "u32": 80
+                },
+                {
+                  "i64": 60
+                },
+                {
+                  "u32": 1
+                },
+                {
+                  "u64": 3601
+                }
+              ]
+            }
+          }
+        }
+      },
+      "failed_call": false
+    },
+    {
+      "event": {
+        "ext": "v0",
+        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
+        "type_": "contract",
+        "body": {
+          "v0": {
+            "topics": [
+              {
                 "symbol": "score"
               },
               {

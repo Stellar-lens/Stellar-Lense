@@ -31,6 +31,9 @@ mod test_embargo;
 #[cfg(test)]
 mod test_score_delta;
 
+#[cfg(test)]
+mod test_jump;
+
 use soroban_sdk::{
     contract, contractimpl, crypto::Hash, symbol_short, token, Address, Bytes, BytesN, Env, Symbol,
     SymbolStr, TryFromVal, Vec,
@@ -261,6 +264,14 @@ impl LedgerLensScoreContract {
         }
 
         Self::emit_score_delta(&env, &wallet, &asset_pair, previous_score, score);
+        Self::emit_score_jump_anomaly(
+            &env,
+            &wallet,
+            &asset_pair,
+            previous_score,
+            score,
+            model_version,
+        );
         events::score_submitted(&env, &wallet, &asset_pair, &risk_score);
         Ok(())
     }
@@ -389,6 +400,14 @@ impl LedgerLensScoreContract {
                         &sub.asset_pair,
                         previous_score,
                         sub.score,
+                    );
+                    Self::emit_score_jump_anomaly(
+                        &env,
+                        &sub.wallet,
+                        &sub.asset_pair,
+                        previous_score,
+                        sub.score,
+                        sub.model_version,
                     );
                     events::score_submitted(&env, &sub.wallet, &sub.asset_pair, &risk_score);
                     accepted = true;
@@ -1663,6 +1682,68 @@ impl LedgerLensScoreContract {
         storage::get_risk_threshold(&env)
     }
 
+    // ── Score jump anomaly detection ──────────────────────────────────────────
+
+    /// Set the score jump anomaly detection threshold (1–99). When the
+    /// absolute delta between consecutive scores exceeds this value, a
+    /// `ScoreJumpAnomalyEvent` is emitted in addition to the normal
+    /// `ScoreDeltaEvent`. No event is emitted on the first submission
+    /// (no previous score to diff against). Default: 30. Admin only.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// client.set_jump_threshold(&Vec::new(&env), &50);
+    /// assert_eq!(client.get_jump_threshold(), 50);
+    /// ```
+    pub fn set_jump_threshold(
+        env: Env,
+        admin_signers: Vec<Address>,
+        threshold: u32,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        if threshold == 0 || threshold > 99 {
+            return Err(Error::InvalidJumpThreshold);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+        storage::set_jump_threshold(&env, threshold);
+        Ok(())
+    }
+
+    /// Returns the current score jump anomaly detection threshold.
+    /// Defaults to 30 until configured.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// assert_eq!(client.get_jump_threshold(), 30);
+    /// ```
+    pub fn get_jump_threshold(env: Env) -> u32 {
+        storage::get_jump_threshold(&env)
+    }
+
     // ── Staleness window ──────────────────────────────────────────────────────
 
     /// Returns `true` when no score exists for this pair, or when the stored
@@ -2332,6 +2413,36 @@ impl LedgerLensScoreContract {
             trend,
             consecutive,
         );
+    }
+
+    /// Emit a `ScoreJumpAnomalyEvent` when the absolute delta between the new
+    /// and previous score exceeds the configured jump threshold. No event is
+    /// emitted on the first submission (previous_score is `None`).
+    fn emit_score_jump_anomaly(
+        env: &Env,
+        wallet: &Address,
+        asset_pair: &Symbol,
+        previous_score: Option<u32>,
+        new_score: u32,
+        model_version: u32,
+    ) {
+        if let Some(prev) = previous_score {
+            let delta_abs = new_score.abs_diff(prev);
+            let jump_threshold = storage::get_jump_threshold(env);
+            if delta_abs > jump_threshold {
+                let delta = (new_score as i64) - (prev as i64);
+                events::score_jump_anomaly(
+                    env,
+                    wallet,
+                    asset_pair,
+                    prev,
+                    new_score,
+                    delta,
+                    model_version,
+                    env.ledger().timestamp(),
+                );
+            }
+        }
     }
 
     /// Shared implementation behind `get_aggregate_score`. Iterates the

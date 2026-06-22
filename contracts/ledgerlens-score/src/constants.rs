@@ -110,3 +110,10 @@ pub const MAX_DECAY_LAMBDA_NUM: u32 = 1;
 
 /// Maximum allowed decay rate denominator (paired with MAX_DECAY_LAMBDA_NUM).
 pub const MAX_DECAY_LAMBDA_DEN: u32 = 1;
+
+// ── Score jump anomaly detection ───────────────────────────────────────────────
+
+/// Default jump threshold used when no threshold has been configured by admin.
+/// When the absolute delta between consecutive scores exceeds this value, a
+/// `ScoreJumpAnomalyEvent` is emitted in addition to the normal `ScoreDeltaEvent`.
+pub const DEFAULT_JUMP_THRESHOLD: u32 = 30;

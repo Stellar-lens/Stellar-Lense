@@ -239,3 +239,28 @@ pub fn delegate_set(env: &Env, sub_wallet: &Address, custodian: &Address) {
 pub fn delegate_removed(env: &Env, sub_wallet: &Address) {
     env.events().publish((symbol_short!("dlg_rem"),), sub_wallet.clone());
 }
+
+// ── Score jump anomaly detection ──────────────────────────────────────────────
+
+/// Emitted after a successful score write when the absolute delta between
+/// the new score and the previous score exceeds the configured jump threshold.
+/// Not emitted on the first submission (no previous score to diff against).
+/// The normal `ScoreDeltaEvent` is still emitted regardless.
+///
+/// `delta` is signed: positive means the score rose, negative means it fell.
+#[allow(clippy::too_many_arguments)]
+pub fn score_jump_anomaly(
+    env: &Env,
+    wallet: &Address,
+    asset_pair: &Symbol,
+    previous_score: u32,
+    new_score: u32,
+    delta: i64,
+    model_version: u32,
+    timestamp: u64,
+) {
+    env.events().publish(
+        (symbol_short!("jmp_ano"), wallet.clone(), asset_pair.clone()),
+        (previous_score, new_score, delta, model_version, timestamp),
+    );
+}

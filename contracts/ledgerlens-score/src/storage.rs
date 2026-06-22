@@ -1,8 +1,8 @@
 use soroban_sdk::{Address, Bytes, Env, Symbol, Vec};
 
 use crate::constants::{
-    DEFAULT_COOLDOWN_SECS, DEFAULT_RISK_THRESHOLD, DEFAULT_UPGRADE_DELAY_SECS, SCORE_TTL_EXTEND_TO,
-    SCORE_TTL_THRESHOLD,
+    DEFAULT_COOLDOWN_SECS, DEFAULT_JUMP_THRESHOLD, DEFAULT_RISK_THRESHOLD,
+    DEFAULT_UPGRADE_DELAY_SECS, SCORE_TTL_EXTEND_TO, SCORE_TTL_THRESHOLD,
 };
 use crate::types::{AggregateRiskScore, DataKey, RiskScore, ScoreTrend, UpgradeProposal};
 
@@ -193,6 +193,17 @@ pub fn get_risk_threshold(env: &Env) -> u32 {
 
 pub fn set_risk_threshold(env: &Env, threshold: u32) {
     env.storage().instance().set(&DataKey::RiskThreshold, &threshold);
+}
+
+// ── Score jump anomaly detection ──────────────────────────────────────────────
+
+pub fn get_jump_threshold(env: &Env) -> u32 {
+    let result: Option<u32> = env.storage().instance().get(&DataKey::JumpThreshold);
+    result.unwrap_or(DEFAULT_JUMP_THRESHOLD)
+}
+
+pub fn set_jump_threshold(env: &Env, threshold: u32) {
+    env.storage().instance().set(&DataKey::JumpThreshold, &threshold);
 }
 
 // ── Score history ring buffer ────────────────────────────────────────────────

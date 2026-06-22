@@ -169,6 +169,11 @@ pub enum DataKey {
     Watchlist(Address),
     /// Global risk-score threshold; scores ≥ threshold emit a breach event.
     RiskThreshold,
+    /// Admin-configurable score jump anomaly detection threshold. When the
+    /// absolute delta between consecutive scores exceeds this value, a
+    /// `ScoreJumpAnomalyEvent` is emitted. Defaults to
+    /// `DEFAULT_JUMP_THRESHOLD` (30) when unset.
+    JumpThreshold,
     /// Ordered ring buffer of the last N risk scores for a wallet/pair.
     ScoreHistory(Address, Symbol),
     /// Baked-in contract version number.
