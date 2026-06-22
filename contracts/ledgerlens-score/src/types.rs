@@ -252,4 +252,36 @@ pub enum DataKey {
     /// and consecutive submission count in that direction. Updated by every
     /// successful `submit_score` / `submit_scores_batch` write.
     TrendState(Address, Symbol),
+    /// Per-model-version performance statistics: tracked submission count,
+    /// score sum (for mean), max, min, and first/last seen timestamps.
+    ModelVersionStats(u32),
+    /// Ordered, de-duplicated list of every model version the contract has
+    /// seen — an incrementally maintained index so `get_all_model_versions`
+    /// is O(1).
+    ModelVersionIndex,
+}
+
+/// Statistics for a single version of the off-chain detection model.
+///
+/// Tracked on-chain so operators can detect model drift and distinguish
+/// between a model that consistently scores 90 and one that has drifted to
+/// systematically score near the threshold.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ModelVersionStats {
+    /// Integer version of the detection model.
+    pub model_version: u32,
+    /// Total number of accepted submissions for this version.
+    pub submission_count: u64,
+    /// Sum of all accepted scores for computing the mean:
+    /// `score_sum / submission_count`.
+    pub score_sum: u64,
+    /// The highest individual score recorded for this version.
+    pub score_max: u32,
+    /// The lowest individual score recorded for this version.
+    pub score_min: u32,
+    /// Ledger timestamp of the very first submission for this version.
+    pub first_seen: u64,
+    /// Ledger timestamp of the most recent submission for this version.
+    pub last_seen: u64,
 }
