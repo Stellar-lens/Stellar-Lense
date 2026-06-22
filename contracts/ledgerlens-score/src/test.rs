@@ -2138,321 +2138,341 @@ fn test_delegate_snapshot() {
     assert_eq!(client.get_score(&sub_wallet, &pair).score, 50);
 }
 
-// ── Consecutive-breach auto-escalation ─────────────────────────────────────────
+// ─── Wallet Relationship Graph Tests ────────────────────────────────────────
 
 #[test]
-fn test_breach_count_increments_on_high_risk() {
+fn test_add_link_is_bidirectional() {
+    let (env, client, _admin, _service) = initialized();
+
+    let wallet_a = Address::generate(&env);
+    let wallet_b = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+
+    client.add_counterparty_link(&wallet_a, &wallet_b, &asset_pair);
+
+    let links_a = client.get_counterparties(&wallet_a, &asset_pair);
+    let links_b = client.get_counterparties(&wallet_b, &asset_pair);
+
+    assert_eq!(links_a.len(), 1);
+    assert_eq!(links_b.len(), 1);
+    assert_eq!(links_a.get(0).unwrap(), wallet_b);
+    assert_eq!(links_b.get(0).unwrap(), wallet_a);
+}
+
+#[test]
+fn test_self_link_rejected() {
     let (env, client, _admin, _service) = initialized();
 
     let wallet = Address::generate(&env);
     let asset_pair = symbol_short!("XLM_USDC");
 
-    assert_eq!(client.get_breach_count(&wallet, &asset_pair), 0);
-
-    // Low-risk score (below default threshold of 75) — no increment.
-    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &50, &false, &false, &1, &80, &1, &None);
-    assert_eq!(client.get_breach_count(&wallet, &asset_pair), 0);
-
-    // High-risk score (>= 75) — must increment.
-    env.ledger().with_mut(|l| l.timestamp += 3_601);
-    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &90, &true, &true, &2, &95, &1, &None);
-    assert_eq!(client.get_breach_count(&wallet, &asset_pair), 1);
-
-    // Another high-risk score — must increment again.
-    env.ledger().with_mut(|l| l.timestamp += 3_601);
-    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &85, &true, &true, &3, &95, &1, &None);
-    assert_eq!(client.get_breach_count(&wallet, &asset_pair), 2);
+    let result = client.try_add_counterparty_link(&wallet, &wallet, &asset_pair);
+    assert_eq!(result, Err(Ok(Error::SelfLink)));
 }
 
 #[test]
-fn test_breach_count_resets_on_low_risk() {
+fn test_contagion_boosts_linked_wallets() {
+    let (env, client, _admin, _service) = initialized();
+
+    let anchor = Address::generate(&env);
+    let counterparty = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+
+    // Submit a score for the counterparty (score: 40)
+    client.submit_score(
+        &Vec::new(&env),
+        &counterparty,
+        &asset_pair,
+        &40,
+        &false,
+        &false,
+        &1,
+        &80,
+        &1,
+        &None,
+    );
+
+    // Add counterparty link
+    client.add_counterparty_link(&anchor, &counterparty, &asset_pair);
+
+    // Propagate contagion with boost of 30
+    let affected = client.propagate_contagion(&anchor, &asset_pair, &30);
+
+    assert_eq!(affected, 1);
+
+    // Counterparty score should be boosted to 70 (40 + 30)
+    let score = client.get_score(&counterparty, &asset_pair);
+    assert_eq!(score.score, 70);
+}
+
+#[test]
+fn test_contagion_boost_capped_at_100() {
+    let (env, client, _admin, _service) = initialized();
+
+    let anchor = Address::generate(&env);
+    let counterparty = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+
+    // Submit a score for the counterparty (score: 90)
+    client.submit_score(
+        &Vec::new(&env),
+        &counterparty,
+        &asset_pair,
+        &90,
+        &false,
+        &false,
+        &1,
+        &80,
+        &1,
+        &None,
+    );
+
+    // Add counterparty link
+    client.add_counterparty_link(&anchor, &counterparty, &asset_pair);
+
+    // Propagate contagion with boost of 30 (should cap at 100)
+    let affected = client.propagate_contagion(&anchor, &asset_pair, &30);
+
+    assert_eq!(affected, 1);
+
+    // Counterparty score should be capped at 100
+    let score = client.get_score(&counterparty, &asset_pair);
+    assert_eq!(score.score, 100);
+}
+
+#[test]
+fn test_contagion_missing_score_treated_as_zero() {
+    let (env, client, _admin, _service) = initialized();
+
+    let anchor = Address::generate(&env);
+    let counterparty = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+
+    // No score submitted for counterparty
+
+    // Add counterparty link
+    client.add_counterparty_link(&anchor, &counterparty, &asset_pair);
+
+    // Propagate contagion with boost of 50
+    let affected = client.propagate_contagion(&anchor, &asset_pair, &50);
+
+    assert_eq!(affected, 1);
+
+    // Counterparty score should be 50 (0 + 50)
+    let score = client.get_score(&counterparty, &asset_pair);
+    assert_eq!(score.score, 50);
+}
+
+#[test]
+fn test_counterparty_link_cap_enforced() {
+    let (env, client, _admin, _service) = initialized();
+
+    let wallet_a = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+
+    // Add 50 counterparties (MAX_COUNTERPARTY_LINKS_PER_WALLET = 50)
+    for _i in 0..50 {
+        let counterparty = Address::generate(&env);
+        client.add_counterparty_link(&wallet_a, &counterparty, &asset_pair);
+    }
+
+    let links = client.get_counterparties(&wallet_a, &asset_pair);
+    assert_eq!(links.len(), 50);
+
+    // The 51st should fail
+    let extra = Address::generate(&env);
+    let result = client.try_add_counterparty_link(&wallet_a, &extra, &asset_pair);
+    assert_eq!(result, Err(Ok(Error::CounterpartyLinkFull)));
+}
+
+#[test]
+fn test_contagion_events_per_affected_wallet() {
+    let (env, client, _admin, _service) = initialized();
+
+    let anchor = Address::generate(&env);
+    let counterparty1 = Address::generate(&env);
+    let counterparty2 = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+
+    client.add_counterparty_link(&anchor, &counterparty1, &asset_pair);
+    client.add_counterparty_link(&anchor, &counterparty2, &asset_pair);
+
+    // Submit scores for both counterparties
+    client.submit_score(
+        &Vec::new(&env),
+        &counterparty1,
+        &asset_pair,
+        &20,
+        &false,
+        &false,
+        &1,
+        &80,
+        &1,
+        &None,
+    );
+    client.submit_score(
+        &Vec::new(&env),
+        &counterparty2,
+        &asset_pair,
+        &30,
+        &false,
+        &false,
+        &1,
+        &80,
+        &1,
+        &None,
+    );
+
+    let affected = client.propagate_contagion(&anchor, &asset_pair, &40);
+
+    assert_eq!(affected, 2);
+
+    // Both scores should be boosted
+    let score1 = client.get_score(&counterparty1, &asset_pair);
+    let score2 = client.get_score(&counterparty2, &asset_pair);
+    assert_eq!(score1.score, 60); // 20 + 40
+    assert_eq!(score2.score, 70); // 30 + 40
+}
+
+#[test]
+fn test_contagion_does_not_affect_unlinked_wallets() {
+    let (env, client, _admin, _service) = initialized();
+
+    let anchor = Address::generate(&env);
+    let linked = Address::generate(&env);
+    let unlinked = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+
+    client.add_counterparty_link(&anchor, &linked, &asset_pair);
+
+    // Submit scores for both wallets
+    client.submit_score(
+        &Vec::new(&env),
+        &linked,
+        &asset_pair,
+        &20,
+        &false,
+        &false,
+        &1,
+        &80,
+        &1,
+        &None,
+    );
+    client.submit_score(
+        &Vec::new(&env),
+        &unlinked,
+        &asset_pair,
+        &20,
+        &false,
+        &false,
+        &1,
+        &80,
+        &1,
+        &None,
+    );
+
+    let affected = client.propagate_contagion(&anchor, &asset_pair, &50);
+
+    assert_eq!(affected, 1);
+
+    // Linked wallet boosted, unlinked unchanged
+    let linked_score = client.get_score(&linked, &asset_pair);
+    let unlinked_score = client.get_score(&unlinked, &asset_pair);
+    assert_eq!(linked_score.score, 70); // 20 + 50
+    assert_eq!(unlinked_score.score, 20); // Unchanged
+}
+
+#[test]
+fn test_contagion_bypasses_rate_limits() {
+    let (env, client, _admin, _service) = initialized();
+
+    let anchor = Address::generate(&env);
+    let counterparty = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+
+    // Add link and submit score
+    client.add_counterparty_link(&anchor, &counterparty, &asset_pair);
+    client.submit_score(
+        &Vec::new(&env),
+        &counterparty,
+        &asset_pair,
+        &30,
+        &false,
+        &false,
+        &1,
+        &80,
+        &1,
+        &None,
+    );
+
+    // Verify the score was set
+    let initial_score = client.get_score(&counterparty, &asset_pair);
+    assert_eq!(initial_score.score, 30);
+
+    // Contagion propagation works regardless of cooldown
+    let affected = client.propagate_contagion(&anchor, &asset_pair, &40);
+    assert_eq!(affected, 1);
+
+    let score = client.get_score(&counterparty, &asset_pair);
+    assert_eq!(score.score, 70); // 30 + 40, despite cooldown not having elapsed
+}
+
+#[test]
+fn test_contagion_depth_returns_graph_degree() {
     let (env, client, _admin, _service) = initialized();
 
     let wallet = Address::generate(&env);
     let asset_pair = symbol_short!("XLM_USDC");
 
-    // Submit two high-risk scores to build up the counter.
-    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &90, &true, &true, &1, &95, &1, &None);
-    env.ledger().with_mut(|l| l.timestamp += 3_601);
-    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &80, &true, &true, &2, &95, &1, &None);
-    assert_eq!(client.get_breach_count(&wallet, &asset_pair), 2);
+    // Initially 0
+    assert_eq!(client.get_contagion_depth(&wallet, &asset_pair), 0);
 
-    // Low-risk score — must reset to 0.
-    env.ledger().with_mut(|l| l.timestamp += 3_601);
-    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &30, &false, &false, &3, &80, &1, &None);
-    assert_eq!(client.get_breach_count(&wallet, &asset_pair), 0);
-}
+    // Add 3 counterparties
+    let c1 = Address::generate(&env);
+    let c2 = Address::generate(&env);
+    let c3 = Address::generate(&env);
 
-fn setup_fresh<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address) {
-    let env = Env::default();
-    env.mock_all_auths();
-    env.ledger().with_mut(|l| l.timestamp = 1_000_000);
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
-    let admin = Address::generate(&env);
-    let service = Address::generate(&env);
-    client.initialize(&admin, &service);
-    (env, client, contract_id)
+    client.add_counterparty_link(&wallet, &c1, &asset_pair);
+    assert_eq!(client.get_contagion_depth(&wallet, &asset_pair), 1);
+
+    client.add_counterparty_link(&wallet, &c2, &asset_pair);
+    assert_eq!(client.get_contagion_depth(&wallet, &asset_pair), 2);
+
+    client.add_counterparty_link(&wallet, &c3, &asset_pair);
+    assert_eq!(client.get_contagion_depth(&wallet, &asset_pair), 3);
 }
 
 #[test]
-fn test_escalation_triggered_at_n_breaches() {
-    let (env, client, contract_id) = setup_fresh();
-
-    let wallet = Address::generate(&env);
-    let asset_pair = symbol_short!("XLM_USDC");
-
-    // Set threshold to 3.
-    client.set_escalation_threshold(&Vec::new(&env), &3);
-
-    // 2 high-risk scores — no escalation yet.
-    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &90, &true, &true, &1, &95, &1, &None);
-    env.ledger().with_mut(|l| l.timestamp += 3_601);
-    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &85, &true, &true, &2, &95, &1, &None);
-    assert_eq!(client.get_breach_count(&wallet, &asset_pair), 2);
-
-    // 3rd high-risk score — escalation_triggered fires.
-    env.ledger().with_mut(|l| l.timestamp += 3_601);
-    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &95, &true, &true, &3, &95, &1, &None);
-    assert_eq!(client.get_breach_count(&wallet, &asset_pair), 3);
-
-    let expected_topic: soroban_sdk::Vec<soroban_sdk::Val> =
-        (symbol_short!("esc_trig"), wallet.clone(), asset_pair.clone()).into_val(&env);
-    let mut found = false;
-    for (addr, topics, _data) in env.events().all().iter() {
-        if addr != contract_id {
-            continue;
-        }
-        if topics == expected_topic {
-            found = true;
-            break;
-        }
-    }
-    assert!(found, "escalation_triggered event was not emitted");
-}
-
-#[test]
-fn test_escalation_triggered_fires_only_once() {
-    let (env, client, contract_id) = setup_fresh();
-
-    let wallet = Address::generate(&env);
-    let asset_pair = symbol_short!("XLM_USDC");
-
-    client.set_escalation_threshold(&Vec::new(&env), &2);
-
-    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &90, &true, &true, &1, &95, &1, &None);
-    env.ledger().with_mut(|l| l.timestamp += 3_601);
-    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &85, &true, &true, &2, &95, &1, &None);
-    env.ledger().with_mut(|l| l.timestamp += 3_601);
-    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &95, &true, &true, &3, &95, &1, &None);
-    env.ledger().with_mut(|l| l.timestamp += 3_601);
-    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &80, &true, &true, &4, &95, &1, &None);
-
-    let expected_topic: soroban_sdk::Vec<soroban_sdk::Val> =
-        (symbol_short!("esc_trig"), wallet, asset_pair).into_val(&env);
-    let mut esc_trig_count = 0;
-    for (addr, topics, _data) in env.events().all().iter() {
-        if addr != contract_id {
-            continue;
-        }
-        if topics == expected_topic {
-            esc_trig_count += 1;
-        }
-    }
-    assert_eq!(esc_trig_count, 1, "escalation_triggered must fire exactly once");
-}
-
-#[test]
-fn test_escalation_resolved_after_low_risk() {
-    let (env, client, contract_id) = setup_fresh();
-
-    let wallet = Address::generate(&env);
-    let asset_pair = symbol_short!("XLM_USDC");
-
-    client.set_escalation_threshold(&Vec::new(&env), &2);
-
-    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &90, &true, &true, &1, &95, &1, &None);
-    env.ledger().with_mut(|l| l.timestamp += 3_601);
-    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &85, &true, &true, &2, &95, &1, &None);
-
-    // Low-risk score should emit escalation_resolved.
-    env.ledger().with_mut(|l| l.timestamp += 3_601);
-    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &30, &false, &false, &3, &80, &1, &None);
-    assert_eq!(client.get_breach_count(&wallet, &asset_pair), 0);
-
-    let expected_topic: soroban_sdk::Vec<soroban_sdk::Val> =
-        (symbol_short!("esc_res"), wallet, asset_pair).into_val(&env);
-    let mut found = false;
-    for (addr, topics, _data) in env.events().all().iter() {
-        if addr != contract_id {
-            continue;
-        }
-        if topics == expected_topic {
-            found = true;
-            break;
-        }
-    }
-    assert!(found, "escalation_resolved event was not emitted");
-}
-
-#[test]
-fn test_escalation_resolved_not_emitted_below_threshold() {
-    let (env, client, contract_id) = setup_fresh();
-
-    let wallet = Address::generate(&env);
-    let asset_pair = symbol_short!("XLM_USDC");
-
-    // 2 high-risk (below default threshold 5).
-    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &90, &true, &true, &1, &95, &1, &None);
-    env.ledger().with_mut(|l| l.timestamp += 3_601);
-    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &85, &true, &true, &2, &95, &1, &None);
-
-    // Low-risk — counter = 2 < 5, no escalation_resolved.
-    env.ledger().with_mut(|l| l.timestamp += 3_601);
-    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &30, &false, &false, &3, &80, &1, &None);
-
-    let expected_topic: soroban_sdk::Vec<soroban_sdk::Val> =
-        (symbol_short!("esc_res"), wallet, asset_pair).into_val(&env);
-    for (addr, topics, _data) in env.events().all().iter() {
-        if addr != contract_id {
-            continue;
-        }
-        assert_ne!(
-            topics, expected_topic,
-            "escalation_resolved must not fire when counter < threshold"
-        );
-    }
-}
-
-#[test]
-fn test_escalation_threshold_bounds_enforced() {
+fn test_remove_counterparty_link() {
     let (env, client, _admin, _service) = initialized();
 
-    // Setting threshold to 0 must be rejected.
-    let result = client.try_set_escalation_threshold(&Vec::new(&env), &0);
-    assert_eq!(result, Err(Ok(Error::InvalidEscalationThreshold)));
-
-    // Setting threshold to 101 must be rejected.
-    let result = client.try_set_escalation_threshold(&Vec::new(&env), &101);
-    assert_eq!(result, Err(Ok(Error::InvalidEscalationThreshold)));
-
-    // Setting threshold to 1 must be accepted (fires on every breach).
-    client.set_escalation_threshold(&Vec::new(&env), &1);
-    assert_eq!(client.get_escalation_threshold(), 1);
-
-    // Setting threshold to 100 must be accepted.
-    client.set_escalation_threshold(&Vec::new(&env), &100);
-    assert_eq!(client.get_escalation_threshold(), 100);
-}
-
-#[test]
-fn test_admin_reset_clears_without_resolved_event() {
-    let (env, client, contract_id) = setup_fresh();
-
-    let wallet = Address::generate(&env);
+    let wallet_a = Address::generate(&env);
+    let wallet_b = Address::generate(&env);
     let asset_pair = symbol_short!("XLM_USDC");
 
-    // Set threshold to 2 and trigger escalation.
-    client.set_escalation_threshold(&Vec::new(&env), &2);
-    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &90, &true, &true, &1, &95, &1, &None);
-    env.ledger().with_mut(|l| l.timestamp += 3_601);
-    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &85, &true, &true, &2, &95, &1, &None);
-    assert_eq!(client.get_breach_count(&wallet, &asset_pair), 2);
+    client.add_counterparty_link(&wallet_a, &wallet_b, &asset_pair);
 
-    // Admin resets — no escalation_resolved.
-    client.reset_breach_count(&Vec::new(&env), &wallet, &asset_pair);
-    assert_eq!(client.get_breach_count(&wallet, &asset_pair), 0);
+    // Verify link exists
+    let links_a = client.get_counterparties(&wallet_a, &asset_pair);
+    assert_eq!(links_a.len(), 1);
 
-    let expected_topic: soroban_sdk::Vec<soroban_sdk::Val> =
-        (symbol_short!("esc_res"), wallet, asset_pair).into_val(&env);
-    for (addr, topics, _data) in env.events().all().iter() {
-        if addr != contract_id {
-            continue;
-        }
-        assert_ne!(topics, expected_topic, "admin reset must not emit escalation_resolved");
-    }
+    // Remove the link
+    client.remove_counterparty_link(&wallet_a, &wallet_b, &asset_pair);
+
+    let links_a = client.get_counterparties(&wallet_a, &asset_pair);
+    let links_b = client.get_counterparties(&wallet_b, &asset_pair);
+    assert_eq!(links_a.len(), 0);
+    assert_eq!(links_b.len(), 0);
 }
 
 #[test]
-fn test_breach_count_is_per_pair() {
+fn test_remove_nonexistent_link_fails() {
     let (env, client, _admin, _service) = initialized();
 
-    let wallet = Address::generate(&env);
-    let pair1 = symbol_short!("XLM_USDC");
-    let pair2 = symbol_short!("XLM_BTC");
-
-    // High-risk score for pair1 only.
-    client.submit_score(&Vec::new(&env), &wallet, &pair1, &90, &true, &true, &1, &95, &1, &None);
-    env.ledger().with_mut(|l| l.timestamp += 3_601);
-    client.submit_score(&Vec::new(&env), &wallet, &pair1, &85, &true, &true, &2, &95, &1, &None);
-
-    assert_eq!(client.get_breach_count(&wallet, &pair1), 2);
-    assert_eq!(client.get_breach_count(&wallet, &pair2), 0);
-
-    // High-risk score for pair2 — must be isolated.
-    client.submit_score(&Vec::new(&env), &wallet, &pair2, &80, &true, &true, &3, &95, &1, &None);
-
-    assert_eq!(client.get_breach_count(&wallet, &pair1), 2);
-    assert_eq!(client.get_breach_count(&wallet, &pair2), 1);
-}
-
-#[test]
-fn test_default_escalation_threshold_is_5() {
-    let (_env, client, _admin, _service) = initialized();
-    assert_eq!(client.get_escalation_threshold(), 5);
-}
-
-#[test]
-fn test_escalation_threshold_fires_at_5_by_default() {
-    let (env, client, contract_id) = setup_fresh();
-
-    let wallet = Address::generate(&env);
+    let wallet_a = Address::generate(&env);
+    let wallet_b = Address::generate(&env);
     let asset_pair = symbol_short!("XLM_USDC");
 
-    for i in 0..5 {
-        env.ledger().with_mut(|l| l.timestamp += 3_601);
-        client.submit_score(
-            &Vec::new(&env),
-            &wallet,
-            &asset_pair,
-            &(80 + i),
-            &true,
-            &true,
-            &(i as u64 + 1),
-            &95,
-            &1,
-            &None,
-        );
-    }
-    assert_eq!(client.get_breach_count(&wallet, &asset_pair), 5);
-
-    let expected_topic: soroban_sdk::Vec<soroban_sdk::Val> =
-        (symbol_short!("esc_trig"), wallet, asset_pair).into_val(&env);
-    let mut found = false;
-    for (addr, topics, _data) in env.events().all().iter() {
-        if addr != contract_id {
-            continue;
-        }
-        if topics == expected_topic {
-            found = true;
-            break;
-        }
-    }
-    assert!(found, "escalation_triggered must fire at default threshold of 5");
-}
-
-#[test]
-fn test_set_escalation_threshold_before_init_fails() {
-    let (env, client, _, _) = setup();
-    let result = client.try_set_escalation_threshold(&Vec::new(&env), &3);
-    assert_eq!(result, Err(Ok(Error::NotInitialized)));
-}
-
-#[test]
-fn test_reset_breach_count_before_init_fails() {
-    let (env, client, _, _) = setup();
-    let wallet = Address::generate(&env);
-    let pair = symbol_short!("XLM_USDC");
-    let result = client.try_reset_breach_count(&Vec::new(&env), &wallet, &pair);
-    assert_eq!(result, Err(Ok(Error::NotInitialized)));
+    let result = client.try_remove_counterparty_link(&wallet_a, &wallet_b, &asset_pair);
+    assert_eq!(result, Err(Ok(Error::CounterpartyNotFound)));
 }
