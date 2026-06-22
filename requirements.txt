@@ -14,6 +14,8 @@ xgboost>=2.0.0
 lightgbm>=4.3.0
 imbalanced-learn>=0.12.0
 shap>=0.45.0
+torch>=2.2.0
+torch-geometric>=2.5.0
 
 # RL threshold controller (streaming/rl_threshold_controller.py)
 stable-baselines3>=2.3.0
