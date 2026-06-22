@@ -1,8 +1,5 @@
-use soroban_sdk::{contracttype, Address, BytesN, Symbol};
+use soroban_sdk::{contracttype, Address};
 
-/// On-chain record of the latest LedgerLens risk assessment for a
-/// wallet / asset-pair combination. Written by `submit_score` and
-/// read by `get_score`.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RiskScore {
@@ -58,6 +55,9 @@ pub struct AggregateRiskScore {
     pub ml_flag_count: u32,
     /// Ledger timestamp of the most recently updated component score.
     pub last_updated: u64,
+    /// True when the aggregate was computed with a non-zero decay rate applied.
+    /// Allows callers to detect whether aging has affected the aggregate score.
+    pub decay_lambda_applied: bool,
 }
 
 /// A cryptographic attestation over a score payload, produced by the
@@ -110,6 +110,83 @@ pub struct BatchResult {
     pub results: soroban_sdk::Vec<BatchEntryResult>,
 }
 
+/// Merkle-root attestation for an entire `submit_scores_batch_attested`
+/// call: a single secp256k1 signature over the Merkle root of every entry
+/// in the batch. See `docs/batch-attestation-spec.md` for the off-chain
+/// tree-construction algorithm, the on-chain verification path, and the
+/// rationale for choosing domain-separated prefix hashing (RFC 9162 style,
+/// `0x00` for leaves / `0x01` for internal nodes) over the alternative
+/// sorted-pair scheme.
+///
+/// The signature format is intentionally byte-identical to that of
+/// [`ScoreAttestation`] — 65 bytes: 32-byte `r`, 32-byte `s`, 1-byte
+/// recovery id — so the same off-chain signing key can be reused for both
+/// per-score and per-batch paths, and so `verify_signature` can be a
+/// single shared helper.
+///
+/// # Verified-digest convention
+///
+/// `signature` is over `SHA256(merkle_root)`, **not** over `merkle_root`
+/// directly. This is a one-extra-hash convention forced by the soroban-sdk
+/// 21.x API: `env.crypto().secp256k1_recover` takes an opaque `Hash<32>`,
+/// and `Hash<32>` has no public constructor — it can only be built via a
+/// host crypto function call. Both sides wrap through SHA-256 once:
+///
+/// * **Off-chain** (`api`/`core` pipeline): build `root`, then sign
+///   `SHA256(root)`.
+/// * **On-chain** (`submit_scores_batch_attested`): wrap
+///   `attestation.merkle_root` through `env.crypto().sha256` once before
+///   calling `verify_signature`.
+///
+/// The pipeline produces exactly the same merkle_root as the verifier
+/// recomputes from the entry commitments — the SHA-256 wrap is purely a
+/// soroban-sdk compatibility shim, not a security downgrade.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BatchAttestation {
+    /// `SHA-256(0x01 || SHA-256(0x00 || commit_i) || SHA-256(0x00 || commit_{i+1}))`
+    /// (recursively, until the 32-byte root). Bound to one specific
+    /// deployment on one specific network by including the contract
+    /// address and `network_id` inside every leaf's underlying commitment
+    /// (see [`ScoreAttestation`]'s preimage layout for context).
+    ///
+    /// The contract does **not** sign this value directly — see the struct
+    /// rustdoc's "Verified-digest convention" above for the SHA-256 wrap.
+    pub merkle_root: BytesN<32>,
+    /// 65-byte secp256k1 ECDSA signature over `SHA256(merkle_root)`: 32-byte `r`,
+    /// 32-byte `s`, then a 1-byte recovery id which must be `0` or `1`.
+    pub signature: BytesN<65>,
+}
+
+/// A single entry in an attested batch score submission. Mirrors
+/// [`ScoreSubmission`] so the service can submit many scores in one call,
+/// and carries its own Merkle inclusion proof against the
+/// [`BatchAttestation`]'s `merkle_root`.
+///
+/// # `proof_flags` bit layout
+///
+/// `proof_flags` is a `u32` bit field that records, for every level of the
+/// Merkle tree from the leaf (`i == 0`) upward, whether the sibling at that
+/// level sits to the **left** (1) or right (0) of the current node being
+/// walked up. So an attestation for leaf index `5` in an 8-leaf tree will
+/// typically produce three flag bits; a single-entry batch produces
+/// `proof_flags == 0` and an empty `proof` ([`verify_merkle_proof`] handles
+/// this case explicitly).
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ScoreSubmissionWithProof {
+    pub submission: ScoreSubmission,
+    /// Sibling hashes from leaf to root, left-to-right (ordered to match
+    /// `proof_flags`'s LSB-first indexing). Length must be in
+    /// `[0, MAX_MERKLE_PROOF_DEPTH]` — anything longer is rejected with
+    /// `Error::InvalidAttestation`.
+    pub proof: soroban_sdk::Vec<BytesN<32>>,
+    /// Bit-field encoding the left/right direction at each level. Bit `i`
+    /// (LSB = 0) is `0` if the sibling at level `i` is to the right, `1` if
+    /// to the left.
+    pub proof_flags: u32,
+}
+
 /// A pending, time-locked contract WASM upgrade.
 ///
 /// Created by `propose_upgrade` and cleared by `execute_upgrade` /
@@ -132,12 +209,27 @@ pub struct UpgradeProposal {
     pub proposed_by: Address,
 }
 
+/// Per-(wallet, asset_pair) trend state persisted between submissions.
+///
+/// `trend` encodes direction as a signed integer: `+1` = rising, `0` = flat,
+/// `-1` = falling. `consecutive` counts how many consecutive submissions have
+/// had the same non-zero direction; it is `0` on the first submission and
+/// resets to `1` on every direction change. Flat submissions (`delta == 0`)
+/// set both fields to `0`.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ScoreTrend {
+    /// +1 = rising, 0 = flat / no history, -1 = falling.
+    pub trend: i32,
+    /// Number of consecutive submissions in the current trend direction.
+    /// 0 on first submission or after a flat submission.
+    pub consecutive: u32,
+}
+
 #[contracttype]
 #[derive(Clone)]
 pub enum DataKey {
-    /// Address allowed to call admin-only functions.
     Admin,
-    /// Address of the authorised LedgerLens off-chain scoring service.
     Service,
     /// Latest risk score for a (wallet, asset_pair) pair.
     Score(Address, Symbol),
@@ -198,18 +290,45 @@ pub enum DataKey {
     /// `DEFAULT_HISTORY_MAX_DEPTH` when unset; bounded above by
     /// `MAX_HISTORY_DEPTH`.
     HistoryMaxDepth,
- feat/confidence-gated-risk-gate
-    /// Admin-configured global minimum confidence floor (0–100).
-    /// When set, `query_risk_gate_with_confidence` uses
-    /// `max(caller_param, global_floor)` as the effective floor.
-    /// Defaults to `0` (no global floor) when unset.
-    GlobalMinConfidence,
-
+    /// Numerator of the fixed-point decay rate λ = numerator / denominator.
+    /// Stored separately to support fractional λ values in fixed-point arithmetic.
+    /// Defaults to 0 (no decay) when unset.
+    DecayRateNumerator,
+    /// Denominator of the fixed-point decay rate λ = numerator / denominator.
+    /// Defaults to 1 when unset.
+    DecayRateDenominator,
     /// The SEP-41 token contract address from which fees are withdrawn.
     /// Unset until `set_fee_token` is called.
     FeeToken,
     /// Boolean flag set for the duration of a `withdraw_fees` call to
     /// prevent concurrent duplicate withdrawals.
     WithdrawalLock,
- main
+    /// Per-asset-pair pause flag. True when `set_pair_paused(pair, true)` has
+    /// been called and not yet reversed. Hot-path key: looked up on every
+    /// submission — never touches `PausedPairIndex`.
+    PairPaused(Symbol),
+    /// Ordered list of all currently paused asset pairs — an incrementally
+    /// maintained index so `get_paused_pairs` is O(1).
+    PausedPairIndex,
+    /// Ordered set of M-of-N admin co-signers.
+    AdminSet,
+    /// Minimum number of admin-set members that must sign an admin call.
+    AdminThreshold,
+    /// Score delegation: maps a sub-wallet to its custodian wallet.
+    ScoreDelegate(Address),
+    /// Per-wallet regulatory hold. Stores `Option<u64>` (expiry timestamp);
+    /// `None` means indefinite. While active, read-path functions return
+    /// `ScoreEmbargoed` / conservative denials; writes are unaffected.
+    ScoreEmbargo(Address),
+    /// Per-(wallet, asset_pair) trend state: current trend direction (+1/0/-1)
+    /// and consecutive submission count in that direction. Updated by every
+    /// successful `submit_score` / `submit_scores_batch` write.
+    TrendState(Address, Symbol),
+}
+
+#[contracttype]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub struct TierBounds {
+    pub min_score: u32,
+    pub max_score: u32,
 }

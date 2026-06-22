@@ -1955,7 +1955,18 @@ fn test_delegate_inherits_custodian_score() {
     client.set_score_delegate(&sub_wallet, &custodian);
 
     // 2. Submit score to custodian
-    client.submit_score(&Vec::new(&env), &custodian, &pair, &40, &false, &false, &1, &80, &1, &None);
+    client.submit_score(
+        &Vec::new(&env),
+        &custodian,
+        &pair,
+        &40,
+        &false,
+        &false,
+        &1,
+        &80,
+        &1,
+        &None,
+    );
 
     // 3. Sub-wallet inherits score
     let score = client.get_score(&sub_wallet, &pair);
@@ -1978,10 +1989,32 @@ fn test_delegate_direct_score_overrides_delegation() {
     let pair = symbol_short!("XLM_USDC");
 
     client.set_score_delegate(&sub_wallet, &custodian);
-    client.submit_score(&Vec::new(&env), &custodian, &pair, &80, &false, &false, &1, &80, &1, &None);
+    client.submit_score(
+        &Vec::new(&env),
+        &custodian,
+        &pair,
+        &80,
+        &false,
+        &false,
+        &1,
+        &80,
+        &1,
+        &None,
+    );
 
     // Sub-wallet overrides with its own score
-    client.submit_score(&Vec::new(&env), &sub_wallet, &pair, &10, &false, &false, &1, &80, &1, &None);
+    client.submit_score(
+        &Vec::new(&env),
+        &sub_wallet,
+        &pair,
+        &10,
+        &false,
+        &false,
+        &1,
+        &80,
+        &1,
+        &None,
+    );
 
     let score = client.get_score(&sub_wallet, &pair);
     assert_eq!(score.score, 10); // Not 80
@@ -1994,11 +2027,17 @@ fn test_cyclic_delegation_rejected() {
     let wallet_b = Address::generate(&env);
 
     // A -> A is rejected
-    assert_eq!(client.try_set_score_delegate(&wallet_a, &wallet_a), Err(Ok(Error::CyclicDelegation)));
+    assert_eq!(
+        client.try_set_score_delegate(&wallet_a, &wallet_a),
+        Err(Ok(Error::CyclicDelegation))
+    );
 
     // A -> B -> A is rejected
     client.set_score_delegate(&wallet_a, &wallet_b);
-    assert_eq!(client.try_set_score_delegate(&wallet_b, &wallet_a), Err(Ok(Error::CyclicDelegation)));
+    assert_eq!(
+        client.try_set_score_delegate(&wallet_b, &wallet_a),
+        Err(Ok(Error::CyclicDelegation))
+    );
 }
 
 #[test]
@@ -2009,7 +2048,18 @@ fn test_remove_delegate_clears_fallback() {
     let pair = symbol_short!("XLM_USDC");
 
     client.set_score_delegate(&sub_wallet, &custodian);
-    client.submit_score(&Vec::new(&env), &custodian, &pair, &40, &false, &false, &1, &80, &1, &None);
+    client.submit_score(
+        &Vec::new(&env),
+        &custodian,
+        &pair,
+        &40,
+        &false,
+        &false,
+        &1,
+        &80,
+        &1,
+        &None,
+    );
 
     // Works with delegate
     assert_eq!(client.get_score(&sub_wallet, &pair).score, 40);
@@ -2029,7 +2079,18 @@ fn test_delegate_propagates_embargo() {
 
     client.set_score_delegate(&sub_wallet, &custodian);
     // Submit embargo score (e.g. 90) which is >= gate_threshold of 75
-    client.submit_score(&Vec::new(&env), &custodian, &pair, &90, &false, &false, &1, &80, &1, &None);
+    client.submit_score(
+        &Vec::new(&env),
+        &custodian,
+        &pair,
+        &90,
+        &false,
+        &false,
+        &1,
+        &80,
+        &1,
+        &None,
+    );
 
     let is_safe = client.query_risk_gate(&sub_wallet, &pair, &75);
     assert!(!is_safe); // Embargo propagates
@@ -2043,13 +2104,35 @@ fn test_delegate_snapshot() {
     let pair = symbol_short!("XLM_USDC");
 
     client.set_score_delegate(&sub_wallet, &custodian);
-    client.submit_score(&Vec::new(&env), &custodian, &pair, &20, &false, &false, &1, &80, &1, &None);
+    client.submit_score(
+        &Vec::new(&env),
+        &custodian,
+        &pair,
+        &20,
+        &false,
+        &false,
+        &1,
+        &80,
+        &1,
+        &None,
+    );
 
     assert_eq!(client.get_score(&sub_wallet, &pair).score, 20);
 
     // Update custodian's score
     env.ledger().with_mut(|l| l.timestamp += 3_601);
-    client.submit_score(&Vec::new(&env), &custodian, &pair, &50, &false, &false, &2, &80, &1, &None);
+    client.submit_score(
+        &Vec::new(&env),
+        &custodian,
+        &pair,
+        &50,
+        &false,
+        &false,
+        &2,
+        &80,
+        &1,
+        &None,
+    );
 
     // Sub-wallet immediately sees the new score without any update to itself
     assert_eq!(client.get_score(&sub_wallet, &pair).score, 50);

@@ -1,10 +1,12 @@
-use soroban_sdk::{Address, Bytes, Env, Symbol, Vec};
+use soroban_sdk::{Env, Address};
+use crate::types::{DataKey, TierBounds};
+use crate::errors::Error;
 
 use crate::constants::{
     DEFAULT_COOLDOWN_SECS, DEFAULT_RISK_THRESHOLD, DEFAULT_UPGRADE_DELAY_SECS, SCORE_TTL_EXTEND_TO,
     SCORE_TTL_THRESHOLD,
 };
-use crate::types::{AggregateRiskScore, DataKey, RiskScore, UpgradeProposal};
+use crate::types::{AggregateRiskScore, DataKey, RiskScore, ScoreTrend, UpgradeProposal};
 
 // ── Admin / Service ─────────────────────────────────────────────────────────
 
@@ -357,8 +359,11 @@ pub fn set_service_set(env: &Env, set: &Vec<Address>) {
     env.storage().instance().set(&DataKey::ServiceSet, set);
 }
 
-pub fn get_service_threshold(env: &Env) -> u32 {
-    env.storage().instance().get(&DataKey::ServiceThreshold).unwrap_or(0)
+pub fn get_signer_tier(env: &Env, signer: &Address) -> TierBounds {
+    env.storage()
+        .instance()
+        .get(&DataKey::SignerTier(signer.clone()))
+        .unwrap_or(TierBounds { min_score: 0, max_score: 100 })
 }
 
 pub fn set_service_threshold(env: &Env, threshold: u32) {
@@ -456,6 +461,55 @@ pub fn get_score_count(env: &Env, wallet: &Address, asset_pair: &Symbol) -> u32 
     env.storage().persistent().get(&key).unwrap_or(0)
 }
 
+// ── Score embargo (regulatory hold) ──────────────────────────────────────────
+
+pub fn set_score_embargo(env: &Env, wallet: &Address, expiry: &Option<u64>) {
+    let key = DataKey::ScoreEmbargo(wallet.clone());
+    env.storage().persistent().set(&key, expiry);
+    env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+}
+
+#[allow(dead_code)]
+pub fn get_score_embargo(env: &Env, wallet: &Address) -> Option<Option<u64>> {
+    let key = DataKey::ScoreEmbargo(wallet.clone());
+    let result: Option<Option<u64>> = env.storage().persistent().get(&key);
+    if result.is_some() {
+        env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    }
+    result
+}
+
+pub fn remove_score_embargo(env: &Env, wallet: &Address) {
+    let key = DataKey::ScoreEmbargo(wallet.clone());
+    env.storage().persistent().remove(&key);
+}
+
+/// Returns `true` when the wallet is under an active, non-expired embargo.
+pub fn is_embargoed(env: &Env, wallet: &Address) -> bool {
+    match env.storage().persistent().get::<_, Option<u64>>(&DataKey::ScoreEmbargo(wallet.clone())) {
+        None => false,
+        Some(None) => true, // indefinite embargo
+        Some(Some(expiry)) => env.ledger().timestamp() < expiry,
+    }
+}
+
+// ── Score trend state ─────────────────────────────────────────────────────────
+
+pub fn get_trend_state(env: &Env, wallet: &Address, asset_pair: &Symbol) -> ScoreTrend {
+    let key = DataKey::TrendState(wallet.clone(), asset_pair.clone());
+    let result: Option<ScoreTrend> = env.storage().persistent().get(&key);
+    if result.is_some() {
+        env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    }
+    result.unwrap_or(ScoreTrend { trend: 0, consecutive: 0 })
+}
+
+pub fn set_trend_state(env: &Env, wallet: &Address, asset_pair: &Symbol, state: &ScoreTrend) {
+    let key = DataKey::TrendState(wallet.clone(), asset_pair.clone());
+    env.storage().persistent().set(&key, state);
+    env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+}
+
 // ── Score attestation ─────────────────────────────────────────────────────
 
 /// Returns the off-chain detection pipeline's secp256k1 public key, or
@@ -464,8 +518,32 @@ pub fn get_service_pubkey(env: &Env) -> Option<Bytes> {
     env.storage().instance().get(&DataKey::ServicePubKey)
 }
 
-pub fn set_service_pubkey(env: &Env, pubkey: &Bytes) {
-    env.storage().instance().set(&DataKey::ServicePubKey, pubkey);
+pub fn set_gate_callers(env: &Env, callers: &Vec<Address>) {
+    env.storage().instance().set(&GateDataKey::GateCallers, callers);
+}
+
+// ── Time-weighted exponential decay ──────────────────────────────────────
+
+/// Returns the numerator and denominator of the configured decay rate λ.
+/// Defaults to (0, 1) when unset, representing no decay.
+pub fn get_decay_rate(env: &Env) -> (u32, u32) {
+    let num = env
+        .storage()
+        .instance()
+        .get(&DataKey::DecayRateNumerator)
+        .unwrap_or(crate::constants::DEFAULT_DECAY_LAMBDA_NUM);
+    let den = env
+        .storage()
+        .instance()
+        .get(&DataKey::DecayRateDenominator)
+        .unwrap_or(crate::constants::DEFAULT_DECAY_LAMBDA_DEN);
+    (num, den)
+}
+
+/// Sets the decay rate to numerator/denominator.
+pub fn set_decay_rate(env: &Env, numerator: u32, denominator: u32) {
+    env.storage().instance().set(&DataKey::DecayRateNumerator, &numerator);
+    env.storage().instance().set(&DataKey::DecayRateDenominator, &denominator);
 }
 
  feat/confidence-gated-risk-gate
@@ -510,4 +588,35 @@ pub fn set_withdrawal_lock(env: &Env) {
 pub fn clear_withdrawal_lock(env: &Env) {
     env.storage().instance().remove(&DataKey::WithdrawalLock);
  main
+}
+
+// ── Score delegation ──────────────────────────────────────────────────────────
+
+/// Returns the custodian wallet delegated for `sub_wallet`, if any.
+/// Extends TTL on read.
+pub fn get_score_delegate(env: &Env, sub_wallet: &Address) -> Option<Address> {
+    let key = DataKey::ScoreDelegate(sub_wallet.clone());
+    let result: Option<Address> = env.storage().persistent().get(&key);
+    if result.is_some() {
+        env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    }
+    result
+}
+
+/// Read-only delegate lookup that does **not** extend TTL — used by the
+/// infallible cross-contract gate path.
+pub fn peek_score_delegate(env: &Env, sub_wallet: &Address) -> Option<Address> {
+    let key = DataKey::ScoreDelegate(sub_wallet.clone());
+    env.storage().persistent().get(&key)
+}
+
+pub fn set_score_delegate(env: &Env, sub_wallet: &Address, custodian: &Address) {
+    let key = DataKey::ScoreDelegate(sub_wallet.clone());
+    env.storage().persistent().set(&key, custodian);
+    env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+}
+
+pub fn remove_score_delegate(env: &Env, sub_wallet: &Address) {
+    let key = DataKey::ScoreDelegate(sub_wallet.clone());
+    env.storage().persistent().remove(&key);
 }

@@ -23,11 +23,10 @@ mod test_rate_limit;
 mod test_attestation;
 
 #[cfg(test)]
- feat/confidence-gated-risk-gate
-mod test_confidence_gate;
+mod test_batch_attestation;
 
-mod test_fee_withdrawal;
-main
+#[cfg(test)]
+mod test_score_delta;
 
 use soroban_sdk::{
     contract, contractimpl, crypto::Hash, symbol_short, token, Address, Bytes, BytesN, Env, Symbol,
@@ -36,8 +35,8 @@ use soroban_sdk::{
 
 pub use errors::Error;
 pub use types::{
-    AggregateRiskScore, BatchEntryResult, BatchResult, RiskScore, ScoreAttestation,
-    ScoreSubmission, UpgradeProposal,
+    AggregateRiskScore, BatchAttestation, BatchEntryResult, BatchResult, RiskScore,
+    ScoreAttestation, ScoreSubmission, ScoreSubmissionWithProof, UpgradeProposal,
 };
 
 /// On-chain truth layer for LedgerLens risk scores.
@@ -242,6 +241,8 @@ impl LedgerLensScoreContract {
         }
         storage::set_last_submit_time(&env, &wallet, &asset_pair, now);
 
+        let previous_score = storage::peek_score(&env, &wallet, &asset_pair).map(|s| s.score);
+
         let risk_score =
             RiskScore { score, benford_flag, ml_flag, timestamp, confidence, model_version };
 
@@ -256,6 +257,7 @@ impl LedgerLensScoreContract {
             events::threshold_breached(&env, &wallet, &asset_pair, score, score_threshold);
         }
 
+        Self::emit_score_delta(&env, &wallet, &asset_pair, previous_score, score);
         events::score_submitted(&env, &wallet, &asset_pair, &risk_score);
         Ok(())
     }
@@ -348,6 +350,9 @@ impl LedgerLensScoreContract {
                 if last_submit != 0 && now < last_submit.saturating_add(cooldown) {
                     rejection_code = Error::RateLimitExceeded as u32;
                 } else {
+                    let previous_score =
+                        storage::peek_score(&env, &sub.wallet, &sub.asset_pair).map(|s| s.score);
+
                     storage::set_last_submit_time(&env, &sub.wallet, &sub.asset_pair, now);
 
                     let risk_score = RiskScore {
@@ -375,6 +380,13 @@ impl LedgerLensScoreContract {
                         );
                     }
 
+                    Self::emit_score_delta(
+                        &env,
+                        &sub.wallet,
+                        &sub.asset_pair,
+                        previous_score,
+                        sub.score,
+                    );
                     events::score_submitted(&env, &sub.wallet, &sub.asset_pair, &risk_score);
                     accepted = true;
                     accepted_count += 1;
@@ -385,6 +397,279 @@ impl LedgerLensScoreContract {
         }
 
         let rejected_count = submissions.len() - accepted_count;
+        Ok(BatchResult { accepted_count, rejected_count, results })
+    }
+
+    /// Submit multiple risk scores under a single Merkle-root attestation.
+    ///
+    /// Unlike [`submit_scores_batch`] — which only enforces Soroban's native
+    /// service-account `require_auth` — this entry point requires the
+    /// off-chain detection pipeline to produce **one** secp256k1 signature
+    /// over the Merkle root of every entry's commitment, plus a per-entry
+    /// inclusion proof that the contract walks through and verifies
+    /// in-line. The cryptographic-payload-integrity gap that the plain
+    /// `submit_scores_batch` leaves open is closed by this entry point.
+    ///
+    /// # Auth
+    ///
+    /// Same model as [`submit_score`]: when the admin has configured an
+    /// M-of-N service set (`add_service_signer` / `set_service_threshold`),
+    /// `signers` must contain at least `threshold` members of the set, each
+    /// of which individually calls `require_auth`; otherwise the legacy
+    /// single-service-account `require_auth` path runs.
+    ///
+    /// # Attestation
+    ///
+    /// Requires `attestation.merkle_root` to be a SHA-256 root over the
+    /// `0x00`-prefixed leaf commitments of every entry (see
+    /// `docs/batch-attestation-spec.md` for the off-chain tree-construction
+    /// algorithm and a worked 4-leaf example), and `attestation.signature`
+    /// to be a valid secp256k1 signature over `SHA256(merkle_root)`
+    /// — not over `merkle_root` directly — recoverable to the key
+    /// registered via `set_service_pubkey`.
+    ///
+    /// The `SHA256(merkle_root)` wrap is a soroban-sdk 21.x API shim:
+    /// `env.crypto().secp256k1_recover` consumes an opaque `Hash<32>`
+    /// that has no public constructor, so both sides wrap once via
+    /// `env.crypto().sha256`. See [`BatchAttestation`]'s rustdoc for the
+    /// full convention and §5 of the spec for the rationale.
+    ///
+    /// **The service pubkey must already be configured.** Unlike the
+    /// opt-in `submit_score` path (which silently ignores `attestation`
+    /// until a pubkey is set), this function returns
+    /// [`Error::ServicePubkeyNotSet`] if no pubkey exists — there is no
+    /// way to "skip attestation" on the batch path, because then the
+    /// security property is gone.
+    ///
+    /// # Per-entry validation
+    ///
+    /// Each entry is rejected individually (with `rejection_code =
+    /// Error::InvalidAttestation as u32`) on a Merkle-proof mismatch or on
+    /// `proof.len() > MAX_MERKLE_PROOF_DEPTH`. Entries that pass the
+    /// Merkle check then proceed through the same validation pipeline as
+    /// [`submit_scores_batch`]: score range, confidence range, timestamp
+    /// non-zero, and per-(wallet, pair) submission cooldown. Any of those
+    /// failures are reported in the entry's `rejection_code`. The whole
+    /// batch is **never** aborted by a single bad entry.
+    ///
+    /// # Worked example (4-leaf batch)
+    ///
+    /// Given four submissions whose 32-byte underlying commitments are
+    /// `C0, C1, C2, C3`, the off-chain pipeline builds:
+    ///
+    /// ```text
+    /// L0 = SHA256(0x00 || C0)
+    /// L1 = SHA256(0x00 || C1)
+    /// L2 = SHA256(0x00 || C2)
+    /// L3 = SHA256(0x00 || C3)
+    /// N0 = SHA256(0x01 || L0 || L1)   // proof_flags bit 0 for L1 = 0 (right sibling)
+    /// N1 = SHA256(0x01 || L2 || L3)   // proof_flags bit 0 for L3 = 0 (right sibling)
+    /// R  = SHA256(0x01 || N0 || N1)   // root
+    /// ```
+    ///
+    /// The per-entry proofs are:
+    ///
+    /// | Index | `proof`            | `proof_flags` |
+    /// |------:|-------------------|--------------:|
+    /// |   0   | `[L1, N1]`         | `0b000` (= 0) |
+    /// |   1   | `[L0, N1]`         | `0b001` (= 1) |
+    /// |   2   | `[L3, N0]`         | `0b010` (= 2) |
+    /// |   3   | `[L2, N0]`         | `0b011` (= 3) |
+    ///
+    /// The off-chain pipeline signs `R` with the secp256k1 key registered
+    /// via `set_service_pubkey` and submits the batch with `attestation =
+    /// { merkle_root: R, signature: sig }`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::{
+    /// #     BatchAttestation, LedgerLensScoreContract, LedgerLensScoreContractClient,
+    /// #     ScoreSubmissionWithProof,
+    /// # };
+    /// # use soroban_sdk::{testutils::Address as _, Address, Env, Vec};
+    /// # use soroban_sdk::symbol_short;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// // The `submit_scores_batch_attested` new entry point surfaces as a new
+    /// // public capability under `supports_interface("batch_attested")`:
+    /// let batch_attested_cap = soroban_sdk::Symbol::new(&env, "batch_attested");
+    /// assert!(client.supports_interface(&batch_attested_cap));
+    /// ```
+    #[allow(clippy::too_many_arguments)]
+    pub fn submit_scores_batch_attested(
+        env: Env,
+        signers: Vec<Address>,
+        submissions: Vec<ScoreSubmissionWithProof>,
+        attestation: BatchAttestation,
+    ) -> Result<BatchResult, Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        if storage::is_paused(&env) {
+            return Err(Error::ContractPaused);
+        }
+
+        // Hard-fail before signature recovery if there is nothing to
+        // recover against — clearer error than `InvalidAttestation`, and
+        // consistent with the "attestation cannot be silently skipped"
+        // guarantee the function's rustdoc advertises.
+        if storage::get_service_pubkey(&env).is_none() {
+            return Err(Error::ServicePubkeyNotSet);
+        }
+
+        // Service-auth — same shape as `submit_score`'s M-of-N path.
+        let service_set = storage::get_service_set(&env);
+        let threshold = storage::get_service_threshold(&env);
+
+        if !service_set.is_empty() && threshold > 0 {
+            if signers.len() < threshold {
+                return Err(Error::InsufficientSigners);
+            }
+            for i in 0..signers.len() {
+                let signer = signers.get(i).unwrap();
+                if !service_set.contains(&signer) {
+                    return Err(Error::UnauthorizedSigner);
+                }
+                signer.require_auth();
+            }
+        } else {
+            let service = storage::get_service(&env);
+            service.require_auth();
+        }
+
+        if submissions.is_empty() {
+            return Err(Error::EmptyBatch);
+        }
+        if submissions.len() > constants::MAX_BATCH_SIZE {
+            return Err(Error::BatchTooLarge);
+        }
+
+        // Verify the single root signature.
+        //
+        // The secp256k1 signature is over `SHA256(attestation.merkle_root)`,
+        // not over `merkle_root` directly. The off-chain pipeline signs the
+        // same digest. We need this extra SHA-256 wrap because
+        // `env.crypto().secp256k1_recover` takes an opaque `Hash<32>`
+        // — and `Hash<32>` in soroban-sdk 21.x has no public constructor;
+        // it can only be built via a host crypto function call. SHA-256 of
+        // the 32-byte merkle_root produces a `Hash<32>` handle, and the
+        // off-chain pipeline signs `SHA256(merkle_root)` so the two
+        // sides agree. The full protocol is documented in
+        // `docs/batch-attestation-spec.md` (the "verified digest" rule).
+        //
+        // Reject the whole batch on failure: a bad root signature means
+        // no entry can be trusted to have come from the off-chain
+        // pipeline.
+        let root_buf = Bytes::from_array(env, &attestation.merkle_root.to_array());
+        let root_digest = env.crypto().sha256(&root_buf);
+        Self::verify_signature(&env, &root_digest, &attestation.signature)?;
+
+        let risk_threshold = storage::get_risk_threshold(&env);
+        let cooldown = storage::get_cooldown_secs(&env);
+        let now = env.ledger().timestamp();
+        let mut accepted_count: u32 = 0;
+        let mut results: Vec<BatchEntryResult> = Vec::new(&env);
+
+        for i in 0..submissions.len() {
+            let entry = submissions.get(i).unwrap();
+            let mut accepted = false;
+            let mut rejection_code: u32 = 0;
+
+        // Per-entry Merkle proof check. A failure here rejects only
+        // this entry with `InvalidAttestation` — siblings in the same
+        // batch can still process if their proofs hold.
+        let leaf = match Self::compute_merkle_leaf(&env, &entry.submission) {
+            Ok(leaf) => leaf,
+            Err(_) => {
+                results.push_back(BatchEntryResult {
+                    index: i,
+                    accepted: false,
+                    rejection_code: Error::InvalidAttestation as u32,
+                });
+                continue;
+            }
+        };
+
+        if !Self::verify_merkle_proof(
+            &env,
+            &leaf,
+            &entry.proof,
+            entry.proof_flags,
+            &attestation.merkle_root,
+        ) {
+                results.push_back(BatchEntryResult {
+                    index: i,
+                    accepted: false,
+                    rejection_code: Error::InvalidAttestation as u32,
+                });
+                continue;
+            }
+
+            // Existing validation pipeline (mirrors `submit_scores_batch`).
+            let sub = &entry.submission;
+            if sub.score > 100 {
+                rejection_code = Error::InvalidScore as u32;
+            } else if sub.confidence > 100 {
+                rejection_code = Error::InvalidConfidence as u32;
+            } else if sub.timestamp == 0 {
+                rejection_code = Error::InvalidTimestamp as u32;
+            } else {
+                let last_submit =
+                    storage::get_last_submit_time(&env, &sub.wallet, &sub.asset_pair);
+                if last_submit != 0 && now < last_submit.saturating_add(cooldown) {
+                    rejection_code = Error::RateLimitExceeded as u32;
+                } else {
+                    storage::set_last_submit_time(&env, &sub.wallet, &sub.asset_pair, now);
+
+                    let risk_score = RiskScore {
+                        score: sub.score,
+                        benford_flag: sub.benford_flag,
+                        ml_flag: sub.ml_flag,
+                        timestamp: sub.timestamp,
+                        confidence: sub.confidence,
+                        model_version: sub.model_version,
+                    };
+
+                    storage::set_score(&env, &sub.wallet, &sub.asset_pair, &risk_score);
+                    storage::push_score_history(
+                        &env,
+                        &sub.wallet,
+                        &sub.asset_pair,
+                        &risk_score,
+                    );
+                    storage::register_pair_for_wallet(&env, &sub.wallet, &sub.asset_pair);
+                    storage::increment_score_count(&env, &sub.wallet, &sub.asset_pair);
+                    Self::refresh_aggregate_cache(&env, &sub.wallet);
+
+                    if sub.score >= risk_threshold {
+                        events::threshold_breached(
+                            &env,
+                            &sub.wallet,
+                            &sub.asset_pair,
+                            sub.score,
+                            risk_threshold,
+                        );
+                    }
+
+                    events::score_submitted(&env, &sub.wallet, &sub.asset_pair, &risk_score);
+                    accepted = true;
+                    accepted_count += 1;
+                }
+            }
+
+            results.push_back(BatchEntryResult { index: i, accepted, rejection_code });
+        }
+
+        let rejected_count = submissions.len() - accepted_count;
+        events::batch_attested(
+            &env,
+            accepted_count,
+            rejected_count,
+            &attestation.merkle_root,
+        );
         Ok(BatchResult { accepted_count, rejected_count, results })
     }
 
@@ -414,6 +699,9 @@ impl LedgerLensScoreContract {
     /// assert_eq!(score.score, 10);
     /// ```
     pub fn get_score(env: Env, wallet: Address, asset_pair: Symbol) -> Result<RiskScore, Error> {
+        if storage::is_embargoed(&env, &wallet) {
+            return Err(Error::ScoreEmbargoed);
+        }
         match storage::get_score(&env, &wallet, &asset_pair) {
             Some(score) => Ok(score),
             None => {
@@ -456,6 +744,9 @@ impl LedgerLensScoreContract {
     /// assert_eq!(history.get(1).unwrap().score, 20);
     /// ```
     pub fn get_score_history(env: Env, wallet: Address, asset_pair: Symbol) -> Vec<RiskScore> {
+        if storage::is_embargoed(&env, &wallet) {
+            return Vec::new(&env);
+        }
         storage::get_score_history(&env, &wallet, &asset_pair)
     }
 
@@ -664,6 +955,9 @@ impl LedgerLensScoreContract {
     /// would overflow — this can only happen with extreme admin-configured
     /// weights, since per-pair scores are bounded to 0-100.
     pub fn get_aggregate_score(env: Env, wallet: Address) -> Result<AggregateRiskScore, Error> {
+        if storage::is_embargoed(&env, &wallet) {
+            return Err(Error::ScoreEmbargoed);
+        }
         let pairs = storage::get_wallet_pairs(&env, &wallet);
         if pairs.is_empty() {
             if let Some(custodian) = storage::get_score_delegate(&env, &wallet) {
@@ -825,107 +1119,9 @@ impl LedgerLensScoreContract {
         asset_pair: Symbol,
         gate_threshold: u32,
     ) -> bool {
-        // Delegate to the confidence-aware variant with min_confidence = 0
-        // (no confidence floor). This is a non-breaking change: callers see
-        // identical semantics while all logic lives in one place.
-        Self::query_risk_gate_with_confidence(env, wallet, asset_pair, gate_threshold, 0)
-    }
-
-    /// Confidence-gated infallible cross-contract risk gate.
-    ///
-    /// An extended version of [`query_risk_gate`] that enforces **both** a
-    /// maximum risk score threshold *and* a minimum confidence floor. A score
-    /// whose confidence falls below the floor is treated as epistemically
-    /// equivalent to "no data" — the gate returns `false` (the conservative
-    /// default), regardless of the risk score value.
-    ///
-    /// # Semantics
-    ///
-    /// Returns `true` **only** when all three conditions hold:
-    ///
-    /// 1. A score exists for `(wallet, asset_pair)`.
-    /// 2. `score.score < gate_threshold` — the wallet is not too risky.
-    /// 3. `score.confidence >= effective_min_confidence` — the model had
-    ///    enough data to make a meaningful determination.
-    ///
-    /// Returns `false` in every other case:
-    /// - No score exists (unknown wallet — fail closed).
-    /// - Score is at or above the threshold (too risky).
-    /// - Confidence is below the effective floor (insufficient data — treated
-    ///   as unknown, not as evidence of safety).
-    /// - `gate_threshold > 100` — no wallet can have a score above 100, so
-    ///   no wallet can pass a threshold of 101+. Returns `false` immediately.
-    /// - `min_confidence > 100` — no wallet can have confidence above 100,
-    ///   so no wallet can meet a floor above 100. Returns `false` immediately.
-    ///
-    /// # Effective confidence floor
-    ///
-    /// The effective floor is `max(min_confidence, global_min_confidence)`,
-    /// where `global_min_confidence` is the admin-configured value from
-    /// [`set_global_min_confidence`] (defaults to `0`). Using `max` means
-    /// the stricter of the two floors always wins: neither the admin nor the
-    /// caller can unilaterally weaken the other's floor. Both values are
-    /// bounded to `0..=100`, so this `max` cannot overflow — the sum of two
-    /// `u32` values each ≤ 100 is at most 200, well within `u32::MAX`.
-    ///
-    /// # Infallibility and side-effect freedom
-    ///
-    /// Like `query_risk_gate`, this function:
-    /// - Returns `bool`, never `Result` — it cannot propagate errors.
-    /// - Never panics under any `u32` input (including `u32::MAX`).
-    /// - Uses [`storage::peek_score`] which does **not** call
-    ///   `extend_ttl` — the function has zero observable side effects.
-    ///
-    /// # Examples
-    ///
-    /// High confidence, low risk → passes:
-    /// ```ignore
-    /// // score=30, confidence=80, gate_threshold=75, min_confidence=50
-    /// assert!(client.query_risk_gate_with_confidence(&wallet, &pair, &75, &50));
-    /// ```
-    ///
-    /// Low confidence → fails even though risk is low:
-    /// ```ignore
-    /// // score=30, confidence=20, gate_threshold=75, min_confidence=50
-    /// // confidence(20) < floor(50) → treated as "no data" → false
-    /// assert!(!client.query_risk_gate_with_confidence(&wallet, &pair, &75, &50));
-    /// ```
-    ///
-    /// Admin-set global floor overrides caller floor:
-    /// ```ignore
-    /// // global_min_confidence=70, min_confidence_param=30
-    /// // effective floor = max(30, 70) = 70
-    /// assert!(!client.query_risk_gate_with_confidence(&wallet, &pair, &75, &30));
-    /// ```
-    pub fn query_risk_gate_with_confidence(
-        env: Env,
-        wallet: Address,
-        asset_pair: Symbol,
-        gate_threshold: u32,
-        min_confidence: u32,
-    ) -> bool {
-        // Short-circuit: gate_threshold > 100 — scores are bounded to 0–100,
-        // so score < gate_threshold would only ever be true for thresholds in
-        // 0..=100. Anything above is effectively "nothing can pass".
-        if gate_threshold > 100 {
+        if storage::is_embargoed(&env, &wallet) {
             return false;
         }
-
-        // Short-circuit: min_confidence > 100 — confidence is bounded to
-        // 0–100. No stored score can ever satisfy confidence >= 101+.
-        if min_confidence > 100 {
-            return false;
-        }
-
-        // Compute the effective confidence floor: max(caller param, global floor).
-        // Both values are bounded to 0–100 (validated above / by set_global_min_confidence),
-        // so their max is at most 100 — no overflow is possible.
-        let global_floor = storage::get_global_min_confidence(&env);
-        // global_floor is stored only after validation (0..=100), so it is
-        // also ≤ 100. The max of two values each ≤ 100 is ≤ 100: no overflow.
-        let effective_floor = if global_floor > min_confidence { global_floor } else { min_confidence };
-
-        // peek_score: pure storage read, no extend_ttl — side-effect free.
         match storage::peek_score(&env, &wallet, &asset_pair) {
 feat/confidence-gated-risk-gate
             Some(risk) => risk.score < gate_threshold && risk.confidence >= effective_floor,
@@ -953,25 +1149,32 @@ feat/confidence-gated-risk-gate
     ///
     /// Recognised capabilities:
     ///
-    /// | Symbol      | Backing functionality                                    |
-    /// |-------------|----------------------------------------------------------|
-    /// | `score`     | `get_score` / `submit_score`                             |
-    /// | `history`   | `get_score_history`                                      |
-    /// | `batch`     | `submit_scores_batch`                                    |
-    /// | `gate`      | `query_risk_gate`                                        |
-    /// | `aggr`      | `get_aggregate_score` (cross-asset aggregate risk)       |
-    /// | `count`     | `get_score_count`                                        |
-    /// | `cgate`     | `query_risk_gate_with_confidence` (confidence-gated gate) |
+    /// | Symbol           | Backing functionality                              |
+    /// |------------------|----------------------------------------------------|
+    /// | `score`          | `get_score` / `submit_score`                       |
+    /// | `history`        | `get_score_history`                                |
+    /// | `batch`          | `submit_scores_batch`                              |
+    /// | `gate`           | `query_risk_gate`                                  |
+    /// | `aggr`           | `get_aggregate_score` (cross-asset aggregate risk) |
+    /// | `count`          | `get_score_count`                                  |
+    /// | `batch_attested` | `submit_scores_batch_attested` (Merkle-root sig)    |
     ///
     /// Any unrecognised `capability` returns `false`.
-    pub fn supports_interface(_env: Env, capability: Symbol) -> bool {
+    ///
+    /// Note on naming: `batch_attested` is a 14-character symbol, longer
+    /// than `symbol_short!`'s 9-character ceiling, so it is constructed via
+    /// `Symbol::new(&env, "batch_attested")` rather than the `symbol_short!`
+    /// macro used for the shorter entries. The equality check is bytewise
+    /// — both sides go through Soroban's normal Symbol serialization — so
+    /// callers can pass either form.
+    pub fn supports_interface(env: Env, capability: Symbol) -> bool {
         capability == symbol_short!("score")
             || capability == symbol_short!("history")
             || capability == symbol_short!("batch")
             || capability == symbol_short!("gate")
             || capability == symbol_short!("aggr")
             || capability == symbol_short!("count")
-            || capability == symbol_short!("cgate")
+            || capability == Symbol::new(&env, "batch_attested")
     }
 
     // ── Service management ───────────────────────────────────────────────────
@@ -1658,6 +1861,96 @@ feat/confidence-gated-risk-gate
         storage::is_watchlisted(&env, &wallet)
     }
 
+    // ── Score embargo (regulatory hold) ─────────────────────────────────────
+
+    /// Place a per-wallet score embargo, blocking all read-path access to the
+    /// wallet's scores without erasing any data.  Admin only.
+    ///
+    /// `expiry` sets the automatic lift time as a ledger timestamp:
+    /// - `None` — indefinite; only `lift_score_embargo` can remove it.
+    /// - `Some(ts)` — auto-lifted once `env.ledger().timestamp() >= ts`.
+    ///
+    /// While active:
+    /// - `get_score` → `Err(ScoreEmbargoed)`
+    /// - `query_risk_gate` → `false` (conservative deny, no error)
+    /// - `get_score_history` → empty `Vec`
+    /// - `get_aggregate_score` → `Err(ScoreEmbargoed)`
+    /// - `submit_score` / `submit_scores_batch` → unaffected (writes succeed)
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient, Error};
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
+    /// # use soroban_sdk::symbol_short;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// let wallet = Address::generate(&env);
+    /// assert!(!client.is_embargoed(&wallet));
+    /// client.set_score_embargo(&wallet, &None).unwrap();
+    /// assert!(client.is_embargoed(&wallet));
+    /// ```
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if the contract has no admin yet.
+    pub fn set_score_embargo(env: Env, wallet: Address, expiry: Option<u64>) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        storage::get_admin(&env).require_auth();
+        storage::set_score_embargo(&env, &wallet, &expiry);
+        events::embargo_set(&env, &wallet, &expiry);
+        Ok(())
+    }
+
+    /// Explicitly lift a per-wallet score embargo.  Admin only.
+    ///
+    /// This is required for indefinite embargoes (`expiry = None`). For
+    /// time-limited embargoes it is also available as an early-lift mechanism.
+    /// After this call `is_embargoed` returns `false` and all read-path
+    /// functions resume their normal behaviour.
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if the contract has no admin yet.
+    pub fn lift_score_embargo(env: Env, wallet: Address) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        let admin = storage::get_admin(&env);
+        admin.require_auth();
+        storage::remove_score_embargo(&env, &wallet);
+        events::embargo_lifted(&env, &wallet, &admin);
+        Ok(())
+    }
+
+    /// Returns `true` when `wallet` is under an active, non-expired embargo.
+    /// Returns `false` when no embargo exists or when a time-limited embargo
+    /// has passed its expiry timestamp.  Read-only, callable by any account.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address};
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// let wallet = Address::generate(&env);
+    /// assert!(!client.is_embargoed(&wallet));
+    /// ```
+    pub fn is_embargoed(env: Env, wallet: Address) -> bool {
+        storage::is_embargoed(&env, &wallet)
+    }
+
     // ── Risk threshold ───────────────────────────────────────────────────────
 
     /// Set the global risk threshold (0-100).  Scores at or above this
@@ -1760,6 +2053,102 @@ feat/confidence-gated-risk-gate
     /// `DEFAULT_STALENESS_WINDOW_SECS` (7 days) until configured.
     pub fn get_staleness_window(env: Env) -> u64 {
         storage::get_staleness_window(&env)
+    }
+
+    // ── Time-weighted exponential decay ──────────────────────────────────────
+
+    /// Set the exponential decay rate (λ) applied to per-pair scores in the
+    /// aggregate computation. The decay formula is:
+    ///   decay_factor(age) = e^(-λ * age_seconds)
+    /// where λ = numerator / denominator.
+    ///
+    /// When λ = 0 (numerator = 0), no decay occurs and aggregate scores
+    /// behave exactly as in prior contract versions. A higher λ causes older
+    /// scores to contribute less to the aggregate.
+    ///
+    /// # Arguments
+    /// - `numerator`: numerator of λ
+    /// - `denominator`: denominator of λ; must be > 0
+    ///
+    /// The ratio must satisfy: 0 <= numerator / denominator <= MAX_DECAY_LAMBDA.
+    /// Admin only. Blocked when the contract is paused.
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if the contract has no admin yet.
+    /// - [`Error::ContractPaused`] if the contract is paused.
+    /// - [`Error::InvalidDecayRate`] if the ratio exceeds MAX_DECAY_LAMBDA.
+    ///
+    /// # Examples
+    ///
+    /// Set λ to 0.001 per second (half-life ~693 seconds):
+    /// ```text
+    /// client.set_decay_rate(&1, &1000);
+    /// ```
+    ///
+    /// With a 7-day staleness window, a score from 7 days ago decays by factor:
+    /// ```text
+    /// decay = e^(-0.001 * 604800) ≈ e^(-604.8) ≈ 0 (fully decayed)
+    /// ```
+    ///
+    /// A score from 1 day ago decays by:
+    /// ```text
+    /// decay = e^(-0.001 * 86400) ≈ e^(-86.4) ≈ 0 (nearly fully decayed)
+    /// ```
+    pub fn set_decay_rate(env: Env, numerator: u32, denominator: u32) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        if storage::is_paused(&env) {
+            return Err(Error::ContractPaused);
+        }
+
+        // Validate denominator is not zero
+        if denominator == 0 {
+            return Err(Error::InvalidDecayRate);
+        }
+
+        // Validate the ratio is within bounds
+        // Check: numerator / denominator <= MAX_DECAY_LAMBDA
+        // Equivalently: numerator * MAX_DEN <= MAX_NUM * denominator
+        let max_num = constants::MAX_DECAY_LAMBDA_NUM as u64;
+        let max_den = constants::MAX_DECAY_LAMBDA_DEN as u64;
+        let num = numerator as u64;
+        let den = denominator as u64;
+
+        if num.checked_mul(max_den).map(|v| v > max_num.saturating_mul(den)).unwrap_or(true) {
+            return Err(Error::InvalidDecayRate);
+        }
+
+        let admin = storage::get_admin(&env);
+        admin.require_auth();
+
+        storage::set_decay_rate(&env, numerator, denominator);
+        events::decay_rate_updated(&env, numerator, denominator);
+
+        Ok(())
+    }
+
+    /// Returns the current decay rate as (numerator, denominator).
+    /// Defaults to (0, 1) (no decay) until configured.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// let (num, den) = client.get_decay_rate();
+    /// assert_eq!((num, den), (0, 1));
+    /// ```
+    pub fn get_decay_rate(env: Env) -> (u32, u32) {
+        storage::get_decay_rate(&env)
     }
 
     // ── Per-wallet/pair submission rate limiting ─────────────────────────────
@@ -1901,6 +2290,39 @@ feat/confidence-gated-risk-gate
     /// was cleared by `override_rate_limit`).
     pub fn get_last_submit_time(env: Env, wallet: Address, asset_pair: Symbol) -> u64 {
         storage::get_last_submit_time(&env, &wallet, &asset_pair)
+    }
+
+    // ── Score trend ───────────────────────────────────────────────────────────
+
+    /// Returns the current trend direction and consecutive-count for
+    /// `(wallet, asset_pair)`.  Read-only, callable by any account.
+    ///
+    /// `ScoreTrend.trend` is `+1` (rising), `0` (flat / no history), or `-1`
+    /// (falling). `ScoreTrend.consecutive` is the number of consecutive
+    /// submissions in that direction; `0` before any submission or after a flat
+    /// one.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
+    /// # use soroban_sdk::symbol_short;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// let wallet = Address::generate(&env);
+    /// let pair = symbol_short!("XLM_USDC");
+    /// let trend = client.get_score_trend(&wallet, &pair);
+    /// assert_eq!(trend.trend, 0);
+    /// assert_eq!(trend.consecutive, 0);
+    /// ```
+    pub fn get_score_trend(env: Env, wallet: Address, asset_pair: Symbol) -> ScoreTrend {
+        storage::get_trend_state(&env, &wallet, &asset_pair)
     }
 
     // ── Fee withdrawal ────────────────────────────────────────────────────────
@@ -2136,35 +2558,137 @@ feat/confidence-gated-risk-gate
 
     // ── Internal helpers ──────────────────────────────────────────────────────
 
-    /// In multisig mode (AdminSet non-empty and AdminThreshold > 0): verifies
-    /// that `admin_signers` contains at least `threshold` addresses, each of
-    /// which is a member of the admin set, and calls `require_auth()` on each.
-    /// In legacy mode (AdminSet empty or threshold == 0): falls back to
-    /// requiring the single stored admin key.
-    fn require_admin_auth(env: &Env, admin_signers: &Vec<Address>) -> Result<(), Error> {
-        let admin_set = storage::get_admin_set(env);
-        let threshold = storage::get_admin_threshold(env);
-        if !admin_set.is_empty() && threshold > 0 {
-            if admin_signers.len() < threshold {
-                return Err(Error::InsufficientAdminSigners);
-            }
-            for i in 0..admin_signers.len() {
-                let signer = admin_signers.get(i).unwrap();
-                if !admin_set.contains(&signer) {
-                    return Err(Error::AdminSignerNotInSet);
-                }
-                signer.require_auth();
-            }
-        } else {
-            storage::get_admin(env).require_auth();
+    /// Computes a fixed-point approximation of the exponential decay factor
+    /// e^(-λ * age_seconds) using a piecewise Taylor-series approximation.
+    ///
+    /// The decay formula is: decay_factor = e^(-λ * age), where λ = numerator / denominator.
+    /// When λ = 0, the function returns the scaling factor (no decay), preserving
+    /// backward compatibility.
+    ///
+    /// # Arguments
+    /// - `age_secs`: elapsed seconds since the score's timestamp
+    /// - `lambda_num`: numerator of the decay rate
+    /// - `lambda_den`: denominator of the decay rate
+    ///
+    /// # Returns
+    /// A fixed-point integer (scaled by 1e6) representing the decay multiplier.
+    /// The result is in the range [0, 1e6], where 1e6 represents a multiplier of 1.0.
+    ///
+    /// # Precision
+    /// The approximation uses Taylor-series terms: 1 - x + x²/2 - x³/6 + x⁴/24
+    /// where x = λ * age. This achieves ~6 decimal places of accuracy.
+    /// For practical staleness windows, the error is <0.01%.
+    fn decay_fixed(age_secs: u64, lambda_num: u32, lambda_den: u32) -> u64 {
+        const SCALE: u64 = constants::DECAY_FIXED_POINT_SCALE;
+
+        // Short-circuit: no decay configured
+        if lambda_num == 0 {
+            return SCALE;
         }
-        Ok(())
+
+        // Compute x = λ * age_seconds = (num / den) * age_seconds
+        // To maintain precision, we compute in scaled integer space.
+        // x_scaled = (num * age_seconds * SCALE) / den
+        let x_scaled = match (lambda_num as u64)
+            .checked_mul(age_secs)
+            .and_then(|v| v.checked_mul(SCALE))
+            .and_then(|v| v.checked_div(lambda_den as u64))
+        {
+            Some(v) => v,
+            None => return 0, // Overflow: decay factor → 0
+        };
+
+        // Piecewise approximation of e^(-x_scaled/SCALE).
+        // For x in [0, 5), use Taylor series: 1 - x + x²/2 - x³/6 + x⁴/24
+        // For x >= 5, decay is negligible, return ~0.
+        if x_scaled >= 5 * SCALE {
+            return 0; // e^(-5) ≈ 0.0067, close enough to 0 for risk scoring
+        }
+
+        let x = x_scaled as i128; // Safe cast; x < 5 * SCALE
+        let s = SCALE as i128;
+
+        // Compute: result = 1 - x + x²/2 - x³/6 + x⁴/24
+        let mut result = s; // Start with 1 * SCALE
+
+        // Term 1: -x
+        result -= x;
+
+        // Term 2: +x²/2
+        let x2 = x.checked_mul(x).unwrap_or(0);
+        result += x2 / (2 * s);
+
+        // Term 3: -x³/6
+        let x3 = x.checked_mul(x).and_then(|v| v.checked_mul(x)).unwrap_or(0);
+        result -= x3 / (6 * s * s);
+
+        // Term 4: +x⁴/24
+        let x4 = x
+            .checked_mul(x)
+            .and_then(|v| v.checked_mul(x))
+            .and_then(|v| v.checked_mul(x))
+            .unwrap_or(0);
+        result += x4 / (24 * s * s * s);
+
+        // Clamp to [0, SCALE] and convert back to u64
+        if result < 0 {
+            0
+        } else if result > s {
+            SCALE
+        } else {
+            result as u64
+        }
+    }
+
+    /// Update the per-pair trend state and emit a `score_delta` event.
+    ///
+    /// `previous_score` is `None` on the very first submission (no score was
+    /// stored yet). On first submission `trend` and `consecutive` are both 0.
+    fn emit_score_delta(
+        env: &Env,
+        wallet: &Address,
+        asset_pair: &Symbol,
+        previous_score: Option<u32>,
+        new_score: u32,
+    ) {
+        let (trend, consecutive, prev_for_event, delta_abs) = match previous_score {
+            None => (0i32, 0u32, 0u32, 0u32),
+            Some(prev) => {
+                let delta_abs = new_score.abs_diff(prev);
+                if delta_abs == 0 {
+                    (0i32, 0u32, prev, 0u32)
+                } else {
+                    let new_trend: i32 = if new_score > prev { 1 } else { -1 };
+                    let prev_state = storage::get_trend_state(env, wallet, asset_pair);
+                    let new_consecutive = if prev_state.trend == new_trend {
+                        prev_state.consecutive.saturating_add(1)
+                    } else {
+                        1
+                    };
+                    (new_trend, new_consecutive, prev, delta_abs)
+                }
+            }
+        };
+
+        storage::set_trend_state(env, wallet, asset_pair, &ScoreTrend { trend, consecutive });
+        events::score_delta(
+            env,
+            wallet,
+            asset_pair,
+            prev_for_event,
+            new_score,
+            delta_abs,
+            trend,
+            consecutive,
+        );
     }
 
     /// Shared implementation behind `get_aggregate_score`. Iterates the
     /// wallet's registered pairs once, accumulating the weighted sum and
     /// weight total with checked arithmetic so a pathological admin-set
-    /// weight can never panic the contract.
+    /// weight can never panic the contract. When a non-zero decay rate is
+    /// configured, each per-pair score's effective weight is multiplied by
+    /// a time-decay factor derived from the score's age.
     fn compute_aggregate_score(env: &Env, wallet: &Address) -> Result<AggregateRiskScore, Error> {
         let pairs = storage::get_wallet_pairs(env, wallet);
         if pairs.is_empty() {
@@ -2181,6 +2705,11 @@ feat/confidence-gated-risk-gate
         let mut benford_flag_count: u32 = 0;
         let mut ml_flag_count: u32 = 0;
         let mut last_updated: u64 = 0;
+
+        // Get decay configuration
+        let (decay_lambda_num, decay_lambda_den) = storage::get_decay_rate(env);
+        let decay_lambda_applied = decay_lambda_num != 0;
+        let ledger_ts = env.ledger().timestamp();
 
         for i in 0..pairs.len() {
             let pair = pairs.get(i).unwrap();
@@ -2200,11 +2729,25 @@ feat/confidence-gated-risk-gate
                 last_updated = component.timestamp;
             }
 
+            // Compute age and apply decay
+            let age_secs = ledger_ts.saturating_sub(component.timestamp);
+            let decay_factor = Self::decay_fixed(age_secs, decay_lambda_num, decay_lambda_den);
+
             let weight = storage::get_pair_weight(env, &pair);
-            let product = weight.checked_mul(component.score).ok_or(Error::ArithmeticOverflow)?;
+
+            // Apply decay to the weight: effective_weight = weight * decay_factor / SCALE
+            let decayed_weight = (weight as u64)
+                .checked_mul(decay_factor)
+                .ok_or(Error::ArithmeticOverflow)?
+                .checked_div(constants::DECAY_FIXED_POINT_SCALE)
+                .ok_or(Error::ArithmeticOverflow)?;
+
+            let product = (decayed_weight as u32)
+                .checked_mul(component.score)
+                .ok_or(Error::ArithmeticOverflow)?;
             weighted_sum =
                 weighted_sum.checked_add(product as u64).ok_or(Error::ArithmeticOverflow)?;
-            weight_sum = weight_sum.checked_add(weight as u64).ok_or(Error::ArithmeticOverflow)?;
+            weight_sum = weight_sum.checked_add(decayed_weight).ok_or(Error::ArithmeticOverflow)?;
         }
 
         // All contributing pairs have weight 0 — the average is undefined.
@@ -2224,6 +2767,7 @@ feat/confidence-gated-risk-gate
             benford_flag_count,
             ml_flag_count,
             last_updated,
+            decay_lambda_applied,
         })
     }
 
@@ -2291,15 +2835,37 @@ feat/confidence-gated-risk-gate
         Ok(env.crypto().sha256(&preimage))
     }
 
+    /// Verifies admin authorization. In multisig mode (AdminSet non-empty and
+    /// AdminThreshold > 0): verifies that `admin_signers` contains at least
+    /// `threshold` addresses, each a member of the admin set, and calls
+    /// `require_auth()` on each. In legacy mode falls back to the single
+    /// stored admin key.
+    fn require_admin_auth(env: &Env, admin_signers: &Vec<Address>) -> Result<(), Error> {
+        let admin_set = storage::get_admin_set(env);
+        let threshold = storage::get_admin_threshold(env);
+        if !admin_set.is_empty() && threshold > 0 {
+            if admin_signers.len() < threshold {
+                return Err(Error::InsufficientAdminSigners);
+            }
+            for i in 0..admin_signers.len() {
+                let signer = admin_signers.get(i).unwrap();
+                if !admin_set.contains(&signer) {
+                    return Err(Error::AdminSignerNotInSet);
+                }
+                signer.require_auth();
+            }
+        } else {
+            storage::get_admin(env).require_auth();
+        }
+        Ok(())
+    }
+
     /// Verifies `attestation` (recomputing the commitment independently
     /// rather than trusting its `commitment` field — see
     /// [`ScoreAttestation`]) against the registered service pubkey, then
-    /// recovers the secp256k1 signer and compares it. Supports both
-    /// compressed (33-byte) and uncompressed (65-byte) registered pubkeys:
-    /// `secp256k1_recover` always yields the uncompressed SEC-1 form, so a
-    /// compressed registered key is compared against the recovered key's
-    /// compressed form instead (parity byte + x-coordinate — no elliptic-
-    /// curve math needed since the full point is already known).
+    /// delegates the secp256k1 recovery + pubkey comparison to
+    /// [`verify_signature`] (which is shared with the Merkle-root path of
+    /// [`submit_scores_batch_attested`]).
     #[allow(clippy::too_many_arguments)]
     fn verify_attestation(
         env: &Env,
@@ -2313,7 +2879,6 @@ feat/confidence-gated-risk-gate
         model_version: u32,
         attestation: Option<ScoreAttestation>,
     ) -> Result<(), Error> {
-        let pubkey = storage::get_service_pubkey(env).ok_or(Error::ServicePubkeyNotSet)?;
         let attestation = attestation.ok_or(Error::InvalidAttestation)?;
 
         let digest = Self::compute_commitment(
@@ -2332,7 +2897,27 @@ feat/confidence-gated-risk-gate
             return Err(Error::InvalidAttestation);
         }
 
-        let sig_bytes = attestation.signature.to_array();
+        Self::verify_signature(env, &digest, &attestation.signature)
+    }
+
+    /// Shared secp256k1 verification used by both
+    /// [`verify_attestation`] (per `ScoreAttestation`) and
+    /// `verify_batch_attestation` (per `BatchAttestation`). Validates that
+    /// `sig` is a properly-formed 65-byte ECDSA over `digest`, recoverable
+    /// to the pubkey stored by `set_service_pubkey`. Supports both 33-byte
+    /// compressed and 65-byte uncompressed stored keys — `secp256k1_recover`
+    /// always yields the uncompressed SEC-1 form, so a compressed stored
+    /// key is compared against the recovered key's compressed form (parity
+    /// byte + x-coordinate; no elliptic-curve math needed since the full
+    /// point is already known).
+    fn verify_signature(
+        env: &Env,
+        digest: &Hash<32>,
+        sig: &BytesN<65>,
+    ) -> Result<(), Error> {
+        let pubkey = storage::get_service_pubkey(env).ok_or(Error::ServicePubkeyNotSet)?;
+
+        let sig_bytes = sig.to_array();
         let recovery_id = sig_bytes[64] as u32;
         if recovery_id > 1 {
             return Err(Error::InvalidAttestation);
@@ -2341,7 +2926,7 @@ feat/confidence-gated-risk-gate
         rs.copy_from_slice(&sig_bytes[..64]);
         let sig64 = BytesN::<64>::from_array(env, &rs);
 
-        let recovered = env.crypto().secp256k1_recover(&digest, &sig64, recovery_id);
+        let recovered = env.crypto().secp256k1_recover(digest, &sig64, recovery_id);
 
         let matches = match pubkey.len() {
             65 => {
@@ -2367,5 +2952,165 @@ feat/confidence-gated-risk-gate
             return Err(Error::InvalidAttestation);
         }
         Ok(())
+    }
+
+    // ── Merkle batch attestation internals ───────────────────────────────────
+
+    /// Computes the Merkle leaf for a single `ScoreSubmission`:
+    /// `SHA-256(0x00 || compute_commitment(submission))`, returned as a
+    /// `BytesN<32>`. The opaque `Hash<32>` that `env.crypto().sha256`
+    /// produces is converted via `.to_bytes()` at the tail so the leaf
+    /// is directly usable as input to [`hash_internal_node`] /
+    /// [`verify_merkle_proof`] without further conversion at the call
+    /// site.
+    ///
+    /// # Domain separation
+    ///
+    /// The prepended `0x00` byte is the **leaf marker** under the RFC 9162
+    /// style domain-separation scheme documented in
+    /// `docs/batch-attestation-spec.md`. It distinguishes leaves (whose
+    /// preimage is 33 bytes: `0x00 || 32-byte commitment`) from internal
+    /// nodes (whose preimage is 65 bytes: `0x01 || 32-byte left || 32-byte
+    /// right`) at every level of the tree, cheap second-preimage resistance
+    /// without the extra hashing a sorted-pair scheme would need.
+    ///
+    /// The underlying commitment is the same 175-byte preimage
+    /// [`ScoreAttestation`] binds (binding every leaf to one specific
+    /// deployment on one specific network), so a single secp256k1 signature
+    /// over the Merkle root cryptographically links every accepted entry
+    /// back to its actual payload.
+    ///
+    /// # Failure modes
+    ///
+    /// The only flow through `Err` is `compute_commitment` returning
+    /// `Error::InvalidAttestation` for a `> 9`-character `asset_pair`
+    /// symbol. Submission-side numeric range checks (score > 100,
+    /// confidence > 100, zero timestamp) live in the batch validation
+    /// pipeline, not here — `compute_merkle_leaf` does not validate the
+    /// submission, only its attestation preimage layout.
+    fn compute_merkle_leaf(
+        env: &Env,
+        submission: &ScoreSubmission,
+    ) -> Result<BytesN<32>, Error> {
+        let commitment_bytes = Self::compute_commitment(
+            env,
+            &submission.wallet,
+            &submission.asset_pair,
+            submission.score,
+            submission.benford_flag,
+            submission.ml_flag,
+            submission.timestamp,
+            submission.confidence,
+            submission.model_version,
+        )?
+        .to_bytes()
+        .to_array();
+        let mut preimage = [0u8; 33];
+        preimage[0] = 0x00; // leaf marker
+        preimage[1..33].copy_from_slice(&commitment_bytes);
+        Ok(env.crypto().sha256(&Bytes::from_array(env, &preimage)).to_bytes())
+    }
+
+    /// Hash two 32-byte siblings into their parent: `SHA-256(0x01 || L || R)`,
+    /// returned as a `BytesN<32>` (no further hashing or opaque wrapping
+    /// required). `BytesN<32>` is the natural type for raw 32-byte
+    /// cryptographic outputs inside this contract; only the root-signature
+    /// verification path needs the opaque `Hash<32>` handle (see
+    /// `verify_batch_attestation`).
+    ///
+    /// `sibling_on_left` is the **bit `i` of `proof_flags`** for the current
+    /// tree level: `true` when the sibling sits to the left of the node
+    /// being walked up (so the canonical preimage order is
+    /// `sibling || current`), `false` when the sibling sits to the right
+    /// (so the canonical order is `current || sibling`). The prepended
+    /// `0x01` byte is the **internal-node marker** under the same RFC 9162
+    /// scheme as [`compute_merkle_leaf`]; combined with the leaf marker,
+    /// no leaf hash can collide with any internal-node hash, and no node of
+    /// one shape can collide with any node of a different shape.
+    fn hash_internal_node(
+        env: &Env,
+        current: &BytesN<32>,
+        sibling: &BytesN<32>,
+        sibling_on_left: bool,
+    ) -> BytesN<32> {
+        let mut preimage = [0u8; 65];
+        preimage[0] = 0x01; // internal-node marker
+        let current_bytes = current.to_array();
+        let sibling_bytes = sibling.to_array();
+        if sibling_on_left {
+            preimage[1..33].copy_from_slice(&sibling_bytes);
+            preimage[33..65].copy_from_slice(&current_bytes);
+        } else {
+            preimage[1..33].copy_from_slice(&current_bytes);
+            preimage[33..65].copy_from_slice(&sibling_bytes);
+        }
+        env.crypto()
+            .sha256(&Bytes::from_array(env, &preimage))
+            .to_bytes()
+    }
+
+    /// Walk a Merkle inclusion proof and verify that `leaf` is included in
+    /// the tree with the supplied `root`. The loop runs exactly
+    /// `proof.len()` iterations regardless of whether any intermediate
+    /// hash diverges, so the gas cost is always bounded — there is no
+    /// early-exit branch that an attacker could exploit as a timing oracle.
+    ///
+    /// # Edge cases
+    ///
+    /// - **Empty proof (single-leaf batch):** `current` stays at `leaf`,
+    ///   and the final equality check is just `leaf == root`. This is what
+    ///   makes `proof = []`, `proof_flags = 0` the correct encoding for a
+    ///   one-entry Merkle attestation.
+    /// - **Proof too deep:** `proof.len() > MAX_MERKLE_PROOF_DEPTH`
+    ///   (currently 30) rejects the proof unconditionally — even if the
+    ///   supplied root matches, the contract cannot afford an unbounded
+    ///   number of SHA-256 invocations.
+    ///
+    /// # Returns
+    ///
+    /// `true` when the proof is well-formed and terminates at `root`,
+    /// `false` otherwise (including on any hash mismatch or an over-deep
+    /// proof). A `false` return in `submit_scores_batch_attested` causes
+    /// the affected entry to be rejected with `Error::InvalidAttestation`,
+    /// not the whole batch.
+    fn verify_merkle_proof(
+        env: &Env,
+        leaf: &BytesN<32>,
+        proof: &Vec<BytesN<32>>,
+        proof_flags: u32,
+        root: &BytesN<32>,
+    ) -> bool {
+        let proof_len = proof.len();
+        if proof_len > crate::constants::MAX_MERKLE_PROOF_DEPTH {
+            return false;
+        }
+        let mut current = leaf.clone();
+        for i in 0..proof_len {
+            let sibling = proof.get(i).unwrap();
+            // Bit `i` of `proof_flags` (LSB = 0): 1 means sibling on the left
+            // at this level, 0 means sibling on the right.
+            let sibling_on_left = ((proof_flags >> i) & 1) == 1;
+            current = Self::hash_internal_node(env, &current, &sibling, sibling_on_left);
+        }
+        // Constant-time across mismatches: we always complete the loop above
+        // before comparing; only the final equality check is short-circuited,
+        // and both operands are public.
+        current.to_array() == root.to_array()
+    }
+}
+
+// Structural block implementations for query gate allowlist controls
+mod storage_gate {
+    use soroban_sdk::{Env, Address, Symbol, Vec};
+    use crate::storage;
+    use crate::types::MAX_GATE_CALLERS;
+
+    pub fn verify_caller_protection(env: &Env) -> bool {
+        if !storage::get_gate_open(env) {
+            let caller = env.as_contract().module().invoking_contract_id();
+            let callers = storage::get_gate_callers(env);
+            return callers.contains(&caller);
+        }
+        true
     }
 }

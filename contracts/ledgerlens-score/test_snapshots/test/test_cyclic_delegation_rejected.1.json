@@ -303,7 +303,7 @@
             ],
             "data": {
               "error": {
-                "contract": 30
+                "contract": 38
               }
             }
           }
@@ -324,7 +324,7 @@
               },
               {
                 "error": {
-                  "contract": 30
+                  "contract": 38
                 }
               }
             ],
@@ -349,7 +349,7 @@
               },
               {
                 "error": {
-                  "contract": 30
+                  "contract": 38
                 }
               }
             ],
@@ -420,14 +420,18 @@
           "v0": {
             "topics": [
               {
-                "symbol": "del_set"
-              },
-              {
-                "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                "symbol": "dlg_set"
               }
             ],
             "data": {
-              "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
+              "vec": [
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                },
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
+                }
+              ]
             }
           }
         }
@@ -505,7 +509,7 @@
             ],
             "data": {
               "error": {
-                "contract": 30
+                "contract": 38
               }
             }
           }
@@ -526,7 +530,7 @@
               },
               {
                 "error": {
-                  "contract": 30
+                  "contract": 38
                 }
               }
             ],
@@ -551,7 +555,7 @@
               },
               {
                 "error": {
-                  "contract": 30
+                  "contract": 38
                 }
               }
             ],

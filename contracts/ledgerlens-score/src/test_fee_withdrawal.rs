@@ -10,7 +10,7 @@
 use soroban_sdk::{
     testutils::Address as _,
     token::{StellarAssetClient, TokenClient},
-    Address, Env,
+    Address, Env, Vec,
 };
 
 use crate::{Error, LedgerLensScoreContract, LedgerLensScoreContractClient};
@@ -173,7 +173,7 @@ fn test_withdraw_fees_fee_token_not_set() {
 fn test_withdraw_fees_contract_paused() {
     let (env, client, _admin, token_address, _contract_id) = setup_with_token(100_000);
     client.set_fee_token(&token_address);
-    client.pause();
+    client.pause(&Vec::new(&env));
     let recipient = Address::generate(&env);
     let result = client.try_withdraw_fees(&recipient, &1000);
     assert_eq!(result, Err(Ok(Error::ContractPaused)));
