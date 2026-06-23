@@ -520,6 +520,8 @@ pub enum DataKey {
     FinalityBufferSecs,
     /// Pending score entry held before commit. Invisible to get_score/query_risk_gate.
     PendingScore(Address, Symbol),
+    /// Index of distinct model versions seen so far (`Vec<u32>` in instance storage).
+    ModelVersionIndex,
 }
 
 #[contracttype]

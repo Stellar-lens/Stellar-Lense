@@ -827,7 +827,10 @@ pub fn get_model_stats(_env: &Env, _version: u32) -> Option<crate::types::ModelV
 }
 
 pub fn get_all_model_versions(env: &Env) -> Vec<u32> {
-    Vec::new(env)
+    env.storage()
+        .instance()
+        .get(&DataKey::ModelVersionIndex)
+        .unwrap_or_else(|| Vec::new(env))
 }
 
 pub fn set_service_pubkey(_env: &Env, _pubkey: &Bytes) {}
@@ -838,7 +841,20 @@ pub fn get_service_threshold(env: &Env) -> u32 {
     env.storage().instance().get(&DataKey::ServiceThreshold).unwrap_or(0)
 }
 
-pub fn update_model_stats(_env: &Env, _model_version: u32, _score: u32) {}
+pub fn update_model_stats(env: &Env, model_version: u32, _score: u32) {
+    let key = DataKey::ModelVersionIndex;
+    let mut versions: Vec<u32> = env
+        .storage()
+        .instance()
+        .get(&key)
+        .unwrap_or_else(|| Vec::new(env));
+    if !versions.contains(&model_version)
+        && versions.len() < crate::constants::MAX_MODEL_VERSIONS as u32
+    {
+        versions.push_back(model_version);
+        env.storage().instance().set(&key, &versions);
+    }
+}
 // ── Score submission floor ────────────────────────────────────────────────────
 
 /// Returns the current score-floor policy, falling back to the compiled-in

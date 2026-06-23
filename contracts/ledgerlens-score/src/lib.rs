@@ -1478,6 +1478,17 @@ impl LedgerLensScoreContract {
         storage::get_all_model_versions(&env)
     }
 
+    /// Returns all distinct model versions the contract has seen, in insertion
+    /// order.  Mirrors `get_all_model_versions` under a more descriptive name.
+    pub fn get_model_version_list(env: Env) -> Vec<u32> {
+        storage::get_all_model_versions(&env)
+    }
+
+    /// Returns the number of distinct model versions recorded so far.
+    pub fn get_model_version_count(env: Env) -> u32 {
+        storage::get_all_model_versions(&env).len() as u32
+    }
+
     // ── History ring-buffer depth ────────────────────────────────────────────
 
     /// Sets the maximum number of history entries retained in the per-wallet /
@@ -1874,6 +1885,7 @@ impl LedgerLensScoreContract {
             || capability == symbol_short!("gate")
             || capability == symbol_short!("aggr")
             || capability == symbol_short!("count")
+            || capability == symbol_short!("mv")
             || capability == Symbol::new(&env, "batch_attested")
     }
 
@@ -4451,6 +4463,7 @@ impl LedgerLensScoreContract {
         storage::push_score_history(env, wallet, asset_pair, risk_score);
         storage::register_pair_for_wallet(env, wallet, asset_pair);
         storage::increment_score_count(env, wallet, asset_pair);
+        storage::update_model_stats(env, risk_score.model_version, risk_score.score);
         Self::refresh_aggregate_cache(env, wallet);
 
         let score_threshold = storage::get_risk_threshold(env);
