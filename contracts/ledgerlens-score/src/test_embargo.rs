@@ -176,10 +176,7 @@ fn test_get_score_available_after_timed_expiry() {
     submit(&env, &client, &wallet, &pair, 77);
     client.set_score_embargo(&wallet, &Some(10_000)).unwrap();
     // Score is blocked while embargo is active.
-    assert_eq!(
-        client.try_get_score(&wallet, &pair),
-        Err(Ok(Error::ScoreEmbargoed))
-    );
+    assert_eq!(client.try_get_score(&wallet, &pair), Err(Ok(Error::ScoreEmbargoed)));
     // Advance past expiry.
     env.ledger().with_mut(|l| l.timestamp = 10_001);
     let score = client.get_score(&wallet, &pair);
@@ -340,10 +337,7 @@ fn test_embargo_is_per_wallet() {
     let score_b = client.get_score(&wallet_b, &pair);
     assert_eq!(score_b.score, 40);
     // wallet_a score blocked.
-    assert_eq!(
-        client.try_get_score(&wallet_a, &pair),
-        Err(Ok(Error::ScoreEmbargoed))
-    );
+    assert_eq!(client.try_get_score(&wallet_a, &pair), Err(Ok(Error::ScoreEmbargoed)));
 }
 
 // ── Authorization: only admin can set/lift embargo ────────────────────────────
@@ -386,10 +380,7 @@ fn test_full_embargo_lifecycle() {
     // 2. Set indefinite embargo — score blocked.
     client.set_score_embargo(&wallet, &None).unwrap();
     assert!(client.is_embargoed(&wallet));
-    assert_eq!(
-        client.try_get_score(&wallet, &pair),
-        Err(Ok(Error::ScoreEmbargoed))
-    );
+    assert_eq!(client.try_get_score(&wallet, &pair), Err(Ok(Error::ScoreEmbargoed)));
     assert_eq!(client.get_score_history(&wallet, &pair).len(), 0);
     assert!(!client.query_risk_gate(&wallet, &pair, &75));
 

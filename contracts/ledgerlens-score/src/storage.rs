@@ -434,6 +434,57 @@ pub fn set_service_threshold(env: &Env, threshold: u32) {
     env.storage().instance().set(&DataKey::ServiceThreshold, &threshold);
 }
 
+pub fn get_service_threshold(env: &Env) -> u32 {
+    env.storage().instance().get(&DataKey::ServiceThreshold).unwrap_or(1)
+}
+
+// ── Escalation / breach count ─────────────────────────────────────────────────
+
+pub fn get_escalation_threshold(env: &Env) -> u32 {
+    env.storage().instance().get(&DataKey::EscalationThreshold).unwrap_or(3)
+}
+
+pub fn set_escalation_threshold(env: &Env, n: u32) {
+    env.storage().instance().set(&DataKey::EscalationThreshold, &n);
+}
+
+pub fn get_breach_count(env: &Env, wallet: &Address, asset_pair: &Symbol) -> u32 {
+    let key = DataKey::BreachCount(wallet.clone(), asset_pair.clone());
+    env.storage().temporary().get(&key).unwrap_or(0)
+}
+
+pub fn set_breach_count(env: &Env, wallet: &Address, asset_pair: &Symbol, count: u32) {
+    let key = DataKey::BreachCount(wallet.clone(), asset_pair.clone());
+    env.storage().temporary().set(&key, &count);
+}
+
+pub fn clear_breach_count(env: &Env, wallet: &Address, asset_pair: &Symbol) {
+    let key = DataKey::BreachCount(wallet.clone(), asset_pair.clone());
+    env.storage().temporary().remove(&key);
+}
+
+// ── Model stats ───────────────────────────────────────────────────────────────
+
+pub fn update_model_stats(env: &Env, model_version: u32, score: u32) {
+    let key = DataKey::ModelStats(model_version);
+    let mut stats: ModelVersionStats = env
+        .storage()
+        .instance()
+        .get(&key)
+        .unwrap_or(ModelVersionStats { model_version, submission_count: 0, score_sum: 0 });
+    stats.submission_count += 1;
+    stats.score_sum += score;
+    env.storage().instance().set(&key, &stats);
+}
+
+pub fn get_model_stats(env: &Env, model_version: u32) -> Option<ModelVersionStats> {
+    env.storage().instance().get(&DataKey::ModelStats(model_version))
+}
+
+pub fn get_all_model_versions(env: &Env) -> Vec<u32> {
+    env.storage().instance().get(&DataKey::AllModelVersions).unwrap_or_else(|| Vec::new(env))
+}
+
 // ── Staleness window ──────────────────────────────────────────────────────────
 
 pub fn get_staleness_window(env: &Env) -> u64 {
@@ -597,8 +648,24 @@ pub fn get_service_pubkey(env: &Env) -> Option<Bytes> {
     env.storage().instance().get(&DataKey::ServicePubKey)
 }
 
+pub fn set_service_pubkey(env: &Env, pubkey: &Bytes) {
+    env.storage().instance().set(&DataKey::ServicePubKey, pubkey);
+}
+
 pub fn set_gate_callers(env: &Env, callers: &Vec<Address>) {
     env.storage().instance().set(&GateDataKey::GateCallers, callers);
+}
+
+pub fn get_gate_callers(env: &Env) -> Vec<Address> {
+    env.storage().instance().get(&GateDataKey::GateCallers).unwrap_or_else(|| Vec::new(env))
+}
+
+pub fn set_gate_open(env: &Env, open: bool) {
+    env.storage().instance().set(&GateDataKey::GateOpen, &open);
+}
+
+pub fn get_gate_open(env: &Env) -> bool {
+    env.storage().instance().get(&GateDataKey::GateOpen).unwrap_or(true)
 }
 
 // ── Time-weighted exponential decay ──────────────────────────────────────
@@ -925,9 +992,11 @@ pub fn get_risk_band_state(env: &Env, wallet: &Address, asset_pair: &Symbol) -> 
     let key = DataKey::RiskBandState(wallet.clone(), asset_pair.clone());
     let result: Option<bool> = env.storage().temporary().get(&key);
     if result.is_some() {
-        env.storage()
-            .temporary()
-            .extend_ttl(&key, BAND_STATE_TTL_THRESHOLD, BAND_STATE_TTL_EXTEND_TO);
+        env.storage().temporary().extend_ttl(
+            &key,
+            BAND_STATE_TTL_THRESHOLD,
+            BAND_STATE_TTL_EXTEND_TO,
+        );
     }
     result.unwrap_or(false)
 }
@@ -950,9 +1019,7 @@ pub fn peek_risk_band_state(env: &Env, wallet: &Address, asset_pair: &Symbol) ->
 pub fn set_embargo(env: &Env, wallet: &Address, expiry: &EmbargoExpiry) {
     let key = DataKey::ScoreEmbargo(wallet.clone());
     env.storage().temporary().set(&key, expiry);
-    env.storage()
-        .temporary()
-        .extend_ttl(&key, EMBARGO_TTL_THRESHOLD, EMBARGO_TTL_EXTEND_TO);
+    env.storage().temporary().extend_ttl(&key, EMBARGO_TTL_THRESHOLD, EMBARGO_TTL_EXTEND_TO);
 }
 
 /// Removes the embargo entry for `wallet`, immediately lifting any embargo.
@@ -974,18 +1041,22 @@ pub fn is_embargoed(env: &Env, wallet: &Address) -> bool {
     match expiry {
         None => false,
         Some(EmbargoExpiry::Indefinite) => {
-            env.storage()
-                .temporary()
-                .extend_ttl(&key, EMBARGO_TTL_THRESHOLD, EMBARGO_TTL_EXTEND_TO);
+            env.storage().temporary().extend_ttl(
+                &key,
+                EMBARGO_TTL_THRESHOLD,
+                EMBARGO_TTL_EXTEND_TO,
+            );
             true
         }
         Some(EmbargoExpiry::Until(ts)) => {
             let now = env.ledger().timestamp();
             let active = now <= ts;
             if active {
-                env.storage()
-                    .temporary()
-                    .extend_ttl(&key, EMBARGO_TTL_THRESHOLD, EMBARGO_TTL_EXTEND_TO);
+                env.storage().temporary().extend_ttl(
+                    &key,
+                    EMBARGO_TTL_THRESHOLD,
+                    EMBARGO_TTL_EXTEND_TO,
+                );
             }
             active
         }
@@ -1012,9 +1083,11 @@ pub fn set_risk_band_state(env: &Env, wallet: &Address, asset_pair: &Symbol, in_
     let key = DataKey::RiskBandState(wallet.clone(), asset_pair.clone());
     if in_band {
         env.storage().temporary().set(&key, &true);
-        env.storage()
-            .temporary()
-            .extend_ttl(&key, BAND_STATE_TTL_THRESHOLD, BAND_STATE_TTL_EXTEND_TO);
+        env.storage().temporary().extend_ttl(
+            &key,
+            BAND_STATE_TTL_THRESHOLD,
+            BAND_STATE_TTL_EXTEND_TO,
+        );
     } else {
         env.storage().temporary().remove(&key);
     }
@@ -1034,10 +1107,7 @@ pub fn set_consensus_threshold_k(env: &Env, k: u32) {
 }
 
 pub fn get_consensus_epsilon(env: &Env) -> u32 {
-    env.storage()
-        .instance()
-        .get(&DataKey::ConsensusEpsilon)
-        .unwrap_or(DEFAULT_CONSENSUS_EPSILON)
+    env.storage().instance().get(&DataKey::ConsensusEpsilon).unwrap_or(DEFAULT_CONSENSUS_EPSILON)
 }
 
 pub fn set_consensus_epsilon(env: &Env, epsilon: u32) {

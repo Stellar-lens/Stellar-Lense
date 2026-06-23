@@ -440,10 +440,7 @@ pub fn hysteresis_margin_updated(env: &Env, old_margin: u32, new_margin: u32) {
 /// Emitted when an embargo is created or updated via `set_score_embargo`.
 /// `expiry` is `None` for an indefinite embargo, or `Some(ts)` for a timed one.
 pub fn embargo_set(env: &Env, wallet: &Address, expiry: Option<u64>) {
-    env.events().publish(
-        (symbol_short!("emb_set"), wallet.clone()),
-        expiry,
-    );
+    env.events().publish((symbol_short!("emb_set"), wallet.clone()), expiry);
 }
 
 /// Emitted when an embargo is explicitly lifted via `lift_score_embargo`.

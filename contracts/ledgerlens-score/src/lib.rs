@@ -488,7 +488,7 @@ impl LedgerLensScoreContract {
         Self::authorize_submission(&env, &signers)?;
 
         if submissions.is_empty() {
-            return Err(Error::ConsensusInputEmpty);
+            return Err(Error::InvalidConsensusConfig);
         }
         if submissions.len() != nonces.len() {
             return Err(Error::CommitmentMismatch); // Or some other length mismatch
@@ -1670,6 +1670,79 @@ impl LedgerLensScoreContract {
             }
         }
         Self::compute_aggregate_score(&env, &wallet)
+    }
+
+    /// Returns every asset pair that `wallet` has ever had a score submitted
+    /// for. Returns an empty `Vec` when no scores exist for the wallet.
+    ///
+    /// The list is maintained incrementally by `register_pair_for_wallet` and
+    /// is O(1) to read — it is **not** recomputed by scanning scores.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use soroban_sdk::symbol_short;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    ///
+    /// let wallet = Address::generate(&env);
+    /// // No scores yet — empty list.
+    /// let pairs = client.get_wallet_pair_list(&wallet);
+    /// assert_eq!(pairs.len(), 0);
+    ///
+    /// // Submit a score for XLM_USDC.
+    /// client.submit_score(&Vec::new(&env), &wallet, &symbol_short!("XLM_USDC"), &50, &false, &false, &1, &90, &1, &None).unwrap();
+    /// let pairs = client.get_wallet_pair_list(&wallet);
+    /// assert_eq!(pairs.len(), 1);
+    /// assert_eq!(pairs.get(0).unwrap(), symbol_short!("XLM_USDC"));
+    ///
+    /// // Submit another score for a different pair.
+    /// client.submit_score(&Vec::new(&env), &wallet, &symbol_short!("XLM_BTC"), &30, &false, &false, &2, &85, &1, &None).unwrap();
+    /// let pairs = client.get_wallet_pair_list(&wallet);
+    /// assert_eq!(pairs.len(), 2);
+    /// ```
+    pub fn get_wallet_pair_list(env: Env, wallet: Address) -> Vec<Symbol> {
+        storage::get_wallet_pairs(&env, &wallet)
+    }
+
+    /// Returns the number of distinct asset pairs `wallet` has scores for.
+    /// A convenience shortcut for `get_wallet_pair_list(wallet).len()` that
+    /// avoids allocating the full list when only the count is needed.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use soroban_sdk::symbol_short;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    ///
+    /// let wallet = Address::generate(&env);
+    /// assert_eq!(client.get_wallet_pair_count(&wallet), 0);
+    ///
+    /// client.submit_score(&Vec::new(&env), &wallet, &symbol_short!("XLM_USDC"), &50, &false, &false, &1, &90, &1, &None).unwrap();
+    /// assert_eq!(client.get_wallet_pair_count(&wallet), 1);
+    ///
+    /// client.submit_score(&Vec::new(&env), &wallet, &symbol_short!("XLM_BTC"), &30, &false, &false, &2, &85, &1, &None).unwrap();
+    /// assert_eq!(client.get_wallet_pair_count(&wallet), 2);
+    /// ```
+    pub fn get_wallet_pair_count(env: Env, wallet: Address) -> u32 {
+        storage::get_wallet_pairs(&env, &wallet).len()
     }
 
     /// Sets the weight used for `asset_pair` in the aggregate risk
@@ -3830,9 +3903,9 @@ impl LedgerLensScoreContract {
         Ok(())
     }
 
-    /// Returns the configured fee token address, or `FeeTokenNotSet` if none.
+    /// Returns the configured fee token address, or `NotFound` if none.
     pub fn get_fee_token(env: Env) -> Result<Address, Error> {
-        storage::get_fee_token(&env).ok_or(Error::FeeTokenNotSet)
+        storage::get_fee_token(&env).ok_or(Error::NotFound)
     }
 
     /// Withdraw accumulated fees from the contract to `recipient`.
@@ -3852,7 +3925,7 @@ impl LedgerLensScoreContract {
     /// - [`Error::NotInitialized`] — contract has no admin.
     /// - [`Error::ContractPaused`] — admin has activated the circuit breaker.
     /// - [`Error::InvalidWithdrawalAmount`] — `amount` is zero.
-    /// - [`Error::FeeTokenNotSet`] — `set_fee_token` has not been called.
+    /// - [`Error::NotFound`] — `set_fee_token` has not been called.
     /// - [`Error::WithdrawalInProgress`] — a concurrent withdrawal is running.
     pub fn withdraw_fees(env: Env, recipient: Address, amount: i128) -> Result<(), Error> {
         if !storage::has_admin(&env) {
@@ -3871,7 +3944,7 @@ impl LedgerLensScoreContract {
         }
 
         // Fee token must be configured.
-        let fee_token = storage::get_fee_token(&env).ok_or(Error::FeeTokenNotSet)?;
+        let fee_token = storage::get_fee_token(&env).ok_or(Error::NotFound)?;
 
         // Acquire the concurrency lock — prevents duplicate in-flight calls.
         if storage::is_withdrawal_locked(&env) {
@@ -4208,12 +4281,9 @@ impl LedgerLensScoreContract {
                 events::risk_band_entered(env, wallet, asset_pair, score, risk_threshold);
             }
             // Already in band: stay, no event.
-        } else if in_band {
-            if score < exit_threshold {
-                storage::set_risk_band_state(env, wallet, asset_pair, false);
-                events::risk_band_cleared(env, wallet, asset_pair, score, exit_threshold);
-            }
-            // score >= exit_threshold: hysteresis holds, stay in band, no event.
+        } else if in_band && score < exit_threshold {
+            storage::set_risk_band_state(env, wallet, asset_pair, false);
+            events::risk_band_cleared(env, wallet, asset_pair, score, exit_threshold);
         }
         // Not in band and score < threshold: nothing to do.
     }
@@ -4503,6 +4573,20 @@ impl LedgerLensScoreContract {
         }
     }
 
+    /// Commits the score update to the in-memory Merkle accumulator.
+    /// No-op in the base contract; overridden by the snapshot-spec compliant
+    /// implementation.
+    fn update_merkle_accumulator(
+        _env: &Env,
+        _wallet: &Address,
+        _asset_pair: &Symbol,
+        _score: u32,
+        _timestamp: u64,
+        _confidence: u32,
+        _model_version: u32,
+    ) {
+    }
+
     /// Returns `true` when the score-floor policy would block a submission of
     /// `new_score` for `(wallet, asset_pair)` — i.e. the policy is enabled, the
     /// pair's historical peak is at or above the high-water mark, and
@@ -4653,7 +4737,10 @@ impl LedgerLensScoreContract {
         None
     }
 
-    fn median_score_for_indices(submissions: &Vec<ModelSubmission>, indices: &Vec<u32>) -> Option<u32> {
+    fn median_score_for_indices(
+        submissions: &Vec<ModelSubmission>,
+        indices: &Vec<u32>,
+    ) -> Option<u32> {
         if indices.is_empty() {
             return None;
         }

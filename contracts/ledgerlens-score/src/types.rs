@@ -408,6 +408,9 @@ pub enum DataKey {
     /// Admin-configured delay (seconds) between proposing and executing an
     /// upgrade. Defaults to `DEFAULT_UPGRADE_DELAY_SECS` when unset.
     UpgradeDelay,
+    /// Per-signer score range restriction. Maps a service signer address to
+    /// its allowed `TierBounds`.
+    SignerTier(Address),
     /// Ordered set of N addresses authorised to co-sign score submissions.
     ServiceSet,
     /// The M-of-N threshold: minimum number of service-set members that must
@@ -444,6 +447,10 @@ pub enum DataKey {
     /// Denominator of the fixed-point decay rate λ = numerator / denominator.
     /// Defaults to 1 when unset.
     DecayRateDenominator,
+    /// Global minimum confidence floor (0–100) enforced by
+    /// `query_risk_gate_with_confidence`. The effective floor is
+    /// `max(caller_param, global_floor)`. Defaults to 0 (no floor) when unset.
+    GlobalMinConfidence,
     /// The SEP-41 token contract address from which fees are withdrawn.
     /// Unset until `set_fee_token` is called.
     FeeToken,
