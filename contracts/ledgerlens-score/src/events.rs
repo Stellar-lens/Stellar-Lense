@@ -491,3 +491,13 @@ pub fn service_resumed(env: &Env, event: &ServiceResumedEvent) {
 pub fn heartbeat_threshold_updated(env: &Env, secs: u64) {
     env.events().publish((symbol_short!("hb_upd"),), secs);
 }
+
+// ── Proactive TTL rent management ────────────────────────────────────────────
+
+/// Emitted by `extend_entry_ttls` after an admin-triggered bulk TTL renewal.
+/// `renewed` counts entries that actually had a live score extended;
+/// `requested` is the size of the input batch, so a gap between the two
+/// signals stale entries in the caller's index (e.g. already archived).
+pub fn entry_ttls_extended(env: &Env, renewed: u32, requested: u32) {
+    env.events().publish((symbol_short!("ttl_ext"),), (renewed, requested));
+}

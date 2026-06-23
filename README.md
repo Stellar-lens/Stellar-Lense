@@ -166,6 +166,15 @@ Read-only. Returns `true` only while `asset_pair` is individually paused. `false
 ### `get_paused_pairs() -> Vec<Symbol>`
 Read-only. Returns every asset pair currently paused, in no particular order. O(1) — backed by the incrementally-maintained `PausedPairIndex`, not a scan.
 
+### `get_expiring_entries(max_entries: u32) -> Vec<(Address, Symbol)>`
+Read-only, callable by anyone. Returns up to `max_entries` (capped at `MAX_EXPIRING_ENTRIES_PER_CALL`, 100) tracked `(wallet, asset_pair)` score entries whose estimated remaining TTL has dropped to or below `SCORE_TTL_THRESHOLD`, most overdue first. Feed the result into `extend_entry_ttls`. See [Storage Rent Management](#storage-rent-management).
+
+### `get_entry_ttl(wallet: Address, asset_pair: Symbol) -> u32`
+Read-only. Returns the estimated number of ledgers remaining before the entry should be proactively renewed. Returns `ScoreNotFound` if the wallet/pair has never been scored.
+
+### `extend_entry_ttls(admin_signers: Vec<Address>, entries: Vec<(Address, Symbol)>) -> u32`
+Admin only. Bulk-renews the TTL of every entry in `entries` that still has a live score, skipping any that don't (already archived, or never existed) rather than failing the whole call. Returns the number actually renewed. Rejects with `BatchTooLarge` if `entries` exceeds `MAX_EXPIRING_ENTRIES_PER_CALL`. Emits `ttl_ext` with the renewed and requested counts.
+
 ### `RiskScore` Structure
 
 ```rust
@@ -268,7 +277,7 @@ A wallet scoring 60-70 on three pairs individually might not breach the per-pair
 | 7 | `ContractPaused` | Submission attempted while admin circuit-breaker is active |
 | 8 | `NoPendingAdminTransfer` | `accept_admin` / `cancel_admin_transfer` with no transfer in flight |
 | 9 | `EmptyBatch` | `submit_scores_batch` called with zero entries |
-| 10 | `BatchTooLarge` | Batch exceeds `MAX_BATCH_SIZE` (20) |
+| 10 | `BatchTooLarge` | `submit_scores_batch` exceeds `MAX_BATCH_SIZE` (20), or `extend_entry_ttls` exceeds `MAX_EXPIRING_ENTRIES_PER_CALL` (100) |
 | 11 | `ArithmeticOverflow` | Weighted aggregate computation overflows |
 | 12 | `UpgradeAlreadyPending` | `propose_upgrade` while a proposal is already pending |
 | 13 | `NoPendingUpgrade` | `execute_upgrade` / `veto_upgrade` / `get_pending_upgrade` with no proposal |
@@ -398,6 +407,35 @@ pub struct ScoreFloorPolicy {
     pub floor_value: u32,      // minimum score [0, high_water_mark-1] for a high-risk wallet
 }
 ```
+
+## Storage Rent Management
+
+Soroban silently **archives** a persistent ledger entry once its TTL reaches zero. Every `submit_score` write extends the written entry's TTL, so high-traffic wallet/pair pairs stay alive automatically — but a wallet that was scored once and then goes quiet has no further writes to trigger that extension, and its score entry counts down to expiry unnoticed. The next read returns `ScoreNotFound` for a wallet that was clearly scored before, with no warning beforehand. `get_expiring_entries` / `extend_entry_ttls` let an admin sweep and proactively renew entries before that happens.
+
+**The flow:**
+
+1. Every accepted `submit_score` / `submit_scores_batch` write registers the `(wallet, asset_pair)` in an incrementally-maintained index (capped at `MAX_TRACKED_SCORE_ENTRIES`, 500) and stamps the ledger sequence it was last touched at.
+2. Periodically (see cadence below), an off-chain job calls `get_expiring_entries(max_entries)` — a free, read-only call — to get back the entries that have gone dormant long enough to be at risk, most urgent first.
+3. The job feeds that list straight into `extend_entry_ttls(admin_signers, entries)`. The admin call renews each entry's on-chain TTL and resets its dormancy clock; entries that turn out to have already been archived (or never existed) are skipped rather than failing the whole batch.
+
+```
+  off-chain cron                 contract
+        │                           │
+        │  get_expiring_entries(N)  │
+        ├──────────────────────────►│  scan ScoreEntryIndex,
+        │◄──────────────────────────┤  return entries due for renewal
+        │  [(wallet, pair), ...]    │
+        │                           │
+        │  extend_entry_ttls(       │
+        │    admin_signers, list)   │
+        ├──────────────────────────►│  extend_ttl() per entry,
+        │◄──────────────────────────┤  refresh dormancy clock
+        │  renewed_count            │
+```
+
+Soroban contracts have no host function to read another entry's *actual* remaining TTL from inside a running contract, so "remaining TTL" here (returned by `get_entry_ttl`, and the ordering used by `get_expiring_entries`) is a conservative estimate based on ledgers elapsed since the entry's last write or renewal, not a literal on-chain read. The estimate can only flag an entry as due *early*, never late — see the rustdoc on `storage::get_expiring_entries` for the full reasoning.
+
+**Recommended operational cadence:** run the sweep (`get_expiring_entries` → `extend_entry_ttls`) on a schedule comfortably shorter than `SCORE_TTL_THRESHOLD` (~30 days at 5s/ledger) — daily is a reasonable default for most deployments, and even weekly leaves a wide safety margin before any entry would actually be at risk of archival.
 
 ## Score Attestation
 

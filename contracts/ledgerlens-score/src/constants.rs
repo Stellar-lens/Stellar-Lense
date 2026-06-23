@@ -162,3 +162,24 @@ pub const MAX_FINALITY_BUFFER_SECS: u64 = 86_400; // 24 hours
 /// Default heartbeat alert threshold (seconds) until the admin configures
 /// one explicitly via `set_heartbeat_alert_threshold` — 1 hour.
 pub const DEFAULT_HEARTBEAT_ALERT_THRESHOLD_SECS: u64 = 3_600; // 1 hour
+
+// ── Proactive TTL rent management ─────────────────────────────────────────────
+//
+// Soroban silently archives a persistent entry once its TTL reaches zero. A
+// high-traffic (wallet, asset_pair) entry has its TTL pushed out on every
+// `submit_score` write, but a dormant entry that simply stops being written
+// to keeps counting down and can expire unnoticed — surfacing later as a
+// confusing `ScoreNotFound` for a wallet that was scored before. These bounds
+// cap the index used to proactively sweep and re-extend entries before that
+// happens. See `get_expiring_entries` / `extend_entry_ttls`.
+
+/// Maximum number of (wallet, asset_pair) entries tracked in `ScoreEntryIndex`
+/// for proactive rent management. Bounds the cost of the admin sweep; once
+/// full, additional entries still get their TTL extended by `set_score`
+/// itself, they just aren't visible to `get_expiring_entries`.
+pub const MAX_TRACKED_SCORE_ENTRIES: u32 = 500;
+
+/// Hard ceiling on `max_entries` accepted by `get_expiring_entries`, and on
+/// the batch size accepted by `extend_entry_ttls` — bounds the cost of a
+/// single read/write call.
+pub const MAX_EXPIRING_ENTRIES_PER_CALL: u32 = 100;

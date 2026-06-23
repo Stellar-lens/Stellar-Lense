@@ -397,6 +397,24 @@ pub enum DataKey {
     /// emitted) the next time a submission or `ping_heartbeat` is accepted —
     /// see `submit_score` / `ping_heartbeat`.
     ServiceSilentAlertEmitted,
+    /// Per-model-version performance statistics: tracked submission count,
+    /// score sum (for mean), max, min, and first/last seen timestamps.
+    ModelVersionStats(u32),
+    /// Ordered, de-duplicated list of every model version the contract has
+    /// seen — an incrementally maintained index so `get_all_model_versions`
+    /// is O(1).
+    ModelVersionIndex,
+    /// Index of every (wallet, asset_pair) entry tracked for proactive TTL
+    /// rent management. `Vec<(Address, Symbol)>`, capped at
+    /// `MAX_TRACKED_SCORE_ENTRIES` and incrementally maintained by
+    /// `storage::track_score_entry`.
+    ScoreEntryIndex,
+    /// Ledger sequence number at which `(wallet, asset_pair)`'s score entry
+    /// was last touched (written via `submit_score` / `submit_scores_batch`,
+    /// or proactively renewed via `extend_entry_ttls`). Used to estimate the
+    /// entry's remaining TTL — see `storage::estimate_entry_ttl` for why this
+    /// is an estimate rather than an exact on-chain read.
+    ScoreEntryLastTouchedLedger(Address, Symbol),
 }
 
 #[contracttype]
