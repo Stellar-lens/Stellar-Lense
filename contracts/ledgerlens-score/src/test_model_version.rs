@@ -266,3 +266,61 @@ fn test_model_version_snapshot() {
     assert_eq!(score.score, 55);
     assert_eq!(score.model_version, 2);
 }
+
+// ── get_model_version_list / get_model_version_count ──────────────────────────
+
+#[test]
+fn test_model_version_list_empty_initially() {
+    let (env, client, _admin) = setup();
+    assert_eq!(client.get_model_version_list().len(), 0);
+    assert_eq!(client.get_model_version_count(), 0);
+}
+
+#[test]
+fn test_model_version_list_grows_with_submissions() {
+    let (env, client, _admin) = setup();
+    let wallet = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+
+    // Submit with version 1
+    client.submit_score(&Vec::new(&env), &wallet, &pair, &50, &false, &false, &START_TS, &90, &1, &None);
+    let versions = client.get_model_version_list();
+    assert_eq!(versions.len(), 1);
+    assert_eq!(versions.get(0).unwrap(), 1);
+
+    // Submit with version 2 (advance ledger to pass cooldown)
+    env.ledger().with_mut(|l| l.timestamp = START_TS + 3_601);
+    client.submit_score(&Vec::new(&env), &wallet, &pair, &60, &false, &false, &START_TS + 1, &95, &2, &None);
+    let versions = client.get_model_version_list();
+    assert_eq!(versions.len(), 2);
+    assert_eq!(versions.get(0).unwrap(), 1);
+    assert_eq!(versions.get(1).unwrap(), 2);
+
+    // Submit with version 1 again (duplicate — not added)
+    env.ledger().with_mut(|l| l.timestamp = START_TS + 7_202);
+    client.submit_score(&Vec::new(&env), &wallet, &pair, &55, &false, &false, &START_TS + 2, &92, &1, &None);
+    let versions = client.get_model_version_list();
+    assert_eq!(versions.len(), 2); // still 2 — no duplicate entry
+    assert_eq!(client.get_model_version_count(), 2);
+}
+
+#[test]
+fn test_model_version_list_multiple_wallets_and_pairs() {
+    let (env, client, _admin) = setup();
+    let wallet_a = Address::generate(&env);
+    let wallet_b = Address::generate(&env);
+    let pair_x = symbol_short!("XLM_USDC");
+    let pair_y = symbol_short!("XLM_BTC");
+
+    // Different wallets/pairs all contribute to the same global index
+    client.submit_score(&Vec::new(&env), &wallet_a, &pair_x, &50, &false, &false, &START_TS, &90, &1, &None);
+    client.submit_score(&Vec::new(&env), &wallet_a, &pair_y, &60, &false, &false, &START_TS, &90, &3, &None);
+    env.ledger().with_mut(|l| l.timestamp = START_TS + 3_601);
+    client.submit_score(&Vec::new(&env), &wallet_b, &pair_x, &70, &false, &false, &START_TS + 1, &90, &1, &None);
+
+    let versions = client.get_model_version_list();
+    assert_eq!(versions.len(), 2);
+    assert_eq!(versions.get(0).unwrap(), 1);
+    assert_eq!(versions.get(1).unwrap(), 3);
+    assert_eq!(client.get_model_version_count(), 2);
+}

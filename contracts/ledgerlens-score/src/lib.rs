@@ -1748,6 +1748,17 @@ impl LedgerLensScoreContract {
         storage::get_all_model_versions(&env)
     }
 
+    /// Returns all distinct model versions the contract has seen, in insertion
+    /// order.  Mirrors `get_all_model_versions` under a more descriptive name.
+    pub fn get_model_version_list(env: Env) -> Vec<u32> {
+        storage::get_all_model_versions(&env)
+    }
+
+    /// Returns the number of distinct model versions recorded so far.
+    pub fn get_model_version_count(env: Env) -> u32 {
+        storage::get_all_model_versions(&env).len() as u32
+    }
+
     // ── History ring-buffer depth ────────────────────────────────────────────
 
     /// Sets the maximum number of history entries retained in the per-wallet /
