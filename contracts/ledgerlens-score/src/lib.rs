@@ -53,6 +53,9 @@ mod test_hysteresis;
 mod test_embargo;
 
 #[cfg(test)]
+mod test_cooldown;
+
+#[cfg(test)]
 mod test_consensus;
 
 #[cfg(test)]
