@@ -28,6 +28,7 @@ from typing import Literal
 import networkx as nx
 import numpy as np
 import pandas as pd
+import re
 
 from ingestion.data_models import AccountActivity
 

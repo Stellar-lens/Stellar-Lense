@@ -61,6 +61,9 @@ class Config:
     )
 
     RISK_SCORE_FLAG_THRESHOLD: int = int(os.getenv("RISK_SCORE_FLAG_THRESHOLD", "70"))
+    # Set to a non-zero integer to pin the alert threshold and disable the RL agent.
+    # E.g. THRESHOLD_RL_PINNED=75 → agent is bypassed, threshold is fixed at 75.
+    THRESHOLD_RL_PINNED: int = int(os.getenv("THRESHOLD_RL_PINNED", "0"))
 
     RISK_SCORE_DB_URL: str = os.getenv("RISK_SCORE_DB_URL", "sqlite:///ledgerlens.db")
 
