@@ -2635,3 +2635,62 @@ fn test_remove_nonexistent_link_fails() {
     let result = client.try_remove_counterparty_link(&wallet_a, &wallet_b, &asset_pair);
     assert_eq!(result, Err(Ok(Error::CounterpartyLinkFull)));
 }
+
+// ── get_score_variance tests ──────────────────────────────────────────────────
+
+#[test]
+fn test_get_score_variance_empty() {
+    let (env, client, _admin, _service) = initialized();
+    let wallet = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+    assert_eq!(client.get_score_variance(&wallet, &asset_pair), 0);
+}
+
+#[test]
+fn test_get_score_variance_single_entry() {
+    let (env, client, _admin, _service) = initialized();
+    let wallet = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &50, &false, &false, &1, &80, &1, &None);
+    assert_eq!(client.get_score_variance(&wallet, &asset_pair), 0);
+}
+
+#[test]
+fn test_get_score_variance_identical_scores() {
+    let (env, client, _admin, _service) = initialized();
+    let wallet = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+    for i in 0u32..4 {
+        env.ledger().with_mut(|l| l.timestamp += 3_601);
+        client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &42, &false, &false, &(i as u64 + 1), &80, &1, &None);
+    }
+    assert_eq!(client.get_score_variance(&wallet, &asset_pair), 0);
+}
+
+#[test]
+fn test_get_score_variance_known_values() {
+    let (env, client, _admin, _service) = initialized();
+    let wallet = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+    // scores: [2, 4, 6, 8]; mean=5; var=((3^2)+(1^2)+(1^2)+(3^2))/4 = 20/4 = 5; scaled = 5*100 = 500
+    for i in 0u32..4 {
+        env.ledger().with_mut(|l| l.timestamp += 3_601);
+        client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &(2 + i * 2), &false, &false, &(i as u64 + 1), &80, &1, &None);
+    }
+    assert_eq!(client.get_score_variance(&wallet, &asset_pair), 500);
+}
+
+#[test]
+fn test_get_score_variance_embargoed() {
+    let (env, client, _admin, _service) = initialized();
+    let wallet = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+    env.ledger().with_mut(|l| l.timestamp += 3_601);
+    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &10, &false, &false, &1, &80, &1, &None);
+    env.ledger().with_mut(|l| l.timestamp += 3_601);
+    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &20, &false, &false, &2, &80, &1, &None);
+    let admin = client.get_admin();
+    env.ledger().with_mut(|l| l.timestamp += 1);
+    client.set_score_embargo(&wallet, &None).unwrap();
+    assert_eq!(client.get_score_variance(&wallet, &asset_pair), 0);
+}
