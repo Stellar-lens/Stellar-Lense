@@ -1,4 +1,4 @@
-use soroban_sdk::{contracttype, Address};
+use soroban_sdk::{contracttype, Address, BytesN, Symbol};
 
 /// Embargo expiry configuration stored per wallet in temporary storage.
 ///
@@ -33,6 +33,38 @@ pub struct RiskScore {
     /// this score.  Allows consumers to detect stale scores when the
     /// pipeline is retrained.
     pub model_version: u32,
+}
+
+/// Query descriptor for a batch score read.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ScoreQuery {
+    pub wallet: Address,
+    pub asset_pair: Symbol,
+}
+
+/// Per-entry result returned by `get_scores_batch`.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BatchScoreResult {
+    pub index: u32,
+    pub found: bool,
+    pub score: Option<RiskScore>,
+}
+
+/// Read-only decay-adjusted view of a stored risk score.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EffectiveRiskScore {
+    pub raw_score: u32,
+    pub effective_score: u32,
+    pub decay_applied: bool,
+    pub elapsed_secs: u64,
+    pub timestamp: u64,
+    pub confidence: u32,
+    pub model_version: u32,
+    pub benford_flag: bool,
+    pub ml_flag: bool,
 }
 
 /// A single entry in a batch score submission.  Mirrors the fields of
@@ -327,6 +359,8 @@ pub enum DataKey {
     UpgradeDelay,
     /// Ordered set of N addresses authorised to co-sign score submissions.
     ServiceSet,
+    /// Optional per-signer score tier bounds for service signers.
+    SignerTier(Address),
     /// The M-of-N threshold: minimum number of service-set members that must
     /// sign a `submit_score` call for it to be accepted.
     ServiceThreshold,
@@ -361,6 +395,8 @@ pub enum DataKey {
     /// Denominator of the fixed-point decay rate λ = numerator / denominator.
     /// Defaults to 1 when unset.
     DecayRateDenominator,
+    /// Admin-configured global confidence floor used by confidence-gated reads.
+    GlobalMinConfidence,
     /// The SEP-41 token contract address from which fees are withdrawn.
     /// Unset until `set_fee_token` is called.
     FeeToken,
@@ -427,3 +463,4 @@ pub enum DataKey {
 pub struct TierBounds {
     pub min_score: u32,
     pub max_score: u32,
+}

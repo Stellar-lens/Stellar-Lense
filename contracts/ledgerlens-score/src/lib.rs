@@ -53,9 +53,10 @@ use soroban_sdk::{
 
 pub use errors::Error;
 pub use types::{
-    AggregateRiskScore, BatchAttestation, BatchEntryResult, BatchResult, EmbargoExpiry,
-    ModelSubmission, RiskScore, ScoreAttestation, ScoreFloorPolicy, ScoreSubmission,
-    ScoreSubmissionWithProof, ScoreTrend, UpgradeProposal,
+    AggregateRiskScore, BatchAttestation, BatchEntryResult, BatchResult, BatchScoreResult,
+    EffectiveRiskScore, EmbargoExpiry, ModelSubmission, RiskScore, ScoreAttestation,
+    ScoreFloorPolicy, ScoreQuery, ScoreSubmission, ScoreSubmissionWithProof, ScoreTrend,
+    UpgradeProposal,
 };
 
 /// On-chain truth layer for LedgerLens risk scores.
@@ -830,19 +831,67 @@ impl LedgerLensScoreContract {
     /// assert_eq!(score.score, 10);
     /// ```
     pub fn get_score(env: Env, wallet: Address, asset_pair: Symbol) -> Result<RiskScore, Error> {
-        if storage::is_embargoed(&env, &wallet) {
-            return Err(Error::ScoreEmbargoed);
+        Self::lookup_score(&env, &wallet, &asset_pair)?.ok_or(Error::ScoreNotFound)
+    }
+
+    /// Reads the latest score for each requested wallet / asset-pair pair.
+    ///
+    /// This is the batch equivalent of [`get_score`]. Each result preserves
+    /// the input index so callers can correlate responses without relying on
+    /// positional decoding alone. Missing scores and embargoed wallets return
+    /// `found = false` and `score = None`; delegated wallets resolve through
+    /// their custodian when no direct score exists.
+    ///
+    /// The call is bounded by [`constants::BATCH_READ_MAX`] to keep execution
+    /// cost predictable. Time complexity is O(n), and output space is O(n),
+    /// where `n = queries.len()` and `n <= BATCH_READ_MAX`.
+    ///
+    /// # Errors
+    /// - [`Error::BatchTooLarge`] if `queries.len() > BATCH_READ_MAX`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreQuery};
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
+    /// # use soroban_sdk::symbol_short;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// let wallet = Address::generate(&env);
+    /// let asset_pair = symbol_short!("XLM_USDC");
+    /// client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &42, &false, &false, &1, &90, &1, &None).unwrap();
+    /// let mut queries = Vec::new(&env);
+    /// queries.push_back(ScoreQuery { wallet, asset_pair });
+    /// let results = client.get_scores_batch(&queries);
+    /// assert_eq!(results.get(0).unwrap().score.unwrap().score, 42);
+    /// ```
+    pub fn get_scores_batch(
+        env: Env,
+        queries: Vec<ScoreQuery>,
+    ) -> Result<Vec<BatchScoreResult>, Error> {
+        if queries.len() > constants::BATCH_READ_MAX {
+            return Err(Error::BatchTooLarge);
         }
-        match storage::get_score(&env, &wallet, &asset_pair) {
-            Some(score) => Ok(score),
-            None => {
-                if let Some(custodian) = storage::get_score_delegate(&env, &wallet) {
-                    storage::get_score(&env, &custodian, &asset_pair).ok_or(Error::ScoreNotFound)
-                } else {
-                    Err(Error::ScoreNotFound)
-                }
-            }
+
+        let mut results = Vec::new(&env);
+        for i in 0..queries.len() {
+            let Some(query) = queries.get(i) else {
+                results.push_back(BatchScoreResult { index: i, found: false, score: None });
+                continue;
+            };
+            let score = match Self::lookup_score(&env, &query.wallet, &query.asset_pair) {
+                Ok(score) => score,
+                Err(Error::ScoreEmbargoed) => None,
+                Err(err) => return Err(err),
+            };
+            results.push_back(BatchScoreResult { index: i, found: score.is_some(), score });
         }
+        Ok(results)
     }
 
     /// Read-only lookup of the live decay-adjusted score for `wallet` / `asset_pair`.
@@ -1394,6 +1443,25 @@ impl LedgerLensScoreContract {
         asset_pair: Symbol,
         gate_threshold: u32,
     ) -> bool {
+        Self::query_risk_gate_with_confidence(env, wallet, asset_pair, gate_threshold, 0)
+    }
+
+    /// Confidence-gated variant of [`query_risk_gate`].
+    ///
+    /// Returns `true` only when a score exists, is strictly below
+    /// `gate_threshold`, and meets the stricter of `min_confidence` and the
+    /// admin-configured global confidence floor. Invalid thresholds above 100
+    /// return `false` instead of panicking.
+    pub fn query_risk_gate_with_confidence(
+        env: Env,
+        wallet: Address,
+        asset_pair: Symbol,
+        gate_threshold: u32,
+        min_confidence: u32,
+    ) -> bool {
+        if gate_threshold > 100 || min_confidence > 100 {
+            return false;
+        }
         // Embargoed wallets: conservative false — treat as "no signal available".
         // Uses peek (no TTL extension) to remain side-effect free.
         if storage::peek_is_embargoed(&env, &wallet) {
@@ -1407,21 +1475,19 @@ impl LedgerLensScoreContract {
         if storage::peek_risk_band_state(&env, &wallet, &asset_pair) {
             return false;
         }
+        let global_floor = storage::get_global_min_confidence(&env);
+        let effective_floor =
+            if min_confidence > global_floor { min_confidence } else { global_floor };
         match storage::peek_score(&env, &wallet, &asset_pair) {
-feat/confidence-gated-risk-gate
             Some(risk) => risk.score < gate_threshold && risk.confidence >= effective_floor,
-            None => false,
-
-            Some(risk) => risk.score < gate_threshold,
             None => {
                 if let Some(custodian) = storage::peek_score_delegate(&env, &wallet) {
                     if let Some(risk) = storage::peek_score(&env, &custodian, &asset_pair) {
-                        return risk.score < gate_threshold;
+                        return risk.score < gate_threshold && risk.confidence >= effective_floor;
                     }
                 }
                 false
             }
- main
         }
     }
 
@@ -1459,6 +1525,8 @@ feat/confidence-gated-risk-gate
             || capability == symbol_short!("gate")
             || capability == symbol_short!("aggr")
             || capability == symbol_short!("count")
+            || capability == symbol_short!("cgate")
+            || capability == Symbol::new(&env, "batch_read")
             || capability == Symbol::new(&env, "batch_attested")
     }
 
@@ -3261,6 +3329,26 @@ feat/confidence-gated-risk-gate
             // score >= exit_threshold: hysteresis holds, stay in band, no event.
         }
         // Not in band and score < threshold: nothing to do.
+    }
+
+    fn lookup_score(
+        env: &Env,
+        wallet: &Address,
+        asset_pair: &Symbol,
+    ) -> Result<Option<RiskScore>, Error> {
+        if storage::is_embargoed(env, wallet) {
+            return Err(Error::ScoreEmbargoed);
+        }
+
+        if let Some(score) = storage::get_score(env, wallet, asset_pair) {
+            return Ok(Some(score));
+        }
+
+        if let Some(custodian) = storage::get_score_delegate(env, wallet) {
+            return Ok(storage::get_score(env, &custodian, asset_pair));
+        }
+
+        Ok(None)
     }
 
     /// Computes a fixed-point approximation of the exponential decay factor

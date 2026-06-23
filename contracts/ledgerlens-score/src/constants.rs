@@ -12,6 +12,9 @@ pub const DEFAULT_HISTORY_MAX_DEPTH: u32 = 10;
 /// Maximum number of entries accepted in a single batch submission call.
 pub const MAX_BATCH_SIZE: u32 = 20;
 
+/// Maximum number of entries accepted in a single batch score read call.
+pub const BATCH_READ_MAX: u32 = 50;
+
 /// Default risk threshold used when no threshold has been configured by admin.
 pub const DEFAULT_RISK_THRESHOLD: u32 = 75;
 

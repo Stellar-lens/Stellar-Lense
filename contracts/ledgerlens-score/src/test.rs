@@ -5,7 +5,8 @@ use soroban_sdk::{
 };
 
 use crate::{
-    BatchResult, Error, LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreSubmission,
+    BatchResult, Error, LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreQuery,
+    ScoreSubmission,
 };
 
 // ── Test helpers ──────────────────────────────────────────────────────────────
@@ -89,6 +90,192 @@ fn test_get_score_not_found() {
 
     let result = client.try_get_score(&wallet, &asset_pair);
     assert_eq!(result, Err(Ok(Error::ScoreNotFound)));
+}
+
+#[test]
+fn test_get_scores_batch_empty() {
+    let (env, client, admin, service) = setup();
+    client.initialize(&admin, &service);
+
+    let queries = Vec::new(&env);
+    let results = client.get_scores_batch(&queries);
+    assert_eq!(results.len(), 0);
+}
+
+#[test]
+fn test_get_scores_batch_single_entry() {
+    let (env, client, admin, service) = setup();
+    client.initialize(&admin, &service);
+
+    let wallet = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &asset_pair,
+        &64,
+        &false,
+        &true,
+        &1,
+        &88,
+        &1,
+        &None,
+    );
+
+    let mut queries = Vec::new(&env);
+    queries.push_back(ScoreQuery { wallet, asset_pair });
+
+    let results = client.get_scores_batch(&queries);
+    let entry = results.get(0).unwrap();
+    assert_eq!(entry.index, 0);
+    assert!(entry.found);
+    assert_eq!(entry.score.unwrap().score, 64);
+}
+
+#[test]
+fn test_get_scores_batch_max_batch() {
+    let (env, client, admin, service) = setup();
+    client.initialize(&admin, &service);
+
+    let asset_pair = symbol_short!("XLM_USDC");
+    let mut queries = Vec::new(&env);
+    for i in 0..crate::constants::BATCH_READ_MAX {
+        let wallet = Address::generate(&env);
+        client.submit_score(
+            &Vec::new(&env),
+            &wallet,
+            &asset_pair,
+            &(i % 100),
+            &false,
+            &false,
+            &(i as u64 + 1),
+            &90,
+            &1,
+            &None,
+        );
+        queries.push_back(ScoreQuery { wallet, asset_pair: asset_pair.clone() });
+    }
+
+    let results = client.get_scores_batch(&queries);
+    assert_eq!(results.len(), crate::constants::BATCH_READ_MAX);
+    for i in 0..results.len() {
+        let entry = results.get(i).unwrap();
+        assert_eq!(entry.index, i);
+        assert!(entry.found);
+        assert_eq!(entry.score.unwrap().score, i % 100);
+    }
+}
+
+#[test]
+fn test_get_scores_batch_too_large() {
+    let (env, client, admin, service) = setup();
+    client.initialize(&admin, &service);
+
+    let asset_pair = symbol_short!("XLM_USDC");
+    let mut queries = Vec::new(&env);
+    for _ in 0..=crate::constants::BATCH_READ_MAX {
+        queries.push_back(ScoreQuery {
+            wallet: Address::generate(&env),
+            asset_pair: asset_pair.clone(),
+        });
+    }
+
+    let result = client.try_get_scores_batch(&queries);
+    assert_eq!(result, Err(Ok(Error::BatchTooLarge)));
+}
+
+#[test]
+fn test_get_scores_batch_partial_hit_miss() {
+    let (env, client, admin, service) = setup();
+    client.initialize(&admin, &service);
+
+    let wallet_hit = Address::generate(&env);
+    let wallet_miss = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet_hit,
+        &asset_pair,
+        &71,
+        &false,
+        &false,
+        &1,
+        &90,
+        &1,
+        &None,
+    );
+
+    let mut queries = Vec::new(&env);
+    queries.push_back(ScoreQuery { wallet: wallet_hit, asset_pair: asset_pair.clone() });
+    queries.push_back(ScoreQuery { wallet: wallet_miss, asset_pair });
+
+    let results = client.get_scores_batch(&queries);
+    assert!(results.get(0).unwrap().found);
+    assert_eq!(results.get(0).unwrap().score.unwrap().score, 71);
+    assert!(!results.get(1).unwrap().found);
+    assert_eq!(results.get(1).unwrap().score, None);
+}
+
+#[test]
+fn test_get_scores_batch_embargoed_entry() {
+    let (env, client, admin, service) = setup();
+    client.initialize(&admin, &service);
+
+    let wallet = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &asset_pair,
+        &55,
+        &false,
+        &false,
+        &1,
+        &90,
+        &1,
+        &None,
+    );
+    client.set_score_embargo(&wallet, &None);
+
+    let mut queries = Vec::new(&env);
+    queries.push_back(ScoreQuery { wallet, asset_pair });
+
+    let results = client.get_scores_batch(&queries);
+    let entry = results.get(0).unwrap();
+    assert_eq!(entry.index, 0);
+    assert!(!entry.found);
+    assert_eq!(entry.score, None);
+}
+
+#[test]
+fn test_get_scores_batch_delegated_wallet() {
+    let (env, client, admin, service) = setup();
+    client.initialize(&admin, &service);
+
+    let sub_wallet = Address::generate(&env);
+    let custodian = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+    client.set_score_delegate(&sub_wallet, &custodian);
+    client.submit_score(
+        &Vec::new(&env),
+        &custodian,
+        &asset_pair,
+        &82,
+        &true,
+        &false,
+        &1,
+        &95,
+        &1,
+        &None,
+    );
+
+    let mut queries = Vec::new(&env);
+    queries.push_back(ScoreQuery { wallet: sub_wallet, asset_pair });
+
+    let results = client.get_scores_batch(&queries);
+    let entry = results.get(0).unwrap();
+    assert!(entry.found);
+    assert_eq!(entry.score.unwrap().score, 82);
 }
 
 #[test]

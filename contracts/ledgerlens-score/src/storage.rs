@@ -529,8 +529,7 @@ pub fn set_decay_rate(env: &Env, numerator: u32, denominator: u32) {
     env.storage().instance().set(&DataKey::DecayRateDenominator, &denominator);
 }
 
- feat/confidence-gated-risk-gate
-// ── Global minimum confidence floor ──────────────────────────────────────────
+// Global minimum confidence floor
 
 /// Returns the admin-configured global minimum confidence floor (0–100).
 /// Defaults to `0` (no floor) when unset.
@@ -549,8 +548,9 @@ pub fn get_global_min_confidence(env: &Env) -> u32 {
 /// Caller is responsible for validating the range (0–100) before calling.
 pub fn set_global_min_confidence(env: &Env, min_confidence: u32) {
     env.storage().instance().set(&DataKey::GlobalMinConfidence, &min_confidence);
+}
 
-// ── Fee withdrawal ────────────────────────────────────────────────────────────
+// Fee withdrawal
 
 pub fn get_fee_token(env: &Env) -> Option<Address> {
     env.storage().instance().get(&DataKey::FeeToken)
@@ -570,7 +570,6 @@ pub fn set_withdrawal_lock(env: &Env) {
 
 pub fn clear_withdrawal_lock(env: &Env) {
     env.storage().instance().remove(&DataKey::WithdrawalLock);
- main
 }
 
 // ── Score delegation ──────────────────────────────────────────────────────────
