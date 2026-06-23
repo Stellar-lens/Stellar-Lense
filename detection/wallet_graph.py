@@ -48,7 +48,7 @@ def build_funding_graph(
     co_trade_window: str | pd.Timedelta = "5min",
     output_format: Literal["networkx", "pyg"] = "networkx",
     node_features: pd.DataFrame | Mapping[str, Sequence[float]] | None = None,
-):
+) -> "nx.DiGraph":
     """Build the wallet graph, preserving the historical NetworkX default.
 
     Funding edges point from funder to funded account. When ``trades`` is
