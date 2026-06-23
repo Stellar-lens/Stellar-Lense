@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import csv
+import io
+import os
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import networkx as nx
 import pandas as pd
@@ -10,6 +14,16 @@ import pandas as pd
 from detection.causal_attribution import CounterfactualAttributor
 from detection.model_inference import RiskScorer
 from detection.shap_explainer import ShapExplainer
+
+# CSV column order for flat export (one row per SHAP feature).
+CSV_COLUMNS = [
+    "wallet",
+    "asset_pair",
+    "risk_score",
+    "feature",
+    "shap_value",
+    "shap_contribution",
+]
 
 
 @dataclass(slots=True)
@@ -48,6 +62,90 @@ class ForensicReport:
     shap_explanations: list[dict] = field(default_factory=list)
     causal_attribution: CausalAttribution | None = None
     propagation_path: PropagationPath | None = None
+
+    # ------------------------------------------------------------------
+    # Serialisation helpers
+    # ------------------------------------------------------------------
+
+    def to_dict(self) -> dict:
+        """Return a fully serialisable nested dict representation.
+
+        The propagation_path section is included when present so the caller
+        can write it verbatim to a JSON file for compliance ingestion.
+        """
+        d: dict = {
+            "wallet": self.wallet,
+            "asset_pair": self.asset_pair,
+            "risk_score": dict(self.risk_score),
+            "shap_explanations": list(self.shap_explanations),
+        }
+
+        if self.causal_attribution is not None:
+            ca = self.causal_attribution
+            d["causal_attribution"] = {
+                "minimal_exonerating_trades": list(ca.minimal_exonerating_trades),
+                "counterfactual_score": ca.counterfactual_score,
+                "root_cause_wallet": ca.root_cause_wallet,
+                "causal_chain": list(ca.causal_chain),
+                "interventional_score_if_no_wash": ca.interventional_score_if_no_wash,
+            }
+        else:
+            d["causal_attribution"] = None
+
+        if self.propagation_path is not None:
+            pp = self.propagation_path
+            d["propagation_path"] = {
+                "propagated_risk": pp.propagated_risk,
+                "contributors": [
+                    {
+                        "source_wallet": c.source_wallet,
+                        "base_score": c.base_score,
+                        "ppr_weight": c.ppr_weight,
+                        "contribution": c.contribution,
+                        "fraction": c.fraction,
+                    }
+                    for c in pp.contributors
+                ],
+            }
+        else:
+            d["propagation_path"] = None
+
+        return d
+
+    def to_csv_rows(self) -> list[dict]:
+        """Return a flat list of dicts — one row per SHAP feature.
+
+        Columns: wallet, asset_pair, risk_score, feature, shap_value,
+        shap_contribution.
+
+        If there are no SHAP explanations a single summary row is still
+        emitted with empty feature/shap columns so the wallet is always
+        represented in the exported file.
+        """
+        score_value = (
+            self.risk_score.get("score", "") if isinstance(self.risk_score, dict) else self.risk_score
+        )
+
+        base: dict = {
+            "wallet": self.wallet,
+            "asset_pair": self.asset_pair,
+            "risk_score": score_value,
+        }
+
+        if not self.shap_explanations:
+            return [{**base, "feature": "", "shap_value": "", "shap_contribution": ""}]
+
+        rows: list[dict] = []
+        for exp in self.shap_explanations:
+            rows.append(
+                {
+                    **base,
+                    "feature": exp.get("feature", ""),
+                    "shap_value": exp.get("value", ""),
+                    "shap_contribution": exp.get("contribution", ""),
+                }
+            )
+        return rows
 
 
 class ForensicReportGenerator:
@@ -193,3 +291,44 @@ class ForensicReportGenerator:
             causal_attribution=causal_attribution,
             propagation_path=propagation_path,
         )
+
+
+# ---------------------------------------------------------------------------
+# I/O helpers
+# ---------------------------------------------------------------------------
+
+
+def write_report_secure(path: str, content: str) -> None:
+    """Write *content* to *path* with restrictive permissions (0o600).
+
+    Parent directories are created automatically.  The file is opened with
+    ``os.O_CREAT | os.O_WRONLY | os.O_TRUNC`` so the mode is set atomically
+    on creation rather than via a subsequent chmod.
+    """
+    dest = Path(path)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(str(dest), os.O_CREAT | os.O_WRONLY | os.O_TRUNC, 0o600)
+    try:
+        with os.fdopen(fd, "w") as fh:
+            fh.write(content)
+    except Exception:
+        # Ensure fd is not leaked when os.fdopen raises
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+        raise
+
+
+def write_csv_report(path: str, report: ForensicReport) -> None:
+    """Write *report* as a flat CSV to *path* with restrictive permissions.
+
+    Columns: wallet, asset_pair, risk_score, feature, shap_value,
+    shap_contribution.  One row is emitted per SHAP feature; wallets with
+    no SHAP explanations get a single row with empty feature/shap fields.
+    """
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=CSV_COLUMNS, lineterminator="\n")
+    writer.writeheader()
+    writer.writerows(report.to_csv_rows())
+    write_report_secure(path, buf.getvalue())
