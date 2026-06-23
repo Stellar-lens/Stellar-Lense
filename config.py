@@ -65,6 +65,7 @@ class Config:
     RISK_SCORE_DB_URL: str = os.getenv("RISK_SCORE_DB_URL", "sqlite:///ledgerlens.db")
 
     MODEL_DIR: str = os.getenv("MODEL_DIR", "./models")
+    BATCH_SCORER_WORKERS: int = int(os.getenv("BATCH_SCORER_WORKERS", 10))
 
     # ledgerlens-score Soroban contract
     SOROBAN_RPC_URL: str = os.getenv("SOROBAN_RPC_URL", "https://soroban-testnet.stellar.org")
