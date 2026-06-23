@@ -173,6 +173,12 @@ pub fn batch_attested(env: &Env, accepted: u32, rejected: u32, merkle_root: &Byt
     env.events().publish((symbol_short!("bat_ok"), merkle_root.clone()), (accepted, rejected));
 }
 
+pub fn score_jump_anomaly(_env: &Env, _wallet: &Address, _asset_pair: &Symbol, _old_score: u32, _new_score: u32, _delta: i64, _model_version: u32, _timestamp: u64) {}
+pub fn escalation_triggered(_env: &Env, _wallet: &Address, _asset_pair: &Symbol, _count: u32, _score: u32, _escalation_n: u32) {}
+pub fn escalation_resolved(_env: &Env, _wallet: &Address, _asset_pair: &Symbol, _count: u32, _score: u32) {}
+pub fn escalation_threshold_updated(_env: &Env, _old: u32, _new: u32) {}
+
+
 // ── Multi-model consensus scoring ─────────────────────────────────────────────
 
 /// Emitted when a consensus score is accepted and stored.

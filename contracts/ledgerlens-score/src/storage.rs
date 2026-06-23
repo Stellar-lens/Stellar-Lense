@@ -644,7 +644,7 @@ pub fn set_trend_state(env: &Env, wallet: &Address, asset_pair: &Symbol, state: 
 
 /// Returns the off-chain detection pipeline's secp256k1 public key, or
 /// `None` if `set_service_pubkey` has never been called.
-pub fn get_service_pubkey(env: &Env) -> Option<Bytes> {
+pub fn get_service_pubkey(env: &Env) -> Option<soroban_sdk::Bytes> {
     env.storage().instance().get(&DataKey::ServicePubKey)
 }
 
@@ -653,7 +653,7 @@ pub fn set_service_pubkey(env: &Env, pubkey: &Bytes) {
 }
 
 pub fn set_gate_callers(env: &Env, callers: &Vec<Address>) {
-    env.storage().instance().set(&GateDataKey::GateCallers, callers);
+    env.storage().instance().set(&DataKey::GateCallers, callers);
 }
 
 pub fn get_gate_callers(env: &Env) -> Vec<Address> {

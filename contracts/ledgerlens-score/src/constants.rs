@@ -36,6 +36,9 @@ pub const DEFAULT_JUMP_THRESHOLD: u32 = 30;
 ///   `docs/batch-attestation-spec.md`).
 pub const CONTRACT_VERSION: u32 = 3;
 
+pub const MIN_ESCALATION_THRESHOLD: u32 = 0;
+pub const MAX_ESCALATION_THRESHOLD: u32 = 100;
+
 /// Hard upper bound on Merkle proof length accepted by
 /// `submit_scores_batch_attested`. Thirty levels of a binary tree can
 /// accommodate up to 2^30 ≈ 1.07 billion leaves — well above the

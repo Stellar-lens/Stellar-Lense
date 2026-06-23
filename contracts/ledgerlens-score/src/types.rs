@@ -373,6 +373,8 @@ pub enum DataKey {
     ModelVersionDescription(u32),
     Admin,
     Service,
+    SignerTier(Address),
+
     /// Latest risk score for a (wallet, asset_pair) pair.
     Score(Address, Symbol),
     /// Boolean flag — true when the contract is paused.

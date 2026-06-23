@@ -45,7 +45,7 @@ pub enum Error {
     // ── Fee withdrawal ─────────────────────────────────────────────────────
     /// Returned by `get_fee_token` and `withdraw_fees` when `set_fee_token`
     /// has not been called.
-    FeeTokenNotSet = 30,
+    FeeTokenNotSet = 52,
     /// Returned by `withdraw_fees` when `amount` is zero.
     InvalidWithdrawalAmount = 31,
     WithdrawalInProgress = 32,
