@@ -294,7 +294,39 @@ def compute_trade_pattern_features(
     wallet_trades: pd.DataFrame,
     orderbook_events: pd.DataFrame | None = None,
 ) -> dict:
-    """Counterparty concentration, round-trips, self-matching, cancellations."""
+    """Compute trade-pattern features for a wallet.
+
+    Computes signals based on the wallet's trade history, and (optionally)
+    augments them with order-cancellation statistics derived from order-book
+    events.
+
+    Args:
+        wallet: Stellar account id to score.
+        wallet_trades: Trades involving ``wallet``. Expected columns include
+            ``base_account``, ``counter_account``, and ``amount``.
+        orderbook_events: Optional order-book event DataFrame as produced by
+            ``ingestion.orderbook_loader.load_accounts_orderbook_events``.
+            When provided, it must include ``account`` and ``action``
+            (with values such as ``created``, ``cancelled``, ``updated``).
+
+    Returns:
+        A dictionary with the following keys:
+
+        - ``counterparty_concentration_ratio``: Fraction of volume attributed
+          to the wallet's most-used counterparty.
+        - ``round_trip_frequency``: Fraction of trades where
+          ``base_account == counter_account``.
+        - ``net_roundtrip_ratio``: Currently identical to
+          ``round_trip_frequency``.
+        - ``self_matching_rate``: Currently identical to
+          ``round_trip_frequency``.
+        - ``order_cancellation_rate``: Fraction of the wallet's manage-offer
+          operations that were cancellations.
+
+    Raises:
+        KeyError: If required columns (e.g., ``base_account``,
+            ``counter_account``, ``amount``) are missing from ``wallet_trades``.
+    """
     order_cancellation_rate = compute_order_cancellation_rate(wallet, orderbook_events)
 
     if wallet_trades.empty:
@@ -330,7 +362,29 @@ def compute_trade_pattern_features(
 
 
 def compute_volume_timing_features(wallet_trades: pd.DataFrame) -> dict:
-    """Volume concentration and timing-based anomaly features."""
+    """Compute volume and timing anomaly features for a wallet.
+
+    Args:
+        wallet_trades: Trades involving a single wallet. Expected columns
+            include ``ledger_close_time`` (timestamp) and ``counter_account``.
+            Must also contain ``amount`` for volume-based calculations.
+
+    Returns:
+        A dictionary containing:
+
+        - ``volume_per_counterparty_ratio``: Total volume divided by the
+          number of unique counterparties.
+        - ``intra_minute_clustering``: Fraction of 1-minute buckets that
+          contain more than one trade.
+        - ``off_hours_activity_ratio``: Fraction of trades executed during
+          off-hours (UTC hours 00:00-04:59).
+        - ``volume_spike_frequency``: Fraction of trades whose amount exceeds
+          3× the rolling mean (window size = 10 trades).
+
+    Raises:
+        KeyError: If required columns (e.g., ``ledger_close_time``,
+            ``counter_account``, ``amount``) are missing.
+    """
     if wallet_trades.empty:
         return {
             "volume_per_counterparty_ratio": 0.0,
