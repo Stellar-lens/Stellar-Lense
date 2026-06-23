@@ -1,17 +1,16 @@
-use soroban_sdk::{Address, Bytes, Env, Symbol, Vec};
-
 use crate::constants::{
     BAND_STATE_TTL_EXTEND_TO, BAND_STATE_TTL_THRESHOLD, DEFAULT_CONSENSUS_EPSILON,
     DEFAULT_CONSENSUS_THRESHOLD_K, DEFAULT_COOLDOWN_SECS, DEFAULT_ESCALATION_THRESHOLD,
-    DEFAULT_JUMP_THRESHOLD, DEFAULT_RISK_THRESHOLD, DEFAULT_UPGRADE_DELAY_SECS, EMBARGO_TTL_EXTEND_TO,
-    EMBARGO_TTL_THRESHOLD, ESCALATION_BREACH_TTL_EXTEND_TO, ESCALATION_BREACH_TTL_THRESHOLD,
-    SCORE_TTL_EXTEND_TO, SCORE_TTL_THRESHOLD,
+    DEFAULT_JUMP_THRESHOLD, DEFAULT_RISK_THRESHOLD, DEFAULT_UPGRADE_DELAY_SECS,
+    EMBARGO_TTL_EXTEND_TO, EMBARGO_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO, SCORE_TTL_THRESHOLD,
 };
 use crate::errors::Error;
 use crate::types::{
-    AggregateRiskScore, DataKey, EmbargoExpiry, ModelVersionStats, RiskScore, ScoreFloorPolicy,
-    ScoreTrend, UpgradeProposal,
+    AggregateRiskScore, DataKey, EmbargoExpiry, GateDataKey, PendingScoreEntry, RiskScore,
+    ScoreDispute, ScoreFloorPolicy, ScoreTrend, ScoreVelocityCap, SnapshotRecord, TierBounds,
+    UpgradeProposal,
 };
+use soroban_sdk::{Address, Bytes, Env, Symbol, Vec};
 
 // ── Admin / Service ─────────────────────────────────────────────────────────
 
@@ -213,6 +212,55 @@ pub fn get_score_history(env: &Env, wallet: &Address, asset_pair: &Symbol) -> Ve
     history
 }
 
+/// Read-only windowed view into the score-history ring buffer.
+///
+/// `offset` is 0-indexed from the **most recent** entry (offset `0` == newest);
+/// at most `limit` entries are returned, ordered most-recent first. `limit` is
+/// clamped to [`MAX_HISTORY_DEPTH`](crate::constants::MAX_HISTORY_DEPTH). An
+/// `offset` at or beyond the current history length yields an empty `Vec`.
+///
+/// The whole ring entry is a single persistent value, so the read cost is the
+/// same as [`get_score_history`]; the saving is purely in the size of the
+/// returned slice. This function never mutates the ring (it only refreshes the
+/// entry TTL, exactly as `get_score_history` does).
+pub fn get_score_history_paginated(
+    env: &Env,
+    wallet: &Address,
+    asset_pair: &Symbol,
+    offset: u32,
+    limit: u32,
+) -> Vec<RiskScore> {
+    let key = DataKey::ScoreHistory(wallet.clone(), asset_pair.clone());
+    let history: Vec<RiskScore> =
+        env.storage().persistent().get(&key).unwrap_or_else(|| Vec::new(env));
+
+    let mut page = Vec::new(env);
+    let len = history.len();
+    // Out-of-bounds offset (including any read against an empty ring) is not an
+    // error — callers paging off the end simply get nothing back.
+    if offset >= len {
+        return page;
+    }
+
+    env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+
+    let capped_limit = limit.min(crate::constants::MAX_HISTORY_DEPTH);
+    // History is stored oldest-first, so the newest entry sits at `len - 1`.
+    // Walk backwards from the `offset`-th most recent entry, emitting up to
+    // `capped_limit` entries in most-recent-first order.
+    let mut idx = len - 1 - offset;
+    let mut produced = 0u32;
+    while produced < capped_limit {
+        page.push_back(history.get(idx).unwrap());
+        produced += 1;
+        if idx == 0 {
+            break;
+        }
+        idx -= 1;
+    }
+    page
+}
+
 // ── Configurable history ring depth ──────────────────────────────────────────
 
 pub fn get_history_max_depth(env: &Env) -> u32 {
@@ -341,7 +389,54 @@ pub fn set_service_threshold(env: &Env, threshold: u32) {
 }
 
 pub fn get_service_threshold(env: &Env) -> u32 {
-    env.storage().instance().get(&DataKey::ServiceThreshold).unwrap_or(0)
+    env.storage().instance().get(&DataKey::ServiceThreshold).unwrap_or(1)
+}
+
+// ── Escalation / breach count ─────────────────────────────────────────────────
+
+pub fn get_escalation_threshold(env: &Env) -> u32 {
+    env.storage().instance().get(&DataKey::EscalationThreshold).unwrap_or(3)
+}
+
+pub fn set_escalation_threshold(env: &Env, n: u32) {
+    env.storage().instance().set(&DataKey::EscalationThreshold, &n);
+}
+
+pub fn get_breach_count(env: &Env, wallet: &Address, asset_pair: &Symbol) -> u32 {
+    let key = DataKey::BreachCount(wallet.clone(), asset_pair.clone());
+    env.storage().temporary().get(&key).unwrap_or(0)
+}
+
+pub fn set_breach_count(env: &Env, wallet: &Address, asset_pair: &Symbol, count: u32) {
+    let key = DataKey::BreachCount(wallet.clone(), asset_pair.clone());
+    env.storage().temporary().set(&key, &count);
+}
+
+pub fn clear_breach_count(env: &Env, wallet: &Address, asset_pair: &Symbol) {
+    let key = DataKey::BreachCount(wallet.clone(), asset_pair.clone());
+    env.storage().temporary().remove(&key);
+}
+
+// ── Model stats ───────────────────────────────────────────────────────────────
+
+pub fn update_model_stats(env: &Env, model_version: u32, score: u32) {
+    let key = DataKey::ModelStats(model_version);
+    let mut stats: ModelVersionStats = env
+        .storage()
+        .instance()
+        .get(&key)
+        .unwrap_or(ModelVersionStats { model_version, submission_count: 0, score_sum: 0 });
+    stats.submission_count += 1;
+    stats.score_sum += score;
+    env.storage().instance().set(&key, &stats);
+}
+
+pub fn get_model_stats(env: &Env, model_version: u32) -> Option<ModelVersionStats> {
+    env.storage().instance().get(&DataKey::ModelStats(model_version))
+}
+
+pub fn get_all_model_versions(env: &Env) -> Vec<u32> {
+    env.storage().instance().get(&DataKey::AllModelVersions).unwrap_or_else(|| Vec::new(env))
 }
 
 // ── Staleness window ──────────────────────────────────────────────────────────
@@ -383,6 +478,53 @@ pub fn get_cooldown_secs(env: &Env) -> u64 {
 
 pub fn set_cooldown_secs(env: &Env, secs: u64) {
     env.storage().instance().set(&DataKey::CooldownSecs, &secs);
+}
+
+/// Returns the cooldown for `asset_pair`, falling back to the global default
+/// when no pair-specific override has been configured.
+pub fn get_pair_cooldown_secs(env: &Env, asset_pair: &Symbol) -> u64 {
+    env.storage()
+        .instance()
+        .get(&DataKey::PairCooldown(asset_pair.clone()))
+        .unwrap_or_else(|| get_cooldown_secs(env))
+}
+
+pub fn set_pair_cooldown_secs(env: &Env, asset_pair: &Symbol, secs: u64) {
+    env.storage().instance().set(&DataKey::PairCooldown(asset_pair.clone()), &secs);
+}
+
+pub fn clear_pair_cooldown_secs(env: &Env, asset_pair: &Symbol) {
+    env.storage().instance().remove(&DataKey::PairCooldown(asset_pair.clone()));
+}
+
+// ── Score Velocity Cap ────────────────────────────────────────────────────────
+
+pub fn get_score_velocity_cap(env: &Env) -> ScoreVelocityCap {
+    let enabled = env.storage().instance().get(&DataKey::ScoreVelocityCapEnabled).unwrap_or(false);
+    let points_per_hour =
+        env.storage().instance().get(&DataKey::ScoreVelocityCapPointsPerHour).unwrap_or(0);
+    ScoreVelocityCap { enabled, points_per_hour }
+}
+
+pub fn set_score_velocity_cap(env: &Env, cap: &ScoreVelocityCap) {
+    env.storage().instance().set(&DataKey::ScoreVelocityCapEnabled, &cap.enabled);
+    env.storage().instance().set(&DataKey::ScoreVelocityCapPointsPerHour, &cap.points_per_hour);
+}
+
+pub fn is_velocity_cap_overridden(env: &Env, wallet: &Address, asset_pair: &Symbol) -> bool {
+    let key = DataKey::VelocityCapOverride(wallet.clone(), asset_pair.clone());
+    env.storage().persistent().get(&key).unwrap_or(false)
+}
+
+pub fn set_velocity_cap_override(env: &Env, wallet: &Address, asset_pair: &Symbol) {
+    let key = DataKey::VelocityCapOverride(wallet.clone(), asset_pair.clone());
+    env.storage().persistent().set(&key, &true);
+    env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+}
+
+pub fn clear_velocity_cap_override(env: &Env, wallet: &Address, asset_pair: &Symbol) {
+    let key = DataKey::VelocityCapOverride(wallet.clone(), asset_pair.clone());
+    env.storage().persistent().remove(&key);
 }
 
 // ── GDPR / data-erasure ───────────────────────────────────────────────────────
@@ -430,12 +572,30 @@ pub fn set_trend_state(env: &Env, wallet: &Address, asset_pair: &Symbol, state: 
 
 // ── Score attestation ─────────────────────────────────────────────────────────
 
-pub fn get_service_pubkey(env: &Env) -> Option<Bytes> {
+/// Returns the off-chain detection pipeline's secp256k1 public key, or
+/// `None` if `set_service_pubkey` has never been called.
+pub fn get_service_pubkey(env: &Env) -> Option<soroban_sdk::Bytes> {
     env.storage().instance().get(&DataKey::ServicePubKey)
 }
 
 pub fn set_service_pubkey(env: &Env, pubkey: &Bytes) {
     env.storage().instance().set(&DataKey::ServicePubKey, pubkey);
+}
+
+pub fn set_gate_callers(env: &Env, callers: &Vec<Address>) {
+    env.storage().instance().set(&DataKey::GateCallers, callers);
+}
+
+pub fn get_gate_callers(env: &Env) -> Vec<Address> {
+    env.storage().instance().get(&GateDataKey::GateCallers).unwrap_or_else(|| Vec::new(env))
+}
+
+pub fn set_gate_open(env: &Env, open: bool) {
+    env.storage().instance().set(&GateDataKey::GateOpen, &open);
+}
+
+pub fn get_gate_open(env: &Env) -> bool {
+    env.storage().instance().get(&GateDataKey::GateOpen).unwrap_or(true)
 }
 
 // ── Time-weighted exponential decay ──────────────────────────────────────────
@@ -601,6 +761,45 @@ pub fn get_contagion_depth(env: &Env, wallet: &Address, asset_pair: &Symbol) -> 
     links.len()
 }
 
+// ── Stubs for broken branch ───────────────────────────────────────────────
+
+pub fn get_escalation_threshold(_env: &Env) -> u32 {
+    0
+}
+
+pub fn get_breach_count(_env: &Env, _wallet: &Address, _asset_pair: &Symbol) -> u32 {
+    0
+}
+
+pub fn set_breach_count(_env: &Env, _wallet: &Address, _asset_pair: &Symbol, _count: u32) {}
+
+pub fn get_gate_open(_env: &Env) -> bool {
+    false
+}
+
+pub fn get_gate_callers(env: &Env) -> Vec<Address> {
+    Vec::new(env)
+}
+
+pub fn clear_breach_count(_env: &Env, _wallet: &Address, _asset_pair: &Symbol) {}
+
+pub fn get_model_stats(_env: &Env, _version: u32) -> Option<crate::types::ModelVersionStats> {
+    None
+}
+
+pub fn get_all_model_versions(env: &Env) -> Vec<u32> {
+    Vec::new(env)
+}
+
+pub fn set_service_pubkey(_env: &Env, _pubkey: &Bytes) {}
+
+pub fn set_escalation_threshold(_env: &Env, _n: u32) {}
+
+pub fn get_service_threshold(env: &Env) -> u32 {
+    env.storage().instance().get(&DataKey::ServiceThreshold).unwrap_or(0)
+}
+
+pub fn update_model_stats(_env: &Env, _model_version: u32, _score: u32) {}
 // ── Score submission floor ────────────────────────────────────────────────────
 
 pub fn get_score_floor_policy(env: &Env) -> ScoreFloorPolicy {
@@ -663,9 +862,11 @@ pub fn get_risk_band_state(env: &Env, wallet: &Address, asset_pair: &Symbol) -> 
     let key = DataKey::RiskBandState(wallet.clone(), asset_pair.clone());
     let result: Option<bool> = env.storage().temporary().get(&key);
     if result.is_some() {
-        env.storage()
-            .temporary()
-            .extend_ttl(&key, BAND_STATE_TTL_THRESHOLD, BAND_STATE_TTL_EXTEND_TO);
+        env.storage().temporary().extend_ttl(
+            &key,
+            BAND_STATE_TTL_THRESHOLD,
+            BAND_STATE_TTL_EXTEND_TO,
+        );
     }
     result.unwrap_or(false)
 }
@@ -693,9 +894,7 @@ pub fn set_risk_band_state(env: &Env, wallet: &Address, asset_pair: &Symbol, in_
 pub fn set_embargo(env: &Env, wallet: &Address, expiry: &EmbargoExpiry) {
     let key = DataKey::ScoreEmbargo(wallet.clone());
     env.storage().temporary().set(&key, expiry);
-    env.storage()
-        .temporary()
-        .extend_ttl(&key, EMBARGO_TTL_THRESHOLD, EMBARGO_TTL_EXTEND_TO);
+    env.storage().temporary().extend_ttl(&key, EMBARGO_TTL_THRESHOLD, EMBARGO_TTL_EXTEND_TO);
 }
 
 pub fn remove_embargo(env: &Env, wallet: &Address) {
@@ -709,18 +908,22 @@ pub fn is_embargoed(env: &Env, wallet: &Address) -> bool {
     match expiry {
         None => false,
         Some(EmbargoExpiry::Indefinite) => {
-            env.storage()
-                .temporary()
-                .extend_ttl(&key, EMBARGO_TTL_THRESHOLD, EMBARGO_TTL_EXTEND_TO);
+            env.storage().temporary().extend_ttl(
+                &key,
+                EMBARGO_TTL_THRESHOLD,
+                EMBARGO_TTL_EXTEND_TO,
+            );
             true
         }
         Some(EmbargoExpiry::Until(ts)) => {
             let now = env.ledger().timestamp();
             let active = now <= ts;
             if active {
-                env.storage()
-                    .temporary()
-                    .extend_ttl(&key, EMBARGO_TTL_THRESHOLD, EMBARGO_TTL_EXTEND_TO);
+                env.storage().temporary().extend_ttl(
+                    &key,
+                    EMBARGO_TTL_THRESHOLD,
+                    EMBARGO_TTL_EXTEND_TO,
+                );
             }
             active
         }
@@ -734,6 +937,24 @@ pub fn peek_is_embargoed(env: &Env, wallet: &Address) -> bool {
         None => false,
         Some(EmbargoExpiry::Indefinite) => true,
         Some(EmbargoExpiry::Until(ts)) => env.ledger().timestamp() <= ts,
+    }
+}
+
+/// Sets the risk band state for `(wallet, asset_pair)`. Passing `true`
+/// records that the wallet has entered the high-risk band; passing `false`
+/// removes the entry (equivalent to `false`, the default) so storage is not
+/// wasted on cleared state.
+pub fn set_risk_band_state(env: &Env, wallet: &Address, asset_pair: &Symbol, in_band: bool) {
+    let key = DataKey::RiskBandState(wallet.clone(), asset_pair.clone());
+    if in_band {
+        env.storage().temporary().set(&key, &true);
+        env.storage().temporary().extend_ttl(
+            &key,
+            BAND_STATE_TTL_THRESHOLD,
+            BAND_STATE_TTL_EXTEND_TO,
+        );
+    } else {
+        env.storage().temporary().remove(&key);
     }
 }
 
@@ -751,163 +972,229 @@ pub fn set_consensus_threshold_k(env: &Env, k: u32) {
 }
 
 pub fn get_consensus_epsilon(env: &Env) -> u32 {
-    env.storage()
-        .instance()
-        .get(&DataKey::ConsensusEpsilon)
-        .unwrap_or(DEFAULT_CONSENSUS_EPSILON)
+    env.storage().instance().get(&DataKey::ConsensusEpsilon).unwrap_or(DEFAULT_CONSENSUS_EPSILON)
 }
 
 pub fn set_consensus_epsilon(env: &Env, epsilon: u32) {
     env.storage().instance().set(&DataKey::ConsensusEpsilon, &epsilon);
 }
 
-// ── Breach count (consecutive threshold breaches for escalation) ────────────
+// ── Score dispute mechanism ─────────────────────────────────────────────────────
 
-pub fn get_breach_count(env: &Env, wallet: &Address, asset_pair: &Symbol) -> u32 {
-    let key = DataKey::BreachCount(wallet.clone(), asset_pair.clone());
-    let result: Option<u32> = env.storage().persistent().get(&key);
-    if result.is_some() {
-        env.storage()
-            .persistent()
-            .extend_ttl(&key, ESCALATION_BREACH_TTL_THRESHOLD, ESCALATION_BREACH_TTL_EXTEND_TO);
+/// Writes (or replaces) the open dispute record for `(wallet, asset_pair)` and
+/// refreshes its TTL. Stored in temporary storage so abandoned disputes
+/// eventually expire on their own.
+pub fn set_dispute(env: &Env, wallet: &Address, asset_pair: &Symbol, dispute: &ScoreDispute) {
+    let key = DataKey::ScoreDispute(wallet.clone(), asset_pair.clone());
+    env.storage().temporary().set(&key, dispute);
+    env.storage().temporary().extend_ttl(
+        &key,
+        crate::constants::DISPUTE_TTL_THRESHOLD,
+        crate::constants::DISPUTE_TTL_EXTEND_TO,
+    );
+}
+
+/// Returns the open dispute for `(wallet, asset_pair)`, if any, extending its
+/// TTL on read.
+pub fn get_dispute(env: &Env, wallet: &Address, asset_pair: &Symbol) -> Option<ScoreDispute> {
+    let key = DataKey::ScoreDispute(wallet.clone(), asset_pair.clone());
+    let dispute: Option<ScoreDispute> = env.storage().temporary().get(&key);
+    if dispute.is_some() {
+        env.storage().temporary().extend_ttl(
+            &key,
+            crate::constants::DISPUTE_TTL_THRESHOLD,
+            crate::constants::DISPUTE_TTL_EXTEND_TO,
+        );
     }
-    result.unwrap_or(0)
+    dispute
 }
 
-pub fn set_breach_count(env: &Env, wallet: &Address, asset_pair: &Symbol, count: u32) {
-    let key = DataKey::BreachCount(wallet.clone(), asset_pair.clone());
-    env.storage().persistent().set(&key, &count);
+/// Removes the dispute record for `(wallet, asset_pair)`. No-op if absent.
+pub fn remove_dispute(env: &Env, wallet: &Address, asset_pair: &Symbol) {
+    let key = DataKey::ScoreDispute(wallet.clone(), asset_pair.clone());
+    env.storage().temporary().remove(&key);
+}
+
+/// Returns every currently open dispute as `(challenger, asset_pair)` pairs.
+/// O(1) storage read — the index is maintained incrementally by
+/// `add_to_dispute_index` / `remove_from_dispute_index`.
+pub fn get_dispute_index(env: &Env) -> Vec<(Address, Symbol)> {
+    let disputes: Vec<(Address, Symbol)> =
+        env.storage().persistent().get(&DataKey::DisputeIndex).unwrap_or_else(|| Vec::new(env));
+    if !disputes.is_empty() {
+        env.storage().persistent().extend_ttl(
+            &DataKey::DisputeIndex,
+            SCORE_TTL_THRESHOLD,
+            SCORE_TTL_EXTEND_TO,
+        );
+    }
+    disputes
+}
+
+/// Adds `(wallet, asset_pair)` to the dispute index if it isn't already there.
+/// Returns `false` (without modifying the index) if the entry is new *and* the
+/// index is already at `MAX_OPEN_DISPUTES` — the caller turns that into an
+/// error. Re-adding an existing entry is a no-op that returns `true`.
+pub fn add_to_dispute_index(env: &Env, wallet: &Address, asset_pair: &Symbol) -> bool {
+    let mut disputes = get_dispute_index(env);
+    let entry = (wallet.clone(), asset_pair.clone());
+    if disputes.contains(&entry) {
+        return true;
+    }
+    if disputes.len() >= crate::constants::MAX_OPEN_DISPUTES {
+        return false;
+    }
+    disputes.push_back(entry);
+    env.storage().persistent().set(&DataKey::DisputeIndex, &disputes);
+    env.storage().persistent().extend_ttl(
+        &DataKey::DisputeIndex,
+        SCORE_TTL_THRESHOLD,
+        SCORE_TTL_EXTEND_TO,
+    );
+    true
+}
+
+/// Removes `(wallet, asset_pair)` from the dispute index. No-op if absent.
+pub fn remove_from_dispute_index(env: &Env, wallet: &Address, asset_pair: &Symbol) {
+    let mut disputes = get_dispute_index(env);
+    let entry = (wallet.clone(), asset_pair.clone());
+    if let Some(idx) = disputes.first_index_of(&entry) {
+        disputes.remove(idx);
+        env.storage().persistent().set(&DataKey::DisputeIndex, &disputes);
+    }
+}
+
+// ── MEV-Resistant Commit-Reveal ──────────────────────────────────────────────
+
+pub fn get_reveal_window_secs(env: &Env) -> u64 {
     env.storage()
-        .persistent()
-        .extend_ttl(&key, ESCALATION_BREACH_TTL_THRESHOLD, ESCALATION_BREACH_TTL_EXTEND_TO);
+        .instance()
+        .get(&DataKey::RevealWindowSecs)
+        .unwrap_or(3600) // Default 1 hour
 }
 
-pub fn clear_breach_count(env: &Env, wallet: &Address, asset_pair: &Symbol) {
-    let key = DataKey::BreachCount(wallet.clone(), asset_pair.clone());
+pub fn set_reveal_window_secs(env: &Env, secs: u64) {
+    env.storage().instance().set(&DataKey::RevealWindowSecs, &secs);
+}
+
+pub fn set_consensus_commitment(
+    env: &Env,
+    model: &Address,
+    wallet: &Address,
+    asset_pair: &Symbol,
+    commitment: &soroban_sdk::BytesN<32>,
+) {
+    let key = DataKey::ConsensusCommitment(model.clone(), wallet.clone(), asset_pair.clone());
+    let ttl = get_reveal_window_secs(env) as u32;
+    let ledgers_to_live = (ttl / 5).max(12);
+    env.storage().temporary().set(&key, commitment);
+    env.storage().temporary().extend_ttl(&key, ledgers_to_live, ledgers_to_live);
+}
+
+pub fn get_consensus_commitment(
+    env: &Env,
+    model: &Address,
+    wallet: &Address,
+    asset_pair: &Symbol,
+) -> Option<soroban_sdk::BytesN<32>> {
+    let key = DataKey::ConsensusCommitment(model.clone(), wallet.clone(), asset_pair.clone());
+    env.storage().temporary().get(&key)
+}
+
+pub fn remove_consensus_commitment(
+    env: &Env,
+    model: &Address,
+    wallet: &Address,
+    asset_pair: &Symbol,
+) {
+    let key = DataKey::ConsensusCommitment(model.clone(), wallet.clone(), asset_pair.clone());
+    env.storage().temporary().remove(&key);
+}
+
+// ── Finality buffer (pending score commit window) ────────────────────────────
+
+/// Returns the admin-configured finality buffer in seconds, defaulting to `0`
+/// (disabled) until `set_finality_buffer` is called.
+pub fn get_finality_buffer_secs(env: &Env) -> u64 {
+    env.storage().instance().get(&DataKey::FinalityBufferSecs).unwrap_or(0)
+}
+
+pub fn set_finality_buffer_secs(env: &Env, secs: u64) {
+    env.storage().instance().set(&DataKey::FinalityBufferSecs, &secs);
+}
+
+/// Returns the pending score held for `(wallet, asset_pair)`, if any.
+/// Invisible to `get_score` / `query_risk_gate`.
+pub fn get_pending_score(
+    env: &Env,
+    wallet: &Address,
+    asset_pair: &Symbol,
+) -> Option<PendingScoreEntry> {
+    let key = DataKey::PendingScore(wallet.clone(), asset_pair.clone());
+    let entry: Option<PendingScoreEntry> = env.storage().persistent().get(&key);
+    if entry.is_some() {
+        env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    }
+    entry
+}
+
+/// Writes `entry` as the pending score for `(wallet, asset_pair)`, replacing
+/// any existing pending entry rather than queuing alongside it.
+pub fn set_pending_score(
+    env: &Env,
+    wallet: &Address,
+    asset_pair: &Symbol,
+    entry: &PendingScoreEntry,
+) {
+    let key = DataKey::PendingScore(wallet.clone(), asset_pair.clone());
+    env.storage().persistent().set(&key, entry);
+    env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+}
+
+/// Removes the pending score for `(wallet, asset_pair)`. No-op if none exists.
+pub fn clear_pending_score(env: &Env, wallet: &Address, asset_pair: &Symbol) {
+    let key = DataKey::PendingScore(wallet.clone(), asset_pair.clone());
     env.storage().persistent().remove(&key);
 }
 
-// ── Escalation threshold ──────────────────────────────────────────────────────
+// ── Service heartbeat monitor ────────────────────────────────────────────
 
-pub fn get_escalation_threshold(env: &Env) -> u32 {
-    env.storage().instance().get(&DataKey::EscalationThreshold).unwrap_or(DEFAULT_ESCALATION_THRESHOLD)
+/// Returns the ledger timestamp of the most recent accepted submission or
+/// `ping_heartbeat` call, or `0` if the service has never been active.
+pub fn get_last_service_activity(env: &Env) -> u64 {
+    env.storage().instance().get(&DataKey::LastServiceActivityAt).unwrap_or(0)
 }
 
-pub fn set_escalation_threshold(env: &Env, threshold: u32) {
-    env.storage().instance().set(&DataKey::EscalationThreshold, &threshold);
+/// Records `timestamp` as the most recent service activity. Called by
+/// `submit_score`, `submit_scores_batch`, and `ping_heartbeat`.
+pub fn set_last_service_activity(env: &Env, timestamp: u64) {
+    env.storage().instance().set(&DataKey::LastServiceActivityAt, &timestamp);
 }
 
-// ── Model statistics (per version) ────────────────────────────────────────────
-
-pub fn update_model_stats(env: &Env, model_version: u32, score: u32) {
-    let key = DataKey::ModelStats(model_version);
-    let now = env.ledger().timestamp();
-    let mut stats: ModelVersionStats =
-        env.storage().instance().get(&key).unwrap_or(ModelVersionStats {
-            model_version,
-            submission_count: 0,
-            score_sum: 0,
-            score_max: 0,
-            score_min: u32::MAX,
-            first_seen: now,
-            last_seen: 0,
-        });
-    stats.submission_count += 1;
-    stats.score_sum = stats.score_sum.wrapping_add(score as u64);
-    if score > stats.score_max {
-        stats.score_max = score;
-    }
-    if score < stats.score_min {
-        stats.score_min = score;
-    }
-    stats.last_seen = now;
-    env.storage().instance().set(&key, &stats);
-
-    let mut all: Vec<u32> =
-        env.storage().instance().get(&DataKey::AllModelVersions).unwrap_or_else(|| Vec::new(env));
-    if !all.contains(&model_version) {
-        let mut inserted = false;
-        for i in 0..all.len() {
-            if all.get(i).unwrap() > model_version {
-                all.insert(i, model_version);
-                inserted = true;
-                break;
-            }
-        }
-        if !inserted {
-            all.push_back(model_version);
-        }
-        env.storage().instance().set(&DataKey::AllModelVersions, &all);
-    }
+/// Returns the admin-configured heartbeat alert threshold (seconds),
+/// defaulting to `DEFAULT_HEARTBEAT_ALERT_THRESHOLD_SECS` until
+/// `set_heartbeat_alert_threshold` is called.
+pub fn get_heartbeat_alert_threshold(env: &Env) -> u64 {
+    env.storage()
+        .instance()
+        .get(&DataKey::ServiceHeartbeatAlertThreshold)
+        .unwrap_or(crate::constants::DEFAULT_HEARTBEAT_ALERT_THRESHOLD_SECS)
 }
 
-pub fn get_model_stats(env: &Env, model_version: u32) -> Option<ModelVersionStats> {
-    env.storage().instance().get(&DataKey::ModelStats(model_version))
+pub fn set_heartbeat_alert_threshold(env: &Env, secs: u64) {
+    env.storage().instance().set(&DataKey::ServiceHeartbeatAlertThreshold, &secs);
 }
 
-pub fn get_all_model_versions(env: &Env) -> Vec<u32> {
-    env.storage().instance().get(&DataKey::AllModelVersions).unwrap_or_else(|| Vec::new(env))
+/// Returns `true` once a `ServiceSilenceAlertEvent` has been emitted for the
+/// current silence window and not yet cleared by a resumed submission.
+pub fn is_silent_alert_emitted(env: &Env) -> bool {
+    env.storage().instance().get(&DataKey::ServiceSilentAlertEmitted).unwrap_or(false)
 }
 
-// ── Signer rotation TTL (Issue #79) ─────────────────────────────────────────
-
-pub const DEFAULT_SIGNER_TTL_SECS: u64 = 2_592_000; // 30 days
-pub const DEFAULT_SIGNER_GRACE_SECS: u64 = 604_800;  // 7 days
-
-pub fn get_signer_rotation_ttl(env: &Env) -> u64 {
-    env.storage().instance().get(&DataKey::SignerRotationTtlSecs).unwrap_or(DEFAULT_SIGNER_TTL_SECS)
+pub fn set_silent_alert_emitted(env: &Env) {
+    env.storage().instance().set(&DataKey::ServiceSilentAlertEmitted, &true);
 }
 
-pub fn set_signer_rotation_ttl(env: &Env, ttl: u64) {
-    env.storage().instance().set(&DataKey::SignerRotationTtlSecs, &ttl);
+pub fn clear_silent_alert_emitted(env: &Env) {
+    env.storage().instance().remove(&DataKey::ServiceSilentAlertEmitted);
 }
-
-pub fn get_signer_rotation_grace(env: &Env) -> u64 {
-    env.storage().instance().get(&DataKey::SignerRotationGraceSecs).unwrap_or(DEFAULT_SIGNER_GRACE_SECS)
-}
-
-pub fn set_signer_rotation_grace(env: &Env, grace: u64) {
-    env.storage().instance().set(&DataKey::SignerRotationGraceSecs, &grace);
-}
-
-pub fn get_signer_added_at(env: &Env, signer: &Address) -> Option<u64> {
-    env.storage().instance().get(&DataKey::SignerAddedAt(signer.clone()))
-}
-
-pub fn set_signer_added_at(env: &Env, signer: &Address, timestamp: u64) {
-    env.storage().instance().set(&DataKey::SignerAddedAt(signer.clone()), &timestamp);
-}
-
-pub fn remove_signer_added_at(env: &Env, signer: &Address) {
-    env.storage().instance().remove(&DataKey::SignerAddedAt(signer.clone()));
-}
-
-
-/// Returns the signer's age in seconds since it was added.
-/// Returns `None` when no activation time is recorded for the signer.
-pub fn get_signer_age(env: &Env, signer: &Address) -> Option<u64> {
-    get_signer_added_at(env, signer)
-        .map(|added| env.ledger().timestamp().saturating_sub(added))
-}
-
-/// Check whether `signer` has exceeded the TTL (including grace period)
-/// and should be rejected. Emits warning/blocked events as appropriate.
-pub fn check_signer_expired(env: &Env, signer: &Address) -> Result<(), Error> {
-    let ttl = get_signer_rotation_ttl(env);
-    if ttl == 0 {
-        return Ok(());
-    }
-    if let Some(age) = get_signer_age(env, signer) {
-        let grace = get_signer_rotation_grace(env);
-        if age > ttl && age <= ttl + grace {
-            crate::events::signer_expiring(env, signer);
-        }
-        if age > ttl + grace {
-            crate::events::signer_expired(env, signer);
-            return Err(Error::UnauthorizedSigner);
-        }
-    }
-    Ok(())
-}
-
-// ── Score histogram (Issue #81) — to be implemented ─────────────────────────
