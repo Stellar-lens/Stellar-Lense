@@ -51,6 +51,9 @@ mod test_embargo;
 #[cfg(test)]
 mod test_consensus;
 
+#[cfg(test)]
+mod test_model_version;
+
 use soroban_sdk::{
     contract, contractimpl, crypto::Hash, symbol_short, token, Address, Bytes, BytesN,
     Env, Symbol, SymbolStr, TryFromVal, Vec,
@@ -468,6 +471,9 @@ impl LedgerLensScoreContract {
         let mut accepted_count: u32 = 0;
         let mut results: Vec<BatchEntryResult> = Vec::new(&env);
 
+        let version_set = storage::get_model_version_set(&env);
+        let version_check_enabled = !version_set.is_empty();
+
         for i in 0..submissions.len() {
             let sub = submissions.get(i).unwrap();
             let mut accepted = false;
@@ -481,6 +487,12 @@ impl LedgerLensScoreContract {
                 rejection_code = Error::InvalidConfidence as u32;
             } else if sub.timestamp == 0 {
                 rejection_code = Error::InvalidTimestamp as u32;
+            } else if version_check_enabled && !version_set.contains(&sub.model_version) {
+                rejection_code = Error::ModelVersionNotRegistered as u32;
+            } else if version_check_enabled
+                && storage::is_model_version_deprecated(&env, sub.model_version)
+            {
+                rejection_code = Error::ModelVersionDeprecated as u32;
             } else {
                 let last_submit = storage::get_last_submit_time(&env, &sub.wallet, &sub.asset_pair);
                 if last_submit != 0 && now < last_submit.saturating_add(cooldown) {
@@ -3391,6 +3403,93 @@ impl LedgerLensScoreContract {
     /// `set_admin_threshold` is called (legacy mode).
     pub fn get_admin_threshold(env: Env) -> u32 {
         storage::get_admin_threshold(&env)
+    }
+
+    // ── Model version registry ────────────────────────────────────────────────
+
+    /// Register `version` as an Active model version.  Admin only.
+    ///
+    /// Once at least one version is registered, `submit_score` and
+    /// `submit_scores_batch` reject any submission whose `model_version` field
+    /// is not in the Active set.  An empty registry (the default) skips all
+    /// version checks, preserving backward compatibility.
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if the contract has no admin yet.
+    /// - [`Error::ModelVersionAlreadyRegistered`] if `version` is already present
+    ///   (Active or Deprecated).
+    /// - [`Error::ModelVersionRegistryFull`] if registering would exceed
+    ///   `MAX_MODEL_VERSIONS` (20).
+    pub fn register_model_version(
+        env: Env,
+        admin_signers: Vec<Address>,
+        version: u32,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+        let mut versions = storage::get_model_version_set(&env);
+        if versions.contains(&version) {
+            return Err(Error::ModelVersionAlreadyRegistered);
+        }
+        if versions.len() >= constants::MAX_MODEL_VERSIONS {
+            return Err(Error::ModelVersionRegistryFull);
+        }
+        versions.push_back(version);
+        storage::set_model_version_set(&env, &versions);
+        events::model_version_registered(&env, version);
+        Ok(())
+    }
+
+    /// Permanently deprecate `version`.  Admin only.  Irreversible — there is
+    /// intentionally no re-activate path so that once a model version is
+    /// retired off-chain, the contract cannot silently start accepting it again.
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if the contract has no admin yet.
+    /// - [`Error::ModelVersionNotRegistered`] if `version` was never registered.
+    /// - [`Error::ModelVersionAlreadyDeprecated`] if `version` is already
+    ///   deprecated.
+    pub fn deprecate_model_version(
+        env: Env,
+        admin_signers: Vec<Address>,
+        version: u32,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+        if !storage::is_model_version_registered(&env, version) {
+            return Err(Error::ModelVersionNotRegistered);
+        }
+        if storage::is_model_version_deprecated(&env, version) {
+            return Err(Error::ModelVersionAlreadyDeprecated);
+        }
+        storage::set_model_version_deprecated(&env, version);
+        events::model_version_deprecated(&env, version);
+        Ok(())
+    }
+
+    /// Returns `true` only when `version` is registered **and** not yet
+    /// deprecated.  Read-only, callable by any account or contract.
+    pub fn is_model_version_active(env: Env, version: u32) -> bool {
+        storage::is_model_version_registered(&env, version)
+            && !storage::is_model_version_deprecated(&env, version)
+    }
+
+    /// Returns every registered model version as `(version, is_active)` pairs
+    /// in registration order.  `is_active` is `true` when the version is
+    /// registered and not yet deprecated.  Read-only, callable by any account.
+    pub fn get_model_versions(env: Env) -> Vec<(u32, bool)> {
+        let versions = storage::get_model_version_set(&env);
+        let mut result: Vec<(u32, bool)> = Vec::new(&env);
+        for i in 0..versions.len() {
+            let v = versions.get(i).unwrap();
+            let is_active = !storage::is_model_version_deprecated(&env, v);
+            result.push_back((v, is_active));
+        }
+        result
     }
 
     // ── Internal helpers ──────────────────────────────────────────────────────
