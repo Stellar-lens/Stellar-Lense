@@ -18,20 +18,11 @@ import re
 import threading
 import time
 from collections import deque
-<<<<<<< HEAD
-from dataclasses import dataclass, asdict
-from typing import Any
-
-import websockets
-from pydantic import BaseModel, Field, ValidationError
-from prometheus_client import Counter, Gauge
-=======
 from typing import Any
 
 import websockets
 from prometheus_client import Counter, Gauge
 from pydantic import BaseModel, Field, ValidationError
->>>>>>> 14aa8ce (fix: resolve ruff linting errors in ws_auth and ws_server)
 
 from config import config
 from streaming.pubsub_router import PubSubRouter
@@ -318,7 +309,9 @@ async def _handler(websocket) -> None:
         if not claims:
             ws_auth_failures_total.inc()
             await websocket.close(code=1008, reason="Unauthorized: invalid token")
-            logger.warning("WebSocket connection rejected: invalid token (%s)", _redact_token(token))
+            logger.warning(
+                "WebSocket connection rejected: invalid token (%s)", _redact_token(token)
+            )
             return
 
         client_id = claims.get("sub", "unknown")
@@ -344,10 +337,6 @@ async def _handler(websocket) -> None:
 
         client_queue = asyncio.Queue(maxlen=config.WS_CLIENT_QUEUE_DEPTH)
         rate_limiter = TokenBucket(config.WS_RATE_LIMIT_MSGS_PER_SECOND)
-<<<<<<< HEAD
-        dropped_count = 0
-=======
->>>>>>> 14aa8ce (fix: resolve ruff linting errors in ws_auth and ws_server)
 
         with _clients_lock:
             _clients[client_id] = {
@@ -399,7 +388,9 @@ async def _handler(websocket) -> None:
             with _clients_lock:
                 _clients.pop(client_id, None)
                 ws_connected_clients.set(len(_clients))
-            logger.info("WebSocket client disconnected (client_id=%s, total=%d)", client_id, len(_clients))
+            logger.info(
+                "WebSocket client disconnected (client_id=%s, total=%d)", client_id, len(_clients)
+            )
 
 
 async def _extract_token(websocket) -> str | None:
@@ -454,7 +445,9 @@ async def _process_inbound(websocket, client_id: str, permissions: set[str]) -> 
                 elif msg_type == "replay":
                     await _handle_replay(websocket, client_id, permissions, payload)
                 else:
-                    error = ErrorMessage(code="unknown_type", message=f"Unknown message type: {msg_type}")
+                    error = ErrorMessage(
+                        code="unknown_type", message=f"Unknown message type: {msg_type}"
+                    )
                     await websocket.send(error.model_dump_json())
 
             except json.JSONDecodeError:
@@ -474,7 +467,9 @@ async def _process_inbound(websocket, client_id: str, permissions: set[str]) -> 
         logger.error("Unexpected error in _process_inbound: %s", str(exc))
 
 
-async def _handle_subscribe(websocket, client_id: str, permissions: set[str], payload: dict) -> None:
+async def _handle_subscribe(
+    websocket, client_id: str, permissions: set[str], payload: dict
+) -> None:
     """Handle subscribe message from client.
 
     Args:
@@ -577,12 +572,16 @@ async def _handle_replay(websocket, client_id: str, permissions: set[str], paylo
         if not _auth.is_permitted_channel(permissions, channel):
             error = ErrorMessage(code="forbidden", message=f"Not permitted to replay: {channel}")
             await websocket.send(error.model_dump_json())
-            logger.warning("Client %s attempted to replay forbidden channel: %s", client_id, channel)
+            logger.warning(
+                "Client %s attempted to replay forbidden channel: %s", client_id, channel
+            )
             return
 
         # Get messages from replay buffer
         messages = _replay_buffer.get_since(channel, since_seq)
-        logger.debug("Client %s replayed %d messages from seq %d", client_id, len(messages), since_seq)
+        logger.debug(
+            "Client %s replayed %d messages from seq %d", client_id, len(messages), since_seq
+        )
 
         # Send replayed messages
         for msg_dict in messages:
@@ -593,7 +592,9 @@ async def _handle_replay(websocket, client_id: str, permissions: set[str], paylo
         await websocket.send(error.model_dump_json())
 
 
-async def _process_outbound(websocket, queue: asyncio.Queue, client_id: str, rate_limiter: TokenBucket) -> None:
+async def _process_outbound(
+    websocket, queue: asyncio.Queue, client_id: str, rate_limiter: TokenBucket
+) -> None:
     """Process outbound messages from router queue to client.
 
     Handles rate limiting and backpressure notifications.
@@ -604,11 +605,6 @@ async def _process_outbound(websocket, queue: asyncio.Queue, client_id: str, rat
         client_id: Client ID
         rate_limiter: Token-bucket rate limiter for this client
     """
-<<<<<<< HEAD
-    dropped_count = 0
-
-=======
->>>>>>> 14aa8ce (fix: resolve ruff linting errors in ws_auth and ws_server)
     try:
         while True:
             try:
@@ -683,11 +679,6 @@ async def publish_score_update(score_event: dict) -> None:
         pair_channel = f"pair/{asset_pair}"
 
         # Route to subscribers
-<<<<<<< HEAD
-        subscriber_ids = _router.get_clients_for_event(wallet_id, asset_pair)
-
-=======
->>>>>>> 14aa8ce (fix: resolve ruff linting errors in ws_auth and ws_server)
         # Send to wallet channel subscribers
         for client_id in _router.get_subscribers(wallet_channel):
             message = {

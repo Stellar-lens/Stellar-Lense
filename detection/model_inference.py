@@ -17,6 +17,7 @@ import os
 import statistics
 
 import joblib
+import numpy as np
 import pandas as pd
 
 from config import config
@@ -107,6 +108,7 @@ class RiskScorer:
         self.metadata = self._load_metadata()
         self.models = self._load_models()
         from detection.meta_learner import LeafEmbeddingExtractor
+
         self.extractor = LeafEmbeddingExtractor(self.models)
         self.maml_adapter, self.proto_classifier = self._load_meta_learners()
 
@@ -121,8 +123,12 @@ class RiskScorer:
 
         if os.path.exists(maml_path) and self.models:
             try:
-                from detection.meta_learner import LeafEmbeddingExtractor, MAMLAdapter, PrototypicalClassifier
                 import torch
+
+                from detection.meta_learner import (
+                    MAMLAdapter,
+                    PrototypicalClassifier,
+                )
 
                 # We need to know input_dim. It depends on the leaf indices from base models.
                 # Use metadata if we have it or a dummy row
@@ -220,6 +226,7 @@ class RiskScorer:
         if self.maml_adapter:
             try:
                 import torch
+
                 emb = torch.from_numpy(self.extractor.transform(X)).float()
                 maml_prob = self.maml_adapter.predict_proba(emb)[0]
                 probs.append(float(maml_prob))

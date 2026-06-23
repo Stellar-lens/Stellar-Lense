@@ -11,8 +11,8 @@ from unittest.mock import MagicMock, patch
 
 import pandas as pd
 
-from config import Config
 import run_pipeline
+from config import Config
 
 
 def _run_dry_run(argv: list[str]) -> MagicMock:

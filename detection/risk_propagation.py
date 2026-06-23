@@ -187,6 +187,7 @@ def propagate_risk_scores(
         row_sums = np.asarray(adj_raw.sum(axis=1)).ravel()
         row_sums[row_sums == 0] = 1.0
         from scipy.sparse import diags
+
         D_inv = diags(1.0 / row_sums)
         A_csr: csr_matrix = (D_inv @ adj_raw).tocsr()
     else:
@@ -263,6 +264,7 @@ def propagation_attribution(
         row_sums = np.asarray(adj_raw.sum(axis=1)).ravel()
         row_sums[row_sums == 0] = 1.0
         from scipy.sparse import diags
+
         D_inv = diags(1.0 / row_sums)
         A_csr: csr_matrix = (D_inv @ adj_raw).tocsr()
     else:

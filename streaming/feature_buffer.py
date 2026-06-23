@@ -106,9 +106,7 @@ class FeatureBuffer:
         with lock:
             records = list(self._buffers[wallet])
             # Prepare pre-computed Benford metrics
-            benford_metrics = {
-                h: s.to_metrics() for h, s in self._benford_sketches[wallet].items()
-            }
+            benford_metrics = {h: s.to_metrics() for h, s in self._benford_sketches[wallet].items()}
             # Prepare per-pair sketches for cross-asset features.
             # Shallow copy to avoid RuntimeError if new pairs are added during iteration.
             pair_benford_sketches = dict(self._pair_benford_sketches[wallet])
