@@ -1,4 +1,4 @@
-use soroban_sdk::{contracttype, Address};
+use soroban_sdk::{contracttype, Address, BytesN, Symbol};
 
 /// Embargo expiry configuration stored per wallet in temporary storage.
 ///
@@ -290,6 +290,8 @@ pub struct SnapshotRecord {
 pub enum DataKey {
     Admin,
     Service,
+    SignerTier(Address),
+
     /// Latest risk score for a (wallet, asset_pair) pair.
     Score(Address, Symbol),
     /// Boolean flag — true when the contract is paused.
@@ -420,6 +422,31 @@ pub enum DataKey {
     /// Maximum allowed score deviation from the provisional median when
     /// building the consensus set.
     ConsensusEpsilon,
+
+    /// Global minimum confidence floor: submissions or gate queries with a
+    /// confidence below this value fail even if the score is acceptable.
+    /// Set by `set_global_min_confidence`. Defaults to 0 (no floor) when unset.
+    GlobalMinConfidence,
+
+    // ── Verkle / KZG polynomial commitment ────────────────────────────────
+    /// Running 32-byte Verkle commitment hash over all live (wallet, pair, score)
+    /// tuples. Serialised as a `BytesN<32>` in instance storage and exposed via
+    /// `get_state_commitment()` as a `BytesN<48>` (48-byte BLS12-381 G1 analog).
+    VerkleCommitment,
+
+    /// Per-entry leaf accumulator used to support incremental removal / update.
+    /// Stores the 32-byte leaf hash `H(0x02 || z || v)` for the *current* score
+    /// of `(wallet, asset_pair)`.  When the score is updated the old leaf is
+    /// XOR-ed out and the new one XOR-ed in.  Absent key means no score yet
+    /// (first write has no old leaf to remove).
+    VerkleLeaf(Address, Symbol),
+
+    // ── Query gate allowlist ─────────────────────────────────────────────
+    /// When `false`, only addresses in `GateCallers` may invoke `query_risk_gate`.
+    GateOpen,
+    /// The list of contract addresses allowed to call `query_risk_gate`
+    /// when `GateOpen` is `false`. Bounded to `MAX_GATE_CALLERS`.
+    GateCallers,
 }
 
 #[contracttype]
@@ -427,3 +454,27 @@ pub enum DataKey {
 pub struct TierBounds {
     pub min_score: u32,
     pub max_score: u32,
+}
+
+/// Maximum number of contract addresses allowed in the gate caller allowlist.
+pub const MAX_GATE_CALLERS: u32 = 20;
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EffectiveRiskScore {
+    pub raw_score: u32,
+    pub effective_score: u32,
+    pub decay_applied: u32,
+    pub elapsed_secs: u64,
+    pub timestamp: u64,
+    pub model_version: u32,
+    pub benford_flag: bool,
+    pub ml_flag: bool,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ModelVersionStats {
+    pub submissions: u32,
+    pub agreements: u32,
+}

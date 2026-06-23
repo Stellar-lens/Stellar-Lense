@@ -15,6 +15,8 @@ pub const MAX_BATCH_SIZE: u32 = 20;
 /// Default risk threshold used when no threshold has been configured by admin.
 pub const DEFAULT_RISK_THRESHOLD: u32 = 75;
 
+pub const DEFAULT_JUMP_THRESHOLD: u32 = 20;
+
 /// Semantic contract version; bump on breaking ABI changes.
 ///
 /// History:
@@ -27,6 +29,9 @@ pub const DEFAULT_RISK_THRESHOLD: u32 = 75;
 ///   `supports_interface` capability were added (see
 ///   `docs/batch-attestation-spec.md`).
 pub const CONTRACT_VERSION: u32 = 3;
+
+pub const MIN_ESCALATION_THRESHOLD: u32 = 0;
+pub const MAX_ESCALATION_THRESHOLD: u32 = 100;
 
 /// Hard upper bound on Merkle proof length accepted by
 /// `submit_scores_batch_attested`. Thirty levels of a binary tree can

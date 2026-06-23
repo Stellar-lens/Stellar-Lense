@@ -9,8 +9,8 @@ pub enum Error {
     Unauthorized = 3,
     InvalidScore = 4,
     InvalidConfidence = 5,
-   SignerTierViolation = 26,
-    InvalidSignerTier = 27, ScoreNotFound = 6,
+    ScoreNotFound = 6,
+
     /// Returned when any state-mutating call is attempted while the
     /// contract is paused by the admin.
     ContractPaused = 7,
@@ -69,7 +69,7 @@ pub enum Error {
     /// `set_service_pubkey` has never been called — there is no key to
     /// verify the signature against. Also returned by `get_service_pubkey`
     /// before one has been configured.
-    ServicePubkeyNotSet = 26,
+    ServicePubkeyNotSet = 53,
     /// Returned by `submit_score` when an attestation is required (a
     /// service pubkey is configured) but missing, or when a supplied
     /// `ScoreAttestation` fails verification: the recomputed commitment
@@ -83,16 +83,14 @@ pub enum Error {
     /// Returned when `set_history_max_depth` is called with `0` or a value
     /// above `MAX_HISTORY_DEPTH`.
     InvalidHistoryDepth = 29,
-feat/confidence-gated-risk-gate
     /// Returned when `set_global_min_confidence` is called with a value
     /// above 100 (confidence is bounded to 0–100).
     InvalidMinConfidence = 30,
 
-
     // ── Fee withdrawal ─────────────────────────────────────────────────────
     /// Returned by `get_fee_token` and `withdraw_fees` when `set_fee_token`
     /// has not been called.
-    FeeTokenNotSet = 30,
+    FeeTokenNotSet = 52,
     /// Returned by `withdraw_fees` when `amount` is zero.
     InvalidWithdrawalAmount = 31,
     /// Returned by `withdraw_fees` when another withdrawal call is already
@@ -172,6 +170,10 @@ feat/confidence-gated-risk-gate
     ConsensusInputEmpty = 50,
     /// `set_consensus_config` was called with `k == 0` or `epsilon > 100`.
     InvalidConsensusConfig = 51,
+
+    // ── Signer tiers ────────────────────────────────────────────────────────
+    SignerTierViolation = 54,
+    InvalidSignerTier = 55,
 }
 
 // Gate caller tracking error variants for structural protection

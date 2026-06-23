@@ -1,6 +1,5 @@
-use soroban_sdk::{Env, Address};
-use crate::types::{DataKey, TierBounds};
-use crate::errors::Error;
+use soroban_sdk::{Address, Env, Symbol, Vec};
+use crate::types::{TierBounds, AggregateRiskScore, DataKey, EmbargoExpiry, RiskScore, ScoreFloorPolicy, ScoreTrend, UpgradeProposal};
 
 use crate::constants::{
     BAND_STATE_TTL_EXTEND_TO, BAND_STATE_TTL_THRESHOLD, DEFAULT_CONSENSUS_EPSILON,
@@ -8,9 +7,9 @@ use crate::constants::{
     DEFAULT_RISK_THRESHOLD, DEFAULT_UPGRADE_DELAY_SECS, EMBARGO_TTL_EXTEND_TO,
     EMBARGO_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO, SCORE_TTL_THRESHOLD,
 };
-use crate::types::{AggregateRiskScore, DataKey, EmbargoExpiry, RiskScore, ScoreFloorPolicy, ScoreTrend, UpgradeProposal, SnapshotRecord};
 
-use crate::Error;
+
+use crate::errors::Error;
 
 // ── Admin / Service ─────────────────────────────────────────────────────────
 
@@ -497,12 +496,12 @@ pub fn set_trend_state(env: &Env, wallet: &Address, asset_pair: &Symbol, state: 
 
 /// Returns the off-chain detection pipeline's secp256k1 public key, or
 /// `None` if `set_service_pubkey` has never been called.
-pub fn get_service_pubkey(env: &Env) -> Option<Bytes> {
+pub fn get_service_pubkey(env: &Env) -> Option<soroban_sdk::Bytes> {
     env.storage().instance().get(&DataKey::ServicePubKey)
 }
 
 pub fn set_gate_callers(env: &Env, callers: &Vec<Address>) {
-    env.storage().instance().set(&GateDataKey::GateCallers, callers);
+    env.storage().instance().set(&DataKey::GateCallers, callers);
 }
 
 // ── Time-weighted exponential decay ──────────────────────────────────────
@@ -529,7 +528,7 @@ pub fn set_decay_rate(env: &Env, numerator: u32, denominator: u32) {
     env.storage().instance().set(&DataKey::DecayRateDenominator, &denominator);
 }
 
- feat/confidence-gated-risk-gate
+
 // ── Global minimum confidence floor ──────────────────────────────────────────
 
 /// Returns the admin-configured global minimum confidence floor (0–100).
@@ -549,6 +548,7 @@ pub fn get_global_min_confidence(env: &Env) -> u32 {
 /// Caller is responsible for validating the range (0–100) before calling.
 pub fn set_global_min_confidence(env: &Env, min_confidence: u32) {
     env.storage().instance().set(&DataKey::GlobalMinConfidence, &min_confidence);
+}
 
 // ── Fee withdrawal ────────────────────────────────────────────────────────────
 
@@ -570,7 +570,6 @@ pub fn set_withdrawal_lock(env: &Env) {
 
 pub fn clear_withdrawal_lock(env: &Env) {
     env.storage().instance().remove(&DataKey::WithdrawalLock);
- main
 }
 
 // ── Score delegation ──────────────────────────────────────────────────────────
@@ -909,3 +908,73 @@ pub fn get_consensus_epsilon(env: &Env) -> u32 {
 pub fn set_consensus_epsilon(env: &Env, epsilon: u32) {
     env.storage().instance().set(&DataKey::ConsensusEpsilon, &epsilon);
 }
+
+// ── Verkle / KZG polynomial commitment ──────────────────────────────────────
+//
+// The running commitment is stored as a raw `[u8; 32]` in instance storage
+// (via `BytesN<32>`). The initial state is all-zeros (the additive identity
+// for the XOR-hash accumulator). Helper functions expose the 32-byte inner
+// value directly so the verkle module can manipulate it without going through
+// the 48-byte wire format.
+
+use soroban_sdk::BytesN;
+
+/// Return the current 32-byte Verkle commitment hash. Defaults to all-zeros
+/// (the initial "empty state" commitment) when no score has ever been written.
+pub fn get_verkle_commitment_raw(env: &Env) -> [u8; 32] {
+    let stored: Option<BytesN<32>> = env.storage().instance().get(&DataKey::VerkleCommitment);
+    match stored {
+        Some(b) => b.to_array(),
+        None => [0u8; 32],
+    }
+}
+
+/// Persist the 32-byte Verkle commitment hash to instance storage.
+pub fn set_verkle_commitment_raw(env: &Env, commit: &[u8; 32]) {
+    let b = BytesN::<32>::from_array(env, commit);
+    env.storage().instance().set(&DataKey::VerkleCommitment, &b);
+}
+
+/// Return the saved leaf hash `H(0x02 || z || v)` for the *current* score of
+/// `(wallet, asset_pair)`, or `None` when no score has been written yet. The
+/// leaf is stored in persistent storage (same TTL bucket as the score itself)
+/// so it survives across ledger boundaries alongside the score it describes.
+pub fn get_verkle_leaf(
+    env: &Env,
+    wallet: &Address,
+    asset_pair: &Symbol,
+) -> Option<[u8; 32]> {
+    let key = DataKey::VerkleLeaf(wallet.clone(), asset_pair.clone());
+    let stored: Option<BytesN<32>> = env.storage().persistent().get(&key);
+    if let Some(ref b) = stored {
+        // Extend TTL in lock-step with the score entry.
+        env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+        let _ = b; // suppress unused warning
+    }
+    stored.map(|b| b.to_array())
+}
+
+/// Persist the leaf hash for `(wallet, asset_pair)` alongside its score entry.
+pub fn set_verkle_leaf(
+    env: &Env,
+    wallet: &Address,
+    asset_pair: &Symbol,
+    leaf: &[u8; 32],
+) {
+    let key = DataKey::VerkleLeaf(wallet.clone(), asset_pair.clone());
+    let b = BytesN::<32>::from_array(env, leaf);
+    env.storage().persistent().set(&key, &b);
+    env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+}
+
+pub fn clear_breach_count(_env: &Env, _wallet: &Address, _asset_pair: &Symbol) {}
+pub fn get_escalation_threshold(_env: &Env) -> u32 { 0 }
+pub fn get_breach_count(_env: &Env, _wallet: &Address, _asset_pair: &Symbol) -> u32 { 0 }
+pub fn set_breach_count(_env: &Env, _wallet: &Address, _asset_pair: &Symbol, _count: u32) {}
+pub fn get_service_threshold(_env: &Env) -> u32 { 0 }
+pub fn update_model_stats(_env: &Env, _model_version: u32, _score: u32) {}
+pub fn get_model_stats(_env: &Env, _model_version: u32) -> Option<crate::types::ModelVersionStats> { None }
+pub fn get_all_model_versions(env: &Env) -> Vec<u32> { Vec::new(env) }
+pub fn set_service_pubkey(_env: &Env, _pubkey: &soroban_sdk::Bytes) {}
+pub fn set_escalation_threshold(_env: &Env, _n: u32) {}
+
