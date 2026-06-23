@@ -65,8 +65,7 @@ fn test_pair_pause_blocks_submit_score() {
         &START_TS,
         &90,
         &1,
-        &None,
-    );
+        &None`n    );
     assert_eq!(result, Err(Ok(Error::PairPaused)));
 }
 
@@ -86,8 +85,7 @@ fn test_pair_pause_allows_read() {
         &START_TS,
         &90,
         &1,
-        &None,
-    );
+        &None`n    );
 
     client.set_pair_paused(&pair, &true);
 
@@ -126,8 +124,7 @@ fn test_pair_unpause_restores_submissions() {
         &START_TS,
         &90,
         &1,
-        &None,
-    );
+        &None`n    );
     assert_eq!(blocked, Err(Ok(Error::PairPaused)));
 
     client.set_pair_paused(&pair, &false);
@@ -141,8 +138,7 @@ fn test_pair_unpause_restores_submissions() {
         &START_TS,
         &90,
         &1,
-        &None,
-    );
+        &None`n    );
     assert_eq!(client.get_score(&wallet, &pair).score, 50);
 }
 
@@ -219,8 +215,7 @@ fn test_global_pause_takes_precedence_over_pair_pause() {
         &START_TS,
         &90,
         &1,
-        &None,
-    );
+        &None`n    );
     assert_eq!(result, Err(Ok(Error::ContractPaused)));
 }
 
@@ -338,7 +333,7 @@ fn test_pair_paused_event_emitted() {
     client.set_pair_paused(&pair, &true);
 
     let events = env.events().all();
-    let (_contract_id, topics, data) = events.get(events.len() - 1).unwrap();
+    let (_contract_id, topics, data) = events.get(events.len() - 1);
     assert_eq!(
         topics,
         Vec::from_array(
@@ -350,7 +345,7 @@ fn test_pair_paused_event_emitted() {
 
     client.set_pair_paused(&pair, &false);
     let events = env.events().all();
-    let (_contract_id, topics, data) = events.get(events.len() - 1).unwrap();
+    let (_contract_id, topics, data) = events.get(events.len() - 1);
     assert_eq!(
         topics,
         Vec::from_array(
