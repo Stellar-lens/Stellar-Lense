@@ -120,6 +120,12 @@ pub fn service_pubkey_updated(env: &Env, pubkey: &Bytes) {
     env.events().publish((symbol_short!("pk_upd"),), pubkey.clone());
 }
 
+/// Emitted when the admin registers or rotates the threshold-group aggregate
+/// secp256k1 public key via `set_aggregate_service_pubkey`.
+pub fn aggregate_service_pubkey_updated(env: &Env, pubkey: &Bytes) {
+    env.events().publish((symbol_short!("agg_pk"),), pubkey.clone());
+}
+
 // ── Merkle-root batch attestation ───────────────────────────────────────────
 
 /// Emitted by `submit_scores_batch_attested` once the batch has been

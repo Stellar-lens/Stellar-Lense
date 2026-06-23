@@ -220,7 +220,7 @@ impl LedgerLensScoreContract {
         timestamp: u64,
         confidence: u32,
         model_version: u32,
-        attestation: Option<ScoreAttestation>,
+        attestation_input: Option<ScoreAttestationInput>,
     ) -> Result<(), Error> {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
@@ -232,45 +232,65 @@ impl LedgerLensScoreContract {
             return Err(Error::PairPaused);
         }
 
-        let service_set = storage::get_service_set(&env);
-        let threshold = storage::get_service_threshold(&env);
-
-        if !service_set.is_empty() && threshold > 0 {
-            // Multi-sig path: verify count, membership, then require_auth each.
-            if signers.len() < threshold {
-                return Err(Error::InsufficientSigners);
+        match attestation_input {
+            Some(ScoreAttestationInput::Threshold(ref ta)) => {
+                // ── Threshold-sig path ───────────────────────────────────────
+                // A single 65-byte secp256k1 threshold signature replaces all
+                // N require_auth calls. Participating signers are validated as
+                // service-set members but no individual Soroban auth is needed.
+                if storage::get_aggregate_service_pubkey(&env).is_none() {
+                    return Err(Error::AggregatePubkeyNotSet);
+                }
+                let service_set = storage::get_service_set(&env);
+                let threshold = storage::get_service_threshold(&env);
+                if !service_set.is_empty() && threshold > 0 {
+                    if ta.participating_signers.len() < threshold {
+                        return Err(Error::InsufficientThresholdSigners);
+                    }
+                    for i in 0..ta.participating_signers.len() {
+                        let signer = ta.participating_signers.get(i).unwrap();
+                        if !service_set.contains(&signer) {
+                            return Err(Error::ThresholdSignerNotInSet);
+                        }
+                    }
+                }
+                Self::verify_threshold_attestation(
+                    &env, &wallet, &asset_pair, score, benford_flag, ml_flag,
+                    timestamp, confidence, model_version, ta,
+                )?;
             }
-            for i in 0..signers.len() {
-                let signer = signers.get(i).unwrap();
-                if !service_set.contains(&signer) {
-                    return Err(Error::UnauthorizedSigner);
+            other => {
+                // ── Legacy M-of-N require_auth path ──────────────────────────
+                let service_set = storage::get_service_set(&env);
+                let threshold = storage::get_service_threshold(&env);
+                if !service_set.is_empty() && threshold > 0 {
+                    if signers.len() < threshold {
+                        return Err(Error::InsufficientSigners);
+                    }
+                    for i in 0..signers.len() {
+                        let signer = signers.get(i).unwrap();
+                        if !service_set.contains(&signer) {
+                            return Err(Error::UnauthorizedSigner);
+                        }
+                        signer.require_auth();
+                    }
+                } else {
+                    storage::get_service(&env).require_auth();
+                }
+                // Opt-in single-key cryptographic attestation.
+                let single_att = match other {
+                    Some(ScoreAttestationInput::Single(a)) => Some(a),
+                    _ => None,
+                };
+                if storage::get_service_pubkey(&env).is_some() || single_att.is_some() {
+                    Self::verify_attestation(
+                        &env, &wallet, &asset_pair, score, benford_flag, ml_flag,
+                        timestamp, confidence, model_version, single_att,
+                    )?;
                 }
                 storage::check_signer_expired(&env, &signer)?;
                 signer.require_auth();
             }
-        } else {
-            // Legacy single-service path.
-            let service = storage::get_service(&env);
-            service.require_auth();
-        }
-
-        // Cryptographic payload attestation — opt-in. Once the admin has
-        // configured a service pubkey, every submission must carry a valid
-        // attestation; until then, `attestation` is ignored entirely so
-        // existing integrations are unaffected. See `set_service_pubkey`.
-        if storage::get_service_pubkey(&env).is_some() || attestation.is_some() {
-            Self::verify_attestation(
-                &env,
-                &wallet,
-                &asset_pair,
-                score,
-                benford_flag,
-                ml_flag,
-                timestamp,
-                confidence,
-                model_version,
-                attestation,
-            )?;
         }
 
         let risk_score =
@@ -2508,6 +2528,50 @@ impl LedgerLensScoreContract {
         storage::get_service_pubkey(&env).ok_or(Error::ServicePubkeyNotSet)
     }
 
+    // ── Threshold signature aggregation ──────────────────────────────────────
+
+    /// Register (or rotate) the aggregate secp256k1 public key for the t-of-n
+    /// threshold signing group.  Admin only.
+    ///
+    /// `pubkey` must be a SEC-1-encoded secp256k1 public key: 33 bytes
+    /// (compressed) or 65 bytes (uncompressed).  Once this key is set, callers
+    /// may pass a `ThresholdAttestation` to `submit_score` instead of relying
+    /// on per-signer `require_auth` calls — the single 65-byte threshold
+    /// signature is verified against this key on-chain.
+    ///
+    /// Rotate to a new key via another call to this function.  There is no
+    /// unset path (short of a contract upgrade) once the key is configured,
+    /// consistent with the security guarantee of `set_service_pubkey`.
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if the contract has no admin yet.
+    /// - [`Error::InvalidPubkeyLength`] if `pubkey` is not 33 or 65 bytes.
+    pub fn set_aggregate_service_pubkey(
+        env: Env,
+        admin_signers: Vec<Address>,
+        pubkey: Bytes,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        if pubkey.len() != 33 && pubkey.len() != 65 {
+            return Err(Error::InvalidPubkeyLength);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+        storage::set_aggregate_service_pubkey(&env, &pubkey);
+        events::aggregate_service_pubkey_updated(&env, &pubkey);
+        Ok(())
+    }
+
+    /// Returns the currently registered aggregate threshold public key.
+    ///
+    /// # Errors
+    /// - [`Error::AggregatePubkeyNotSet`] if `set_aggregate_service_pubkey`
+    ///   has never been called.
+    pub fn get_aggregate_service_pubkey(env: Env) -> Result<Bytes, Error> {
+        storage::get_aggregate_service_pubkey(&env).ok_or(Error::AggregatePubkeyNotSet)
+    }
+
     // ── Consensus configuration ─────────────────────────────────────────────
 
     /// Sets the minimum agreeing model count (`k`) and maximum score
@@ -2517,7 +2581,7 @@ impl LedgerLensScoreContract {
             return Err(Error::NotInitialized);
         }
         if k == 0 || epsilon > 100 {
-            return Err(Error::InvalidConsensusConfig);
+            return Err(Error::InvalidThreshold);
         }
         storage::get_admin(&env).require_auth();
         storage::set_consensus_threshold_k(&env, k);
@@ -3344,14 +3408,14 @@ impl LedgerLensScoreContract {
     /// recovery before the band is cleared.  When `margin == 0` the exit
     /// threshold equals the entry threshold (no hysteresis).
     ///
-    /// The value is rejected with [`Error::InvalidHysteresisMargin`] when it
+    /// The value is rejected with [`Error::InvalidThreshold`] when it
     /// exceeds [`constants::MAX_HYSTERESIS_MARGIN`] (50). Admin only.
     pub fn set_hysteresis_margin(env: Env, margin: u32) -> Result<(), Error> {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
         if margin > constants::MAX_HYSTERESIS_MARGIN {
-            return Err(Error::InvalidHysteresisMargin);
+            return Err(Error::InvalidThreshold);
         }
         let admin = storage::get_admin(&env);
         admin.require_auth();
@@ -5264,6 +5328,87 @@ impl LedgerLensScoreContract {
 
         if !matches {
             return Err(Error::InvalidAttestation);
+        }
+        Ok(())
+    }
+
+    /// Verifies a `ThresholdAttestation` against the registered aggregate
+    /// secp256k1 public key.
+    ///
+    /// Recomputes the commitment independently from the call arguments and
+    /// checks it against `ta.commitment`, then recovers the signing key from
+    /// `ta.threshold_sig` and compares it against the key stored by
+    /// `set_aggregate_service_pubkey`.  Supports both 33-byte compressed and
+    /// 65-byte uncompressed stored keys — same decompression logic as
+    /// [`verify_signature`].
+    ///
+    /// Returns [`Error::InvalidThresholdSignature`] on any mismatch.
+    #[allow(clippy::too_many_arguments)]
+    fn verify_threshold_attestation(
+        env: &Env,
+        wallet: &Address,
+        asset_pair: &Symbol,
+        score: u32,
+        benford_flag: bool,
+        ml_flag: bool,
+        timestamp: u64,
+        confidence: u32,
+        model_version: u32,
+        ta: &ThresholdAttestation,
+    ) -> Result<(), Error> {
+        let digest = Self::compute_commitment(
+            env,
+            wallet,
+            asset_pair,
+            score,
+            benford_flag,
+            ml_flag,
+            timestamp,
+            confidence,
+            model_version,
+        )?;
+
+        // Commitment must match what the contract independently derives.
+        if digest.to_bytes().to_array() != ta.commitment.to_array() {
+            return Err(Error::InvalidThresholdSignature);
+        }
+
+        let pubkey =
+            storage::get_aggregate_service_pubkey(env).ok_or(Error::AggregatePubkeyNotSet)?;
+
+        let sig_bytes = ta.threshold_sig.to_array();
+        let recovery_id = sig_bytes[64] as u32;
+        if recovery_id > 1 {
+            return Err(Error::InvalidThresholdSignature);
+        }
+        let mut rs = [0u8; 64];
+        rs.copy_from_slice(&sig_bytes[..64]);
+        let sig64 = BytesN::<64>::from_array(env, &rs);
+
+        let recovered = env.crypto().secp256k1_recover(&digest, &sig64, recovery_id);
+
+        let matches = match pubkey.len() {
+            65 => {
+                let mut stored = [0u8; 65];
+                pubkey.copy_into_slice(&mut stored);
+                recovered.to_array() == stored
+            }
+            33 => {
+                let recovered_arr = recovered.to_array();
+                let mut compressed = [0u8; 33];
+                compressed[0] = if recovered_arr[64].is_multiple_of(2) { 0x02 } else { 0x03 };
+                compressed[1..33].copy_from_slice(&recovered_arr[1..33]);
+                let mut stored = [0u8; 33];
+                pubkey.copy_into_slice(&mut stored);
+                compressed == stored
+            }
+            // `set_aggregate_service_pubkey` rejects any other length, so
+            // this is unreachable in practice.
+            _ => false,
+        };
+
+        if !matches {
+            return Err(Error::InvalidThresholdSignature);
         }
         Ok(())
     }

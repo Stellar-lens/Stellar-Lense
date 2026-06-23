@@ -2420,7 +2420,7 @@ fn test_counterparty_link_cap_enforced() {
     // The 51st should fail
     let extra = Address::generate(&env);
     let result = client.try_add_counterparty_link(&wallet_a, &extra, &asset_pair);
-    assert_eq!(result, Err(Ok(Error::CounterpartyLinkFull)));
+    assert_eq!(result, Err(Ok(Error::ServiceSetFull)));
 }
 
 #[test]

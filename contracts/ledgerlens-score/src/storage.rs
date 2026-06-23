@@ -694,7 +694,7 @@ pub fn add_counterparty_link(
     let mut links_a = get_counterparties(env, wallet_a, asset_pair);
     if !links_a.contains(wallet_b) {
         if links_a.len() >= crate::constants::MAX_COUNTERPARTY_LINKS_PER_WALLET {
-            return Err(Error::CounterpartyLinkFull);
+            return Err(Error::ServiceSetFull);
         }
         links_a.push_back(wallet_b.clone());
         let key_a = DataKey::Counterparties(wallet_a.clone(), asset_pair.clone());
@@ -705,7 +705,7 @@ pub fn add_counterparty_link(
     let mut links_b = get_counterparties(env, wallet_b, asset_pair);
     if !links_b.contains(wallet_a) {
         if links_b.len() >= crate::constants::MAX_COUNTERPARTY_LINKS_PER_WALLET {
-            return Err(Error::CounterpartyLinkFull);
+            return Err(Error::ServiceSetFull);
         }
         links_b.push_back(wallet_a.clone());
         let key_b = DataKey::Counterparties(wallet_b.clone(), asset_pair.clone());

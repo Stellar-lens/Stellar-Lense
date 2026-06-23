@@ -1,5 +1,6 @@
 use soroban_sdk::contracterror;
 
+// XDR spec hard-limits contracterror enums to 50 variants.
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
