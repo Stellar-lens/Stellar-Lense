@@ -642,8 +642,7 @@ fn test_batch_attested_respects_rate_limit() {
         &100,
         &80,
         &1,
-        &None,
-    );
+        &None`n    );
 
     let key = signing_key(1);
     client.set_service_pubkey(&Vec::new(&env), &pubkey_bytes(&env, &key, true));

@@ -694,7 +694,7 @@ pub fn add_counterparty_link(
     let mut links_a = get_counterparties(env, wallet_a, asset_pair);
     if !links_a.contains(wallet_b) {
         if links_a.len() >= crate::constants::MAX_COUNTERPARTY_LINKS_PER_WALLET {
-            return Err(Error::CounterpartyLinkFull);
+            return Err(Error::ServiceSetFull);
         }
         links_a.push_back(wallet_b.clone());
         let key_a = DataKey::Counterparties(wallet_a.clone(), asset_pair.clone());
@@ -705,7 +705,7 @@ pub fn add_counterparty_link(
     let mut links_b = get_counterparties(env, wallet_b, asset_pair);
     if !links_b.contains(wallet_a) {
         if links_b.len() >= crate::constants::MAX_COUNTERPARTY_LINKS_PER_WALLET {
-            return Err(Error::CounterpartyLinkFull);
+            return Err(Error::ServiceSetFull);
         }
         links_b.push_back(wallet_a.clone());
         let key_b = DataKey::Counterparties(wallet_b.clone(), asset_pair.clone());
@@ -788,7 +788,10 @@ pub fn get_model_stats(_env: &Env, _version: u32) -> Option<crate::types::ModelV
 }
 
 pub fn get_all_model_versions(env: &Env) -> Vec<u32> {
-    Vec::new(env)
+    env.storage()
+        .instance()
+        .get(&DataKey::ModelVersionIndex)
+        .unwrap_or_else(|| Vec::new(env))
 }
 
 pub fn set_service_pubkey(_env: &Env, _pubkey: &Bytes) {}
@@ -799,7 +802,20 @@ pub fn get_service_threshold(env: &Env) -> u32 {
     env.storage().instance().get(&DataKey::ServiceThreshold).unwrap_or(0)
 }
 
-pub fn update_model_stats(_env: &Env, _model_version: u32, _score: u32) {}
+pub fn update_model_stats(env: &Env, model_version: u32, _score: u32) {
+    let key = DataKey::ModelVersionIndex;
+    let mut versions: Vec<u32> = env
+        .storage()
+        .instance()
+        .get(&key)
+        .unwrap_or_else(|| Vec::new(env));
+    if !versions.contains(&model_version)
+        && versions.len() < crate::constants::MAX_MODEL_VERSIONS as u32
+    {
+        versions.push_back(model_version);
+        env.storage().instance().set(&key, &versions);
+    }
+}
 // ── Score submission floor ────────────────────────────────────────────────────
 
 pub fn get_score_floor_policy(env: &Env) -> ScoreFloorPolicy {
@@ -958,6 +974,42 @@ pub fn set_risk_band_state(env: &Env, wallet: &Address, asset_pair: &Symbol, in_
     }
 }
 
+// ── Band entry timestamp ──────────────────────────────────────────────────────
+
+/// Returns the ledger timestamp at which `wallet` first entered the high-risk
+/// band for `asset_pair`, or `None` when the wallet is not currently in the
+/// band (never entered, or the entry time has been cleared on exit). Extends
+/// TTL on read so active band memberships keep their entry time alive.
+pub fn get_band_entry_time(env: &Env, wallet: &Address, asset_pair: &Symbol) -> Option<u64> {
+    let key = DataKey::BandEntryTime(wallet.clone(), asset_pair.clone());
+    let result: Option<u64> = env.storage().temporary().get(&key);
+    if result.is_some() {
+        env.storage()
+            .temporary()
+            .extend_ttl(&key, BAND_STATE_TTL_THRESHOLD, BAND_STATE_TTL_EXTEND_TO);
+    }
+    result
+}
+
+/// Records `timestamp` as the ledger time when `wallet` entered the high-risk
+/// band for `asset_pair`. Uses the same TTL constants as `RiskBandState` so
+/// both keys expire together if they go cold.
+pub fn set_band_entry_time(env: &Env, wallet: &Address, asset_pair: &Symbol, timestamp: u64) {
+    let key = DataKey::BandEntryTime(wallet.clone(), asset_pair.clone());
+    env.storage().temporary().set(&key, &timestamp);
+    env.storage()
+        .temporary()
+        .extend_ttl(&key, BAND_STATE_TTL_THRESHOLD, BAND_STATE_TTL_EXTEND_TO);
+}
+
+/// Removes the band entry timestamp for `wallet` / `asset_pair`. Called when
+/// the wallet exits the high-risk band so the key is absent whenever the
+/// wallet is not in the band.
+pub fn clear_band_entry_time(env: &Env, wallet: &Address, asset_pair: &Symbol) {
+    let key = DataKey::BandEntryTime(wallet.clone(), asset_pair.clone());
+    env.storage().temporary().remove(&key);
+}
+
 // ── Consensus configuration ─────────────────────────────────────────────────
 
 pub fn get_consensus_threshold_k(env: &Env) -> u32 {
@@ -1066,15 +1118,23 @@ pub fn remove_from_dispute_index(env: &Env, wallet: &Address, asset_pair: &Symbo
 
 // ── MEV-Resistant Commit-Reveal ──────────────────────────────────────────────
 
-pub fn get_reveal_window_secs(env: &Env) -> u64 {
-    env.storage()
-        .instance()
-        .get(&DataKey::RevealWindowSecs)
-        .unwrap_or(3600) // Default 1 hour
+pub fn get_last_global_submission_time(env: &Env) -> u64 {
+    env.storage().instance().get(&DataKey::LastGlobalSubmissionTime).unwrap_or(0)
 }
 
-pub fn set_reveal_window_secs(env: &Env, secs: u64) {
-    env.storage().instance().set(&DataKey::RevealWindowSecs, &secs);
+pub fn set_last_global_submission_time(env: &Env, timestamp: u64) {
+    env.storage().instance().set(&DataKey::LastGlobalSubmissionTime, &timestamp);
+}
+
+pub fn get_quorum_failure_window(env: &Env) -> u64 {
+    env.storage()
+        .instance()
+        .get(&DataKey::QuorumFailureWindow)
+        .unwrap_or(DEFAULT_QUORUM_FAILURE_WINDOW_SECS)
+}
+
+pub fn set_quorum_failure_window(env: &Env, window_secs: u64) {
+    env.storage().instance().set(&DataKey::QuorumFailureWindow, &window_secs);
 }
 
 pub fn set_consensus_commitment(
@@ -1101,14 +1161,16 @@ pub fn get_consensus_commitment(
     env.storage().temporary().get(&key)
 }
 
-pub fn remove_consensus_commitment(
-    env: &Env,
-    model: &Address,
-    wallet: &Address,
-    asset_pair: &Symbol,
-) {
-    let key = DataKey::ConsensusCommitment(model.clone(), wallet.clone(), asset_pair.clone());
-    env.storage().temporary().remove(&key);
+pub fn set_original_service_threshold(env: &Env, threshold: u32) {
+    env.storage().instance().set(&DataKey::OriginalServiceThreshold, &threshold);
+}
+
+pub fn clear_original_service_threshold(env: &Env) {
+    env.storage().instance().remove(&DataKey::OriginalServiceThreshold);
+}
+
+pub fn get_service_threshold(env: &Env) -> u32 {
+    env.storage().instance().get(&DataKey::ServiceThreshold).unwrap_or(0)
 }
 
 // ── Finality buffer (pending score commit window) ────────────────────────────

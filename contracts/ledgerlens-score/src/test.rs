@@ -1708,6 +1708,27 @@ fn test_multisig_unauthorized_signer_rejected() {
 }
 
 #[test]
+fn test_get_admin_signer_count_tracks_set_size() {
+    let (env, client, admin, service) = setup();
+    client.initialize(&admin, &service);
+
+    assert_eq!(client.get_admin_signer_count(), 0);
+
+    let s1 = Address::generate(&env);
+    let s2 = Address::generate(&env);
+    client.add_admin_signer(&Vec::new(&env), &s1);
+    client.add_admin_signer(&Vec::new(&env), &s2);
+    assert_eq!(client.get_admin_signer_count(), 2);
+
+    client.set_admin_threshold(&Vec::new(&env), &2);
+    let mut admin_signers = Vec::new(&env);
+    admin_signers.push_back(s1.clone());
+    admin_signers.push_back(s2.clone());
+    client.remove_admin_signer(&admin_signers, &s2);
+    assert_eq!(client.get_admin_signer_count(), 1);
+}
+
+#[test]
 fn test_add_signer_beyond_max_rejected() {
     // Adding an 11th signer → ServiceSetFull.
     let (env, client, admin, service) = setup();
@@ -2607,7 +2628,7 @@ fn test_counterparty_link_cap_enforced() {
     // The 51st should fail
     let extra = Address::generate(&env);
     let result = client.try_add_counterparty_link(&wallet_a, &extra, &asset_pair);
-    assert_eq!(result, Err(Ok(Error::CounterpartyLinkFull)));
+    assert_eq!(result, Err(Ok(Error::ServiceSetFull)));
 }
 
 #[test]
@@ -2800,4 +2821,63 @@ fn test_remove_nonexistent_link_fails() {
 
     let result = client.try_remove_counterparty_link(&wallet_a, &wallet_b, &asset_pair);
     assert_eq!(result, Err(Ok(Error::CounterpartyLinkFull)));
+}
+
+// ── get_score_variance tests ──────────────────────────────────────────────────
+
+#[test]
+fn test_get_score_variance_empty() {
+    let (env, client, _admin, _service) = initialized();
+    let wallet = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+    assert_eq!(client.get_score_variance(&wallet, &asset_pair), 0);
+}
+
+#[test]
+fn test_get_score_variance_single_entry() {
+    let (env, client, _admin, _service) = initialized();
+    let wallet = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &50, &false, &false, &1, &80, &1, &None);
+    assert_eq!(client.get_score_variance(&wallet, &asset_pair), 0);
+}
+
+#[test]
+fn test_get_score_variance_identical_scores() {
+    let (env, client, _admin, _service) = initialized();
+    let wallet = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+    for i in 0u32..4 {
+        env.ledger().with_mut(|l| l.timestamp += 3_601);
+        client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &42, &false, &false, &(i as u64 + 1), &80, &1, &None);
+    }
+    assert_eq!(client.get_score_variance(&wallet, &asset_pair), 0);
+}
+
+#[test]
+fn test_get_score_variance_known_values() {
+    let (env, client, _admin, _service) = initialized();
+    let wallet = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+    // scores: [2, 4, 6, 8]; mean=5; var=((3^2)+(1^2)+(1^2)+(3^2))/4 = 20/4 = 5; scaled = 5*100 = 500
+    for i in 0u32..4 {
+        env.ledger().with_mut(|l| l.timestamp += 3_601);
+        client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &(2 + i * 2), &false, &false, &(i as u64 + 1), &80, &1, &None);
+    }
+    assert_eq!(client.get_score_variance(&wallet, &asset_pair), 500);
+}
+
+#[test]
+fn test_get_score_variance_embargoed() {
+    let (env, client, _admin, _service) = initialized();
+    let wallet = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+    env.ledger().with_mut(|l| l.timestamp += 3_601);
+    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &10, &false, &false, &1, &80, &1, &None);
+    env.ledger().with_mut(|l| l.timestamp += 3_601);
+    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &20, &false, &false, &2, &80, &1, &None);
+    let admin = client.get_admin();
+    env.ledger().with_mut(|l| l.timestamp += 1);
+    client.set_score_embargo(&wallet, &None).unwrap();
+    assert_eq!(client.get_score_variance(&wallet, &asset_pair), 0);
 }

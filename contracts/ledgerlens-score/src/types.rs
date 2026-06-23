@@ -109,7 +109,50 @@ pub struct ScoreAttestation {
     pub signature: BytesN<65>,
 }
 
-/// A single model's contribution to an ensemble consensus submission.
+/// Threshold-signature attestation: t-of-n signers produce one 65-byte proof.
+/// See `docs/threshold-attestation-spec.md`.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ThresholdAttestation {
+    pub commitment: BytesN<32>,
+    pub threshold_sig: BytesN<65>,
+    pub participating_signers: soroban_sdk::Vec<Address>,
+}
+
+/// Unified attestation input for `submit_score`.
+/// Wraps both attestation variants so the function stays within
+/// Soroban's 10-parameter limit.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ScoreAttestationInput {
+    Single(ScoreAttestation),
+    Threshold(ThresholdAttestation),
+}
+
+/// Decay-adjusted view of a score, returned by `get_effective_score`.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EffectiveRiskScore {
+    pub raw_score: u32,
+    pub effective_score: u32,
+    pub decay_applied: bool,
+    pub elapsed_secs: u64,
+    pub timestamp: u64,
+    pub confidence: u32,
+    pub model_version: u32,
+    pub benford_flag: bool,
+    pub ml_flag: bool,
+}
+
+/// Per-model-version aggregate stats, returned by `get_model_version_stats`.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ModelVersionStats {
+    pub model_version: u32,
+    pub submission_count: u32,
+    pub score_sum: u64,
+}
+
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 
@@ -288,12 +331,7 @@ pub enum DataKey {
     ScoreCount(Address, Symbol),
     ServicePubKey,
     HistoryMaxDepth,
-    /// Numerator of the fixed-point decay rate λ = numerator / denominator.
-    /// Stored separately to support fractional λ values in fixed-point arithmetic.
-    /// Defaults to 0 (no decay) when unset.
     DecayRateNumerator,
-    /// Denominator of the fixed-point decay rate λ = numerator / denominator.
-    /// Defaults to 1 when unset.
     DecayRateDenominator,
     /// Global minimum confidence floor (0–100) enforced by
     /// `query_risk_gate_with_confidence`. The effective floor is
@@ -323,15 +361,8 @@ pub enum DataKey {
     /// the floor applies. Global config, `u32`, defaults to
     /// `DEFAULT_SCORE_FLOOR_HWM` (80) when unset.
     ScoreFloorHighWaterMark,
-    /// Score-floor policy: minimum score permitted for high-risk wallets.
-    /// Global config, `u32`, defaults to `DEFAULT_SCORE_FLOOR_MIN` (20).
     ScoreFloorMinValue,
-    /// Score-floor policy kill-switch. Global config, `bool`, defaults to
-    /// `false` (floor disabled) until the admin opts in.
     ScoreFloorEnabled,
-    /// Per-(wallet, asset_pair) running maximum of every score ever accepted,
-    /// used to decide whether the submission floor applies. Updated on every
-    /// accepted `submit_score` / `submit_scores_batch` write.
     HistoricalMaxScore(Address, Symbol),
     HysteresisMargin,
     RiskBandState(Address, Symbol),
