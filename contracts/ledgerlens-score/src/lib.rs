@@ -62,6 +62,9 @@ mod test_consensus;
 mod test_dispute;
 
 #[cfg(test)]
+mod test_finality_buffer;
+
+#[cfg(test)]
 mod test_history_paginated;
 
 #[cfg(test)]
@@ -75,11 +78,9 @@ use soroban_sdk::{
 pub use errors::Error;
 pub use types::{
     AggregateRiskScore, BatchAttestation, BatchEntryResult, BatchResult, EffectiveRiskScore,
-    ModelVersionStats, RiskScore, ScoreAttestation, ScoreSubmission, ScoreSubmissionWithProof,
-    ScoreTrend, ScoreVelocityCap, UpgradeProposal,
-    AggregateRiskScore, BatchAttestation, BatchEntryResult, BatchResult, EmbargoExpiry,
-    ModelSubmission, RiskScore, ScoreAttestation, ScoreDispute, ScoreFloorPolicy, ScoreSubmission,
-    ScoreSubmissionWithProof, ScoreTrend, UpgradeProposal,
+    EmbargoExpiry, ModelSubmission, ModelVersionStats, PendingScoreEntry, RiskScore, ScoreAttestation,
+    ScoreDispute, ScoreFloorPolicy, ScoreSubmission, ScoreSubmissionWithProof, ScoreTrend,
+    ScoreVelocityCap, UpgradeProposal,
 };
 
 /// On-chain truth layer for LedgerLens risk scores.
@@ -266,7 +267,179 @@ impl LedgerLensScoreContract {
 
         let risk_score =
             RiskScore { score, benford_flag, ml_flag, timestamp, confidence, model_version };
-        Self::write_score_with_rate_limit(&env, &wallet, &asset_pair, &risk_score)?;
+
+        let buffer = storage::get_finality_buffer_secs(&env);
+        if buffer == 0 {
+            // Disabled — commit straight to live storage.
+            Self::write_score_with_rate_limit(&env, &wallet, &asset_pair, &risk_score)?;
+        } else {
+            // Buffer active — validate but hold in pending storage.
+            // Rate limit still applies so we can't be flooded with pending entries.
+            let last_submit = storage::get_last_submit_time(&env, &wallet, &asset_pair);
+            let cooldown = storage::get_pair_cooldown_secs(&env, &asset_pair);
+            let now2 = env.ledger().timestamp();
+            if last_submit != 0 && now2 < last_submit.saturating_add(cooldown) {
+                return Err(Error::RateLimitExceeded);
+            }
+            storage::set_last_submit_time(&env, &wallet, &asset_pair, now2);
+
+            let commit_after = now2.saturating_add(buffer);
+            let pending = PendingScoreEntry {
+                score,
+                benford_flag,
+                ml_flag,
+                timestamp,
+                confidence,
+                model_version,
+                submitted_at: now2,
+                commit_after,
+                submitted_by: if !storage::get_service_set(&env).is_empty() {
+                    signers.get(0).unwrap_or_else(|| storage::get_service(&env))
+                } else {
+                    storage::get_service(&env)
+                },
+            };
+            storage::set_pending_score(&env, &wallet, &asset_pair, &pending);
+            events::score_pending(&env, &wallet, &asset_pair, commit_after);
+        }
+        Ok(())
+    }
+
+
+    // ── Finality buffer (pending score commit window) ───────────────────────
+
+    /// Sets the finality buffer: the number of seconds a `submit_score`
+    /// payload is held in `PendingScore` before it can be committed to live
+    /// storage via `commit_pending_score`. While pending, the admin may
+    /// inspect it with `get_pending_score` and discard it with
+    /// `cancel_pending_score` before it ever reaches `get_score` /
+    /// `query_risk_gate`. Admin only.
+    ///
+    /// `secs == 0` (the default) disables the buffer entirely — `submit_score`
+    /// then writes straight to live storage, exactly as it did before this
+    /// feature existed. Any non-zero value up to `MAX_FINALITY_BUFFER_SECS`
+    /// (24 hours) is accepted.
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if the contract has no admin yet.
+    /// - [`Error::InvalidFinalityBuffer`] if `secs > MAX_FINALITY_BUFFER_SECS`.
+    pub fn set_finality_buffer(
+        env: Env,
+        admin_signers: Vec<Address>,
+        secs: u64,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        if secs > constants::MAX_FINALITY_BUFFER_SECS {
+            return Err(Error::InvalidFinalityBuffer);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+        storage::set_finality_buffer_secs(&env, secs);
+        events::finality_buffer_updated(&env, secs);
+        Ok(())
+    }
+
+    /// Returns the current finality buffer in seconds. `0` means the buffer
+    /// is disabled and `submit_score` commits immediately.
+    pub fn get_finality_buffer(env: Env) -> u64 {
+        storage::get_finality_buffer_secs(&env)
+    }
+
+    /// Read-only lookup of the pending score held for `(wallet, asset_pair)`,
+    /// if any. Returns `None` when the buffer is disabled or no score is
+    /// currently in the hold window.
+    pub fn get_pending_score(
+        env: Env,
+        wallet: Address,
+        asset_pair: Symbol,
+    ) -> Option<PendingScoreEntry> {
+        storage::get_pending_score(&env, &wallet, &asset_pair)
+    }
+
+    /// Commits a pending score to live storage once its hold window has
+    /// elapsed. Callable by anyone — the only gate is `commit_after <= now`.
+    ///
+    /// # Errors
+    /// - [`Error::NoPendingScore`] if no pending score exists for
+    ///   `(wallet, asset_pair)`.
+    /// - [`Error::FinalityWindowNotElapsed`] if `commit_after > now`.
+    pub fn commit_pending_score(
+        env: Env,
+        wallet: Address,
+        asset_pair: Symbol,
+    ) -> Result<(), Error> {
+        let pending =
+            storage::get_pending_score(&env, &wallet, &asset_pair).ok_or(Error::NoPendingScore)?;
+
+        let now = env.ledger().timestamp();
+        if now < pending.commit_after {
+            return Err(Error::FinalityWindowNotElapsed);
+        }
+
+        let previous_score = storage::peek_score(&env, &wallet, &asset_pair).map(|s| s.score);
+
+        let risk_score = RiskScore {
+            score: pending.score,
+            benford_flag: pending.benford_flag,
+            ml_flag: pending.ml_flag,
+            timestamp: pending.timestamp,
+            confidence: pending.confidence,
+            model_version: pending.model_version,
+        };
+
+        storage::set_score(&env, &wallet, &asset_pair, &risk_score);
+        storage::push_score_history(&env, &wallet, &asset_pair, &risk_score);
+        storage::register_pair_for_wallet(&env, &wallet, &asset_pair);
+        storage::increment_score_count(&env, &wallet, &asset_pair);
+        Self::refresh_aggregate_cache(&env, &wallet);
+        // Self::update_merkle_accumulator(
+        //     &env,
+        //     &wallet,
+        //     &asset_pair,
+        //     pending.score,
+        //     pending.timestamp,
+        //     pending.confidence,
+        //     pending.model_version,
+        // );
+
+        let score_threshold = storage::get_risk_threshold(&env);
+        if pending.score >= score_threshold {
+            events::threshold_breached(&env, &wallet, &asset_pair, pending.score, score_threshold);
+        }
+
+        Self::emit_score_delta(&env, &wallet, &asset_pair, previous_score, pending.score);
+        storage::clear_pending_score(&env, &wallet, &asset_pair);
+        events::score_committed(&env, &wallet, &asset_pair);
+        Ok(())
+    }
+
+    /// Discards a pending score before it can take effect. Admin only —
+    /// this is the review-and-cancel mechanism the finality buffer exists
+    /// to provide.
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if the contract has no admin yet.
+    /// - [`Error::NoPendingScore`] if no pending score exists for
+    ///   `(wallet, asset_pair)`.
+    pub fn cancel_pending_score(
+        env: Env,
+        admin_signers: Vec<Address>,
+        wallet: Address,
+        asset_pair: Symbol,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+
+        if storage::get_pending_score(&env, &wallet, &asset_pair).is_none() {
+            return Err(Error::NoPendingScore);
+        }
+        storage::clear_pending_score(&env, &wallet, &asset_pair);
+
+        let admin = storage::get_admin(&env);
+        events::score_pending_cancelled(&env, &wallet, &asset_pair, &admin);
         Ok(())
     }
 
