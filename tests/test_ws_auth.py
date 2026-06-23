@@ -12,7 +12,7 @@ def auth(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# extract_permissions() — 7 required test cases from Issue #89
+# extract_permissions()
 # ---------------------------------------------------------------------------
 
 def test_extract_permissions_unrestricted_scope(auth):
@@ -68,7 +68,7 @@ def test_is_permitted_channel_wallet_isolation(auth):
 
 
 # ---------------------------------------------------------------------------
-# verify() — additional tests for coverage >= 85%
+# verify()
 # ---------------------------------------------------------------------------
 
 def test_verify_returns_none_for_empty_string(auth):
@@ -93,7 +93,7 @@ def test_verify_returns_none_for_bad_segments(auth):
 
 
 # ---------------------------------------------------------------------------
-# _has_scores_read_scope() — static helper coverage
+# _has_scores_read_scope()
 # ---------------------------------------------------------------------------
 
 def test_has_scores_read_scope_returns_true():
@@ -111,7 +111,7 @@ def test_has_scores_read_scope_returns_false():
 
 
 # ---------------------------------------------------------------------------
-# is_permitted_channel() — extra edge cases for coverage
+# is_permitted_channel()
 # ---------------------------------------------------------------------------
 
 def test_is_permitted_channel_empty_permissions():
