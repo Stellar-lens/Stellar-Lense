@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 // Ledger TTL constants assume ~5 s per ledger on Stellar mainnet.
 pub const SCORE_TTL_THRESHOLD: u32 = 518_400; // ~30 days
 pub const SCORE_TTL_EXTEND_TO: u32 = 777_600; // ~45 days
@@ -26,8 +27,11 @@ pub const DEFAULT_RISK_THRESHOLD: u32 = 75;
 /// * `3` — `submit_scores_batch_attested` and the `batch_attested`
 ///   `supports_interface` capability were added (see
 ///   `docs/batch-attestation-spec.md`).
-pub const CONTRACT_VERSION: u32 = 3;
-
+/// * `4` — threshold secp256k1 signature aggregation was added:
+///   `set_aggregate_service_pubkey` / `get_aggregate_service_pubkey` and the
+///   `threshold_attestation` parameter on `submit_score` (see
+///   `docs/threshold-attestation-spec.md`).
+pub const CONTRACT_VERSION: u32 = 4;
 /// Hard upper bound on Merkle proof length accepted by
 /// `submit_scores_batch_attested`. Thirty levels of a binary tree can
 /// accommodate up to 2^30 ≈ 1.07 billion leaves — well above the
@@ -195,3 +199,20 @@ pub const DEFAULT_CONSENSUS_THRESHOLD_K: u32 = 2;
 
 /// Default maximum allowed absolute deviation from the provisional median.
 pub const DEFAULT_CONSENSUS_EPSILON: u32 = 5;
+
+// ── Score jump anomaly detection ──────────────────────────────────────────────
+
+/// Default absolute score delta that triggers a jump-anomaly event.
+pub const DEFAULT_JUMP_THRESHOLD: u32 = 30;
+
+// ── Consecutive-breach escalation ─────────────────────────────────────────────
+
+/// Default number of consecutive high-risk submissions before an
+/// `escalation_triggered` event fires.
+pub const DEFAULT_ESCALATION_THRESHOLD: u32 = 3;
+
+/// Minimum configurable escalation threshold.
+pub const MIN_ESCALATION_THRESHOLD: u32 = 1;
+
+/// Maximum configurable escalation threshold.
+pub const MAX_ESCALATION_THRESHOLD: u32 = 100;

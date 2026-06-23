@@ -698,8 +698,7 @@ fn test_batch_attested_respects_rate_limit() {
         &100,
         &80,
         &1,
-        &None,
-    );
+        &None`n    );
 
     // Now build a 2-entry batch:
     //   index 0 — same wallet/pair as the pre-submission (must hit the cooldown)

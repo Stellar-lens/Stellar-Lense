@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use soroban_sdk::{symbol_short, Address, Bytes, BytesN, Env, Symbol};
 
 use crate::types::RiskScore;
@@ -148,6 +149,12 @@ pub fn rate_limit_overridden(env: &Env, by: &Address, wallet: &Address, asset_pa
 /// `set_service_pubkey`.
 pub fn service_pubkey_updated(env: &Env, pubkey: &Bytes) {
     env.events().publish((symbol_short!("pk_upd"),), pubkey.clone());
+}
+
+/// Emitted when the admin registers or rotates the threshold-group aggregate
+/// secp256k1 public key via `set_aggregate_service_pubkey`.
+pub fn aggregate_service_pubkey_updated(env: &Env, pubkey: &Bytes) {
+    env.events().publish((symbol_short!("agg_pk"),), pubkey.clone());
 }
 
 // ── Merkle-root batch attestation ───────────────────────────────────────────
@@ -391,4 +398,56 @@ pub fn embargo_set(env: &Env, wallet: &Address, expiry: Option<u64>) {
 /// Emitted when an embargo is explicitly lifted via `lift_score_embargo`.
 pub fn embargo_lifted(env: &Env, wallet: &Address) {
     env.events().publish((symbol_short!("emb_lift"), wallet.clone()), ());
+}
+
+// ── Score jump anomaly ────────────────────────────────────────────────────────
+
+#[allow(clippy::too_many_arguments)]
+pub fn score_jump_anomaly(
+    env: &Env,
+    wallet: &Address,
+    asset_pair: &Symbol,
+    prev_score: u32,
+    new_score: u32,
+    delta: i64,
+    model_version: u32,
+    timestamp: u64,
+) {
+    env.events().publish(
+        (symbol_short!("scr_jmp"), wallet.clone(), asset_pair.clone()),
+        (prev_score, new_score, delta, model_version, timestamp),
+    );
+}
+
+// ── Escalation ────────────────────────────────────────────────────────────────
+
+pub fn escalation_triggered(
+    env: &Env,
+    wallet: &Address,
+    asset_pair: &Symbol,
+    breach_count: u32,
+    score: u32,
+    threshold_n: u32,
+) {
+    env.events().publish(
+        (symbol_short!("esc_trig"), wallet.clone(), asset_pair.clone()),
+        (breach_count, score, threshold_n),
+    );
+}
+
+pub fn escalation_resolved(
+    env: &Env,
+    wallet: &Address,
+    asset_pair: &Symbol,
+    breach_count: u32,
+    score: u32,
+) {
+    env.events().publish(
+        (symbol_short!("esc_res"), wallet.clone(), asset_pair.clone()),
+        (breach_count, score),
+    );
+}
+
+pub fn escalation_threshold_updated(env: &Env, old_threshold: u32, new_threshold: u32) {
+    env.events().publish((symbol_short!("esc_upd"),), (old_threshold, new_threshold));
 }

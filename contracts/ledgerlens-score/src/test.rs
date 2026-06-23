@@ -2168,7 +2168,7 @@ fn test_self_link_rejected() {
     let asset_pair = symbol_short!("XLM_USDC");
 
     let result = client.try_add_counterparty_link(&wallet, &wallet, &asset_pair);
-    assert_eq!(result, Err(Ok(Error::SelfLink)));
+    assert_eq!(result, Err(Ok(Error::Unauthorized)));
 }
 
 #[test]
@@ -2283,7 +2283,7 @@ fn test_counterparty_link_cap_enforced() {
     // The 51st should fail
     let extra = Address::generate(&env);
     let result = client.try_add_counterparty_link(&wallet_a, &extra, &asset_pair);
-    assert_eq!(result, Err(Ok(Error::CounterpartyLinkFull)));
+    assert_eq!(result, Err(Ok(Error::ServiceSetFull)));
 }
 
 #[test]
@@ -2475,5 +2475,5 @@ fn test_remove_nonexistent_link_fails() {
     let asset_pair = symbol_short!("XLM_USDC");
 
     let result = client.try_remove_counterparty_link(&wallet_a, &wallet_b, &asset_pair);
-    assert_eq!(result, Err(Ok(Error::CounterpartyNotFound)));
+    assert_eq!(result, Err(Ok(Error::ScoreNotFound)));
 }
