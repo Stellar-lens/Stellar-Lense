@@ -83,6 +83,12 @@ class Config:
     MIN_TRADES_FOR_SCORING: int = int(os.getenv("MIN_TRADES_FOR_SCORING", "20"))
     LIST_RELOAD_INTERVAL_SECONDS: int = int(os.getenv("LIST_RELOAD_INTERVAL_SECONDS", "60"))
 
+    # Feature computation cache (detection/feature_cache.py) — avoids
+    # recomputing the feature matrix when the same wallet is re-scored
+    # within TTL_SECONDS, e.g. repeated WebSocket scoring events.
+    FEATURE_CACHE_TTL_SECONDS: int = int(os.getenv("FEATURE_CACHE_TTL_SECONDS", "300"))
+    FEATURE_CACHE_MAXSIZE: int = int(os.getenv("FEATURE_CACHE_MAXSIZE", "1000"))
+
     # Forensic reporting
     REPORT_CONCURRENCY: int = int(os.getenv("REPORT_CONCURRENCY", "4"))
 

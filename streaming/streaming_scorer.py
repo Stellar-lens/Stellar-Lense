@@ -23,6 +23,7 @@ from typing import Optional
 import networkx as nx
 
 from config import config
+from detection.feature_cache import FeatureCache
 from detection.model_inference import RiskScorer
 from streaming.feature_buffer import FeatureBuffer
 from utils.logging import get_logger
@@ -48,6 +49,13 @@ class StreamingScorer:
         The current wallet funding/co-trade graph.  Required when
         *gnn_encoder* is provided.  May be updated externally as new
         account-activity events arrive.
+    feature_cache:
+        Optional :class:`~detection.feature_cache.FeatureCache` instance.
+        When a wallet is re-scored within the cache's TTL, the buffered
+        feature matrix is reused instead of being rebuilt from scratch —
+        the dominant cost of repeatedly scoring the same wallet during a
+        burst of trade activity. Defaults to a fresh cache configured from
+        ``config.FEATURE_CACHE_TTL_SECONDS`` / ``config.FEATURE_CACHE_MAXSIZE``.
     """
 
     def __init__(
@@ -55,11 +63,13 @@ class StreamingScorer:
         model_dir: str | None = None,
         gnn_encoder: Optional["GNNEncoder"] = None,  # type: ignore[name-defined]  # noqa: F821
         funding_graph: nx.DiGraph | None = None,
+        feature_cache: FeatureCache | None = None,
     ) -> None:
         self._risk_scorer = RiskScorer(model_dir=model_dir)
         self.min_trades: int = config.MIN_TRADES_FOR_SCORING
         self._gnn_encoder = gnn_encoder
         self._funding_graph: nx.DiGraph = funding_graph if funding_graph is not None else nx.DiGraph()
+        self._feature_cache = feature_cache if feature_cache is not None else FeatureCache()
 
     # ------------------------------------------------------------------
     # Incremental GNN update
@@ -127,9 +137,12 @@ class StreamingScorer:
         if buffer.wallet_trade_count(wallet) < self.min_trades:
             return None
 
-        feature_row = buffer.get_feature_row(wallet)
+        feature_row = self._feature_cache.get(wallet)
         if feature_row is None:
-            return None
+            feature_row = buffer.get_feature_row(wallet)
+            if feature_row is None:
+                return None
+            self._feature_cache.put(wallet, feature_row)
 
         try:
             return self._risk_scorer.score(feature_row)
