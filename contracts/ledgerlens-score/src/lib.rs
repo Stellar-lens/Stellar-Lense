@@ -2227,7 +2227,7 @@ impl LedgerLensScoreContract {
             || capability == symbol_short!("gate")
             || capability == symbol_short!("aggr")
             || capability == symbol_short!("count")
-            || capability == symbol_short!("cgate")
+            || capability == symbol_short!("var")
             || capability == Symbol::new(&env, "batch_read")
             || capability == Symbol::new(&env, "batch_attested")
             || capability == symbol_short!("cgate")
