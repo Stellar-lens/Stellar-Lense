@@ -3438,6 +3438,20 @@ impl LedgerLensScoreContract {
         storage::get_risk_band_state(&env, &wallet, &asset_pair)
     }
 
+    /// Returns the ledger timestamp at which `wallet` entered the high-risk
+    /// band for `asset_pair`, or `None` when the wallet is not currently in
+    /// the band.
+    ///
+    /// The timestamp is written exactly once — on the transition from
+    /// not-in-band to in-band — and is cleared when the wallet exits the band,
+    /// so it always reflects the start of the *current* continuous high-risk
+    /// period.  It is intentionally not updated on subsequent in-band
+    /// submissions so callers can compute "time in band" as
+    /// `ledger_timestamp - entry_time`.
+    pub fn get_risk_band_entry_time(env: Env, wallet: Address, asset_pair: Symbol) -> Option<u64> {
+        storage::get_band_entry_time(&env, &wallet, &asset_pair)
+    }
+
     // ── Score embargo ─────────────────────────────────────────────────────────
 
     /// Places `wallet` under a score embargo, blocking external read access to
@@ -4649,6 +4663,7 @@ impl LedgerLensScoreContract {
         if score >= risk_threshold {
             if !in_band {
                 storage::set_risk_band_state(env, wallet, asset_pair, true);
+                storage::set_band_entry_time(env, wallet, asset_pair, env.ledger().timestamp());
                 events::risk_band_entered(env, wallet, asset_pair, score, risk_threshold);
             }
             // Already in band: stay, no event.
