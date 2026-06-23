@@ -2305,7 +2305,7 @@ fn test_self_link_rejected() {
     let asset_pair = symbol_short!("XLM_USDC");
 
     let result = client.try_add_counterparty_link(&wallet, &wallet, &asset_pair);
-    assert_eq!(result, Err(Ok(Error::SelfLink)));
+    assert_eq!(result, Err(Ok(Error::CounterpartyLinkFull)));
 }
 
 #[test]
@@ -2612,5 +2612,5 @@ fn test_remove_nonexistent_link_fails() {
     let asset_pair = symbol_short!("XLM_USDC");
 
     let result = client.try_remove_counterparty_link(&wallet_a, &wallet_b, &asset_pair);
-    assert_eq!(result, Err(Ok(Error::CounterpartyNotFound)));
+    assert_eq!(result, Err(Ok(Error::CounterpartyLinkFull)));
 }

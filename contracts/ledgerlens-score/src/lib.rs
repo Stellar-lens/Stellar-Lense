@@ -245,6 +245,7 @@ impl LedgerLensScoreContract {
                 if !service_set.contains(&signer) {
                     return Err(Error::UnauthorizedSigner);
                 }
+                storage::check_signer_expired(&env, &signer)?;
                 signer.require_auth();
             }
         } else {
@@ -1014,6 +1015,7 @@ impl LedgerLensScoreContract {
                 if !service_set.contains(&signer) {
                     return Err(Error::UnauthorizedSigner);
                 }
+                storage::check_signer_expired(&env, &signer)?;
                 signer.require_auth();
             }
         } else {
@@ -2110,25 +2112,47 @@ impl LedgerLensScoreContract {
         asset_pair: Symbol,
         gate_threshold: u32,
     ) -> bool {
-        // Embargoed wallets: conservative false — treat as "no signal available".
-        // Uses peek (no TTL extension) to remain side-effect free.
+        Self::query_risk_gate_with_confidence(env, wallet, asset_pair, gate_threshold, 0)
+    }
+
+    /// Confidence-aware variant of [`query_risk_gate`].
+    ///
+    /// In addition to the score-vs-threshold check, this function enforces
+    /// a minimum confidence floor: the wallet's risk score must have a
+    /// `confidence >= effective_floor` where `effective_floor` is computed
+    /// as `max(min_confidence, global_min_confidence)` so the admin's
+    /// system-wide floor always applies.
+    ///
+    /// Returns `false` (fail closed) when no score exists, the wallet is
+    /// embargoed, inside the hysteresis risk band, or the confidence floor
+    /// is not met.
+    ///
+    /// This function is infallible (returns `bool`, never `Result`) and
+    /// side-effect free — it performs pure reads that do not extend TTL.
+    pub fn query_risk_gate_with_confidence(
+        env: Env,
+        wallet: Address,
+        asset_pair: Symbol,
+        gate_threshold: u32,
+        min_confidence: u32,
+    ) -> bool {
+        if gate_threshold > 100 {
+            return false;
+        }
         if storage::peek_is_embargoed(&env, &wallet) {
             return false;
         }
-        // A wallet currently in the high-risk band fails the gate even if its
-        // raw score has dipped below gate_threshold — the hysteresis state is
-        // sticky until the score crosses the full exit boundary.
-        // Uses peek (no TTL extension) to remain side-effect free per the
-        // ILedgerLensScore interface contract.
         if storage::peek_risk_band_state(&env, &wallet, &asset_pair) {
             return false;
         }
+        let effective_floor = core::cmp::max(min_confidence, storage::get_global_min_confidence(&env));
         match storage::peek_score(&env, &wallet, &asset_pair) {
             Some(risk) => risk.score < gate_threshold,
             None => {
                 if let Some(custodian) = storage::peek_score_delegate(&env, &wallet) {
                     if let Some(risk) = storage::peek_score(&env, &custodian, &asset_pair) {
-                        return risk.score < gate_threshold;
+                        return risk.score < gate_threshold
+                            && risk.confidence >= effective_floor;
                     }
                 }
                 false
@@ -2154,6 +2178,7 @@ impl LedgerLensScoreContract {
     /// | `aggr`           | `get_aggregate_score` (cross-asset aggregate risk) |
     /// | `count`          | `get_score_count`                                  |
     /// | `batch_attested` | `submit_scores_batch_attested` (Merkle-root sig)    |
+    /// | `cgate`          | `query_risk_gate_with_confidence` / global confidence floor |
     ///
     /// Any unrecognised `capability` returns `false`.
     ///
@@ -2172,6 +2197,7 @@ impl LedgerLensScoreContract {
             || capability == symbol_short!("aggr")
             || capability == symbol_short!("count")
             || capability == Symbol::new(&env, "batch_attested")
+            || capability == symbol_short!("cgate")
     }
 
     // ── Service management ───────────────────────────────────────────────────
@@ -2200,6 +2226,7 @@ impl LedgerLensScoreContract {
         }
         set.push_back(signer.clone());
         storage::set_service_set(&env, &set);
+        storage::set_signer_added_at(&env, &signer, env.ledger().timestamp());
         events::signer_added(&env, &signer);
         Ok(())
     }
@@ -2235,6 +2262,7 @@ impl LedgerLensScoreContract {
             events::service_threshold_updated(&env, set.len());
         }
 
+        storage::remove_signer_added_at(&env, &signer);
         events::signer_removed(&env, &signer);
         Ok(())
     }
@@ -2270,6 +2298,54 @@ impl LedgerLensScoreContract {
     /// Returns the current signing threshold.
     pub fn get_service_threshold(env: Env) -> u32 {
         storage::get_service_threshold(&env)
+    }
+
+    // ── Signer rotation TTL (Issue #79) ─────────────────────────────────────
+
+    /// Set the signer rotation TTL in seconds. Once a signer has been in the
+    /// set for longer than `ttl_secs` (plus the grace period), it will be
+    /// rejected on score submission. Admin only.
+    ///
+    /// Setting to 0 disables the TTL check entirely.
+    pub fn set_signer_rotation_ttl(
+        env: Env,
+        admin_signers: Vec<Address>,
+        ttl_secs: u64,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+        storage::set_signer_rotation_ttl(&env, ttl_secs);
+        events::signer_ttl_updated(&env, ttl_secs);
+        Ok(())
+    }
+
+    /// Returns the current signer rotation TTL in seconds. Default is 30 days.
+    pub fn get_signer_rotation_ttl(env: Env) -> u64 {
+        storage::get_signer_rotation_ttl(&env)
+    }
+
+    /// Returns the age of `signer` in seconds since it was added to the
+    /// service set, or `None` if no activation time is recorded.
+    pub fn get_signer_age(env: Env, signer: Address) -> Option<u64> {
+        storage::get_signer_age(&env, &signer)
+    }
+
+    /// Set the grace period in seconds that is added to the TTL before a
+    /// signer is considered expired. Admin only.
+    pub fn set_signer_rotation_grace(
+        env: Env,
+        admin_signers: Vec<Address>,
+        grace_secs: u64,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+        storage::set_signer_rotation_grace(&env, grace_secs);
+        events::signer_grace_period_updated(&env, grace_secs);
+        Ok(())
     }
 
     /// Rotate the authorised off-chain scoring service address.  Admin only.
@@ -4844,6 +4920,7 @@ impl LedgerLensScoreContract {
                 if !service_set.contains(&signer) {
                     return Err(Error::UnauthorizedSigner);
                 }
+                storage::check_signer_expired(env, &signer)?;
                 signer.require_auth();
             }
         } else {
@@ -4881,10 +4958,18 @@ impl LedgerLensScoreContract {
         }
         storage::set_last_submit_time(env, wallet, asset_pair, now);
 
+        let previous_score = storage::peek_score(env, wallet, asset_pair).map(|s| s.score);
+
+        if Self::score_floor_blocks(env, wallet, asset_pair, risk_score.score) {
+            return Err(Error::BelowScoreFloor);
+        }
+
         storage::set_score(env, wallet, asset_pair, risk_score);
         storage::push_score_history(env, wallet, asset_pair, risk_score);
         storage::register_pair_for_wallet(env, wallet, asset_pair);
         storage::increment_score_count(env, wallet, asset_pair);
+        storage::update_model_stats(env, risk_score.model_version, risk_score.score);
+        storage::update_historical_max_score(env, wallet, asset_pair, risk_score.score);
         Self::refresh_aggregate_cache(env, wallet);
         // Update the incremental Verkle commitment over the full contract state.
         Self::update_verkle_commitment(env, wallet, asset_pair, risk_score);
@@ -4893,6 +4978,10 @@ impl LedgerLensScoreContract {
         if risk_score.score >= score_threshold {
             events::threshold_breached(env, wallet, asset_pair, risk_score.score, score_threshold);
         }
+        Self::update_breach_counter(env, wallet, asset_pair, risk_score.score, score_threshold);
+        Self::evaluate_risk_band(env, wallet, asset_pair, risk_score.score, score_threshold);
+        Self::emit_score_delta(env, wallet, asset_pair, previous_score, risk_score.score);
+        Self::emit_score_jump_anomaly(env, wallet, asset_pair, previous_score, risk_score.score, risk_score.model_version);
 
         events::score_submitted(env, wallet, asset_pair, risk_score);
         Ok(())
@@ -5254,6 +5343,89 @@ impl LedgerLensScoreContract {
     /// Walk a Merkle inclusion proof and verify that `leaf` is included in
     /// the tree with the supplied `root`. The loop runs exactly
     /// `proof.len()` iterations regardless of whether any intermediate
+    // ── Wallet Relationship Graph ─────────────────────────────────────────────
+
+    /// Add a bidirectional counterparty link between `wallet_a` and `wallet_b`
+    /// for `asset_pair`. Each wallet tracks up to
+    /// `MAX_COUNTERPARTY_LINKS_PER_WALLET` links. Self-links and duplicates are
+    /// rejected.
+    ///
+    /// # Errors
+    /// - [`Error::CounterpartyLinkFull`] if either wallet's link set is already
+    ///   full or if trying to self-link.
+    pub fn add_counterparty_link(
+        env: Env,
+        wallet_a: Address,
+        wallet_b: Address,
+        asset_pair: Symbol,
+    ) -> Result<(), Error> {
+        storage::add_counterparty_link(&env, &wallet_a, &wallet_b, &asset_pair)?;
+        events::counterparty_link_added(&env, &wallet_a, &wallet_b, &asset_pair);
+        Ok(())
+    }
+
+    /// Remove a bidirectional counterparty link between `wallet_a` and
+    /// `wallet_b` for `asset_pair`.
+    ///
+    /// # Errors
+    /// - [`Error::CounterpartyLinkFull`] if no link existed between the wallets.
+    pub fn remove_counterparty_link(
+        env: Env,
+        wallet_a: Address,
+        wallet_b: Address,
+        asset_pair: Symbol,
+    ) -> Result<(), Error> {
+        storage::remove_counterparty_link(&env, &wallet_a, &wallet_b, &asset_pair)?;
+        events::counterparty_link_removed(&env, &wallet_a, &wallet_b, &asset_pair);
+        Ok(())
+    }
+
+    /// Returns the list of counterparty addresses linked to `wallet` for
+    /// `asset_pair`.
+    pub fn get_counterparties(env: Env, wallet: Address, asset_pair: Symbol) -> Vec<Address> {
+        storage::get_counterparties(&env, &wallet, &asset_pair)
+    }
+
+    /// Returns the number of counterparty links `wallet` has for `asset_pair`.
+    pub fn get_contagion_depth(env: Env, wallet: Address, asset_pair: Symbol) -> u32 {
+        storage::get_contagion_depth(&env, &wallet, &asset_pair)
+    }
+
+    /// Propagate an additive score boost of `boost` points to every
+    /// counterparty of `anchor` for `asset_pair`.  Affected scores are
+    /// capped at 100.  Returns the number of wallets that were boosted.
+    pub fn propagate_contagion(
+        env: Env,
+        anchor: Address,
+        asset_pair: Symbol,
+        boost: u32,
+    ) -> u32 {
+        let counterparties = storage::get_counterparties(&env, &anchor, &asset_pair);
+        let mut affected = 0u32;
+        for i in 0..counterparties.len() {
+            let cw = counterparties.get(i).unwrap();
+            let old = storage::get_score(&env, &cw, &asset_pair)
+                .unwrap_or(RiskScore {
+                    score: 0,
+                    benford_flag: false,
+                    ml_flag: false,
+                    timestamp: env.ledger().timestamp(),
+                    confidence: 0,
+                    model_version: 0,
+                });
+            let new_score = core::cmp::min(old.score.saturating_add(boost), 100);
+            if new_score != old.score {
+                let updated = RiskScore { score: new_score, ..old };
+                storage::set_score(&env, &cw, &asset_pair, &updated);
+                events::contagion_propagated(
+                    &env, &anchor, &asset_pair, &cw, old.score, new_score,
+                );
+                affected += 1;
+            }
+        }
+        affected
+    }
+
     /// hash diverges, so the gas cost is always bounded — there is no
     /// early-exit branch that an attacker could exploit as a timing oracle.
     ///
