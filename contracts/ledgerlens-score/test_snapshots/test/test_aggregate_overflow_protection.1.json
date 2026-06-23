@@ -11948,6 +11948,22 @@
                     "storage": [
                       {
                         "key": {
+                          "symbol": "hist_b5"
+                        },
+                        "val": {
+                          "u32": 20
+                        }
+                      },
+                      {
+                        "key": {
+                          "symbol": "hist_tot"
+                        },
+                        "val": {
+                          "u32": 20
+                        }
+                      },
+                      {
+                        "key": {
                           "vec": [
                             {
                               "symbol": "Admin"

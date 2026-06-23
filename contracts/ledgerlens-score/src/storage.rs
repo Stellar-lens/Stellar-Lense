@@ -910,4 +910,100 @@ pub fn check_signer_expired(env: &Env, signer: &Address) -> Result<(), Error> {
     Ok(())
 }
 
-// ── Score histogram (Issue #81) — to be implemented ─────────────────────────
+// ── Score histogram (Issue #81) ─────────────────────────────────────────────
+
+use soroban_sdk::symbol_short;
+
+const HIST_TOTAL: Symbol = symbol_short!("hist_tot");
+
+fn hist_bucket_key(bucket: u32) -> Symbol {
+    match bucket {
+        0 => symbol_short!("hist_b0"),
+        1 => symbol_short!("hist_b1"),
+        2 => symbol_short!("hist_b2"),
+        3 => symbol_short!("hist_b3"),
+        4 => symbol_short!("hist_b4"),
+        5 => symbol_short!("hist_b5"),
+        6 => symbol_short!("hist_b6"),
+        7 => symbol_short!("hist_b7"),
+        8 => symbol_short!("hist_b8"),
+        9 => symbol_short!("hist_b9"),
+        _ => panic!("invalid bucket {bucket}"),
+    }
+}
+
+/// Increment the count for a histogram bucket.
+pub fn increment_histogram_bucket(env: &Env, bucket: u32) {
+    let key = hist_bucket_key(bucket);
+    let current: u32 = env.storage().instance().get(&key).unwrap_or(0);
+    env.storage().instance().set(&key, &(current + 1));
+}
+
+/// Decrement the count for a histogram bucket (saturating).
+pub fn decrement_histogram_bucket(env: &Env, bucket: u32) {
+    let key = hist_bucket_key(bucket);
+    let current: u32 = env.storage().instance().get(&key).unwrap_or(0);
+    if current > 0 {
+        env.storage().instance().set(&key, &(current - 1));
+    }
+}
+
+/// Get the count for a histogram bucket.
+pub fn get_histogram_bucket(env: &Env, bucket: u32) -> u32 {
+    let key = hist_bucket_key(bucket);
+    env.storage().instance().get(&key).unwrap_or(0)
+}
+
+/// Increment the total tracked wallet/pair count.
+pub fn increment_histogram_total(env: &Env) {
+    let current: u32 = env.storage().instance().get(&HIST_TOTAL).unwrap_or(0);
+    env.storage().instance().set(&HIST_TOTAL, &(current + 1));
+}
+
+/// Decrement the total tracked wallet/pair count (saturating).
+pub fn decrement_histogram_total(env: &Env) {
+    let current: u32 = env.storage().instance().get(&HIST_TOTAL).unwrap_or(0);
+    if current > 0 {
+        env.storage().instance().set(&HIST_TOTAL, &(current - 1));
+    }
+}
+
+/// Get the total tracked wallet/pair count.
+pub fn get_histogram_total(env: &Env) -> u32 {
+    env.storage().instance().get(&HIST_TOTAL).unwrap_or(0)
+}
+
+/// Compute bucket index (0-9) for a score. Score 100 maps to bucket 9.
+pub fn score_to_bucket(score: u32) -> u32 {
+    if score >= 100 { 9 } else { score / 10 }
+}
+
+/// Update the histogram when a score is written.
+/// `previous_score` is `None` for first-time submissions (no prior score).
+pub fn update_histogram_on_write(env: &Env, previous_score: Option<u32>, new_score: u32) {
+    if let Some(old) = previous_score {
+        let old_bucket = score_to_bucket(old);
+        decrement_histogram_bucket(env, old_bucket);
+    } else {
+        increment_histogram_total(env);
+    }
+    let new_bucket = score_to_bucket(new_score);
+    increment_histogram_bucket(env, new_bucket);
+}
+
+/// Update the histogram when a score is cleared.
+pub fn update_histogram_on_clear(env: &Env, cleared_score: u32) {
+    let bucket = score_to_bucket(cleared_score);
+    decrement_histogram_bucket(env, bucket);
+    decrement_histogram_total(env);
+}
+
+/// Read the full histogram from storage.
+pub fn get_score_histogram(env: &Env) -> crate::types::ScoreHistogram {
+    let mut buckets: soroban_sdk::Vec<u32> = soroban_sdk::Vec::new(env);
+    for i in 0..10 {
+        buckets.push_back(get_histogram_bucket(env, i));
+    }
+    let total = get_histogram_total(env);
+    crate::types::ScoreHistogram { buckets, total }
+}
