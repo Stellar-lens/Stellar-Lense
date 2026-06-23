@@ -4,9 +4,9 @@ use crate::errors::Error;
 
 use crate::constants::{
     BAND_STATE_TTL_EXTEND_TO, BAND_STATE_TTL_THRESHOLD, DEFAULT_CONSENSUS_EPSILON,
-    DEFAULT_CONSENSUS_THRESHOLD_K, DEFAULT_COOLDOWN_SECS, DEFAULT_ESCALATION_THRESHOLD,
-    DEFAULT_RISK_THRESHOLD, DEFAULT_UPGRADE_DELAY_SECS, EMBARGO_TTL_EXTEND_TO,
-    EMBARGO_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO, SCORE_TTL_THRESHOLD,
+    DEFAULT_CONSENSUS_THRESHOLD_K, DEFAULT_COOLDOWN_SECS, DEFAULT_ESCALATION_THRESHOLD, DEFAULT_QUORUM_FAILURE_WINDOW_SECS,
+    DEFAULT_RISK_THRESHOLD, DEFAULT_UPGRADE_DELAY_SECS, EMBARGO_TTL_EXTEND_TO, EMBARGO_TTL_THRESHOLD,
+    SCORE_TTL_EXTEND_TO, SCORE_TTL_THRESHOLD,
 };
 use crate::types::{AggregateRiskScore, DataKey, EmbargoExpiry, RiskScore, ScoreFloorPolicy, ScoreTrend, UpgradeProposal, SnapshotRecord};
 
@@ -908,4 +908,41 @@ pub fn get_consensus_epsilon(env: &Env) -> u32 {
 
 pub fn set_consensus_epsilon(env: &Env, epsilon: u32) {
     env.storage().instance().set(&DataKey::ConsensusEpsilon, &epsilon);
+}
+
+// ── Automatic quorum reduction ──────────────────────────────────────────────
+
+pub fn get_last_global_submission_time(env: &Env) -> u64 {
+    env.storage().instance().get(&DataKey::LastGlobalSubmissionTime).unwrap_or(0)
+}
+
+pub fn set_last_global_submission_time(env: &Env, timestamp: u64) {
+    env.storage().instance().set(&DataKey::LastGlobalSubmissionTime, &timestamp);
+}
+
+pub fn get_quorum_failure_window(env: &Env) -> u64 {
+    env.storage()
+        .instance()
+        .get(&DataKey::QuorumFailureWindow)
+        .unwrap_or(DEFAULT_QUORUM_FAILURE_WINDOW_SECS)
+}
+
+pub fn set_quorum_failure_window(env: &Env, window_secs: u64) {
+    env.storage().instance().set(&DataKey::QuorumFailureWindow, &window_secs);
+}
+
+pub fn get_original_service_threshold(env: &Env) -> Option<u32> {
+    env.storage().instance().get(&DataKey::OriginalServiceThreshold)
+}
+
+pub fn set_original_service_threshold(env: &Env, threshold: u32) {
+    env.storage().instance().set(&DataKey::OriginalServiceThreshold, &threshold);
+}
+
+pub fn clear_original_service_threshold(env: &Env) {
+    env.storage().instance().remove(&DataKey::OriginalServiceThreshold);
+}
+
+pub fn get_service_threshold(env: &Env) -> u32 {
+    env.storage().instance().get(&DataKey::ServiceThreshold).unwrap_or(0)
 }

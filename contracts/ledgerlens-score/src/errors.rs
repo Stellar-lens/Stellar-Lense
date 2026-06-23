@@ -172,6 +172,8 @@ feat/confidence-gated-risk-gate
     ConsensusInputEmpty = 50,
     /// `set_consensus_config` was called with `k == 0` or `epsilon > 100`.
     InvalidConsensusConfig = 51,
+    /// `request_quorum_reduction` called before the failure window has elapsed.
+    QuorumFailureWindowNotElapsed = 52,
 }
 
 // Gate caller tracking error variants for structural protection

@@ -392,3 +392,15 @@ pub fn embargo_set(env: &Env, wallet: &Address, expiry: Option<u64>) {
 pub fn embargo_lifted(env: &Env, wallet: &Address) {
     env.events().publish((symbol_short!("emb_lift"), wallet.clone()), ());
 }
+
+// ── Automatic quorum reduction ────────────────────────────────────────────────
+
+/// Emitted when the service quorum is temporarily reduced via `request_quorum_reduction`.
+pub fn quorum_reduced(env: &Env, old_threshold: u32, new_threshold: u32) {
+    env.events().publish((symbol_short!("qrm_red"),), (old_threshold, new_threshold));
+}
+
+/// Emitted when the original service quorum is restored via `restore_quorum`.
+pub fn quorum_restored(env: &Env, old_threshold: u32, new_threshold: u32) {
+    env.events().publish((symbol_short!("qrm_res"),), (old_threshold, new_threshold));
+}

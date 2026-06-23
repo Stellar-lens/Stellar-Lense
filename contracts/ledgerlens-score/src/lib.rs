@@ -242,6 +242,7 @@ impl LedgerLensScoreContract {
 
         let risk_score =
             RiskScore { score, benford_flag, ml_flag, timestamp, confidence, model_version };
+        storage::set_last_global_submission_time(&env, env.ledger().timestamp());
         Self::write_score_with_rate_limit(&env, &wallet, &asset_pair, &risk_score)?;
         Ok(())
     }
@@ -344,6 +345,7 @@ impl LedgerLensScoreContract {
             model_version: 0,
         };
 
+        storage::set_last_global_submission_time(&env, env.ledger().timestamp());
         Self::write_score_with_rate_limit(&env, &wallet, &asset_pair, &risk_score)?;
         events::consensus_score_submitted(
             &env,
@@ -527,6 +529,7 @@ impl LedgerLensScoreContract {
             results.push_back(BatchEntryResult { index: i, accepted, rejection_code });
         }
 
+        storage::set_last_global_submission_time(&env, now);
         let rejected_count = submissions.len() - accepted_count;
         Ok(BatchResult { accepted_count, rejected_count, results })
     }
@@ -794,6 +797,7 @@ impl LedgerLensScoreContract {
             results.push_back(BatchEntryResult { index: i, accepted, rejection_code });
         }
 
+        storage::set_last_global_submission_time(&env, now);
         let rejected_count = submissions.len() - accepted_count;
         events::batch_attested(
             &env,
@@ -1558,6 +1562,93 @@ feat/confidence-gated-risk-gate
     /// Returns the current signing threshold.
     pub fn get_service_threshold(env: Env) -> u32 {
         storage::get_service_threshold(&env)
+    }
+
+    // ── Automatic quorum reduction ───────────────────────────────────────────
+
+    /// Returns the ledger timestamp of the most recent successful submission
+    /// across all wallets and pairs.
+    pub fn get_last_global_submission_time(env: Env) -> u64 {
+        storage::get_last_global_submission_time(&env)
+    }
+
+    /// Configure the time window after which a quorum reduction can be
+    /// requested if no scores have been submitted. Admin only.
+    pub fn set_quorum_failure_window(
+        env: Env,
+        admin_signers: Vec<Address>,
+        window_secs: u64,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+        storage::set_quorum_failure_window(&env, window_secs);
+        Ok(())
+    }
+
+    /// Returns the current quorum failure window in seconds. Defaults to
+    /// `DEFAULT_QUORUM_FAILURE_WINDOW_SECS` (24 hours) until configured.
+    pub fn get_quorum_failure_window(env: Env) -> u64 {
+        storage::get_quorum_failure_window(&env)
+    }
+
+    /// Temporarily reduce the service signing threshold if no scores have
+    /// been submitted for longer than the configured failure window.
+    ///
+    /// This is an emergency recovery path: if too many service signers go
+    /// offline, the M-of-N threshold can no longer be met, freezing score
+    /// updates. This function allows a reduced quorum of admins to lower
+    /// the threshold so the remaining online signers can resume submissions.
+    ///
+    /// # Errors
+    /// - [`Error::QuorumFailureWindowNotElapsed`] if a submission has been
+    ///   accepted within the configured `quorum_failure_window`.
+    /// - [`Error::InvalidThreshold`] if `target_threshold` is `0` or exceeds
+    ///   the current service set size.
+    pub fn request_quorum_reduction(
+        env: Env,
+        admin_signers: Vec<Address>,
+        target_threshold: u32,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+
+        let now = env.ledger().timestamp();
+        let last_submit = storage::get_last_global_submission_time(&env);
+        let failure_window = storage::get_quorum_failure_window(&env);
+
+        if now < last_submit.saturating_add(failure_window) {
+            return Err(Error::QuorumFailureWindowNotElapsed);
+        }
+
+        let set = storage::get_service_set(&env);
+        if target_threshold == 0 || target_threshold > set.len() {
+            return Err(Error::InvalidThreshold);
+        }
+
+        let old_threshold = storage::get_service_threshold(&env);
+        storage::set_original_service_threshold(&env, old_threshold);
+        storage::set_service_threshold(&env, target_threshold);
+        events::quorum_reduced(&env, old_threshold, target_threshold);
+        Ok(())
+    }
+
+    /// Restore the original service signing threshold after a reduction.
+    /// Requires the full original admin quorum.
+    pub fn restore_quorum(env: Env, admin_signers: Vec<Address>) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+        let original = storage::get_original_service_threshold(&env).ok_or(Error::InvalidThreshold)?;
+        let current = storage::get_service_threshold(&env);
+        storage::set_service_threshold(&env, original);
+        storage::clear_original_service_threshold(&env);
+        events::quorum_restored(&env, current, original);
+        Ok(())
     }
 
     /// Rotate the authorised off-chain scoring service address.  Admin only.
@@ -3630,6 +3721,7 @@ feat/confidence-gated-risk-gate
         storage::set_last_submit_time(env, wallet, asset_pair, now);
 
         storage::set_score(env, wallet, asset_pair, risk_score);
+        storage::set_last_global_submission_time(env, now);
         storage::push_score_history(env, wallet, asset_pair, risk_score);
         storage::register_pair_for_wallet(env, wallet, asset_pair);
         storage::increment_score_count(env, wallet, asset_pair);

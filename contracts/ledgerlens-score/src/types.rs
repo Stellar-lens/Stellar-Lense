@@ -420,6 +420,15 @@ pub enum DataKey {
     /// Maximum allowed score deviation from the provisional median when
     /// building the consensus set.
     ConsensusEpsilon,
+    /// Timestamp of the last successful score submission across all wallets
+    /// and pairs. Used to detect if the service is down.
+    LastGlobalSubmissionTime,
+    /// Admin-configured window (seconds) after which a quorum reduction can
+    /// be requested.
+    QuorumFailureWindow,
+    /// The original service threshold stored during a quorum reduction, so it
+    /// can be restored later.
+    OriginalServiceThreshold,
 }
 
 #[contracttype]

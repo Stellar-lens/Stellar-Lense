@@ -195,3 +195,9 @@ pub const DEFAULT_CONSENSUS_THRESHOLD_K: u32 = 2;
 
 /// Default maximum allowed absolute deviation from the provisional median.
 pub const DEFAULT_CONSENSUS_EPSILON: u32 = 5;
+
+// ── Automatic quorum reduction ────────────────────────────────────────────────
+
+/// Default window after which a service quorum reduction can be requested if
+/// no scores have been submitted: 24 hours.
+pub const DEFAULT_QUORUM_FAILURE_WINDOW_SECS: u64 = 86_400;
