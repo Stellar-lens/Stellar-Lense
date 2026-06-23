@@ -1,16 +1,15 @@
 use soroban_sdk::{
-    symbol_short,
-    testutils::{Address as _, Events as _, Ledger as _},
-    Address, Env, IntoVal, Symbol, Vec,
+    testutils::{Address as _, Ledger as _},
+    Address, Env,
 };
 
 use crate::{
-    BatchResult, Error, LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreSubmission,
+    LedgerLensScoreContract, LedgerLensScoreContractClient,
 };
 
 // ── Test helpers ──────────────────────────────────────────────────────────────
 
-fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
+pub fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
     let env = Env::default();
     env.mock_all_auths();
 
@@ -23,8 +22,9 @@ fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
     (env, client, admin, service)
 }
 
-fn initialized<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
+pub fn initialized<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
     let (env, client, admin, service) = setup();
+    env.ledger().with_mut(|l| l.timestamp = 100_000);
     client.initialize(&admin, &service);
     (env, client, admin, service)
 }
@@ -1825,6 +1825,143 @@ fn test_score_count_is_per_pair() {
 
     assert_eq!(client.get_score_count(&wallet, &pair1), 2);
     assert_eq!(client.get_score_count(&wallet, &pair2), 1);
+}
+
+// ── Wallet pair list / count ──────────────────────────────────────────────────
+
+#[test]
+fn test_wallet_pair_list_empty_initially() {
+    let (env, client, _admin, _service) = initialized();
+    let wallet = Address::generate(&env);
+    let pairs = client.get_wallet_pair_list(&wallet);
+    assert_eq!(pairs.len(), 0);
+}
+
+#[test]
+fn test_wallet_pair_count_empty_initially() {
+    let (env, client, _admin, _service) = initialized();
+    let wallet = Address::generate(&env);
+    assert_eq!(client.get_wallet_pair_count(&wallet), 0);
+}
+
+#[test]
+fn test_wallet_pair_list_single_pair() {
+    let (env, client, _admin, _service) = initialized();
+    let wallet = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+    client.submit_score(&Vec::new(&env), &wallet, &pair, &50, &false, &false, &1, &90, &1, &None);
+    let pairs = client.get_wallet_pair_list(&wallet);
+    assert_eq!(pairs.len(), 1);
+    assert_eq!(pairs.get(0).unwrap(), pair);
+}
+
+#[test]
+fn test_wallet_pair_count_single_pair() {
+    let (env, client, _admin, _service) = initialized();
+    let wallet = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+    client.submit_score(&Vec::new(&env), &wallet, &pair, &50, &false, &false, &1, &90, &1, &None);
+    assert_eq!(client.get_wallet_pair_count(&wallet), 1);
+}
+
+#[test]
+fn test_wallet_pair_list_multiple_pairs() {
+    let (env, client, _admin, _service) = initialized();
+    let wallet = Address::generate(&env);
+    let pair1 = symbol_short!("XLM_USDC");
+    let pair2 = symbol_short!("XLM_BTC");
+    let pair3 = symbol_short!("XLM_ETH");
+
+    client.submit_score(&Vec::new(&env), &wallet, &pair1, &50, &false, &false, &1, &90, &1, &None);
+    client.submit_score(&Vec::new(&env), &wallet, &pair2, &30, &false, &true, &2, &85, &1, &None);
+    client.submit_score(&Vec::new(&env), &wallet, &pair3, &70, &true, &true, &3, &95, &1, &None);
+
+    let pairs = client.get_wallet_pair_list(&wallet);
+    assert_eq!(pairs.len(), 3);
+
+    // All three pairs should be present (order may vary).
+    let mut found = 0u32;
+    for i in 0..pairs.len() {
+        let p = pairs.get(i).unwrap();
+        if p == pair1 || p == pair2 || p == pair3 {
+            found += 1;
+        }
+    }
+    assert_eq!(found, 3);
+}
+
+#[test]
+fn test_wallet_pair_count_multiple_pairs() {
+    let (env, client, _admin, _service) = initialized();
+    let wallet = Address::generate(&env);
+
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &symbol_short!("XLM_USDC"),
+        &50,
+        &false,
+        &false,
+        &1,
+        &90,
+        &1,
+        &None,
+    );
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &symbol_short!("XLM_BTC"),
+        &30,
+        &false,
+        &true,
+        &2,
+        &85,
+        &1,
+        &None,
+    );
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &symbol_short!("XLM_ETH"),
+        &70,
+        &true,
+        &true,
+        &3,
+        &95,
+        &1,
+        &None,
+    );
+
+    assert_eq!(client.get_wallet_pair_count(&wallet), 3);
+}
+
+#[test]
+fn test_wallet_pair_list_is_per_wallet() {
+    let (env, client, _admin, _service) = initialized();
+    let wallet_a = Address::generate(&env);
+    let wallet_b = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+
+    client.submit_score(&Vec::new(&env), &wallet_a, &pair, &50, &false, &false, &1, &90, &1, &None);
+
+    assert_eq!(client.get_wallet_pair_list(&wallet_a).len(), 1);
+    assert_eq!(client.get_wallet_pair_list(&wallet_b).len(), 0);
+    assert_eq!(client.get_wallet_pair_count(&wallet_a), 1);
+    assert_eq!(client.get_wallet_pair_count(&wallet_b), 0);
+}
+
+#[test]
+fn test_wallet_pair_list_deduplicates() {
+    let (env, client, _admin, _service) = initialized();
+    let wallet = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+
+    // Submit twice for the same pair — should still count as 1.
+    client.submit_score(&Vec::new(&env), &wallet, &pair, &50, &false, &false, &1, &90, &1, &None);
+    client.submit_score(&Vec::new(&env), &wallet, &pair, &60, &false, &false, &2, &90, &1, &None);
+
+    assert_eq!(client.get_wallet_pair_list(&wallet).len(), 1);
+    assert_eq!(client.get_wallet_pair_count(&wallet), 1);
 }
 
 #[test]
