@@ -46,6 +46,9 @@ mod test_embargo;
 #[cfg(test)]
 mod test_consensus;
 
+#[cfg(test)]
+mod test_bayesian;
+
 use soroban_sdk::{
     contract, contractimpl, crypto::Hash, symbol_short, token, xdr::ToXdr, Address, Bytes, BytesN,
     Env, Symbol, SymbolStr, TryFromVal, Vec,
@@ -353,6 +356,24 @@ impl LedgerLensScoreContract {
             consensus_indices.len(),
             epsilon,
         );
+
+        // ── Bayesian posterior update ──────────────────────────────────────
+        // For each consensus model, update its posterior weight by penalising
+        // squared deviation from the accepted median:
+        //   new_weight = max(1, prior_weight - k * (median - score)^2)
+        // where k = 1 (fixed) and all weights are scaled by BAYESIAN_WEIGHT_SCALE.
+        for i in 0..consensus_indices.len() {
+            let idx = consensus_indices.get(i).unwrap();
+            let sub = submissions.get(idx).unwrap();
+            let version = sub.model_version;
+            let prior = storage::get_model_posterior_weight(&env, version);
+            let diff = (median_score as i64) - (sub.score as i64);
+            let penalty = (diff * diff) as u64; // squared error, unscaled
+            // Scale penalty by 1 (k=1) — subtract from weight directly
+            let new_weight = prior.saturating_sub(penalty).max(1);
+            storage::set_model_posterior_weight(&env, version, new_weight);
+        }
+
         Ok(())
     }
 
@@ -1644,6 +1665,112 @@ feat/confidence-gated-risk-gate
     /// Returns the current `(k, epsilon)` consensus configuration.
     pub fn get_consensus_config(env: Env) -> (u32, u32) {
         (storage::get_consensus_threshold_k(&env), storage::get_consensus_epsilon(&env))
+    }
+
+    // ── Bayesian score aggregator ────────────────────────────────────────────
+
+    /// Sets the prior weight for `model_version` used in the Bayesian
+    /// aggregate. `weight` is expressed in fixed-point units scaled by 1e6,
+    /// so `1_000_000` represents a weight of 1.0. The minimum accepted value
+    /// is `1` (floor that prevents a model from being zeroed out). Admin only.
+    pub fn set_model_prior_weight(
+        env: Env,
+        model_version: u32,
+        weight: u64,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        if weight == 0 {
+            return Err(Error::InvalidModelPriorWeight);
+        }
+        storage::get_admin(&env).require_auth();
+        storage::set_model_prior_weight(&env, model_version, weight);
+        events::model_weight_updated(&env, model_version, weight);
+        Ok(())
+    }
+
+    /// Returns the current prior weight for `model_version`, scaled by 1e6.
+    /// Returns `1_000_000` (1.0) for any version that has never been configured.
+    pub fn get_model_prior_weight(env: Env, model_version: u32) -> u64 {
+        storage::get_model_prior_weight(&env, model_version)
+    }
+
+    /// Computes the Bayesian-weighted average score for `wallet` / `asset_pair`
+    /// across all model versions that have a stored score for that pair.
+    ///
+    /// Each model version's contribution is weighted by its current posterior
+    /// weight (initialized from its prior, then updated on each accepted
+    /// consensus submission). Returns `ScoreNotFound` if the wallet has no
+    /// score for `asset_pair`.
+    pub fn get_bayesian_aggregate(
+        env: Env,
+        wallet: Address,
+        asset_pair: Symbol,
+    ) -> Result<u32, Error> {
+        // We build the Bayesian aggregate over every distinct model version
+        // recorded in the score history for this (wallet, asset_pair). The
+        // most recent per-version score is derived from the history ring.
+        let history = storage::get_score_history(&env, &wallet, &asset_pair);
+        if history.is_empty() {
+            // Fall back to the current score's model_version if no history.
+            let score = storage::get_score(&env, &wallet, &asset_pair)
+                .ok_or(Error::ScoreNotFound)?;
+            // Single version: weighted average is just the score itself.
+            return Ok(score.score);
+        }
+
+        // Collect the latest score per model version from history.
+        // soroban_sdk::Map is not available without the std feature, so we
+        // iterate linearly over the (small, bounded) history ring.
+        let mut weighted_sum: u64 = 0;
+        let mut total_weight: u64 = 0;
+
+        // History ring: oldest at index 0, newest at index len-1.
+        // Iterate in reverse so the first occurrence we see per version is
+        // the most recent submission for that version. O(N²) dedup is fine
+        // given the small bounded ring size (≤50).
+        let len = history.len();
+        let mut seen_versions: soroban_sdk::Vec<u32> = soroban_sdk::Vec::new(&env);
+        let mut seen_scores: soroban_sdk::Vec<u32> = soroban_sdk::Vec::new(&env);
+
+        let mut i = len;
+        while i > 0 {
+            i -= 1;
+            let entry = history.get(i).unwrap();
+            let version = entry.model_version;
+            let mut already_seen = false;
+            for j in 0..seen_versions.len() {
+                if seen_versions.get(j).unwrap() == version {
+                    already_seen = true;
+                    break;
+                }
+            }
+            if !already_seen {
+                seen_versions.push_back(version);
+                seen_scores.push_back(entry.score);
+            }
+        }
+
+        if seen_versions.is_empty() {
+            return Err(Error::ScoreNotFound);
+        }
+
+        for i in 0..seen_versions.len() {
+            let version = seen_versions.get(i).unwrap();
+            let score = seen_scores.get(i).unwrap();
+            let w = storage::get_model_posterior_weight(&env, version);
+            weighted_sum = weighted_sum
+                .checked_add(w.checked_mul(score as u64).ok_or(Error::ArithmeticOverflow)?)
+                .ok_or(Error::ArithmeticOverflow)?;
+            total_weight = total_weight.checked_add(w).ok_or(Error::ArithmeticOverflow)?;
+        }
+
+        if total_weight == 0 {
+            return Err(Error::ArithmeticOverflow);
+        }
+
+        Ok((weighted_sum / total_weight) as u32)
     }
 
     // ── Admin management ─────────────────────────────────────────────────────

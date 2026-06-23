@@ -172,6 +172,10 @@ feat/confidence-gated-risk-gate
     ConsensusInputEmpty = 50,
     /// `set_consensus_config` was called with `k == 0` or `epsilon > 100`.
     InvalidConsensusConfig = 51,
+
+    // ── Bayesian score aggregator ──────────────────────────────────────────
+    /// `set_model_prior_weight` was called with a weight of 0 (minimum is 1).
+    InvalidModelPriorWeight = 52,
 }
 
 // Gate caller tracking error variants for structural protection

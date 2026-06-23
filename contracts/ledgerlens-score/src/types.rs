@@ -420,6 +420,12 @@ pub enum DataKey {
     /// Maximum allowed score deviation from the provisional median when
     /// building the consensus set.
     ConsensusEpsilon,
+    /// Admin-configured prior weight for a model version, scaled by 1e6.
+    /// Defaults to 1_000_000 (1.0) when unset. Key: ModelPriorWeight(version).
+    ModelPriorWeight(u32),
+    /// Posterior weight for a model version, updated after each accepted
+    /// consensus score. Scaled by 1e6. Key: ModelPosteriorWeight(version).
+    ModelPosteriorWeight(u32),
 }
 
 #[contracttype]
@@ -427,3 +433,4 @@ pub enum DataKey {
 pub struct TierBounds {
     pub min_score: u32,
     pub max_score: u32,
+}

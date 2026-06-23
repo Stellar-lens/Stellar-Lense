@@ -909,3 +909,48 @@ pub fn get_consensus_epsilon(env: &Env) -> u32 {
 pub fn set_consensus_epsilon(env: &Env, epsilon: u32) {
     env.storage().instance().set(&DataKey::ConsensusEpsilon, &epsilon);
 }
+
+// ── Bayesian model weights ───────────────────────────────────────────────────
+
+/// Fixed-point scale: 1_000_000 = 1.0.
+pub const BAYESIAN_WEIGHT_SCALE: u64 = 1_000_000;
+
+/// Returns the prior weight for `model_version`, scaled by 1e6.
+/// Defaults to `BAYESIAN_WEIGHT_SCALE` (1.0) when unset.
+pub fn get_model_prior_weight(env: &Env, model_version: u32) -> u64 {
+    env.storage()
+        .persistent()
+        .get(&DataKey::ModelPriorWeight(model_version))
+        .unwrap_or(BAYESIAN_WEIGHT_SCALE)
+}
+
+pub fn set_model_prior_weight(env: &Env, model_version: u32, weight: u64) {
+    env.storage()
+        .persistent()
+        .set(&DataKey::ModelPriorWeight(model_version), &weight);
+    env.storage().persistent().extend_ttl(
+        &DataKey::ModelPriorWeight(model_version),
+        SCORE_TTL_THRESHOLD,
+        SCORE_TTL_EXTEND_TO,
+    );
+}
+
+/// Returns the posterior weight for `model_version`, scaled by 1e6.
+/// Falls back to prior weight if no posterior has been computed yet.
+pub fn get_model_posterior_weight(env: &Env, model_version: u32) -> u64 {
+    env.storage()
+        .persistent()
+        .get(&DataKey::ModelPosteriorWeight(model_version))
+        .unwrap_or_else(|| get_model_prior_weight(env, model_version))
+}
+
+pub fn set_model_posterior_weight(env: &Env, model_version: u32, weight: u64) {
+    env.storage()
+        .persistent()
+        .set(&DataKey::ModelPosteriorWeight(model_version), &weight);
+    env.storage().persistent().extend_ttl(
+        &DataKey::ModelPosteriorWeight(model_version),
+        SCORE_TTL_THRESHOLD,
+        SCORE_TTL_EXTEND_TO,
+    );
+}

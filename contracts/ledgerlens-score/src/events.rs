@@ -392,3 +392,10 @@ pub fn embargo_set(env: &Env, wallet: &Address, expiry: Option<u64>) {
 pub fn embargo_lifted(env: &Env, wallet: &Address) {
     env.events().publish((symbol_short!("emb_lift"), wallet.clone()), ());
 }
+
+// ── Bayesian model weights ────────────────────────────────────────────────────
+
+/// Emitted when an admin sets a model prior weight via `set_model_prior_weight`.
+pub fn model_weight_updated(env: &Env, model_version: u32, weight: u64) {
+    env.events().publish((symbol_short!("mw_upd"), model_version), weight);
+}
