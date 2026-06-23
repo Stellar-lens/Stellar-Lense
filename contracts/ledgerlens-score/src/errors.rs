@@ -168,10 +168,14 @@ feat/confidence-gated-risk-gate
     /// Fewer than the configured consensus threshold of models agreed on a
     /// score within the configured epsilon window.
     InsufficientConsensus = 49,
-    /// `submit_consensus_score` was called with zero model submissions.
+    /// `reveal_consensus` was called with zero model submissions.
     ConsensusInputEmpty = 50,
     /// `set_consensus_config` was called with `k == 0` or `epsilon > 100`.
     InvalidConsensusConfig = 51,
+    /// `reveal_consensus` was called after the commitment's TTL expired.
+    RevealWindowExpired = 52,
+    /// `reveal_consensus` was called but the score and nonce do not match the commitment.
+    CommitmentMismatch = 53,
 }
 
 // Gate caller tracking error variants for structural protection

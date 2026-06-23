@@ -255,13 +255,30 @@ impl LedgerLensScoreContract {
     /// if at least `k` models agree. The stored score is the integer median of
     /// the consensus set, with `model_version = 0` marking it as an on-chain
     /// consensus aggregate rather than a direct single-model output.
+    pub fn commit_consensus(
+        env: Env,
+        model: Address,
+        wallet: Address,
+        asset_pair: Symbol,
+        commitment: BytesN<32>,
+    ) -> Result<(), Error> {
+        Self::ensure_active(&env)?;
+        model.require_auth();
+
+        storage::set_consensus_commitment(&env, &model, &wallet, &asset_pair, &commitment);
+        Ok(())
+    }
+
+    /// Phase 2 of MEV-resistant consensus. Opens all commitments, verifies them against
+    /// the provided `nonces` and score data, and then computes the aggregate consensus score.
     #[allow(clippy::too_many_arguments)]
-    pub fn submit_consensus_score(
+    pub fn reveal_consensus(
         env: Env,
         signers: Vec<Address>,
         wallet: Address,
         asset_pair: Symbol,
         submissions: Vec<ModelSubmission>,
+        nonces: Vec<u64>,
         timestamp: u64,
     ) -> Result<(), Error> {
         Self::ensure_active(&env)?;
@@ -270,6 +287,9 @@ impl LedgerLensScoreContract {
         if submissions.is_empty() {
             return Err(Error::ConsensusInputEmpty);
         }
+        if submissions.len() != nonces.len() {
+            return Err(Error::CommitmentMismatch); // Or some other length mismatch
+        }
         if timestamp == 0 {
             return Err(Error::InvalidTimestamp);
         }
@@ -277,9 +297,31 @@ impl LedgerLensScoreContract {
         let mut valid_indices: Vec<u32> = Vec::new(&env);
         for i in 0..submissions.len() {
             let sub = submissions.get(i).unwrap();
+            let nonce = nonces.get(i).unwrap();
             if sub.score > 100 || sub.confidence > 100 {
                 continue;
             }
+
+            let commitment = storage::get_consensus_commitment(&env, &sub.model, &wallet, &asset_pair);
+            if commitment.is_none() {
+                return Err(Error::RevealWindowExpired);
+            }
+            let commitment = commitment.unwrap();
+
+            // Verify sha256(score || nonce). In Soroban, we can serialize a tuple using XDR,
+            // or just pack them. Using (score, nonce).into_val(&env) serialization.
+            // Let's use simple xdr serialization to bytes.
+            let mut buf = [0u8; 12];
+            buf[0..4].copy_from_slice(&sub.score.to_be_bytes());
+            buf[4..12].copy_from_slice(&nonce.to_be_bytes());
+            let computed_hash = env.crypto().sha256(&soroban_sdk::Bytes::from_array(&env, &buf));
+
+            if computed_hash != commitment {
+                return Err(Error::CommitmentMismatch);
+            }
+
+            // Clean up to prevent replay
+            storage::remove_consensus_commitment(&env, &sub.model, &wallet, &asset_pair);
 
             let should_verify = storage::get_service_pubkey(&env).is_some();
             let verified = if should_verify {
@@ -1628,7 +1670,7 @@ feat/confidence-gated-risk-gate
     // ── Consensus configuration ─────────────────────────────────────────────
 
     /// Sets the minimum agreeing model count (`k`) and maximum score
-    /// deviation (`epsilon`) used by `submit_consensus_score`. Admin only.
+    /// deviation (`epsilon`) used by `reveal_consensus`. Admin only.
     pub fn set_consensus_config(env: Env, k: u32, epsilon: u32) -> Result<(), Error> {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
@@ -1646,6 +1688,22 @@ feat/confidence-gated-risk-gate
     /// Returns the current `(k, epsilon)` consensus configuration.
     pub fn get_consensus_config(env: Env) -> (u32, u32) {
         (storage::get_consensus_threshold_k(&env), storage::get_consensus_epsilon(&env))
+    }
+
+    /// Sets the reveal window for MEV-resistant consensus. Admin only.
+    pub fn set_reveal_window(env: Env, secs: u64) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        storage::get_admin(&env).require_auth();
+        storage::set_reveal_window_secs(&env, secs);
+        // We could emit an event here, but skipping for brevity unless requested.
+        Ok(())
+    }
+
+    /// Returns the current reveal window in seconds.
+    pub fn get_reveal_window(env: Env) -> u64 {
+        storage::get_reveal_window_secs(&env)
     }
 
     // ── Admin management ─────────────────────────────────────────────────────

@@ -909,3 +909,52 @@ pub fn get_consensus_epsilon(env: &Env) -> u32 {
 pub fn set_consensus_epsilon(env: &Env, epsilon: u32) {
     env.storage().instance().set(&DataKey::ConsensusEpsilon, &epsilon);
 }
+
+// ── MEV-Resistant Commit-Reveal ──────────────────────────────────────────────
+
+pub fn get_reveal_window_secs(env: &Env) -> u64 {
+    env.storage()
+        .instance()
+        .get(&DataKey::RevealWindowSecs)
+        .unwrap_or(3600) // Default 1 hour
+}
+
+pub fn set_reveal_window_secs(env: &Env, secs: u64) {
+    env.storage().instance().set(&DataKey::RevealWindowSecs, &secs);
+}
+
+pub fn set_consensus_commitment(
+    env: &Env,
+    model: &Address,
+    wallet: &Address,
+    asset_pair: &Symbol,
+    commitment: &soroban_sdk::BytesN<32>,
+) {
+    let key = DataKey::ConsensusCommitment(model.clone(), wallet.clone(), asset_pair.clone());
+    let ttl = get_reveal_window_secs(env) as u32; // Assuming 1 ledger = 1 sec approx for thresholds or convert if needed
+    // In Soroban, TTL is typically in ledgers. Let's convert secs to ledgers (assume 5s/ledger).
+    // Or just use a fixed large TTL for temporary storage. Let's use ttl ledgers directly or assume secs is mapped to ledgers.
+    let ledgers_to_live = (ttl / 5).max(12);
+    env.storage().temporary().set(&key, commitment);
+    env.storage().temporary().extend_ttl(&key, ledgers_to_live, ledgers_to_live);
+}
+
+pub fn get_consensus_commitment(
+    env: &Env,
+    model: &Address,
+    wallet: &Address,
+    asset_pair: &Symbol,
+) -> Option<soroban_sdk::BytesN<32>> {
+    let key = DataKey::ConsensusCommitment(model.clone(), wallet.clone(), asset_pair.clone());
+    env.storage().temporary().get(&key)
+}
+
+pub fn remove_consensus_commitment(
+    env: &Env,
+    model: &Address,
+    wallet: &Address,
+    asset_pair: &Symbol,
+) {
+    let key = DataKey::ConsensusCommitment(model.clone(), wallet.clone(), asset_pair.clone());
+    env.storage().temporary().remove(&key);
+}

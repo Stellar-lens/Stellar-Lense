@@ -102,6 +102,7 @@ pub struct ScoreAttestation {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ModelSubmission {
     pub model_version: u32,
+    pub model: Address,
     pub score: u32,
     pub confidence: u32,
     pub benford_flag: bool,
@@ -420,6 +421,11 @@ pub enum DataKey {
     /// Maximum allowed score deviation from the provisional median when
     /// building the consensus set.
     ConsensusEpsilon,
+    /// A single model's commitment (sha256(score || nonce)) for consensus.
+    /// Key: ConsensusCommitment(model_address, wallet, asset_pair) -> BytesN<32>
+    ConsensusCommitment(Address, Address, Symbol),
+    /// Configurable window for reveal in seconds.
+    RevealWindowSecs,
 }
 
 #[contracttype]
