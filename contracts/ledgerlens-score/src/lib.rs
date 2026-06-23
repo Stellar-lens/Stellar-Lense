@@ -4497,6 +4497,12 @@ impl LedgerLensScoreContract {
         storage::get_admin_set(&env)
     }
 
+    /// Returns the number of configured admin signers. Zero indicates legacy
+    /// single-admin mode, before any admin signer set has been configured.
+    pub fn get_admin_signer_count(env: Env) -> u32 {
+        storage::get_admin_set(&env).len()
+    }
+
     /// Returns the current admin signing threshold. Zero until
     /// `set_admin_threshold` is called (legacy mode).
     pub fn get_admin_threshold(env: Env) -> u32 {

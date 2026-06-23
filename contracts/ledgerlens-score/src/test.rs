@@ -1521,6 +1521,27 @@ fn test_multisig_unauthorized_signer_rejected() {
 }
 
 #[test]
+fn test_get_admin_signer_count_tracks_set_size() {
+    let (env, client, admin, service) = setup();
+    client.initialize(&admin, &service);
+
+    assert_eq!(client.get_admin_signer_count(), 0);
+
+    let s1 = Address::generate(&env);
+    let s2 = Address::generate(&env);
+    client.add_admin_signer(&Vec::new(&env), &s1);
+    client.add_admin_signer(&Vec::new(&env), &s2);
+    assert_eq!(client.get_admin_signer_count(), 2);
+
+    client.set_admin_threshold(&Vec::new(&env), &2);
+    let mut admin_signers = Vec::new(&env);
+    admin_signers.push_back(s1.clone());
+    admin_signers.push_back(s2.clone());
+    client.remove_admin_signer(&admin_signers, &s2);
+    assert_eq!(client.get_admin_signer_count(), 1);
+}
+
+#[test]
 fn test_add_signer_beyond_max_rejected() {
     // Adding an 11th signer → ServiceSetFull.
     let (env, client, admin, service) = setup();
