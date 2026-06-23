@@ -77,6 +77,9 @@ mod test_model_version;
 #[cfg(test)]
 mod test_histogram;
 
+#[cfg(test)]
+mod test_breach_counter_reset;
+
 use soroban_sdk::{
     contract, contractimpl, crypto::Hash, symbol_short, token, Address, Bytes, BytesN,
     Env, Symbol, SymbolStr, TryFromVal, Vec,
@@ -3474,6 +3477,53 @@ impl LedgerLensScoreContract {
         }
         Self::require_admin_auth(&env, &admin_signers)?;
         storage::clear_breach_count(&env, &wallet, &asset_pair);
+        Ok(())
+    }
+
+    /// Admin-initiated reset of the consecutive-breach counter for
+    /// `(wallet, asset_pair)`. Unlike [`Self::reset_breach_count`], this
+    /// emits a `breach_counter_reset` event recording which admin performed
+    /// the reset, giving operators an on-chain audit trail for
+    /// investigations that conclude before a clean score submission would
+    /// otherwise reset the counter naturally. Admin only (M-of-N).
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if the contract has no admin yet.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use soroban_sdk::symbol_short;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// let wallet = Address::generate(&env);
+    /// let asset_pair = symbol_short!("XLM_USDC");
+    /// client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &90, &true, &true, &1, &95, &1, &None).unwrap();
+    /// assert_eq!(client.get_breach_count(&wallet, &asset_pair), 1);
+    /// client.reset_breach_counter(&Vec::new(&env), &wallet, &asset_pair).unwrap();
+    /// assert_eq!(client.get_breach_count(&wallet, &asset_pair), 0);
+    /// ```
+    pub fn reset_breach_counter(
+        env: Env,
+        admin_signers: Vec<Address>,
+        wallet: Address,
+        asset_pair: Symbol,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+        let admin = storage::get_admin(&env);
+        storage::clear_breach_count(&env, &wallet, &asset_pair);
+        events::breach_counter_reset(&env, &wallet, &asset_pair, &admin);
         Ok(())
     }
 
