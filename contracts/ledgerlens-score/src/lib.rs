@@ -3696,6 +3696,43 @@ impl LedgerLensScoreContract {
         Ok(())
     }
 
+    /// Lifts embargoes for a cohort of wallets in a single call, reducing
+    /// transaction overhead for bulk compliance workflows.
+    ///
+    /// Wallets without an active embargo are silently skipped — no error is
+    /// raised and no event is emitted for them.  Returns the count of wallets
+    /// that were actually lifted (i.e. had an active embargo removed), which
+    /// may be less than `wallets.len()`.
+    ///
+    /// Requires M-of-N admin authorization and is capped at
+    /// [`constants::MAX_BATCH_SIZE`] wallets per call.
+    pub fn batch_lift_score_embargo(
+        env: Env,
+        admin_signers: Vec<Address>,
+        wallets: Vec<Address>,
+    ) -> Result<u32, Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+        if wallets.is_empty() {
+            return Err(Error::EmptyBatch);
+        }
+        if wallets.len() > constants::MAX_BATCH_SIZE {
+            return Err(Error::BatchTooLarge);
+        }
+        let mut lifted: u32 = 0;
+        for i in 0..wallets.len() {
+            let wallet = wallets.get(i).unwrap();
+            if storage::peek_is_embargoed(&env, &wallet) {
+                storage::remove_embargo(&env, &wallet);
+                events::embargo_lifted(&env, &wallet);
+                lifted += 1;
+            }
+        }
+        Ok(lifted)
+    }
+
     /// Returns `true` when `wallet` is currently under an active score embargo.
     ///
     /// A timed embargo (`Some(ts)`) is considered active while

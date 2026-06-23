@@ -397,3 +397,103 @@ fn test_full_embargo_lifecycle() {
     // 5. Low-risk score passes gate normally.
     assert!(client.query_risk_gate(&wallet, &pair, &75));
 }
+
+// ── batch_lift_score_embargo ──────────────────────────────────────────────────
+
+#[test]
+fn test_batch_lift_lifts_only_embargoed_wallets() {
+    // 5 wallets: embargo all 5, manually lift 2, then batch-lift all 5.
+    // Expect batch to report 3 lifted (the 2 already-lifted ones are skipped).
+    let (env, client, _admin, _service) = setup();
+
+    let wallets: soroban_sdk::Vec<Address> = {
+        let mut v = Vec::new(&env);
+        for _ in 0..5 {
+            v.push_back(Address::generate(&env));
+        }
+        v
+    };
+
+    // Embargo all 5.
+    for i in 0..5u32 {
+        client.set_score_embargo(&wallets.get(i).unwrap(), &None);
+    }
+
+    // Lift wallets[0] and wallets[1] individually before the batch call.
+    client.lift_score_embargo(&wallets.get(0).unwrap());
+    client.lift_score_embargo(&wallets.get(1).unwrap());
+
+    // Batch-lift all 5 — only 3 should actually be lifted.
+    let lifted = client.batch_lift_score_embargo(&Vec::new(&env), &wallets);
+    assert_eq!(lifted, 3);
+
+    // All 5 wallets must now be clear.
+    for i in 0..5u32 {
+        assert!(!client.is_embargoed(&wallets.get(i).unwrap()));
+    }
+}
+
+#[test]
+fn test_batch_lift_all_already_clear_returns_zero() {
+    let (env, client, _admin, _service) = setup();
+
+    let mut wallets = Vec::new(&env);
+    for _ in 0..3u32 {
+        wallets.push_back(Address::generate(&env));
+    }
+
+    // No embargoes set — batch should lift 0.
+    let lifted = client.batch_lift_score_embargo(&Vec::new(&env), &wallets);
+    assert_eq!(lifted, 0);
+}
+
+#[test]
+fn test_batch_lift_all_embargoed_returns_full_count() {
+    let (env, client, _admin, _service) = setup();
+
+    let mut wallets = Vec::new(&env);
+    for _ in 0..4u32 {
+        wallets.push_back(Address::generate(&env));
+    }
+    for i in 0..4u32 {
+        client.set_score_embargo(&wallets.get(i).unwrap(), &None);
+    }
+
+    let lifted = client.batch_lift_score_embargo(&Vec::new(&env), &wallets);
+    assert_eq!(lifted, 4);
+
+    for i in 0..4u32 {
+        assert!(!client.is_embargoed(&wallets.get(i).unwrap()));
+    }
+}
+
+#[test]
+fn test_batch_lift_empty_returns_error() {
+    let (env, client, _admin, _service) = setup();
+    let empty: Vec<Address> = Vec::new(&env);
+    let result = client.try_batch_lift_score_embargo(&Vec::new(&env), &empty);
+    assert_eq!(result, Err(Ok(Error::EmptyBatch)));
+}
+
+#[test]
+fn test_batch_lift_exceeds_max_size_returns_error() {
+    let (env, client, _admin, _service) = setup();
+    let mut wallets = Vec::new(&env);
+    for _ in 0..21u32 {
+        wallets.push_back(Address::generate(&env));
+    }
+    let result = client.try_batch_lift_score_embargo(&Vec::new(&env), &wallets);
+    assert_eq!(result, Err(Ok(Error::BatchTooLarge)));
+}
+
+#[test]
+fn test_batch_lift_requires_init() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let mut wallets = Vec::new(&env);
+    wallets.push_back(Address::generate(&env));
+    let result = client.try_batch_lift_score_embargo(&Vec::new(&env), &wallets);
+    assert_eq!(result, Err(Ok(Error::NotInitialized)));
+}
