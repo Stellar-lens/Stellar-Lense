@@ -23,6 +23,7 @@ import re
 import warnings
 from collections.abc import Iterable, Mapping, Sequence
 from itertools import combinations
+import re
 from typing import Literal
 
 import networkx as nx
