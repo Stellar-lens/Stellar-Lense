@@ -237,8 +237,16 @@ _clients_lock = threading.Lock()
 _seq_counter = SequenceCounter()
 _replay_buffer = ReplayBuffer(config.WS_REPLAY_BUFFER_SIZE)
 _router = PubSubRouter()
-_auth = JWTAuthenticator(config.JWT_PUBLIC_KEY_PATH)
+_auth: JWTAuthenticator | None = None
 _loop: asyncio.AbstractEventLoop | None = None
+
+
+def _get_auth() -> JWTAuthenticator:
+    """Return the JWT authenticator, creating it on first use."""
+    global _auth
+    if _auth is None:
+        _auth = JWTAuthenticator(config.JWT_PUBLIC_KEY_PATH)
+    return _auth
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -305,7 +313,7 @@ async def _handler(websocket) -> None:
             logger.warning("WebSocket connection rejected: no token provided")
             return
 
-        claims = _auth.verify(token)
+        claims = _get_auth().verify(token)
         if not claims:
             ws_auth_failures_total.inc()
             await websocket.close(code=1008, reason="Unauthorized: invalid token")
@@ -315,7 +323,7 @@ async def _handler(websocket) -> None:
             return
 
         client_id = claims.get("sub", "unknown")
-        permissions = _auth.extract_permissions(claims)
+        permissions = _get_auth().extract_permissions(claims)
 
         # ─────────────────────────────────────────────────────────────────
         # 2. CONNECTION LIMITS: Check max clients
@@ -494,7 +502,7 @@ async def _handle_subscribe(
 
         # Check permissions
         forbidden_channels = [
-            ch for ch in channels if not _auth.is_permitted_channel(permissions, ch)
+            ch for ch in channels if not _get_auth().is_permitted_channel(permissions, ch)
         ]
         if forbidden_channels:
             error = ErrorMessage(
@@ -569,7 +577,7 @@ async def _handle_replay(websocket, client_id: str, permissions: set[str], paylo
             return
 
         # Check permission
-        if not _auth.is_permitted_channel(permissions, channel):
+        if not _get_auth().is_permitted_channel(permissions, channel):
             error = ErrorMessage(code="forbidden", message=f"Not permitted to replay: {channel}")
             await websocket.send(error.model_dump_json())
             logger.warning(
