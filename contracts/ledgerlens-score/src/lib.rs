@@ -22,6 +22,9 @@ mod test_interface;
 mod test_rate_limit;
 
 #[cfg(test)]
+mod test_multisig_service;
+
+#[cfg(test)]
 mod test_attestation;
 
 // #[cfg(test)]
