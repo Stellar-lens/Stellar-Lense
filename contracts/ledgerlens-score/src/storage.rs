@@ -625,7 +625,7 @@ pub fn set_global_min_confidence(env: &Env, min_confidence: u32) {
     env.storage().instance().set(&DataKey::GlobalMinConfidence, &min_confidence);
 }
 
-// ── Fee withdrawal ────────────────────────────────────────────────────────────
+// Fee withdrawal
 
 pub fn get_fee_token(env: &Env) -> Option<Address> {
     env.storage().instance().get(&DataKey::FeeToken)
