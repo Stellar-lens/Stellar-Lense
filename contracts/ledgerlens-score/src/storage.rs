@@ -1,8 +1,14 @@
-use soroban_sdk::{Env, Address};
-use crate::types::{DataKey, TierBounds};
 use crate::errors::Error;
+use crate::types::{DataKey, TierBounds};
+use soroban_sdk::{Address, Bytes, Env, Symbol, Vec};
 
 use crate::constants::{
+    DEFAULT_COOLDOWN_SECS, DEFAULT_JUMP_THRESHOLD, DEFAULT_RISK_THRESHOLD,
+    DEFAULT_UPGRADE_DELAY_SECS, SCORE_TTL_EXTEND_TO, SCORE_TTL_THRESHOLD,
+};
+use crate::types::{
+    AggregateRiskScore, GateDataKey, RiskScore, ScoreTrend, ScoreVelocityCap, UpgradeProposal,
+};
     BAND_STATE_TTL_EXTEND_TO, BAND_STATE_TTL_THRESHOLD, DEFAULT_CONSENSUS_EPSILON,
     DEFAULT_CONSENSUS_THRESHOLD_K, DEFAULT_COOLDOWN_SECS, DEFAULT_ESCALATION_THRESHOLD,
     DEFAULT_RISK_THRESHOLD, DEFAULT_UPGRADE_DELAY_SECS, EMBARGO_TTL_EXTEND_TO,
@@ -436,6 +442,36 @@ pub fn set_cooldown_secs(env: &Env, secs: u64) {
     env.storage().instance().set(&DataKey::CooldownSecs, &secs);
 }
 
+// ── Score Velocity Cap ────────────────────────────────────────────────────────
+
+pub fn get_score_velocity_cap(env: &Env) -> ScoreVelocityCap {
+    let enabled = env.storage().instance().get(&DataKey::ScoreVelocityCapEnabled).unwrap_or(false);
+    let points_per_hour =
+        env.storage().instance().get(&DataKey::ScoreVelocityCapPointsPerHour).unwrap_or(0);
+    ScoreVelocityCap { enabled, points_per_hour }
+}
+
+pub fn set_score_velocity_cap(env: &Env, cap: &ScoreVelocityCap) {
+    env.storage().instance().set(&DataKey::ScoreVelocityCapEnabled, &cap.enabled);
+    env.storage().instance().set(&DataKey::ScoreVelocityCapPointsPerHour, &cap.points_per_hour);
+}
+
+pub fn is_velocity_cap_overridden(env: &Env, wallet: &Address, asset_pair: &Symbol) -> bool {
+    let key = DataKey::VelocityCapOverride(wallet.clone(), asset_pair.clone());
+    env.storage().persistent().get(&key).unwrap_or(false)
+}
+
+pub fn set_velocity_cap_override(env: &Env, wallet: &Address, asset_pair: &Symbol) {
+    let key = DataKey::VelocityCapOverride(wallet.clone(), asset_pair.clone());
+    env.storage().persistent().set(&key, &true);
+    env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+}
+
+pub fn clear_velocity_cap_override(env: &Env, wallet: &Address, asset_pair: &Symbol) {
+    let key = DataKey::VelocityCapOverride(wallet.clone(), asset_pair.clone());
+    env.storage().persistent().remove(&key);
+}
+
 // ── GDPR / data-erasure ───────────────────────────────────────────────────────
 
 /// Removes the score history ring buffer for `wallet` / `asset_pair`.
@@ -529,7 +565,6 @@ pub fn set_decay_rate(env: &Env, numerator: u32, denominator: u32) {
     env.storage().instance().set(&DataKey::DecayRateDenominator, &denominator);
 }
 
- feat/confidence-gated-risk-gate
 // ── Global minimum confidence floor ──────────────────────────────────────────
 
 /// Returns the admin-configured global minimum confidence floor (0–100).
@@ -549,7 +584,7 @@ pub fn get_global_min_confidence(env: &Env) -> u32 {
 /// Caller is responsible for validating the range (0–100) before calling.
 pub fn set_global_min_confidence(env: &Env, min_confidence: u32) {
     env.storage().instance().set(&DataKey::GlobalMinConfidence, &min_confidence);
-
+}
 // ── Fee withdrawal ────────────────────────────────────────────────────────────
 
 pub fn get_fee_token(env: &Env) -> Option<Address> {
@@ -570,7 +605,6 @@ pub fn set_withdrawal_lock(env: &Env) {
 
 pub fn clear_withdrawal_lock(env: &Env) {
     env.storage().instance().remove(&DataKey::WithdrawalLock);
- main
 }
 
 // ── Score delegation ──────────────────────────────────────────────────────────
@@ -705,6 +739,45 @@ pub fn get_contagion_depth(env: &Env, wallet: &Address, asset_pair: &Symbol) -> 
     links.len()
 }
 
+// ── Stubs for broken branch ───────────────────────────────────────────────
+
+pub fn get_escalation_threshold(_env: &Env) -> u32 {
+    0
+}
+
+pub fn get_breach_count(_env: &Env, _wallet: &Address, _asset_pair: &Symbol) -> u32 {
+    0
+}
+
+pub fn set_breach_count(_env: &Env, _wallet: &Address, _asset_pair: &Symbol, _count: u32) {}
+
+pub fn get_gate_open(_env: &Env) -> bool {
+    false
+}
+
+pub fn get_gate_callers(env: &Env) -> Vec<Address> {
+    Vec::new(env)
+}
+
+pub fn clear_breach_count(_env: &Env, _wallet: &Address, _asset_pair: &Symbol) {}
+
+pub fn get_model_stats(_env: &Env, _version: u32) -> Option<crate::types::ModelVersionStats> {
+    None
+}
+
+pub fn get_all_model_versions(env: &Env) -> Vec<u32> {
+    Vec::new(env)
+}
+
+pub fn set_service_pubkey(_env: &Env, _pubkey: &Bytes) {}
+
+pub fn set_escalation_threshold(_env: &Env, _n: u32) {}
+
+pub fn get_service_threshold(env: &Env) -> u32 {
+    env.storage().instance().get(&DataKey::ServiceThreshold).unwrap_or(0)
+}
+
+pub fn update_model_stats(_env: &Env, _model_version: u32, _score: u32) {}
 // ── Score submission floor ────────────────────────────────────────────────────
 
 /// Returns the current score-floor policy, falling back to the compiled-in

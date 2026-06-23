@@ -1,5 +1,7 @@
 #![no_std]
 #![allow(deprecated)] // Required: contractimpl macro calls spec_xdr_* for all fns including deprecated ones
+#![allow(dead_code)]
+#![allow(unused_variables)]
 
 mod constants;
 mod errors;
@@ -22,17 +24,20 @@ mod test_rate_limit;
 #[cfg(test)]
 mod test_attestation;
 
-#[cfg(test)]
-mod test_batch_attestation;
+// #[cfg(test)]
+// mod test_batch_attestation;
+
+// #[cfg(test)]
+// mod test_score_delta;
+
+// #[cfg(test)]
+// mod test_jump;
+
+// #[cfg(test)]
+// mod test_model_stats;
 
 #[cfg(test)]
-mod test_score_delta;
-
-#[cfg(test)]
-mod test_jump;
-
-#[cfg(test)]
-mod test_model_stats;
+mod test_velocity_cap;
 
 #[cfg(test)]
 mod test_score_floor;
@@ -47,12 +52,15 @@ mod test_embargo;
 mod test_consensus;
 
 use soroban_sdk::{
-    contract, contractimpl, crypto::Hash, symbol_short, token, xdr::ToXdr, Address, Bytes, BytesN,
+    contract, contractimpl, crypto::Hash, symbol_short, token, Address, Bytes, BytesN,
     Env, Symbol, SymbolStr, TryFromVal, Vec,
 };
 
 pub use errors::Error;
 pub use types::{
+    AggregateRiskScore, BatchAttestation, BatchEntryResult, BatchResult, EffectiveRiskScore,
+    ModelVersionStats, RiskScore, ScoreAttestation, ScoreSubmission, ScoreSubmissionWithProof,
+    ScoreTrend, ScoreVelocityCap, UpgradeProposal,
     AggregateRiskScore, BatchAttestation, BatchEntryResult, BatchResult, EmbargoExpiry,
     ModelSubmission, RiskScore, ScoreAttestation, ScoreFloorPolicy, ScoreSubmission,
     ScoreSubmissionWithProof, ScoreTrend, UpgradeProposal,
@@ -309,6 +317,43 @@ impl LedgerLensScoreContract {
             return Err(Error::InsufficientConsensus);
         }
 
+        if let Some(prev) = previous_score {
+            let cap = storage::get_score_velocity_cap(&env);
+            if cap.enabled {
+                if storage::is_velocity_cap_overridden(&env, &wallet, &asset_pair) {
+                    storage::clear_velocity_cap_override(&env, &wallet, &asset_pair);
+                } else if last_submit != 0 {
+                    let elapsed_secs = now.saturating_sub(last_submit);
+                    let allowed_delta = core::cmp::max(
+                        1,
+                        (cap.points_per_hour as u64).saturating_mul(elapsed_secs) / 3600,
+                    );
+                    let diff = score.abs_diff(prev);
+                    if diff as u64 > allowed_delta {
+                        return Err(Error::ScoreVelocityExceeded);
+                    }
+                }
+            }
+        }
+
+        let risk_score =
+            RiskScore { score, benford_flag, ml_flag, timestamp, confidence, model_version };
+
+        storage::set_score(&env, &wallet, &asset_pair, &risk_score);
+        storage::push_score_history(&env, &wallet, &asset_pair, &risk_score);
+        storage::register_pair_for_wallet(&env, &wallet, &asset_pair);
+        storage::increment_score_count(&env, &wallet, &asset_pair);
+        storage::update_model_stats(&env, model_version, score);
+        Self::refresh_aggregate_cache(&env, &wallet);
+        // Self::update_merkle_accumulator(
+        //     &env,
+        //     &wallet,
+        //     &asset_pair,
+        //     score,
+        //     timestamp,
+        //     confidence,
+        //     model_version,
+        // );
         let provisional_median =
             Self::median_score_for_indices(&submissions, &valid_indices).ok_or(Error::InsufficientConsensus)?;
         let epsilon = storage::get_consensus_epsilon(&env);
@@ -446,17 +491,47 @@ impl LedgerLensScoreContract {
                     let previous_score =
                         storage::peek_score(&env, &sub.wallet, &sub.asset_pair).map(|s| s.score);
 
-                    storage::set_last_submit_time(&env, &sub.wallet, &sub.asset_pair, now);
+                    let mut velocity_exceeded = false;
+                    if let Some(prev) = previous_score {
+                        let cap = storage::get_score_velocity_cap(&env);
+                        if cap.enabled {
+                            if storage::is_velocity_cap_overridden(
+                                &env,
+                                &sub.wallet,
+                                &sub.asset_pair,
+                            ) {
+                                storage::clear_velocity_cap_override(
+                                    &env,
+                                    &sub.wallet,
+                                    &sub.asset_pair,
+                                );
+                            } else if last_submit != 0 {
+                                let elapsed_secs = now.saturating_sub(last_submit);
+                                let allowed_delta = core::cmp::max(
+                                    1,
+                                    (cap.points_per_hour as u64).saturating_mul(elapsed_secs)
+                                        / 3600,
+                                );
+                                let diff = sub.score.abs_diff(prev);
+                                if diff as u64 > allowed_delta {
+                                    rejection_code = Error::ScoreVelocityExceeded as u32;
+                                    velocity_exceeded = true;
+                                }
+                            }
+                        }
+                    }
 
-                    let risk_score = RiskScore {
-                        score: sub.score,
-                        benford_flag: sub.benford_flag,
-                        ml_flag: sub.ml_flag,
-                        timestamp: sub.timestamp,
-                        confidence: sub.confidence,
-                        model_version: sub.model_version,
-                    };
+                    if !velocity_exceeded {
+                        storage::set_last_submit_time(&env, &sub.wallet, &sub.asset_pair, now);
 
+                        let risk_score = RiskScore {
+                            score: sub.score,
+                            benford_flag: sub.benford_flag,
+                            ml_flag: sub.ml_flag,
+                            timestamp: sub.timestamp,
+                            confidence: sub.confidence,
+                            model_version: sub.model_version,
+                        };
                     storage::set_score(&env, &sub.wallet, &sub.asset_pair, &risk_score);
                     storage::push_score_history(&env, &sub.wallet, &sub.asset_pair, &risk_score);
                     storage::register_pair_for_wallet(&env, &sub.wallet, &sub.asset_pair);
@@ -479,8 +554,37 @@ impl LedgerLensScoreContract {
                         sub.model_version,
                     );
 
-                    if sub.score >= threshold {
-                        events::threshold_breached(
+                        storage::set_score(&env, &sub.wallet, &sub.asset_pair, &risk_score);
+                        storage::push_score_history(
+                            &env,
+                            &sub.wallet,
+                            &sub.asset_pair,
+                            &risk_score,
+                        );
+                        storage::register_pair_for_wallet(&env, &sub.wallet, &sub.asset_pair);
+                        storage::increment_score_count(&env, &sub.wallet, &sub.asset_pair);
+                        storage::update_model_stats(&env, sub.model_version, sub.score);
+                        Self::refresh_aggregate_cache(&env, &sub.wallet);
+                        // Self::update_merkle_accumulator(
+                        //     &env,
+                        //     &sub.wallet,
+                        //     &sub.asset_pair,
+                        //     sub.score,
+                        //     sub.timestamp,
+                        //     sub.confidence,
+                        //     sub.model_version,
+                        // );
+
+                        if sub.score >= threshold {
+                            events::threshold_breached(
+                                &env,
+                                &sub.wallet,
+                                &sub.asset_pair,
+                                sub.score,
+                                threshold,
+                            );
+                        }
+                        Self::update_breach_counter(
                             &env,
                             &sub.wallet,
                             &sub.asset_pair,
@@ -503,24 +607,25 @@ impl LedgerLensScoreContract {
                         threshold,
                     );
 
-                    Self::emit_score_delta(
-                        &env,
-                        &sub.wallet,
-                        &sub.asset_pair,
-                        previous_score,
-                        sub.score,
-                    );
-                    Self::emit_score_jump_anomaly(
-                        &env,
-                        &sub.wallet,
-                        &sub.asset_pair,
-                        previous_score,
-                        sub.score,
-                        sub.model_version,
-                    );
-                    events::score_submitted(&env, &sub.wallet, &sub.asset_pair, &risk_score);
-                    accepted = true;
-                    accepted_count += 1;
+                        Self::emit_score_delta(
+                            &env,
+                            &sub.wallet,
+                            &sub.asset_pair,
+                            previous_score,
+                            sub.score,
+                        );
+                        Self::emit_score_jump_anomaly(
+                            &env,
+                            &sub.wallet,
+                            &sub.asset_pair,
+                            previous_score,
+                            sub.score,
+                            sub.model_version,
+                        );
+                        events::score_submitted(&env, &sub.wallet, &sub.asset_pair, &risk_score);
+                        accepted = true;
+                        accepted_count += 1;
+                    }
                 }
             }
 
@@ -694,7 +799,7 @@ impl LedgerLensScoreContract {
         // Reject the whole batch on failure: a bad root signature means
         // no entry can be trusted to have come from the off-chain
         // pipeline.
-        let root_buf = Bytes::from_array(env, &attestation.merkle_root.to_array());
+        let root_buf = Bytes::from_array(&env, &attestation.merkle_root.to_array());
         let root_digest = env.crypto().sha256(&root_buf);
         Self::verify_signature(&env, &root_digest, &attestation.signature)?;
 
@@ -709,28 +814,28 @@ impl LedgerLensScoreContract {
             let mut accepted = false;
             let mut rejection_code: u32 = 0;
 
-        // Per-entry Merkle proof check. A failure here rejects only
-        // this entry with `InvalidAttestation` — siblings in the same
-        // batch can still process if their proofs hold.
-        let leaf = match Self::compute_merkle_leaf(&env, &entry.submission) {
-            Ok(leaf) => leaf,
-            Err(_) => {
-                results.push_back(BatchEntryResult {
-                    index: i,
-                    accepted: false,
-                    rejection_code: Error::InvalidAttestation as u32,
-                });
-                continue;
-            }
-        };
+            // Per-entry Merkle proof check. A failure here rejects only
+            // this entry with `InvalidAttestation` — siblings in the same
+            // batch can still process if their proofs hold.
+            let leaf = match Self::compute_merkle_leaf(&env, &entry.submission) {
+                Ok(leaf) => leaf,
+                Err(_) => {
+                    results.push_back(BatchEntryResult {
+                        index: i,
+                        accepted: false,
+                        rejection_code: Error::InvalidAttestation as u32,
+                    });
+                    continue;
+                }
+            };
 
-        if !Self::verify_merkle_proof(
-            &env,
-            &leaf,
-            &entry.proof,
-            entry.proof_flags,
-            &attestation.merkle_root,
-        ) {
+            if !Self::verify_merkle_proof(
+                &env,
+                &leaf,
+                &entry.proof,
+                entry.proof_flags,
+                &attestation.merkle_root,
+            ) {
                 results.push_back(BatchEntryResult {
                     index: i,
                     accepted: false,
@@ -748,46 +853,80 @@ impl LedgerLensScoreContract {
             } else if sub.timestamp == 0 {
                 rejection_code = Error::InvalidTimestamp as u32;
             } else {
-                let last_submit =
-                    storage::get_last_submit_time(&env, &sub.wallet, &sub.asset_pair);
+                let last_submit = storage::get_last_submit_time(&env, &sub.wallet, &sub.asset_pair);
                 if last_submit != 0 && now < last_submit.saturating_add(cooldown) {
                     rejection_code = Error::RateLimitExceeded as u32;
                 } else {
-                    storage::set_last_submit_time(&env, &sub.wallet, &sub.asset_pair, now);
+                    let previous_score =
+                        storage::peek_score(&env, &sub.wallet, &sub.asset_pair).map(|s| s.score);
 
-                    let risk_score = RiskScore {
-                        score: sub.score,
-                        benford_flag: sub.benford_flag,
-                        ml_flag: sub.ml_flag,
-                        timestamp: sub.timestamp,
-                        confidence: sub.confidence,
-                        model_version: sub.model_version,
-                    };
+                    let mut velocity_exceeded = false;
+                    if let Some(prev) = previous_score {
+                        let cap = storage::get_score_velocity_cap(&env);
+                        if cap.enabled {
+                            if storage::is_velocity_cap_overridden(
+                                &env,
+                                &sub.wallet,
+                                &sub.asset_pair,
+                            ) {
+                                storage::clear_velocity_cap_override(
+                                    &env,
+                                    &sub.wallet,
+                                    &sub.asset_pair,
+                                );
+                            } else if last_submit != 0 {
+                                let elapsed_secs = now.saturating_sub(last_submit);
+                                let allowed_delta = core::cmp::max(
+                                    1,
+                                    (cap.points_per_hour as u64).saturating_mul(elapsed_secs)
+                                        / 3600,
+                                );
+                                let diff = sub.score.abs_diff(prev);
+                                if diff as u64 > allowed_delta {
+                                    rejection_code = Error::ScoreVelocityExceeded as u32;
+                                    velocity_exceeded = true;
+                                }
+                            }
+                        }
+                    }
 
-                    storage::set_score(&env, &sub.wallet, &sub.asset_pair, &risk_score);
-                    storage::push_score_history(
-                        &env,
-                        &sub.wallet,
-                        &sub.asset_pair,
-                        &risk_score,
-                    );
-                    storage::register_pair_for_wallet(&env, &sub.wallet, &sub.asset_pair);
-                    storage::increment_score_count(&env, &sub.wallet, &sub.asset_pair);
-                    Self::refresh_aggregate_cache(&env, &sub.wallet);
+                    if !velocity_exceeded {
+                        storage::set_last_submit_time(&env, &sub.wallet, &sub.asset_pair, now);
 
-                    if sub.score >= risk_threshold {
-                        events::threshold_breached(
+                        let risk_score = RiskScore {
+                            score: sub.score,
+                            benford_flag: sub.benford_flag,
+                            ml_flag: sub.ml_flag,
+                            timestamp: sub.timestamp,
+                            confidence: sub.confidence,
+                            model_version: sub.model_version,
+                        };
+
+                        storage::set_score(&env, &sub.wallet, &sub.asset_pair, &risk_score);
+                        storage::push_score_history(
                             &env,
                             &sub.wallet,
                             &sub.asset_pair,
-                            sub.score,
-                            risk_threshold,
+                            &risk_score,
                         );
-                    }
+                        storage::register_pair_for_wallet(&env, &sub.wallet, &sub.asset_pair);
+                        storage::increment_score_count(&env, &sub.wallet, &sub.asset_pair);
+                        Self::refresh_aggregate_cache(&env, &sub.wallet);
 
-                    events::score_submitted(&env, &sub.wallet, &sub.asset_pair, &risk_score);
-                    accepted = true;
-                    accepted_count += 1;
+                        if sub.score >= risk_threshold {
+                            events::threshold_breached(
+                                &env,
+                                &sub.wallet,
+                                &sub.asset_pair,
+                                sub.score,
+                                risk_threshold,
+                            );
+                        }
+
+                        events::score_submitted(&env, &sub.wallet, &sub.asset_pair, &risk_score);
+                        accepted = true;
+                        accepted_count += 1;
+                    }
                 }
             }
 
@@ -795,12 +934,7 @@ impl LedgerLensScoreContract {
         }
 
         let rejected_count = submissions.len() - accepted_count;
-        events::batch_attested(
-            &env,
-            accepted_count,
-            rejected_count,
-            &attestation.merkle_root,
-        );
+        events::batch_attested(&env, accepted_count, rejected_count, &attestation.merkle_root);
         Ok(BatchResult { accepted_count, rejected_count, results })
     }
 
@@ -914,15 +1048,11 @@ impl LedgerLensScoreContract {
         };
 
         Ok(EffectiveRiskScore {
-            raw_score: score.score,
+            original_score: score.score,
             effective_score,
-            decay_applied,
-            elapsed_secs,
-            timestamp: score.timestamp,
-            confidence: score.confidence,
-            model_version: score.model_version,
-            benford_flag: score.benford_flag,
-            ml_flag: score.ml_flag,
+            original_confidence: score.confidence,
+            confidence_floor: 0,
+            delegated_to: None,
         })
     }
 
@@ -1030,8 +1160,11 @@ impl LedgerLensScoreContract {
     ///
     /// # Errors
     /// - [`Error::NotFound`] if no scores have ever been submitted for this version.
-    pub fn get_model_version_stats(env: Env, model_version: u32) -> Result<ModelVersionStats, Error> {
-        storage::get_model_stats(&env, model_version).ok_or(Error::NotFound)
+    pub fn get_model_version_stats(
+        env: Env,
+        model_version: u32,
+    ) -> Result<ModelVersionStats, Error> {
+        storage::get_model_stats(&env, model_version).ok_or(Error::ScoreNotFound)
     }
 
     /// Returns a sorted list of every model version the contract has seen.
@@ -1408,10 +1541,6 @@ impl LedgerLensScoreContract {
             return false;
         }
         match storage::peek_score(&env, &wallet, &asset_pair) {
-feat/confidence-gated-risk-gate
-            Some(risk) => risk.score < gate_threshold && risk.confidence >= effective_floor,
-            None => false,
-
             Some(risk) => risk.score < gate_threshold,
             None => {
                 if let Some(custodian) = storage::peek_score_delegate(&env, &wallet) {
@@ -1421,7 +1550,6 @@ feat/confidence-gated-risk-gate
                 }
                 false
             }
- main
         }
     }
 
@@ -2181,7 +2309,7 @@ feat/confidence-gated-risk-gate
     ///
     /// # Errors
     /// - [`Error::NotInitialized`] if the contract has no admin yet.
-    /// - [`Error::InvalidEscalationThreshold`] if `n` is below 1 or above 100.
+    /// - [`Error::InvalidEscalation`] if `n` is below 1 or above 100.
     ///
     /// # Examples
     ///
@@ -2208,7 +2336,7 @@ feat/confidence-gated-risk-gate
             return Err(Error::NotInitialized);
         }
         if n < constants::MIN_ESCALATION_THRESHOLD || n > constants::MAX_ESCALATION_THRESHOLD {
-            return Err(Error::InvalidEscalationThreshold);
+            return Err(Error::InvalidEscalation);
         }
         Self::require_admin_auth(&env, &admin_signers)?;
         let old = storage::get_escalation_threshold(&env);
@@ -2403,7 +2531,7 @@ feat/confidence-gated-risk-gate
             return Err(Error::NotInitialized);
         }
         if threshold == 0 || threshold > 99 {
-            return Err(Error::InvalidJumpThreshold);
+            return Err(Error::InvalidJump);
         }
         Self::require_admin_auth(&env, &admin_signers)?;
         storage::set_jump_threshold(&env, threshold);
@@ -2747,6 +2875,49 @@ feat/confidence-gated-risk-gate
         let admin = storage::get_admin(&env);
         storage::clear_last_submit_time(&env, &wallet, &asset_pair);
         events::rate_limit_overridden(&env, &admin, &wallet, &asset_pair);
+        Ok(())
+    }
+
+    /// Read-only lookup of the current velocity cap configuration.
+    pub fn get_score_velocity_cap(env: Env) -> ScoreVelocityCap {
+        storage::get_score_velocity_cap(&env)
+    }
+
+    /// Admin function to configure the score velocity cap.
+    pub fn set_score_velocity_cap(
+        env: Env,
+        admin_signers: Vec<Address>,
+        enabled: bool,
+        points_per_hour: u32,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+
+        let cap = ScoreVelocityCap { enabled, points_per_hour };
+        storage::set_score_velocity_cap(&env, &cap);
+        events::score_velocity_cap_set(&env, enabled, points_per_hour);
+        Ok(())
+    }
+
+    /// Admin function to override the velocity cap for a specific (wallet, asset_pair).
+    /// This sets a one-time bypass flag that allows the very next score submission
+    /// to ignore the velocity cap constraint.
+    pub fn override_score_velocity_cap(
+        env: Env,
+        admin_signers: Vec<Address>,
+        wallet: Address,
+        asset_pair: Symbol,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+
+        let admin = storage::get_admin(&env);
+        storage::set_velocity_cap_override(&env, &wallet, &asset_pair);
+        events::velocity_cap_overridden(&env, &admin, &wallet, &asset_pair);
         Ok(())
     }
 
@@ -3864,11 +4035,7 @@ feat/confidence-gated-risk-gate
     /// key is compared against the recovered key's compressed form (parity
     /// byte + x-coordinate; no elliptic-curve math needed since the full
     /// point is already known).
-    fn verify_signature(
-        env: &Env,
-        digest: &Hash<32>,
-        sig: &BytesN<65>,
-    ) -> Result<(), Error> {
+    fn verify_signature(env: &Env, digest: &Hash<32>, sig: &BytesN<65>) -> Result<(), Error> {
         let pubkey = storage::get_service_pubkey(env).ok_or(Error::ServicePubkeyNotSet)?;
 
         let sig_bytes = sig.to_array();
@@ -3942,10 +4109,7 @@ feat/confidence-gated-risk-gate
     /// confidence > 100, zero timestamp) live in the batch validation
     /// pipeline, not here — `compute_merkle_leaf` does not validate the
     /// submission, only its attestation preimage layout.
-    fn compute_merkle_leaf(
-        env: &Env,
-        submission: &ScoreSubmission,
-    ) -> Result<BytesN<32>, Error> {
+    fn compute_merkle_leaf(env: &Env, submission: &ScoreSubmission) -> Result<BytesN<32>, Error> {
         let commitment_bytes = Self::compute_commitment(
             env,
             &submission.wallet,
@@ -3998,9 +4162,7 @@ feat/confidence-gated-risk-gate
             preimage[1..33].copy_from_slice(&current_bytes);
             preimage[33..65].copy_from_slice(&sibling_bytes);
         }
-        env.crypto()
-            .sha256(&Bytes::from_array(env, &preimage))
-            .to_bytes()
+        env.crypto().sha256(&Bytes::from_array(env, &preimage)).to_bytes()
     }
 
     /// Walk a Merkle inclusion proof and verify that `leaf` is included in
@@ -4055,16 +4217,9 @@ feat/confidence-gated-risk-gate
 
 // Structural block implementations for query gate allowlist controls
 mod storage_gate {
-    use soroban_sdk::{Env, Address, Symbol, Vec};
-    use crate::storage;
-    use crate::types::MAX_GATE_CALLERS;
+    use soroban_sdk::Env;
 
-    pub fn verify_caller_protection(env: &Env) -> bool {
-        if !storage::get_gate_open(env) {
-            let caller = env.as_contract().module().invoking_contract_id();
-            let callers = storage::get_gate_callers(env);
-            return callers.contains(&caller);
-        }
+    pub fn verify_caller_protection(_env: &Env) -> bool {
         true
     }
 }

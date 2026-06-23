@@ -1,4 +1,4 @@
-use soroban_sdk::{contracttype, Address};
+use soroban_sdk::{contracttype, Address, BytesN, Symbol};
 
 /// Embargo expiry configuration stored per wallet in temporary storage.
 ///
@@ -281,9 +281,42 @@ pub struct ScoreFloorPolicy {
 pub struct SnapshotRecord {
     pub root: BytesN<32>,
     pub leaf_count: u64,
-    pub committed_at: u64,      // ledger timestamp
-    pub committed_by: Address,  // who called commit_snapshot
+    pub committed_at: u64,     // ledger timestamp
+    pub committed_by: Address, // who called commit_snapshot
 }
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ScoreVelocityCap {
+    pub enabled: bool,
+    pub points_per_hour: u32,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EffectiveRiskScore {
+    pub effective_score: u32,
+    pub original_score: u32,
+    pub original_confidence: u32,
+    pub confidence_floor: u32,
+    pub delegated_to: Option<Address>,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ModelVersionStats {
+    pub model_version: u32,
+    pub total_submissions: u64,
+    pub average_score: u32,
+}
+
+#[contracttype]
+#[derive(Clone)]
+pub enum GateDataKey {
+    GateCallers,
+}
+
+pub const MAX_GATE_CALLERS: u32 = 100;
 
 #[contracttype]
 #[derive(Clone)]
@@ -388,6 +421,15 @@ pub enum DataKey {
     /// List of counterparty addresses for a wallet on a specific asset pair.
     /// Key: Counterparties(wallet, asset_pair) -> Vec<Address>
     Counterparties(Address, Symbol),
+    /// Global boolean kill-switch for score velocity checks.
+    ScoreVelocityCapEnabled,
+    /// Maximum points a score can change per hour when the cap is enabled.
+    ScoreVelocityCapPointsPerHour,
+    /// One-time bypass flag set by the admin to allow a single submission
+    /// for a specific (wallet, asset_pair) to bypass the velocity cap.
+    VelocityCapOverride(Address, Symbol),
+    SignerTier(Address),
+    GlobalMinConfidence,
     /// Score-floor policy: historical peak (high-water mark) at or above which
     /// the floor applies. Global config, `u32`, defaults to
     /// `DEFAULT_SCORE_FLOOR_HWM` (80) when unset.
