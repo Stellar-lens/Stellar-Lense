@@ -10,6 +10,7 @@ pub enum Error {
     InvalidScore = 4,
     InvalidConfidence = 5,
     InvalidSignerTier = 48,
+    SignerTierViolation = 54,
     ScoreNotFound = 6,
     /// Returned when any state-mutating call is attempted while the
     /// contract is paused by the admin.
@@ -181,6 +182,22 @@ pub enum Error {
     RevealWindowExpired = 52,
     /// `reveal_consensus` was called but the score and nonce do not match the commitment.
     CommitmentMismatch = 53,
+
+    // ── Score dispute mechanism ────────────────────────────────────────────
+    /// Returned by `open_score_dispute` when a dispute already exists for the
+    /// given `(wallet, asset_pair)`.
+    DisputeAlreadyOpen = 55,
+    /// Returned by `resolve_dispute_timeout` when the dispute deadline has not
+    /// yet elapsed.
+    DisputeNotYetTimedOut = 56,
+    /// Returned when attempting to resolve a dispute that does not exist.
+    DisputeNotFound = 57,
+    /// Returned by `open_score_dispute` when the staked bond is zero or
+    /// negative.
+    InvalidDisputeBond = 58,
+    /// Returned by `open_score_dispute` when the open-dispute index is already
+    /// at `MAX_OPEN_DISPUTES`.
+    DisputeIndexFull = 59,
 }
 
 // Gate caller tracking error variants for structural protection

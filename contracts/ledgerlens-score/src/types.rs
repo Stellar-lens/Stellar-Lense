@@ -13,6 +13,26 @@ pub enum EmbargoExpiry {
     Until(u64),
 }
 
+/// On-chain record of an open score dispute, tracking the challenger's staked
+/// bond, the deadline by which the admin must resubmit a corrected score, and
+/// the score that was being challenged when the dispute was opened.
+///
+/// Stored in temporary TTL-bounded storage keyed by `(wallet, asset_pair)`;
+/// removed once the dispute is resolved by admin correction or by timeout.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ScoreDispute {
+    /// Wallet operator that opened the dispute and staked the bond.
+    pub challenger: Address,
+    /// Fee-token amount staked to open the dispute (escrowed in the contract).
+    pub bond: i128,
+    /// Ledger timestamp after which the dispute may be settled by timeout.
+    pub deadline: u64,
+    /// The disputed score at the time the dispute was opened, recorded for
+    /// audit purposes.
+    pub challenged_score: u32,
+}
+
 /// On-chain record of the latest LedgerLens risk assessment for a
 /// wallet / asset-pair combination. Written by `submit_score` and
 /// read by `get_score`.
@@ -463,6 +483,12 @@ pub enum DataKey {
     /// Maximum allowed score deviation from the provisional median when
     /// building the consensus set.
     ConsensusEpsilon,
+    /// Open dispute record for a (wallet, asset_pair) pair. Absent key means
+    /// no active dispute. Stored in temporary TTL-bounded storage.
+    ScoreDispute(Address, Symbol),
+    /// Index of all currently open disputes: `Vec<(Address, Symbol)>`.
+    /// Incrementally maintained so `get_open_disputes` is a single read.
+    DisputeIndex,
     /// A single model's commitment (sha256(score || nonce)) for consensus.
     /// Key: ConsensusCommitment(model_address, wallet, asset_pair) -> BytesN<32>
     ConsensusCommitment(Address, Address, Symbol),
@@ -475,3 +501,4 @@ pub enum DataKey {
 pub struct TierBounds {
     pub min_score: u32,
     pub max_score: u32,
+}
