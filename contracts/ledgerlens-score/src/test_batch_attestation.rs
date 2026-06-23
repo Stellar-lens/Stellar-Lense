@@ -32,6 +32,7 @@ use crate::{
 // `Env` reference), but the off-chain test helpers below need the
 // allocation-side Rust Vec with `.push(…)`, direct indexing, and
 // `slice.to_vec()`-style conversions. Use this alias to disambiguate.
+extern crate alloc;
 use alloc::vec::Vec as StdVec;
 
 // ── Test infrastructure ─────────────────────────────────────────────────────
@@ -773,4 +774,4 @@ fn test_batch_attested_contract_paused_rejected() {
 // (kept for symmetry with test_attestation.rs and in case future helpers
 // want to construct a per-entry attestation for cross-checks). ────────────
 #[allow(dead_code)]
-type _Attest = ScoreAttestation;
+type _Attest = BatchAttestation;
