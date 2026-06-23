@@ -74,6 +74,9 @@ mod test_history_paginated;
 #[cfg(test)]
 mod test_model_version;
 
+#[cfg(test)]
+mod test_histogram;
+
 use soroban_sdk::{
     contract, contractimpl, crypto::Hash, symbol_short, token, Address, Bytes, BytesN,
     Env, Symbol, SymbolStr, TryFromVal, Vec,
@@ -832,6 +835,7 @@ impl LedgerLensScoreContract {
                         &sub.asset_pair,
                         sub.score,
                     );
+                    storage::update_histogram_on_write(&env, previous_score, sub.score);
                     Self::refresh_aggregate_cache(&env, &sub.wallet);
                     Self::update_verkle_commitment(&env, &sub.wallet, &sub.asset_pair, &risk_score);
 
@@ -2200,6 +2204,145 @@ impl LedgerLensScoreContract {
         }
     }
 
+    /// Returns the full score histogram (10 buckets of width 10) and total
+    /// tracked (wallet, pair) count.
+    ///
+    /// Bucket 0 = [0-9], bucket 1 = [10-19], ..., bucket 9 = [90-100].
+    /// `total` is the number of unique (wallet, asset_pair) combinations that
+    /// have ever received a score (not decremented on clear — see `clear_score`
+    /// for the full accounting).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreHistogram};
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
+    /// # use soroban_sdk::symbol_short;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// // Empty histogram
+    /// let hist = client.get_score_histogram();
+    /// assert_eq!(hist.total, 0);
+    /// for i in 0..10 { assert_eq!(hist.buckets.get(i).unwrap(), 0); }
+    /// // Submit a score of 42 -> bucket 4
+    /// let wallet = Address::generate(&env);
+    /// let pair = symbol_short!("XLM_USDC");
+    /// client.submit_score(&Vec::new(&env), &wallet, &pair, &42, &false, &false, &1, &90, &1, &None).unwrap();
+    /// let hist = client.get_score_histogram();
+    /// assert_eq!(hist.total, 1);
+    /// assert_eq!(hist.buckets.get(4).unwrap(), 1);
+    /// ```
+    pub fn get_score_histogram(env: Env) -> ScoreHistogram {
+        storage::get_score_histogram(&env)
+    }
+
+    /// Returns the approximate percentile rank (0–100) of the wallet's current
+    /// score for `asset_pair`, relative to all scored wallets.
+    ///
+    /// Computed as `(cumulative_below * 100) / total` where
+    /// `cumulative_below` is the sum of all histogram buckets strictly below
+    /// the wallet's score's bucket. Returns `Error::ScoreNotFound` if no score
+    /// exists for this pair (or its delegate), and `Error::ArithmeticOverflow`
+    /// if the histogram total is 0.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
+    /// # use soroban_sdk::symbol_short;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// let wallet = Address::generate(&env);
+    /// let pair = symbol_short!("XLM_USDC");
+    /// client.submit_score(&Vec::new(&env), &wallet, &pair, &42, &false, &false, &1, &90, &1, &None).unwrap();
+    /// let pct = client.get_score_percentile(&wallet, &pair).unwrap();
+    /// assert_eq!(pct, 0); // Only wallet in histogram -> 0th percentile
+    /// ```
+    pub fn get_score_percentile(
+        env: Env,
+        wallet: Address,
+        asset_pair: Symbol,
+    ) -> Result<u32, Error> {
+        if storage::is_embargoed(&env, &wallet) {
+            return Err(Error::ScoreEmbargoed);
+        }
+        let score = match storage::get_score(&env, &wallet, &asset_pair) {
+            Some(s) => s,
+            None => {
+                if let Some(custodian) = storage::get_score_delegate(&env, &wallet) {
+                    storage::get_score(&env, &custodian, &asset_pair).ok_or(Error::ScoreNotFound)?
+                } else {
+                    return Err(Error::ScoreNotFound);
+                }
+            }
+        };
+        let total = storage::get_histogram_total(&env);
+        if total == 0 {
+            return Err(Error::ScoreNotFound);
+        }
+        let bucket = if score.score >= 100 { 9 } else { score.score / 10 };
+        let mut cumulative: u32 = 0;
+        for i in 0..bucket {
+            cumulative = cumulative.saturating_add(storage::get_histogram_bucket(&env, i));
+        }
+        Ok(cumulative.saturating_mul(100) / total)
+    }
+
+    /// Relative-risk gate: returns `true` (risky) if the wallet's score is in
+    /// the top `top_percentile`% most risky among all scored wallets.
+    ///
+    /// For example, `top_percentile = 10` blocks the top 10% most risky
+    /// wallets. The computation uses the approximate percentile from the on-chain
+    /// histogram: `percentile >= 100 - top_percentile`.
+    ///
+    /// Returns `Error::InvalidParameter` when `top_percentile` is not in `[1, 100]`,
+    /// `Error::ScoreNotFound` when no score exists for the pair.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
+    /// # use soroban_sdk::symbol_short;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// let wallet = Address::generate(&env);
+    /// let pair = symbol_short!("XLM_USDC");
+    /// client.submit_score(&Vec::new(&env), &wallet, &pair, &95, &false, &false, &1, &90, &1, &None).unwrap();
+    /// // Score 95 is in bucket 9 -> percentile >= 90 -> top 10% -> risky
+    /// assert!(client.query_risk_gate_relative(&wallet, &pair, &10).unwrap());
+    /// // Score 95 not in top 1% -> not risky
+    /// assert!(!client.query_risk_gate_relative(&wallet, &pair, &1).unwrap());
+    /// ```
+    pub fn query_risk_gate_relative(
+        env: Env,
+        wallet: Address,
+        asset_pair: Symbol,
+        top_percentile: u32,
+    ) -> Result<bool, Error> {
+        if top_percentile == 0 || top_percentile > 100 {
+            return Err(Error::InvalidThreshold);
+        }
+        let percentile = Self::get_score_percentile(env, wallet, asset_pair)?;
+        Ok(percentile >= 100u32.saturating_sub(top_percentile))
+    }
+
     /// Capability-detection registry for the composability interface.
     ///
     /// Returns `true` if this contract build supports the named `capability`,
@@ -2239,6 +2382,8 @@ impl LedgerLensScoreContract {
             || capability == symbol_short!("var")
             || capability == Symbol::new(&env, "batch_attested")
             || capability == symbol_short!("cgate")
+            || capability == Symbol::new(&env, "histogram")
+            || capability == Symbol::new(&env, "rgate")
     }
 
     // ── Service management ───────────────────────────────────────────────────
@@ -4050,6 +4195,9 @@ impl LedgerLensScoreContract {
             return Err(Error::NotInitialized);
         }
         Self::require_admin_auth(&env, &admin_signers)?;
+        if let Some(risk) = storage::peek_score(&env, &wallet, &asset_pair) {
+            storage::update_histogram_on_clear(&env, risk.score);
+        }
         storage::clear_score_history(&env, &wallet, &asset_pair);
         events::score_history_cleared(&env, &wallet, &asset_pair);
         Ok(())
@@ -4073,6 +4221,9 @@ impl LedgerLensScoreContract {
             return Err(Error::NotInitialized);
         }
         Self::require_admin_auth(&env, &admin_signers)?;
+        if let Some(risk) = storage::peek_score(&env, &wallet, &asset_pair) {
+            storage::update_histogram_on_clear(&env, risk.score);
+        }
         storage::clear_score(&env, &wallet, &asset_pair);
         events::score_cleared(&env, &wallet, &asset_pair);
         Ok(())
@@ -5077,6 +5228,7 @@ impl LedgerLensScoreContract {
         storage::increment_score_count(env, wallet, asset_pair);
         storage::update_model_stats(env, risk_score.model_version, risk_score.score);
         storage::update_historical_max_score(env, wallet, asset_pair, risk_score.score);
+        storage::update_histogram_on_write(env, previous_score, risk_score.score);
         Self::refresh_aggregate_cache(env, wallet);
         // Update the incremental Verkle commitment over the full contract state.
         Self::update_verkle_commitment(env, wallet, asset_pair, risk_score);
