@@ -198,6 +198,17 @@ pub enum Error {
     /// Returned by `open_score_dispute` when the open-dispute index is already
     /// at `MAX_OPEN_DISPUTES`.
     DisputeIndexFull = 59,
+
+    // ── Finality buffer (pending score commit window) ──────────────────────
+    /// `set_finality_buffer` was called with a value above
+    /// `MAX_FINALITY_BUFFER_SECS`.
+    InvalidFinalityBuffer = 60,
+    /// `commit_pending_score`, `cancel_pending_score`, or any function
+    /// expecting a pending entry was called for a `(wallet, asset_pair)`
+    /// with no pending score.
+    NoPendingScore = 61,
+    /// `commit_pending_score` was called before `commit_after` elapsed.
+    FinalityWindowNotElapsed = 62,
 }
 
 // Gate caller tracking error variants for structural protection

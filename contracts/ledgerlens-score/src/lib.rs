@@ -521,7 +521,6 @@ impl LedgerLensScoreContract {
         }
 
         let now = env.ledger().timestamp();
-        let cooldown = storage::get_cooldown_secs(&env);
         let threshold = storage::get_risk_threshold(&env);
         let mut accepted_count: u32 = 0;
         let mut results: Vec<BatchEntryResult> = Vec::new(&env);
@@ -550,6 +549,7 @@ impl LedgerLensScoreContract {
                 rejection_code = Error::ModelVersionDeprecated as u32;
             } else {
                 let last_submit = storage::get_last_submit_time(&env, &sub.wallet, &sub.asset_pair);
+                let cooldown = storage::get_pair_cooldown_secs(&env, &sub.asset_pair);
                 if last_submit != 0 && now < last_submit.saturating_add(cooldown) {
                     rejection_code = Error::RateLimitExceeded as u32;
                 } else if Self::score_floor_blocks(&env, &sub.wallet, &sub.asset_pair, sub.score) {
@@ -871,7 +871,6 @@ impl LedgerLensScoreContract {
         Self::verify_signature(&env, &root_digest, &attestation.signature)?;
 
         let risk_threshold = storage::get_risk_threshold(&env);
-        let cooldown = storage::get_cooldown_secs(&env);
         let now = env.ledger().timestamp();
         let mut accepted_count: u32 = 0;
         let mut results: Vec<BatchEntryResult> = Vec::new(&env);
@@ -921,6 +920,7 @@ impl LedgerLensScoreContract {
                 rejection_code = Error::InvalidTimestamp as u32;
             } else {
                 let last_submit = storage::get_last_submit_time(&env, &sub.wallet, &sub.asset_pair);
+                let cooldown = storage::get_pair_cooldown_secs(&env, &sub.asset_pair);
                 if last_submit != 0 && now < last_submit.saturating_add(cooldown) {
                     rejection_code = Error::RateLimitExceeded as u32;
                 } else {
@@ -3172,6 +3172,49 @@ impl LedgerLensScoreContract {
         storage::get_cooldown_secs(&env)
     }
 
+    /// Sets a per-asset-pair cooldown override. The value must satisfy the
+    /// same bounds as the global cooldown and takes precedence for this pair
+    /// until cleared. Admin only.
+    pub fn set_pair_cooldown(
+        env: Env,
+        admin_signers: Vec<Address>,
+        asset_pair: Symbol,
+        secs: u64,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        if !(constants::MIN_COOLDOWN_SECS..=constants::MAX_COOLDOWN_SECS).contains(&secs) {
+            return Err(Error::InvalidCooldown);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+        storage::set_pair_cooldown_secs(&env, &asset_pair, secs);
+        events::pair_cooldown_updated(&env, &asset_pair, secs);
+        Ok(())
+    }
+
+    /// Returns this pair's cooldown, falling back to the global cooldown when
+    /// no pair-specific override is configured.
+    pub fn get_pair_cooldown(env: Env, asset_pair: Symbol) -> u64 {
+        storage::get_pair_cooldown_secs(&env, &asset_pair)
+    }
+
+    /// Clears a per-asset-pair cooldown override so the pair uses the current
+    /// global cooldown again. Admin only.
+    pub fn clear_pair_cooldown(
+        env: Env,
+        admin_signers: Vec<Address>,
+        asset_pair: Symbol,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+        storage::clear_pair_cooldown_secs(&env, &asset_pair);
+        events::pair_cooldown_updated(&env, &asset_pair, storage::get_cooldown_secs(&env));
+        Ok(())
+    }
+
     /// Emergency re-score path: immediately clears the submission cooldown
     /// for `(wallet, asset_pair)`, allowing the very next `submit_score` /
     /// `submit_scores_batch` call to be accepted regardless of how recently
@@ -3196,6 +3239,30 @@ impl LedgerLensScoreContract {
         storage::clear_last_submit_time(&env, &wallet, &asset_pair);
         events::rate_limit_overridden(&env, &admin, &wallet, &asset_pair);
         Ok(())
+    }
+
+    /// Clears multiple `(wallet, asset_pair)` cooldown entries in one admin
+    /// operation. Emits the same `rl_ovrd` event for each cleared entry and
+    /// returns the number of entries processed.
+    pub fn batch_override_rate_limit(
+        env: Env,
+        admin_signers: Vec<Address>,
+        entries: Vec<(Address, Symbol)>,
+    ) -> Result<u32, Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        if entries.len() > constants::MAX_BATCH_SIZE {
+            return Err(Error::BatchTooLarge);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+        let admin = storage::get_admin(&env);
+        for i in 0..entries.len() {
+            let (wallet, asset_pair) = entries.get(i).unwrap();
+            storage::clear_last_submit_time(&env, &wallet, &asset_pair);
+            events::rate_limit_overridden(&env, &admin, &wallet, &asset_pair);
+        }
+        Ok(entries.len())
     }
 
     /// Read-only lookup of the current velocity cap configuration.
@@ -4200,7 +4267,7 @@ impl LedgerLensScoreContract {
         Self::validate_risk_score(risk_score)?;
 
         let last_submit = storage::get_last_submit_time(env, wallet, asset_pair);
-        let cooldown = storage::get_cooldown_secs(env);
+        let cooldown = storage::get_pair_cooldown_secs(env, asset_pair);
         let now = env.ledger().timestamp();
         if last_submit != 0 && now < last_submit.saturating_add(cooldown) {
             return Err(Error::RateLimitExceeded);

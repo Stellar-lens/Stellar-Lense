@@ -120,6 +120,28 @@ pub struct ScoreAttestation {
 /// A single model's contribution to an ensemble consensus submission.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
+
+/// Pending, time-locked risk score submission.
+///
+/// Written by `submit_score` when the admin has configured
+/// `FinalityBufferSecs > 0`. The score is held in this pending state
+/// (invisible to `get_score` / `query_risk_gate`) until
+/// `commit_pending_score` observes that `env.ledger().timestamp() >=
+/// commit_after`.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PendingScoreEntry {
+    pub score: u32,
+    pub benford_flag: bool,
+    pub ml_flag: bool,
+    pub submitted_at: u64,
+    pub confidence: u32,
+    pub model_version: u32,
+    pub timestamp: u64,
+    pub commit_after: u64,
+    pub submitted_by: Address,
+}
+
 pub struct ModelSubmission {
     pub model_version: u32,
     pub model: Address,
@@ -494,6 +516,10 @@ pub enum DataKey {
     ConsensusCommitment(Address, Address, Symbol),
     /// Configurable window for reveal in seconds.
     RevealWindowSecs,
+    /// Admin-configured finality buffer in seconds.
+    FinalityBufferSecs,
+    /// Pending score entry held before commit. Invisible to get_score/query_risk_gate.
+    PendingScore(Address, Symbol),
 }
 
 #[contracttype]

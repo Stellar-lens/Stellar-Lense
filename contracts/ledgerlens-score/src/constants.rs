@@ -227,3 +227,9 @@ pub const DISPUTE_TTL_THRESHOLD: u32 = 518_400;
 
 /// Target TTL for dispute entries on creation or refresh (~45 days at 5 s/ledger).
 pub const DISPUTE_TTL_EXTEND_TO: u32 = 777_600;
+
+// ── Finality buffer (pending score commit window) ────────────────────────────
+
+/// Maximum configurable finality buffer — 24 hour ceiling, so a misconfigured
+/// admin cannot delay score visibility indefinitely.
+pub const MAX_FINALITY_BUFFER_SECS: u64 = 86_400; // 24 hours
