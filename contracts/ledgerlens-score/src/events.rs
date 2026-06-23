@@ -195,6 +195,27 @@ pub fn consensus_config_updated(env: &Env, k: u32, epsilon: u32) {
     env.events().publish((symbol_short!("cons_cfg"),), (k, epsilon));
 }
 
+// ── Model version governance ─────────────────────────────────────────────
+
+/// Emitted when an admin proposes a model version.
+pub fn model_version_proposed(env: &Env, version: u32, executable_after: u64) {
+    env.events().publish((symbol_short!("mv_prop"),), (version, executable_after));
+}
+
+/// Emitted when an admin activates/approves a model version.
+pub fn model_version_activated(env: &Env, version: u32) {
+    env.events().publish((symbol_short!("mv_act"),), version);
+}
+
+/// Emitted when an admin deprecates a model version.
+pub fn model_version_deprecated(env: &Env, version: u32) {
+    env.events().publish((symbol_short!("mv_depr"),), version);
+}
+
+/// Emitted when the admin updates the consensus configuration.
+
+    // (intentionally empty: kept for backward compatibility of the symbol)
+
 
 // ── History depth ─────────────────────────────────────────────────────────────
 

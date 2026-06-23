@@ -364,6 +364,13 @@ pub const MAX_GATE_CALLERS: u32 = 100;
 #[contracttype]
 #[derive(Clone)]
 pub enum DataKey {
+    /// Model version registry status.
+    /// Encoded as a `u32` discriminant (see `ModelVersionStatus`).
+    ModelVersionStatus(u32),
+    /// When a model version is `Proposed`, this holds `proposed_at + upgrade_delay`.
+    ModelVersionExecutableAfter(u32),
+    /// Optional description committed at proposal time (for auditability).
+    ModelVersionDescription(u32),
     Admin,
     Service,
     /// Latest risk score for a (wallet, asset_pair) pair.
