@@ -1159,6 +1159,28 @@ impl LedgerLensScoreContract {
         storage::get_score_history(&env, &wallet, &asset_pair)
     }
 
+    /// Returns a windowed slice of the score history for `wallet` / `asset_pair`
+    /// without fetching the entire ring buffer.
+    ///
+    /// - `offset` is 0-indexed from the most recent entry (`0` == newest).
+    /// - `limit` caps the number of entries returned (clamped to `MAX_HISTORY_DEPTH`).
+    /// - Entries come back most-recent first.
+    /// - An `offset` at or beyond the current history length returns an empty `Vec`.
+    ///
+    /// This call is read-only and never mutates the ring buffer.
+    pub fn get_score_history_paginated(
+        env: Env,
+        wallet: Address,
+        asset_pair: Symbol,
+        offset: u32,
+        limit: u32,
+    ) -> Vec<RiskScore> {
+        if storage::is_embargoed(&env, &wallet) {
+            return Vec::new(&env);
+        }
+        storage::get_score_history_paginated(&env, &wallet, &asset_pair, offset, limit)
+    }
+
     /// Returns an interpolated score at `timestamp` using stored history.
     /// Minimal linear fallback implementation: exact-node returns stored
     /// value, extrapolation is clamped to boundaries, and in-between points
