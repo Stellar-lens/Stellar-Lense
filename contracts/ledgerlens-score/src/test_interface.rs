@@ -48,8 +48,7 @@ fn test_query_risk_gate_safe_wallet() {
         &1_700_000_000,
         &90,
         &1,
-        &None,
-    );
+        &None`n    );
 
     assert!(client.query_risk_gate(&wallet, &pair, &75));
 }
@@ -71,8 +70,7 @@ fn test_query_risk_gate_risky_wallet() {
         &1_700_000_000,
         &90,
         &1,
-        &None,
-    );
+        &None`n    );
 
     assert!(!client.query_risk_gate(&wallet, &pair, &75));
 }
@@ -94,8 +92,7 @@ fn test_query_risk_gate_at_threshold() {
         &1_700_000_000,
         &90,
         &1,
-        &None,
-    );
+        &None`n    );
 
     assert!(!client.query_risk_gate(&wallet, &pair, &75));
 }
@@ -156,8 +153,7 @@ fn test_query_risk_gate_never_panics() {
             &1_700_000_000,
             &50,
             &1,
-            &None,
-        );
+            &None`n        );
 
         let threshold = next() % 200; // intentionally also exceeds the 0-100 range
         let wallet = if next() % 2 == 0 { &scored } else { &unknown };
@@ -245,3 +241,36 @@ fn test_error_codes_stable() {
     assert_eq!(Error::ConsensusInputEmpty as u32, 31);
     assert_eq!(Error::InvalidConsensusConfig as u32, 32);
 }
+
+// ── Delegation acyclicity vulnerability (Found by TLC) ────────────────────────
+
+#[test]
+fn test_delegation_3_cycle_vulnerability() {
+    let (env, client, _admin, _service) = setup();
+    
+    let w1 = Address::generate(&env);
+    let w2 = Address::generate(&env);
+    let w3 = Address::generate(&env);
+
+    // The contract currently only prevents 1-cycles (w1 -> w1) and 2-cycles (w1 -> w2 -> w1).
+    // A 3-cycle (w1 -> w2 -> w3 -> w1) is not prevented by the acyclicity check in `set_score_delegate`.
+    
+    // 1. w1 -> w2
+    client.set_score_delegate(&w1, &w2);
+    
+    // 2. w2 -> w3
+    client.set_score_delegate(&w2, &w3);
+    
+    // 3. w3 -> w1
+    // The TLC model checker found this exact trace violating DelegationAcyclicity.
+    // We expect this to return an error, but because of the vulnerability it succeeds.
+    // Asserting for the error will cause the test to fail, demonstrating the vulnerability.
+    let result = env.try_invoke_contract::<(), _>(
+        &client.address,
+        &soroban_sdk::Symbol::new(&env, "set_score_delegate"),
+        (w3.clone(), w1.clone()).into_val(&env),
+    );
+
+    assert!(result.is_err(), "Vulnerability: 3-cycle delegation succeeded when it should have failed!");
+}
+
