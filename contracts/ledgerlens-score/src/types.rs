@@ -420,6 +420,10 @@ pub enum DataKey {
     /// Maximum allowed score deviation from the provisional median when
     /// building the consensus set.
     ConsensusEpsilon,
+    /// Ledger timestamp at which `wallet` first entered the high-risk band
+    /// for `asset_pair`. Written on band entry, cleared on band exit.
+    /// Absent when the wallet is not currently in the band.
+    BandEntryTime(Address, Symbol),
 }
 
 #[contracttype]

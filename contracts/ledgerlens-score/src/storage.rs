@@ -886,6 +886,42 @@ pub fn set_risk_band_state(env: &Env, wallet: &Address, asset_pair: &Symbol, in_
     }
 }
 
+// ── Band entry timestamp ──────────────────────────────────────────────────────
+
+/// Returns the ledger timestamp at which `wallet` first entered the high-risk
+/// band for `asset_pair`, or `None` when the wallet is not currently in the
+/// band (never entered, or the entry time has been cleared on exit). Extends
+/// TTL on read so active band memberships keep their entry time alive.
+pub fn get_band_entry_time(env: &Env, wallet: &Address, asset_pair: &Symbol) -> Option<u64> {
+    let key = DataKey::BandEntryTime(wallet.clone(), asset_pair.clone());
+    let result: Option<u64> = env.storage().temporary().get(&key);
+    if result.is_some() {
+        env.storage()
+            .temporary()
+            .extend_ttl(&key, BAND_STATE_TTL_THRESHOLD, BAND_STATE_TTL_EXTEND_TO);
+    }
+    result
+}
+
+/// Records `timestamp` as the ledger time when `wallet` entered the high-risk
+/// band for `asset_pair`. Uses the same TTL constants as `RiskBandState` so
+/// both keys expire together if they go cold.
+pub fn set_band_entry_time(env: &Env, wallet: &Address, asset_pair: &Symbol, timestamp: u64) {
+    let key = DataKey::BandEntryTime(wallet.clone(), asset_pair.clone());
+    env.storage().temporary().set(&key, &timestamp);
+    env.storage()
+        .temporary()
+        .extend_ttl(&key, BAND_STATE_TTL_THRESHOLD, BAND_STATE_TTL_EXTEND_TO);
+}
+
+/// Removes the band entry timestamp for `wallet` / `asset_pair`. Called when
+/// the wallet exits the high-risk band so the key is absent whenever the
+/// wallet is not in the band.
+pub fn clear_band_entry_time(env: &Env, wallet: &Address, asset_pair: &Symbol) {
+    let key = DataKey::BandEntryTime(wallet.clone(), asset_pair.clone());
+    env.storage().temporary().remove(&key);
+}
+
 // ── Consensus configuration ─────────────────────────────────────────────────
 
 pub fn get_consensus_threshold_k(env: &Env) -> u32 {
