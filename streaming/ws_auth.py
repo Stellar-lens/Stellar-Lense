@@ -118,7 +118,9 @@ class JWTAuthenticator:
         permissions = set()
 
         for s in scopes:
-            if s.startswith("scores:read"):
+            if s == "scores:read":
+                permissions.add("scores:read:all")
+            elif s.startswith("scores:read:"):
                 permissions.add(s)
 
         return permissions
