@@ -303,3 +303,26 @@ class RiskScorer:
         """Score every row in a feature matrix."""
         scores = feature_matrix.apply(self.score, axis=1, result_type="expand")
         return pd.concat([feature_matrix[["wallet"]], scores], axis=1)
+
+
+def _score_one(wallet: str) -> dict:
+    """Fetch a wallet's on-chain account data and return a risk score dict.
+
+    Raises on network/HTTP errors so batch_scorer can capture per-wallet
+    failures without crashing the batch.
+    """
+    import requests
+
+    resp = requests.get(
+        f"https://horizon.stellar.org/accounts/{wallet}", timeout=10
+    )
+    resp.raise_for_status()
+    data = resp.json()
+
+    balances = data.get("balances", [])
+    native = next((b for b in balances if b.get("asset_type") == "native"), {})
+    xlm_balance = float(native.get("balance", 0))
+
+    # Placeholder — replace with RiskScorer.score() once feature pipeline wired in
+    score = min(xlm_balance / 10_000, 1.0)
+    return {"wallet": wallet, "score": round(score, 4), "xlm_balance": xlm_balance}

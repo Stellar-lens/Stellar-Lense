@@ -73,6 +73,7 @@ class Config:
     DB_POOL_TIMEOUT: int = int(os.getenv("DB_POOL_TIMEOUT", "30"))
 
     MODEL_DIR: str = os.getenv("MODEL_DIR", "./models")
+    BATCH_SCORER_WORKERS: int = int(os.getenv("BATCH_SCORER_WORKERS", 10))
 
     # ledgerlens-score Soroban contract
     SOROBAN_RPC_URL: str = os.getenv("SOROBAN_RPC_URL", "https://soroban-testnet.stellar.org")
