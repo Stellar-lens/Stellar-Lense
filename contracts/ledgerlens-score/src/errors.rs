@@ -117,4 +117,10 @@ pub enum Error {
     NoPendingScore = 61,
     /// `commit_pending_score` was called before `commit_after` elapsed.
     FinalityWindowNotElapsed = 62,
+
+    // ── Score embargo ────────────────────────────────────────────────────────
+    /// Returned by `set_score_embargo` when the wallet is not already
+    /// embargoed and the `EmbargoedWalletIndex` is already at
+    /// `MAX_EMBARGOED_WALLETS`.
+    EmbargoedWalletIndexFull = 63,
 }

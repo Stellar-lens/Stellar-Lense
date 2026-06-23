@@ -956,6 +956,49 @@ pub fn peek_is_embargoed(env: &Env, wallet: &Address) -> bool {
     }
 }
 
+pub fn get_embargoed_wallets(env: &Env) -> Vec<Address> {
+    let wallets: Vec<Address> =
+        env.storage().temporary().get(&DataKey::EmbargoedWalletIndex).unwrap_or_else(|| Vec::new(env));
+    if !wallets.is_empty() {
+        env.storage().temporary().extend_ttl(
+            &DataKey::EmbargoedWalletIndex,
+            EMBARGO_TTL_THRESHOLD,
+            EMBARGO_TTL_EXTEND_TO,
+        );
+    }
+    wallets
+}
+
+pub fn add_to_embargoed_index(env: &Env, wallet: &Address) -> bool {
+    let mut wallets = get_embargoed_wallets(env);
+    if wallets.contains(wallet) {
+        return true;
+    }
+    if wallets.len() >= crate::constants::MAX_EMBARGOED_WALLETS {
+        return false;
+    }
+    wallets.push_back(wallet.clone());
+    env.storage().temporary().set(&DataKey::EmbargoedWalletIndex, &wallets);
+    env.storage().temporary().extend_ttl(
+        &DataKey::EmbargoedWalletIndex,
+        EMBARGO_TTL_THRESHOLD,
+        EMBARGO_TTL_EXTEND_TO,
+    );
+    true
+}
+
+pub fn remove_from_embargoed_index(env: &Env, wallet: &Address) {
+    let mut wallets = get_embargoed_wallets(env);
+    if let Some(idx) = wallets.first_index_of(wallet) {
+        wallets.remove(idx);
+        env.storage().temporary().set(&DataKey::EmbargoedWalletIndex, &wallets);
+    }
+}
+
+pub fn clear_embargoed_index(env: &Env) {
+    env.storage().temporary().remove(&DataKey::EmbargoedWalletIndex);
+}
+
 /// Sets the risk band state for `(wallet, asset_pair)`. Passing `true`
 /// records that the wallet has entered the high-risk band; passing `false`
 /// removes the entry (equivalent to `false`, the default) so storage is not
