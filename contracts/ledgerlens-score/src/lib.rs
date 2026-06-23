@@ -1159,6 +1159,31 @@ impl LedgerLensScoreContract {
         storage::get_score_history(&env, &wallet, &asset_pair)
     }
 
+    /// Returns the population variance of scores in the history ring buffer,
+    /// scaled by 100 (two decimal places preserved as fixed-point).
+    /// Returns 0 when fewer than 2 entries exist.
+    pub fn get_score_variance(env: Env, wallet: Address, asset_pair: Symbol) -> u32 {
+        if storage::is_embargoed(&env, &wallet) {
+            return 0;
+        }
+        let history = storage::get_score_history(&env, &wallet, &asset_pair);
+        let n = history.len();
+        if n < 2 {
+            return 0;
+        }
+        let mut sum: u64 = 0;
+        for i in 0..n {
+            sum += history.get_unchecked(i).score as u64;
+        }
+        let mean = sum / n as u64;
+        let mut variance_sum: u64 = 0;
+        for i in 0..n {
+            let diff = (history.get_unchecked(i).score as u64).abs_diff(mean);
+            variance_sum += diff * diff;
+        }
+        (variance_sum / n as u64 * 100) as u32
+    }
+
     /// Returns an interpolated score at `timestamp` using stored history.
     /// Minimal linear fallback implementation: exact-node returns stored
     /// value, extrapolation is clamped to boundaries, and in-between points
@@ -1679,6 +1704,7 @@ impl LedgerLensScoreContract {
             || capability == symbol_short!("gate")
             || capability == symbol_short!("aggr")
             || capability == symbol_short!("count")
+            || capability == symbol_short!("var")
             || capability == Symbol::new(&env, "batch_attested")
     }
 
