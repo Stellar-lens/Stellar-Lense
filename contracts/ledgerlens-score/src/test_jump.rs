@@ -46,8 +46,7 @@ fn submit(
         &env.ledger().timestamp(),
         &90,
         &1,
-        &None,
-    );
+        &None`n    );
 }
 
 /// Returns the last `jmp_ano` event data for `(wallet, pair)`, or `None` if
@@ -289,14 +288,14 @@ fn test_custom_threshold_emits_event() {
 fn test_set_jump_threshold_zero_rejected() {
     let (env, client) = setup();
     let result = client.try_set_jump_threshold(&Vec::new(&env), &0);
-    assert_eq!(result, Err(Ok(Error::InvalidJumpThreshold)));
+    assert_eq!(result, Err(Ok(Error::InvalidThreshold)));
 }
 
 #[test]
 fn test_set_jump_threshold_over_99_rejected() {
     let (env, client) = setup();
     let result = client.try_set_jump_threshold(&Vec::new(&env), &100);
-    assert_eq!(result, Err(Ok(Error::InvalidJumpThreshold)));
+    assert_eq!(result, Err(Ok(Error::InvalidThreshold)));
 }
 
 #[test]

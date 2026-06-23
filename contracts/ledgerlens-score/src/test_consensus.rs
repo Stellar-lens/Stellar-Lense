@@ -8,7 +8,8 @@ use soroban_sdk::{
 };
 
 use crate::{
-    Error, LedgerLensScoreContract, LedgerLensScoreContractClient, ModelSubmission, ScoreAttestation,
+    Error, LedgerLensScoreContract, LedgerLensScoreContractClient, ModelSubmission,
+    ScoreAttestation,
 };
 
 const START_TS: u64 = 1_700_000_000;
@@ -72,7 +73,7 @@ fn commitment(
 }
 
 fn attest(env: &Env, key: &SigningKey, digest: [u8; 32]) -> ScoreAttestation {
-    let (sig, recid) = key.sign_prehash_recoverable(&digest).unwrap();
+    let Ok((sig, recid)) = key.sign_prehash_recoverable(&digest) else { panic!("sign failed") };
     let mut sig_bytes = [0u8; 65];
     sig_bytes[..64].copy_from_slice(&sig.to_bytes());
     sig_bytes[64] = recid.to_byte();
@@ -170,7 +171,7 @@ fn try_do_consensus(
 fn test_consensus_accepts_converging_models() {
     let (env, client) = setup();
     let key = signing_key(7);
-    client.set_service_pubkey(&pubkey_bytes(&env, &key));
+    client.set_service_pubkey(&Vec::new(&env), &pubkey_bytes(&env, &key));
 
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
@@ -196,7 +197,7 @@ fn test_consensus_accepts_converging_models() {
 fn test_consensus_rejects_diverging_models() {
     let (env, client) = setup();
     let key = signing_key(7);
-    client.set_service_pubkey(&pubkey_bytes(&env, &key));
+    client.set_service_pubkey(&Vec::new(&env), &pubkey_bytes(&env, &key));
     client.set_consensus_config(&3, &5);
 
     let wallet = Address::generate(&env);
@@ -221,7 +222,7 @@ fn test_consensus_rejects_diverging_models() {
 fn test_consensus_tampered_attestation_excluded() {
     let (env, client) = setup();
     let key = signing_key(7);
-    client.set_service_pubkey(&pubkey_bytes(&env, &key));
+    client.set_service_pubkey(&Vec::new(&env), &pubkey_bytes(&env, &key));
     client.set_consensus_config(&2, &5);
 
     let wallet = Address::generate(&env);
@@ -251,7 +252,7 @@ fn test_consensus_tampered_attestation_excluded() {
 fn test_consensus_median_stored_correctly() {
     let (env, client) = setup();
     let key = signing_key(7);
-    client.set_service_pubkey(&pubkey_bytes(&env, &key));
+    client.set_service_pubkey(&Vec::new(&env), &pubkey_bytes(&env, &key));
     client.set_consensus_config(&2, &1);
 
     let wallet = Address::generate(&env);
@@ -292,7 +293,7 @@ fn test_consensus_config_bounds_enforced() {
 fn test_consensus_snapshot() {
     let (env, client) = setup();
     let key = signing_key(7);
-    client.set_service_pubkey(&pubkey_bytes(&env, &key));
+    client.set_service_pubkey(&Vec::new(&env), &pubkey_bytes(&env, &key));
 
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
