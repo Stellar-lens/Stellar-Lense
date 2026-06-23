@@ -21,6 +21,7 @@ Also provides:
 
 from collections.abc import Iterable, Mapping, Sequence
 from itertools import combinations
+import re
 from typing import Literal
 
 import networkx as nx
@@ -40,17 +41,12 @@ def _validate_account_id(account_id: str) -> bool:
 
 def build_funding_graph(
     activities: Iterable[AccountActivity],
-    validate_account_ids: bool = False,
-) -> nx.DiGraph:
-    """Build a directed graph with edges ``funding_account -> account_id``.
-
-def build_funding_graph(
-    activities: Iterable[AccountActivity],
     trades: pd.DataFrame | None = None,
     *,
     co_trade_window: str | pd.Timedelta = "5min",
     output_format: Literal["networkx", "pyg"] = "networkx",
     node_features: pd.DataFrame | Mapping[str, Sequence[float]] | None = None,
+    validate_account_ids: bool = False,
 ):
     """Build the wallet graph, preserving the historical NetworkX default.
 
