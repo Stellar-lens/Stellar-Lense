@@ -49,8 +49,7 @@ fn submit(
         &env.ledger().timestamp(),
         &90,
         &1,
-        &None,
-    );
+        &None`n    );
 }
 
 /// `try_submit_score` variant returning the raw result for assertions.
