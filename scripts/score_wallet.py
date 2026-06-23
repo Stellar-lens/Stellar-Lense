@@ -13,6 +13,7 @@ SHAP feature attributions, and prints the result to stdout.
 
 import argparse
 import json
+import re
 import sys
 from datetime import UTC, datetime
 
@@ -32,12 +33,12 @@ from ingestion.orderbook_loader import (
 )
 
 
-def validate_wallet_id(wallet_id: str) -> None:
-    """Validate that wallet_id looks like a Stellar public key (56 chars, starts with G)."""
-    if len(wallet_id) != 56 or not wallet_id.startswith("G"):
-        print(f"Error: Invalid wallet ID format '{wallet_id}'.")
-        print("Must be a 56-character Stellar public key starting with 'G'.")
-        sys.exit(1)
+STELLAR_ADDRESS_RE = re.compile(r'^G[A-Z2-7]{55}$')
+
+
+def validate_wallet_address(addr: str) -> None:
+    if not STELLAR_ADDRESS_RE.match(addr):
+        raise ValueError(f'Invalid Stellar address: {addr!r}. Must match G[A-Z2-7]{55}')
 
 
 def parse_asset_pair(pair_str: str) -> tuple[SdkAsset, SdkAsset]:
@@ -122,7 +123,7 @@ def _parse_remove_trade_ids(
 def main() -> None:
     args = parse_args()
 
-    validate_wallet_id(args.wallet)
+    validate_wallet_address(args.wallet)
     base_asset, counter_asset = parse_asset_pair(args.pair)
 
     # 1. Load models
