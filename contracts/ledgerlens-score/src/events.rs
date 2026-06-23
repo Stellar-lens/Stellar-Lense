@@ -138,12 +138,6 @@ pub fn batch_attested(env: &Env, accepted: u32, rejected: u32, merkle_root: &Byt
     env.events().publish((symbol_short!("bat_ok"), merkle_root.clone()), (accepted, rejected));
 }
 
-pub fn score_jump_anomaly(_env: &Env, _wallet: &Address, _asset_pair: &Symbol, _old_score: u32, _new_score: u32, _delta: i64, _model_version: u32, _timestamp: u64) {}
-pub fn escalation_triggered(_env: &Env, _wallet: &Address, _asset_pair: &Symbol, _count: u32, _score: u32, _escalation_n: u32) {}
-pub fn escalation_resolved(_env: &Env, _wallet: &Address, _asset_pair: &Symbol, _count: u32, _score: u32) {}
-pub fn escalation_threshold_updated(_env: &Env, _old: u32, _new: u32) {}
-
-
 // ── Multi-model consensus scoring ─────────────────────────────────────────────
 
 /// Emitted when a consensus score is accepted and stored.
@@ -184,8 +178,7 @@ pub fn model_version_deprecated(env: &Env, version: u32) {
 
 /// Emitted when the admin updates the consensus configuration.
 
-    // (intentionally empty: kept for backward compatibility of the symbol)
-
+// (intentionally empty: kept for backward compatibility of the symbol)
 
 // ── History depth ─────────────────────────────────────────────────────────────
 
@@ -414,10 +407,8 @@ pub fn dispute_timed_out(
     bond: i128,
     bonus: i128,
 ) {
-    env.events().publish(
-        (symbol_short!("disp_to"), challenger.clone()),
-        (asset_pair.clone(), bond, bonus),
-    );
+    env.events()
+        .publish((symbol_short!("disp_to"), challenger.clone()), (asset_pair.clone(), bond, bonus));
 }
 
 // ── Finality buffer (pending score commit window) ────────────────────────────
@@ -490,4 +481,20 @@ pub fn service_resumed(env: &Env, event: &ServiceResumedEvent) {
 /// `set_heartbeat_alert_threshold`.
 pub fn heartbeat_threshold_updated(env: &Env, secs: u64) {
     env.events().publish((symbol_short!("hb_upd"),), secs);
+}
+
+pub fn pair_cooldown_updated(env: &Env, asset_pair: &Symbol, secs: u64) {
+    env.events().publish((symbol_short!("pc_upd"), asset_pair.clone()), secs);
+}
+
+pub fn signer_ttl_updated(env: &Env, ttl_secs: u64) {
+    env.events().publish((symbol_short!("sg_ttl"),), ttl_secs);
+}
+
+pub fn signer_grace_period_updated(env: &Env, grace_secs: u64) {
+    env.events().publish((symbol_short!("sg_grc"),), grace_secs);
+}
+
+pub fn model_version_registered(env: &Env, version: u32) {
+    env.events().publish((symbol_short!("mv_reg"),), version);
 }

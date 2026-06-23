@@ -34,9 +34,6 @@ pub const DEFAULT_JUMP_THRESHOLD: u32 = 30;
 ///   `docs/batch-attestation-spec.md`).
 pub const CONTRACT_VERSION: u32 = 3;
 
-pub const MIN_ESCALATION_THRESHOLD: u32 = 0;
-pub const MAX_ESCALATION_THRESHOLD: u32 = 100;
-
 /// Hard upper bound on Merkle proof length accepted by
 /// `submit_scores_batch_attested`. Thirty levels of a binary tree can
 /// accommodate up to 2^30 ≈ 1.07 billion leaves — well above the
@@ -73,9 +70,6 @@ pub const MAX_ESCALATION_THRESHOLD: u32 = 100;
 /// Prevents unbounded storage growth and gas exhaustion.
 pub const MAX_COUNTERPARTY_LINKS_PER_WALLET: u32 = 50;
 
-pub const DEFAULT_JUMP_THRESHOLD: u32 = 10;
-pub const MIN_ESCALATION_THRESHOLD: u32 = 1;
-pub const MAX_ESCALATION_THRESHOLD: u32 = 100;
 // ── Score submission floor ─────────────────────────────────────────────────────
 //
 // A compromised or colluding signer could otherwise submit an artificially low
@@ -99,22 +93,16 @@ pub const EMBARGO_TTL_EXTEND_TO: u32 = 3_110_400;
 pub const DEFAULT_CONSENSUS_THRESHOLD_K: u32 = 2;
 pub const DEFAULT_CONSENSUS_EPSILON: u32 = 5;
 
-// ── Score jump anomaly detection ─────────────────────────────────────────────
-
-pub const DEFAULT_JUMP_THRESHOLD: u32 = 30;
-
 // ── Escalation / consecutive breach ──────────────────────────────────────────
 
 pub const ESCALATION_BREACH_TTL_THRESHOLD: u32 = 518_400;
 pub const ESCALATION_BREACH_TTL_EXTEND_TO: u32 = 777_600;
 pub const DEFAULT_ESCALATION_THRESHOLD: u32 = 5;
-pub const MIN_ESCALATION_THRESHOLD: u32 = 1;
-pub const MAX_ESCALATION_THRESHOLD: u32 = 100;
 
-// ── Model stats ─────────────────────────────────────────────────────────────
+// ── Model version registry ────────────────────────────────────────────────────
 
-/// Default maximum allowed absolute deviation from the provisional median.
-pub const DEFAULT_CONSENSUS_EPSILON: u32 = 5;
+/// Hard upper bound on the number of model versions that can be registered.
+pub const MAX_MODEL_VERSIONS: u32 = 20;
 
 // ── Score dispute mechanism ─────────────────────────────────────────────────────
 //
@@ -162,3 +150,9 @@ pub const MAX_FINALITY_BUFFER_SECS: u64 = 86_400; // 24 hours
 /// Default heartbeat alert threshold (seconds) until the admin configures
 /// one explicitly via `set_heartbeat_alert_threshold` — 1 hour.
 pub const DEFAULT_HEARTBEAT_ALERT_THRESHOLD_SECS: u64 = 3_600; // 1 hour
+
+// ── Quorum / consensus ────────────────────────────────────────────────────────
+
+/// Default window (seconds) for which a quorum-failure is considered recent.
+/// After this window the failure state is cleared automatically.
+pub const DEFAULT_QUORUM_FAILURE_WINDOW_SECS: u64 = 86_400; // 24 hours

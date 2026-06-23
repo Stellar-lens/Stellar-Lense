@@ -1,4 +1,4 @@
-#![cfg(test)]
+﻿#![cfg(test)]
 //! Tests for the per-wallet score embargo (regulatory hold).
 
 use soroban_sdk::{
@@ -32,20 +32,18 @@ fn submit(
     pair: &soroban_sdk::Symbol,
     score: u32,
 ) {
-    client
-        .submit_score(
-            &Vec::new(env),
-            wallet,
-            pair,
-            &score,
-            &false,
-            &false,
-            &(env.ledger().timestamp().max(1)),
-            &80,
-            &1,
-            &None,
-        )
-        ;
+    client.submit_score(
+        &Vec::new(env),
+        wallet,
+        pair,
+        &score,
+        &false,
+        &false,
+        &(env.ledger().timestamp().max(1)),
+        &80,
+        &1,
+        &None,
+    );
     env.ledger().with_mut(|l| l.timestamp += 3_601);
 }
 
@@ -281,20 +279,18 @@ fn test_submit_score_unaffected_by_embargo() {
     let pair = symbol_short!("XLM_USDC");
     client.set_score_embargo(&wallet, &None);
     // Ingestion must still succeed even while embargoed.
-    client
-        .submit_score(
-            &Vec::new(&env),
-            &wallet,
-            &pair,
-            &55,
-            &false,
-            &false,
-            &(env.ledger().timestamp().max(1)),
-            &80,
-            &1,
-            &None,
-        )
-        ;
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &55,
+        &false,
+        &false,
+        &(env.ledger().timestamp().max(1)),
+        &80,
+        &1,
+        &None,
+    );
 }
 
 #[test]

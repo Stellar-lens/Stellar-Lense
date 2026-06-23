@@ -1,4 +1,4 @@
-#![cfg(test)]
+﻿#![cfg(test)]
 
 //! Comprehensive tests for the admin fee withdrawal feature:
 //! `set_fee_token`, `get_fee_token`, and `withdraw_fees`.

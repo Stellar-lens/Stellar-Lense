@@ -1,4 +1,4 @@
-//! Tests for structured score delta events and get_score_trend (issue #51).
+﻿//! Tests for structured score delta events and get_score_trend (issue #51).
 
 use soroban_sdk::{
     symbol_short,
@@ -42,7 +42,8 @@ fn submit(
         &env.ledger().timestamp(),
         &90,
         &1,
-        &None`n    );
+        &None,
+    );
 }
 
 /// Returns the last `score_delta` event data tuple for `(wallet, pair)`.
