@@ -84,6 +84,8 @@ pub enum Error {
     ConsensusInputEmpty = 50,
     /// `set_consensus_config` was called with `k == 0` or `epsilon > 100`.
     InvalidConsensusConfig = 51,
+    /// `request_quorum_reduction` called before the failure window has elapsed.
+    QuorumFailureWindowNotElapsed = 52,
     /// `reveal_consensus` was called after the commitment's TTL expired.
     RevealWindowExpired = 52,
     /// `reveal_consensus` was called but the score and nonce do not match the commitment.

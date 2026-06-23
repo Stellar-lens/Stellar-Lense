@@ -1102,15 +1102,23 @@ pub fn remove_from_dispute_index(env: &Env, wallet: &Address, asset_pair: &Symbo
 
 // ── MEV-Resistant Commit-Reveal ──────────────────────────────────────────────
 
-pub fn get_reveal_window_secs(env: &Env) -> u64 {
-    env.storage()
-        .instance()
-        .get(&DataKey::RevealWindowSecs)
-        .unwrap_or(3600) // Default 1 hour
+pub fn get_last_global_submission_time(env: &Env) -> u64 {
+    env.storage().instance().get(&DataKey::LastGlobalSubmissionTime).unwrap_or(0)
 }
 
-pub fn set_reveal_window_secs(env: &Env, secs: u64) {
-    env.storage().instance().set(&DataKey::RevealWindowSecs, &secs);
+pub fn set_last_global_submission_time(env: &Env, timestamp: u64) {
+    env.storage().instance().set(&DataKey::LastGlobalSubmissionTime, &timestamp);
+}
+
+pub fn get_quorum_failure_window(env: &Env) -> u64 {
+    env.storage()
+        .instance()
+        .get(&DataKey::QuorumFailureWindow)
+        .unwrap_or(DEFAULT_QUORUM_FAILURE_WINDOW_SECS)
+}
+
+pub fn set_quorum_failure_window(env: &Env, window_secs: u64) {
+    env.storage().instance().set(&DataKey::QuorumFailureWindow, &window_secs);
 }
 
 pub fn set_consensus_commitment(
@@ -1137,14 +1145,16 @@ pub fn get_consensus_commitment(
     env.storage().temporary().get(&key)
 }
 
-pub fn remove_consensus_commitment(
-    env: &Env,
-    model: &Address,
-    wallet: &Address,
-    asset_pair: &Symbol,
-) {
-    let key = DataKey::ConsensusCommitment(model.clone(), wallet.clone(), asset_pair.clone());
-    env.storage().temporary().remove(&key);
+pub fn set_original_service_threshold(env: &Env, threshold: u32) {
+    env.storage().instance().set(&DataKey::OriginalServiceThreshold, &threshold);
+}
+
+pub fn clear_original_service_threshold(env: &Env) {
+    env.storage().instance().remove(&DataKey::OriginalServiceThreshold);
+}
+
+pub fn get_service_threshold(env: &Env) -> u32 {
+    env.storage().instance().get(&DataKey::ServiceThreshold).unwrap_or(0)
 }
 
 // ── Finality buffer (pending score commit window) ────────────────────────────

@@ -650,6 +650,7 @@ impl LedgerLensScoreContract {
             model_version: 0,
         };
 
+        storage::set_last_global_submission_time(&env, env.ledger().timestamp());
         Self::write_score_with_rate_limit(&env, &wallet, &asset_pair, &risk_score)?;
         events::consensus_score_submitted(
             &env,
@@ -1218,6 +1219,7 @@ impl LedgerLensScoreContract {
             results.push_back(BatchEntryResult { index: i, accepted, rejection_code });
         }
 
+        storage::set_last_global_submission_time(&env, now);
         let rejected_count = submissions.len() - accepted_count;
         events::batch_attested(&env, accepted_count, rejected_count, &attestation.merkle_root);
         Ok(BatchResult { accepted_count, rejected_count, results })
@@ -5062,6 +5064,7 @@ impl LedgerLensScoreContract {
         }
 
         storage::set_score(env, wallet, asset_pair, risk_score);
+        storage::set_last_global_submission_time(env, now);
         storage::push_score_history(env, wallet, asset_pair, risk_score);
         storage::register_pair_for_wallet(env, wallet, asset_pair);
         storage::increment_score_count(env, wallet, asset_pair);
