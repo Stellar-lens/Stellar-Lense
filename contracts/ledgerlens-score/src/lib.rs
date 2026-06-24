@@ -3723,6 +3723,11 @@ impl LedgerLensScoreContract {
         }
         let admin = storage::get_admin(&env);
         admin.require_auth();
+        if !storage::peek_is_embargoed(&env, &wallet)
+            && !storage::add_to_embargoed_index(&env, &wallet)
+        {
+            return Err(Error::EmbargoedWalletIndexFull);
+        }
         let embargo_expiry = match expiry {
             None => EmbargoExpiry::Indefinite,
             Some(ts) => EmbargoExpiry::Until(ts),
@@ -3742,6 +3747,7 @@ impl LedgerLensScoreContract {
         let admin = storage::get_admin(&env);
         admin.require_auth();
         storage::remove_embargo(&env, &wallet);
+        storage::remove_from_embargoed_index(&env, &wallet);
         events::embargo_lifted(&env, &wallet);
         Ok(())
     }
@@ -3753,6 +3759,44 @@ impl LedgerLensScoreContract {
     /// is exceeded — no admin action required for expiry.
     pub fn is_embargoed(env: Env, wallet: Address) -> bool {
         storage::is_embargoed(&env, &wallet)
+    }
+
+    /// Lifts every wallet currently tracked in the `EmbargoedWalletIndex` in a
+    /// single transaction and clears the index, instead of requiring one
+    /// `lift_score_embargo` call per wallet. Useful when a regulatory hold is
+    /// lifted globally (e.g. after a court ruling) and hundreds of wallets
+    /// need to be released at once.
+    ///
+    /// The index tracks every wallet ever placed under embargo that has not
+    /// since been explicitly lifted — including a timed embargo whose expiry
+    /// has already passed — so this call also clears out any such
+    /// already-expired entries.
+    ///
+    /// Emits one `emb_lift` event per wallet that was lifted. No-op if the
+    /// index is empty. Admin only.
+    pub fn revoke_all_embargoes(env: Env, admin_signers: Vec<Address>) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+
+        let wallets = storage::get_embargoed_wallets(&env);
+        for i in 0..wallets.len() {
+            let wallet = wallets.get(i).unwrap();
+            storage::remove_embargo(&env, &wallet);
+            events::embargo_lifted(&env, &wallet);
+        }
+        storage::clear_embargoed_index(&env);
+        Ok(())
+    }
+
+    /// Returns the number of wallets currently tracked in the
+    /// `EmbargoedWalletIndex`, i.e. the number of wallets a subsequent
+    /// [`revoke_all_embargoes`](Self::revoke_all_embargoes) call would lift.
+    /// Includes wallets whose timed embargo has already expired but were
+    /// never explicitly lifted (see [`revoke_all_embargoes`](Self::revoke_all_embargoes)).
+    pub fn get_embargoed_wallet_count(env: Env) -> u32 {
+        storage::get_embargoed_wallets(&env).len()
     }
 
     // ── Score dispute mechanism ───────────────────────────────────────────────
