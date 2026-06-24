@@ -9,7 +9,7 @@ license = "MIT"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
-doctest = false
+doctest = true
 
 [dependencies]
 soroban-sdk = "21.0.0"
