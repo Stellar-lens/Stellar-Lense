@@ -17,7 +17,7 @@ def trained_models(tmp_path_factory):
     output = train_models(df, test_size=0.3, random_state=2)
     model_dir = str(tmp_path_factory.mktemp("models"))
     save_models(output["results"], model_dir)
-    return output["results"], model_dir, df
+    return output, model_dir, df
 
 
 # ---------------------------------------------------------------------------

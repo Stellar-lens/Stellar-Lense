@@ -46,7 +46,7 @@ MODEL_REGISTRY = {
     "lightgbm": LGBMClassifier,
 }
 
-FEATURE_COLUMNS_EXCLUDE = {"wallet", "label"}
+FEATURE_COLUMNS_EXCLUDE = {"wallet", "label", "profile"}
 PSI_N_BINS = 10
 PSI_EPSILON = 1e-4
 
@@ -271,7 +271,8 @@ def train_models(
 def save_models(results: dict, model_dir: str | None = None) -> None:
     model_dir = model_dir or config.MODEL_DIR
     os.makedirs(model_dir, exist_ok=True)
-    for name, result in results.items():
+    to_save = results.get("results", results) if isinstance(results, dict) else results
+    for name, result in to_save.items():
         joblib.dump(result["model"], os.path.join(model_dir, f"{name}.joblib"))
 
 
@@ -280,12 +281,7 @@ def save_training_artifacts(
     data_path: str,
     model_dir: str | None = None,
 ) -> None:
-    """Write metrics.json and model_metadata.json to the model directory.
-
-    NOTE: data_path is stored as-is from the CLI. If this path contains
-    sensitive information (e.g. S3 credentials), it will be persisted
-    in the metadata file.
-    """
+    """Write metrics.json and model_metadata.json to the model directory."""
     model_dir = model_dir or config.MODEL_DIR
     os.makedirs(model_dir, exist_ok=True)
 
@@ -364,14 +360,14 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
-        "--calibrate-ensemble",
+        "--with-gnn",
         action="store_true",
         default=False,
         help=(
-            "After training, run NSGA-II Pareto front search over ensemble "
-            "combination weights (precision/recall/SHAP-stability) and write "
-            "models/pareto_front.json. Offline step, disabled by default since "
-            "it is significantly more expensive than training itself."
+            "Pre-train a GraphSAGE encoder on the full training graph using "
+            "contrastive link-prediction loss, then append GNN embedding features "
+            "(gnn_0 … gnn_{GNN_EMBEDDING_DIM-1}) to each wallet's feature row. "
+            "Requires torch and torch_geometric to be installed."
         ),
     )
     return parser.parse_args()
@@ -409,6 +405,76 @@ def main() -> None:
             alert_path,
         )
         return
+
+    # --with-gnn: pre-train GNN encoder and append embedding features
+    if args.with_gnn:
+        try:
+            import networkx as nx
+
+            from detection.gnn_encoder import GNNEncoder, pretrain_gnn_contrastive
+
+            logger.info("Building wallet graph for GNN pre-training…")
+            # Build a simple co-occurrence graph from wallet column for pre-training
+            encoder = GNNEncoder(model_dir=model_dir, random_state=args.random_state)
+
+            # Build a minimal funding graph from the training data
+            # (wallets with label=1 form synthetic wash rings for contrastive training)
+            graph = nx.DiGraph()
+            wallets = df["wallet"].tolist() if "wallet" in df.columns else []
+            for w in wallets:
+                graph.add_node(w)
+
+            wash_wallets = (
+                df.loc[df["label"] == 1, "wallet"].tolist()
+                if "wallet" in df.columns and "label" in df.columns
+                else []
+            )
+            # Group labelled wash-trade wallets into a single synthetic ring
+            wash_rings = [wash_wallets] if wash_wallets else []
+
+            logger.info(
+                "GNN pre-training: %d nodes, %d wash-trade wallets in %d ring(s)",
+                graph.number_of_nodes(),
+                len(wash_wallets),
+                len(wash_rings),
+            )
+
+            loss_curve = pretrain_gnn_contrastive(
+                encoder=encoder,
+                graph=graph,
+                wash_ring_wallets=wash_rings,
+                random_state=args.random_state,
+            )
+
+            # Persist pre-trained encoder
+            os.makedirs(model_dir, exist_ok=True)
+            encoder.save()
+            logger.info("GNN encoder saved to %s", model_dir)
+
+            # Log loss curve
+            ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%S")
+            os.makedirs("reports", exist_ok=True)
+            loss_report_path = f"reports/gnn_pretrain_{ts}.json"
+            with open(loss_report_path, "w") as f:
+                json.dump({"loss_curve": loss_curve}, f, indent=2)
+            logger.info("GNN pre-training loss curve written to %s", loss_report_path)
+
+            # Append GNN embedding features to the training DataFrame
+            logger.info("Appending GNN embedding features to training data…")
+            gnn_features: list[dict] = []
+            for wallet in wallets:
+                try:
+                    emb = encoder.encode(graph, wallet)
+                    gnn_features.append({f"gnn_{i}": float(emb[i]) for i in range(len(emb))})
+                except Exception:
+                    gnn_features.append({f"gnn_{i}": 0.0 for i in range(config.GNN_EMBEDDING_DIM)})
+            gnn_df = pd.DataFrame(gnn_features, index=df.index)
+            df = pd.concat([df, gnn_df], axis=1)
+            logger.info("GNN embedding columns added: gnn_0 … gnn_%d", config.GNN_EMBEDDING_DIM - 1)
+
+        except ImportError as exc:
+            logger.error("--with-gnn requested but torch/torch_geometric not available: %s", exc)
+            logger.error("Install torch and torch_geometric to enable GNN training.")
 
     training_output = train_models(
         df,

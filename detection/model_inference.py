@@ -25,9 +25,11 @@ import os
 import statistics
 
 import joblib
+import numpy as np
 import pandas as pd
 
 from config import config
+from detection.list_override import ListOverride
 from detection.model_training import (
     FEATURE_COLUMNS_EXCLUDE,
     MODEL_REGISTRY,
@@ -119,9 +121,64 @@ class RiskScorer:
 
     def __init__(self, model_dir: str | None = None, weights: dict[str, float] | None = None):
         self.model_dir = model_dir or config.MODEL_DIR
-        self.weights = self._validate_weights(weights)
+        self.list_override = ListOverride()
         self.metadata = self._load_metadata()
         self.models = self._load_models()
+        from detection.meta_learner import LeafEmbeddingExtractor
+
+        self.extractor = LeafEmbeddingExtractor(self.models)
+        self.maml_adapter, self.proto_classifier = self._load_meta_learners()
+
+    def _load_meta_learners(self):
+        maml = None
+        proto = None
+
+        # Prefer adapted model if available
+        maml_path = os.path.join(self.model_dir, "maml_adapter_adapted.pt")
+        if not os.path.exists(maml_path):
+            maml_path = os.path.join(self.model_dir, "maml_adapter.pt")
+
+        if os.path.exists(maml_path) and self.models:
+            try:
+                import torch
+
+                from detection.meta_learner import (
+                    MAMLAdapter,
+                    PrototypicalClassifier,
+                )
+
+                # We need to know input_dim. It depends on the leaf indices from base models.
+                # Use metadata if we have it or a dummy row
+                # This is a bit inefficient to do on every init, but usually done once
+                # Let's use a dummy row based on metadata columns
+                if self.metadata:
+                    cols = self.metadata["feature_columns"]
+                    dummy_X = pd.DataFrame(np.zeros((1, len(cols))), columns=cols)
+                    self.extractor.fit(dummy_X)
+                    input_dim = self.extractor.transform(dummy_X).shape[1]
+
+                    maml = MAMLAdapter(input_dim=input_dim)
+                    maml.load_state_dict(torch.load(maml_path, weights_only=True))
+                    maml.eval()
+
+                    # Prototypical classifier
+                    proto_path = os.path.join(self.model_dir, "prototypes.joblib")
+                    if os.path.exists(proto_path):
+                        from detection.persistence import ModelArtifact, ModelIntegrityError
+
+                        proto = PrototypicalClassifier()
+                        proto.prototypes = joblib.load(proto_path)
+                        try:
+                            ModelArtifact(self.model_dir).verify_chain("prototypes")
+                        except ModelIntegrityError as exc:
+                            logger.warning(
+                                "Artifact integrity check skipped or failed for prototypes: %s",
+                                exc,
+                            )
+            except Exception as e:
+                logger.warning("Failed to load meta-learners: %s", e)
+
+        return maml, proto
 
     @staticmethod
     def _validate_weights(weights: dict[str, float] | None) -> dict[str, float] | None:
@@ -169,6 +226,18 @@ class RiskScorer:
         When consensus cannot be reached:
             {"score": 100, "consensus_failure": True, ...}
         """
+        if isinstance(feature_row, pd.Series):
+            wallet = feature_row.get("wallet")
+            if wallet is not None:
+                override_val = self.list_override.check(wallet)
+                if override_val in (0, 100):
+                    return {
+                        "score": override_val,
+                        "benford_flag": False,
+                        "ml_flag": bool(override_val >= 50),
+                        "confidence": 100,
+                    }
+
         if not self.models:
             raise RuntimeError(
                 f"No trained models found in {self.model_dir}. Run model_training.py first."
@@ -199,6 +268,29 @@ class RiskScorer:
         X = feature_row[feature_cols].to_frame().T.astype(float)
 
         probs = [model.predict_proba(X)[0][1] for model in self.models.values()]
+
+        # Incorporate MAML adapter if available
+        if self.maml_adapter:
+            try:
+                import torch
+
+                emb = torch.from_numpy(self.extractor.transform(X)).float()
+                maml_prob = self.maml_adapter.predict_proba(emb)[0]
+                probs.append(float(maml_prob))
+                logger.debug("MAML adapter prediction: %.4f", maml_prob)
+            except Exception as e:
+                logger.warning("MAML scoring failed: %s", e)
+
+        # Incorporate Prototypical classifier if available
+        if self.proto_classifier:
+            try:
+                emb = self.extractor.transform(X)
+                proto_prob = self.proto_classifier.predict_proba(emb)[0]
+                probs.append(float(proto_prob))
+                logger.debug("Prototypical prediction: %.4f", proto_prob)
+            except Exception as e:
+                logger.warning("Prototypical scoring failed: %s", e)
+
         scores_100 = [p * 100 for p in probs]
 
         if self.weights is not None:
@@ -262,3 +354,24 @@ class RiskScorer:
         """Score every row in a feature matrix."""
         scores = feature_matrix.apply(self.score, axis=1, result_type="expand")
         return pd.concat([feature_matrix[["wallet"]], scores], axis=1)
+
+
+def _score_one(wallet: str) -> dict:
+    """Fetch a wallet's on-chain account data and return a risk score dict.
+
+    Raises on network/HTTP errors so batch_scorer can capture per-wallet
+    failures without crashing the batch.
+    """
+    import requests
+
+    resp = requests.get(f"https://horizon.stellar.org/accounts/{wallet}", timeout=10)
+    resp.raise_for_status()
+    data = resp.json()
+
+    balances = data.get("balances", [])
+    native = next((b for b in balances if b.get("asset_type") == "native"), {})
+    xlm_balance = float(native.get("balance", 0))
+
+    # Placeholder — replace with RiskScorer.score() once feature pipeline wired in
+    score = min(xlm_balance / 10_000, 1.0)
+    return {"wallet": wallet, "score": round(score, 4), "xlm_balance": xlm_balance}

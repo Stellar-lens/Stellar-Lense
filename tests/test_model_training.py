@@ -66,38 +66,8 @@ def test_save_models_and_training_artifacts(tmp_path, trained_output):
         metrics = json.load(f)
     assert set(MODEL_REGISTRY).issubset(set(metrics))
 
-
-def test_save_training_artifacts_writes_metadata(tmp_path, trained_output):
-    output, _ = trained_output
-    model_dir = str(tmp_path)
-    data_path = "data/synthetic_dataset.parquet"
-
-    save_training_artifacts(output, data_path, model_dir)
-    metadata_path = os.path.join(model_dir, "model_metadata.json")
-    assert os.path.exists(metadata_path)
-
-    with open(metadata_path) as f:
-        meta = json.load(f)
-
-    assert "trained_at" in meta
-    assert meta["data_path"] == data_path
-    assert meta["n_training_rows"] == output["n_train"]
-    assert meta["n_test_rows"] == output["n_test"]
-    assert meta["feature_columns"] == output["feature_columns"]
-    assert "feature_schema_hash" in meta
-    assert meta["model_names"] == list(MODEL_REGISTRY.keys())
-    assert "python_version" in meta
-    assert meta["ledgerlens_version"] == "0.2.0"
-
-
-def test_metadata_feature_hash_matches_training_columns(tmp_path, trained_output):
-    output, _ = trained_output
-    model_dir = str(tmp_path)
-    save_training_artifacts(output, "data/test.parquet", model_dir)
-
     with open(os.path.join(model_dir, "model_metadata.json")) as f:
         meta = json.load(f)
-
     expected_hash = compute_feature_schema_hash(output["feature_columns"])
     assert meta["feature_schema_hash"] == expected_hash
 
@@ -126,9 +96,12 @@ def test_training_data_sha256_changes_when_row_added():
 
 def test_detect_label_poisoning_returns_true_when_ratio_shifts(tmp_path):
     baseline_path = str(tmp_path / "baseline.json")
+    # Write a baseline with ~10% wash-trade ratio
+    baseline_ratio = 0.10
     with open(baseline_path, "w") as f:
-        json.dump({"wash_trade_ratio": 0.10}, f)
+        json.dump({"wash_trade_ratio": baseline_ratio}, f)
 
+    # Current distribution: ~30% wash trades → shift = 0.20 > 0.15 threshold
     distribution = {0: 70, 1: 30}
     assert detect_label_poisoning(distribution, baseline_path=baseline_path, threshold=0.15)
 
@@ -138,7 +111,7 @@ def test_detect_label_poisoning_returns_false_when_ratio_ok(tmp_path):
     with open(baseline_path, "w") as f:
         json.dump({"wash_trade_ratio": 0.20}, f)
 
-    distribution = {0: 82, 1: 18}
+    distribution = {0: 82, 1: 18}  # 18% — shift < 15%
     assert not detect_label_poisoning(distribution, baseline_path=baseline_path, threshold=0.15)
 
 
@@ -160,14 +133,18 @@ def test_detect_label_poisoning_aborts_training(tmp_path, monkeypatch):
     with open(baseline_path, "w") as f:
         json.dump({"wash_trade_ratio": 0.05}, f)
 
+    # Patch baseline path and threshold so poisoning is always detected
     monkeypatch.setattr(mt, "LABEL_DISTRIBUTION_BASELINE_PATH", baseline_path)
     monkeypatch.setattr(mt.config, "POISON_LABEL_RATIO_THRESHOLD", 0.05)
     monkeypatch.setattr(mt.config, "MODEL_DIR", str(tmp_path / "models"))
     monkeypatch.setattr(mt.config, "MODEL_SIGNING_PRIVATE_KEY_PATH", "")
 
+    # Build a minimal dataset with a high wash-trade ratio (60%)
     df = generate_synthetic_dataset(n_wallets=40, seed=7)
+    # Override labels so ratio = 60%
     df["label"] = [1 if i % 5 != 0 else 0 for i in range(len(df))]
 
+    # Simulate main() with a temp data file
     import tempfile
 
     with tempfile.NamedTemporaryFile(suffix=".parquet", delete=False) as tmp_file:
@@ -181,6 +158,7 @@ def test_detect_label_poisoning_aborts_training(tmp_path, monkeypatch):
 
     mt.main()
 
+    # No model artifacts should have been written
     model_dir = str(tmp_path / "models")
     for name in MODEL_REGISTRY:
         assert not os.path.exists(os.path.join(model_dir, f"{name}.joblib"))

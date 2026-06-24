@@ -14,14 +14,17 @@ SHAP feature attributions, and prints the result to stdout.
 import argparse
 import json
 import sys
-from datetime import datetime
+import time
+from datetime import UTC, datetime
 
 import pandas as pd
 from stellar_sdk import Asset as SdkAsset
 
 from config import config
+from utils.logging import get_logger
 from detection.causal_attribution import CounterfactualAttributor
 from detection.feature_engineering import build_feature_vector
+from detection.forensic_report import ForensicReportGenerator, write_report_secure
 from detection.model_inference import RiskScorer
 from detection.shap_explainer import ShapExplainer
 from ingestion.historical_loader import load_trades, trades_to_dataframe
@@ -31,11 +34,17 @@ from ingestion.orderbook_loader import (
 )
 
 
+logger = get_logger(__name__)
+
+
 def validate_wallet_id(wallet_id: str) -> None:
     """Validate that wallet_id looks like a Stellar public key (56 chars, starts with G)."""
     if len(wallet_id) != 56 or not wallet_id.startswith("G"):
-        print(f"Error: Invalid wallet ID format '{wallet_id}'.")
-        print("Must be a 56-character Stellar public key starting with 'G'.")
+        logger.error("Invalid wallet ID format", extra={
+            "wallet": wallet_id,
+            "error_type": "ValueError",
+            "error_message": f"Invalid wallet ID format '{wallet_id}'. Must be a 56-character Stellar public key starting with 'G'."
+        })
         sys.exit(1)
 
 
@@ -60,7 +69,11 @@ def parse_asset_pair(pair_str: str) -> tuple[SdkAsset, SdkAsset]:
 
         return _to_sdk_asset(base_str), _to_sdk_asset(counter_str)
     except Exception as e:
-        print(f"Error: Invalid asset pair format '{pair_str}': {e}")
+        logger.error("Invalid asset pair format", exc_info=True, extra={
+            "wallet": "unknown",
+            "error_type": type(e).__name__,
+            "error_message": f"Invalid asset pair format '{pair_str}': {e}"
+        })
         sys.exit(1)
 
 
@@ -128,82 +141,119 @@ def main() -> None:
     try:
         scorer = RiskScorer()
     except RuntimeError as e:
-        print(f"Error: {e}", file=sys.stderr)
+        logger.error("Model load error", exc_info=True, extra={
+            "wallet": args.wallet,
+            "error_type": type(e).__name__,
+            "error_message": str(e)
+        })
         if "No trained models" in str(e):
-            print(
-                "Suggestion: train models first by running model_training.py:"
-                " python -m detection.model_training",
-                file=sys.stderr,
-            )
+            logger.info("Suggestion: train models first by running model_training.py: python -m detection.model_training", extra={"wallet": args.wallet})
         sys.exit(1)
 
-    # 2. Ingest
-    try:
-        trades = list(load_trades(base_asset, counter_asset, start_time=args.since))
-        trades_df = trades_to_dataframe(trades)
-
-        # Filter trades to only those involving the target wallet
-        if not trades_df.empty:
-            mask = (trades_df["base_account"] == args.wallet) | (
-                trades_df["counter_account"] == args.wallet
-            )
-            trades_df = trades_df[mask]
-
-        orderbook_events_df = None
-        if not args.no_orderbook:
-            events = list(load_orderbook_events(args.wallet))
-            orderbook_events_df = orderbook_events_to_dataframe(events)
-
-    except Exception as e:
-        print(f"Error fetching data from Horizon: {e}", file=sys.stderr)
-        sys.exit(1)
-
-    # 3. Feature Engineering
-    feature_vector = build_feature_vector(
-        args.wallet, trades_df, orderbook_events=orderbook_events_df
-    )
-    feature_row = pd.Series(feature_vector)
-
-    # 4. Score
-    try:
-        result = scorer.score(feature_row)
-    except Exception as e:
-        print(f"Error during scoring: {e}", file=sys.stderr)
-        sys.exit(1)
-
-    remove_trade_ids = []
-    causal_result = None
-    if args.what_if_remove or args.causal:
-        try:
-            remove_trade_ids = _parse_remove_trade_ids(args.what_if_remove, trades_df, args.wallet)
-        except ValueError as exc:
-            print(f"Error: {exc}", file=sys.stderr)
-            raise
-
-        attributor = CounterfactualAttributor(scorer)
-        if remove_trade_ids:
-            causal_result = attributor.counterfactual_score(
-                args.wallet,
-                trades_df,
-                remove_trade_ids,
-                orderbook_events=orderbook_events_df,
-            )
-        elif args.causal:
-            causal_result = attributor.counterfactual_score(
-                args.wallet,
-                trades_df,
-                [],
-                orderbook_events=orderbook_events_df,
-            )
-
-    # 5. Explain
-    try:
-        explainer = ShapExplainer()
-        models = scorer.models
-        shap_explanations = explainer.explain_ensemble(feature_row, models, top_n=5)
-    except Exception:
-        # Fallback: empty explanations if SHAP fails
+    override_val = scorer.list_override.check(args.wallet)
+    if override_val in (0, 100):
+        result = {
+            "score": override_val,
+            "benford_flag": False,
+            "ml_flag": bool(override_val >= 50),
+            "confidence": 100,
+        }
+        trades_df = pd.DataFrame()
+        feature_row = pd.Series({"wallet": args.wallet})
         shap_explanations = []
+        causal_result = None
+    else:
+        # 2. Ingest
+        try:
+            trades = list(load_trades(base_asset, counter_asset, start_time=args.since))
+            trades_df = trades_to_dataframe(trades)
+
+            # Filter trades to only those involving the target wallet
+            if not trades_df.empty:
+                mask = (trades_df["base_account"] == args.wallet) | (
+                    trades_df["counter_account"] == args.wallet
+                )
+                trades_df = trades_df[mask]
+
+            orderbook_events_df = None
+            if not args.no_orderbook:
+                events = list(load_orderbook_events(args.wallet))
+                orderbook_events_df = orderbook_events_to_dataframe(events)
+
+        except Exception as e:
+            logger.error("Error fetching data from Horizon", exc_info=True, extra={
+                "wallet": args.wallet,
+                "error_type": type(e).__name__,
+                "error_message": str(e)
+            })
+            sys.exit(1)
+
+        # 3. Feature Engineering
+        feature_vector = build_feature_vector(
+            args.wallet, trades_df, orderbook_events=orderbook_events_df
+        )
+        feature_row = pd.Series(feature_vector)
+
+        # 4. Score
+        try:
+            t0 = time.time()
+            result = scorer.score(feature_row)
+            latency_ms = (time.time() - t0) * 1000
+            model_version = scorer.metadata.get("model_version", "unknown") if scorer.metadata else "unknown"
+            logger.info("Wallet scored", extra={
+                "wallet": args.wallet,
+                "score": result["score"],
+                "latency_ms": latency_ms,
+                "model_version": model_version,
+                "asset_pair": args.pair
+            })
+        except Exception as e:
+            logger.error("Error during scoring", exc_info=True, extra={
+                "wallet": args.wallet,
+                "error_type": type(e).__name__,
+                "error_message": str(e)
+            })
+            sys.exit(1)
+
+        remove_trade_ids = []
+        causal_result = None
+        if args.what_if_remove or args.causal:
+            try:
+                remove_trade_ids = _parse_remove_trade_ids(
+                    args.what_if_remove, trades_df, args.wallet
+                )
+            except ValueError as exc:
+                logger.error("Error parsing what_if", exc_info=True, extra={
+                    "wallet": args.wallet,
+                    "error_type": type(exc).__name__,
+                    "error_message": str(exc)
+                })
+                raise
+
+            attributor = CounterfactualAttributor(scorer)
+            if remove_trade_ids:
+                causal_result = attributor.counterfactual_score(
+                    args.wallet,
+                    trades_df,
+                    remove_trade_ids,
+                    orderbook_events=orderbook_events_df,
+                )
+            elif args.causal:
+                causal_result = attributor.counterfactual_score(
+                    args.wallet,
+                    trades_df,
+                    [],
+                    orderbook_events=orderbook_events_df,
+                )
+
+        # 5. Explain
+        try:
+            explainer = ShapExplainer()
+            models = scorer.models
+            shap_explanations = explainer.explain_ensemble(feature_row, models, top_n=5)
+        except Exception:
+            # Fallback: empty explanations if SHAP fails
+            shap_explanations = []
 
     # 6. Output
     if args.json:
@@ -244,3 +294,62 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+def _generate_report(args, result, shap_explanations, trades_df, feature_row, scorer) -> None:
+    """Generate and optionally anchor a forensic report."""
+    from pathlib import Path
+
+    generator = ForensicReportGenerator()
+
+    model_metadata = {}
+    if scorer.metadata:
+        model_metadata = {
+            "name": "LedgerLens Ensemble",
+            "version": scorer.metadata.get("model_version", "unknown"),
+            "training_dataset_sha256": scorer.metadata.get("training_dataset_sha256", "unknown"),
+            "feature_schema_version": scorer.metadata.get("feature_schema_hash", "unknown"),
+        }
+
+    report = generator.generate(
+        wallet=args.wallet,
+        wallet_trades=trades_df,
+        risk_score_dict=result,
+        shap_values=shap_explanations,
+        asset_pair=args.pair,
+        model_metadata=model_metadata or None,
+    )
+
+    # Optional on-chain anchoring — only when --anchor is set
+    if args.anchor:
+        try:
+            from integrations.contract_client import LedgerLensContractClient
+
+            client = LedgerLensContractClient()
+            tx_hash = client.anchor_report(report)
+            logger.info("Anchored to Soroban", extra={"tx_hash": tx_hash})
+        except Exception as e:
+            logger.warning("on-chain anchoring failed", exc_info=True, extra={
+                "wallet": args.wallet,
+                "error_type": type(e).__name__,
+                "error_message": str(e)
+            })
+
+    # Determine output path and format
+    ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    safe_wallet = args.wallet[:12]
+    out_dir = Path("reports/forensic")
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    fmt = args.report_format
+    if fmt == "json":
+        out_path = out_dir / f"{safe_wallet}_{ts}.json"
+        write_report_secure(str(out_path), json.dumps(report.to_dict(), indent=2))
+    elif fmt == "markdown":
+        out_path = out_dir / f"{safe_wallet}_{ts}.md"
+        write_report_secure(str(out_path), report.to_markdown())
+    elif fmt == "pdf":
+        out_path = out_dir / f"{safe_wallet}_{ts}.pdf"
+        report.to_pdf(str(out_path))
+
+    logger.info("Forensic report written", extra={"out_path": str(out_path)})
