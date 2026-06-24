@@ -1,4 +1,4 @@
-//! Tests for the configurable per-wallet score submission floor (issue:
+﻿//! Tests for the configurable per-wallet score submission floor (issue:
 //! "Configurable Score Submission Floor for High-Risk Wallets").
 //!
 //! The floor blocks a compromised or colluding signer from laundering a
@@ -49,7 +49,8 @@ fn submit(
         &env.ledger().timestamp(),
         &90,
         &1,
-        &None`n    );
+        &None,
+    );
 }
 
 /// `try_submit_score` variant returning the raw result for assertions.

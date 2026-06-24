@@ -15,9 +15,9 @@
 
 #![allow(dead_code)]
 
-use soroban_sdk::{BytesN, Env, Symbol, Address};
+use soroban_sdk::{Address, BytesN, Env, Symbol};
 
-use crate::{types::RiskScore, Error};
+use crate::Error;
 
 /// Fixed-size deletion proof returned by `get_deletion_proof`.
 ///
@@ -36,7 +36,11 @@ pub fn exponent_from_entry_digest(_env: &Env, digest: &[u8; 32]) -> u64 {
         v |= (digest[i] as u64) << (8 * i);
     }
     // Ensure non-zero.
-    if v == 0 { 1 } else { v }
+    if v == 0 {
+        1
+    } else {
+        v
+    }
 }
 
 /// Update accumulator: A' = A^{e} mod N
@@ -63,10 +67,24 @@ pub fn generate_deletion_witness(
     out[0..8].copy_from_slice(&accumulator_value.to_le_bytes());
 
     let mut tag_preimage = [0u8; 64];
-    let wallet_bytes = wallet.to_string().as_bytes();
-    let pair_bytes = asset_pair.to_string().as_bytes();
-    for i in 0..wallet_bytes.len().min(32) { tag_preimage[i] = wallet_bytes[i]; }
-    for i in 0..pair_bytes.len().min(32) { tag_preimage[32 + i] = pair_bytes[i]; }
+    {
+        // Embed a hash of the wallet address string into the first 32 bytes.
+        let wallet_str = wallet.to_string();
+        let wallet_len = (wallet_str.len() as usize).min(56);
+        let mut wallet_buf = [0u8; 56];
+        wallet_str.copy_into_slice(&mut wallet_buf[..wallet_len]);
+        // Simple fold into 32 bytes.
+        for i in 0..wallet_len {
+            tag_preimage[i % 32] ^= wallet_buf[i];
+        }
+    }
+    {
+        // Embed symbol bytes into the last 32 bytes via its Val encoding.
+        use soroban_sdk::IntoVal;
+        let val: soroban_sdk::Val = asset_pair.into_val(env);
+        let raw: u64 = val.get_payload();
+        tag_preimage[32..40].copy_from_slice(&raw.to_le_bytes());
+    }
 
     let mut digest_seed: [u8; 32] = [0u8; 32];
     // Soroban doesn't expose SHA here in scaffold. Keep deterministic by XOR.
@@ -123,4 +141,3 @@ fn mod_pow_u64(mut base: u64, mut exp: u64, modulus: u64) -> u64 {
     }
     result
 }
-

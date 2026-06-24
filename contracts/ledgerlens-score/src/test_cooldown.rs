@@ -1,4 +1,4 @@
-//! Dedicated cooldown / rate-limit edge-case tests.
+﻿//! Dedicated cooldown / rate-limit edge-case tests.
 //!
 //! Complements `test_rate_limit.rs` with scenarios that exercise
 //! `override_rate_limit` reset semantics, cross-path cooldown enforcement
@@ -78,7 +78,7 @@ fn try_submit(
         &90,
         &1,
         &None,
-    )
+    ).map(|_| ())
 }
 
 // ── Consensus submission helpers ──────────────────────────────────────────────
@@ -107,7 +107,15 @@ fn commitment(
 ) -> [u8; 32] {
     env.as_contract(contract_id, || {
         LedgerLensScoreContract::compute_commitment(
-            env, wallet, pair, score, false, false, timestamp, confidence, model_version,
+            env,
+            wallet,
+            pair,
+            score,
+            false,
+            false,
+            timestamp,
+            confidence,
+            model_version,
         )
         .unwrap()
         .to_bytes()
@@ -141,6 +149,7 @@ fn consensus_pair(
         let digest = commitment(env, &client.address, wallet, pair, score, timestamp, 90, mv);
         subs.push_back(ModelSubmission {
             model_version: mv,
+            model: Address::generate(env),
             score,
             confidence: 90,
             benford_flag: false,
@@ -315,7 +324,7 @@ fn test_batch_respects_override_for_single_entry() {
 fn test_consensus_within_cooldown_rejected() {
     let (env, client, _admin) = setup();
     let key = signing_key(1);
-    client.set_service_pubkey(&pubkey_bytes(&env, &key));
+    client.set_service_pubkey(&Vec::new(&env), &pubkey_bytes(&env, &key));
 
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
@@ -335,7 +344,7 @@ fn test_consensus_within_cooldown_rejected() {
 fn test_consensus_after_cooldown_accepted() {
     let (env, client, _admin) = setup();
     let key = signing_key(2);
-    client.set_service_pubkey(&pubkey_bytes(&env, &key));
+    client.set_service_pubkey(&Vec::new(&env), &pubkey_bytes(&env, &key));
 
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
@@ -352,7 +361,13 @@ fn test_consensus_after_cooldown_accepted() {
         &[70, 72],
         START_TS + DEFAULT_COOLDOWN_SECS,
     );
-    client.submit_consensus_score(&Vec::new(&env), &wallet, &pair, &subs, &(START_TS + DEFAULT_COOLDOWN_SECS));
+    client.submit_consensus_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &subs,
+        &(START_TS + DEFAULT_COOLDOWN_SECS),
+    );
     assert_eq!(client.get_score(&wallet, &pair).score, 70);
 }
 
@@ -360,7 +375,7 @@ fn test_consensus_after_cooldown_accepted() {
 fn test_consensus_after_override_accepted() {
     let (env, client, _admin) = setup();
     let key = signing_key(3);
-    client.set_service_pubkey(&pubkey_bytes(&env, &key));
+    client.set_service_pubkey(&Vec::new(&env), &pubkey_bytes(&env, &key));
 
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
@@ -577,7 +592,7 @@ fn test_batch_different_pairs_same_wallet_independent_cooldown() {
 fn test_single_submit_then_consensus_within_cooldown_rejected() {
     let (env, client, _admin) = setup();
     let key = signing_key(4);
-    client.set_service_pubkey(&pubkey_bytes(&env, &key));
+    client.set_service_pubkey(&Vec::new(&env), &pubkey_bytes(&env, &key));
 
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
@@ -595,7 +610,7 @@ fn test_single_submit_then_consensus_within_cooldown_rejected() {
 fn test_consensus_then_single_submit_within_cooldown_rejected() {
     let (env, client, _admin) = setup();
     let key = signing_key(5);
-    client.set_service_pubkey(&pubkey_bytes(&env, &key));
+    client.set_service_pubkey(&Vec::new(&env), &pubkey_bytes(&env, &key));
 
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
