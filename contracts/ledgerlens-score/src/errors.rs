@@ -7,14 +7,10 @@ use soroban_sdk::contracterror;
 pub enum Error {
     AlreadyInitialized = 1,
     NotInitialized = 2,
-    NotFound = 3,
+    Unauthorized = 3,
     InvalidScore = 4,
     InvalidConfidence = 5,
-    InvalidSignerTier = 48,
-    SignerTierViolation = 54,
     ScoreNotFound = 6,
-    /// Returned when any state-mutating call is attempted while the
-    /// contract is paused by the admin.
     ContractPaused = 7,
     NoPendingAdminTransfer = 8,
     EmptyBatch = 9,
@@ -38,6 +34,28 @@ pub enum Error {
     InvalidAttestation = 27,
     InvalidPubkeyLength = 28,
     InvalidHistoryDepth = 29,
+    InsufficientConsensus = 30,
+    ConsensusInputEmpty = 31,
+    InvalidConsensusConfig = 32,
+    AdminSetFull = 33,
+    AdminSignerNotInSet = 34,
+    InsufficientAdminSigners = 35,
+    CyclicDelegation = 36,
+    ScoreEmbargoed = 37,
+    FeeTokenNotSet = 38,
+    QuorumFailureWindowNotElapsed = 39,
+    RevealWindowExpired = 40,
+    CommitmentMismatch = 41,
+    InvalidFinalityBuffer = 42,
+    NoPendingScore = 43,
+    FinalityWindowNotElapsed = 44,
+    InvalidDisputeBond = 45,
+    DisputeAlreadyOpen = 46,
+    DisputeNotFound = 47,
+    DisputeNotYetTimedOut = 48,
+    InvalidHysteresisMargin = 49,
+    InvalidModelPriorWeight = 50,
+}
 
     /// Returned when `set_global_min_confidence` is called with a value
     /// above 100 (confidence is bounded to 0–100).
@@ -117,4 +135,10 @@ pub enum Error {
     NoPendingScore = 61,
     /// `commit_pending_score` was called before `commit_after` elapsed.
     FinalityWindowNotElapsed = 62,
+
+    // ── Score embargo ────────────────────────────────────────────────────────
+    /// Returned by `set_score_embargo` when the wallet is not already
+    /// embargoed and the `EmbargoedWalletIndex` is already at
+    /// `MAX_EMBARGOED_WALLETS`.
+    EmbargoedWalletIndexFull = 63,
 }

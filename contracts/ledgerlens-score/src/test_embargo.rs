@@ -1,4 +1,4 @@
-#![cfg(test)]
+﻿#![cfg(test)]
 //! Tests for the per-wallet score embargo (regulatory hold).
 
 use soroban_sdk::{
@@ -7,7 +7,10 @@ use soroban_sdk::{
     Address, Env, Vec,
 };
 
-use crate::{Error, LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreSubmission};
+use crate::{
+    constants::MAX_EMBARGOED_WALLETS, Error, LedgerLensScoreContract,
+    LedgerLensScoreContractClient, ScoreSubmission,
+};
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -32,20 +35,18 @@ fn submit(
     pair: &soroban_sdk::Symbol,
     score: u32,
 ) {
-    client
-        .submit_score(
-            &Vec::new(env),
-            wallet,
-            pair,
-            &score,
-            &false,
-            &false,
-            &(env.ledger().timestamp().max(1)),
-            &80,
-            &1,
-            &None,
-        )
-        ;
+    client.submit_score(
+        &Vec::new(env),
+        wallet,
+        pair,
+        &score,
+        &false,
+        &false,
+        &(env.ledger().timestamp().max(1)),
+        &80,
+        &1,
+        &None,
+    );
     env.ledger().with_mut(|l| l.timestamp += 3_601);
 }
 
@@ -281,20 +282,18 @@ fn test_submit_score_unaffected_by_embargo() {
     let pair = symbol_short!("XLM_USDC");
     client.set_score_embargo(&wallet, &None);
     // Ingestion must still succeed even while embargoed.
-    client
-        .submit_score(
-            &Vec::new(&env),
-            &wallet,
-            &pair,
-            &55,
-            &false,
-            &false,
-            &(env.ledger().timestamp().max(1)),
-            &80,
-            &1,
-            &None,
-        )
-        ;
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &55,
+        &false,
+        &false,
+        &(env.ledger().timestamp().max(1)),
+        &80,
+        &1,
+        &None,
+    );
 }
 
 #[test]
@@ -396,4 +395,130 @@ fn test_full_embargo_lifecycle() {
 
     // 5. Low-risk score passes gate normally.
     assert!(client.query_risk_gate(&wallet, &pair, &75));
+}
+
+// ── EmbargoedWalletIndex / revoke_all_embargoes ────────────────────────────────
+
+#[test]
+fn test_embargoed_wallet_count_zero_by_default() {
+    let (_env, client, _admin, _service) = setup();
+    assert_eq!(client.get_embargoed_wallet_count(), 0);
+}
+
+#[test]
+fn test_set_score_embargo_adds_to_index() {
+    let (env, client, _admin, _service) = setup();
+    let wallet_a = Address::generate(&env);
+    let wallet_b = Address::generate(&env);
+
+    client.set_score_embargo(&wallet_a, &None);
+    assert_eq!(client.get_embargoed_wallet_count(), 1);
+
+    client.set_score_embargo(&wallet_b, &Some(10_000));
+    assert_eq!(client.get_embargoed_wallet_count(), 2);
+
+    // Re-embargoing an already-embargoed wallet must not duplicate the entry.
+    client.set_score_embargo(&wallet_a, &Some(20_000));
+    assert_eq!(client.get_embargoed_wallet_count(), 2);
+}
+
+#[test]
+fn test_lift_score_embargo_removes_from_index() {
+    let (env, client, _admin, _service) = setup();
+    let wallet_a = Address::generate(&env);
+    let wallet_b = Address::generate(&env);
+    client.set_score_embargo(&wallet_a, &None);
+    client.set_score_embargo(&wallet_b, &None);
+    assert_eq!(client.get_embargoed_wallet_count(), 2);
+
+    client.lift_score_embargo(&wallet_a);
+    assert_eq!(client.get_embargoed_wallet_count(), 1);
+
+    // Lifting a wallet that was never embargoed is a no-op on the index.
+    client.lift_score_embargo(&Address::generate(&env));
+    assert_eq!(client.get_embargoed_wallet_count(), 1);
+}
+
+#[test]
+fn test_revoke_all_embargoes_lifts_all_and_clears_index() {
+    let (env, client, _admin, _service) = setup();
+    let wallet_a = Address::generate(&env);
+    let wallet_b = Address::generate(&env);
+    let wallet_c = Address::generate(&env);
+
+    client.set_score_embargo(&wallet_a, &None);
+    client.set_score_embargo(&wallet_b, &None);
+    client.set_score_embargo(&wallet_c, &Some(10_000));
+    assert_eq!(client.get_embargoed_wallet_count(), 3);
+
+    client.revoke_all_embargoes(&Vec::new(&env));
+
+    assert_eq!(client.get_embargoed_wallet_count(), 0);
+    assert!(!client.is_embargoed(&wallet_a));
+    assert!(!client.is_embargoed(&wallet_b));
+    assert!(!client.is_embargoed(&wallet_c));
+}
+
+#[test]
+fn test_revoke_all_embargoes_noop_when_index_empty() {
+    let (env, client, _admin, _service) = setup();
+    client.revoke_all_embargoes(&Vec::new(&env));
+    assert_eq!(client.get_embargoed_wallet_count(), 0);
+}
+
+#[test]
+fn test_revoke_all_embargoes_also_clears_already_expired_timed_entries() {
+    let (env, client, _admin, _service) = setup();
+    let wallet = Address::generate(&env);
+    // Timed embargo that will auto-expire without an explicit lift.
+    client.set_score_embargo(&wallet, &Some(100));
+    env.ledger().with_mut(|l| l.timestamp = 200);
+    assert!(!client.is_embargoed(&wallet));
+    // Still tracked in the index because it was never explicitly lifted.
+    assert_eq!(client.get_embargoed_wallet_count(), 1);
+
+    client.revoke_all_embargoes(&Vec::new(&env));
+    assert_eq!(client.get_embargoed_wallet_count(), 0);
+}
+
+#[test]
+fn test_revoke_all_embargoes_requires_init() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let r = client.try_revoke_all_embargoes(&Vec::new(&env));
+    assert_eq!(r, Err(Ok(Error::NotInitialized)));
+}
+
+#[test]
+fn test_embargoed_wallet_index_full_rejected() {
+    let (env, client, _admin, _service) = setup();
+
+    for _ in 0..MAX_EMBARGOED_WALLETS {
+        client.set_score_embargo(&Address::generate(&env), &None);
+    }
+    assert_eq!(client.get_embargoed_wallet_count(), MAX_EMBARGOED_WALLETS);
+
+    let overflow_wallet = Address::generate(&env);
+    let result = client.try_set_score_embargo(&overflow_wallet, &None);
+    assert_eq!(result, Err(Ok(Error::EmbargoedWalletIndexFull)));
+    assert!(!client.is_embargoed(&overflow_wallet));
+    assert_eq!(client.get_embargoed_wallet_count(), MAX_EMBARGOED_WALLETS);
+}
+
+#[test]
+fn test_embargoed_wallet_index_full_does_not_block_revoke_all() {
+    let (env, client, _admin, _service) = setup();
+
+    for _ in 0..MAX_EMBARGOED_WALLETS {
+        client.set_score_embargo(&Address::generate(&env), &None);
+    }
+    client.revoke_all_embargoes(&Vec::new(&env));
+    assert_eq!(client.get_embargoed_wallet_count(), 0);
+
+    // Index has room again after the revoke.
+    let wallet = Address::generate(&env);
+    client.set_score_embargo(&wallet, &None);
+    assert_eq!(client.get_embargoed_wallet_count(), 1);
 }

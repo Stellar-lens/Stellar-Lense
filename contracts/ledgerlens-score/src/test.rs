@@ -1,6 +1,6 @@
-use soroban_sdk::{
+﻿use soroban_sdk::{symbol_short,
     testutils::{Address as _, Ledger as _},
-    Address, Env,
+    Address, Env, Symbol, Vec,
 };
 
 use crate::{
@@ -129,7 +129,7 @@ fn test_get_scores_batch_single_entry() {
     let entry = results.get(0).unwrap();
     assert_eq!(entry.index, 0);
     assert!(entry.found);
-    assert_eq!(entry.score.unwrap().score, 64);
+    assert_eq!(entry.score.clone().unwrap().score, 64);
 }
 
 #[test]
@@ -162,7 +162,7 @@ fn test_get_scores_batch_max_batch() {
         let entry = results.get(i).unwrap();
         assert_eq!(entry.index, i);
         assert!(entry.found);
-        assert_eq!(entry.score.unwrap().score, i % 100);
+        assert_eq!(entry.score.clone().unwrap().score, i % 100);
     }
 }
 
@@ -213,7 +213,7 @@ fn test_get_scores_batch_partial_hit_miss() {
     assert!(results.get(0).unwrap().found);
     assert_eq!(results.get(0).unwrap().score.unwrap().score, 71);
     assert!(!results.get(1).unwrap().found);
-    assert_eq!(results.get(1).unwrap().score, None);
+    assert_eq!(results.get(1).unwrap().score, crate::MaybeRiskScore::None);
 }
 
 #[test]
@@ -244,7 +244,7 @@ fn test_get_scores_batch_embargoed_entry() {
     let entry = results.get(0).unwrap();
     assert_eq!(entry.index, 0);
     assert!(!entry.found);
-    assert_eq!(entry.score, None);
+    assert_eq!(entry.score, crate::MaybeRiskScore::None);
 }
 
 #[test]
@@ -275,7 +275,7 @@ fn test_get_scores_batch_delegated_wallet() {
     let results = client.get_scores_batch(&queries);
     let entry = results.get(0).unwrap();
     assert!(entry.found);
-    assert_eq!(entry.score.unwrap().score, 82);
+    assert_eq!(entry.score.clone().unwrap().score, 82);
 }
 
 #[test]
@@ -1617,6 +1617,73 @@ fn test_get_pair_weight_defaults_to_one() {
     assert_eq!(client.get_pair_weight(&pair), 1);
 }
 
+#[test]
+fn test_set_pair_weight_batch() {
+    let (env, client, _admin, _service) = initialized();
+    let pair_a = symbol_short!("XLM_USDC");
+    let pair_b = symbol_short!("XLM_BTC");
+
+    let mut entries: Vec<(Symbol, u32)> = Vec::new(&env);
+    entries.push_back((pair_a.clone(), 2));
+    entries.push_back((pair_b.clone(), 5));
+
+    client.set_pair_weight_batch(&Vec::new(&env), &entries);
+
+    assert_eq!(client.get_pair_weight(&pair_a), 2);
+    assert_eq!(client.get_pair_weight(&pair_b), 5);
+}
+
+#[test]
+fn test_set_pair_weight_batch_partial_overlap_updates_only_changed_pairs() {
+    let (env, client, _admin, _service) = initialized();
+    let pair_a = symbol_short!("XLM_USDC");
+    let pair_b = symbol_short!("XLM_BTC");
+    let pair_c = symbol_short!("XLM_ETH");
+
+    client.set_pair_weight(&Vec::new(&env), &pair_a, &1);
+    client.set_pair_weight(&Vec::new(&env), &pair_b, &1);
+
+    // Second batch only touches pair_b and introduces pair_c; pair_a must
+    // remain at its previously configured weight.
+    let mut entries: Vec<(Symbol, u32)> = Vec::new(&env);
+    entries.push_back((pair_b.clone(), 9));
+    entries.push_back((pair_c.clone(), 4));
+
+    client.set_pair_weight_batch(&Vec::new(&env), &entries);
+
+    assert_eq!(client.get_pair_weight(&pair_a), 1);
+    assert_eq!(client.get_pair_weight(&pair_b), 9);
+    assert_eq!(client.get_pair_weight(&pair_c), 4);
+}
+
+#[test]
+fn test_set_pair_weight_batch_empty_returns_error() {
+    let (env, client, _admin, _service) = initialized();
+
+    let empty: Vec<(Symbol, u32)> = Vec::new(&env);
+    let result = client.try_set_pair_weight_batch(&Vec::new(&env), &empty);
+    assert_eq!(result, Err(Ok(Error::EmptyBatch)));
+}
+
+#[test]
+fn test_set_pair_weight_batch_too_large_returns_error() {
+    let (env, client, _admin, _service) = initialized();
+
+    let pair_names = [
+        "P0", "P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "PA", "PB", "PC", "PD", "PE",
+        "PF", "PG", "PH", "PI", "PJ", "PK",
+    ];
+    assert_eq!(pair_names.len(), 21); // one over the MAX_BATCH_SIZE (20) cap.
+
+    let mut entries: Vec<(Symbol, u32)> = Vec::new(&env);
+    for name in pair_names.iter() {
+        entries.push_back((Symbol::new(&env, name), 1));
+    }
+
+    let result = client.try_set_pair_weight_batch(&Vec::new(&env), &entries);
+    assert_eq!(result, Err(Ok(Error::BatchTooLarge)));
+}
+
 // ── M-of-N multi-signature service authorization ──────────────────────────────
 
 /// Helper: add N signers and set threshold M on an already-initialized client.
@@ -2838,7 +2905,18 @@ fn test_get_score_variance_single_entry() {
     let (env, client, _admin, _service) = initialized();
     let wallet = Address::generate(&env);
     let asset_pair = symbol_short!("XLM_USDC");
-    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &50, &false, &false, &1, &80, &1, &None);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &asset_pair,
+        &50,
+        &false,
+        &false,
+        &1,
+        &80,
+        &1,
+        &None,
+    );
     assert_eq!(client.get_score_variance(&wallet, &asset_pair), 0);
 }
 
@@ -2849,7 +2927,18 @@ fn test_get_score_variance_identical_scores() {
     let asset_pair = symbol_short!("XLM_USDC");
     for i in 0u32..4 {
         env.ledger().with_mut(|l| l.timestamp += 3_601);
-        client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &42, &false, &false, &(i as u64 + 1), &80, &1, &None);
+        client.submit_score(
+            &Vec::new(&env),
+            &wallet,
+            &asset_pair,
+            &42,
+            &false,
+            &false,
+            &(i as u64 + 1),
+            &80,
+            &1,
+            &None,
+        );
     }
     assert_eq!(client.get_score_variance(&wallet, &asset_pair), 0);
 }
@@ -2862,7 +2951,18 @@ fn test_get_score_variance_known_values() {
     // scores: [2, 4, 6, 8]; mean=5; var=((3^2)+(1^2)+(1^2)+(3^2))/4 = 20/4 = 5; scaled = 5*100 = 500
     for i in 0u32..4 {
         env.ledger().with_mut(|l| l.timestamp += 3_601);
-        client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &(2 + i * 2), &false, &false, &(i as u64 + 1), &80, &1, &None);
+        client.submit_score(
+            &Vec::new(&env),
+            &wallet,
+            &asset_pair,
+            &(2 + i * 2),
+            &false,
+            &false,
+            &(i as u64 + 1),
+            &80,
+            &1,
+            &None,
+        );
     }
     assert_eq!(client.get_score_variance(&wallet, &asset_pair), 500);
 }
@@ -2873,11 +2973,33 @@ fn test_get_score_variance_embargoed() {
     let wallet = Address::generate(&env);
     let asset_pair = symbol_short!("XLM_USDC");
     env.ledger().with_mut(|l| l.timestamp += 3_601);
-    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &10, &false, &false, &1, &80, &1, &None);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &asset_pair,
+        &10,
+        &false,
+        &false,
+        &1,
+        &80,
+        &1,
+        &None,
+    );
     env.ledger().with_mut(|l| l.timestamp += 3_601);
-    client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &20, &false, &false, &2, &80, &1, &None);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &asset_pair,
+        &20,
+        &false,
+        &false,
+        &2,
+        &80,
+        &1,
+        &None,
+    );
     let admin = client.get_admin();
     env.ledger().with_mut(|l| l.timestamp += 1);
-    client.set_score_embargo(&wallet, &None).unwrap();
+    client.set_score_embargo(&wallet, &None);
     assert_eq!(client.get_score_variance(&wallet, &asset_pair), 0);
 }

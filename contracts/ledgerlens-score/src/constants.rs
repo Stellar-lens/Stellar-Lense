@@ -34,9 +34,6 @@ pub const DEFAULT_JUMP_THRESHOLD: u32 = 30;
 ///   `docs/batch-attestation-spec.md`).
 pub const CONTRACT_VERSION: u32 = 3;
 
-pub const MIN_ESCALATION_THRESHOLD: u32 = 0;
-pub const MAX_ESCALATION_THRESHOLD: u32 = 100;
-
 /// Hard upper bound on Merkle proof length accepted by
 /// `submit_scores_batch_attested`. Thirty levels of a binary tree can
 /// accommodate up to 2^30 ≈ 1.07 billion leaves — well above the
@@ -73,9 +70,6 @@ pub const MAX_ESCALATION_THRESHOLD: u32 = 100;
 /// Prevents unbounded storage growth and gas exhaustion.
 pub const MAX_COUNTERPARTY_LINKS_PER_WALLET: u32 = 50;
 
-pub const DEFAULT_JUMP_THRESHOLD: u32 = 10;
-pub const MIN_ESCALATION_THRESHOLD: u32 = 1;
-pub const MAX_ESCALATION_THRESHOLD: u32 = 100;
 // ── Score submission floor ─────────────────────────────────────────────────────
 //
 // A compromised or colluding signer could otherwise submit an artificially low
@@ -96,25 +90,23 @@ pub const BAND_STATE_TTL_THRESHOLD: u32 = 518_400;
 pub const BAND_STATE_TTL_EXTEND_TO: u32 = 777_600;
 pub const EMBARGO_TTL_THRESHOLD: u32 = 1_555_200;
 pub const EMBARGO_TTL_EXTEND_TO: u32 = 3_110_400;
+
+/// Hard ceiling on the `EmbargoedWalletIndex` so `revoke_all_embargoes` stays
+/// within a single transaction's resource budget.
+pub const MAX_EMBARGOED_WALLETS: u32 = 100;
 pub const DEFAULT_CONSENSUS_THRESHOLD_K: u32 = 2;
 pub const DEFAULT_CONSENSUS_EPSILON: u32 = 5;
-
-// ── Score jump anomaly detection ─────────────────────────────────────────────
-
-pub const DEFAULT_JUMP_THRESHOLD: u32 = 30;
 
 // ── Escalation / consecutive breach ──────────────────────────────────────────
 
 pub const ESCALATION_BREACH_TTL_THRESHOLD: u32 = 518_400;
 pub const ESCALATION_BREACH_TTL_EXTEND_TO: u32 = 777_600;
 pub const DEFAULT_ESCALATION_THRESHOLD: u32 = 5;
-pub const MIN_ESCALATION_THRESHOLD: u32 = 1;
-pub const MAX_ESCALATION_THRESHOLD: u32 = 100;
 
-// ── Model stats ─────────────────────────────────────────────────────────────
+// ── Model version registry ────────────────────────────────────────────────────
 
-/// Default maximum allowed absolute deviation from the provisional median.
-pub const DEFAULT_CONSENSUS_EPSILON: u32 = 5;
+/// Hard upper bound on the number of model versions that can be registered.
+pub const MAX_MODEL_VERSIONS: u32 = 20;
 
 // ── Score dispute mechanism ─────────────────────────────────────────────────────
 //
@@ -163,23 +155,8 @@ pub const MAX_FINALITY_BUFFER_SECS: u64 = 86_400; // 24 hours
 /// one explicitly via `set_heartbeat_alert_threshold` — 1 hour.
 pub const DEFAULT_HEARTBEAT_ALERT_THRESHOLD_SECS: u64 = 3_600; // 1 hour
 
-// ── Proactive TTL rent management ─────────────────────────────────────────────
-//
-// Soroban silently archives a persistent entry once its TTL reaches zero. A
-// high-traffic (wallet, asset_pair) entry has its TTL pushed out on every
-// `submit_score` write, but a dormant entry that simply stops being written
-// to keeps counting down and can expire unnoticed — surfacing later as a
-// confusing `ScoreNotFound` for a wallet that was scored before. These bounds
-// cap the index used to proactively sweep and re-extend entries before that
-// happens. See `get_expiring_entries` / `extend_entry_ttls`.
+// ── Quorum / consensus ────────────────────────────────────────────────────────
 
-/// Maximum number of (wallet, asset_pair) entries tracked in `ScoreEntryIndex`
-/// for proactive rent management. Bounds the cost of the admin sweep; once
-/// full, additional entries still get their TTL extended by `set_score`
-/// itself, they just aren't visible to `get_expiring_entries`.
-pub const MAX_TRACKED_SCORE_ENTRIES: u32 = 500;
-
-/// Hard ceiling on `max_entries` accepted by `get_expiring_entries`, and on
-/// the batch size accepted by `extend_entry_ttls` — bounds the cost of a
-/// single read/write call.
-pub const MAX_EXPIRING_ENTRIES_PER_CALL: u32 = 100;
+/// Default window (seconds) for which a quorum-failure is considered recent.
+/// After this window the failure state is cleared automatically.
+pub const DEFAULT_QUORUM_FAILURE_WINDOW_SECS: u64 = 86_400; // 24 hours

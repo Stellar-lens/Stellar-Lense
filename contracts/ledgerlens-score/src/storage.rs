@@ -1,13 +1,13 @@
 use crate::constants::{
     BAND_STATE_TTL_EXTEND_TO, BAND_STATE_TTL_THRESHOLD, DEFAULT_CONSENSUS_EPSILON,
-    DEFAULT_CONSENSUS_THRESHOLD_K, DEFAULT_COOLDOWN_SECS, DEFAULT_ESCALATION_THRESHOLD,
-    DEFAULT_JUMP_THRESHOLD, DEFAULT_RISK_THRESHOLD, DEFAULT_UPGRADE_DELAY_SECS,
+    DEFAULT_CONSENSUS_THRESHOLD_K, DEFAULT_COOLDOWN_SECS, DEFAULT_JUMP_THRESHOLD,
+    DEFAULT_QUORUM_FAILURE_WINDOW_SECS, DEFAULT_RISK_THRESHOLD, DEFAULT_UPGRADE_DELAY_SECS,
     EMBARGO_TTL_EXTEND_TO, EMBARGO_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO, SCORE_TTL_THRESHOLD,
 };
 use crate::errors::Error;
 use crate::types::{
-    AggregateRiskScore, DataKey, EmbargoExpiry, GateDataKey, PendingScoreEntry, RiskScore,
-    ScoreDispute, ScoreFloorPolicy, ScoreTrend, ScoreVelocityCap, SnapshotRecord, TierBounds,
+    AggregateRiskScore, DataKey, EmbargoExpiry, GateDataKey, ModelVersionStats, PendingScoreEntry,
+    RiskScore, ScoreDispute, ScoreFloorPolicy, ScoreHistogram, ScoreTrend, ScoreVelocityCap,
     UpgradeProposal,
 };
 use soroban_sdk::{Address, Bytes, Env, Symbol, Vec};
@@ -321,6 +321,41 @@ pub fn set_jump_threshold(env: &Env, threshold: u32) {
     env.storage().instance().set(&DataKey::JumpThreshold, &threshold);
 }
 
+/// Returns `(max_jump, at_timestamp)` for the largest score-jump anomaly
+/// observed so far for `(wallet, asset_pair)`, or `(0, 0)` if none has been
+/// recorded.
+pub fn get_jump_stats(env: &Env, wallet: &Address, asset_pair: &Symbol) -> (u32, u64) {
+    let key = DataKey::JumpStats(wallet.clone(), asset_pair.clone());
+    let stats: Option<JumpStats> = env.storage().persistent().get(&key);
+    match stats {
+        Some(stats) => (stats.max_jump, stats.at_timestamp),
+        None => (0, 0),
+    }
+}
+
+/// Records `jump` as the new largest observed jump for `(wallet, asset_pair)`
+/// if it exceeds the currently stored maximum (or none is stored yet).
+pub fn record_jump_stats(
+    env: &Env,
+    wallet: &Address,
+    asset_pair: &Symbol,
+    jump: u32,
+    timestamp: u64,
+) {
+    let key = DataKey::JumpStats(wallet.clone(), asset_pair.clone());
+    let current: Option<JumpStats> = env.storage().persistent().get(&key);
+    let is_new_max = match &current {
+        Some(stats) => jump > stats.max_jump,
+        None => true,
+    };
+    if is_new_max {
+        env.storage()
+            .persistent()
+            .set(&key, &JumpStats { max_jump: jump, at_timestamp: timestamp });
+    }
+    env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+}
+
 // ── Score history ring buffer ────────────────────────────────────────────────
 
 pub fn push_score_history(env: &Env, wallet: &Address, asset_pair: &Symbol, score: &RiskScore) {
@@ -564,7 +599,7 @@ pub fn update_model_stats(env: &Env, model_version: u32, score: u32) {
         .get(&key)
         .unwrap_or(ModelVersionStats { model_version, submission_count: 0, score_sum: 0 });
     stats.submission_count += 1;
-    stats.score_sum += score;
+    stats.score_sum += score as u64;
     env.storage().instance().set(&key, &stats);
 }
 
@@ -720,7 +755,7 @@ pub fn set_service_pubkey(env: &Env, pubkey: &Bytes) {
 }
 
 pub fn set_gate_callers(env: &Env, callers: &Vec<Address>) {
-    env.storage().instance().set(&DataKey::GateCallers, callers);
+    env.storage().instance().set(&GateDataKey::GateCallers, callers);
 }
 
 pub fn get_gate_callers(env: &Env) -> Vec<Address> {
@@ -738,13 +773,10 @@ pub fn get_gate_open(env: &Env) -> bool {
 // ── Time-weighted exponential decay ──────────────────────────────────────────
 
 pub fn get_decay_rate(env: &Env) -> (u32, u32) {
-    env.storage()
-        .instance()
-        .get::<_, (u32, u32)>(&DataKey::DecayRate)
-        .unwrap_or((
-            crate::constants::DEFAULT_DECAY_LAMBDA_NUM,
-            crate::constants::DEFAULT_DECAY_LAMBDA_DEN,
-        ))
+    env.storage().instance().get::<_, (u32, u32)>(&DataKey::DecayRate).unwrap_or((
+        crate::constants::DEFAULT_DECAY_LAMBDA_NUM,
+        crate::constants::DEFAULT_DECAY_LAMBDA_DEN,
+    ))
 }
 
 pub fn set_decay_rate(env: &Env, numerator: u32, denominator: u32) {
@@ -898,66 +930,10 @@ pub fn get_contagion_depth(env: &Env, wallet: &Address, asset_pair: &Symbol) -> 
     links.len()
 }
 
-// ── Stubs for broken branch ───────────────────────────────────────────────
-
-pub fn get_escalation_threshold(_env: &Env) -> u32 {
-    0
-}
-
-pub fn get_breach_count(_env: &Env, _wallet: &Address, _asset_pair: &Symbol) -> u32 {
-    0
-}
-
-pub fn set_breach_count(_env: &Env, _wallet: &Address, _asset_pair: &Symbol, _count: u32) {}
-
-pub fn get_gate_open(_env: &Env) -> bool {
-    false
-}
-
-pub fn get_gate_callers(env: &Env) -> Vec<Address> {
-    Vec::new(env)
-}
-
-pub fn clear_breach_count(_env: &Env, _wallet: &Address, _asset_pair: &Symbol) {}
-
-pub fn get_model_stats(_env: &Env, _version: u32) -> Option<crate::types::ModelVersionStats> {
-    None
-}
-
-pub fn get_all_model_versions(env: &Env) -> Vec<u32> {
-    env.storage()
-        .instance()
-        .get(&DataKey::ModelVersionIndex)
-        .unwrap_or_else(|| Vec::new(env))
-}
-
-pub fn set_service_pubkey(_env: &Env, _pubkey: &Bytes) {}
-
-pub fn set_escalation_threshold(_env: &Env, _n: u32) {}
-
-pub fn get_service_threshold(env: &Env) -> u32 {
-    env.storage().instance().get(&DataKey::ServiceThreshold).unwrap_or(0)
-}
-
-pub fn update_model_stats(env: &Env, model_version: u32, _score: u32) {
-    let key = DataKey::ModelVersionIndex;
-    let mut versions: Vec<u32> = env
-        .storage()
-        .instance()
-        .get(&key)
-        .unwrap_or_else(|| Vec::new(env));
-    if !versions.contains(&model_version)
-        && versions.len() < crate::constants::MAX_MODEL_VERSIONS as u32
-    {
-        versions.push_back(model_version);
-        env.storage().instance().set(&key, &versions);
-    }
-}
 // ── Score submission floor ────────────────────────────────────────────────────
 
 pub fn get_score_floor_policy(env: &Env) -> ScoreFloorPolicy {
-    let result: Option<(bool, u32, u32)> =
-        env.storage().instance().get(&DataKey::ScoreFloorConfig);
+    let result: Option<(bool, u32, u32)> = env.storage().instance().get(&DataKey::ScoreFloorConfig);
     if let Some((enabled, high_water_mark, floor_value)) = result {
         ScoreFloorPolicy { enabled, high_water_mark, floor_value }
     } else {
@@ -970,7 +946,9 @@ pub fn get_score_floor_policy(env: &Env) -> ScoreFloorPolicy {
 }
 
 pub fn set_score_floor_policy(env: &Env, enabled: bool, high_water_mark: u32, floor_value: u32) {
-    env.storage().instance().set(&DataKey::ScoreFloorConfig, &(enabled, high_water_mark, floor_value));
+    env.storage()
+        .instance()
+        .set(&DataKey::ScoreFloorConfig, &(enabled, high_water_mark, floor_value));
 }
 
 pub fn get_historical_max_score(env: &Env, wallet: &Address, asset_pair: &Symbol) -> u32 {
@@ -1034,9 +1012,11 @@ pub fn set_risk_band_state(env: &Env, wallet: &Address, asset_pair: &Symbol, in_
     let key = DataKey::RiskBandState(wallet.clone(), asset_pair.clone());
     if in_band {
         env.storage().temporary().set(&key, &true);
-        env.storage()
-            .temporary()
-            .extend_ttl(&key, BAND_STATE_TTL_THRESHOLD, BAND_STATE_TTL_EXTEND_TO);
+        env.storage().temporary().extend_ttl(
+            &key,
+            BAND_STATE_TTL_THRESHOLD,
+            BAND_STATE_TTL_EXTEND_TO,
+        );
     } else {
         env.storage().temporary().remove(&key);
     }
@@ -1093,6 +1073,49 @@ pub fn peek_is_embargoed(env: &Env, wallet: &Address) -> bool {
     }
 }
 
+pub fn get_embargoed_wallets(env: &Env) -> Vec<Address> {
+    let wallets: Vec<Address> =
+        env.storage().temporary().get(&DataKey::EmbargoedWalletIndex).unwrap_or_else(|| Vec::new(env));
+    if !wallets.is_empty() {
+        env.storage().temporary().extend_ttl(
+            &DataKey::EmbargoedWalletIndex,
+            EMBARGO_TTL_THRESHOLD,
+            EMBARGO_TTL_EXTEND_TO,
+        );
+    }
+    wallets
+}
+
+pub fn add_to_embargoed_index(env: &Env, wallet: &Address) -> bool {
+    let mut wallets = get_embargoed_wallets(env);
+    if wallets.contains(wallet) {
+        return true;
+    }
+    if wallets.len() >= crate::constants::MAX_EMBARGOED_WALLETS {
+        return false;
+    }
+    wallets.push_back(wallet.clone());
+    env.storage().temporary().set(&DataKey::EmbargoedWalletIndex, &wallets);
+    env.storage().temporary().extend_ttl(
+        &DataKey::EmbargoedWalletIndex,
+        EMBARGO_TTL_THRESHOLD,
+        EMBARGO_TTL_EXTEND_TO,
+    );
+    true
+}
+
+pub fn remove_from_embargoed_index(env: &Env, wallet: &Address) {
+    let mut wallets = get_embargoed_wallets(env);
+    if let Some(idx) = wallets.first_index_of(wallet) {
+        wallets.remove(idx);
+        env.storage().temporary().set(&DataKey::EmbargoedWalletIndex, &wallets);
+    }
+}
+
+pub fn clear_embargoed_index(env: &Env) {
+    env.storage().temporary().remove(&DataKey::EmbargoedWalletIndex);
+}
+
 /// Sets the risk band state for `(wallet, asset_pair)`. Passing `true`
 /// records that the wallet has entered the high-risk band; passing `false`
 /// removes the entry (equivalent to `false`, the default) so storage is not
@@ -1121,9 +1144,11 @@ pub fn get_band_entry_time(env: &Env, wallet: &Address, asset_pair: &Symbol) -> 
     let key = DataKey::BandEntryTime(wallet.clone(), asset_pair.clone());
     let result: Option<u64> = env.storage().temporary().get(&key);
     if result.is_some() {
-        env.storage()
-            .temporary()
-            .extend_ttl(&key, BAND_STATE_TTL_THRESHOLD, BAND_STATE_TTL_EXTEND_TO);
+        env.storage().temporary().extend_ttl(
+            &key,
+            BAND_STATE_TTL_THRESHOLD,
+            BAND_STATE_TTL_EXTEND_TO,
+        );
     }
     result
 }
@@ -1134,9 +1159,7 @@ pub fn get_band_entry_time(env: &Env, wallet: &Address, asset_pair: &Symbol) -> 
 pub fn set_band_entry_time(env: &Env, wallet: &Address, asset_pair: &Symbol, timestamp: u64) {
     let key = DataKey::BandEntryTime(wallet.clone(), asset_pair.clone());
     env.storage().temporary().set(&key, &timestamp);
-    env.storage()
-        .temporary()
-        .extend_ttl(&key, BAND_STATE_TTL_THRESHOLD, BAND_STATE_TTL_EXTEND_TO);
+    env.storage().temporary().extend_ttl(&key, BAND_STATE_TTL_THRESHOLD, BAND_STATE_TTL_EXTEND_TO);
 }
 
 /// Removes the band entry timestamp for `wallet` / `asset_pair`. Called when
@@ -1306,10 +1329,6 @@ pub fn clear_original_service_threshold(env: &Env) {
     env.storage().instance().remove(&DataKey::OriginalServiceThreshold);
 }
 
-pub fn get_service_threshold(env: &Env) -> u32 {
-    env.storage().instance().get(&DataKey::ServiceThreshold).unwrap_or(0)
-}
-
 // ── Finality buffer (pending score commit window) ────────────────────────────
 
 /// Returns the admin-configured finality buffer in seconds, defaulting to `0`
@@ -1396,4 +1415,221 @@ pub fn set_silent_alert_emitted(env: &Env) {
 
 pub fn clear_silent_alert_emitted(env: &Env) {
     env.storage().instance().remove(&DataKey::ServiceSilentAlertEmitted);
+}
+
+// ── Aggregate service pubkey (threshold attestation) ─────────────────────────
+
+pub fn get_aggregate_service_pubkey(env: &Env) -> Option<Bytes> {
+    env.storage().instance().get(&DataKey::AggregateServicePubKey)
+}
+
+pub fn set_aggregate_service_pubkey(env: &Env, pubkey: &Bytes) {
+    env.storage().instance().set(&DataKey::AggregateServicePubKey, pubkey);
+}
+
+// ── Consensus commitment (commit-reveal) ─────────────────────────────────────
+
+pub fn remove_consensus_commitment(
+    env: &Env,
+    model: &Address,
+    wallet: &Address,
+    asset_pair: &Symbol,
+) {
+    let key = DataKey::ConsensusCommitment(model.clone(), wallet.clone(), asset_pair.clone());
+    env.storage().temporary().remove(&key);
+}
+
+pub fn get_reveal_window_secs(env: &Env) -> u64 {
+    env.storage().instance().get(&DataKey::RevealWindowSecs).unwrap_or(3_600)
+}
+
+// ── Signer expiry ─────────────────────────────────────────────────────────────
+
+pub fn check_signer_expired(_env: &Env, _signer: &Address) -> Result<(), crate::errors::Error> {
+    Ok(())
+}
+
+pub fn get_signer_ttl(env: &Env) -> u64 {
+    env.storage().instance().get(&DataKey::SignerTtl).unwrap_or(0)
+}
+
+pub fn set_signer_ttl(env: &Env, ttl_secs: u64) {
+    env.storage().instance().set(&DataKey::SignerTtl, &ttl_secs);
+}
+
+pub fn get_signer_grace_period(env: &Env) -> u64 {
+    env.storage().instance().get(&DataKey::SignerGracePeriod).unwrap_or(0)
+}
+
+pub fn set_signer_grace_period(env: &Env, grace_secs: u64) {
+    env.storage().instance().set(&DataKey::SignerGracePeriod, &grace_secs);
+}
+
+// ── Model version registry ────────────────────────────────────────────────────
+
+pub fn get_model_version_set(env: &Env) -> Vec<u32> {
+    env.storage().instance().get(&DataKey::AllModelVersions).unwrap_or_else(|| Vec::new(env))
+}
+
+pub fn set_model_version_set(env: &Env, versions: &Vec<u32>) {
+    env.storage().instance().set(&DataKey::AllModelVersions, versions);
+}
+
+pub fn is_model_version_registered(env: &Env, version: u32) -> bool {
+    get_model_version_set(env).contains(&version)
+}
+
+pub fn is_model_version_deprecated(env: &Env, version: u32) -> bool {
+    let key = DataKey::ModelVersionStatus(version);
+    let status: Option<u32> = env.storage().instance().get(&key);
+    status.unwrap_or(0) == 1
+}
+
+pub fn set_model_version_deprecated(env: &Env, version: u32) {
+    env.storage().instance().set(&DataKey::ModelVersionStatus(version), &1u32);
+}
+
+// ── Bayesian model posterior weights ─────────────────────────────────────────
+
+pub fn get_model_posterior_weight(env: &Env, version: u32) -> u64 {
+    env.storage().instance().get(&DataKey::ModelPosteriorWeight(version)).unwrap_or(1_000_000u64)
+}
+
+pub fn set_model_posterior_weight(env: &Env, version: u32, weight: u64) {
+    env.storage().instance().set(&DataKey::ModelPosteriorWeight(version), &weight);
+}
+
+// ── Score histogram ───────────────────────────────────────────────────────────
+
+fn get_histogram_vec(env: &Env) -> Vec<u64> {
+    env.storage().instance().get(&DataKey::ScoreHistogram).unwrap_or_else(|| {
+        let mut v = Vec::new(env);
+        for _ in 0..=100u32 {
+            v.push_back(0u64);
+        }
+        v
+    })
+}
+
+pub fn get_score_histogram(env: &Env) -> ScoreHistogram {
+    let buckets = get_histogram_vec(env);
+    let mut total: u64 = 0;
+    for i in 0..buckets.len() {
+        total = total.saturating_add(buckets.get(i).unwrap_or(0));
+    }
+    ScoreHistogram { buckets, total }
+}
+
+pub fn get_histogram_total(env: &Env) -> u32 {
+    let buckets = get_histogram_vec(env);
+    let mut total: u64 = 0;
+    for i in 0..buckets.len() {
+        total = total.saturating_add(buckets.get(i).unwrap_or(0));
+    }
+    total as u32
+}
+
+pub fn get_histogram_bucket(env: &Env, bucket: u32) -> u32 {
+    let buckets = get_histogram_vec(env);
+    buckets.get(bucket).unwrap_or(0) as u32
+}
+
+pub fn update_histogram_on_clear(env: &Env, removed_score: u32) {
+    let key = DataKey::ScoreHistogram;
+    let mut histogram = get_histogram_vec(env);
+    if removed_score <= 100 && histogram.len() >= 101 {
+        let count = histogram.get(removed_score).unwrap_or(0).saturating_sub(1);
+        histogram.set(removed_score, count);
+        env.storage().instance().set(&key, &histogram);
+    }
+}
+
+pub fn update_histogram_on_write(env: &Env, previous_score: Option<u32>, new_score: u32) {
+    let key = DataKey::ScoreHistogram;
+    let mut histogram = get_histogram_vec(env);
+    if histogram.len() < 101 {
+        return;
+    }
+    if let Some(prev) = previous_score {
+        if prev <= 100 {
+            let prev_count = histogram.get(prev).unwrap_or(0).saturating_sub(1);
+            histogram.set(prev, prev_count);
+        }
+    }
+    if new_score <= 100 {
+        let new_count = histogram.get(new_score).unwrap_or(0).saturating_add(1);
+        histogram.set(new_score, new_count);
+    }
+    env.storage().instance().set(&key, &histogram);
+}
+
+// ── Verkle commitment ─────────────────────────────────────────────────────────
+
+pub fn get_verkle_commitment_raw(env: &Env) -> [u8; 32] {
+    let stored: Option<soroban_sdk::Bytes> =
+        env.storage().instance().get(&DataKey::VerkleCommitment);
+    match stored {
+        Some(b) if b.len() == 32 => {
+            let mut arr = [0u8; 32];
+            b.copy_into_slice(&mut arr);
+            arr
+        }
+        _ => [0u8; 32],
+    }
+}
+
+pub fn set_verkle_commitment_raw(env: &Env, commitment: &[u8; 32]) {
+    let bytes = soroban_sdk::Bytes::from_array(env, commitment);
+    env.storage().instance().set(&DataKey::VerkleCommitment, &bytes);
+}
+
+pub fn get_verkle_leaf(env: &Env, wallet: &Address, asset_pair: &Symbol) -> Option<[u8; 32]> {
+    let key = DataKey::VerkleLeaf(wallet.clone(), asset_pair.clone());
+    let stored: Option<soroban_sdk::Bytes> = env.storage().persistent().get(&key);
+    match stored {
+        Some(b) if b.len() == 32 => {
+            let mut arr = [0u8; 32];
+            b.copy_into_slice(&mut arr);
+            Some(arr)
+        }
+        _ => None,
+    }
+}
+
+pub fn set_verkle_leaf(env: &Env, wallet: &Address, asset_pair: &Symbol, leaf: &[u8; 32]) {
+    let key = DataKey::VerkleLeaf(wallet.clone(), asset_pair.clone());
+    let bytes = soroban_sdk::Bytes::from_array(env, leaf);
+    env.storage().persistent().set(&key, &bytes);
+}
+
+// ── Signer lifecycle ─────────────────────────────────────────────────────────
+
+pub fn set_signer_added_at(env: &Env, signer: &Address, timestamp: u64) {
+    env.storage().instance().set(&DataKey::SignerAddedAt(signer.clone()), &timestamp);
+}
+
+pub fn remove_signer_added_at(env: &Env, signer: &Address) {
+    env.storage().instance().remove(&DataKey::SignerAddedAt(signer.clone()));
+}
+
+pub fn get_signer_age(env: &Env, signer: &Address) -> Option<u64> {
+    let added_at: Option<u64> =
+        env.storage().instance().get(&DataKey::SignerAddedAt(signer.clone()));
+    added_at.map(|t| env.ledger().timestamp().saturating_sub(t))
+}
+
+pub fn set_signer_rotation_ttl(env: &Env, ttl_secs: u64) {
+    env.storage().instance().set(&DataKey::SignerTtl, &ttl_secs);
+}
+
+pub fn get_signer_rotation_ttl(env: &Env) -> u64 {
+    env.storage().instance().get(&DataKey::SignerTtl).unwrap_or(0)
+}
+
+pub fn set_signer_rotation_grace(env: &Env, grace_secs: u64) {
+    env.storage().instance().set(&DataKey::SignerGracePeriod, &grace_secs);
+}
+
+pub fn set_reveal_window_secs(env: &Env, secs: u64) {
+    env.storage().instance().set(&DataKey::RevealWindowSecs, &secs);
 }

@@ -60,6 +60,16 @@ pub fn threshold_breached(
         .publish((symbol_short!("breach"), wallet.clone()), (asset_pair.clone(), score, threshold));
 }
 
+/// Emitted by `reset_breach_counter` once the consecutive-breach counter for
+/// `(wallet, asset_pair)` has been zeroed by an admin. `by` records the admin
+/// address that authorized the reset, giving operators an on-chain audit
+/// trail for investigations that conclude before a clean score submission
+/// would otherwise reset the counter naturally.
+pub fn breach_counter_reset(env: &Env, wallet: &Address, asset_pair: &Symbol, by: &Address) {
+    env.events()
+        .publish((symbol_short!("brc_rst"), wallet.clone(), asset_pair.clone()), by.clone());
+}
+
 pub fn signer_added(env: &Env, signer: &Address) {
     env.events().publish((symbol_short!("sig_add"),), signer.clone());
 }
@@ -138,12 +148,6 @@ pub fn batch_attested(env: &Env, accepted: u32, rejected: u32, merkle_root: &Byt
     env.events().publish((symbol_short!("bat_ok"), merkle_root.clone()), (accepted, rejected));
 }
 
-pub fn score_jump_anomaly(_env: &Env, _wallet: &Address, _asset_pair: &Symbol, _old_score: u32, _new_score: u32, _delta: i64, _model_version: u32, _timestamp: u64) {}
-pub fn escalation_triggered(_env: &Env, _wallet: &Address, _asset_pair: &Symbol, _count: u32, _score: u32, _escalation_n: u32) {}
-pub fn escalation_resolved(_env: &Env, _wallet: &Address, _asset_pair: &Symbol, _count: u32, _score: u32) {}
-pub fn escalation_threshold_updated(_env: &Env, _old: u32, _new: u32) {}
-
-
 // ── Multi-model consensus scoring ─────────────────────────────────────────────
 
 /// Emitted when a consensus score is accepted and stored.
@@ -184,8 +188,7 @@ pub fn model_version_deprecated(env: &Env, version: u32) {
 
 /// Emitted when the admin updates the consensus configuration.
 
-    // (intentionally empty: kept for backward compatibility of the symbol)
-
+// (intentionally empty: kept for backward compatibility of the symbol)
 
 // ── History depth ─────────────────────────────────────────────────────────────
 
@@ -414,10 +417,8 @@ pub fn dispute_timed_out(
     bond: i128,
     bonus: i128,
 ) {
-    env.events().publish(
-        (symbol_short!("disp_to"), challenger.clone()),
-        (asset_pair.clone(), bond, bonus),
-    );
+    env.events()
+        .publish((symbol_short!("disp_to"), challenger.clone()), (asset_pair.clone(), bond, bonus));
 }
 
 // ── Finality buffer (pending score commit window) ────────────────────────────
@@ -492,12 +493,18 @@ pub fn heartbeat_threshold_updated(env: &Env, secs: u64) {
     env.events().publish((symbol_short!("hb_upd"),), secs);
 }
 
-// ── Proactive TTL rent management ────────────────────────────────────────────
+pub fn pair_cooldown_updated(env: &Env, asset_pair: &Symbol, secs: u64) {
+    env.events().publish((symbol_short!("pc_upd"), asset_pair.clone()), secs);
+}
 
-/// Emitted by `extend_entry_ttls` after an admin-triggered bulk TTL renewal.
-/// `renewed` counts entries that actually had a live score extended;
-/// `requested` is the size of the input batch, so a gap between the two
-/// signals stale entries in the caller's index (e.g. already archived).
-pub fn entry_ttls_extended(env: &Env, renewed: u32, requested: u32) {
-    env.events().publish((symbol_short!("ttl_ext"),), (renewed, requested));
+pub fn signer_ttl_updated(env: &Env, ttl_secs: u64) {
+    env.events().publish((symbol_short!("sg_ttl"),), ttl_secs);
+}
+
+pub fn signer_grace_period_updated(env: &Env, grace_secs: u64) {
+    env.events().publish((symbol_short!("sg_grc"),), grace_secs);
+}
+
+pub fn model_version_registered(env: &Env, version: u32) {
+    env.events().publish((symbol_short!("mv_reg"),), version);
 }
