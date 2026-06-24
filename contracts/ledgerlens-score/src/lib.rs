@@ -5746,6 +5746,119 @@ impl LedgerLensScoreContract {
         false
     }
 
+    // ── Proactive TTL rent management ─────────────────────────────────────────
+
+    /// Returns up to `max_entries` tracked `(wallet, asset_pair)` score
+    /// entries whose estimated remaining TTL has dropped to or below
+    /// `SCORE_TTL_THRESHOLD`, most urgent (longest overdue) first. Read-only;
+    /// callable by anyone.
+    ///
+    /// Feed the result straight into [`extend_entry_ttls`](Self::extend_entry_ttls)
+    /// to renew them. "Remaining TTL" here is a conservative estimate, not an
+    /// exact on-chain read — Soroban contracts have no host function to
+    /// inspect another entry's live-until ledger directly. See the rustdoc on
+    /// `storage::get_expiring_entries` for the full rationale, and the
+    /// README's Storage Rent Management section for the recommended
+    /// operational cadence (e.g. an off-chain cron job calling this daily).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// assert!(client.get_expiring_entries(&50).is_empty());
+    /// ```
+    pub fn get_expiring_entries(env: Env, max_entries: u32) -> Vec<(Address, Symbol)> {
+        storage::get_expiring_entries(&env, max_entries)
+    }
+
+    /// Returns the estimated number of ledgers remaining before
+    /// `(wallet, asset_pair)`'s score entry should be proactively renewed.
+    /// See [`get_expiring_entries`](Self::get_expiring_entries) for why this
+    /// is an estimate. Returns [`Error::ScoreNotFound`] if the wallet/pair
+    /// has no tracked score entry.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address, symbol_short};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// let wallet = Address::generate(&env);
+    /// let asset_pair = symbol_short!("XLM_USDC");
+    /// client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &42, &true, &false, &1, &90, &1, &None).unwrap();
+    /// assert!(client.get_entry_ttl(&wallet, &asset_pair).is_ok());
+    /// ```
+    pub fn get_entry_ttl(env: Env, wallet: Address, asset_pair: Symbol) -> Result<u32, Error> {
+        storage::estimate_entry_ttl(&env, &wallet, &asset_pair).ok_or(Error::ScoreNotFound)
+    }
+
+    /// Admin-triggered bulk TTL renewal for a set of `(wallet, asset_pair)`
+    /// entries — typically the output of
+    /// [`get_expiring_entries`](Self::get_expiring_entries). Entries that no
+    /// longer have a live score (already archived, or never existed) are
+    /// skipped rather than failing the whole call; the returned count is how
+    /// many entries were actually renewed, so a gap against `entries.len()`
+    /// signals stale entries in the caller's index.
+    ///
+    /// Rejects with [`Error::BatchTooLarge`] if `entries` exceeds
+    /// `MAX_EXPIRING_ENTRIES_PER_CALL` — the same cap `get_expiring_entries`
+    /// returns within, so feeding it that function's output is always valid.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// assert_eq!(client.extend_entry_ttls(&Vec::new(&env), &Vec::new(&env)), 0);
+    /// ```
+    pub fn extend_entry_ttls(
+        env: Env,
+        admin_signers: Vec<Address>,
+        entries: Vec<(Address, Symbol)>,
+    ) -> Result<u32, Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+        if entries.len() > constants::MAX_EXPIRING_ENTRIES_PER_CALL {
+            return Err(Error::BatchTooLarge);
+        }
+
+        let mut renewed: u32 = 0;
+        for i in 0..entries.len() {
+            let (wallet, asset_pair) = entries.get(i).unwrap();
+            if storage::extend_score_entry_ttl(&env, &wallet, &asset_pair) {
+                renewed += 1;
+            }
+        }
+        events::entry_ttls_extended(&env, renewed, entries.len());
+        Ok(renewed)
+    }
+
     // ── Score attestation internals ──────────────────────────────────────────
 
     /// Builds the canonical commitment preimage and hashes it with SHA-256.

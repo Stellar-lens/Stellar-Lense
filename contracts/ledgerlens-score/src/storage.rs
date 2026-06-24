@@ -40,6 +40,7 @@ pub fn set_score(env: &Env, wallet: &Address, asset_pair: &Symbol, score: &RiskS
     let key = DataKey::Score(wallet.clone(), asset_pair.clone());
     env.storage().persistent().set(&key, score);
     env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    track_score_entry(env, wallet, asset_pair);
 }
 
 pub fn get_score(env: &Env, wallet: &Address, asset_pair: &Symbol) -> Option<RiskScore> {
@@ -54,6 +55,142 @@ pub fn get_score(env: &Env, wallet: &Address, asset_pair: &Symbol) -> Option<Ris
 pub fn peek_score(env: &Env, wallet: &Address, asset_pair: &Symbol) -> Option<RiskScore> {
     let key = DataKey::Score(wallet.clone(), asset_pair.clone());
     env.storage().persistent().get(&key)
+}
+
+// ── Proactive TTL rent management ────────────────────────────────────────────
+//
+// Soroban contracts have no host function to read another entry's remaining
+// TTL, so this module can't ask "how close to expiry is this entry?"
+// directly. Instead it tracks the ledger sequence at which each entry was
+// last written or proactively renewed (`ScoreEntryLastTouchedLedger`) and
+// estimates remaining TTL from elapsed ledgers since that touch, against the
+// same `SCORE_TTL_THRESHOLD` the live entry's own TTL is bounded by.
+//
+// This is a conservative estimate, not the literal on-chain TTL: immediately
+// after a touch, `extend_ttl(SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO)`
+// guarantees the entry's actual remaining TTL is at least
+// `SCORE_TTL_THRESHOLD` ledgers. So flagging an entry "due" once that many
+// ledgers have elapsed since its last touch can only run early, never late.
+
+/// Returns every (wallet, asset_pair) entry tracked for proactive rent
+/// management. O(1) storage read — the index is maintained incrementally by
+/// `track_score_entry`.
+pub fn get_score_entry_index(env: &Env) -> Vec<(Address, Symbol)> {
+    let index: Vec<(Address, Symbol)> =
+        env.storage().persistent().get(&DataKey::ScoreEntryIndex).unwrap_or_else(|| Vec::new(env));
+    if !index.is_empty() {
+        env.storage().persistent().extend_ttl(
+            &DataKey::ScoreEntryIndex,
+            SCORE_TTL_THRESHOLD,
+            SCORE_TTL_EXTEND_TO,
+        );
+    }
+    index
+}
+
+/// Registers `(wallet, asset_pair)` in the rent-management index — if it
+/// isn't already present and the index has room — and stamps its
+/// last-touched ledger to now. Called from `set_score` so every write is
+/// automatically covered, and from `extend_score_entry_ttl` when the admin
+/// proactively renews an entry.
+///
+/// Silently leaves the index untouched once it holds
+/// `MAX_TRACKED_SCORE_ENTRIES` entries — newly written entries beyond that
+/// cap still get their TTL extended by `set_score` itself, they just aren't
+/// visible to `get_expiring_entries`'s sweep. An already-tracked entry's
+/// last-touched ledger is always refreshed regardless of index capacity.
+pub fn track_score_entry(env: &Env, wallet: &Address, asset_pair: &Symbol) {
+    let entry = (wallet.clone(), asset_pair.clone());
+    let mut index = get_score_entry_index(env);
+    if !index.contains(&entry) && index.len() < crate::constants::MAX_TRACKED_SCORE_ENTRIES {
+        index.push_back(entry);
+        env.storage().persistent().set(&DataKey::ScoreEntryIndex, &index);
+        env.storage().persistent().extend_ttl(
+            &DataKey::ScoreEntryIndex,
+            SCORE_TTL_THRESHOLD,
+            SCORE_TTL_EXTEND_TO,
+        );
+    }
+    touch_score_entry(env, wallet, asset_pair);
+}
+
+fn touch_score_entry(env: &Env, wallet: &Address, asset_pair: &Symbol) {
+    let key = DataKey::ScoreEntryLastTouchedLedger(wallet.clone(), asset_pair.clone());
+    env.storage().persistent().set(&key, &env.ledger().sequence());
+    env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+}
+
+/// Ledgers elapsed since `(wallet, asset_pair)` was last touched, or `None`
+/// if it has never been tracked.
+fn ledgers_since_touch(env: &Env, wallet: &Address, asset_pair: &Symbol) -> Option<u32> {
+    let key = DataKey::ScoreEntryLastTouchedLedger(wallet.clone(), asset_pair.clone());
+    let last_touched: Option<u32> = env.storage().persistent().get(&key);
+    last_touched.map(|last| env.ledger().sequence().saturating_sub(last))
+}
+
+/// Estimated number of ledgers remaining before `(wallet, asset_pair)`'s
+/// score entry should be proactively renewed, floored at `0`. Returns `None`
+/// if the entry has never been tracked. See the module doc comment above for
+/// why this is a conservative estimate rather than the literal on-chain TTL.
+pub fn estimate_entry_ttl(env: &Env, wallet: &Address, asset_pair: &Symbol) -> Option<u32> {
+    ledgers_since_touch(env, wallet, asset_pair)
+        .map(|elapsed| SCORE_TTL_THRESHOLD.saturating_sub(elapsed))
+}
+
+/// Returns up to `max_entries` tracked entries whose estimated remaining TTL
+/// has dropped to or below `SCORE_TTL_THRESHOLD` — i.e. entries `set_score`'s
+/// own extend-on-write would now renew if it were called again — ordered
+/// most-urgent (longest elapsed since last touch) first.
+pub fn get_expiring_entries(env: &Env, max_entries: u32) -> Vec<(Address, Symbol)> {
+    let index = get_score_entry_index(env);
+    let capped = max_entries.min(crate::constants::MAX_EXPIRING_ENTRIES_PER_CALL);
+
+    let mut due: Vec<(u32, Address, Symbol)> = Vec::new(env);
+    for i in 0..index.len() {
+        let (wallet, asset_pair) = index.get(i).unwrap();
+        if let Some(elapsed) = ledgers_since_touch(env, &wallet, &asset_pair) {
+            if elapsed >= SCORE_TTL_THRESHOLD {
+                due.push_back((elapsed, wallet, asset_pair));
+            }
+        }
+    }
+
+    // Selection sort by descending urgency. `due` is bounded by
+    // `MAX_TRACKED_SCORE_ENTRIES`, and only this infrequent admin-sweep path
+    // pays the O(n^2) — simplicity wins over an asymptotically better sort.
+    let mut result = Vec::new(env);
+    let take = capped.min(due.len());
+    for _ in 0..take {
+        let mut best_idx = 0;
+        let mut best_elapsed = due.get(0).unwrap().0;
+        for i in 1..due.len() {
+            let elapsed = due.get(i).unwrap().0;
+            if elapsed > best_elapsed {
+                best_elapsed = elapsed;
+                best_idx = i;
+            }
+        }
+        let (_, wallet, asset_pair) = due.get(best_idx).unwrap();
+        due.remove(best_idx);
+        result.push_back((wallet, asset_pair));
+    }
+    result
+}
+
+/// Proactively renews `(wallet, asset_pair)`'s score entry TTL and refreshes
+/// its tracked last-touched ledger, as if `set_score` had just written to
+/// it. No-op if the entry doesn't actually have a live score (`peek_score`
+/// returns `None`) — there's nothing on-chain to extend, and tracking a
+/// never-written entry would let `get_expiring_entries` report ghosts.
+/// Returns `true` if the entry existed and was renewed.
+pub fn extend_score_entry_ttl(env: &Env, wallet: &Address, asset_pair: &Symbol) -> bool {
+    if peek_score(env, wallet, asset_pair).is_none() {
+        return false;
+    }
+    let key = DataKey::Score(wallet.clone(), asset_pair.clone());
+    env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    touch_score_entry(env, wallet, asset_pair);
+    true
 }
 
 // ── Pause circuit breaker ────────────────────────────────────────────────────
