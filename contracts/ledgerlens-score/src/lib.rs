@@ -3705,6 +3705,18 @@ impl LedgerLensScoreContract {
         storage::is_embargoed(&env, &wallet)
     }
 
+    /// Returns when `wallet`'s active embargo expires, if applicable.
+    ///
+    /// - `None` — no embargo is active, including when a timed embargo has
+    ///   already passed `ledger_timestamp`.
+    /// - `None` — the embargo is indefinite (`set_score_embargo` was called
+    ///   with `expiry = None`); there is no timestamp to report.
+    /// - `Some(ts)` — the embargo is timed and still active, expiring at
+    ///   `ledger_timestamp > ts`.
+    pub fn get_embargo_expiry(env: Env, wallet: Address) -> Option<u64> {
+        storage::get_embargo_expiry(&env, &wallet)
+    }
+
     // ── Score dispute mechanism ───────────────────────────────────────────────
 
     /// Open a stake-backed dispute against `wallet`'s current risk score for
