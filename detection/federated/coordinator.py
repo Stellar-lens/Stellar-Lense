@@ -44,6 +44,7 @@ FED_WEIGHT_DIM: int = int(os.getenv("FED_WEIGHT_DIM", "0"))  # 0 = inferred at r
 # In-memory state (one coordinator per process; reset on restart)
 # ---------------------------------------------------------------------------
 
+
 class _RoundState:
     def __init__(self) -> None:
         self.round_number: int = 0
@@ -91,6 +92,7 @@ _state = _RoundState()
 # App
 # ---------------------------------------------------------------------------
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     global _state
@@ -108,6 +110,7 @@ app = FastAPI(title="LedgerLens Federated Coordinator", lifespan=lifespan)
 # ---------------------------------------------------------------------------
 # Schemas
 # ---------------------------------------------------------------------------
+
 
 class RegisterRequest(BaseModel):
     participant_id: str
@@ -127,6 +130,7 @@ class GlobalWeightsResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
+
 
 @app.post("/register")
 def register(req: RegisterRequest) -> dict[str, Any]:
@@ -200,6 +204,7 @@ def advance_round() -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 # Programmatic reset helper (used by tests)
 # ---------------------------------------------------------------------------
+
 
 def reset_state(weight_dim: int = 0) -> None:
     """Reset coordinator state; optionally pre-seed global weights to zeros."""

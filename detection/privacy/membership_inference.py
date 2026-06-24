@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Callable, cast
+from collections.abc import Callable
 
 import numpy as np
 import torch

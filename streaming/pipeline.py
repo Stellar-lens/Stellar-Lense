@@ -47,6 +47,7 @@ class StreamingPipeline:
     ):
         if role not in ("all", "producer", "worker"):
             raise ValueError(f"Unknown role: {role!r}")
+        self._role = role
         self._buffer = buffer
         self._scorer = scorer
         self._dispatcher = dispatcher
