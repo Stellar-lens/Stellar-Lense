@@ -13,6 +13,7 @@ SHAP feature attributions, and prints the result to stdout.
 
 import argparse
 import json
+import re
 import sys
 import time
 from datetime import UTC, datetime
@@ -134,7 +135,7 @@ def _parse_remove_trade_ids(
 def main() -> None:
     args = parse_args()
 
-    validate_wallet_id(args.wallet)
+    validate_wallet_address(args.wallet)
     base_asset, counter_asset = parse_asset_pair(args.pair)
 
     # 1. Load models
