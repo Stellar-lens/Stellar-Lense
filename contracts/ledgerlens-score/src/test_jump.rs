@@ -1,4 +1,4 @@
-//! Tests for score jump anomaly detection (issue #74).
+﻿//! Tests for score jump anomaly detection (issue #74).
 //!
 //! When the absolute delta between consecutive scores exceeds the configured
 //! `JumpThreshold`, a `ScoreJumpAnomalyEvent` is emitted in addition to the
@@ -46,7 +46,8 @@ fn submit(
         &env.ledger().timestamp(),
         &90,
         &1,
-        &None`n    );
+        &None,
+    );
 }
 
 /// Returns the last `jmp_ano` event data for `(wallet, pair)`, or `None` if

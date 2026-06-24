@@ -1,4 +1,4 @@
-#![cfg(test)]
+﻿#![cfg(test)]
 
 //! Tests for the Merkle-root batch attestation entry point:
 //! `submit_scores_batch_attested` and the supporting internals
@@ -642,7 +642,8 @@ fn test_batch_attested_respects_rate_limit() {
         &100,
         &80,
         &1,
-        &None`n    );
+        &None,
+    );
 
     let key = signing_key(1);
     client.set_service_pubkey(&Vec::new(&env), &pubkey_bytes(&env, &key, true));
