@@ -214,17 +214,11 @@ class RiskScorer:
                 models[name] = model
         return models
 
-    def score(self, feature_row: pd.Series) -> dict:
-        """Score a single wallet's feature row with BFT voting.
+    def _ensemble_probabilities(self, feature_row: pd.Series) -> list[float]:
+        """Per-model wash-trade probabilities for a single feature row.
 
-        Returns a dict matching the on-chain `RiskScore` shape:
-            {score, benford_flag, ml_flag, confidence}
-
-        When BFT divergence is detected the dict also contains:
-            {"bft_divergence": True}
-
-        When consensus cannot be reached:
-            {"score": 100, "consensus_failure": True, ...}
+        Raises if no models are loaded so callers (`score`,
+        `score_continuous`) surface the same error.
         """
         if isinstance(feature_row, pd.Series):
             wallet = feature_row.get("wallet")
@@ -266,8 +260,10 @@ class RiskScorer:
                 raise RuntimeError(msg)
 
         X = feature_row[feature_cols].to_frame().T.astype(float)
+        return [model.predict_proba(X)[0, 1] for model in self.models.values()]
 
-        probs = [model.predict_proba(X)[0][1] for model in self.models.values()]
+    def score_continuous(self, feature_row: pd.Series) -> float:
+        """Continuous ensemble risk score in `[0, 100]` (unrounded).
 
         # Incorporate MAML adapter if available
         if self.maml_adapter:
@@ -281,17 +277,22 @@ class RiskScorer:
             except Exception as e:
                 logger.warning("MAML scoring failed: %s", e)
 
-        # Incorporate Prototypical classifier if available
-        if self.proto_classifier:
-            try:
-                emb = self.extractor.transform(X)
-                proto_prob = self.proto_classifier.predict_proba(emb)[0]
-                probs.append(float(proto_prob))
-                logger.debug("Prototypical prediction: %.4f", proto_prob)
-            except Exception as e:
-                logger.warning("Prototypical scoring failed: %s", e)
+    def score_continuous_batch(self, X: pd.DataFrame) -> np.ndarray:
+        """Continuous ensemble scores for a batch of feature rows.
 
-        scores_100 = [p * 100 for p in probs]
+        `X` must contain (at least) the model feature columns; non-feature
+        columns (`FEATURE_COLUMNS_EXCLUDE`) are dropped. Vectorised over the
+        batch so the adversarial tooling can evaluate every finite-difference
+        probe in one `predict_proba` call per model instead of one per row.
+        """
+        if not self.models:
+            raise RuntimeError(
+                f"No trained models found in {self.model_dir}. " "Run model_training.py first."
+            )
+        feature_cols = [c for c in X.columns if c not in FEATURE_COLUMNS_EXCLUDE]
+        Xf = X[feature_cols].astype(float)
+        per_model = np.column_stack([m.predict_proba(Xf)[:, 1] for m in self.models.values()])
+        return per_model.mean(axis=1) * 100
 
         if self.weights is not None:
             missing = set(self.weights) - set(self.models)
@@ -312,23 +313,11 @@ class RiskScorer:
 
         result: dict = {}
 
-        if not _has_consensus(scores_100):
-            logger.warning(
-                "BFT consensus failure — raw scores: %s",
-                [round(s, 1) for s in scores_100],
-            )
-            _increment_bft_counter()
-            avg_prob = sum(probs) / len(probs)
-            result = {
-                "score": 100,
-                "benford_flag": False,
-                "ml_flag": True,
-                "confidence": 0,
-                "consensus_failure": True,
-                "bft_divergence": True,
-            }
-        else:
-            final_score, diverged = bft_trimmed_mean(scores_100)
+        Returns a dict matching the on-chain `RiskScore` shape:
+            {score, benford_flag, ml_flag, confidence}
+        """
+        probs = self._ensemble_probabilities(feature_row)
+        avg_prob = _combine_probabilities(probs)
 
             if diverged:
                 logger.warning(
