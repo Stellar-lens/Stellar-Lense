@@ -13,6 +13,8 @@ Usage:
 """
 
 import argparse
+import sys
+from typing import TextIO
 
 import numpy as np
 import pandas as pd
@@ -20,6 +22,11 @@ import pandas as pd
 from config import config
 
 BENFORD_FEATURE_TEMPLATE = ["benford_chi_square_{h}h", "benford_mad_{h}h", "benford_z_max_{h}h"]
+
+SUMMARY_FEATURE_COLUMNS = (
+    "benford_chi_square_24h",
+    "counterparty_concentration_ratio",
+)
 
 
 def generate_synthetic_dataset(
@@ -185,6 +192,54 @@ def _generate_from_simulator(
     return df
 
 
+def print_dataset_summary(df: pd.DataFrame, profile: str, file: TextIO | None = None) -> None:
+    """Print label distribution and feature stats to *file* (default stderr)."""
+    out = file if file is not None else sys.stderr
+    if df.empty or "label" not in df.columns:
+        return
+
+    total = len(df)
+    wash = int((df["label"] == 1).sum())
+    legit = int((df["label"] == 0).sum())
+
+    def pct(count: int) -> float:
+        return 100.0 * count / total if total else 0.0
+
+    print("Label distribution:", file=out)
+    print(f"  wash_trade  (label=1): {wash}  ({pct(wash):.1f}%)", file=out)
+    print(f"  legitimate  (label=0): {legit}  ({pct(legit):.1f}%)", file=out)
+    print(file=out)
+
+    if profile != "NaiveAttacker":
+        print("Profile breakdown:", file=out)
+        if "profile" in df.columns:
+            for prof_name, group in df.groupby("profile", sort=True):
+                n = len(group)
+                w = int((group["label"] == 1).sum())
+                leg = int((group["label"] == 0).sum())
+                print(f"  {prof_name}: {n} rows  (wash={w}, legitimate={leg})", file=out)
+        else:
+            print(
+                f"  {profile}: {total} rows  (wash={wash}, legitimate={legit})",
+                file=out,
+            )
+        print(file=out)
+
+    wash_rows = df[df["label"] == 1]
+    if wash_rows.empty:
+        return
+
+    print("Feature summary (wash_trade rows):", file=out)
+    for col in SUMMARY_FEATURE_COLUMNS:
+        if col not in wash_rows.columns:
+            continue
+        series = pd.to_numeric(wash_rows[col], errors="coerce").dropna()
+        if series.empty:
+            continue
+        print(f"  {col}: mean={series.mean():.1f}, std={series.std():.1f}", file=out)
+    print(file=out)
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--n-wallets", type=int, default=500)
@@ -242,6 +297,8 @@ def main() -> None:
     )
     df.to_parquet(args.output)
     print(f"Wrote {len(df)} rows to {args.output}")
+    if not args.quiet:
+        print_dataset_summary(df, profile=args.profile)
 
 
 if __name__ == "__main__":
