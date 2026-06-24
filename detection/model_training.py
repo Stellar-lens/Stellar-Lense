@@ -296,24 +296,37 @@ def save_models(results: dict, model_dir: str | None = None) -> None:
         joblib.dump(result["model"], os.path.join(model_dir, f"{name}.joblib"))
 
 
-def save_metrics_report(
-    results: dict,
+def save_training_artifacts(
+    training_output: dict,
+    data_path: str,
     model_dir: str | None = None,
-    extra: dict | None = None,
-) -> str:
-    """Write metrics (plus optional *extra* provenance fields) to metrics.json."""
+) -> None:
+    """Write both metrics.json and model_metadata.json artifacts."""
+    import sys
     model_dir = model_dir or config.MODEL_DIR
     os.makedirs(model_dir, exist_ok=True)
-    path = os.path.join(model_dir, "metrics.json")
 
     results = training_output["results"]
     feature_columns = training_output["feature_columns"]
     feature_distributions = training_output.get("feature_distributions")
 
+    # Save metrics.json
     metrics_path = os.path.join(model_dir, "metrics.json")
-    with open(metrics_path, "w") as f:
-        json.dump({name: result["metrics"] for name, result in results.items()}, f, indent=2)
+    metrics_payload = {name: result["metrics"] for name, result in results.items()}
+    for name in results:
+        artifact_path = os.path.join(model_dir, f"{name}.joblib")
+        if os.path.exists(artifact_path):
+            sha = hashlib.sha256()
+            with open(artifact_path, "rb") as f:
+                for chunk in iter(lambda: f.read(65536), b""):
+                    sha.update(chunk)
+            metrics_payload[name]["artifact_sha256"] = sha.hexdigest()
 
+    with open(metrics_path, "w") as f:
+        json.dump(metrics_payload, f, indent=2)
+
+    # Save model_metadata.json
+    metadata_path = os.path.join(model_dir, "model_metadata.json")
     metadata = {
         "trained_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "data_path": data_path,
@@ -326,23 +339,8 @@ def save_metrics_report(
         "ledgerlens_version": "0.2.0",
         "feature_distributions": feature_distributions,
     }
-
-    # Embed artifact SHA-256 for each saved model
-    for name in results:
-        artifact_path = os.path.join(model_dir, f"{name}.joblib")
-        if os.path.exists(artifact_path):
-            sha = hashlib.sha256()
-            with open(artifact_path, "rb") as f:
-                for chunk in iter(lambda: f.read(65536), b""):
-                    sha.update(chunk)
-            payload[name]["artifact_sha256"] = sha.hexdigest()
-
-    if extra:
-        payload.update(extra)
-
-    with open(path, "w") as f:
-        json.dump(payload, f, indent=2)
-    return path
+    with open(metadata_path, "w") as f:
+        json.dump(metadata, f, indent=2)
 
 
 def save_metrics_report(
