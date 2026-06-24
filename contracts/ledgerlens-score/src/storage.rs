@@ -647,6 +647,14 @@ pub fn clear_withdrawal_lock(env: &Env) {
     env.storage().instance().remove(&DataKey::WithdrawalLock);
 }
 
+pub fn get_fee_recipient(env: &Env) -> Option<Address> {
+    env.storage().instance().get(&DataKey::FeeRecipient)
+}
+
+pub fn set_fee_recipient(env: &Env, recipient: &Address) {
+    env.storage().instance().set(&DataKey::FeeRecipient, recipient);
+}
+
 // ── Score delegation ──────────────────────────────────────────────────────────
 
 pub fn get_score_delegate(env: &Env, sub_wallet: &Address) -> Option<Address> {

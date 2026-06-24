@@ -117,4 +117,12 @@ pub enum Error {
     NoPendingScore = 61,
     /// `commit_pending_score` was called before `commit_after` elapsed.
     FinalityWindowNotElapsed = 62,
+
+    // ── Fee recipient dual-authorization ────────────────────────────────────
+    /// Returned by `withdraw_fees` when `set_fee_recipient` has not been
+    /// called yet.
+    FeeRecipientNotSet = 63,
+    /// Returned by `withdraw_fees` when `recipient` does not match the
+    /// address registered via `set_fee_recipient`.
+    FeeRecipientMismatch = 64,
 }

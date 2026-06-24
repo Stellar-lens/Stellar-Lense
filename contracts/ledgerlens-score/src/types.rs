@@ -341,6 +341,10 @@ pub enum DataKey {
     /// Unset until `set_fee_token` is called.
     FeeToken,
     WithdrawalLock,
+    /// The only address allowed to receive fee withdrawals. Unset until
+    /// `set_fee_recipient` is called; `withdraw_fees` requires both admin
+    /// quorum and this address's own `require_auth()`.
+    FeeRecipient,
     PairPaused(Symbol),
     PausedPairIndex,
     AdminSet,

@@ -237,6 +237,10 @@ pub fn withdrawal_locked(env: &Env, admin: &Address) {
     env.events().publish((symbol_short!("wdl_lck"),), admin.clone());
 }
 
+pub fn fee_recipient_set(env: &Env, recipient: &Address) {
+    env.events().publish((symbol_short!("fr_set"),), recipient.clone());
+}
+
 pub fn delegate_set(env: &Env, sub_wallet: &Address, custodian: &Address) {
     env.events().publish((symbol_short!("dlg_set"),), (sub_wallet.clone(), custodian.clone()));
 }
