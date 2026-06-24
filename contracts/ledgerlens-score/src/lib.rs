@@ -4825,6 +4825,33 @@ impl LedgerLensScoreContract {
         storage::get_fee_token(&env).ok_or(Error::FeeTokenNotSet)
     }
 
+    /// Registers the only address allowed to receive fee withdrawals.
+    /// Must be called before `withdraw_fees` can succeed. Admin M-of-N
+    /// (see [`Self::require_admin_auth`]).
+    ///
+    /// Emits [`events::fee_recipient_set`] on change.
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if the contract has no admin yet.
+    pub fn set_fee_recipient(
+        env: Env,
+        admin_signers: Vec<Address>,
+        recipient: Address,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+        storage::set_fee_recipient(&env, &recipient);
+        events::fee_recipient_set(&env, &recipient);
+        Ok(())
+    }
+
+    /// Returns the registered fee recipient address, or `NotFound` if none.
+    pub fn get_fee_recipient(env: Env) -> Result<Address, Error> {
+        storage::get_fee_recipient(&env).ok_or(Error::NotFound)
+    }
+
     /// Withdraw accumulated fees from the contract to `recipient`.
     ///
     /// Guards:
@@ -4835,8 +4862,8 @@ impl LedgerLensScoreContract {
     /// - Concurrency lock: rejects with [`Error::ContractPaused`] if
     ///   another withdrawal is already in-flight for this contract.
     /// - Fee token must be configured via `set_fee_token`.
-    /// - Emits [`fee_withdrawn`] on success; [`withdrawal_locked`] if the
-    ///   lock is already held.
+    /// - Emits [`events::fee_withdrawn`] on success; [`events::withdrawal_locked`]
+    ///   if the lock is already held.
     ///
     /// # Errors
     /// - [`Error::NotInitialized`] — contract has no admin.
@@ -4852,8 +4879,8 @@ impl LedgerLensScoreContract {
             return Err(Error::ContractPaused);
         }
 
+        Self::require_admin_auth(&env, &admin_signers)?;
         let admin = storage::get_admin(&env);
-        admin.require_auth();
 
         // Reject zero-amount withdrawals early.
         if amount == 0 {
@@ -4862,6 +4889,15 @@ impl LedgerLensScoreContract {
 
         // Fee token must be configured.
         let fee_token = storage::get_fee_token(&env).ok_or(Error::FeeTokenNotSet)?;
+
+        // The destination must be the pre-registered fee recipient, and that
+        // recipient must independently authorize this specific withdrawal.
+        let registered_recipient =
+            storage::get_fee_recipient(&env).ok_or(Error::FeeRecipientNotSet)?;
+        if recipient != registered_recipient {
+            return Err(Error::FeeRecipientMismatch);
+        }
+        recipient.require_auth();
 
         // Acquire the concurrency lock — prevents duplicate in-flight calls.
         if storage::is_withdrawal_locked(&env) {
