@@ -2103,6 +2103,62 @@ impl LedgerLensScoreContract {
         storage::get_pair_weight(&env, &asset_pair)
     }
 
+    /// Sets the weight for multiple asset pairs in one admin call, avoiding
+    /// N separate transactions during initial contract setup. Each entry is
+    /// applied independently via [`set_pair_weight`]'s underlying storage
+    /// write, emitting one `pw_upd` event per entry. Admin only.
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if the contract has no admin yet.
+    /// - [`Error::EmptyBatch`] if `entries` is empty.
+    /// - [`Error::BatchTooLarge`] if `entries.len() > MAX_BATCH_SIZE`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use soroban_sdk::symbol_short;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// let pair_a = symbol_short!("XLM_USDC");
+    /// let pair_b = symbol_short!("XLM_BTC");
+    /// let mut entries = Vec::new(&env);
+    /// entries.push_back((pair_a.clone(), 2u32));
+    /// entries.push_back((pair_b.clone(), 5u32));
+    /// client.set_pair_weight_batch(&Vec::new(&env), &entries).unwrap();
+    /// assert_eq!(client.get_pair_weight(&pair_a), 2);
+    /// assert_eq!(client.get_pair_weight(&pair_b), 5);
+    /// ```
+    pub fn set_pair_weight_batch(
+        env: Env,
+        admin_signers: Vec<Address>,
+        entries: Vec<(Symbol, u32)>,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        if entries.is_empty() {
+            return Err(Error::EmptyBatch);
+        }
+        if entries.len() > constants::MAX_BATCH_SIZE {
+            return Err(Error::BatchTooLarge);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+        for i in 0..entries.len() {
+            let (asset_pair, weight) = entries.get(i).unwrap();
+            storage::set_pair_weight(&env, &asset_pair, weight);
+            events::pair_weight_updated(&env, &asset_pair, weight);
+        }
+        Ok(())
+    }
+
     // ── Global minimum confidence floor ──────────────────────────────────────
 
     /// Set the admin-configured global minimum confidence floor (0–100).
