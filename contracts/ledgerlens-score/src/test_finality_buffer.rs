@@ -1,4 +1,4 @@
-//! Tests for the finality buffer: holding submitted scores in a pending,
+﻿//! Tests for the finality buffer: holding submitted scores in a pending,
 //! admin-cancellable state for a configurable window before they take
 //! effect on the live read path.
 
@@ -90,8 +90,7 @@ fn test_set_and_get_finality_buffer() {
 #[test]
 fn test_set_finality_buffer_rejects_above_max() {
     let (env, client, _admin, _service) = setup();
-    let result =
-        client.try_set_finality_buffer(&Vec::new(&env), &(MAX_FINALITY_BUFFER_SECS + 1));
+    let result = client.try_set_finality_buffer(&Vec::new(&env), &(MAX_FINALITY_BUFFER_SECS + 1));
     assert_eq!(result, Err(Ok(Error::InvalidFinalityBuffer)));
 }
 
