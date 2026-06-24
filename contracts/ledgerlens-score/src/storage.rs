@@ -6,9 +6,9 @@ use crate::constants::{
 };
 use crate::errors::Error;
 use crate::types::{
-    AggregateRiskScore, DataKey, EmbargoExpiry, GateDataKey, ModelVersionStats, PendingScoreEntry,
-    RiskScore, ScoreDispute, ScoreFloorPolicy, ScoreHistogram, ScoreTrend, ScoreVelocityCap,
-    UpgradeProposal,
+    AggregateRiskScore, DataKey, EmbargoExpiry, GateDataKey, JumpStats, ModelVersionStats,
+    PendingScoreEntry, RiskScore, ScoreDispute, ScoreFloorPolicy, ScoreHistogram, ScoreTrend,
+    ScoreVelocityCap, UpgradeProposal,
 };
 use soroban_sdk::{Address, Bytes, Env, Symbol, Vec};
 
@@ -601,6 +601,19 @@ pub fn update_model_stats(env: &Env, model_version: u32, score: u32) {
     stats.submission_count += 1;
     stats.score_sum += score as u64;
     env.storage().instance().set(&key, &stats);
+
+    let idx_key = DataKey::ModelVersionIndex;
+    let mut versions: Vec<u32> = env
+        .storage()
+        .instance()
+        .get(&idx_key)
+        .unwrap_or_else(|| Vec::new(env));
+    if !versions.contains(&model_version)
+        && versions.len() < crate::constants::MAX_MODEL_VERSIONS
+    {
+        versions.push_back(model_version);
+        env.storage().instance().set(&idx_key, &versions);
+    }
 }
 
 pub fn get_model_stats(env: &Env, model_version: u32) -> Option<ModelVersionStats> {
@@ -608,7 +621,7 @@ pub fn get_model_stats(env: &Env, model_version: u32) -> Option<ModelVersionStat
 }
 
 pub fn get_all_model_versions(env: &Env) -> Vec<u32> {
-    env.storage().instance().get(&DataKey::AllModelVersions).unwrap_or_else(|| Vec::new(env))
+    env.storage().instance().get(&DataKey::ModelVersionIndex).unwrap_or_else(|| Vec::new(env))
 }
 
 // ── Staleness window ──────────────────────────────────────────────────────────
@@ -1081,6 +1094,28 @@ pub fn peek_is_embargoed(env: &Env, wallet: &Address) -> bool {
     }
 }
 
+/// Returns the expiry timestamp of `wallet`'s active embargo, if any.
+///
+/// - No embargo on record, or an expired timed embargo — `None`.
+/// - Indefinite embargo — `None` (there is no timestamp to report).
+/// - Active timed embargo — `Some(ts)`.
+pub fn get_embargo_expiry(env: &Env, wallet: &Address) -> Option<u64> {
+    let key = DataKey::ScoreEmbargo(wallet.clone());
+    let expiry: Option<EmbargoExpiry> = env.storage().temporary().get(&key);
+    match expiry {
+        None => None,
+        Some(EmbargoExpiry::Indefinite) => None,
+        Some(EmbargoExpiry::Until(ts)) => {
+            if env.ledger().timestamp() <= ts {
+                Some(ts)
+            } else {
+                None
+            }
+        }
+    }
+}
+
+
 pub fn get_embargoed_wallets(env: &Env) -> Vec<Address> {
     let wallets: Vec<Address> =
         env.storage().temporary().get(&DataKey::EmbargoedWalletIndex).unwrap_or_else(|| Vec::new(env));
@@ -1123,25 +1158,6 @@ pub fn remove_from_embargoed_index(env: &Env, wallet: &Address) {
 pub fn clear_embargoed_index(env: &Env) {
     env.storage().temporary().remove(&DataKey::EmbargoedWalletIndex);
 }
-
-/// Sets the risk band state for `(wallet, asset_pair)`. Passing `true`
-/// records that the wallet has entered the high-risk band; passing `false`
-/// removes the entry (equivalent to `false`, the default) so storage is not
-/// wasted on cleared state.
-pub fn set_risk_band_state(env: &Env, wallet: &Address, asset_pair: &Symbol, in_band: bool) {
-    let key = DataKey::RiskBandState(wallet.clone(), asset_pair.clone());
-    if in_band {
-        env.storage().temporary().set(&key, &true);
-        env.storage().temporary().extend_ttl(
-            &key,
-            BAND_STATE_TTL_THRESHOLD,
-            BAND_STATE_TTL_EXTEND_TO,
-        );
-    } else {
-        env.storage().temporary().remove(&key);
-    }
-}
-
 // ── Band entry timestamp ──────────────────────────────────────────────────────
 
 /// Returns the ledger timestamp at which `wallet` first entered the high-risk
@@ -1512,7 +1528,7 @@ pub fn set_model_posterior_weight(env: &Env, version: u32, weight: u64) {
 fn get_histogram_vec(env: &Env) -> Vec<u64> {
     env.storage().instance().get(&DataKey::ScoreHistogram).unwrap_or_else(|| {
         let mut v = Vec::new(env);
-        for _ in 0..=100u32 {
+        for _ in 0..10u32 {
             v.push_back(0u64);
         }
         v
@@ -1545,9 +1561,10 @@ pub fn get_histogram_bucket(env: &Env, bucket: u32) -> u32 {
 pub fn update_histogram_on_clear(env: &Env, removed_score: u32) {
     let key = DataKey::ScoreHistogram;
     let mut histogram = get_histogram_vec(env);
-    if removed_score <= 100 && histogram.len() >= 101 {
-        let count = histogram.get(removed_score).unwrap_or(0).saturating_sub(1);
-        histogram.set(removed_score, count);
+    let bucket = if removed_score >= 100 { 9 } else { removed_score / 10 };
+    if histogram.len() >= 10 {
+        let count = histogram.get(bucket).unwrap_or(0).saturating_sub(1);
+        histogram.set(bucket, count);
         env.storage().instance().set(&key, &histogram);
     }
 }
@@ -1555,19 +1572,17 @@ pub fn update_histogram_on_clear(env: &Env, removed_score: u32) {
 pub fn update_histogram_on_write(env: &Env, previous_score: Option<u32>, new_score: u32) {
     let key = DataKey::ScoreHistogram;
     let mut histogram = get_histogram_vec(env);
-    if histogram.len() < 101 {
+    if histogram.len() < 10 {
         return;
     }
     if let Some(prev) = previous_score {
-        if prev <= 100 {
-            let prev_count = histogram.get(prev).unwrap_or(0).saturating_sub(1);
-            histogram.set(prev, prev_count);
-        }
+        let prev_bucket = if prev >= 100 { 9 } else { prev / 10 };
+        let prev_count = histogram.get(prev_bucket).unwrap_or(0).saturating_sub(1);
+        histogram.set(prev_bucket, prev_count);
     }
-    if new_score <= 100 {
-        let new_count = histogram.get(new_score).unwrap_or(0).saturating_add(1);
-        histogram.set(new_score, new_count);
-    }
+    let new_bucket = if new_score >= 100 { 9 } else { new_score / 10 };
+    let new_count = histogram.get(new_bucket).unwrap_or(0).saturating_add(1);
+    histogram.set(new_bucket, new_count);
     env.storage().instance().set(&key, &histogram);
 }
 

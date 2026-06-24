@@ -512,3 +512,7 @@ pub fn signer_grace_period_updated(env: &Env, grace_secs: u64) {
 pub fn model_version_registered(env: &Env, version: u32) {
     env.events().publish((symbol_short!("mv_reg"),), version);
 }
+
+pub fn entry_ttls_extended(env: &Env, renewed: u32, requested: u32) {
+    env.events().publish((symbol_short!("ttl_ext"),), (renewed, requested));
+}

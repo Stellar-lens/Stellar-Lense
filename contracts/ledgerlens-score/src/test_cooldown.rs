@@ -1,4 +1,4 @@
-﻿//! Dedicated cooldown / rate-limit edge-case tests.
+//! Dedicated cooldown / rate-limit edge-case tests.
 //!
 //! Complements `test_rate_limit.rs` with scenarios that exercise
 //! `override_rate_limit` reset semantics, cross-path cooldown enforcement
@@ -46,6 +46,25 @@ fn submit(
     pair: &Symbol,
     score: u32,
 ) {
+    let has_pubkey = env.as_contract(&client.address, || {
+        env.storage().instance().has(&crate::types::DataKey::ServicePubKey)
+    });
+    let att = if has_pubkey {
+        let mut key = signing_key(1);
+        if let Ok(Ok(stored_bytes)) = client.try_get_service_pubkey() {
+            for seed in [1, 4, 5] {
+                let k = signing_key(seed);
+                if pubkey_bytes(env, &k) == stored_bytes {
+                    key = k;
+                    break;
+                }
+            }
+        }
+        let dig = commitment(env, &client.address, wallet, pair, score, START_TS, 90, 1);
+        Some(crate::ScoreAttestationInput::Single(attest(env, &key, dig)))
+    } else {
+        None
+    };
     client.submit_score(
         &Vec::new(env),
         wallet,
@@ -56,7 +75,7 @@ fn submit(
         &START_TS,
         &90,
         &1,
-        &None,
+        &att,
     );
 }
 
@@ -67,6 +86,25 @@ fn try_submit(
     pair: &Symbol,
     score: u32,
 ) -> Result<(), Result<Error, soroban_sdk::InvokeError>> {
+    let has_pubkey = env.as_contract(&client.address, || {
+        env.storage().instance().has(&crate::types::DataKey::ServicePubKey)
+    });
+    let att = if has_pubkey {
+        let mut key = signing_key(1);
+        if let Ok(Ok(stored_bytes)) = client.try_get_service_pubkey() {
+            for seed in [1, 4, 5] {
+                let k = signing_key(seed);
+                if pubkey_bytes(env, &k) == stored_bytes {
+                    key = k;
+                    break;
+                }
+            }
+        }
+        let dig = commitment(env, &client.address, wallet, pair, score, START_TS, 90, 1);
+        Some(crate::ScoreAttestationInput::Single(attest(env, &key, dig)))
+    } else {
+        None
+    };
     client.try_submit_score(
         &Vec::new(env),
         wallet,
@@ -77,7 +115,7 @@ fn try_submit(
         &START_TS,
         &90,
         &1,
-        &None,
+        &att,
     ).map(|_| ())
 }
 
@@ -343,7 +381,7 @@ fn test_consensus_within_cooldown_rejected() {
 #[test]
 fn test_consensus_after_cooldown_accepted() {
     let (env, client, _admin) = setup();
-    let key = signing_key(2);
+    let key = signing_key(1);
     client.set_service_pubkey(&Vec::new(&env), &pubkey_bytes(&env, &key));
 
     let wallet = Address::generate(&env);
@@ -374,7 +412,7 @@ fn test_consensus_after_cooldown_accepted() {
 #[test]
 fn test_consensus_after_override_accepted() {
     let (env, client, _admin) = setup();
-    let key = signing_key(3);
+    let key = signing_key(1);
     client.set_service_pubkey(&Vec::new(&env), &pubkey_bytes(&env, &key));
 
     let wallet = Address::generate(&env);

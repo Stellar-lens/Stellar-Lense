@@ -65,22 +65,29 @@
                   "u32": 1
                 },
                 {
-                  "map": [
+                  "vec": [
                     {
-                      "key": {
-                        "symbol": "commitment"
-                      },
-                      "val": {
-                        "bytes": "df938bb3ab365144e099437d20b1770c4e775a1c5eb9d156d84a5925e6fbecd4"
-                      }
+                      "symbol": "Single"
                     },
                     {
-                      "key": {
-                        "symbol": "signature"
-                      },
-                      "val": {
-                        "bytes": "57c365bbd607db6d6e37dfe2ca9075380a8704bc642006450399aedf136381dd63109c355dea275c11a05045898c254d72578daac630f7eea003a631b2310ff600"
-                      }
+                      "map": [
+                        {
+                          "key": {
+                            "symbol": "commitment"
+                          },
+                          "val": {
+                            "bytes": "df938bb3ab365144e099437d20b1770c4e775a1c5eb9d156d84a5925e6fbecd4"
+                          }
+                        },
+                        {
+                          "key": {
+                            "symbol": "signature"
+                          },
+                          "val": {
+                            "bytes": "57c365bbd607db6d6e37dfe2ca9075380a8704bc642006450399aedf136381dd63109c355dea275c11a05045898c254d72578daac630f7eea003a631b2310ff600"
+                          }
+                        }
+                      ]
                     }
                   ]
                 }
@@ -278,7 +285,7 @@
                 }
               ]
             },
-            "durability": "persistent"
+            "durability": "temporary"
           }
         },
         [
@@ -301,7 +308,7 @@
                     }
                   ]
                 },
-                "durability": "persistent",
+                "durability": "temporary",
                 "val": {
                   "u32": 0
                 }
@@ -309,7 +316,7 @@
             },
             "ext": "v0"
           },
-          777600
+          15
         ]
       ],
       [
@@ -319,7 +326,7 @@
             "key": {
               "vec": [
                 {
-                  "symbol": "HistoricalMaxScore"
+                  "symbol": "HistMaxScore"
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
@@ -342,7 +349,7 @@
                 "key": {
                   "vec": [
                     {
-                      "symbol": "HistoricalMaxScore"
+                      "symbol": "HistMaxScore"
                     },
                     {
                       "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
@@ -622,7 +629,7 @@
             "key": {
               "vec": [
                 {
-                  "symbol": "ScoreEntryLastTouchedLedger"
+                  "symbol": "ScoreEntryLTL"
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
@@ -645,7 +652,7 @@
                 "key": {
                   "vec": [
                     {
-                      "symbol": "ScoreEntryLastTouchedLedger"
+                      "symbol": "ScoreEntryLTL"
                     },
                     {
                       "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
@@ -842,6 +849,57 @@
         {
           "contract_data": {
             "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+            "key": {
+              "vec": [
+                {
+                  "symbol": "VerkleLeaf"
+                },
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                },
+                {
+                  "symbol": "XLM_USDC"
+                }
+              ]
+            },
+            "durability": "persistent"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+                "key": {
+                  "vec": [
+                    {
+                      "symbol": "VerkleLeaf"
+                    },
+                    {
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                    },
+                    {
+                      "symbol": "XLM_USDC"
+                    }
+                  ]
+                },
+                "durability": "persistent",
+                "val": {
+                  "bytes": "6f8bd32ba6a07c6ba97dbf9af340d748064fa7ff31c20a3361f0223942ca271f"
+                }
+              }
+            },
+            "ext": "v0"
+          },
+          4095
+        ]
+      ],
+      [
+        {
+          "contract_data": {
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
             "key": "ledger_key_contract_instance",
             "durability": "persistent"
           }
@@ -863,22 +921,6 @@
                     "storage": [
                       {
                         "key": {
-                          "symbol": "hist_b4"
-                        },
-                        "val": {
-                          "u32": 1
-                        }
-                      },
-                      {
-                        "key": {
-                          "symbol": "hist_tot"
-                        },
-                        "val": {
-                          "u32": 1
-                        }
-                      },
-                      {
-                        "key": {
                           "vec": [
                             {
                               "symbol": "Admin"
@@ -893,16 +935,24 @@
                         "key": {
                           "vec": [
                             {
-                              "symbol": "AllModelVersions"
+                              "symbol": "LastGlobalSub"
                             }
                           ]
                         },
                         "val": {
+                          "u64": 0
+                        }
+                      },
+                      {
+                        "key": {
                           "vec": [
                             {
-                              "u32": 1
+                              "symbol": "LastSvcActivity"
                             }
                           ]
+                        },
+                        "val": {
+                          "u64": 0
                         }
                       },
                       {
@@ -920,42 +970,10 @@
                           "map": [
                             {
                               "key": {
-                                "symbol": "first_seen"
-                              },
-                              "val": {
-                                "u64": 0
-                              }
-                            },
-                            {
-                              "key": {
-                                "symbol": "last_seen"
-                              },
-                              "val": {
-                                "u64": 0
-                              }
-                            },
-                            {
-                              "key": {
                                 "symbol": "model_version"
                               },
                               "val": {
                                 "u32": 1
-                              }
-                            },
-                            {
-                              "key": {
-                                "symbol": "score_max"
-                              },
-                              "val": {
-                                "u32": 42
-                              }
-                            },
-                            {
-                              "key": {
-                                "symbol": "score_min"
-                              },
-                              "val": {
-                                "u32": 42
                               }
                             },
                             {
@@ -973,6 +991,65 @@
                               "val": {
                                 "u32": 1
                               }
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "key": {
+                          "vec": [
+                            {
+                              "symbol": "MvIndex"
+                            }
+                          ]
+                        },
+                        "val": {
+                          "vec": [
+                            {
+                              "u32": 1
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "key": {
+                          "vec": [
+                            {
+                              "symbol": "ScoreHistogram"
+                            }
+                          ]
+                        },
+                        "val": {
+                          "vec": [
+                            {
+                              "u64": 0
+                            },
+                            {
+                              "u64": 0
+                            },
+                            {
+                              "u64": 0
+                            },
+                            {
+                              "u64": 0
+                            },
+                            {
+                              "u64": 1
+                            },
+                            {
+                              "u64": 0
+                            },
+                            {
+                              "u64": 0
+                            },
+                            {
+                              "u64": 0
+                            },
+                            {
+                              "u64": 0
+                            },
+                            {
+                              "u64": 0
                             }
                           ]
                         }
@@ -999,6 +1076,18 @@
                         },
                         "val": {
                           "bytes": "04e4dbb4350d84eabec1d67e40a398a78a8e6d719d86914393fca83b88dbe927afb80fe66bf659859889a544623c945d0bd80d855f649e8c197be3aa41fe0390f8"
+                        }
+                      },
+                      {
+                        "key": {
+                          "vec": [
+                            {
+                              "symbol": "VerkleCommit"
+                            }
+                          ]
+                        },
+                        "val": {
+                          "bytes": "549670cf06f068929bf0a8b72788884339a6dac0764b2332b8e4cce4ea118735"
                         }
                       }
                     ]
@@ -1277,22 +1366,29 @@
                   "u32": 1
                 },
                 {
-                  "map": [
+                  "vec": [
                     {
-                      "key": {
-                        "symbol": "commitment"
-                      },
-                      "val": {
-                        "bytes": "df938bb3ab365144e099437d20b1770c4e775a1c5eb9d156d84a5925e6fbecd4"
-                      }
+                      "symbol": "Single"
                     },
                     {
-                      "key": {
-                        "symbol": "signature"
-                      },
-                      "val": {
-                        "bytes": "57c365bbd607db6d6e37dfe2ca9075380a8704bc642006450399aedf136381dd63109c355dea275c11a05045898c254d72578daac630f7eea003a631b2310ff600"
-                      }
+                      "map": [
+                        {
+                          "key": {
+                            "symbol": "commitment"
+                          },
+                          "val": {
+                            "bytes": "df938bb3ab365144e099437d20b1770c4e775a1c5eb9d156d84a5925e6fbecd4"
+                          }
+                        },
+                        {
+                          "key": {
+                            "symbol": "signature"
+                          },
+                          "val": {
+                            "bytes": "57c365bbd607db6d6e37dfe2ca9075380a8704bc642006450399aedf136381dd63109c355dea275c11a05045898c254d72578daac630f7eea003a631b2310ff600"
+                          }
+                        }
+                      ]
                     }
                   ]
                 }

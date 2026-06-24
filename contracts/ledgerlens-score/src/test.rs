@@ -1,4 +1,4 @@
-﻿use soroban_sdk::{symbol_short,
+use soroban_sdk::{symbol_short,
     testutils::{Address as _, Ledger as _},
     Address, Env, Symbol, Vec,
 };
@@ -13,6 +13,7 @@ use crate::{
 pub fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
     let env = Env::default();
     env.mock_all_auths();
+    env.budget().reset_unlimited();
 
     let contract_id = env.register_contract(None, LedgerLensScoreContract);
     let client = LedgerLensScoreContractClient::new(&env, &contract_id);
@@ -2003,6 +2004,7 @@ fn test_score_count_increments_on_submit() {
     );
     assert_eq!(client.get_score_count(&wallet, &asset_pair), 1);
 
+    env.ledger().with_mut(|l| l.timestamp += 3_601);
     client.submit_score(
         &Vec::new(&env),
         &wallet,
@@ -2095,6 +2097,7 @@ fn test_score_count_is_per_pair() {
     let pair2 = symbol_short!("XLM_BTC");
 
     client.submit_score(&Vec::new(&env), &wallet, &pair1, &30, &false, &false, &1, &60, &1, &None);
+    env.ledger().with_mut(|l| l.timestamp += 3_601);
     client.submit_score(&Vec::new(&env), &wallet, &pair1, &40, &false, &false, &2, &70, &1, &None);
     client.submit_score(&Vec::new(&env), &wallet, &pair2, &90, &true, &true, &3, &95, &1, &None);
 
@@ -2233,6 +2236,7 @@ fn test_wallet_pair_list_deduplicates() {
 
     // Submit twice for the same pair — should still count as 1.
     client.submit_score(&Vec::new(&env), &wallet, &pair, &50, &false, &false, &1, &90, &1, &None);
+    env.ledger().with_mut(|l| l.timestamp += 3_601);
     client.submit_score(&Vec::new(&env), &wallet, &pair, &60, &false, &false, &2, &90, &1, &None);
 
     assert_eq!(client.get_wallet_pair_list(&wallet).len(), 1);

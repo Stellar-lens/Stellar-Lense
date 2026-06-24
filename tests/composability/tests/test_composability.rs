@@ -69,8 +69,7 @@ fn submit_score(fixture: &Fixture, wallet: &Address, score: u32, confidence: u32
             &confidence,
             &1,
             &None,
-        )
-        .unwrap();
+        );
 }
 
 // ── Acceptance criterion: both mock contracts compile and deploy ───────────
@@ -81,7 +80,7 @@ fn both_mock_contracts_deploy_alongside_ledgerlens() {
     // mock-amm and mock-lending compile, link against ledgerlens-score, and
     // register in the same Env as a real LedgerLens deployment.
     let fixture = setup();
-    assert_eq!(fixture.ledgerlens.get_version(), 2);
+    assert_eq!(fixture.ledgerlens.get_version(), 3);
 }
 
 // ── Acceptance criterion: AMM swap rejected/accepted by risk score ─────────
@@ -103,7 +102,7 @@ fn amm_swap_accepted_for_low_risk_score() {
     submit_score(&fixture, &wallet, 10, 95); // 10 < GATE_THRESHOLD(75)
 
     let result = fixture.amm.try_swap(&wallet, &symbol_short!("XLM_USDC"), &1_000);
-    assert_eq!(result, Ok(()));
+    assert_eq!(result, Ok(Ok(())));
 }
 
 #[test]
@@ -136,7 +135,7 @@ fn lending_borrow_accepted_for_low_risk_high_confidence_score() {
     submit_score(&fixture, &wallet, 10, 90);
 
     let result = fixture.lending.try_borrow(&wallet, &symbol_short!("XLM_USDC"), &1_000);
-    assert_eq!(result, Ok(()));
+    assert_eq!(result, Ok(Ok(())));
 }
 
 #[test]
@@ -189,7 +188,7 @@ fn amm_swap_resumes_after_embargo_lifted() {
     );
 
     fixture.ledgerlens.lift_score_embargo(&wallet);
-    assert_eq!(fixture.amm.try_swap(&wallet, &symbol_short!("XLM_USDC"), &1_000), Ok(()));
+    assert_eq!(fixture.amm.try_swap(&wallet, &symbol_short!("XLM_USDC"), &1_000), Ok(Ok(())));
 }
 
 // ── Mock-contract input validation (not LedgerLens-specific, but part of
