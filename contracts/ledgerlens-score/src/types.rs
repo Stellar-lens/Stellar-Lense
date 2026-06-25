@@ -122,6 +122,8 @@ pub struct AggregateRiskScore {
 pub struct ScoreAttestation {
     pub commitment: BytesN<32>,
     pub signature: BytesN<65>,
+    pub contract_id: BytesN<32>,
+    pub contract_version: u32,
 }
 
 /// Threshold-signature attestation: t-of-n signers produce one 65-byte proof.
@@ -132,6 +134,8 @@ pub struct ThresholdAttestation {
     pub commitment: BytesN<32>,
     pub threshold_sig: BytesN<65>,
     pub participating_signers: soroban_sdk::Vec<Address>,
+    pub contract_id: BytesN<32>,
+    pub contract_version: u32,
 }
 
 /// Unified attestation input for `submit_score`.
@@ -435,6 +439,10 @@ pub enum DataKey {
     ScoreEntryIndex,
     ScoreEntryLastTouchedLedger(Address, Symbol),
     ModelVersionIndex,
+    /// Merkle audit root over all admin governance actions since initialization.
+    AdminAuditRoot,
+    /// Configurable score decay profile (Linear, Exponential, or Step).
+    DecayProfile,
 }
 
 impl DataKey {
@@ -546,6 +554,8 @@ impl DataKey {
             DataKey::JumpStats(w, s) => k2!("JumpStats", w, s),
             DataKey::FeeRecipient => k0!("FeeRecipient"),
             DataKey::EmbargoedWalletIndex => k0!("EmbargoedWIndex"),
+            DataKey::AdminAuditRoot => k0!("AdminAuditRoot"),
+            DataKey::DecayProfile => k0!("DecayProfile"),
         }
     }
 }
@@ -593,4 +603,13 @@ pub struct VerkleLeaf {
     pub score: u32,
     pub timestamp: u64,
     pub model_version: u32,
+}
+
+/// Configurable score decay profile.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum DecayProfile {
+    Linear { lambda_num: u32, lambda_den: u32 },
+    Exponential { half_life_secs: u64 },
+    Step { steps: Vec<(u64, u32)> },
 }
