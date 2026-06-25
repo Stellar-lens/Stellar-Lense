@@ -435,6 +435,12 @@ pub enum DataKey {
     ScoreEntryIndex,
     ScoreEntryLastTouchedLedger(Address, Symbol),
     ModelVersionIndex,
+    /// Running total of score submissions for an asset pair (all wallets combined).
+    /// Incremented on every successful submission for `asset_pair`.
+    PairScoreCount(Symbol),
+    /// Running total of unique (wallet, asset_pair) combinations ever scored.
+    /// Incremented on the *first* successful submission for each new combination.
+    TotalWalletsScored,
 }
 
 impl DataKey {
@@ -546,6 +552,8 @@ impl DataKey {
             DataKey::JumpStats(w, s) => k2!("JumpStats", w, s),
             DataKey::FeeRecipient => k0!("FeeRecipient"),
             DataKey::EmbargoedWalletIndex => k0!("EmbargoedWIndex"),
+            DataKey::PairScoreCount(s) => k1!("PairScoreCnt", s),
+            DataKey::TotalWalletsScored => k0!("TotalWalletsScored"),
         }
     }
 }
