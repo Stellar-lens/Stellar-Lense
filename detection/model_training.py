@@ -12,6 +12,10 @@ artifacts to `config.MODEL_DIR`, and writes `metrics.json` alongside them.
 
 After every training run, `metrics.json` is signed with the Ed25519 private
 key at `MODEL_SIGNING_PRIVATE_KEY_PATH` (if configured).
+
+Pass `--calibrate-ensemble` to additionally run NSGA-II Pareto front search
+over ensemble combination weights (see `detection/ensemble_calibrator.py`)
+and write `models/pareto_front.json`.
 """
 
 import argparse
@@ -42,7 +46,7 @@ MODEL_REGISTRY = {
     "lightgbm": LGBMClassifier,
 }
 
-FEATURE_COLUMNS_EXCLUDE = {"wallet", "label"}
+FEATURE_COLUMNS_EXCLUDE = {"wallet", "label", "profile"}
 PSI_N_BINS = 10
 PSI_EPSILON = 1e-4
 
@@ -100,11 +104,6 @@ def compute_feature_schema_hash(feature_columns: list[str]) -> str:
     return f"sha256:{hashlib.sha256(schema_str.encode()).hexdigest()}"
 
 
-LABEL_DISTRIBUTION_BASELINE_PATH = os.path.join(
-    config.MODEL_DIR, "label_distribution_baseline.json"
-)
-
-
 def load_training_data(path: str) -> pd.DataFrame:
     """Load a labelled feature matrix (output of `build_feature_matrix` plus
     a `label` column: 1 = wash trading, 0 = legitimate)."""
@@ -151,7 +150,7 @@ def detect_label_poisoning(
         baseline = json.load(f)
 
     baseline_ratio = baseline.get("wash_trade_ratio", current_ratio)
-    return abs(current_ratio - baseline_ratio) > threshold
+    return bool(abs(current_ratio - baseline_ratio) > threshold)
 
 
 def _adversarial_augment(
@@ -200,6 +199,8 @@ def train_models(
           "feature_distributions": {...},
           "n_train": int,
           "n_test": int,
+          "X_test": pd.DataFrame,
+          "y_test": pd.Series,
         }
 
     If ``adversarial_augmentation`` is True, ``auc_roc_adversarial`` is also
@@ -257,13 +258,16 @@ def train_models(
         "feature_distributions": compute_feature_distributions(X),
         "n_train": len(X_train),
         "n_test": len(X_test),
+        "X_test": X_test,
+        "y_test": y_test,
     }
 
 
 def save_models(results: dict, model_dir: str | None = None) -> None:
     model_dir = model_dir or config.MODEL_DIR
     os.makedirs(model_dir, exist_ok=True)
-    for name, result in results.items():
+    to_save = results.get("results", results) if isinstance(results, dict) else results
+    for name, result in to_save.items():
         joblib.dump(result["model"], os.path.join(model_dir, f"{name}.joblib"))
 
 
@@ -272,12 +276,58 @@ def save_training_artifacts(
     data_path: str,
     model_dir: str | None = None,
 ) -> None:
-    """Write metrics.json and model_metadata.json to the model directory.
+    """Write metrics.json and model_metadata.json to the model directory."""
+    model_dir = model_dir or config.MODEL_DIR
+    os.makedirs(model_dir, exist_ok=True)
 
-    NOTE: data_path is stored as-is from the CLI. If this path contains
-    sensitive information (e.g. S3 credentials), it will be persisted
-    in the metadata file.
-    """
+    results = training_output["results"]
+    feature_columns = training_output["feature_columns"]
+    feature_distributions = training_output.get("feature_distributions")
+
+    # Save metrics.json
+    metrics_path = os.path.join(model_dir, "metrics.json")
+    metrics_payload = {name: result["metrics"] for name, result in results.items()}
+    for name in results:
+        artifact_path = os.path.join(model_dir, f"{name}.joblib")
+        if os.path.exists(artifact_path):
+            sha = hashlib.sha256()
+            with open(artifact_path, "rb") as f:
+                for chunk in iter(lambda: f.read(65536), b""):
+                    sha.update(chunk)
+            metrics_payload[name]["artifact_sha256"] = sha.hexdigest()
+
+    with open(metrics_path, "w") as f:
+        json.dump(metrics_payload, f, indent=2)
+
+    # Save model_metadata.json
+    metadata_path = os.path.join(model_dir, "model_metadata.json")
+    metadata = {
+        "trained_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+        "data_path": data_path,
+        "n_training_rows": training_output["n_train"],
+        "n_test_rows": training_output["n_test"],
+        "feature_columns": feature_columns,
+        "feature_schema_hash": compute_feature_schema_hash(feature_columns),
+        "model_names": list(results.keys()),
+        "python_version": sys.version.split()[0],
+        "ledgerlens_version": "0.2.0",
+        "feature_distributions": feature_distributions,
+    }
+
+    metadata_path = os.path.join(model_dir, "model_metadata.json")
+    with open(metadata_path, "w") as f:
+        json.dump(metadata, f, indent=2)
+
+    logger.info("Saved metrics to %s", metrics_path)
+    logger.info("Saved model metadata to %s", metadata_path)
+
+
+def save_training_artifacts(
+    training_output: dict,
+    data_path: str,
+    model_dir: str | None = None,
+) -> None:
+    """Write metrics.json and model_metadata.json to the model directory."""
     model_dir = model_dir or config.MODEL_DIR
     os.makedirs(model_dir, exist_ok=True)
 
@@ -306,38 +356,6 @@ def save_training_artifacts(
     with open(metadata_path, "w") as f:
         json.dump(metadata, f, indent=2)
 
-    logger.info("Saved metrics to %s", metrics_path)
-    logger.info("Saved model metadata to %s", metadata_path)
-
-
-def save_metrics_report(
-    results: dict,
-    model_dir: str | None = None,
-    extra: dict | None = None,
-) -> str:
-    """Write metrics (plus optional *extra* provenance fields) to metrics.json."""
-    model_dir = model_dir or config.MODEL_DIR
-    os.makedirs(model_dir, exist_ok=True)
-    path = os.path.join(model_dir, "metrics.json")
-
-    payload: dict = {name: result["metrics"] for name, result in results.items()}
-
-    for name in results:
-        artifact_path = os.path.join(model_dir, f"{name}.joblib")
-        if os.path.exists(artifact_path):
-            sha = hashlib.sha256()
-            with open(artifact_path, "rb") as f:
-                for chunk in iter(lambda: f.read(65536), b""):
-                    sha.update(chunk)
-            payload[name]["artifact_sha256"] = sha.hexdigest()
-
-    if extra:
-        payload.update(extra)
-
-    with open(path, "w") as f:
-        json.dump(payload, f, indent=2)
-    return path
-
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train the LedgerLens ensemble classifiers")
@@ -353,6 +371,17 @@ def parse_args() -> argparse.Namespace:
             "Augment training data with AmountJitter / TemporalSpreading-style "
             "perturbed copies of wash-trade rows. Augmentation ratio is controlled "
             "by ADVERSARIAL_AUG_RATIO in config / .env (default 0.0 = disabled)."
+        ),
+    )
+    parser.add_argument(
+        "--with-gnn",
+        action="store_true",
+        default=False,
+        help=(
+            "Pre-train a GraphSAGE encoder on the full training graph using "
+            "contrastive link-prediction loss, then append GNN embedding features "
+            "(gnn_0 … gnn_{GNN_EMBEDDING_DIM-1}) to each wallet's feature row. "
+            "Requires torch and torch_geometric to be installed."
         ),
     )
     return parser.parse_args()
@@ -391,6 +420,76 @@ def main() -> None:
         )
         return
 
+    # --with-gnn: pre-train GNN encoder and append embedding features
+    if args.with_gnn:
+        try:
+            import networkx as nx
+
+            from detection.gnn_encoder import GNNEncoder, pretrain_gnn_contrastive
+
+            logger.info("Building wallet graph for GNN pre-training…")
+            # Build a simple co-occurrence graph from wallet column for pre-training
+            encoder = GNNEncoder(model_dir=model_dir, random_state=args.random_state)
+
+            # Build a minimal funding graph from the training data
+            # (wallets with label=1 form synthetic wash rings for contrastive training)
+            graph = nx.DiGraph()
+            wallets = df["wallet"].tolist() if "wallet" in df.columns else []
+            for w in wallets:
+                graph.add_node(w)
+
+            wash_wallets = (
+                df.loc[df["label"] == 1, "wallet"].tolist()
+                if "wallet" in df.columns and "label" in df.columns
+                else []
+            )
+            # Group labelled wash-trade wallets into a single synthetic ring
+            wash_rings = [wash_wallets] if wash_wallets else []
+
+            logger.info(
+                "GNN pre-training: %d nodes, %d wash-trade wallets in %d ring(s)",
+                graph.number_of_nodes(),
+                len(wash_wallets),
+                len(wash_rings),
+            )
+
+            loss_curve = pretrain_gnn_contrastive(
+                encoder=encoder,
+                graph=graph,
+                wash_ring_wallets=wash_rings,
+                random_state=args.random_state,
+            )
+
+            # Persist pre-trained encoder
+            os.makedirs(model_dir, exist_ok=True)
+            encoder.save()
+            logger.info("GNN encoder saved to %s", model_dir)
+
+            # Log loss curve
+            ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%S")
+            os.makedirs("reports", exist_ok=True)
+            loss_report_path = f"reports/gnn_pretrain_{ts}.json"
+            with open(loss_report_path, "w") as f:
+                json.dump({"loss_curve": loss_curve}, f, indent=2)
+            logger.info("GNN pre-training loss curve written to %s", loss_report_path)
+
+            # Append GNN embedding features to the training DataFrame
+            logger.info("Appending GNN embedding features to training data…")
+            gnn_features: list[dict] = []
+            for wallet in wallets:
+                try:
+                    emb = encoder.encode(graph, wallet)
+                    gnn_features.append({f"gnn_{i}": float(emb[i]) for i in range(len(emb))})
+                except Exception:
+                    gnn_features.append({f"gnn_{i}": 0.0 for i in range(config.GNN_EMBEDDING_DIM)})
+            gnn_df = pd.DataFrame(gnn_features, index=df.index)
+            df = pd.concat([df, gnn_df], axis=1)
+            logger.info("GNN embedding columns added: gnn_0 … gnn_%d", config.GNN_EMBEDDING_DIM - 1)
+
+        except ImportError as exc:
+            logger.error("--with-gnn requested but torch/torch_geometric not available: %s", exc)
+            logger.error("Install torch and torch_geometric to enable GNN training.")
+
     training_output = train_models(
         df,
         test_size=args.test_size,
@@ -403,6 +502,16 @@ def main() -> None:
 
     save_models(results, model_dir)
     save_training_artifacts(training_output, args.data_path, model_dir)
+
+    if args.calibrate_ensemble:
+        from detection.ensemble_calibrator import EnsembleCalibrator, summarize_pareto_front
+
+        trained_models = {name: result["model"] for name, result in results.items()}
+        calibrator = EnsembleCalibrator(model_dir)
+        pareto_front = calibrator.run_search(
+            trained_models, training_output["X_test"], training_output["y_test"]
+        )
+        logger.info(summarize_pareto_front(pareto_front))
 
     if config.MODEL_SIGNING_PRIVATE_KEY_PATH:
         from detection.persistence import sign_metrics

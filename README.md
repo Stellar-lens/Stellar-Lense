@@ -20,9 +20,9 @@ Wash trading — simultaneously buying and selling the same asset to artificiall
 
 ## What This Repo Does
 
-- **Ingests** — Streams and bulk-loads trade history, order book events, and account activity from the Stellar Horizon API
-- **Detects** — Computes Benford's Law anomaly metrics (chi-square, per-digit Z-scores, MAD) per wallet, per asset, and per trading pair across rolling time windows
-- **Scores** — Extracts 30+ on-chain features and runs ensemble ML classifiers (Random Forest, XGBoost, LightGBM) to produce a 0–100 risk score per wallet/asset pair
+- **Ingests** — Streams and bulk-loads trade history from both the Stellar SDEX (order book) and AMM liquidity pools, plus order book events and account activity from the Stellar Horizon API
+- **Detects** — Computes Benford's Law anomaly metrics (chi-square, per-digit Z-scores, MAD) per wallet, per asset, and per trading pair across rolling time windows; detects **cross-venue coordination** between SDEX and AMM pool activity
+- **Scores** — Extracts 37+ on-chain features (including 7 cross-venue coordination features) and runs ensemble ML classifiers (Random Forest, XGBoost, LightGBM) to produce a 0–100 risk score per wallet/asset pair
 - **Explains** — Generates SHAP-based interpretability output so every risk score is auditable
 
 ## Architecture
@@ -95,10 +95,14 @@ Benford signals alone aren't definitive — legitimate high-frequency market mak
 - Volume spike frequency relative to rolling baseline
 
 **Wallet Graph Features**
-- Funding source similarity score
-- Network centrality within trading cluster graphs
+- Funding source similarity score *(legacy scalar — kept for model backwards compat)*
+- Network centrality within trading cluster graphs *(legacy scalar — kept for model backwards compat)*
 - Account age at time of trading activity
 - Wash-trading ring membership (`in_wash_trading_ring`, `ring_size`, `ring_internal_density`) — see [Wallet Graph Features](#wallet-graph-features-multi-hop--ring-detection) below
+
+**GNN Embedding Features (default 32 dims)**
+- `gnn_0` … `gnn_31`: GraphSAGE embedding of the wallet node in the combined funding + co-trade graph, capturing multi-hop ring structure that pairwise Jaccard similarity misses.  Computed by `detection/gnn_encoder.py`; defaults to all-zeros before the first training run.
+- See [`docs/gnn_architecture.md`](docs/gnn_architecture.md) for the full architecture, training procedure, and edge schema.
 
 **Cross-Asset Coordination Features (6)**
 - **Cross-pair trade synchrony** (0–1): Fraction of trades where the wallet simultaneously trades on other pairs within a configurable synchrony window (default: 30 seconds). High values indicate coordinated multi-pair activity — a strong wash-trading signal.
@@ -136,6 +140,18 @@ These columns are emitted only when community detection runs (i.e. a funding gra
 
 Models are trained with **SMOTE** to handle class imbalance and evaluated using **AUC-ROC**, **Precision-Recall AUC**, and **F1-score**. SHAP values provide interpretable explanations for every risk score.
 
+### Adversarial robustness
+
+A sophisticated operator who reverse-engineers the scoring system could perturb
+their on-chain footprint just enough to stay below the alert threshold. The
+`detection/adversarial/` package quantifies that attack surface: it runs
+**FGSM** and **PGD** (Madry et al., 2018) evasion attacks — estimating feature
+gradients by finite differences against the tree ensemble's continuous score —
+and reports the evasion success rate, the minimum L-inf perturbation per
+feature, and the most vulnerable features. **Adversarial-training augmentation**
+then retrains on PGD-perturbed wash examples and measures the AUC-ROC gain on a
+perturbed test set. See `scripts/run_adversarial_eval.py`.
+
 ## Repository Structure
 
 ```
@@ -163,6 +179,7 @@ ledgerlens-data/
 │   ├── model_inference.py            ← Real-time risk scoring
 │   ├── drift_monitor.py              ← PSI-based feature drift detection
 │   ├── shap_explainer.py             ← SHAP interpretability layer
+│   ├── adversarial/                  ← FGSM/PGD evasion attacks + robustness eval
 │   ├── persistence.py                ← SQLAlchemy RiskScore model + engine
 │   └── risk_score_store.py           ← RiskScore upsert/read repository
 │
@@ -176,30 +193,23 @@ ledgerlens-data/
 │   └── pipeline.py                   ← StreamingPipeline orchestrator
 │
 ├── scripts/
-│   ├── stream.py                     ← Real-time pipeline CLI (python -m scripts.stream)
 │   ├── generate_synthetic_dataset.py ← Synthetic labelled dataset for local training/demo
-│   ├── retrain_if_drifted.py         ← Automated drift detection + retraining trigger
-│   └── list_model_versions.py        ← List archived model versions with metrics
-│
-├── docs/
-│   ├── streaming_architecture.md     ← Real-time pipeline diagram and component docs
-│   └── drift_detection.md           ← PSI drift detection methodology and retraining docs
+│   └── run_adversarial_eval.py       ← Adversarial robustness report (FGSM/PGD)
 │
 ├── utils/
 │   ├── logging.py                    ← Shared logger setup
 │   └── retry.py                      ← Retry/backoff decorator for Horizon calls
 │
-├── tests/
-│   ├── test_benford.py
-│   ├── test_features.py
-│   ├── test_orderbook.py
-│   ├── test_wallet_graph.py
-│   ├── test_persistence.py
-│   ├── test_contract_client.py
-│   ├── test_model_training.py
-│   ├── test_inference_shap.py
-│   ├── test_drift_monitor.py
-│   └── test_retrain_trigger.py
+└── tests/
+    ├── test_benford.py
+    ├── test_features.py
+    ├── test_orderbook.py
+    ├── test_wallet_graph.py
+    ├── test_persistence.py
+    ├── test_contract_client.py
+    ├── test_model_training.py
+    ├── test_inference_shap.py
+    └── test_adversarial.py
 ```
 
 ## Quick Start
@@ -259,6 +269,42 @@ python -m scripts.stream --alert-channel websocket
 
 See [docs/streaming_architecture.md](docs/streaming_architecture.md) for the
 full pipeline diagram, threading model, and latency budget.
+
+#### Kafka deployment option (`STREAMING_BACKEND=kafka`)
+
+The default `sse` backend runs one thread per pair in a single process. For
+scale-out, durability, event replay, and backpressure, set
+`STREAMING_BACKEND=kafka` to route trades through Apache Kafka instead. The
+`sse` backend remains the default and is unchanged — operators without Kafka
+need do nothing.
+
+```bash
+# Bring up Zookeeper, Kafka, the producer, 3 scorer replicas, Prometheus + Grafana
+docker-compose up --scale ledgerlens-scorer=3
+```
+
+Architecture: a `HorizonKafkaProducer` serialises each Horizon SSE trade to Avro
+(`data/trade_avro_schema.json`) and produces it to
+`ledgerlens.trades.{asset_pair}`, keyed by `wallet_id` so per-wallet ordering is
+preserved. `KafkaWorker` replicas in the shared `ledgerlens-scorer` consumer
+group consume via a wildcard subscription, score wallets, dispatch alerts, and
+commit offsets only after dispatch (at-least-once). Serialisation failures go to
+a dead-letter queue (`ledgerlens.trades.dlq`); they are never auto-retried.
+
+| Variable | Default | Description |
+|---|---|---|
+| `STREAMING_BACKEND` | `sse` | `sse` (threaded) or `kafka` |
+| `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` | Broker list |
+| `KAFKA_SASL_USERNAME` | — | SASL username (read from env only) |
+| `KAFKA_SASL_PASSWORD` | — | SASL password (read from env only) |
+| `KAFKA_LAG_ALERT_THRESHOLD` | `500` | Consumer lag (messages) that triggers a CRITICAL log |
+
+Each scorer exposes Prometheus metrics (`kafka_lag_by_partition`,
+`scoring_latency_ms`, `alerts_dispatched_total`, `kafka_messages_consumed_total`)
+on `KAFKA_METRICS_PORT` (default `9100`); Grafana ships a pre-configured Kafka
+lag + scoring-latency dashboard. See
+[docs/streaming_architecture.md](docs/streaming_architecture.md#kafka-streaming-backend-issue-36)
+for the Kafka topology, partition strategy, and at-least-once semantics.
 
 ### `run_pipeline.py` flags
 
@@ -532,14 +578,17 @@ ledgerlens-data/
 │   ├── wallet_graph.py          ← funding-graph similarity/centrality
 │   ├── model_training.py        ← ensemble training CLI
 │   ├── model_inference.py       ← RiskScorer ensemble scoring
+│   ├── ensemble_calibrator.py   ← NSGA-II Pareto search over ensemble weights
 │   ├── shap_explainer.py        ← per-wallet + ensemble SHAP attributions
+│   ├── adversarial/             ← FGSM/PGD evasion attacks + robustness eval
 │   ├── persistence.py           ← SQLAlchemy RiskScore model + engine
 │   └── risk_score_store.py      ← RiskScore upsert/read repository
 ├── integrations/
 │   └── contract_client.py      ← ledgerlens-score Soroban contract client
 ├── scripts/
-│   └── generate_synthetic_dataset.py ← synthetic labelled dataset generator
-└── tests/ (8 modules, see Repository Structure above)
+│   ├── generate_synthetic_dataset.py ← synthetic labelled dataset generator
+│   └── run_adversarial_eval.py  ← adversarial robustness report (FGSM/PGD)
+└── tests/ (9 modules, see Repository Structure above)
 ```
 
 #### Known gaps / TODOs
@@ -593,6 +642,10 @@ Every trained model artifact is verified through a four-step chain before loadin
 
 The three models (RF, XGBoost, LightGBM) vote using a **trimmed mean / median** scheme. If the spread across model scores exceeds `BFT_SCORE_DIVERGENCE_THRESHOLD` (default 30 points), the outlier scores are trimmed and the median is used — ensuring a single compromised model cannot shift the final score by more than ~17 points. Divergence events are logged, counted in a Prometheus counter (`bft_divergence_detected_total`), and surfaced in the score response as `bft_divergence: true`.
 
+### Multi-Objective Ensemble Calibration
+
+`detection/ensemble_calibrator.py` runs NSGA-II (via `pymoo`) over the ensemble's per-model combination weights to find the Pareto front of non-dominated tradeoffs between **precision**, **recall**, and **SHAP stability** (mean cosine similarity between SHAP vectors under small input perturbations — high values mean explanations don't flip under noise). Run it with `python -m detection.model_training --calibrate-ensemble ...`, which writes `models/pareto_front.json`. Operators then call `EnsembleCalibrator.select_operating_point(min_precision=..., min_recall=...)` to pick the most explanation-stable point that still satisfies their precision/recall floor, and pass the resulting weights to `RiskScorer(weights=...)` to score with that calibrated point instead of the default BFT trimmed-mean voting.
+
 ### Label Poisoning Detection
 
 Each training run records the SHA-256 of the input dataset and the label distribution. If the wash-trade ratio has shifted more than `POISON_LABEL_RATIO_THRESHOLD` (default 15%) from the stored baseline, training is aborted and an alert is written to `reports/poisoning_alert_{timestamp}.json`.
@@ -604,6 +657,41 @@ Each annotation in `data/annotation_queue.json` is protected by an HMAC-SHA256 c
 ## Why This Matters
 
 A DEX where volume figures cannot be trusted is one that institutional participants and serious traders will avoid. LedgerLens is an **open-source public good** — its scores, methodology, and training data are fully transparent and auditable, and will always be free to query.
+
+## Compliance & Forensic Reporting
+
+LedgerLens risk scores are designed to support regulatory compliance workflows
+including FATF Travel Rule reviews, SEC market-manipulation investigations, and
+FinCEN Suspicious Activity Report (SAR) filings.
+
+Every risk score can be accompanied by a **tamper-evident forensic report** that
+documents exactly how the score was computed:
+
+- The 20 most anomalous trades with direct Horizon URLs for independent verification.
+- SHAP feature attributions with plain-English descriptions of each risk factor.
+- Benford's Law analysis across five time windows.
+- A SHA-256 fingerprint of the entire report, optionally anchored to the Stellar
+  ledger via Soroban for a non-repudiable timestamp.
+
+**Generating a report:**
+
+```bash
+# Markdown report for human review
+python -m scripts.score_wallet \
+  --wallet G... \
+  --pair "USDC:GA5Z.../XLM:native" \
+  --report --report-format markdown
+
+# JSON report anchored on-chain
+python -m scripts.score_wallet ... --report --anchor
+
+# Bulk report generation from a CSV of wallets
+python -m scripts.generate_reports --input wallets.csv --anchor
+```
+
+Reports are written to `reports/forensic/` with mode `0o600` (owner-readable
+only). See [`docs/forensic_reporting.md`](docs/forensic_reporting.md) for the
+full schema, anchoring workflow, and the three-step regulator verification guide.
 
 ## Contributing
 

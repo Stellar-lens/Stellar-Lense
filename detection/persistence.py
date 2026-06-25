@@ -5,6 +5,7 @@ integrity verification (Ed25519 trust chain).
 import hashlib
 import json
 import os
+import threading
 from datetime import UTC, datetime
 
 from cryptography.hazmat.primitives import serialization
@@ -12,8 +13,11 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey,
 from sqlalchemy import DateTime, Integer, String, UniqueConstraint, create_engine
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
+from sqlalchemy.pool import QueuePool
 
 from config import config
+
+_table_init_lock = threading.Lock()
 
 
 class Base(DeclarativeBase):
@@ -33,6 +37,8 @@ class RiskScoreRecord(Base):
     benford_flag: Mapped[bool] = mapped_column(nullable=False, default=False)
     ml_flag: Mapped[bool] = mapped_column(nullable=False, default=False)
     confidence: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # Non-breaking addition: NULL means propagation has not been run yet.
+    propagated_risk: Mapped[float | None] = mapped_column(nullable=True, default=None)
     # Stable wash-trading ring id ("ring_<hash>") grouping wallets in the same
     # detected community; NULL when the wallet is not part of any ring.
     ring_id: Mapped[str | None] = mapped_column(String, index=True, nullable=True, default=None)
@@ -41,23 +47,100 @@ class RiskScoreRecord(Base):
     )
 
     def to_risk_score(self) -> dict:
-        return {
+        result = {
             "score": self.score,
             "benford_flag": self.benford_flag,
             "ml_flag": self.ml_flag,
             "timestamp": int(self.updated_at.timestamp()),
             "confidence": self.confidence,
         }
+        if self.propagated_risk is not None:
+            result["propagated_risk"] = self.propagated_risk
+        return result
 
 
 def get_engine(db_url: str | None = None) -> Engine:
-    return create_engine(db_url or config.RISK_SCORE_DB_URL, future=True)
+    """Create SQLAlchemy engine with connection pooling.
+
+    Uses QueuePool for better concurrency support, preventing
+    'database is locked' errors when multiple threads write simultaneously.
+
+    Args:
+        db_url: Database URL (defaults to config.RISK_SCORE_DB_URL)
+
+    Returns:
+        SQLAlchemy Engine with connection pooling configured
+    """
+    effective_db_url = db_url or config.RISK_SCORE_DB_URL
+
+    # Enable WAL mode for SQLite to improve concurrent access
+    connect_args = {}
+    if effective_db_url.startswith("sqlite"):
+        connect_args = {
+            "check_same_thread": False,
+            # Enable WAL mode for better concurrent access
+            "timeout": 20,
+        }
+
+    return create_engine(
+        effective_db_url,
+        future=True,
+        poolclass=QueuePool,
+        pool_size=config.DB_POOL_SIZE,
+        max_overflow=config.DB_MAX_OVERFLOW,
+        pool_timeout=config.DB_POOL_TIMEOUT,
+        pool_pre_ping=True,  # Verify connections before use
+        connect_args=connect_args,
+    )
 
 
 def get_session_factory(engine: Engine | None = None) -> sessionmaker[Session]:
+    """Create session factory with properly configured engine.
+
+    Args:
+        engine: Optional engine instance (creates new one if not provided)
+
+    Returns:
+        SQLAlchemy sessionmaker bound to the engine
+    """
     engine = engine or get_engine()
-    Base.metadata.create_all(engine)
+    with _table_init_lock:
+        Base.metadata.create_all(engine, checkfirst=True)
+
+    # Configure SQLite for better concurrent access
+    if str(engine.url).startswith("sqlite"):
+        _configure_sqlite_for_concurrency(engine)
+
     return sessionmaker(bind=engine, future=True)
+
+
+def _configure_sqlite_for_concurrency(engine: Engine) -> None:
+    """Configure SQLite database for optimal concurrent access.
+
+    Enables WAL mode and adjusts pragmas for better concurrent performance.
+
+    Args:
+        engine: SQLAlchemy engine connected to SQLite database
+    """
+    from sqlalchemy import event
+
+    @event.listens_for(engine, "connect")
+    def _set_sqlite_pragma(dbapi_connection, connection_record):
+        # Enable WAL mode for better concurrent access
+        cursor = dbapi_connection.cursor()
+
+        # WAL mode allows concurrent readers with one writer
+        cursor.execute("PRAGMA journal_mode=WAL")
+
+        # Increase timeout to reduce contention errors
+        cursor.execute("PRAGMA busy_timeout=30000")  # 30 seconds
+
+        # Optimize for concurrent access
+        cursor.execute("PRAGMA synchronous=NORMAL")  # Faster than FULL, still safe in WAL mode
+        cursor.execute("PRAGMA cache_size=-64000")  # 64MB cache
+        cursor.execute("PRAGMA temp_store=MEMORY")  # Use memory for temp tables
+
+        cursor.close()
 
 
 # ---------------------------------------------------------------------------
