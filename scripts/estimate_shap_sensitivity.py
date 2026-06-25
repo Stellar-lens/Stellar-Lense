@@ -30,7 +30,6 @@ import pandas as pd
 import shap
 
 from config import config
-from detection.model_inference import RiskScorer
 from detection.model_training import FEATURE_COLUMNS_EXCLUDE
 from utils.logging import get_logger
 
@@ -94,6 +93,10 @@ def _parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    # Imported lazily so the reusable estimator helpers above don't pull in the
+    # full inference stack at module import time.
+    from detection.model_inference import RiskScorer
+
     args = _parse_args()
 
     df = pd.read_parquet(args.data)

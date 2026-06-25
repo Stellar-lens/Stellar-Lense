@@ -38,9 +38,45 @@ plus ground-truth labels and provenance metadata.
 | `intra_minute_clustering` | float | Fraction of minute buckets with > 1 trade |
 | `off_hours_activity_ratio` | float | Proportion of trades in UTC 00:00–05:00 |
 | `volume_spike_frequency` | float | Fraction of trades exceeding 3× rolling mean volume |
-| `funding_source_similarity` | float | Max Jaccard similarity of funding ancestors |
-| `network_centrality` | float | Degree centrality in the funding graph |
+| `funding_source_similarity` | float | Max Jaccard similarity of funding ancestors _(legacy scalar — kept for model backwards compat)_ |
+| `network_centrality` | float | Degree centrality in the funding graph _(legacy scalar — kept for model backwards compat)_ |
 | `account_age_days` | float | Account age at the time of last trade in window |
+| `inter_arrival_cv` | float | Coefficient of variation of inter-trade intervals |
+| `entropy_of_amounts` | float | Shannon entropy of the trade amount distribution |
+| `cross_wallet_volume_corr` | float | Pearson correlation of per-minute volumes across top-2 counterparties |
+
+### Cross-venue coordination features (from `compute_cross_venue_features`)
+
+These features are populated when AMM pool data is available (via `WATCHED_AMM_POOLS`).
+When AMM data is unavailable, all cross-venue features default to `0.0`.
+
+| Column | Type | Description |
+|---|---|---|
+| `venue_trade_ratio` | float | Ratio of SDEX to AMM trade count; balanced ratios indicate wash trading |
+| `cross_venue_volume_correlation` | float | Pearson correlation of 1-hour SDEX and AMM trade volumes |
+| `cross_venue_timing_synchrony` | float | Fraction of AMM trades occurring within 10 s of a paired SDEX trade |
+| `cross_venue_net_flow` | float | Absolute net XLM flow across SDEX and AMM venues (near-zero = wash) |
+| `counterparty_venue_overlap` | float | Fraction of SDEX counterparties also seen as AMM liquidity providers |
+| `simultaneous_order_pair` | float | Binary: 1.0 if wallet has overlapping SDEX and AMM activity windows |
+| `cross_venue_cluster_score` | float | Centrality within Louvain cross-venue coordination cluster |
+
+### GNN Embedding Features
+
+When the GNN encoder artifact (`models/gnn_encoder.pt`) is present, the feature
+vector is extended by **`GNN_EMBEDDING_DIM`** additional columns (default 32):
+
+| Column | Type | Description |
+|---|---|---|
+| `gnn_0` … `gnn_31` | float32 | GraphSAGE embedding dimensions for the wallet node |
+
+These embeddings encode multi-hop structural patterns in the wallet funding and
+co-trade graph (see `docs/gnn_architecture.md`).  When the encoder artifact is
+absent (e.g., before the first training run), all `gnn_*` columns default to
+`0.0`.
+
+**Total feature vector length:** 30+ legacy features + `GNN_EMBEDDING_DIM`
+(default 32) GNN embedding features = **62+ features** when the GNN encoder is
+enabled.
 
 ### Label and provenance columns
 
@@ -85,6 +121,47 @@ python -m scripts.build_labelled_dataset \
     --output data/labelled_dataset.parquet \
     --config data/build_config.json
 ```
+
+## Simulation Engine — Wash Trade Simulation Engine (WTSE)
+
+The dataset can also be generated synthetically using the Wash Trade Simulation
+Engine in `scripts/wash_trade_simulator.py`. The WTSE implements 7 attacker
+strategy profiles, each modelling a different wash-trading behaviour pattern.
+
+| Profile | Description | Parameters | Wash / Legitimate Ratio |
+|---|---|---|---|
+| `NaiveAttacker` | Fixed amounts, regular intervals — baseline | `fixed_amount=500.0`, `interval_seconds=60` | 100% wash (label=1) |
+| `TimingJitterAttacker` | Poisson-distributed trade intervals | `lambda_seconds=60.0` | 100% wash |
+| `AmountConformanceAttacker` | Benford-conforming amounts via log-uniform sampling | `min_amount=50.0`, `max_amount=5000.0` | 100% wash |
+| `RingAttacker` | N-wallet ring where each wallet trades with its neighbour | `fixed_amount=500.0` | 100% wash |
+| `LayeringAttacker` | Interleaves wash trades with noise trades at 3:1 ratio | `wash_to_noise_ratio=3` | 25% wash / 75% noise |
+| `CrossPairAttacker` | Rotates wash volume across K asset pairs | `n_pairs=3` | 100% wash |
+| `AdaptiveAttacker` | Reads model feature importances and down-weights top features | `model_path`, `top_k=3` | 100% wash |
+
+### Distribution Plot Description
+
+When the CI notebook job runs, it generates per-profile distribution plots
+showing the feature value distributions for each attacker profile overlaid
+with the legitimate-trader distribution from the real labelled dataset.
+These plots validate that each profile produces realistic feature separations.
+The generated plots are available in the `reports/` directory.
+
+### Usage
+
+```bash
+# Generate using a specific profile
+python -m scripts.generate_synthetic_dataset \
+    --profile RingAttacker \
+    --n-wallets 20 \
+    --output data/ring_dataset.parquet
+
+# Run the full adversarial loop (5 rounds by default)
+python -m scripts.generate_synthetic_dataset \
+    --profile AdaptiveAttacker \
+    --gan-rounds 5
+```
+
+---
 
 ## Known Biases and Limitations
 
