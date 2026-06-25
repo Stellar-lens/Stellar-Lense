@@ -49,6 +49,17 @@ class Config:
 
     MIN_TRADES_FOR_SCORING: int = int(os.getenv("MIN_TRADES_FOR_SCORING", "20"))
 
+    # Differential privacy for SHAP attribution (model-inversion defense)
+    DP_EPSILON: float = float(os.getenv("DP_EPSILON", "1.0"))
+    DP_DELTA: float = float(os.getenv("DP_DELTA", "1e-5"))
+    # Rényi composition: above this per-wallet query count the Gaussian noise
+    # sigma is scaled by DP_RENYI_NOISE_MULTIPLIER to bound cumulative leakage.
+    DP_RENYI_QUERY_THRESHOLD: int = int(os.getenv("DP_RENYI_QUERY_THRESHOLD", "100"))
+    DP_RENYI_NOISE_MULTIPLIER: float = float(os.getenv("DP_RENYI_NOISE_MULTIPLIER", "3.0"))
+    # Fallback per-feature SHAP sensitivity when shap_sensitivity.json lacks an entry.
+    DP_DEFAULT_SENSITIVITY: float = float(os.getenv("DP_DEFAULT_SENSITIVITY", "0.05"))
+    SHAP_SENSITIVITY_PATH: str = os.getenv("SHAP_SENSITIVITY_PATH", "models/shap_sensitivity.json")
+
     # Real-time streaming / alerting
     ALERT_CHANNEL: str = os.getenv("ALERT_CHANNEL", "stdout")
     ALERT_WEBHOOK_URL: str | None = os.getenv("ALERT_WEBHOOK_URL")
