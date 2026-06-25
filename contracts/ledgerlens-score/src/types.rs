@@ -39,6 +39,9 @@ pub struct RiskScore {
     pub timestamp: u64,
     pub confidence: u32,
     pub model_version: u32,
+    pub benford_score: u32,
+    pub ml_score: u32,
+    pub network_score: u32,
 }
 
 /// Query descriptor for a batch score read.
@@ -443,6 +446,8 @@ pub enum DataKey {
     AdminAuditRoot,
     /// Configurable score decay profile (Linear, Exponential, or Step).
     DecayProfile,
+    /// Weights for multi-dimensional risk score components (w1, w2, w3).
+    ScoreComponentWeights,
 }
 
 impl DataKey {
@@ -556,6 +561,7 @@ impl DataKey {
             DataKey::EmbargoedWalletIndex => k0!("EmbargoedWIndex"),
             DataKey::AdminAuditRoot => k0!("AdminAuditRoot"),
             DataKey::DecayProfile => k0!("DecayProfile"),
+            DataKey::ScoreComponentWeights => k0!("ScoreCompWts"),
         }
     }
 }
