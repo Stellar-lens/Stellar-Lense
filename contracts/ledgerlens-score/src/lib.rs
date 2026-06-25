@@ -83,6 +83,15 @@ mod test_breach_counter_reset;
 #[cfg(test)]
 mod test_query_helpers;
 
+#[cfg(test)]
+mod error_coverage;
+
+#[cfg(test)]
+mod upgrade_smoke;
+
+#[cfg(test)]
+mod event_emission;
+
 use soroban_sdk::{
     contract, contractimpl, crypto::Hash, symbol_short, token, Address, Bytes, BytesN, Env, Symbol,
     SymbolStr, TryFromVal, Vec,
@@ -416,6 +425,9 @@ impl LedgerLensScoreContract {
     /// Commits a pending score to live storage once its hold window has
     /// elapsed. Callable by anyone — the only gate is `commit_after <= now`.
     ///
+    /// See [docs/commit-reveal-flow.md](../../docs/commit-reveal-flow.md) for the full
+    /// finality buffer commit-reveal sequence.
+    ///
     /// # Errors
     /// - [`Error::NoPendingScore`] if no pending score exists for
     ///   `(wallet, asset_pair)`.
@@ -474,6 +486,9 @@ impl LedgerLensScoreContract {
     /// this is the review-and-cancel mechanism the finality buffer exists
     /// to provide.
     ///
+    /// See [docs/commit-reveal-flow.md](../../docs/commit-reveal-flow.md) for the full
+    /// finality buffer commit-reveal sequence.
+    ///
     /// # Errors
     /// - [`Error::NotInitialized`] if the contract has no admin yet.
     /// - [`Error::NoPendingScore`] if no pending score exists for
@@ -508,6 +523,9 @@ impl LedgerLensScoreContract {
     /// if at least `k` models agree. The stored score is the integer median of
     /// the consensus set, with `model_version = 0` marking it as an on-chain
     /// consensus aggregate rather than a direct single-model output.
+    ///
+    /// **Phase 1 of MEV-resistant commit-reveal:** See
+    /// [docs/commit-reveal-flow.md](../../docs/commit-reveal-flow.md) for the full sequence.
     pub fn commit_consensus(
         env: Env,
         model: Address,
@@ -524,6 +542,9 @@ impl LedgerLensScoreContract {
 
     /// Phase 2 of MEV-resistant consensus. Opens all commitments, verifies them against
     /// the provided `nonces` and score data, and then computes the aggregate consensus score.
+    ///
+    /// See [docs/commit-reveal-flow.md](../../docs/commit-reveal-flow.md) for the full
+    /// multi-model consensus commit-reveal sequence and security considerations.
     #[allow(clippy::too_many_arguments)]
     pub fn reveal_consensus(
         env: Env,
