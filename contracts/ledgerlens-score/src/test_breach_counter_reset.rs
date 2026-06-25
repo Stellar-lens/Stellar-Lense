@@ -75,7 +75,7 @@ fn test_reset_breach_counter_zeroes_count_after_two_breaches() {
     submit_breach(&env, &client, &wallet, &pair);
     assert_eq!(client.get_breach_count(&wallet, &pair), 2);
 
-    client.reset_breach_counter(&Vec::new(&env), &wallet, &pair).unwrap();
+    client.reset_breach_counter(&Vec::new(&env), &wallet, &pair);
     assert_eq!(client.get_breach_count(&wallet, &pair), 0);
 }
 
@@ -87,7 +87,7 @@ fn test_breach_count_increments_from_zero_after_reset() {
 
     submit_breach(&env, &client, &wallet, &pair);
     submit_breach(&env, &client, &wallet, &pair);
-    client.reset_breach_counter(&Vec::new(&env), &wallet, &pair).unwrap();
+    client.reset_breach_counter(&Vec::new(&env), &wallet, &pair);
 
     submit_breach(&env, &client, &wallet, &pair);
     assert_eq!(client.get_breach_count(&wallet, &pair), 1);
@@ -105,7 +105,7 @@ fn test_reset_breach_counter_only_affects_targeted_pair() {
     assert_eq!(client.get_breach_count(&wallet, &pair_a), 1);
     assert_eq!(client.get_breach_count(&wallet, &pair_b), 1);
 
-    client.reset_breach_counter(&Vec::new(&env), &wallet, &pair_a).unwrap();
+    client.reset_breach_counter(&Vec::new(&env), &wallet, &pair_a);
     assert_eq!(client.get_breach_count(&wallet, &pair_a), 0);
     assert_eq!(client.get_breach_count(&wallet, &pair_b), 1);
 }
@@ -121,7 +121,7 @@ fn test_reset_breach_counter_emits_event_with_wallet_pair_and_admin() {
     submit_breach(&env, &client, &wallet, &pair);
 
     let contract_id = client.address.clone();
-    client.reset_breach_counter(&Vec::new(&env), &wallet, &pair).unwrap();
+    client.reset_breach_counter(&Vec::new(&env), &wallet, &pair);
 
     let topic = (symbol_short!("brc_rst"), wallet.clone(), pair.clone());
     let found = env.events().all().iter().any(|(addr, topics, data)| {
@@ -163,7 +163,7 @@ fn test_reset_breach_counter_multisig_success() {
     client.set_admin_threshold(&Vec::new(&env), &2);
 
     let both = signers_vec(&env, &[s1, s2]);
-    client.reset_breach_counter(&both, &wallet, &pair).unwrap();
+    client.reset_breach_counter(&both, &wallet, &pair);
     assert_eq!(client.get_breach_count(&wallet, &pair), 0);
 }
 

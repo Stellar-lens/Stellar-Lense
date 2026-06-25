@@ -1,4 +1,4 @@
-﻿//! Tests for the per-wallet/pair submission rate limiting (cooldown) mechanism.
+//! Tests for the per-wallet/pair submission rate limiting (cooldown) mechanism.
 //!
 //! Time is simulated with `env.ledger().with_mut(|l| l.timestamp = ...)`; the
 //! contract derives the cooldown deadline from `env.ledger().timestamp()`,
@@ -516,7 +516,8 @@ fn test_pair_cooldown_override_takes_precedence() {
             &90,
             &1,
             &None,
-        );`n    advance_to(&env, START_TS + MIN_COOLDOWN_SECS);
+        );
+    advance_to(&env, START_TS + MIN_COOLDOWN_SECS);
     assert!(client
         .try_submit_score(
             &Vec::new(&env),
@@ -564,7 +565,8 @@ fn test_batch_override_rate_limit_single_entry() {
             &90,
             &1,
             &None,
-        );`n    let mut entries: Vec<(Address, soroban_sdk::Symbol)> = Vec::new(&env);
+        );
+    let mut entries: Vec<(Address, soroban_sdk::Symbol)> = Vec::new(&env);
     entries.push_back((wallet.clone(), pair.clone()));
     assert_eq!(client.batch_override_rate_limit(&Vec::new(&env), &entries), 1);
     assert_eq!(client.get_last_submit_time(&wallet, &pair), 0);
@@ -590,7 +592,8 @@ fn test_batch_override_rate_limit_multiple_entries() {
             &90,
             &1,
             &None,
-        );`n    client
+        );
+    client
         .submit_score(
             &Vec::new(&env),
             &wallet2,
@@ -602,7 +605,8 @@ fn test_batch_override_rate_limit_multiple_entries() {
             &90,
             &1,
             &None,
-        );`n    let mut entries: Vec<(Address, soroban_sdk::Symbol)> = Vec::new(&env);
+        );
+    let mut entries: Vec<(Address, soroban_sdk::Symbol)> = Vec::new(&env);
     entries.push_back((wallet1.clone(), pair1.clone()));
     entries.push_back((wallet2.clone(), pair2.clone()));
 

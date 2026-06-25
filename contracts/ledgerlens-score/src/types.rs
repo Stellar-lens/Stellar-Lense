@@ -432,6 +432,9 @@ pub enum DataKey {
     DecayRate,
     /// Ledger timestamp of the most recent accepted score submission globally.
     LastGlobalSubmissionTime,
+    ScoreEntryIndex,
+    ScoreEntryLastTouchedLedger(Address, Symbol),
+    ModelVersionIndex,
 }
 
 impl DataKey {
@@ -537,6 +540,12 @@ impl DataKey {
             DataKey::ModelVersionStatus(v) => k1!("MvStatus", v),
             DataKey::DecayRate => k0!("DecayRate"),
             DataKey::LastGlobalSubmissionTime => k0!("LastGlobalSub"),
+            DataKey::ModelVersionIndex => k0!("MvIndex"),
+            DataKey::ScoreEntryIndex => k0!("ScoreEntryIndex"),
+            DataKey::ScoreEntryLastTouchedLedger(w, s) => k2!("ScoreEntryLTL", w, s),
+            DataKey::JumpStats(w, s) => k2!("JumpStats", w, s),
+            DataKey::FeeRecipient => k0!("FeeRecipient"),
+            DataKey::EmbargoedWalletIndex => k0!("EmbargoedWIndex"),
         }
     }
 }

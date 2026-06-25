@@ -160,3 +160,7 @@ pub const DEFAULT_HEARTBEAT_ALERT_THRESHOLD_SECS: u64 = 3_600; // 1 hour
 /// Default window (seconds) for which a quorum-failure is considered recent.
 /// After this window the failure state is cleared automatically.
 pub const DEFAULT_QUORUM_FAILURE_WINDOW_SECS: u64 = 86_400; // 24 hours
+
+pub const MAX_TRACKED_SCORE_ENTRIES: u32 = 500;
+pub const MAX_EXPIRING_ENTRIES_PER_CALL: u32 = 100;
+
