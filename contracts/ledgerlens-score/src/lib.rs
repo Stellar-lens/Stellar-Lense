@@ -2231,11 +2231,19 @@ impl LedgerLensScoreContract {
     ///
     /// # Examples
     ///
-    /// Set a floor of 60 — calls with `min_confidence < 60` will still use 60:
-    /// ```ignore
-    /// client.set_global_min_confidence(&60).unwrap();
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// client.set_global_min_confidence(&60);
     /// assert_eq!(client.get_global_min_confidence(), 60);
-    /// // query with min_confidence=30 → effective floor = max(30, 60) = 60
     /// ```
     ///
     /// # Errors
@@ -2264,10 +2272,19 @@ impl LedgerLensScoreContract {
     ///
     /// # Examples
     ///
-    /// ```ignore
-    /// // Before any admin configuration → 0 (no floor).
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
     /// assert_eq!(client.get_global_min_confidence(), 0);
-    /// client.set_global_min_confidence(&70).unwrap();
+    /// client.set_global_min_confidence(&70);
     /// assert_eq!(client.get_global_min_confidence(), 70);
     /// ```
     pub fn get_global_min_confidence(env: Env) -> u32 {
@@ -4255,18 +4272,19 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// Set λ to 0.001 per second (half-life ~693 seconds):
-    /// ```text
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
     /// client.set_decay_rate(&1, &1000);
-    /// ```
-    ///
-    /// With a 7-day staleness window, a score from 7 days ago decays by factor:
-    /// ```text
-    /// decay = e^(-0.001 * 604800) ≈ e^(-604.8) ≈ 0 (fully decayed)
-    /// ```
-    ///
-    /// A score from 1 day ago decays by:
-    /// ```text
-    /// decay = e^(-0.001 * 86400) ≈ e^(-86.4) ≈ 0 (nearly fully decayed)
+    /// assert_eq!(client.get_decay_rate(), (1, 1000));
     /// ```
     pub fn set_decay_rate(env: Env, numerator: u32, denominator: u32) -> Result<(), Error> {
         if !storage::has_admin(&env) {
