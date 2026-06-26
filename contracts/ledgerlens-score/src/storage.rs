@@ -1656,3 +1656,52 @@ pub fn set_signer_rotation_grace(env: &Env, grace_secs: u64) {
 pub fn set_reveal_window_secs(env: &Env, secs: u64) {
     env.storage().instance().set(&DataKey::RevealWindowSecs, &secs);
 }
+
+// ── Epoch sealing (#301) ──────────────────────────────────────────────────────
+
+pub fn get_current_epoch(env: &Env) -> u32 {
+    env.storage().instance().get(&DataKey::CurrentEpoch).unwrap_or(0)
+}
+
+pub fn set_current_epoch(env: &Env, epoch_id: u32) {
+    env.storage().instance().set(&DataKey::CurrentEpoch, &epoch_id);
+}
+
+pub fn is_epoch_open(env: &Env) -> bool {
+    // Default true: epoch is open unless the admin has explicitly closed it.
+    env.storage().instance().get(&DataKey::EpochOpen).unwrap_or(true)
+}
+
+pub fn set_epoch_open(env: &Env, open: bool) {
+    env.storage().instance().set(&DataKey::EpochOpen, &open);
+}
+
+// ── Flash-loan protection (#300) ─────────────────────────────────────────────
+
+/// Records the current ledger sequence as the last gate-read ledger for
+/// (wallet, asset_pair). Stored in temporary storage — expires automatically.
+pub fn set_gate_read_ledger(env: &Env, wallet: &Address, asset_pair: &Symbol) {
+    let key = DataKey::GateReadLedger(wallet.clone(), asset_pair.clone());
+    let seq = env.ledger().sequence();
+    env.storage().temporary().set(&key, &seq);
+    // Keep alive for exactly one ledger boundary; 1 threshold / 1 max is fine.
+    env.storage().temporary().extend_ttl(&key, 1, 1);
+}
+
+/// Returns the ledger sequence stored by the last `query_risk_gate` call for
+/// (wallet, asset_pair), or `None` if no gate read is recorded.
+pub fn get_gate_read_ledger(env: &Env, wallet: &Address, asset_pair: &Symbol) -> Option<u32> {
+    let key = DataKey::GateReadLedger(wallet.clone(), asset_pair.clone());
+    env.storage().temporary().get(&key)
+}
+
+pub fn get_flash_protection_mode(env: &Env) -> crate::types::FlashProtectionMode {
+    env.storage()
+        .instance()
+        .get(&DataKey::FlashProtectionMode)
+        .unwrap_or(crate::types::FlashProtectionMode::Log)
+}
+
+pub fn set_flash_protection_mode(env: &Env, mode: &crate::types::FlashProtectionMode) {
+    env.storage().instance().set(&DataKey::FlashProtectionMode, mode);
+}

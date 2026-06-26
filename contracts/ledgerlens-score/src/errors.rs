@@ -86,4 +86,5 @@ impl Error {
     pub const NotFound: Error = Error::ScoreNotFound;
     pub const FeeRecipientNotSet: Error = Error::FeeTokenNotSet;
     pub const FeeRecipientMismatch: Error = Error::Unauthorized;
+    pub const EpochClosed: Error = Error::ContractPaused;
 }

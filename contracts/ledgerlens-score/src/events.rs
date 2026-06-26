@@ -516,3 +516,36 @@ pub fn model_version_registered(env: &Env, version: u32) {
 pub fn entry_ttls_extended(env: &Env, renewed: u32, requested: u32) {
     env.events().publish((symbol_short!("ttl_ext"),), (renewed, requested));
 }
+
+// ── Epoch sealing (#301) ──────────────────────────────────────────────────────
+
+/// Emitted when the admin opens a new epoch via `open_epoch`.
+pub fn epoch_opened(env: &Env, epoch_id: u32) {
+    env.events().publish((symbol_short!("epoch_opn"),), epoch_id);
+}
+
+/// Emitted when the admin closes the current epoch via `close_epoch`.
+pub fn epoch_closed(env: &Env, epoch_id: u32) {
+    env.events().publish((symbol_short!("epoch_cls"),), epoch_id);
+}
+
+// ── Flash-loan protection (#300) ─────────────────────────────────────────────
+
+/// Emitted when a submission arrives in the same ledger as a gate read for
+/// the same (wallet, asset_pair) — indicative of a flash-loan pattern.
+pub fn suspicious_same_ledger_submission(
+    env: &Env,
+    wallet: &Address,
+    asset_pair: &Symbol,
+    ledger_seq: u32,
+) {
+    env.events().publish(
+        (Symbol::new(env, "flash_sub"), wallet.clone(), asset_pair.clone()),
+        ledger_seq,
+    );
+}
+
+/// Emitted when the admin changes the flash-protection mode.
+pub fn flash_protection_mode_updated(env: &Env, mode: u32) {
+    env.events().publish((Symbol::new(env, "flash_mode"),), mode);
+}

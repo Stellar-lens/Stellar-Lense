@@ -435,6 +435,15 @@ pub enum DataKey {
     ScoreEntryIndex,
     ScoreEntryLastTouchedLedger(Address, Symbol),
     ModelVersionIndex,
+    /// Current epoch ID. u32 stored in instance storage.
+    CurrentEpoch,
+    /// Whether the current epoch is open for submissions. bool in instance storage.
+    EpochOpen,
+    /// Ledger sequence number of the last query_risk_gate call for (wallet, asset_pair).
+    /// Stored in temporary storage so it expires automatically after the ledger closes.
+    GateReadLedger(Address, Symbol),
+    /// Admin-configured flash-loan protection mode (Log or Reject).
+    FlashProtectionMode,
 }
 
 impl DataKey {
@@ -546,6 +555,10 @@ impl DataKey {
             DataKey::JumpStats(w, s) => k2!("JumpStats", w, s),
             DataKey::FeeRecipient => k0!("FeeRecipient"),
             DataKey::EmbargoedWalletIndex => k0!("EmbargoedWIndex"),
+            DataKey::CurrentEpoch => k0!("CurEpoch"),
+            DataKey::EpochOpen => k0!("EpochOpen"),
+            DataKey::GateReadLedger(a, s) => k2!("GateReadLedger", a, s),
+            DataKey::FlashProtectionMode => k0!("FlashProtMode"),
         }
     }
 }
@@ -593,4 +606,15 @@ pub struct VerkleLeaf {
     pub score: u32,
     pub timestamp: u64,
     pub model_version: u32,
+}
+
+/// Admin-configurable behaviour when a same-ledger gate-read + submit pattern is detected.
+#[contracttype]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[repr(u32)]
+pub enum FlashProtectionMode {
+    /// Record the event but allow the submission to proceed (default).
+    Log = 0,
+    /// Reject the submission outright with `EpochClosed` error.
+    Reject = 1,
 }
