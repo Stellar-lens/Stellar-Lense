@@ -435,6 +435,10 @@ pub enum DataKey {
     ScoreEntryIndex,
     ScoreEntryLastTouchedLedger(Address, Symbol),
     ModelVersionIndex,
+    /// Whether adaptive epsilon is enabled (bool).
+    AdaptiveEpsilonEnabled,
+    /// Scale factor used in: effective_epsilon = base + scale * stddev / 1000
+    AdaptiveEpsilonScaleFactor,
 }
 
 impl DataKey {
@@ -546,6 +550,8 @@ impl DataKey {
             DataKey::JumpStats(w, s) => k2!("JumpStats", w, s),
             DataKey::FeeRecipient => k0!("FeeRecipient"),
             DataKey::EmbargoedWalletIndex => k0!("EmbargoedWIndex"),
+            DataKey::AdaptiveEpsilonEnabled => k0!("AEpsEnabled"),
+            DataKey::AdaptiveEpsilonScaleFactor => k0!("AEpsScale"),
         }
     }
 }

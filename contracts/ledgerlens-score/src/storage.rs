@@ -1656,3 +1656,21 @@ pub fn set_signer_rotation_grace(env: &Env, grace_secs: u64) {
 pub fn set_reveal_window_secs(env: &Env, secs: u64) {
     env.storage().instance().set(&DataKey::RevealWindowSecs, &secs);
 }
+
+// ── Adaptive consensus epsilon (#287) ────────────────────────────────────────
+
+pub fn set_adaptive_epsilon_enabled(env: &Env, enabled: bool) {
+    env.storage().instance().set(&DataKey::AdaptiveEpsilonEnabled, &enabled);
+}
+
+pub fn get_adaptive_epsilon_enabled(env: &Env) -> bool {
+    env.storage().instance().get(&DataKey::AdaptiveEpsilonEnabled).unwrap_or(false)
+}
+
+pub fn set_adaptive_epsilon_scale_factor(env: &Env, scale: u32) {
+    env.storage().instance().set(&DataKey::AdaptiveEpsilonScaleFactor, &scale);
+}
+
+pub fn get_adaptive_epsilon_scale_factor(env: &Env) -> u32 {
+    env.storage().instance().get(&DataKey::AdaptiveEpsilonScaleFactor).unwrap_or(0)
+}

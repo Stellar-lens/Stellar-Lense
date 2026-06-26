@@ -516,3 +516,7 @@ pub fn model_version_registered(env: &Env, version: u32) {
 pub fn entry_ttls_extended(env: &Env, renewed: u32, requested: u32) {
     env.events().publish((symbol_short!("ttl_ext"),), (renewed, requested));
 }
+
+pub fn adaptive_epsilon_updated(env: &Env, enabled: bool, scale_factor: u32) {
+    env.events().publish((symbol_short!("aeps_upd"),), (enabled, scale_factor));
+}
