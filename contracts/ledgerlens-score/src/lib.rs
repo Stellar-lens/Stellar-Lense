@@ -140,6 +140,7 @@ impl LedgerLensScoreContract {
         }
         storage::set_admin(&env, &admin);
         storage::set_service(&env, &service);
+        storage::set_contract_version(&env, &crate::constants::CONTRACT_VERSION);
         Ok(())
     }
 
