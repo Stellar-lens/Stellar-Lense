@@ -10,7 +10,7 @@ use crate::types::{
     ParameterProposalRecord, ParameterProposalStatus, PendingScoreEntry, RiskScore, ScoreDispute,
     ScoreFloorPolicy, ScoreHistogram, ScoreTrend, ScoreVelocityCap, UpgradeProposal,
 };
-use soroban_sdk::{Address, Bytes, Env, Symbol, Vec};
+use soroban_sdk::{Address, Bytes, BytesN, Env, Symbol, Vec};
 
 #[cfg(test)]
 fn extend_persistent_ttl(env: &Env, key: &crate::types::DataKey) {
