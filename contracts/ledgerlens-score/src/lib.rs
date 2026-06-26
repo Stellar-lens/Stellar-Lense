@@ -2823,6 +2823,44 @@ impl LedgerLensScoreContract {
     }
 
     // ── Score attestation ─────────────────────────────────────────────────────
+    //
+    // # Why ECIES sealed-submission mode is not implemented (issue #293)
+    //
+    // Issue #293 proposed encrypting score payloads on the way to the contract
+    // using ECIES (secp256k1 ECDH + HKDF + AES-GCM) so that MEV bots watching
+    // the mempool cannot read score values before a transaction is finalised.
+    //
+    // Two independent hard blockers make this impossible:
+    //
+    // **1. Smart contracts cannot hold secrets.**
+    // Every byte of Soroban contract storage is readable by any network
+    // participant querying the ledger.  A "contract private key" stored in
+    // instance storage is visible to all observers, so any ciphertext produced
+    // with the corresponding public key can be decrypted by anyone.  This is a
+    // fundamental property of all public blockchains, not a Soroban limitation.
+    //
+    // **2. The Soroban v21 host-function set is missing the required primitives.**
+    // ECIES decryption requires: ECDH point-multiplication, HKDF key
+    // derivation, and AES-GCM (or equivalent AEAD) decryption.  The
+    // `env.crypto()` API provides sha256, keccak256, ed25519_verify,
+    // secp256k1_recover, and secp256r1_verify — none of which can substitute
+    // for those missing operations.
+    //
+    // **The existing `ScoreAttestation` path already addresses the real threat.**
+    // Attestations bind a score to a specific (wallet, asset_pair, timestamp)
+    // tuple via a secp256k1 signature from the off-chain pipeline.  A replayed
+    // or tampered submission fails signature verification before storage is
+    // touched.  Score *confidentiality* (hiding the value from mempool
+    // observers) is a separate property that no Soroban-native mechanism can
+    // currently provide.
+    //
+    // **The only viable privacy-preserving alternative on Stellar today** is a
+    // two-transaction commit-reveal scheme:
+    //   tx 1 — publish `hash(score || nonce || wallet || pair || timestamp)`
+    //   tx 2 — reveal plaintext; contract re-hashes and checks commitment
+    // This prevents front-running between tx 1 and tx 2 but leaves the score
+    // visible once tx 2 lands.  For this oracle's threat model (5-second
+    // Stellar finality, no public mempool auction) the window is negligible.
 
     /// Configure (or rotate) the off-chain detection pipeline's secp256k1
     /// public key used to verify `ScoreAttestation`s passed to
