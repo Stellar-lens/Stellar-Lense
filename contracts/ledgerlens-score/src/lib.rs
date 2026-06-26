@@ -1973,11 +1973,20 @@ impl LedgerLensScoreContract {
         if current == sub_wallet {
             return Err(Error::CyclicDelegation);
         }
-        while let Some(next_delegate) = storage::get_score_delegate(&env, &current) {
-            if next_delegate == sub_wallet {
-                return Err(Error::CyclicDelegation);
+        
+        // Check for transitive cycles up to MAX_DELEGATION_DEPTH
+        let mut depth = 0;
+        let max_depth = constants::MAX_DELEGATION_DEPTH;
+        while depth < max_depth {
+            if let Some(next_delegate) = storage::get_score_delegate(&env, &current) {
+                if next_delegate == sub_wallet {
+                    return Err(Error::CyclicDelegation);
+                }
+                current = next_delegate;
+                depth += 1;
+            } else {
+                break;
             }
-            current = next_delegate;
         }
 
         storage::set_score_delegate(&env, &sub_wallet, &custodian);
@@ -2006,6 +2015,42 @@ impl LedgerLensScoreContract {
     pub fn get_score_delegate(env: Env, sub_wallet: Address) -> Option<Address> {
         storage::get_score_delegate(&env, &sub_wallet)
     }
+
+    /// Returns the full delegation chain for a wallet, from the wallet through all custodians.
+    /// Returns a vector of addresses: [wallet, custodian1, custodian2, ...] up to MAX_DELEGATION_DEPTH.
+    /// Returns empty vector if wallet not found or chain cannot be resolved.
+    pub fn get_delegation_chain(env: Env, wallet: Address) -> Vec<Address> {
+        let mut chain: Vec<Address> = Vec::new(&env);
+        let mut current = wallet.clone();
+        let mut depth = 0;
+        let max_depth = constants::MAX_DELEGATION_DEPTH;
+        
+        chain.push_back(current.clone());
+        
+        while depth < max_depth {
+            if let Some(next) = storage::get_score_delegate(&env, &current) {
+                // Cycle detection: check if next is already in chain
+                let mut found_cycle = false;
+                for i in 0..chain.len() {
+                    if chain.get(i).unwrap() == next {
+                        found_cycle = true;
+                        break;
+                    }
+                }
+                if found_cycle {
+                    break; // Stop at cycle
+                }
+                chain.push_back(next.clone());
+                current = next;
+                depth += 1;
+            } else {
+                break; // No more delegates
+            }
+        }
+        
+        chain
+    }
+
 
     // ── Cross-asset aggregate risk ───────────────────────────────────────────
 
@@ -5323,8 +5368,30 @@ impl LedgerLensScoreContract {
             return Ok(Some(score));
         }
 
-        if let Some(custodian) = storage::get_score_delegate(env, wallet) {
-            return Ok(storage::get_score(env, &custodian, asset_pair));
+        // Follow delegation chain up to MAX_DELEGATION_DEPTH with cycle detection
+        let mut current = wallet.clone();
+        let mut visited: Vec<Address> = Vec::new(env);
+        let max_depth = constants::MAX_DELEGATION_DEPTH;
+        let mut depth = 0;
+        
+        while depth < max_depth {
+            // Cycle detection
+            for i in 0..visited.len() {
+                if visited.get(i).unwrap() == current {
+                    return Err(Error::CyclicDelegation);
+                }
+            }
+            visited.push_back(current.clone());
+            
+            if let Some(custodian) = storage::get_score_delegate(env, &current) {
+                current = custodian;
+                if let Some(score) = storage::get_score(env, &current, asset_pair) {
+                    return Ok(Some(score));
+                }
+                depth += 1;
+            } else {
+                break;
+            }
         }
 
         Ok(None)

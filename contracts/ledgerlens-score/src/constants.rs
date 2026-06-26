@@ -70,6 +70,10 @@ pub const MAX_ESCALATION_THRESHOLD: u32 = 100;
 /// Prevents unbounded storage growth and gas exhaustion.
 pub const MAX_COUNTERPARTY_LINKS_PER_WALLET: u32 = 50;
 
+/// Maximum delegation chain depth to prevent unbounded traversal.
+/// Prevents DoS attacks via deep circular delegation chains.
+pub const MAX_DELEGATION_DEPTH: u32 = 5;
+
 // ── Score submission floor ─────────────────────────────────────────────────────
 //
 // A compromised or colluding signer could otherwise submit an artificially low
