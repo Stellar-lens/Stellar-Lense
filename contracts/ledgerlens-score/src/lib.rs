@@ -87,6 +87,7 @@ use soroban_sdk::{
     contract, contractimpl, crypto::Hash, symbol_short, token, Address, Bytes, BytesN, Env, Symbol,
     SymbolStr, TryFromVal, Vec,
 };
+use subtle::ConstantTimeEq;
 
 pub use errors::Error;
 pub use events::{ServiceResumedEvent, ServiceSilenceAlertEvent};
@@ -6166,7 +6167,8 @@ impl LedgerLensScoreContract {
             attestation.nonce,
         )?;
 
-        if digest.to_bytes().to_array() != attestation.commitment.to_array() {
+        // Constant-time comparison to prevent timing side-channels
+        if digest.to_bytes().to_array().ct_eq(&attestation.commitment.to_array()).unwrap_u8() == 0 {
             return Err(Error::InvalidAttestation);
         }
 
@@ -6208,7 +6210,7 @@ impl LedgerLensScoreContract {
             65 => {
                 let mut stored = [0u8; 65];
                 pubkey.copy_into_slice(&mut stored);
-                recovered.to_array() == stored
+                recovered.to_array().ct_eq(&stored).unwrap_u8() != 0
             }
             33 => {
                 let recovered_arr = recovered.to_array();
@@ -6217,7 +6219,7 @@ impl LedgerLensScoreContract {
                 compressed[1..33].copy_from_slice(&recovered_arr[1..33]);
                 let mut stored = [0u8; 33];
                 pubkey.copy_into_slice(&mut stored);
-                compressed == stored
+                compressed.ct_eq(&stored).unwrap_u8() != 0
             }
             // `set_service_pubkey` rejects any other length, so this is
             // unreachable in practice; treat defensively as a mismatch.
@@ -6268,7 +6270,8 @@ impl LedgerLensScoreContract {
         )?;
 
         // Commitment must match what the contract independently derives.
-        if digest.to_bytes().to_array() != ta.commitment.to_array() {
+        // Use constant-time comparison to prevent timing side-channels.
+        if digest.to_bytes().to_array().ct_eq(&ta.commitment.to_array()).unwrap_u8() == 0 {
             return Err(Error::InvalidAttestation);
         }
 
@@ -6290,7 +6293,7 @@ impl LedgerLensScoreContract {
             65 => {
                 let mut stored = [0u8; 65];
                 pubkey.copy_into_slice(&mut stored);
-                recovered.to_array() == stored
+                recovered.to_array().ct_eq(&stored).unwrap_u8() != 0
             }
             33 => {
                 let recovered_arr = recovered.to_array();
@@ -6299,7 +6302,7 @@ impl LedgerLensScoreContract {
                 compressed[1..33].copy_from_slice(&recovered_arr[1..33]);
                 let mut stored = [0u8; 33];
                 pubkey.copy_into_slice(&mut stored);
-                compressed == stored
+                compressed.ct_eq(&stored).unwrap_u8() != 0
             }
             // `set_aggregate_service_pubkey` rejects any other length, so
             // this is unreachable in practice.
