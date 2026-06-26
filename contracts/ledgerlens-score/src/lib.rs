@@ -92,10 +92,11 @@ pub use errors::Error;
 pub use events::{ServiceResumedEvent, ServiceSilenceAlertEvent};
 pub use types::{
     AggregateRiskScore, BatchAttestation, BatchEntryResult, BatchResult, BatchScoreResult,
-    EffectiveRiskScore, EmbargoExpiry, MaybeRiskScore, ModelSubmission, ModelVersionStats,
-    PendingScoreEntry, RiskScore, ScoreAttestation, ScoreAttestationInput, ScoreDispute, ScoreFloorPolicy,
-    ScoreHistogram, ScoreQuery, ScoreSubmission, ScoreSubmissionWithProof, ScoreTrend,
-    ScoreVelocityCap, ThresholdAttestation, UpgradeProposal,
+    DecayCurve, EffectiveRiskScore, EmbargoExpiry, MaybeRiskScore, ModelSubmission,
+    ModelVersionStats, PendingScoreEntry, RiskScore, ScoreAttestation, ScoreAttestationInput,
+    ScoreDispute, ScoreFloorPolicy, ScoreHistogram, ScoreQuery, ScoreSubmission,
+    ScoreSubmissionWithProof, ScoreTrend, ScoreVelocityCap, ScoreWithFinality, StepWiseEntry,
+    SubscorePayload, ThresholdAttestation, UpgradeProposal,
 };
 /// The 32-byte all-zeros field element used as the value in non-membership proofs.
 pub use verkle::NON_MEMBER_SENTINEL;
@@ -497,6 +498,248 @@ impl LedgerLensScoreContract {
         let admin = storage::get_admin(&env);
         events::score_pending_cancelled(&env, &wallet, &asset_pair, &admin);
         Ok(())
+    }
+
+    // ── Issue #284: Ledger-depth finality gadget ─────────────────────────────
+
+    /// Sets the number of Stellar ledger closures that must elapse after a
+    /// score submission before it is considered final.  `0` (the default)
+    /// disables the depth check — `get_score_with_finality` always returns
+    /// `finality_pending: false`.  Admin only.
+    pub fn set_finality_depth(
+        env: Env,
+        admin_signers: Vec<Address>,
+        ledgers: u32,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+        storage::set_finality_depth(&env, ledgers);
+        Ok(())
+    }
+
+    /// Returns the configured finality depth in ledger closures.
+    /// `0` means the depth check is disabled.
+    pub fn get_finality_depth(env: Env) -> u32 {
+        storage::get_finality_depth(&env)
+    }
+
+    /// Returns the latest risk score for `wallet` / `asset_pair` together with
+    /// a `finality_pending` flag that is `true` when fewer than
+    /// `finality_depth` ledger closures have elapsed since the score was
+    /// submitted.  Consumers requiring confirmation-depth guarantees should
+    /// wait until `finality_pending` is `false` before acting on the score.
+    ///
+    /// # Errors
+    /// - [`Error::ScoreNotFound`] if no score has been submitted yet.
+    pub fn get_score_with_finality(
+        env: Env,
+        wallet: Address,
+        asset_pair: Symbol,
+    ) -> Result<ScoreWithFinality, Error> {
+        let score = storage::get_score(&env, &wallet, &asset_pair)
+            .ok_or(Error::ScoreNotFound)?;
+        let depth = storage::get_finality_depth(&env);
+        let finality_pending = if depth > 0 {
+            let sub_ledger =
+                storage::get_score_submission_ledger(&env, &wallet, &asset_pair);
+            let current_seq = env.ledger().sequence();
+            (sub_ledger as u64).saturating_add(depth as u64) > current_seq as u64
+        } else {
+            false
+        };
+        Ok(ScoreWithFinality { score, finality_pending })
+    }
+
+    // ── Issue #283: Dormancy decay with checkpoint snapshots ─────────────────
+
+    /// Configures the dormancy decay policy.
+    ///
+    /// - `inactivity_secs`: seconds of silence after the last score submission
+    ///   before a wallet is considered dormant.
+    /// - `decay_fraction_bps`: fraction of `(score − global_mean)` removed at
+    ///   each checkpoint, expressed in basis points (e.g. `500` = 5 %).
+    ///
+    /// Set both to `0` to disable dormancy decay.  Admin only.
+    pub fn set_dormancy_decay_config(
+        env: Env,
+        admin_signers: Vec<Address>,
+        inactivity_secs: u64,
+        decay_fraction_bps: u32,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+        storage::set_dormancy_inactivity_secs(&env, inactivity_secs);
+        storage::set_dormancy_decay_fraction_bps(&env, decay_fraction_bps);
+        Ok(())
+    }
+
+    /// Applies checkpoint-based dormancy decay to `wallet` / `asset_pair`.
+    ///
+    /// Callable by anyone.  No-ops when:
+    /// - dormancy decay is not configured,
+    /// - the wallet has no stored score, or
+    /// - the wallet has been active within `inactivity_secs`.
+    ///
+    /// For each elapsed inactivity period the stored score is pulled toward
+    /// the global mean (50) by `decay_fraction_bps` / 10 000.  Emits
+    /// `dormancy_decay_applied` once per successful decay application.
+    pub fn apply_dormancy_decay(
+        env: Env,
+        wallet: Address,
+        asset_pair: Symbol,
+    ) -> Result<(), Error> {
+        let inactivity_secs = storage::get_dormancy_inactivity_secs(&env);
+        let decay_fraction_bps = storage::get_dormancy_decay_fraction_bps(&env);
+        if inactivity_secs == 0 || decay_fraction_bps == 0 {
+            return Ok(());
+        }
+
+        let score = match storage::get_score(&env, &wallet, &asset_pair) {
+            Some(s) => s,
+            None => return Ok(()),
+        };
+
+        let now = env.ledger().timestamp();
+        let last_submit = storage::get_last_submit_time(&env, &wallet, &asset_pair);
+
+        if now.saturating_sub(last_submit) < inactivity_secs {
+            return Ok(());
+        }
+
+        let last_checkpoint = {
+            let cp = storage::get_decay_checkpoint(&env, &wallet, &asset_pair);
+            if cp == 0 { last_submit } else { cp }
+        };
+
+        let elapsed_since_checkpoint = now.saturating_sub(last_checkpoint);
+        let periods = (elapsed_since_checkpoint / inactivity_secs).min(200);
+        if periods == 0 {
+            return Ok(());
+        }
+
+        const GLOBAL_MEAN: u32 = 50;
+        let mut current_score = score.score;
+        for _ in 0..periods {
+            let delta = if current_score >= GLOBAL_MEAN {
+                ((current_score - GLOBAL_MEAN) as u64
+                    * decay_fraction_bps as u64
+                    / 10_000) as u32
+            } else {
+                ((GLOBAL_MEAN - current_score) as u64
+                    * decay_fraction_bps as u64
+                    / 10_000) as u32
+            };
+            if current_score >= GLOBAL_MEAN {
+                current_score = current_score.saturating_sub(delta);
+            } else {
+                current_score = (current_score + delta).min(GLOBAL_MEAN);
+            }
+        }
+
+        let new_checkpoint = last_checkpoint + periods * inactivity_secs;
+        storage::set_decay_checkpoint(&env, &wallet, &asset_pair, new_checkpoint);
+
+        let new_score = RiskScore { score: current_score, ..score };
+        storage::set_score(&env, &wallet, &asset_pair, &new_score);
+
+        events::dormancy_decay_applied(
+            &env,
+            &wallet,
+            &asset_pair,
+            current_score,
+            periods as u32,
+        );
+        Ok(())
+    }
+
+    /// Returns the timestamp of the last dormancy-decay checkpoint for
+    /// `wallet` / `asset_pair`.  Returns `0` when no decay has been applied yet.
+    pub fn get_decay_checkpoint(env: Env, wallet: Address, asset_pair: Symbol) -> u64 {
+        storage::get_decay_checkpoint(&env, &wallet, &asset_pair)
+    }
+
+    // ── Issue #285: Configurable non-linear decay curves ─────────────────────
+
+    /// Sets the decay curve used by `get_interpolated_score`.
+    /// Variants: `Exponential` (linear, default), `Quadratic`, `Logarithmic`,
+    /// `StepWise(Vec<StepWiseEntry>)`.  Admin only.
+    pub fn set_decay_curve(
+        env: Env,
+        admin_signers: Vec<Address>,
+        curve: DecayCurve,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+        storage::set_decay_curve(&env, &curve);
+        Ok(())
+    }
+
+    /// Returns the currently configured decay curve.
+    /// Defaults to `DecayCurve::Exponential` (backward-compatible linear
+    /// interpolation) when no curve has been set.
+    pub fn get_decay_curve(env: Env) -> DecayCurve {
+        storage::get_decay_curve(&env)
+    }
+
+    // ── Issue #286: Multi-dimensional score breakdown ─────────────────────────
+
+    /// Attaches optional sub-scores to an existing `(wallet, asset_pair)` entry.
+    ///
+    /// Off-chain models call this after `submit_score` to persist whichever
+    /// analysis dimensions they computed.  Existing score submissions that
+    /// omit sub-scores are unaffected — `get_score_breakdown` returns `None`
+    /// for them.  Requires service authentication.
+    pub fn submit_score_breakdown(
+        env: Env,
+        signers: Vec<Address>,
+        wallet: Address,
+        asset_pair: Symbol,
+        subscores: SubscorePayload,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        if storage::is_paused(&env) {
+            return Err(Error::ContractPaused);
+        }
+        let service_set = storage::get_service_set(&env);
+        let threshold = storage::get_service_threshold(&env);
+        if !service_set.is_empty()
+            && threshold > 0
+            && !(signers.len() == 1
+                && signers.get(0).unwrap() == storage::get_service(&env))
+        {
+            if signers.len() < threshold {
+                return Err(Error::InsufficientSigners);
+            }
+            for i in 0..signers.len() {
+                let signer = signers.get(i).unwrap();
+                if !service_set.contains(&signer) {
+                    return Err(Error::UnauthorizedSigner);
+                }
+                signer.require_auth();
+            }
+        } else {
+            storage::get_service(&env).require_auth();
+        }
+        storage::set_score_breakdown(&env, &wallet, &asset_pair, &subscores);
+        Ok(())
+    }
+
+    /// Returns the sub-score breakdown for `wallet` / `asset_pair`, or `None`
+    /// if no breakdown has been submitted.
+    pub fn get_score_breakdown(
+        env: Env,
+        wallet: Address,
+        asset_pair: Symbol,
+    ) -> Option<SubscorePayload> {
+        storage::get_score_breakdown(&env, &wallet, &asset_pair)
     }
 
     /// Register a consensus-backed score for `wallet` / `asset_pair` from
@@ -1617,28 +1860,53 @@ impl LedgerLensScoreContract {
             }
         };
 
+        // Issue #284: if finality depth is configured and not yet reached,
+        // fall back to the previous confirmed score from history.
+        let confirmed_score = {
+            let depth = storage::get_finality_depth(&env);
+            if depth > 0 {
+                let sub_ledger = storage::get_score_submission_ledger(&env, &wallet, &asset_pair);
+                let current_seq = env.ledger().sequence();
+                let is_pending = (sub_ledger as u64)
+                    .saturating_add(depth as u64)
+                    > current_seq as u64;
+                if is_pending {
+                    let history = storage::get_score_history(&env, &wallet, &asset_pair);
+                    if history.len() >= 2 {
+                        history.get(history.len() - 2).unwrap()
+                    } else {
+                        return Err(Error::FinalityWindowNotElapsed);
+                    }
+                } else {
+                    score.clone()
+                }
+            } else {
+                score.clone()
+            }
+        };
+
         let ledger_ts = env.ledger().timestamp();
-        let elapsed_secs = ledger_ts.saturating_sub(score.timestamp);
+        let elapsed_secs = ledger_ts.saturating_sub(confirmed_score.timestamp);
         let (lambda_num, lambda_den) = storage::get_decay_rate(&env);
         let decay_applied = lambda_num != 0;
 
         let effective_score = if decay_applied {
             let decay_factor = Self::decay_fixed(elapsed_secs, lambda_num, lambda_den);
             let fixed_scale = constants::DECAY_FIXED_POINT_SCALE;
-            let effective = (score.score as u64)
+            let effective = (confirmed_score.score as u64)
                 .checked_mul(decay_factor)
                 .ok_or(Error::ArithmeticOverflow)?
                 .checked_div(fixed_scale)
                 .ok_or(Error::ArithmeticOverflow)?;
             effective as u32
         } else {
-            score.score
+            confirmed_score.score
         };
 
         Ok(EffectiveRiskScore {
             original_score: score.score,
             effective_score,
-            original_confidence: score.confidence,
+            original_confidence: confirmed_score.confidence,
             confidence_floor: 0,
             delegated_to: None,
         })
@@ -1730,19 +1998,73 @@ impl LedgerLensScoreContract {
         if timestamp >= last.timestamp {
             return last.score;
         }
+        let curve = storage::get_decay_curve(&env);
         for i in 0..(history.len() - 1) {
             let a = history.get(i).unwrap();
             let b = history.get(i + 1).unwrap();
             if a.timestamp <= timestamp && timestamp <= b.timestamp {
-                let dt = (b.timestamp - a.timestamp) as i128;
+                let dt = b.timestamp.saturating_sub(a.timestamp);
                 if dt == 0 {
                     return a.score;
                 }
-                let num = (timestamp - a.timestamp) as i128 * (b.score as i128 - a.score as i128);
-                return (a.score as i128 + num / dt) as u32;
+                let elapsed = timestamp.saturating_sub(a.timestamp);
+                return Self::apply_curve_interp(elapsed, dt, a.score, b.score, &curve);
             }
         }
         last.score
+    }
+
+    /// Fixed-point curve interpolation between two score points.
+    /// `elapsed` and `dt` are both in seconds; result is clamped to 0–100.
+    fn apply_curve_interp(
+        elapsed: u64,
+        dt: u64,
+        score_a: u32,
+        score_b: u32,
+        curve: &DecayCurve,
+    ) -> u32 {
+        const SCALE: i128 = 1_000_000;
+        let f = (elapsed as i128 * SCALE) / (dt as i128); // 0..SCALE
+        let sa = score_a as i128;
+        let sb = score_b as i128;
+        let delta = sb - sa;
+
+        let result = match curve {
+            // Linear — preserves existing behaviour.
+            DecayCurve::Exponential => sa + (f * delta) / SCALE,
+            // Convex: slow initial change, accelerates toward the end.
+            DecayCurve::Quadratic => {
+                let f2 = (f * f) / SCALE;
+                sa + (f2 * delta) / SCALE
+            }
+            // Concave: fast initial change, decelerates — y = 2f − f².
+            // Passes through (0,0) and (1,1) so the endpoints are exact.
+            DecayCurve::Logarithmic => {
+                let f2 = (f * f) / SCALE;
+                let y = (2 * f - f2).clamp(0, SCALE);
+                sa + (y * delta) / SCALE
+            }
+            // Discrete tier drops: pick the step with the highest
+            // time_threshold_secs that is still ≤ elapsed.
+            DecayCurve::StepWise(steps) => {
+                let mut best_thr: u64 = 0;
+                let mut best_found = false;
+                let mut step_score = sa;
+                for j in 0..steps.len() {
+                    let step = steps.get(j).unwrap();
+                    if step.time_threshold_secs <= elapsed
+                        && (!best_found
+                            || step.time_threshold_secs >= best_thr)
+                    {
+                        best_thr = step.time_threshold_secs;
+                        step_score = step.score_value as i128;
+                        best_found = true;
+                    }
+                }
+                step_score
+            }
+        };
+        result.clamp(0, 100) as u32
     }
 
     /// Returns the total number of score submissions ever recorded for
@@ -5733,6 +6055,7 @@ impl LedgerLensScoreContract {
         }
 
         storage::set_score(env, wallet, asset_pair, risk_score);
+        storage::set_score_submission_ledger(env, wallet, asset_pair, env.ledger().sequence());
         storage::set_last_global_submission_time(env, now);
         storage::push_score_history(env, wallet, asset_pair, risk_score);
         storage::register_pair_for_wallet(env, wallet, asset_pair);

@@ -516,3 +516,16 @@ pub fn model_version_registered(env: &Env, version: u32) {
 pub fn entry_ttls_extended(env: &Env, renewed: u32, requested: u32) {
     env.events().publish((symbol_short!("ttl_ext"),), (renewed, requested));
 }
+
+pub fn dormancy_decay_applied(
+    env: &Env,
+    wallet: &Address,
+    asset_pair: &Symbol,
+    new_score: u32,
+    periods: u32,
+) {
+    env.events().publish(
+        (symbol_short!("drm_dec"), wallet.clone(), asset_pair.clone()),
+        (new_score, periods),
+    );
+}
