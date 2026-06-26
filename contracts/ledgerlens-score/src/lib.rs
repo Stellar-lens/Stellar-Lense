@@ -152,6 +152,7 @@ impl LedgerLensScoreContract {
         }
         storage::set_admin(&env, &admin);
         storage::set_service(&env, &service);
+        env.storage().instance().set(&types::DataKey::AdminAuditRoot, &BytesN::<32>::from_array(&env, &[0u8; 32]));
         Ok(())
     }
 
@@ -3176,6 +3177,8 @@ impl LedgerLensScoreContract {
         let admin = storage::get_admin(&env);
         storage::set_paused(&env, true);
         events::contract_paused(&env, &admin);
+        let action_bytes = Bytes::new(&env);
+        Self::update_audit_root(&env, symbol_short!("pause"), admin.clone(), action_bytes);
         Ok(())
     }
 
@@ -3207,6 +3210,8 @@ impl LedgerLensScoreContract {
         let admin = storage::get_admin(&env);
         storage::set_paused(&env, false);
         events::contract_unpaused(&env, &admin);
+        let action_bytes = Bytes::new(&env);
+        Self::update_audit_root(&env, symbol_short!("unpause"), admin.clone(), action_bytes);
         Ok(())
     }
 
@@ -3405,6 +3410,9 @@ impl LedgerLensScoreContract {
         storage::set_pending_upgrade(&env, &proposal);
 
         events::upgrade_proposed(&env, &new_wasm_hash, executable_after);
+        let mut params_bytes = Bytes::new(&env);
+        params_bytes.extend_from_array(&new_wasm_hash.to_array());
+        Self::update_audit_root(&env, symbol_short!("upg_prop"), admin.clone(), params_bytes);
         Ok(())
     }
 
@@ -6191,6 +6199,8 @@ impl LedgerLensScoreContract {
         timestamp: u64,
         confidence: u32,
         model_version: u32,
+        contract_id: &BytesN<32>,
+        contract_version: u32,
     ) -> Result<Hash<32>, Error> {
         let pair_str = SymbolStr::try_from_val(env, &asset_pair.to_symbol_val())
             .map_err(|_| Error::InvalidAttestation)?;
@@ -6218,8 +6228,52 @@ impl LedgerLensScoreContract {
         preimage.extend_from_array(&model_version.to_le_bytes());
         preimage.extend_from_array(&contract_buf);
         preimage.extend_from_array(&env.ledger().network_id().to_array());
+        preimage.extend_from_array(&contract_id.to_array());
+        preimage.extend_from_array(&contract_version.to_le_bytes());
 
         Ok(env.crypto().sha256(&preimage))
+    }
+
+    /// Updates the Merkle audit root after an admin action.
+    /// Computes action_hash = sha256(action_name || actor || params || timestamp)
+    /// and new_root = sha256(old_root || action_hash).
+    fn update_audit_root(
+        env: &Env,
+        action_name: Symbol,
+        actor: Address,
+        params_bytes: Bytes,
+    ) {
+        let old_root: BytesN<32> = env
+            .storage()
+            .instance()
+            .get(&types::DataKey::AdminAuditRoot)
+            .unwrap_or_else(|| BytesN::from_array(env, &[0u8; 32]));
+
+        let mut action_preimage = Bytes::new(env);
+        let action_name_bytes = action_name.to_xdr(env);
+        action_preimage.extend_from_slice(&action_name_bytes);
+        action_preimage.extend_from_slice(&actor.to_xdr(env));
+        action_preimage.extend_from_slice(&params_bytes);
+        action_preimage.extend_from_array(&env.ledger().timestamp().to_le_bytes());
+
+        let action_hash = env.crypto().sha256(&action_preimage);
+
+        let mut chain_preimage = Bytes::new(env);
+        chain_preimage.extend_from_array(&old_root.to_array());
+        chain_preimage.extend_from_array(&action_hash.to_bytes().to_array());
+
+        let new_root = env.crypto().sha256(&chain_preimage);
+        env.storage()
+            .instance()
+            .set(&types::DataKey::AdminAuditRoot, &new_root);
+    }
+
+    /// Returns the current Merkle audit root over all admin governance actions since initialization.
+    pub fn get_admin_audit_root(env: Env) -> BytesN<32> {
+        env.storage()
+            .instance()
+            .get(&types::DataKey::AdminAuditRoot)
+            .unwrap_or_else(|| BytesN::from_array(&env, &[0u8; 32]))
     }
 
     /// Verifies admin authorization. In multisig mode (AdminSet non-empty and
@@ -6268,6 +6322,19 @@ impl LedgerLensScoreContract {
     ) -> Result<(), Error> {
         let attestation = attestation.ok_or(Error::InvalidAttestation)?;
 
+        // contract_id is cross-checked against env.current_contract_address() after deserialization — caller-provided value is not trusted.
+        let current_address_xdr = env.current_contract_address().to_xdr(env);
+        let mut current_contract_id = [0u8; 32];
+        if current_address_xdr.len() >= 32 {
+            current_contract_id.copy_from_slice(&current_address_xdr.as_ref()[..32]);
+        }
+        if attestation.contract_id.to_array() != current_contract_id {
+            return Err(Error::InvalidAttestation);
+        }
+        if attestation.contract_version != storage::get_contract_version(env) {
+            return Err(Error::InvalidAttestation);
+        }
+
         let digest = Self::compute_commitment(
             env,
             wallet,
@@ -6278,6 +6345,8 @@ impl LedgerLensScoreContract {
             timestamp,
             confidence,
             model_version,
+            &attestation.contract_id,
+            attestation.contract_version,
         )?;
 
         if digest.to_bytes().to_array() != attestation.commitment.to_array() {
@@ -6361,6 +6430,19 @@ impl LedgerLensScoreContract {
         model_version: u32,
         ta: &ThresholdAttestation,
     ) -> Result<(), Error> {
+        // contract_id is cross-checked against env.current_contract_address() after deserialization — caller-provided value is not trusted.
+        let current_address_xdr = env.current_contract_address().to_xdr(env);
+        let mut current_contract_id = [0u8; 32];
+        if current_address_xdr.len() >= 32 {
+            current_contract_id.copy_from_slice(&current_address_xdr.as_ref()[..32]);
+        }
+        if ta.contract_id.to_array() != current_contract_id {
+            return Err(Error::InvalidAttestation);
+        }
+        if ta.contract_version != storage::get_contract_version(env) {
+            return Err(Error::InvalidAttestation);
+        }
+
         let digest = Self::compute_commitment(
             env,
             wallet,
@@ -6371,6 +6453,8 @@ impl LedgerLensScoreContract {
             timestamp,
             confidence,
             model_version,
+            &ta.contract_id,
+            ta.contract_version,
         )?;
 
         // Commitment must match what the contract independently derives.
