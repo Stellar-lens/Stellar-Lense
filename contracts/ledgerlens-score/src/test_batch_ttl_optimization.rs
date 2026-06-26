@@ -60,10 +60,15 @@ fn risk_score(sub: &ScoreSubmission) -> RiskScore {
 fn test_batch_resubmit_lazy_ttl_reduces_instructions() {
     let (env, client, asset_pair) = setup();
     let batch = build_batch(&env, &asset_pair, MAX_BATCH_SIZE, 40);
-    let _ = client.submit_scores_batch(&batch);
 
     let contract_id = client.address.clone();
     env.as_contract(&contract_id, || {
+        // Prewarm entries without a full batch submit (avoids multi-MB test snapshots).
+        for i in 0..batch.len() {
+            let sub = batch.get(i).unwrap();
+            storage::set_score(&env, &sub.wallet, &asset_pair, &risk_score(&sub));
+        }
+
         storage::reset_test_extend_count(&env);
 
         for i in 0..batch.len() {
@@ -94,7 +99,9 @@ fn test_batch_resubmit_lazy_ttl_reduces_instructions() {
 #[test]
 fn test_batch_resubmit_lazy_ttl_preserves_scores() {
     let (env, client, asset_pair) = setup();
-    let batch = build_batch(&env, &asset_pair, MAX_BATCH_SIZE, 55);
+    // Small batch keeps Soroban test snapshots manageable while still exercising
+    // the submit_scores_batch path end-to-end.
+    let batch = build_batch(&env, &asset_pair, 3, 55);
     let _ = client.submit_scores_batch(&batch);
 
     env.ledger().with_mut(|l| l.timestamp += 3_601);
