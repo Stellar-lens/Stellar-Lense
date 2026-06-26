@@ -435,6 +435,17 @@ pub enum DataKey {
     ScoreEntryIndex,
     ScoreEntryLastTouchedLedger(Address, Symbol),
     ModelVersionIndex,
+    /// #298: Pending co-signatures for a proposed upgrade.
+    /// Stores Vec<Address> of signers who have approved.
+    UpgradeApprovals,
+    /// #299: Current Merkle governance chain head (sha256 hash).
+    GovernanceChainHead,
+    /// #297: IQR rejection multiplier (scaled by 100, default 150 = 1.5×).
+    IqrRejectionMultiplier,
+    /// #297: Per-signer rejection counter.
+    SignerRejectionCount(Address),
+    /// #302: Strict gate enforcement mode flag.
+    GateEnforcementMode,
 }
 
 impl DataKey {
@@ -546,6 +557,11 @@ impl DataKey {
             DataKey::JumpStats(w, s) => k2!("JumpStats", w, s),
             DataKey::FeeRecipient => k0!("FeeRecipient"),
             DataKey::EmbargoedWalletIndex => k0!("EmbargoedWIndex"),
+            DataKey::UpgradeApprovals => k0!("UpgradeApprovals"),
+            DataKey::GovernanceChainHead => k0!("GovChainHead"),
+            DataKey::IqrRejectionMultiplier => k0!("IqrRejMult"),
+            DataKey::SignerRejectionCount(a) => k1!("SignerRejCnt", a),
+            DataKey::GateEnforcementMode => k0!("GateEnfMode"),
         }
     }
 }

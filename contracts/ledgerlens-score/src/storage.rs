@@ -1656,3 +1656,59 @@ pub fn set_signer_rotation_grace(env: &Env, grace_secs: u64) {
 pub fn set_reveal_window_secs(env: &Env, secs: u64) {
     env.storage().instance().set(&DataKey::RevealWindowSecs, &secs);
 }
+
+// ── #298: Upgrade approvals (M-of-N propose_upgrade) ─────────────────────────
+
+pub fn get_upgrade_approvals(env: &Env) -> soroban_sdk::Vec<Address> {
+    env.storage().instance().get(&DataKey::UpgradeApprovals).unwrap_or_else(|| soroban_sdk::Vec::new(env))
+}
+
+pub fn set_upgrade_approvals(env: &Env, approvals: &soroban_sdk::Vec<Address>) {
+    env.storage().instance().set(&DataKey::UpgradeApprovals, approvals);
+}
+
+pub fn clear_upgrade_approvals(env: &Env) {
+    env.storage().instance().remove(&DataKey::UpgradeApprovals);
+}
+
+// ── #299: Governance Merkle audit chain ──────────────────────────────────────
+
+pub fn get_governance_chain_head(env: &Env) -> soroban_sdk::BytesN<32> {
+    env.storage().instance().get(&DataKey::GovernanceChainHead).unwrap_or_else(|| soroban_sdk::BytesN::from_array(env, &[0u8; 32]))
+}
+
+pub fn set_governance_chain_head(env: &Env, head: &soroban_sdk::BytesN<32>) {
+    env.storage().instance().set(&DataKey::GovernanceChainHead, head);
+}
+
+// ── #297: IQR rejection multiplier & signer rejection count ──────────────────
+
+/// Default IQR multiplier scaled by 100 (i.e. 150 → 1.5×).
+pub const DEFAULT_IQR_REJECTION_MULTIPLIER: u32 = 150;
+
+pub fn get_iqr_rejection_multiplier(env: &Env) -> u32 {
+    env.storage().instance().get(&DataKey::IqrRejectionMultiplier).unwrap_or(DEFAULT_IQR_REJECTION_MULTIPLIER)
+}
+
+pub fn set_iqr_rejection_multiplier(env: &Env, multiplier: u32) {
+    env.storage().instance().set(&DataKey::IqrRejectionMultiplier, &multiplier);
+}
+
+pub fn get_signer_rejection_count(env: &Env, signer: &Address) -> u32 {
+    env.storage().instance().get(&DataKey::SignerRejectionCount(signer.clone())).unwrap_or(0)
+}
+
+pub fn increment_signer_rejection_count(env: &Env, signer: &Address) {
+    let count = get_signer_rejection_count(env, signer);
+    env.storage().instance().set(&DataKey::SignerRejectionCount(signer.clone()), &(count + 1));
+}
+
+// ── #302: Gate enforcement mode ───────────────────────────────────────────────
+
+pub fn get_gate_enforcement_mode(env: &Env) -> bool {
+    env.storage().instance().get(&DataKey::GateEnforcementMode).unwrap_or(false)
+}
+
+pub fn set_gate_enforcement_mode(env: &Env, strict: bool) {
+    env.storage().instance().set(&DataKey::GateEnforcementMode, &strict);
+}

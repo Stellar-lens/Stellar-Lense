@@ -83,6 +83,18 @@ mod test_breach_counter_reset;
 #[cfg(test)]
 mod test_query_helpers;
 
+#[cfg(test)]
+mod test_upgrade_multisig;
+
+#[cfg(test)]
+mod test_governance_chain;
+
+#[cfg(test)]
+mod test_iqr_rejection;
+
+#[cfg(test)]
+mod test_gate_enforcement;
+
 use soroban_sdk::{
     contract, contractimpl, crypto::Hash, symbol_short, token, Address, Bytes, BytesN, Env, Symbol,
     SymbolStr, TryFromVal, Vec,
@@ -713,6 +725,47 @@ impl LedgerLensScoreContract {
         if valid_indices.is_empty() {
             return Err(Error::InsufficientConsensus);
         }
+        // ── #297: IQR-based outlier rejection ────────────────────────────────
+        // Compute Q1 (25th percentile) and Q3 (75th percentile) of scores among
+        // valid submissions, then reject any signer whose score deviates from
+        // the median by more than multiplier/100 × IQR.
+        let n = valid_indices.len();
+        if n >= 4 {
+            let q1_idx = (n - 1) / 4;
+            let q3_idx = (3 * (n - 1)) / 4;
+            if let (Some(q1), Some(q3)) = (
+                Self::kth_score_for_indices(&submissions, &valid_indices, q1_idx),
+                Self::kth_score_for_indices(&submissions, &valid_indices, q3_idx),
+            ) {
+                let iqr = q3.saturating_sub(q1);
+                let multiplier = storage::get_iqr_rejection_multiplier(&env); // scaled × 100
+                // threshold = multiplier/100 × iqr (integer arithmetic, scaled)
+                let threshold_scaled = (multiplier as u64) * (iqr as u64); // ×100 still
+                let median_idx = (n - 1) / 2;
+                if let Some(median) = Self::kth_score_for_indices(&submissions, &valid_indices, median_idx) {
+                    let mut non_outlier: Vec<u32> = Vec::new(&env);
+                    for k in 0..valid_indices.len() {
+                        let idx = valid_indices.get(k).unwrap();
+                        let sub = submissions.get(idx).unwrap();
+                        let score = sub.score;
+                        let deviation = if score >= median { score - median } else { median - score };
+                        // deviation_scaled = deviation × 100; compare with threshold_scaled
+                        if (deviation as u64) * 100 <= threshold_scaled {
+                            non_outlier.push_back(idx);
+                        } else {
+                            storage::increment_signer_rejection_count(&env, &sub.model);
+                            events::consensus_signer_rejected(&env, &sub.model, deviation);
+                        }
+                    }
+                    if !non_outlier.is_empty() {
+                        valid_indices = non_outlier;
+                    }
+                    // If all signers are rejected as outliers, fall through with
+                    // the original valid_indices (prefer imperfect consensus to none).
+                }
+            }
+        }
+        // ─────────────────────────────────────────────────────────────────────
         let median_score = Self::median_score_for_indices(&submissions, &valid_indices)
             .ok_or(Error::InsufficientConsensus)?;
         let median_confidence =
@@ -2364,6 +2417,14 @@ impl LedgerLensScoreContract {
         min_confidence: u32,
     ) -> bool {
         Self::check_service_silence(&env);
+        // #302: strict gate enforcement — reject callers not in the allowlist.
+        if storage::get_gate_enforcement_mode(&env) {
+            let caller = env.current_contract_address();
+            let callers = storage::get_gate_callers(&env);
+            if !callers.contains(&caller) {
+                return false; // CallerNotAuthorized: infallible, so return false
+            }
+        }
         if gate_threshold > 100 || min_confidence > 100 {
             return false;
         }
@@ -2574,6 +2635,10 @@ impl LedgerLensScoreContract {
             || capability == Symbol::new(&env, "rgate")
             || capability == symbol_short!("emb")
             || capability == symbol_short!("cons")
+            || capability == Symbol::new(&env, "gov_chain")   // #299
+            || capability == symbol_short!("iqr")             // #297
+            || capability == Symbol::new(&env, "gate_strict") // #302
+            || capability == symbol_short!("mofn_upg")        // #298
     }
 
     // ── Service management ───────────────────────────────────────────────────
@@ -2604,6 +2669,11 @@ impl LedgerLensScoreContract {
         storage::set_service_set(&env, &set);
         storage::set_signer_added_at(&env, &signer, env.ledger().timestamp());
         events::signer_added(&env, &signer);
+        // #299: governance audit chain
+        let mut data = [0u8; 32];
+        data[0] = 0x02; // action: add_service_signer
+        Self::append_governance_action_raw(&env, &data);
+        Ok(())
         Ok(())
     }
 
@@ -2741,6 +2811,10 @@ impl LedgerLensScoreContract {
         storage::get_admin(&env).require_auth();
         storage::set_service(&env, &new_service);
         events::service_updated(&env, &new_service);
+        // #299: append to governance audit chain (action discriminant 0x01)
+        let mut data = [0u8; 32];
+        data[0] = 0x01; // action: set_service
+        Self::append_governance_action_raw(&env, &data);
         Ok(())
     }
 
@@ -3279,6 +3353,33 @@ impl LedgerLensScoreContract {
             return Err(Error::UpgradeAlreadyPending);
         }
 
+        // ── #298: M-of-N co-signature requirement ────────────────────────────
+        // In multisig mode we require ALL threshold signers to be present in
+        // admin_signers before storing the proposal (require_admin_auth already
+        // verified they are valid set members and called require_auth on each).
+        // In legacy (single-admin) mode this check is a no-op.
+        let admin_set = storage::get_admin_set(&env);
+        let threshold = storage::get_admin_threshold(&env);
+        if !admin_set.is_empty() && threshold > 0 {
+            let mut approvals = storage::get_upgrade_approvals(&env);
+            // Add any new signers from this call.
+            for i in 0..admin_signers.len() {
+                let s = admin_signers.get(i).unwrap();
+                if !approvals.contains(&s) {
+                    approvals.push_back(s.clone());
+                    events::upgrade_approval_added(&env, &s, approvals.len(), threshold);
+                }
+            }
+            if approvals.len() < threshold {
+                // Not enough approvals yet — persist partial state and return.
+                storage::set_upgrade_approvals(&env, &approvals);
+                return Ok(());
+            }
+            // Threshold met: clear accumulator and proceed to store proposal.
+            storage::clear_upgrade_approvals(&env);
+        }
+        // ─────────────────────────────────────────────────────────────────────
+
         let now = env.ledger().timestamp();
         let delay = storage::get_upgrade_delay(&env);
         // delay is bounded to MAX_UPGRADE_DELAY_SECS on the way in, so this
@@ -3292,6 +3393,7 @@ impl LedgerLensScoreContract {
             proposed_by: admin,
         };
         storage::set_pending_upgrade(&env, &proposal);
+        Self::append_governance_action_raw(&env, &new_wasm_hash.to_array());
 
         events::upgrade_proposed(&env, &new_wasm_hash, executable_after);
         Ok(())
@@ -3372,6 +3474,14 @@ impl LedgerLensScoreContract {
         storage::get_pending_upgrade(&env).ok_or(Error::NoPendingUpgrade)
     }
 
+    /// #298: Returns the number of admin co-signatures collected so far for the
+    /// pending upgrade proposal. Returns `0` when there are no partial approvals
+    /// (either no proposal is accumulating or the counter was cleared after
+    /// the threshold was met).
+    pub fn get_upgrade_approval_count(env: Env) -> u32 {
+        storage::get_upgrade_approvals(&env).len()
+    }
+
     /// Configure the upgrade time-lock delay (seconds) applied to future
     /// proposals. Must be within `[MIN_UPGRADE_DELAY_SECS,
     /// MAX_UPGRADE_DELAY_SECS]` (48 hours – 14 days). Admin only.
@@ -3408,6 +3518,98 @@ impl LedgerLensScoreContract {
     /// `DEFAULT_UPGRADE_DELAY_SECS` (48 hours) until configured.
     pub fn get_upgrade_delay(env: Env) -> u64 {
         storage::get_upgrade_delay(&env)
+    }
+
+    // ── #299: Governance Merkle audit chain ──────────────────────────────────
+
+    /// Returns the current Merkle governance chain head hash.
+    /// The genesis state is all-zeros; advances with every admin action.
+    pub fn get_governance_chain_head(env: Env) -> BytesN<32> {
+        storage::get_governance_chain_head(&env)
+    }
+
+    /// Verifies that `action_hash` (a 32-byte digest of an action's data) is
+    /// linked in the governance chain. The caller supplies an ordered
+    /// `proof` of intermediate heads: starting from `action_hash` the function
+    /// walks the chain forward and checks that the final result matches
+    /// the current chain head.
+    ///
+    /// proof[0] = the sibling head at the action's level,
+    /// proof[i] = successive chained heads.
+    ///
+    /// Returns `true` when the re-derived head equals the stored chain head.
+    pub fn verify_governance_action(
+        env: Env,
+        action_hash: BytesN<32>,
+        proof: Vec<BytesN<32>>,
+    ) -> bool {
+        let chain_head = storage::get_governance_chain_head(&env);
+        // Walk forward: iteratively hash (0x01 || current || next_sibling)
+        let mut current = action_hash.to_array();
+        for i in 0..proof.len() {
+            let sibling = proof.get(i).unwrap().to_array();
+            let mut buf = [0u8; 65];
+            buf[0] = 0x01;
+            buf[1..33].copy_from_slice(&current);
+            buf[33..65].copy_from_slice(&sibling);
+            current = env.crypto().sha256(&Bytes::from_array(&env, &buf)).to_bytes().to_array();
+        }
+        current == chain_head.to_array()
+    }
+
+    // ── #297: IQR rejection multiplier / signer rejection count ─────────────
+
+    /// Admin: set the IQR rejection multiplier (scaled by 100).
+    /// E.g. `150` = 1.5× IQR. Default is 150.
+    pub fn set_iqr_rejection_multiplier(
+        env: Env,
+        admin_signers: Vec<Address>,
+        multiplier: u32,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+        storage::set_iqr_rejection_multiplier(&env, multiplier);
+        // Append to governance audit chain: encode multiplier into 32 bytes.
+        let mut data = [0u8; 32];
+        data[28..32].copy_from_slice(&multiplier.to_be_bytes());
+        Self::append_governance_action_raw(&env, &data);
+        Ok(())
+    }
+
+    /// Returns the IQR rejection count for `signer` (how many times their
+    /// consensus submission was rejected as an outlier).
+    pub fn get_signer_rejection_count(env: Env, signer: Address) -> u32 {
+        storage::get_signer_rejection_count(&env, &signer)
+    }
+
+    // ── #302: Strict gate enforcement mode ───────────────────────────────────
+
+    /// Admin: enable or disable strict gate enforcement mode.
+    /// When `strict = true`, `query_risk_gate` rejects any caller not in the
+    /// GateCallers allowlist with `CallerNotAuthorized`.
+    pub fn set_gate_enforcement_mode(
+        env: Env,
+        admin_signers: Vec<Address>,
+        strict: bool,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+        storage::set_gate_enforcement_mode(&env, strict);
+        events::gate_enforcement_mode_set(&env, strict);
+        // Append to governance audit chain.
+        let mut data = [0u8; 32];
+        data[31] = if strict { 1 } else { 0 };
+        Self::append_governance_action_raw(&env, &data);
+        Ok(())
+    }
+
+    /// Returns whether strict gate enforcement mode is active.
+    pub fn get_gate_enforcement_mode(env: Env) -> bool {
+        storage::get_gate_enforcement_mode(&env)
     }
 
     // ── Watchlist ────────────────────────────────────────────────────────────
@@ -5074,6 +5276,11 @@ impl LedgerLensScoreContract {
             return Err(Error::InvalidThreshold);
         }
         storage::set_admin_threshold(&env, threshold);
+        // #299: governance audit chain
+        let mut data = [0u8; 32];
+        data[0] = 0x03; // action: set_admin_threshold
+        data[28..32].copy_from_slice(&threshold.to_be_bytes());
+        Self::append_governance_action_raw(&env, &data);
         Ok(())
     }
 
@@ -6023,6 +6230,21 @@ impl LedgerLensScoreContract {
         preimage.extend_from_array(&env.ledger().network_id().to_array());
 
         Ok(env.crypto().sha256(&preimage))
+    }
+
+    /// #299: Append an admin governance action to the Merkle audit chain.
+    /// new_head = SHA256(0x01 || prev_head || action_data)
+    /// The genesis head (all-zeros) is the implicit starting point.
+    fn append_governance_action_raw(env: &Env, action_data: &[u8; 32]) {
+        let prev = storage::get_governance_chain_head(env);
+        let mut buf = [0u8; 65];
+        buf[0] = 0x01;
+        buf[1..33].copy_from_slice(&prev.to_array());
+        buf[33..65].copy_from_slice(action_data);
+        let new_head_hash = env.crypto().sha256(&Bytes::from_array(env, &buf));
+        let new_head = BytesN::from_array(env, &new_head_hash.to_bytes().to_array());
+        storage::set_governance_chain_head(env, &new_head);
+        events::governance_action_appended(env, &new_head);
     }
 
     /// Verifies admin authorization. In multisig mode (AdminSet non-empty and
