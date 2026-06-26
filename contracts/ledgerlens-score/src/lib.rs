@@ -1552,6 +1552,38 @@ impl LedgerLensScoreContract {
         Self::lookup_score(&env, &wallet, &asset_pair)?.ok_or(Error::ScoreNotFound)
     }
 
+
+
+    /// Returns `true` if a score entry exists for `wallet` / `asset_pair`,
+    /// `false` otherwise. Never returns an error.
+    ///
+    /// Use this as a cheap presence check before calling [`get_score`] when
+    /// you only need to know whether a score has been submitted.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use soroban_sdk::symbol_short;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// let wallet = Address::generate(&env);
+    /// let asset_pair = symbol_short!("XLM_USDC");
+    /// assert!(!client.get_score_exists(&wallet, &asset_pair));
+    /// client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &10, &false, &false, &1, &50, &1, &None).unwrap();
+    /// assert!(client.get_score_exists(&wallet, &asset_pair));
+    /// ```
+    pub fn get_score_exists(env: Env, wallet: Address, asset_pair: Symbol) -> bool {
+        storage::peek_score(&env, &wallet, &asset_pair).is_some()
+    }
+
     /// Reads the latest score for each requested wallet / asset-pair pair.
     ///
     /// This is the batch equivalent of [`get_score`]. Each result preserves

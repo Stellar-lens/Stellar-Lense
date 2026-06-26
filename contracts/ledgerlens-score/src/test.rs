@@ -82,6 +82,37 @@ fn test_submit_and_get_score() {
 }
 
 #[test]
+fn test_get_score_exists_returns_true_when_score_present() {
+    let (env, client, admin, service) = initialized();
+    let wallet = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &asset_pair,
+        &50,
+        &false,
+        &false,
+        &1_700_000_000,
+        &80,
+        &1,
+        &None,
+    );
+
+    assert!(client.get_score_exists(&wallet, &asset_pair));
+}
+
+#[test]
+fn test_get_score_exists_returns_false_when_no_score() {
+    let (env, client, admin, service) = initialized();
+    let wallet = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+
+    assert!(!client.get_score_exists(&wallet, &asset_pair));
+}
+
+#[test]
 fn test_get_score_not_found() {
     let (env, client, admin, service) = setup();
     client.initialize(&admin, &service);
