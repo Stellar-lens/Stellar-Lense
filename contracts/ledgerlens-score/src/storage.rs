@@ -767,6 +767,16 @@ pub fn set_service_pubkey(env: &Env, pubkey: &Bytes) {
     env.storage().instance().set(&DataKey::ServicePubKey, pubkey);
 }
 
+// ── Signer nonce tracking ───────────────────────────────────────────────────
+
+pub fn get_signer_nonce(env: &Env, signer: &Address) -> u64 {
+    env.storage().instance().get(&DataKey::SignerNonce(signer.clone())).unwrap_or(0)
+}
+
+pub fn set_signer_nonce(env: &Env, signer: &Address, nonce: u64) {
+    env.storage().instance().set(&DataKey::SignerNonce(signer.clone()), &nonce);
+}
+
 pub fn set_gate_callers(env: &Env, callers: &Vec<Address>) {
     env.storage().instance().set(&GateDataKey::GateCallers, callers);
 }

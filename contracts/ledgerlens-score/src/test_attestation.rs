@@ -64,6 +64,7 @@ fn commitment(
     timestamp: u64,
     confidence: u32,
     model_version: u32,
+    nonce: u64,
 ) -> [u8; 32] {
     env.as_contract(contract_id, || {
         LedgerLensScoreContract::compute_commitment(
@@ -76,6 +77,7 @@ fn commitment(
             timestamp,
             confidence,
             model_version,
+            nonce,
         )
         .unwrap()
         .to_bytes()
@@ -83,7 +85,7 @@ fn commitment(
     })
 }
 
-fn attest(env: &Env, key: &SigningKey, digest: [u8; 32]) -> ScoreAttestation {
+fn attest(env: &Env, key: &SigningKey, digest: [u8; 32], nonce: u64) -> ScoreAttestation {
     let Ok((sig, recid)) = key.sign_prehash_recoverable(&digest) else { panic!("sign failed") };
     let mut sig_bytes = [0u8; 65];
     sig_bytes[..64].copy_from_slice(&sig.to_bytes());
@@ -91,6 +93,7 @@ fn attest(env: &Env, key: &SigningKey, digest: [u8; 32]) -> ScoreAttestation {
     ScoreAttestation {
         commitment: BytesN::from_array(env, &digest),
         signature: BytesN::from_array(env, &sig_bytes),
+        nonce,
     }
 }
 
@@ -206,8 +209,8 @@ fn test_submit_score_with_valid_attestation_compressed_pubkey_succeeds() {
 
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
-    let digest = commitment(&env, &client.address, &wallet, &pair, 42, true, false, 1, 90, 1);
-    let attestation = attest(&env, &key, digest);
+    let digest = commitment(&env, &client.address, &wallet, &pair, 42, true, false, 1, 90, 1, 0);
+    let attestation = attest(&env, &key, digest, 0);
 
     let result = client.try_submit_score(
         &Vec::new(&env),
@@ -233,8 +236,8 @@ fn test_submit_score_with_valid_attestation_uncompressed_pubkey_succeeds() {
 
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
-    let digest = commitment(&env, &client.address, &wallet, &pair, 42, false, true, 1, 90, 1);
-    let attestation = attest(&env, &key, digest);
+    let digest = commitment(&env, &client.address, &wallet, &pair, 42, false, true, 1, 90, 1, 0);
+    let attestation = attest(&env, &key, digest, 0);
 
     let result = client.try_submit_score(
         &Vec::new(&env),
@@ -260,8 +263,8 @@ fn test_submit_score_with_attestation_for_different_payload_rejected() {
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
     // Attestation is valid, but for score 42 — the call below submits 43.
-    let digest = commitment(&env, &client.address, &wallet, &pair, 42, false, false, 1, 90, 1);
-    let attestation = attest(&env, &key, digest);
+    let digest = commitment(&env, &client.address, &wallet, &pair, 42, false, false, 1, 90, 1, 0);
+    let attestation = attest(&env, &key, digest, 0);
 
     let result = client.try_submit_score(
         &Vec::new(&env),
@@ -286,8 +289,8 @@ fn test_submit_score_with_tampered_commitment_field_rejected() {
 
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
-    let digest = commitment(&env, &client.address, &wallet, &pair, 42, false, false, 1, 90, 1);
-    let mut attestation = attest(&env, &key, digest);
+    let digest = commitment(&env, &client.address, &wallet, &pair, 42, false, false, 1, 90, 1, 0);
+    let mut attestation = attest(&env, &key, digest, 0);
     // Corrupt the (otherwise untrusted) commitment field directly; the
     // signature still matches the *original* digest, but the contract
     // recomputes the commitment independently and must reject the mismatch.
@@ -318,9 +321,9 @@ fn test_submit_score_signed_by_wrong_key_rejected() {
 
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
-    let digest = commitment(&env, &client.address, &wallet, &pair, 42, false, false, 1, 90, 1);
+    let digest = commitment(&env, &client.address, &wallet, &pair, 42, false, false, 1, 90, 1, 0);
     // Signed by a different key than the one registered.
-    let attestation = attest(&env, &signing_key(2), digest);
+    let attestation = attest(&env, &signing_key(2), digest, 0);
 
     let result = client.try_submit_score(
         &Vec::new(&env),
@@ -345,8 +348,8 @@ fn test_submit_score_with_out_of_range_recovery_id_rejected() {
 
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
-    let digest = commitment(&env, &client.address, &wallet, &pair, 42, false, false, 1, 90, 1);
-    let mut attestation = attest(&env, &key, digest);
+    let digest = commitment(&env, &client.address, &wallet, &pair, 42, false, false, 1, 90, 1, 0);
+    let mut attestation = attest(&env, &key, digest, 0);
     let mut sig = attestation.signature.to_array();
     sig[64] = 2; // only 0/1 are valid recovery ids
     attestation.signature = BytesN::from_array(&env, &sig);

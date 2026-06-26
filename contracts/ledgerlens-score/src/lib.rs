@@ -5994,6 +5994,7 @@ impl LedgerLensScoreContract {
         timestamp: u64,
         confidence: u32,
         model_version: u32,
+        nonce: u64,
     ) -> Result<Hash<32>, Error> {
         let pair_str = SymbolStr::try_from_val(env, &asset_pair.to_symbol_val())
             .map_err(|_| Error::InvalidAttestation)?;
@@ -6019,6 +6020,7 @@ impl LedgerLensScoreContract {
         preimage.extend_from_array(&timestamp.to_le_bytes());
         preimage.extend_from_array(&confidence.to_le_bytes());
         preimage.extend_from_array(&model_version.to_le_bytes());
+        preimage.extend_from_array(&nonce.to_le_bytes());
         preimage.extend_from_array(&contract_buf);
         preimage.extend_from_array(&env.ledger().network_id().to_array());
 
@@ -6081,13 +6083,28 @@ impl LedgerLensScoreContract {
             timestamp,
             confidence,
             model_version,
+            attestation.nonce,
         )?;
 
         if digest.to_bytes().to_array() != attestation.commitment.to_array() {
             return Err(Error::InvalidAttestation);
         }
 
-        Self::verify_signature(env, &digest, &attestation.signature)
+        // For single attestation, verify nonce per service account.
+        let service = storage::get_service(env);
+        let current_nonce = storage::get_signer_nonce(env, &service);
+        if current_nonce != attestation.nonce {
+            return Err(Error::InvalidAttestation);
+        }
+
+        Self::verify_signature(env, &digest, &attestation.signature)?;
+
+        // Signature verified and nonce matched; increment nonce for next submission.
+        let next_nonce = attestation.nonce.checked_add(1)
+            .ok_or(Error::InvalidAttestation)?;
+        storage::set_signer_nonce(env, &service, next_nonce);
+
+        Ok(())
     }
 
     /// Shared secp256k1 verification used by both
@@ -6174,6 +6191,7 @@ impl LedgerLensScoreContract {
             timestamp,
             confidence,
             model_version,
+            ta.nonce,
         )?;
 
         // Commitment must match what the contract independently derives.
@@ -6218,6 +6236,27 @@ impl LedgerLensScoreContract {
         if !matches {
             return Err(Error::InvalidAttestation);
         }
+
+        // ── Nonce verification and increment ───────────────────────────────────
+        // Each participating signer must have the expected next nonce.
+        // After successful verification, increment each signer's nonce to prevent replay.
+        for i in 0..ta.participating_signers.len() {
+            let signer = ta.participating_signers.get(i).unwrap();
+            let current_nonce = storage::get_signer_nonce(env, &signer);
+            if current_nonce != ta.nonce {
+                return Err(Error::InvalidAttestation);
+            }
+        }
+
+        // All nonces matched; increment them for the next submission.
+        // Safe unwrap: nonce overflow returns error, doesn't panic.
+        for i in 0..ta.participating_signers.len() {
+            let signer = ta.participating_signers.get(i).unwrap();
+            let next_nonce = ta.nonce.checked_add(1)
+                .ok_or(Error::InvalidAttestation)?;
+            storage::set_signer_nonce(env, &signer, next_nonce);
+        }
+
         Ok(())
     }
 
@@ -6266,6 +6305,7 @@ impl LedgerLensScoreContract {
             submission.timestamp,
             submission.confidence,
             submission.model_version,
+            0, // Batch/merkle attestations use nonce 0 (not per-submission)
         )?
         .to_bytes()
         .to_array();

@@ -117,11 +117,13 @@ pub struct AggregateRiskScore {
 }
 
 /// A cryptographic attestation over a score payload.
+/// Includes per-signer nonce for replay attack prevention.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ScoreAttestation {
     pub commitment: BytesN<32>,
     pub signature: BytesN<65>,
+    pub nonce: u64,
 }
 
 /// Threshold-signature attestation: t-of-n signers produce one 65-byte proof.
@@ -132,6 +134,7 @@ pub struct ThresholdAttestation {
     pub commitment: BytesN<32>,
     pub threshold_sig: BytesN<65>,
     pub participating_signers: soroban_sdk::Vec<Address>,
+    pub nonce: u64,
 }
 
 /// Unified attestation input for `submit_score`.
@@ -294,6 +297,9 @@ pub enum DataKey {
     /// Per-signer score range restriction. Maps a service signer address to
     /// its allowed `TierBounds`.
     SignerTier(Address),
+    /// Per-signer nonce for multi-sig attestation replay attack prevention.
+    /// Maps signer address to the next nonce that will be accepted.
+    SignerNonce(Address),
 
     /// Latest risk score for a (wallet, asset_pair) pair.
     Score(Address, Symbol),
@@ -466,6 +472,7 @@ impl DataKey {
             DataKey::Admin => k0!("Admin"),
             DataKey::Service => k0!("Service"),
             DataKey::SignerTier(a) => k1!("SignerTier", a),
+            DataKey::SignerNonce(a) => k1!("SignerNonce", a),
             DataKey::Score(a, s) => k2!("Score", a, s),
             DataKey::Paused => k0!("Paused"),
             DataKey::PendingAdmin => k0!("PendingAdmin"),
