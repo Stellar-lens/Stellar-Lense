@@ -314,8 +314,21 @@ impl LedgerLensScoreContract {
                         timestamp,
                         confidence,
                         model_version,
-                        single_att,
+                        single_att.clone(),
                     )?;
+                    
+                    // For single attestation provided by caller, verify and increment per-service-account nonce.
+                    // Only check nonce if the attestation was explicitly provided (not auto-generated).
+                    if let Some(att) = single_att.as_ref() {
+                        let service = storage::get_service(&env);
+                        let current_nonce = storage::get_signer_nonce(&env, &service);
+                        if current_nonce != att.nonce {
+                            return Err(Error::InvalidAttestation);
+                        }
+                        let next_nonce = att.nonce.checked_add(1)
+                            .ok_or(Error::InvalidAttestation)?;
+                        storage::set_signer_nonce(&env, &service, next_nonce);
+                    }
                 }
             }
         }
@@ -6097,14 +6110,7 @@ impl LedgerLensScoreContract {
             return Err(Error::InvalidAttestation);
         }
 
-        Self::verify_signature(env, &digest, &attestation.signature)?;
-
-        // Signature verified and nonce matched; increment nonce for next submission.
-        let next_nonce = attestation.nonce.checked_add(1)
-            .ok_or(Error::InvalidAttestation)?;
-        storage::set_signer_nonce(env, &service, next_nonce);
-
-        Ok(())
+        Self::verify_signature(env, &digest, &attestation.signature)
     }
 
     /// Shared secp256k1 verification used by both
