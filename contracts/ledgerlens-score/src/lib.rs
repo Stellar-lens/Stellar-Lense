@@ -413,6 +413,16 @@ impl LedgerLensScoreContract {
         Self::set_finality_buffer(env, admin_signers, secs)
     }
 
+    /// Public alias for `commit_pending_score`.
+    /// Callable by anyone once the escrow hold window has elapsed.
+    pub fn auto_commit_score(
+        env: Env,
+        wallet: Address,
+        asset_pair: Symbol,
+    ) -> Result<(), Error> {
+        Self::commit_pending_score(env, wallet, asset_pair)
+    }
+
     /// Returns an estimate of the number of unique wallets that have a live
     /// score for `asset_pair`. Uses a per-pair HyperLogLog sketch to avoid
     /// storing full wallet lists on-chain.
