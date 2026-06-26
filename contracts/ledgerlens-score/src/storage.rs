@@ -7,10 +7,47 @@ use crate::constants::{
 use crate::errors::Error;
 use crate::types::{
     AggregateRiskScore, DataKey, EmbargoExpiry, GateDataKey, JumpStats, ModelVersionStats,
-    PendingScoreEntry, RiskScore, ScoreDispute, ScoreFloorPolicy, ScoreHistogram, ScoreTrend,
-    ScoreVelocityCap, UpgradeProposal,
+    ParameterProposalRecord, ParameterProposalStatus, PendingScoreEntry, RiskScore, ScoreDispute,
+    ScoreFloorPolicy, ScoreHistogram, ScoreTrend, ScoreVelocityCap, UpgradeProposal,
 };
 use soroban_sdk::{Address, Bytes, Env, Symbol, Vec};
+
+#[cfg(test)]
+fn extend_persistent_ttl(env: &Env, key: &crate::types::DataKey) {
+    env.storage()
+        .persistent()
+        .extend_ttl(key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    let count: u32 = env
+        .storage()
+        .instance()
+        .get(&crate::types::DataKey::TestExtendCount)
+        .unwrap_or(0);
+    env.storage()
+        .instance()
+        .set(&crate::types::DataKey::TestExtendCount, &(count + 1));
+}
+
+#[cfg(not(test))]
+fn extend_persistent_ttl(env: &Env, key: &crate::types::DataKey) {
+    env.storage()
+        .persistent()
+        .extend_ttl(key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+}
+
+#[cfg(test)]
+pub fn test_extend_count(env: &Env) -> u32 {
+    env.storage()
+        .instance()
+        .get(&crate::types::DataKey::TestExtendCount)
+        .unwrap_or(0)
+}
+
+#[cfg(test)]
+pub fn reset_test_extend_count(env: &Env) {
+    env.storage()
+        .instance()
+        .set(&crate::types::DataKey::TestExtendCount, &0u32);
+}
 
 // ── Admin / Service ─────────────────────────────────────────────────────────
 
@@ -39,8 +76,29 @@ pub fn get_service(env: &Env) -> Address {
 pub fn set_score(env: &Env, wallet: &Address, asset_pair: &Symbol, score: &RiskScore) {
     let key = DataKey::Score(wallet.clone(), asset_pair.clone());
     env.storage().persistent().set(&key, score);
-    env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    // Lazy TTL extension: only renew the score entry when the touch marker shows
+    // SCORE_TTL_THRESHOLD ledgers have elapsed since the last write. Strict `>=`
+    // on elapsed so entries at exactly the threshold still renew. Untracked
+    // entries (first write) always extend.
+    let needs_extend = match ledgers_since_touch(env, wallet, asset_pair) {
+        None => true,
+        Some(elapsed) => elapsed >= SCORE_TTL_THRESHOLD,
+    };
+    if needs_extend {
+        extend_persistent_ttl(env, &key);
+    }
     track_score_entry(env, wallet, asset_pair);
+}
+
+/// Eager TTL path retained for instruction-count regression tests only.
+#[cfg(test)]
+pub fn set_score_eager_ttl(env: &Env, wallet: &Address, asset_pair: &Symbol, score: &RiskScore) {
+    let key = DataKey::Score(wallet.clone(), asset_pair.clone());
+    env.storage().persistent().set(&key, score);
+    extend_persistent_ttl(env, &key);
+    track_score_entry(env, wallet, asset_pair);
+    let touch_key = DataKey::ScoreEntryLastTouchedLedger(wallet.clone(), asset_pair.clone());
+    extend_persistent_ttl(env, &touch_key);
 }
 
 pub fn get_score(env: &Env, wallet: &Address, asset_pair: &Symbol) -> Option<RiskScore> {
@@ -116,8 +174,12 @@ pub fn track_score_entry(env: &Env, wallet: &Address, asset_pair: &Symbol) {
 
 fn touch_score_entry(env: &Env, wallet: &Address, asset_pair: &Symbol) {
     let key = DataKey::ScoreEntryLastTouchedLedger(wallet.clone(), asset_pair.clone());
+    let had_touch = env.storage().persistent().has(&key);
     env.storage().persistent().set(&key, &env.ledger().sequence());
-    env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    // Lazy TTL on the touch marker: skip extend while the entry is still tracked.
+    if !had_touch {
+        extend_persistent_ttl(env, &key);
+    }
 }
 
 /// Ledgers elapsed since `(wallet, asset_pair)` was last touched, or `None`
@@ -519,6 +581,136 @@ pub fn get_upgrade_delay(env: &Env) -> u64 {
 
 pub fn set_upgrade_delay(env: &Env, delay_secs: u64) {
     env.storage().instance().set(&DataKey::UpgradeDelay, &delay_secs);
+}
+
+// ── Parameter change governance ───────────────────────────────────────────────
+
+pub fn next_parameter_proposal_id(env: &Env) -> u64 {
+    let id: u64 = env
+        .storage()
+        .instance()
+        .get(&DataKey::ParameterProposalNextId)
+        .unwrap_or(1);
+    env.storage()
+        .instance()
+        .set(&DataKey::ParameterProposalNextId, &(id.saturating_add(1)));
+    id
+}
+
+pub fn get_parameter_proposal_record(env: &Env, proposal_id: u64) -> Option<ParameterProposalRecord> {
+    env.storage()
+        .instance()
+        .get(&DataKey::ParameterProposal(proposal_id))
+}
+
+pub fn set_parameter_proposal_record(env: &Env, proposal_id: u64, record: &ParameterProposalRecord) {
+    env.storage()
+        .instance()
+        .set(&DataKey::ParameterProposal(proposal_id), record);
+}
+
+pub fn get_pending_parameter_proposal_ids(env: &Env) -> Vec<u64> {
+    env.storage()
+        .instance()
+        .get(&DataKey::PendingParameterProposalIds)
+        .unwrap_or_else(|| Vec::new(env))
+}
+
+pub fn set_pending_parameter_proposal_ids(env: &Env, ids: &Vec<u64>) {
+    env.storage()
+        .instance()
+        .set(&DataKey::PendingParameterProposalIds, ids);
+}
+
+pub fn push_pending_parameter_proposal(env: &Env, proposal_id: u64) {
+    let mut ids = get_pending_parameter_proposal_ids(env);
+    ids.push_back(proposal_id);
+    set_pending_parameter_proposal_ids(env, &ids);
+}
+
+pub fn remove_pending_parameter_proposal(env: &Env, proposal_id: u64) {
+    let ids = get_pending_parameter_proposal_ids(env);
+    let mut next = Vec::new(env);
+    for i in 0..ids.len() {
+        let id = ids.get(i).unwrap();
+        if id != proposal_id {
+            next.push_back(id);
+        }
+    }
+    set_pending_parameter_proposal_ids(env, &next);
+}
+
+pub fn count_pending_parameter_proposals(env: &Env) -> u32 {
+    get_pending_parameter_proposal_ids(env).len()
+}
+
+pub fn mark_parameter_proposal_status(
+    env: &Env,
+    proposal_id: u64,
+    status: ParameterProposalStatus,
+) -> Option<ParameterProposalRecord> {
+    let mut record = get_parameter_proposal_record(env, proposal_id)?;
+    record.status = status;
+    set_parameter_proposal_record(env, proposal_id, &record);
+    remove_pending_parameter_proposal(env, proposal_id);
+    Some(record)
+}
+
+pub fn is_parameter_proposal_expired(proposal: &crate::types::ParameterProposal, now: u64) -> bool {
+    let expiry = proposal
+        .proposed_at
+        .saturating_add(proposal.time_lock_secs.saturating_mul(2));
+    now > expiry
+}
+
+/// Marks expired pending proposals and removes them from the pending index.
+pub fn prune_expired_parameter_proposals(env: &Env) {
+    let ids = get_pending_parameter_proposal_ids(env);
+    let now = env.ledger().timestamp();
+    for i in 0..ids.len() {
+        let id = ids.get(i).unwrap();
+        if let Some(record) = get_parameter_proposal_record(env, id) {
+            if record.status == ParameterProposalStatus::Pending
+                && is_parameter_proposal_expired(&record.proposal, now)
+            {
+                mark_parameter_proposal_status(env, id, ParameterProposalStatus::Expired);
+            }
+        }
+    }
+}
+
+/// Seeds `count` pending proposals directly in storage for cap tests without
+/// replaying the full propose flow (keeps Soroban test snapshots small).
+#[cfg(test)]
+pub fn test_seed_pending_parameter_proposals(
+    env: &Env,
+    count: u32,
+    proposer: &Address,
+    param_key: &Symbol,
+    new_value: &Bytes,
+) {
+    use crate::types::{ParameterProposal, ParameterProposalRecord, ParameterProposalStatus};
+
+    let now = env.ledger().timestamp();
+    let time_lock_secs = get_upgrade_delay(env);
+    for i in 1..=count {
+        let proposal = ParameterProposal {
+            param_key: param_key.clone(),
+            new_value: new_value.clone(),
+            proposer: proposer.clone(),
+            proposed_at: now,
+            time_lock_secs,
+        };
+        let record = ParameterProposalRecord {
+            proposal,
+            status: ParameterProposalStatus::Pending,
+        };
+        set_parameter_proposal_record(env, i as u64, &record);
+        push_pending_parameter_proposal(env, i as u64);
+    }
+    env.storage()
+        .instance()
+        .set(&DataKey::ParameterProposalNextId, &(count as u64 + 1));
 }
 
 // ── Multi-sig admin set ──────────────────────────────────────────────────────

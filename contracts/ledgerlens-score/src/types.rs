@@ -1,4 +1,4 @@
-use soroban_sdk::{contracttype, Address, BytesN, Env, Symbol, Vec};
+use soroban_sdk::{contracttype, Address, Bytes, BytesN, Env, Symbol, Vec};
 
 /// Embargo expiry configuration stored per wallet in temporary storage.
 #[contracttype]
@@ -236,6 +236,36 @@ pub struct UpgradeProposal {
     pub proposed_at: u64,
     pub executable_after: u64,
     pub proposed_by: Address,
+}
+
+/// A pending, time-locked admin parameter change.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParameterProposal {
+    pub param_key: Symbol,
+    pub new_value: Bytes,
+    pub proposer: Address,
+    pub proposed_at: u64,
+    pub time_lock_secs: u64,
+}
+
+/// Lifecycle status of a parameter change proposal.
+#[contracttype]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[repr(u32)]
+pub enum ParameterProposalStatus {
+    Pending = 0,
+    Executed = 1,
+    Vetoed = 2,
+    Expired = 3,
+}
+
+/// Stored record combining a proposal with its current status.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParameterProposalRecord {
+    pub proposal: ParameterProposal,
+    pub status: ParameterProposalStatus,
 }
 
 /// Per-(wallet, asset_pair) trend state persisted between submissions.
