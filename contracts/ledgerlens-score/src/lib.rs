@@ -83,6 +83,12 @@ mod test_breach_counter_reset;
 #[cfg(test)]
 mod test_query_helpers;
 
+#[cfg(test)]
+mod test_rate_limit_override_log;
+
+#[cfg(test)]
+mod test_dual_key_pubkey;
+
 use soroban_sdk::{
     contract, contractimpl, crypto::Hash, symbol_short, token, Address, Bytes, BytesN, Env, Symbol,
     SymbolStr, TryFromVal, Vec,
@@ -2865,6 +2871,50 @@ impl LedgerLensScoreContract {
         storage::get_service_pubkey(&env).ok_or(Error::ServicePubkeyNotSet)
     }
 
+    /// Rotates the active service pubkey with an optional dual-key overlap
+    /// window. During `overlap_secs` seconds both the old and new keys are
+    /// accepted for attestation verification, allowing in-flight submissions
+    /// signed with the old key to complete.
+    ///
+    /// When `overlap_secs == 0` the rotation is instant: the old key is
+    /// replaced immediately with no overlap.
+    ///
+    /// Admin only.
+    pub fn rotate_service_pubkey(
+        env: Env,
+        admin_signers: Vec<Address>,
+        new_key: Bytes,
+        overlap_secs: u64,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        if new_key.len() != 33 && new_key.len() != 65 {
+            return Err(Error::InvalidPubkeyLength);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+        // Any previous pending key is superseded.
+        storage::clear_pending_service_pubkey(&env);
+        let overlap_expiry = if overlap_secs == 0 {
+            // Instant rotation: promote straight to active.
+            storage::set_service_pubkey(&env, &new_key);
+            events::service_pubkey_updated(&env, &new_key);
+            0u64
+        } else {
+            let expiry = env.ledger().timestamp().saturating_add(overlap_secs);
+            storage::set_pending_service_pubkey(&env, &new_key, expiry);
+            expiry
+        };
+        events::service_pubkey_rotation_started(&env, &new_key, overlap_expiry);
+        Ok(())
+    }
+
+    /// Returns the pending pubkey and its overlap-window expiry, or `None` if
+    /// no rotation is currently in flight.
+    pub fn get_pending_service_pubkey(env: Env) -> Option<(Bytes, u64)> {
+        storage::get_pending_service_pubkey(&env)
+    }
+
     // ── Threshold signature aggregation ──────────────────────────────────────
 
     /// Register (or rotate) the aggregate secp256k1 public key for the t-of-n
@@ -4463,6 +4513,7 @@ impl LedgerLensScoreContract {
         admin_signers: Vec<Address>,
         wallet: Address,
         asset_pair: Symbol,
+        justification: Bytes,
     ) -> Result<(), Error> {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
@@ -4470,6 +4521,15 @@ impl LedgerLensScoreContract {
         Self::require_admin_auth(&env, &admin_signers)?;
         let admin = storage::get_admin(&env);
         storage::clear_last_submit_time(&env, &wallet, &asset_pair);
+        let justification_hash = env.crypto().sha256(&justification);
+        let entry = crate::types::RateLimitOverrideEntry {
+            admin: admin.clone(),
+            wallet: wallet.clone(),
+            asset_pair: asset_pair.clone(),
+            timestamp: env.ledger().timestamp(),
+            justification_hash: justification_hash.into(),
+        };
+        storage::append_rate_limit_override_log(&env, &entry);
         events::rate_limit_overridden(&env, &admin, &wallet, &asset_pair);
         Ok(())
     }
@@ -4496,6 +4556,14 @@ impl LedgerLensScoreContract {
             events::rate_limit_overridden(&env, &admin, &wallet, &asset_pair);
         }
         Ok(entries.len())
+    }
+
+    /// Returns the on-chain audit log of all `override_rate_limit` calls,
+    /// ordered oldest-first, capped at `MAX_RATE_LIMIT_OVERRIDE_LOG` entries.
+    pub fn get_rate_limit_override_log(
+        env: Env,
+    ) -> Vec<crate::types::RateLimitOverrideEntry> {
+        storage::get_rate_limit_override_log(&env)
     }
 
     /// Read-only lookup of the current velocity cap configuration.
@@ -6094,13 +6162,20 @@ impl LedgerLensScoreContract {
     /// [`verify_attestation`] (per `ScoreAttestation`) and
     /// `verify_batch_attestation` (per `BatchAttestation`). Validates that
     /// `sig` is a properly-formed 65-byte ECDSA over `digest`, recoverable
-    /// to the pubkey stored by `set_service_pubkey`. Supports both 33-byte
-    /// compressed and 65-byte uncompressed stored keys — `secp256k1_recover`
-    /// always yields the uncompressed SEC-1 form, so a compressed stored
-    /// key is compared against the recovered key's compressed form (parity
-    /// byte + x-coordinate; no elliptic-curve math needed since the full
-    /// point is already known).
+    /// to the pubkey stored by `set_service_pubkey`. During an active
+    /// dual-key overlap window the pending key is also accepted; once the
+    /// window expires the pending key is automatically promoted to active.
     fn verify_signature(env: &Env, digest: &Hash<32>, sig: &BytesN<65>) -> Result<(), Error> {
+        // If a rotation is pending, resolve the overlap state first so the
+        // active-key slot always reflects the current state before we check it.
+        if let Some((pending_key, expiry)) = storage::get_pending_service_pubkey(env) {
+            if env.ledger().timestamp() > expiry {
+                // Overlap has elapsed — promote pending key to active now.
+                storage::set_service_pubkey(env, &pending_key);
+                storage::clear_pending_service_pubkey(env);
+            }
+        }
+
         let pubkey = storage::get_service_pubkey(env).ok_or(Error::ServicePubkeyNotSet)?;
 
         let sig_bytes = sig.to_array();
@@ -6114,30 +6189,21 @@ impl LedgerLensScoreContract {
 
         let recovered = env.crypto().secp256k1_recover(digest, &sig64, recovery_id);
 
-        let matches = match pubkey.len() {
-            65 => {
-                let mut stored = [0u8; 65];
-                pubkey.copy_into_slice(&mut stored);
-                recovered.to_array() == stored
-            }
-            33 => {
-                let recovered_arr = recovered.to_array();
-                let mut compressed = [0u8; 33];
-                compressed[0] = if recovered_arr[64].is_multiple_of(2) { 0x02 } else { 0x03 };
-                compressed[1..33].copy_from_slice(&recovered_arr[1..33]);
-                let mut stored = [0u8; 33];
-                pubkey.copy_into_slice(&mut stored);
-                compressed == stored
-            }
-            // `set_service_pubkey` rejects any other length, so this is
-            // unreachable in practice; treat defensively as a mismatch.
-            _ => false,
-        };
-
-        if !matches {
-            return Err(Error::InvalidAttestation);
+        // Check active key.
+        if storage::pubkeys_match(&recovered, &pubkey) {
+            return Ok(());
         }
-        Ok(())
+
+        // During the overlap window, also accept the pending key.
+        if let Some((pending_key, expiry)) = storage::get_pending_service_pubkey(env) {
+            if env.ledger().timestamp() <= expiry {
+                if storage::pubkeys_match(&recovered, &pending_key) {
+                    return Ok(());
+                }
+            }
+        }
+
+        Err(Error::InvalidAttestation)
     }
 
     /// Verifies a `ThresholdAttestation` against the registered aggregate

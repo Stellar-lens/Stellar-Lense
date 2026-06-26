@@ -136,6 +136,13 @@ pub fn aggregate_service_pubkey_updated(env: &Env, pubkey: &Bytes) {
     env.events().publish((symbol_short!("agg_pk"),), pubkey.clone());
 }
 
+/// Emitted when `rotate_service_pubkey` is called. `new_key` is the incoming
+/// pubkey; `overlap_expiry` is the ledger timestamp after which the old key
+/// stops being accepted. When `overlap_expiry == 0` the rotation was instant.
+pub fn service_pubkey_rotation_started(env: &Env, new_key: &Bytes, overlap_expiry: u64) {
+    env.events().publish((symbol_short!("pk_rot"),), (new_key.clone(), overlap_expiry));
+}
+
 // ── Merkle-root batch attestation ───────────────────────────────────────────
 
 /// Emitted by `submit_scores_batch_attested` once the batch has been

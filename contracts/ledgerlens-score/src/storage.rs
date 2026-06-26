@@ -7,10 +7,10 @@ use crate::constants::{
 use crate::errors::Error;
 use crate::types::{
     AggregateRiskScore, DataKey, EmbargoExpiry, GateDataKey, JumpStats, ModelVersionStats,
-    PendingScoreEntry, RiskScore, ScoreDispute, ScoreFloorPolicy, ScoreHistogram, ScoreTrend,
-    ScoreVelocityCap, UpgradeProposal,
+    PendingScoreEntry, RateLimitOverrideEntry, RiskScore, ScoreDispute, ScoreFloorPolicy,
+    ScoreHistogram, ScoreTrend, ScoreVelocityCap, UpgradeProposal,
 };
-use soroban_sdk::{Address, Bytes, Env, Symbol, Vec};
+use soroban_sdk::{Address, Bytes, BytesN, Env, Symbol, Vec};
 
 // ── Admin / Service ─────────────────────────────────────────────────────────
 
@@ -1655,4 +1655,75 @@ pub fn set_signer_rotation_grace(env: &Env, grace_secs: u64) {
 
 pub fn set_reveal_window_secs(env: &Env, secs: u64) {
     env.storage().instance().set(&DataKey::RevealWindowSecs, &secs);
+}
+
+// ── Rate-limit override audit log (#296) ─────────────────────────────────────
+
+/// Returns the full `RateLimitOverrideLog` ring buffer.
+pub fn get_rate_limit_override_log(env: &Env) -> Vec<RateLimitOverrideEntry> {
+    env.storage()
+        .persistent()
+        .get(&DataKey::RateLimitOverrideLog)
+        .unwrap_or_else(|| Vec::new(env))
+}
+
+/// Appends `entry` to the ring buffer, evicting the oldest entry once the
+/// buffer exceeds `MAX_RATE_LIMIT_OVERRIDE_LOG`.
+pub fn append_rate_limit_override_log(env: &Env, entry: &RateLimitOverrideEntry) {
+    let mut log = get_rate_limit_override_log(env);
+    if log.len() >= crate::constants::MAX_RATE_LIMIT_OVERRIDE_LOG {
+        log.remove(0);
+    }
+    log.push_back(entry.clone());
+    env.storage().persistent().set(&DataKey::RateLimitOverrideLog, &log);
+    env.storage()
+        .persistent()
+        .extend_ttl(&DataKey::RateLimitOverrideLog, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+}
+
+// ── Pending service pubkey (dual-key overlap, #295) ───────────────────────────
+
+/// Returns the pending pubkey and its overlap expiry, or `None` if no
+/// rotation is in flight or the overlap window has expired.
+pub fn get_pending_service_pubkey(env: &Env) -> Option<(Bytes, u64)> {
+    let pubkey: Option<Bytes> = env.storage().instance().get(&DataKey::PendingServicePubKey);
+    let expiry: Option<u64> = env.storage().instance().get(&DataKey::PendingServicePubKeyExpiry);
+    match (pubkey, expiry) {
+        (Some(pk), Some(exp)) => Some((pk, exp)),
+        _ => None,
+    }
+}
+
+/// Stores a new pending pubkey together with its overlap expiry.
+pub fn set_pending_service_pubkey(env: &Env, pubkey: &Bytes, expiry: u64) {
+    env.storage().instance().set(&DataKey::PendingServicePubKey, pubkey);
+    env.storage().instance().set(&DataKey::PendingServicePubKeyExpiry, &expiry);
+}
+
+/// Clears the pending pubkey and its expiry (called when the overlap window
+/// ends or is superseded by another rotation).
+pub fn clear_pending_service_pubkey(env: &Env) {
+    env.storage().instance().remove(&DataKey::PendingServicePubKey);
+    env.storage().instance().remove(&DataKey::PendingServicePubKeyExpiry);
+}
+
+/// Checks whether `candidate` matches `stored` (supports 33- or 65-byte keys).
+pub fn pubkeys_match(candidate: &BytesN<65>, stored: &Bytes) -> bool {
+    match stored.len() {
+        65 => {
+            let mut arr = [0u8; 65];
+            stored.copy_into_slice(&mut arr);
+            candidate.to_array() == arr
+        }
+        33 => {
+            let rec = candidate.to_array();
+            let mut compressed = [0u8; 33];
+            compressed[0] = if rec[64].is_multiple_of(2) { 0x02 } else { 0x03 };
+            compressed[1..33].copy_from_slice(&rec[1..33]);
+            let mut stored_arr = [0u8; 33];
+            stored.copy_into_slice(&mut stored_arr);
+            compressed == stored_arr
+        }
+        _ => false,
+    }
 }

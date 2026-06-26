@@ -435,6 +435,12 @@ pub enum DataKey {
     ScoreEntryIndex,
     ScoreEntryLastTouchedLedger(Address, Symbol),
     ModelVersionIndex,
+    /// Bounded ring buffer of `RateLimitOverrideEntry` records. See #296.
+    RateLimitOverrideLog,
+    /// Pending service pubkey and its overlap expiry timestamp. See #295.
+    PendingServicePubKey,
+    /// Overlap-window expiry for the pending pubkey (ledger timestamp u64).
+    PendingServicePubKeyExpiry,
 }
 
 impl DataKey {
@@ -546,6 +552,9 @@ impl DataKey {
             DataKey::JumpStats(w, s) => k2!("JumpStats", w, s),
             DataKey::FeeRecipient => k0!("FeeRecipient"),
             DataKey::EmbargoedWalletIndex => k0!("EmbargoedWIndex"),
+            DataKey::RateLimitOverrideLog => k0!("RLOverrideLog"),
+            DataKey::PendingServicePubKey => k0!("PendingSvcPK"),
+            DataKey::PendingServicePubKeyExpiry => k0!("PendingSvcPKExp"),
         }
     }
 }
@@ -593,4 +602,17 @@ pub struct VerkleLeaf {
     pub score: u32,
     pub timestamp: u64,
     pub model_version: u32,
+}
+
+/// Immutable audit record appended to the `RateLimitOverrideLog` ring buffer
+/// each time `override_rate_limit` is called.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RateLimitOverrideEntry {
+    pub admin: Address,
+    pub wallet: Address,
+    pub asset_pair: Symbol,
+    pub timestamp: u64,
+    /// SHA-256 hash of the admin-supplied justification bytes.
+    pub justification_hash: BytesN<32>,
 }
