@@ -83,6 +83,18 @@ mod test_breach_counter_reset;
 #[cfg(test)]
 mod test_query_helpers;
 
+#[cfg(test)]
+mod test_pair_score_count;
+
+#[cfg(test)]
+mod test_rate_limit_window;
+
+#[cfg(test)]
+mod test_total_wallets_scored;
+
+#[cfg(test)]
+mod test_cooldown_period;
+
 use soroban_sdk::{
     contract, contractimpl, crypto::Hash, symbol_short, token, Address, Bytes, BytesN, Env, Symbol,
     SymbolStr, TryFromVal, Vec,
@@ -449,16 +461,20 @@ impl LedgerLensScoreContract {
         storage::push_score_history(&env, &wallet, &asset_pair, &risk_score);
         storage::register_pair_for_wallet(&env, &wallet, &asset_pair);
         storage::increment_score_count(&env, &wallet, &asset_pair);
+        // Increment per-pair submission counter (Issue 1).
+        storage::increment_pair_score_count(&env, &asset_pair);
+        // Increment unique wallet-pair counter on first-ever write (Issue 3).
+        // pending.score is committed only once, so there was no prior live score.
+        // We use peek_score which was called before set_score above — but at this
+        // point set_score has already run.  The pending path always replaces the
+        // live entry, so we treat "had no pending-committed score before" as new.
+        // The reliable signal is: register_pair_for_wallet just ran; if this is
+        // the first time, peek_score would have returned None before set_score.
+        // We detect it by checking whether the score count is now exactly 1.
+        if storage::get_score_count(&env, &wallet, &asset_pair) == 1 {
+            storage::increment_total_wallets_scored(&env);
+        }
         Self::refresh_aggregate_cache(&env, &wallet);
-        // Self::update_merkle_accumulator(
-        //     &env,
-        //     &wallet,
-        //     &asset_pair,
-        //     pending.score,
-        //     pending.timestamp,
-        //     pending.confidence,
-        //     pending.model_version,
-        // );
 
         let score_threshold = storage::get_risk_threshold(&env);
         if pending.score >= score_threshold {
@@ -874,6 +890,12 @@ impl LedgerLensScoreContract {
                         );
                         storage::register_pair_for_wallet(&env, &sub.wallet, &sub.asset_pair);
                         storage::increment_score_count(&env, &sub.wallet, &sub.asset_pair);
+                        // Increment per-pair submission counter (Issue 1).
+                        storage::increment_pair_score_count(&env, &sub.asset_pair);
+                        // Increment unique wallet-pair counter on first-ever submission (Issue 3).
+                        if previous_score.is_none() {
+                            storage::increment_total_wallets_scored(&env);
+                        }
                         storage::update_model_stats(&env, sub.model_version, sub.score);
                         storage::update_historical_max_score(
                             &env,
@@ -1223,6 +1245,12 @@ impl LedgerLensScoreContract {
                         );
                         storage::register_pair_for_wallet(&env, &sub.wallet, &sub.asset_pair);
                         storage::increment_score_count(&env, &sub.wallet, &sub.asset_pair);
+                        // Increment per-pair submission counter (Issue 1).
+                        storage::increment_pair_score_count(&env, &sub.asset_pair);
+                        // Increment unique wallet-pair counter on first-ever submission (Issue 3).
+                        if previous_score.is_none() {
+                            storage::increment_total_wallets_scored(&env);
+                        }
                         Self::refresh_aggregate_cache(&env, &sub.wallet);
 
                         if sub.score >= risk_threshold {
@@ -1575,6 +1603,8 @@ impl LedgerLensScoreContract {
     /// When no decay is configured (`λ = 0`), `effective_score == raw_score` and
     /// `decay_applied == false`.
     ///
+    /// See [docs/score-math.md](../../docs/score-math.md) for the formula and fixed-point implementation notes.
+    ///
     /// # Errors
     /// - [`Error::ScoreNotFound`] if no score exists for this pair (or its delegate).
     /// - [`Error::ScoreEmbargoed`] if the wallet is under an active embargo.
@@ -1707,6 +1737,8 @@ impl LedgerLensScoreContract {
     /// Minimal linear fallback implementation: exact-node returns stored
     /// value, extrapolation is clamped to boundaries, and in-between points
     /// are linearly interpolated.
+    ///
+    /// See [docs/score-math.md](../../docs/score-math.md) for the formula and fixed-point implementation notes.
     pub fn get_interpolated_score(
         env: Env,
         wallet: Address,
@@ -1782,7 +1814,82 @@ impl LedgerLensScoreContract {
         storage::get_score_count(&env, &wallet, &asset_pair)
     }
 
-    // ── Model-version statistics ────────────────────────────────────────────
+    /// Returns the total number of successful score submissions ever recorded
+    /// for `asset_pair` across **all** wallets.
+    ///
+    /// This per-pair counter is incremented on every accepted
+    /// [`submit_score`], [`submit_scores_batch`], or consensus submission
+    /// that writes a live score for the pair — regardless of which wallet
+    /// was scored.  It is never decremented and is not affected by GDPR
+    /// erasure of individual wallet scores.
+    ///
+    /// Useful for analytics and monitoring dashboards to identify which
+    /// pairs have the highest scoring activity.
+    ///
+    /// Returns `0` before any submission has been accepted for the pair.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use soroban_sdk::symbol_short;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// let wallet = Address::generate(&env);
+    /// let asset_pair = symbol_short!("XLM_USDC");
+    /// assert_eq!(client.get_pair_score_count(&asset_pair), 0);
+    /// client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &50, &false, &false, &1, &90, &1, &None).unwrap();
+    /// assert_eq!(client.get_pair_score_count(&asset_pair), 1);
+    /// ```
+    pub fn get_pair_score_count(env: Env, asset_pair: Symbol) -> u64 {
+        storage::get_pair_score_count(&env, &asset_pair)
+    }
+
+    // ── Total unique wallet-pair combinations ever scored ───────────────────
+
+    /// Returns the total number of unique `(wallet, asset_pair)` combinations
+    /// that have ever been successfully scored.
+    ///
+    /// The counter is incremented exactly once per combination — on the first
+    /// accepted submission for that wallet/pair — and is never decremented.
+    /// Useful as a high-level activity metric for dashboards and protocol
+    /// health monitoring.
+    ///
+    /// Returns `0` before any submission has been accepted.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use soroban_sdk::symbol_short;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// let wallet_a = Address::generate(&env);
+    /// let wallet_b = Address::generate(&env);
+    /// let asset_pair = symbol_short!("XLM_USDC");
+    /// assert_eq!(client.get_total_wallets_scored(), 0);
+    /// client.submit_score(&Vec::new(&env), &wallet_a, &asset_pair, &50, &false, &false, &1, &90, &1, &None).unwrap();
+    /// assert_eq!(client.get_total_wallets_scored(), 1);
+    /// client.submit_score(&Vec::new(&env), &wallet_b, &asset_pair, &60, &false, &false, &1, &90, &1, &None).unwrap();
+    /// assert_eq!(client.get_total_wallets_scored(), 2);
+    /// ```
+    pub fn get_total_wallets_scored(env: Env) -> u64 {
+        storage::get_total_wallets_scored(&env)
+    }
 
     /// Returns the running performance statistics for `model_version`.
     ///
@@ -2029,6 +2136,8 @@ impl LedgerLensScoreContract {
     /// average). Returns [`Error::ArithmeticOverflow`] if the weighted sum
     /// would overflow — this can only happen with extreme admin-configured
     /// weights, since per-pair scores are bounded to 0-100.
+    ///
+    /// See [docs/score-math.md](../../docs/score-math.md) for the formula and fixed-point implementation notes.
     pub fn get_aggregate_score(env: Env, wallet: Address) -> Result<AggregateRiskScore, Error> {
         if storage::is_embargoed(&env, &wallet) {
             return Err(Error::ScoreEmbargoed);
@@ -2551,6 +2660,7 @@ impl LedgerLensScoreContract {
     /// | `cgate`          | `query_risk_gate_with_confidence` / global confidence floor |
     /// | `emb`            | `set_score_embargo` / `lift_score_embargo`         |
     /// | `cons`           | `commit_consensus` / `reveal_consensus` / `set_consensus_config` |
+    /// | `pr_rd`          | `is_pair_paused` (per-asset-pair pause read)        |
     ///
     /// Any unrecognised `capability` returns `false`.
     ///
@@ -2575,6 +2685,7 @@ impl LedgerLensScoreContract {
             || capability == Symbol::new(&env, "rgate")
             || capability == symbol_short!("emb")
             || capability == symbol_short!("cons")
+            || capability == symbol_short!("pr_rd")
     }
 
     // ── Service management ───────────────────────────────────────────────────
@@ -4130,6 +4241,10 @@ impl LedgerLensScoreContract {
         storage::push_score_history(&env, &wallet, &asset_pair, &corrected);
         storage::register_pair_for_wallet(&env, &wallet, &asset_pair);
         storage::increment_score_count(&env, &wallet, &asset_pair);
+        // Increment per-pair submission counter (Issue 1).
+        storage::increment_pair_score_count(&env, &asset_pair);
+        // Dispute correction always applies to an already-scored wallet-pair,
+        // so we intentionally do NOT increment total_wallets_scored here.
         Self::refresh_aggregate_cache(&env, &wallet);
         events::score_submitted(&env, &wallet, &asset_pair, &corrected);
 
@@ -4410,6 +4525,78 @@ impl LedgerLensScoreContract {
     /// assert_eq!(client.get_cooldown(), 3_600);
     /// ```
     pub fn get_cooldown(env: Env) -> u64 {
+        storage::get_cooldown_secs(&env)
+    }
+
+    /// Returns the configured rate-limit window duration in seconds.
+    ///
+    /// The rate-limit window is the minimum time that must elapse between two
+    /// accepted score submissions for the same `(wallet, asset_pair)`.  It is
+    /// the same value as the submission cooldown — this function exists as an
+    /// explicitly named alias so integrators building retry logic can
+    /// discover the window without needing to know the internal naming
+    /// convention.
+    ///
+    /// Returns `DEFAULT_COOLDOWN_SECS` (3 600 s, i.e. 1 hour) until the admin
+    /// calls `set_cooldown`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// // Default window is one hour.
+    /// assert_eq!(client.get_rate_limit_window(), 3_600);
+    /// ```
+    pub fn get_rate_limit_window(env: Env) -> u64 {
+        storage::get_cooldown_secs(&env)
+    }
+
+    /// Returns the score-submission cooldown period in seconds.
+    ///
+    /// Off-chain scoring services can call this before scheduling a
+    /// re-submission to avoid hitting `RateLimitExceeded`.  The cooldown is
+    /// the amount of time that must pass after a successful submission before
+    /// the next submission for the same `(wallet, asset_pair)` is accepted.
+    ///
+    /// Returns `DEFAULT_COOLDOWN_SECS` (3 600 s, i.e. 1 hour) until the
+    /// admin calls `set_cooldown`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use soroban_sdk::symbol_short;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// // Default cooldown is one hour (3 600 seconds).
+    /// let cooldown = client.get_cooldown_period();
+    /// assert_eq!(cooldown, 3_600);
+    ///
+    /// // Off-chain scheduler example: schedule next submission at
+    /// // `last_submit_timestamp + cooldown`.
+    /// let wallet = Address::generate(&env);
+    /// let pair = symbol_short!("XLM_USDC");
+    /// client.submit_score(&Vec::new(&env), &wallet, &pair, &42, &false, &false, &1, &90, &1, &None).unwrap();
+    /// let next_allowed = client.get_last_submit_time(&wallet, &pair) + cooldown;
+    /// // next_allowed is the earliest timestamp at which a re-submission is accepted.
+    /// ```
+    pub fn get_cooldown_period(env: Env) -> u64 {
         storage::get_cooldown_secs(&env)
     }
 
@@ -5345,6 +5532,8 @@ impl LedgerLensScoreContract {
     /// The approximation uses Taylor-series terms: 1 - x + x²/2 - x³/6 + x⁴/24
     /// where x = λ * age. This achieves ~6 decimal places of accuracy.
     /// For practical staleness windows, the error is <0.01%.
+    ///
+    /// See [docs/score-math.md](../../docs/score-math.md) for the formula and fixed-point implementation notes.
     fn decay_fixed(age_secs: u64, lambda_num: u32, lambda_den: u32) -> u64 {
         const SCALE: u64 = constants::DECAY_FIXED_POINT_SCALE;
 
@@ -5740,11 +5929,19 @@ impl LedgerLensScoreContract {
             return Err(Error::InvalidScore);
         }
 
+        // Detect first-ever submission for this (wallet, asset_pair) before writing.
+        let is_new_wallet_pair = previous_score.is_none();
         storage::set_score(env, wallet, asset_pair, risk_score);
         storage::set_last_global_submission_time(env, now);
         storage::push_score_history(env, wallet, asset_pair, risk_score);
         storage::register_pair_for_wallet(env, wallet, asset_pair);
         storage::increment_score_count(env, wallet, asset_pair);
+        // Increment per-pair submission counter (Issue 1).
+        storage::increment_pair_score_count(env, asset_pair);
+        // Increment unique wallet-pair counter on first-ever submission (Issue 3).
+        if is_new_wallet_pair {
+            storage::increment_total_wallets_scored(env);
+        }
         storage::update_model_stats(env, risk_score.model_version, risk_score.score);
         storage::update_historical_max_score(env, wallet, asset_pair, risk_score.score);
         storage::update_histogram_on_write(env, previous_score, risk_score.score);
