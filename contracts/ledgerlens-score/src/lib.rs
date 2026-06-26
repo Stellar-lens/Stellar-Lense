@@ -22,6 +22,9 @@ mod test_upgrade;
 mod test_parameter_governance;
 
 #[cfg(test)]
+mod test_batch_ttl_optimization;
+
+#[cfg(test)]
 mod test_interface;
 
 #[cfg(test)]

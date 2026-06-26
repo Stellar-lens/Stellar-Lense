@@ -12,6 +12,43 @@ use crate::types::{
 };
 use soroban_sdk::{Address, Bytes, Env, Symbol, Vec};
 
+#[cfg(test)]
+fn extend_persistent_ttl(env: &Env, key: &crate::types::DataKey) {
+    env.storage()
+        .persistent()
+        .extend_ttl(key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    let count: u32 = env
+        .storage()
+        .instance()
+        .get(&crate::types::DataKey::TestExtendCount)
+        .unwrap_or(0);
+    env.storage()
+        .instance()
+        .set(&crate::types::DataKey::TestExtendCount, &(count + 1));
+}
+
+#[cfg(not(test))]
+fn extend_persistent_ttl(env: &Env, key: &crate::types::DataKey) {
+    env.storage()
+        .persistent()
+        .extend_ttl(key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+}
+
+#[cfg(test)]
+pub fn test_extend_count(env: &Env) -> u32 {
+    env.storage()
+        .instance()
+        .get(&crate::types::DataKey::TestExtendCount)
+        .unwrap_or(0)
+}
+
+#[cfg(test)]
+pub fn reset_test_extend_count(env: &Env) {
+    env.storage()
+        .instance()
+        .set(&crate::types::DataKey::TestExtendCount, &0u32);
+}
+
 // ── Admin / Service ─────────────────────────────────────────────────────────
 
 pub fn has_admin(env: &Env) -> bool {
@@ -39,8 +76,29 @@ pub fn get_service(env: &Env) -> Address {
 pub fn set_score(env: &Env, wallet: &Address, asset_pair: &Symbol, score: &RiskScore) {
     let key = DataKey::Score(wallet.clone(), asset_pair.clone());
     env.storage().persistent().set(&key, score);
-    env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    // Lazy TTL extension: only renew the score entry when the touch marker shows
+    // SCORE_TTL_THRESHOLD ledgers have elapsed since the last write. Strict `>=`
+    // on elapsed so entries at exactly the threshold still renew. Untracked
+    // entries (first write) always extend.
+    let needs_extend = match ledgers_since_touch(env, wallet, asset_pair) {
+        None => true,
+        Some(elapsed) => elapsed >= SCORE_TTL_THRESHOLD,
+    };
+    if needs_extend {
+        extend_persistent_ttl(env, &key);
+    }
     track_score_entry(env, wallet, asset_pair);
+}
+
+/// Eager TTL path retained for instruction-count regression tests only.
+#[cfg(test)]
+pub fn set_score_eager_ttl(env: &Env, wallet: &Address, asset_pair: &Symbol, score: &RiskScore) {
+    let key = DataKey::Score(wallet.clone(), asset_pair.clone());
+    env.storage().persistent().set(&key, score);
+    extend_persistent_ttl(env, &key);
+    track_score_entry(env, wallet, asset_pair);
+    let touch_key = DataKey::ScoreEntryLastTouchedLedger(wallet.clone(), asset_pair.clone());
+    extend_persistent_ttl(env, &touch_key);
 }
 
 pub fn get_score(env: &Env, wallet: &Address, asset_pair: &Symbol) -> Option<RiskScore> {
@@ -116,8 +174,12 @@ pub fn track_score_entry(env: &Env, wallet: &Address, asset_pair: &Symbol) {
 
 fn touch_score_entry(env: &Env, wallet: &Address, asset_pair: &Symbol) {
     let key = DataKey::ScoreEntryLastTouchedLedger(wallet.clone(), asset_pair.clone());
+    let had_touch = env.storage().persistent().has(&key);
     env.storage().persistent().set(&key, &env.ledger().sequence());
-    env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    // Lazy TTL on the touch marker: skip extend while the entry is still tracked.
+    if !had_touch {
+        extend_persistent_ttl(env, &key);
+    }
 }
 
 /// Ledgers elapsed since `(wallet, asset_pair)` was last touched, or `None`

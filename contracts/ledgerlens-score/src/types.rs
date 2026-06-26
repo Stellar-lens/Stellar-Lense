@@ -471,6 +471,9 @@ pub enum DataKey {
     ParameterProposalNextId,
     /// Ordered list of proposal IDs that are still pending execution.
     PendingParameterProposalIds,
+    /// Test-only counter for TTL extend regression tests (`cfg(test)` writes only).
+    #[cfg(test)]
+    TestExtendCount,
 }
 
 impl DataKey {
@@ -585,6 +588,8 @@ impl DataKey {
             DataKey::ParameterProposal(id) => k1!("ParamProp", id),
             DataKey::ParameterProposalNextId => k0!("ParamPropNxt"),
             DataKey::PendingParameterProposalIds => k0!("ParamPropIdx"),
+            #[cfg(test)]
+            DataKey::TestExtendCount => k0!("TestExtCnt"),
         }
     }
 }
