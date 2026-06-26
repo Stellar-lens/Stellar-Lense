@@ -377,6 +377,12 @@ pub enum DataKey {
     /// Open dispute record for a (wallet, asset_pair) pair. Absent key means
     /// no active dispute. Stored in temporary TTL-bounded storage.
     ScoreDispute(Address, Symbol),
+    /// Commit-reveal hash for dispute bond: H(bond || salt). Scoped to (challenger, wallet, asset_pair).
+    /// Key: DisputeCommit(challenger, wallet, asset_pair) -> BytesN<32> (sha256 hash)
+    DisputeCommit(Address, Address, Symbol),
+    /// Timestamp when dispute bond commitment was made.
+    /// Key: DisputeCommitTime(challenger, wallet, asset_pair) -> u64 (ledger timestamp)
+    DisputeCommitTime(Address, Address, Symbol),
     /// Index of all currently open disputes: `Vec<(Address, Symbol)>`.
     /// Incrementally maintained so `get_open_disputes` is a single read.
     DisputeIndex,
@@ -520,6 +526,8 @@ impl DataKey {
             DataKey::ConsensusThresholdK => k0!("ConsThresholdK"),
             DataKey::ConsensusEpsilon => k0!("ConsEpsilon"),
             DataKey::ScoreDispute(a, s) => k2!("ScoreDispute", a, s),
+            DataKey::DisputeCommit(c, w, s) => k3!("DisputeCommit", c, w, s),
+            DataKey::DisputeCommitTime(c, w, s) => k3!("DisputeCommitTime", c, w, s),
             DataKey::DisputeIndex => k0!("DisputeIndex"),
             DataKey::ConsensusCommitment(m, w, s) => k3!("ConsCommit", m, w, s),
             DataKey::RevealWindowSecs => k0!("RevealWinSecs"),

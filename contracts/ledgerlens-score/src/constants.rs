@@ -141,6 +141,9 @@ pub const DISPUTE_TTL_THRESHOLD: u32 = 518_400;
 /// Target TTL for dispute entries on creation or refresh (~45 days at 5 s/ledger).
 pub const DISPUTE_TTL_EXTEND_TO: u32 = 777_600;
 
+/// Default reveal window for sealed-bid dispute bond: 10 minutes (600 seconds).
+pub const DEFAULT_DISPUTE_REVEAL_WINDOW_SECS: u64 = 600;
+
 // ── Finality buffer (pending score commit window) ────────────────────────────
 
 /// Maximum configurable finality buffer — 24 hour ceiling, so a misconfigured

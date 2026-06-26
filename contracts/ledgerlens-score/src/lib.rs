@@ -4090,11 +4090,43 @@ impl LedgerLensScoreContract {
     /// - [`Error::FeeTokenNotSet`] — `set_fee_token` has not been called.
     /// - [`Error::DisputeAlreadyOpen`] — a dispute already exists for the pair.
     /// - [`Error::DisputeAlreadyOpen`] — the open-dispute index is at capacity.
+    /// Commit-reveal for sealed-bid dispute bond: commit to (bond, salt) before revealing.
+    /// Stores H(bond || salt) under temporary storage scoped to (challenger, wallet, asset_pair).
+    /// Caller must reveal within the configured reveal window or commitment expires.
+    ///
+    /// # Arguments
+    /// - `challenger`: Account committing to a dispute bond
+    /// - `wallet`: Wallet whose score is being challenged
+    /// - `asset_pair`: Asset pair of the challenged score
+    /// - `bond_amount_salt`: Salt for commit-reveal (must be ≥16 bytes for security)
+    pub fn commit_dispute_bond(
+        env: Env,
+        challenger: Address,
+        wallet: Address,
+        asset_pair: Symbol,
+        bond_amount_salt: Bytes,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        
+        // Require caller to be the challenger
+        challenger.require_auth();
+        
+        // Compute H(bond_amount_salt) and store
+        let commitment = env.crypto().sha256(&bond_amount_salt);
+        storage::set_dispute_commit(&env, &challenger, &wallet, &asset_pair, &commitment);
+        
+        Ok(())
+    }
+
     pub fn open_score_dispute(
         env: Env,
+        challenger: Address,
         wallet: Address,
         asset_pair: Symbol,
         bond: i128,
+        bond_salt: Bytes,
     ) -> Result<(), Error> {
         Self::ensure_active(&env)?;
 
@@ -4104,7 +4136,30 @@ impl LedgerLensScoreContract {
         let fee_token = storage::get_fee_token(&env).ok_or(Error::FeeTokenNotSet)?;
 
         // The challenger stakes its own funds, so it must authorize.
-        wallet.require_auth();
+        challenger.require_auth();
+
+        // Sealed-bid: verify commitment was made and reveal window not expired
+        let commitment = storage::get_dispute_commit(&env, &challenger, &wallet, &asset_pair)
+            .ok_or(Error::RevealWindowExpired)?;
+        let commit_time = storage::get_dispute_commit_time(&env, &challenger, &wallet, &asset_pair);
+        let reveal_window = storage::get_reveal_window_secs(&env);
+        if env.ledger().timestamp() > commit_time.saturating_add(reveal_window) {
+            storage::remove_dispute_commit(&env, &challenger, &wallet, &asset_pair);
+            return Err(Error::RevealWindowExpired);
+        }
+
+        // Verify revealed bond+salt matches commitment
+        let salt_preimage = [bond.to_le_bytes().to_vec(), bond_salt.to_vec()];
+        let mut revealed = Bytes::new(&env);
+        revealed.extend_from_slice(&bond.to_le_bytes());
+        revealed.extend_from_slice(&bond_salt);
+        let revealed_hash = env.crypto().sha256(&revealed);
+        if revealed_hash.to_bytes() != commitment {
+            return Err(Error::CommitmentMismatch);
+        }
+
+        // Clear commitment after successful reveal
+        storage::remove_dispute_commit(&env, &challenger, &wallet, &asset_pair);
 
         if storage::get_dispute(&env, &wallet, &asset_pair).is_some() {
             return Err(Error::DisputeAlreadyOpen);
@@ -4115,13 +4170,13 @@ impl LedgerLensScoreContract {
 
         // Escrow the bond into the contract.
         let contract_address = env.current_contract_address();
-        token::TokenClient::new(&env, &fee_token).transfer(&wallet, &contract_address, &bond);
+        token::TokenClient::new(&env, &fee_token).transfer(&challenger, &contract_address, &bond);
 
         let challenged_score =
             storage::peek_score(&env, &wallet, &asset_pair).map(|s| s.score).unwrap_or(0);
         let deadline =
             env.ledger().timestamp().saturating_add(constants::DISPUTE_CHALLENGE_PERIOD_SECS);
-        let dispute = ScoreDispute { challenger: wallet.clone(), bond, deadline, challenged_score };
+        let dispute = ScoreDispute { challenger: challenger.clone(), bond, deadline, challenged_score };
         storage::set_dispute(&env, &wallet, &asset_pair, &dispute);
 
         events::dispute_opened(&env, &wallet, &asset_pair, bond, deadline);
