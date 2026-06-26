@@ -8179,6 +8179,38 @@ impl LedgerLensScoreContract {
         storage::get_counterparties(&env, &wallet, &asset_pair)
     }
 
+    /// Returns every wallet bidirectionally linked to `wallet` on `asset_pair`,
+    /// or an empty vector if it has no counterparty links. Because
+    /// `add_counterparty_link` records links in both directions, the returned
+    /// set is exactly the neighbourhood graph-analytics tools need to traverse
+    /// the on-chain counterparty network without reconstructing it from events.
+    /// Read-only, callable by any account or contract.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
+    /// # use soroban_sdk::symbol_short;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// let alice = Address::generate(&env);
+    /// let bob = Address::generate(&env);
+    /// let pair = symbol_short!("XLM_USDC");
+    /// client.add_counterparty_link(&alice, &bob, &pair);
+    /// // The link is bidirectional, so each side lists the other.
+    /// assert_eq!(client.get_counterparty_list(&alice, &pair), Vec::from_array(&env, [bob.clone()]));
+    /// assert_eq!(client.get_counterparty_list(&bob, &pair), Vec::from_array(&env, [alice]));
+    /// ```
+    pub fn get_counterparty_list(env: Env, wallet: Address, asset_pair: Symbol) -> Vec<Address> {
+        storage::get_counterparties(&env, &wallet, &asset_pair)
+    }
+
     /// Returns the number of counterparty links `wallet` has for `asset_pair`.
     pub fn get_contagion_depth(env: Env, wallet: Address, asset_pair: Symbol) -> u32 {
         storage::get_contagion_depth(&env, &wallet, &asset_pair)

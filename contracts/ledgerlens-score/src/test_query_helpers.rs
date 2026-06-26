@@ -117,3 +117,39 @@ fn test_get_score_age_unknown_pair_returns_zero() {
     // other_pair was never scored → age is 0.
     assert_eq!(client.get_score_age(&wallet, &other_pair), 0);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Issue #246 – get_counterparty_list
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[test]
+fn test_get_counterparty_list_empty_when_no_links() {
+    let (env, client, _admin, _service) = setup();
+    let wallet = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+
+    // No links recorded → empty list.
+    assert_eq!(client.get_counterparty_list(&wallet, &pair), Vec::new(&env));
+}
+
+#[test]
+fn test_get_counterparty_list_returns_bidirectional_links() {
+    let (env, client, _admin, _service) = setup();
+    let alice = Address::generate(&env);
+    let bob = Address::generate(&env);
+    let carol = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+
+    client.add_counterparty_link(&alice, &bob, &pair);
+    client.add_counterparty_link(&alice, &carol, &pair);
+
+    // Alice is linked to both bob and carol.
+    let alice_links = client.get_counterparty_list(&alice, &pair);
+    assert_eq!(alice_links.len(), 2);
+    assert!(alice_links.contains(&bob));
+    assert!(alice_links.contains(&carol));
+
+    // Links are bidirectional: bob and carol each list alice back.
+    assert_eq!(client.get_counterparty_list(&bob, &pair), Vec::from_array(&env, [alice.clone()]));
+    assert_eq!(client.get_counterparty_list(&carol, &pair), Vec::from_array(&env, [alice]));
+}
