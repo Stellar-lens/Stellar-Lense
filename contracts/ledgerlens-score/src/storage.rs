@@ -1656,3 +1656,47 @@ pub fn set_signer_rotation_grace(env: &Env, grace_secs: u64) {
 pub fn set_reveal_window_secs(env: &Env, secs: u64) {
     env.storage().instance().set(&DataKey::RevealWindowSecs, &secs);
 }
+
+// ── Per-pair score submission counter ────────────────────────────────────────
+
+/// Increments the running total of successful score submissions for
+/// `asset_pair` across all wallets.  Called from every write path
+/// (`write_score_with_rate_limit` and `submit_scores_batch`) on a
+/// successful write.
+pub fn increment_pair_score_count(env: &Env, asset_pair: &Symbol) {
+    let key = DataKey::PairScoreCount(asset_pair.clone());
+    let current: u64 = env.storage().persistent().get(&key).unwrap_or(0);
+    env.storage().persistent().set(&key, &(current + 1));
+    env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+}
+
+/// Returns the total number of successful score submissions ever recorded
+/// for `asset_pair` (across all wallets).  Returns `0` before any
+/// submission has been accepted for the pair.
+pub fn get_pair_score_count(env: &Env, asset_pair: &Symbol) -> u64 {
+    let key = DataKey::PairScoreCount(asset_pair.clone());
+    let result: Option<u64> = env.storage().persistent().get(&key);
+    if result.is_some() {
+        env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    }
+    result.unwrap_or(0)
+}
+
+// ── Total unique wallet-pair combinations ever scored ─────────────────────────
+
+/// Increments the global counter of unique `(wallet, asset_pair)`
+/// combinations ever scored.  Must be called only on the *first* successful
+/// write for a combination — callers check `peek_score` **before** writing
+/// to decide whether the combination is new.
+pub fn increment_total_wallets_scored(env: &Env) {
+    let current: u64 =
+        env.storage().instance().get(&DataKey::TotalWalletsScored).unwrap_or(0);
+    env.storage().instance().set(&DataKey::TotalWalletsScored, &(current + 1));
+}
+
+/// Returns the total number of unique `(wallet, asset_pair)` combinations
+/// that have ever been successfully scored.  Useful as a high-level
+/// protocol-health metric.
+pub fn get_total_wallets_scored(env: &Env) -> u64 {
+    env.storage().instance().get(&DataKey::TotalWalletsScored).unwrap_or(0)
+}
