@@ -1407,6 +1407,29 @@ pub fn set_consensus_epsilon(env: &Env, epsilon: u32) {
     env.storage().instance().set(&DataKey::ConsensusEpsilon, &epsilon);
 }
 
+// ── Adaptive Epsilon (issue #204) ───────────────────────────────────────────
+
+pub fn set_adaptive_epsilon_enabled(env: &Env, enabled: bool) {
+    env.storage().instance().set(&DataKey::AdaptiveEpsilonEnabled, &enabled);
+}
+
+pub fn get_adaptive_epsilon_enabled(env: &Env) -> bool {
+    env.storage().instance().get(&DataKey::AdaptiveEpsilonEnabled).unwrap_or(false)
+}
+
+pub fn set_adaptive_epsilon_bounds(env: &Env, min: u32, max: u32) {
+    env.storage().instance().set(&DataKey::AdaptiveEpsilonMin, &min);
+    env.storage().instance().set(&DataKey::AdaptiveEpsilonMax, &max);
+}
+
+pub fn get_adaptive_epsilon_min(env: &Env) -> u32 {
+    env.storage().instance().get(&DataKey::AdaptiveEpsilonMin).unwrap_or(5)
+}
+
+pub fn get_adaptive_epsilon_max(env: &Env) -> u32 {
+    env.storage().instance().get(&DataKey::AdaptiveEpsilonMax).unwrap_or(75)
+}
+
 // ── Score dispute mechanism ─────────────────────────────────────────────────────
 
 /// Writes (or replaces) the open dispute record for `(wallet, asset_pair)` and

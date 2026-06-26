@@ -405,6 +405,12 @@ pub enum DataKey {
     ScoreEmbargo(Address),
     ConsensusThresholdK,
     ConsensusEpsilon,
+    /// Adaptive epsilon enabled flag (issue #204).
+    AdaptiveEpsilonEnabled,
+    /// Minimum epsilon bound for adaptive mode (issue #204).
+    AdaptiveEpsilonMin,
+    /// Maximum epsilon bound for adaptive mode (issue #204).
+    AdaptiveEpsilonMax,
     /// Open dispute record for a (wallet, asset_pair) pair. Absent key means
     /// no active dispute. Stored in temporary TTL-bounded storage.
     ScoreDispute(Address, Symbol),
@@ -555,6 +561,9 @@ impl DataKey {
             DataKey::ScoreEmbargo(a) => k1!("ScoreEmbargo", a),
             DataKey::ConsensusThresholdK => k0!("ConsThresholdK"),
             DataKey::ConsensusEpsilon => k0!("ConsEpsilon"),
+            DataKey::AdaptiveEpsilonEnabled => k0!("AdaptEpsEn"),
+            DataKey::AdaptiveEpsilonMin => k0!("AdaptEpsMin"),
+            DataKey::AdaptiveEpsilonMax => k0!("AdaptEpsMax"),
             DataKey::ScoreDispute(a, s) => k2!("ScoreDispute", a, s),
             DataKey::DisputeIndex => k0!("DisputeIndex"),
             DataKey::ConsensusCommitment(m, w, s) => k3!("ConsCommit", m, w, s),
