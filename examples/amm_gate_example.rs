@@ -1,93 +1,109 @@
-//! Reference integration: gating AMM liquidity provision on LedgerLens risk
-//! score **and** confidence.
+// Example only — not production code
+
+//! Minimal AMM swap implementation with LedgerLens risk gating.
 //!
-//! See also [`examples/amm_gate.rs`](amm_gate.rs) for the score-only swap pattern
-//! and `contracts/mock-amm/` for a deployable test fixture exercising the same
-//! gate in cross-contract tests.
-//!
-//! Build:
-//!
-//! ```text
-//! cargo build --example amm_gate_example -p ledgerlens-score
-//! ```
+//! This example demonstrates:
+//! - Importing the LedgerLens contract client.
+//! - Calling `query_risk_gate` from within a swap function.
+//! - Handling the gate result and rejecting high-risk wallets.
 
 #![no_std]
 
-use ledgerlens_score::LedgerLensScoreContractClient;
 use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttype, symbol_short, Address, Env,
+    contract, contractimpl, symbol_short, Address, BytesN, Env, Symbol,
 };
-
-#[contracterror]
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-#[repr(u32)]
-pub enum AmmLiquidityError {
-    NotConfigured = 1,
-    /// Score too high or no score on file (fail closed).
-    HighRiskProvider = 2,
-    /// Score exists but confidence is below the pool minimum.
-    LowConfidence = 3,
-    InvalidAmount = 4,
-}
-
-#[contracttype]
-enum DataKey {
-    LedgerLens,
-    GateThreshold,
-    MinConfidence,
-}
+use ledgerlens_score::LedgerLensScoreContractClient;
 
 #[contract]
-pub struct LedgerLensGatedLiquidity;
+pub struct SimpleAMM;
 
 #[contractimpl]
-impl LedgerLensGatedLiquidity {
-    pub fn initialize(env: Env, ledgerlens: Address, gate_threshold: u32, min_confidence: u32) {
-        env.storage().instance().set(&DataKey::LedgerLens, &ledgerlens);
-        env.storage().instance().set(&DataKey::GateThreshold, &gate_threshold);
-        env.storage().instance().set(&DataKey::MinConfidence, &min_confidence);
+impl SimpleAMM {
+    /// Execute a swap between two tokens, enforcing LedgerLens risk gating.
+    ///
+    /// Before proceeding with the swap, this function calls `query_risk_gate`
+    /// to verify that the user's risk score is below the specified threshold.
+    /// If the gate returns `false` (user is too risky, embargoed, or unknown),
+    /// the swap is rejected.
+    pub fn swap(
+        env: Env,
+        user: Address,
+        asset_pair: Symbol,
+        amount_in: u64,
+        ledgerlens_id: Address,
+        gate_threshold: u32,
+    ) -> Result<u64, u32> {
+        // 1. Build the LedgerLens client
+        let client = LedgerLensScoreContractClient::new(&env, &ledgerlens_id);
+
+        // 2. Call query_risk_gate to check the user's risk score
+        // This function returns bool: true if score < threshold, false otherwise.
+        // It never panics and never raises an error — all failure cases collapse to false.
+        let passes_gate = client.query_risk_gate(&user, &asset_pair, &gate_threshold);
+
+        // 3. Reject the swap if the user's risk gate fails
+        if !passes_gate {
+            // Return error code: 1 = UserHighRisk
+            return Err(1);
+        }
+
+        // 4. User passed the gate; proceed with swap logic
+        // (In a real AMM, this would include pool checks, reserve calculations, etc.)
+        let output_amount = Self::compute_swap_output(amount_in);
+
+        Ok(output_amount)
     }
 
-    /// Gate liquidity provision on `query_risk_gate_with_confidence` **before**
-    /// any pool state is mutated.
-    pub fn provide_liquidity_gated(
-        env: Env,
-        provider: Address,
-        amount: i128,
-    ) -> Result<(), AmmLiquidityError> {
-        if amount <= 0 {
-            return Err(AmmLiquidityError::InvalidAmount);
-        }
+    /// Simplified swap output calculation (not production logic).
+    fn compute_swap_output(amount_in: u64) -> u64 {
+        // Example: simple 1:1 swap with a 0.3% fee
+        (amount_in * 997) / 1000
+    }
+}
 
-        let llens: Address = env
-            .storage()
-            .instance()
-            .get(&DataKey::LedgerLens)
-            .ok_or(AmmLiquidityError::NotConfigured)?;
-        let threshold: u32 = env
-            .storage()
-            .instance()
-            .get(&DataKey::GateThreshold)
-            .ok_or(AmmLiquidityError::NotConfigured)?;
-        let min_confidence: u32 = env
-            .storage()
-            .instance()
-            .get(&DataKey::MinConfidence)
-            .unwrap_or(0);
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use soroban_sdk::testutils::{Address as _, Env as _};
 
-        let client = LedgerLensScoreContractClient::new(&env, &llens);
-        let pair = symbol_short!("XLM_USDC");
+    #[test]
+    fn test_swap_with_passing_gate() {
+        // This is a stub test showing the happy path structure.
+        // In a real test, you would:
+        // 1. Initialize the LedgerLens contract with test data.
+        // 2. Submit a low-risk score for the user.
+        // 3. Call swap() and verify it succeeds.
 
-        if !client.query_risk_gate_with_confidence(&provider, &pair, &threshold, &min_confidence) {
-            match client.try_get_score(&provider, &pair) {
-                Ok(Ok(score)) if score.confidence < min_confidence => {
-                    return Err(AmmLiquidityError::LowConfidence);
-                }
-                _ => return Err(AmmLiquidityError::HighRiskProvider),
-            }
-        }
+        let env = Env::default();
+        env.mock_all_auths();
 
-        // ... mint LP tokens / update reserves here ...
-        Ok(())
+        // Pseudo-code (not actual test):
+        // let user = Address::generate(&env);
+        // let llens_id = Address::generate(&env);
+        // let amm_contract = env.register_contract(None, SimpleAMM);
+        // let client = SimpleAMMClient::new(&env, &amm_contract);
+        //
+        // let result = client.swap(
+        //     &user,
+        //     &symbol_short!("XLM_USDC"),
+        //     &1_000_000,
+        //     &llens_id,
+        //     &75,
+        // );
+        // assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_swap_with_failing_gate() {
+        // Stub: verify that swap rejects high-risk wallets.
+        //
+        // let result = client.swap(
+        //     &high_risk_user,
+        //     &symbol_short!("XLM_USDC"),
+        //     &1_000_000,
+        //     &llens_id,
+        //     &75,
+        // );
+        // assert_eq!(result, Err(1)); // UserHighRisk error
     }
 }

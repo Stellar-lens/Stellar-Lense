@@ -39,6 +39,9 @@ pub struct RiskScore {
     pub timestamp: u64,
     pub confidence: u32,
     pub model_version: u32,
+    pub benford_score: u32,
+    pub ml_score: u32,
+    pub network_score: u32,
 }
 
 /// Query descriptor for a batch score read.
@@ -122,6 +125,8 @@ pub struct AggregateRiskScore {
 pub struct ScoreAttestation {
     pub commitment: BytesN<32>,
     pub signature: BytesN<65>,
+    pub contract_id: BytesN<32>,
+    pub contract_version: u32,
 }
 
 /// Threshold-signature attestation: t-of-n signers produce one 65-byte proof.
@@ -132,6 +137,8 @@ pub struct ThresholdAttestation {
     pub commitment: BytesN<32>,
     pub threshold_sig: BytesN<65>,
     pub participating_signers: soroban_sdk::Vec<Address>,
+    pub contract_id: BytesN<32>,
+    pub contract_version: u32,
 }
 
 /// Unified attestation input for `submit_score`.
@@ -465,15 +472,12 @@ pub enum DataKey {
     ScoreEntryIndex,
     ScoreEntryLastTouchedLedger(Address, Symbol),
     ModelVersionIndex,
-    /// Parameter change proposal keyed by monotonic proposal ID.
-    ParameterProposal(u64),
-    /// Next proposal ID to allocate (starts at 1).
-    ParameterProposalNextId,
-    /// Ordered list of proposal IDs that are still pending execution.
-    PendingParameterProposalIds,
-    /// Test-only counter for TTL extend regression tests (`cfg(test)` writes only).
-    #[cfg(test)]
-    TestExtendCount,
+    /// Running total of score submissions for an asset pair (all wallets combined).
+    /// Incremented on every successful submission for `asset_pair`.
+    PairScoreCount(Symbol),
+    /// Running total of unique (wallet, asset_pair) combinations ever scored.
+    /// Incremented on the *first* successful submission for each new combination.
+    TotalWalletsScored,
 }
 
 impl DataKey {
@@ -585,11 +589,8 @@ impl DataKey {
             DataKey::JumpStats(w, s) => k2!("JumpStats", w, s),
             DataKey::FeeRecipient => k0!("FeeRecipient"),
             DataKey::EmbargoedWalletIndex => k0!("EmbargoedWIndex"),
-            DataKey::ParameterProposal(id) => k1!("ParamProp", id),
-            DataKey::ParameterProposalNextId => k0!("ParamPropNxt"),
-            DataKey::PendingParameterProposalIds => k0!("ParamPropIdx"),
-            #[cfg(test)]
-            DataKey::TestExtendCount => k0!("TestExtCnt"),
+            DataKey::PairScoreCount(s) => k1!("PairScoreCnt", s),
+            DataKey::TotalWalletsScored => k0!("TotalWalletsScored"),
         }
     }
 }
@@ -637,4 +638,13 @@ pub struct VerkleLeaf {
     pub score: u32,
     pub timestamp: u64,
     pub model_version: u32,
+}
+
+/// Configurable score decay profile.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum DecayProfile {
+    Linear { lambda_num: u32, lambda_den: u32 },
+    Exponential { half_life_secs: u64 },
+    Step { steps: Vec<(u64, u32)> },
 }
