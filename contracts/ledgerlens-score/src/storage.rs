@@ -508,6 +508,10 @@ pub fn set_history_max_depth(env: &Env, depth: u32) {
 
 // ── Contract version ─────────────────────────────────────────────────────────
 
+pub fn set_contract_version(env: &Env, contract_version: &u32) {
+    env.storage().instance().set(&DataKey::ContractVersion, contract_version);
+}
+
 pub fn get_contract_version(env: &Env) -> u32 {
     let result: Option<u32> = env.storage().instance().get(&DataKey::ContractVersion);
     result.unwrap_or(crate::constants::CONTRACT_VERSION)

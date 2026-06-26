@@ -1429,6 +1429,12 @@ fn test_get_version_returns_three() {
     assert_eq!(client.get_version(), 3);
 }
 
+#[test]
+fn test_get_contract_version_returns_three() {
+    let (_env, client, _admin, _service) = initialized();
+    assert_eq!(client.get_contract_version(), 3);
+}
+
 // ── Not-initialized guards ────────────────────────────────────────────────────
 
 #[test]
