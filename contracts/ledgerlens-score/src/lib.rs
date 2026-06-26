@@ -2405,6 +2405,131 @@ impl LedgerLensScoreContract {
         storage::get_wallet_pairs(&env, &wallet)
     }
 
+    /// Sets the correlation coefficient between two asset pairs for use in
+    /// portfolio VaR calculations. `corr` is scaled ×10 000 (e.g. `5000`
+    /// represents ρ = 0.5). Valid range: [-10 000, 10 000]. Admin only.
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if `initialize` has not been called.
+    pub fn set_pair_correlation(
+        env: Env,
+        pair_a: Symbol,
+        pair_b: Symbol,
+        corr: i32,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        storage::get_admin(&env).require_auth();
+        storage::set_pair_correlation(&env, &pair_a, &pair_b, corr);
+        #[cfg(any(test, feature = "testutils"))]
+        invariants::invariant_check(&env);
+        Ok(())
+    }
+
+    /// Returns the stored correlation coefficient (×10 000) between two pairs.
+    /// Defaults to `0` (uncorrelated) when unset.
+    pub fn get_pair_correlation(env: Env, pair_a: Symbol, pair_b: Symbol) -> i32 {
+        storage::get_pair_correlation(&env, &pair_a, &pair_b)
+    }
+
+    /// Estimates portfolio-level Value-at-Risk (VaR) for a wallet by combining
+    /// its per-pair risk scores with the on-chain pair correlation matrix and
+    /// pair weights.
+    ///
+    /// The computation is:
+    ///   1. Collect all (pair, score, weight) triples for the wallet.
+    ///   2. Compute weighted variance:
+    ///      `σ² = Σᵢ Σⱼ wᵢ wⱼ sᵢ sⱼ ρᵢⱼ / W²`
+    ///      where `W = Σ wᵢ` and `ρᵢⱼ` is the correlation from storage
+    ///      (defaulting to 0 for uncorrelated pairs, 10 000 for i == j).
+    ///   3. Multiply `sqrt(σ²)` by a z-score for the requested confidence:
+    ///      95 → ×165 (z = 1.645, scaled ×100), 99 → ×233 (z = 2.326, scaled ×100).
+    ///   4. Return as an integer in [0, 100], clamped.
+    ///
+    /// All intermediate arithmetic uses `i64` to avoid overflow within the
+    /// [0, 100] score domain.
+    ///
+    /// # Errors
+    /// - [`Error::InsufficientPairData`] when fewer than 2 pairs have scores.
+    pub fn get_portfolio_var(
+        env: Env,
+        wallet: Address,
+        confidence: u32,
+    ) -> Result<u32, Error> {
+        let all_pairs = storage::get_wallet_pairs(&env, &wallet);
+
+        // Collect parallel arrays for pairs that have a live score.
+        let mut pair_syms: Vec<Symbol> = Vec::new(&env);
+        let mut scores: Vec<u32> = Vec::new(&env);
+        let mut weights: Vec<u32> = Vec::new(&env);
+
+        for pair in all_pairs.iter() {
+            if let Some(risk) = storage::peek_score(&env, &wallet, &pair) {
+                let w = storage::get_pair_weight(&env, &pair);
+                pair_syms.push_back(pair);
+                scores.push_back(risk.score);
+                weights.push_back(w);
+            }
+        }
+
+        let n = pair_syms.len() as usize;
+        if n < 2 {
+            return Err(Error::InsufficientPairData);
+        }
+
+        let mut w_total: i64 = 0;
+        for idx in 0..n {
+            w_total += weights.get(idx as u32).unwrap() as i64;
+        }
+        if w_total == 0 {
+            return Err(Error::InsufficientPairData);
+        }
+
+        // Weighted covariance sum: Σᵢ Σⱼ wᵢ wⱼ sᵢ sⱼ ρᵢⱼ (ρ scaled ×10 000).
+        let mut cov_sum: i64 = 0;
+        for i in 0..n {
+            let si = scores.get(i as u32).unwrap() as i64;
+            let wi = weights.get(i as u32).unwrap() as i64;
+            for j in 0..n {
+                let sj = scores.get(j as u32).unwrap() as i64;
+                let wj = weights.get(j as u32).unwrap() as i64;
+                let rho: i64 = if i == j {
+                    10_000
+                } else {
+                    let pi = pair_syms.get(i as u32).unwrap();
+                    let pj = pair_syms.get(j as u32).unwrap();
+                    storage::get_pair_correlation(&env, &pi, &pj) as i64
+                };
+                cov_sum += wi * wj * si * sj * rho / 10_000;
+            }
+        }
+
+        // Portfolio variance = cov_sum / W².
+        let var_scaled = cov_sum / (w_total * w_total).max(1);
+        // σ = integer sqrt via Newton's method.
+        let sigma: i64 = {
+            let v = var_scaled.max(0) as u64;
+            if v == 0 {
+                0u64
+            } else {
+                let mut x = v;
+                let mut y = (x + 1) / 2;
+                while y < x {
+                    x = y;
+                    y = (x + v / x) / 2;
+                }
+                x
+            }
+        } as i64;
+
+        // z-score scaled ×100: 95 → 165 (1.645), 99 → 233 (2.326), else 165.
+        let z100: i64 = if confidence == 99 { 233 } else { 165 };
+
+        let var_score = (sigma * z100 / 100).clamp(0, 100) as u32;
+        Ok(var_score)
+    }
+
     /// Returns the number of distinct asset pairs `wallet` has scores for.
     /// A convenience shortcut for `get_wallet_pair_list(wallet).len()` that
     /// avoids allocating the full list when only the count is needed.
@@ -2633,6 +2758,8 @@ impl LedgerLensScoreContract {
         let admin = storage::get_admin(&env);
         admin.require_auth();
         storage::set_global_min_confidence(&env, min_confidence);
+        #[cfg(any(test, feature = "testutils"))]
+        invariants::invariant_check(&env);
         Ok(())
     }
 
@@ -2785,6 +2912,27 @@ impl LedgerLensScoreContract {
         // Flash-loan protection: record this gate read in temporary storage (#300).
         storage::set_gate_read_ledger(&env, &wallet, &asset_pair);
         Self::query_risk_gate_with_confidence(env, wallet, asset_pair, gate_threshold, 0)
+    }
+
+    /// Sets the per-query fee (in fee-token stroops) charged on each
+    /// `query_risk_gate` call. `0` disables fee collection. Admin only.
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if `initialize` has not been called.
+    pub fn set_gate_query_fee(env: Env, amount: i128) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        storage::get_admin(&env).require_auth();
+        storage::set_gate_query_fee(&env, amount);
+        #[cfg(any(test, feature = "testutils"))]
+        invariants::invariant_check(&env);
+        Ok(())
+    }
+
+    /// Returns the running total of fees collected via `query_risk_gate`.
+    pub fn get_accumulated_fees(env: Env) -> i128 {
+        storage::get_accumulated_fees(&env)
     }
 
     /// Confidence-aware variant of [`query_risk_gate`].
