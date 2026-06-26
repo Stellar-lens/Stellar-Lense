@@ -83,6 +83,18 @@ mod test_breach_counter_reset;
 #[cfg(test)]
 mod test_query_helpers;
 
+#[cfg(test)]
+mod test_fuzz_submit_score;
+
+#[cfg(test)]
+mod test_admin_rotation;
+
+#[cfg(test)]
+mod test_aggregate_invariants;
+
+#[cfg(test)]
+mod test_chaos_pause;
+
 use soroban_sdk::{
     contract, contractimpl, crypto::Hash, symbol_short, token, Address, Bytes, BytesN, Env, Symbol,
     SymbolStr, TryFromVal, Vec,

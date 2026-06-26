@@ -41,6 +41,26 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --workspace
 
+  fuzz-property-chaos:
+    name: Fuzz / property / chaos tests (issues 303-306)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # Run only the four new test suites; each is bounded and deterministic.
+      # The combined wall-clock budget (fuzz seeds + 10k property cases + 1000
+      # chaos sequences) comfortably fits within 60 seconds on a standard runner.
+      - name: Fuzz submit_score (issue 303)
+        run: cargo test -p ledgerlens-score --features testutils -- test_fuzz_submit_score --nocapture
+      - name: Admin rotation integration (issue 304)
+        run: cargo test -p ledgerlens-score --features testutils -- test_admin_rotation --nocapture
+      - name: Aggregate invariants property tests (issue 305)
+        run: cargo test -p ledgerlens-score --features testutils -- test_aggregate_invariants --nocapture
+      - name: Chaos pause harness (issue 306)
+        run: cargo test -p ledgerlens-score --features testutils -- test_chaos_pause --nocapture
+
   build:
     name: WASM build
     runs-on: ubuntu-latest
