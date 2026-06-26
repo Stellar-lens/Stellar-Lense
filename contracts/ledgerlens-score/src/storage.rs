@@ -1656,3 +1656,23 @@ pub fn set_signer_rotation_grace(env: &Env, grace_secs: u64) {
 pub fn set_reveal_window_secs(env: &Env, secs: u64) {
     env.storage().instance().set(&DataKey::RevealWindowSecs, &secs);
 }
+
+// ── Per-pair score volatility (Welford) ──────────────────────────────────────
+
+pub fn get_pair_volatility_state(env: &Env, asset_pair: &Symbol) -> Option<crate::types::PairVolatilityState> {
+    env.storage().persistent().get(&DataKey::PairVolatility(asset_pair.clone()))
+}
+
+pub fn set_pair_volatility_state(env: &Env, asset_pair: &Symbol, state: &crate::types::PairVolatilityState) {
+    let key = DataKey::PairVolatility(asset_pair.clone());
+    env.storage().persistent().set(&key, state);
+    env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+}
+
+pub fn get_pair_volatility_window(env: &Env) -> u64 {
+    env.storage().instance().get(&DataKey::PairVolatilityWindow).unwrap_or(86_400)
+}
+
+pub fn set_pair_volatility_window(env: &Env, secs: u64) {
+    env.storage().instance().set(&DataKey::PairVolatilityWindow, &secs);
+}

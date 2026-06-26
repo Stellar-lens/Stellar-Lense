@@ -435,6 +435,10 @@ pub enum DataKey {
     ScoreEntryIndex,
     ScoreEntryLastTouchedLedger(Address, Symbol),
     ModelVersionIndex,
+    /// Rolling Welford state for per-pair 24h score volatility.
+    PairVolatility(Symbol),
+    /// Configurable rolling window for pair volatility (seconds). Default 86400.
+    PairVolatilityWindow,
 }
 
 impl DataKey {
@@ -546,6 +550,8 @@ impl DataKey {
             DataKey::JumpStats(w, s) => k2!("JumpStats", w, s),
             DataKey::FeeRecipient => k0!("FeeRecipient"),
             DataKey::EmbargoedWalletIndex => k0!("EmbargoedWIndex"),
+            DataKey::PairVolatility(s) => k1!("PairVolatility", s),
+            DataKey::PairVolatilityWindow => k0!("PairVolWin"),
         }
     }
 }
@@ -593,4 +599,20 @@ pub struct VerkleLeaf {
     pub score: u32,
     pub timestamp: u64,
     pub model_version: u32,
+}
+
+/// Welford online algorithm state for rolling per-pair score volatility.
+/// All scaled values use fixed-point with scale factor 1_000 for mean and
+/// 1_000_000 for m2, avoiding floats.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PairVolatilityState {
+    /// Number of samples currently counted.
+    pub count: u64,
+    /// Running mean × 1000.
+    pub mean_scaled: i64,
+    /// Running M2 (sum of squared deviations) × 1_000_000.
+    pub m2_scaled: i64,
+    /// Ledger timestamp of the last update (used for window management).
+    pub last_updated: u64,
 }
