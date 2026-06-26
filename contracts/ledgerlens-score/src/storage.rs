@@ -7,10 +7,47 @@ use crate::constants::{
 use crate::errors::Error;
 use crate::types::{
     AggregateRiskScore, DataKey, EmbargoExpiry, GateDataKey, JumpStats, ModelVersionStats,
-    PendingScoreEntry, RiskScore, ScoreDispute, ScoreFloorPolicy, ScoreHistogram, ScoreTrend,
-    ScoreVelocityCap, UpgradeProposal,
+    ParameterProposalRecord, ParameterProposalStatus, PendingScoreEntry, RiskScore, ScoreDispute,
+    ScoreFloorPolicy, ScoreHistogram, ScoreTrend, ScoreVelocityCap, UpgradeProposal,
 };
-use soroban_sdk::{Address, Bytes, Env, Symbol, Vec};
+use soroban_sdk::{Address, Bytes, BytesN, Env, Symbol, Vec};
+
+#[cfg(test)]
+fn extend_persistent_ttl(env: &Env, key: &crate::types::DataKey) {
+    env.storage()
+        .persistent()
+        .extend_ttl(key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    let count: u32 = env
+        .storage()
+        .instance()
+        .get(&crate::types::DataKey::TestExtendCount)
+        .unwrap_or(0);
+    env.storage()
+        .instance()
+        .set(&crate::types::DataKey::TestExtendCount, &(count + 1));
+}
+
+#[cfg(not(test))]
+fn extend_persistent_ttl(env: &Env, key: &crate::types::DataKey) {
+    env.storage()
+        .persistent()
+        .extend_ttl(key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+}
+
+#[cfg(test)]
+pub fn test_extend_count(env: &Env) -> u32 {
+    env.storage()
+        .instance()
+        .get(&crate::types::DataKey::TestExtendCount)
+        .unwrap_or(0)
+}
+
+#[cfg(test)]
+pub fn reset_test_extend_count(env: &Env) {
+    env.storage()
+        .instance()
+        .set(&crate::types::DataKey::TestExtendCount, &0u32);
+}
 
 // ── Admin / Service ─────────────────────────────────────────────────────────
 
@@ -39,8 +76,29 @@ pub fn get_service(env: &Env) -> Address {
 pub fn set_score(env: &Env, wallet: &Address, asset_pair: &Symbol, score: &RiskScore) {
     let key = DataKey::Score(wallet.clone(), asset_pair.clone());
     env.storage().persistent().set(&key, score);
-    env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    // Lazy TTL extension: only renew the score entry when the touch marker shows
+    // SCORE_TTL_THRESHOLD ledgers have elapsed since the last write. Strict `>=`
+    // on elapsed so entries at exactly the threshold still renew. Untracked
+    // entries (first write) always extend.
+    let needs_extend = match ledgers_since_touch(env, wallet, asset_pair) {
+        None => true,
+        Some(elapsed) => elapsed >= SCORE_TTL_THRESHOLD,
+    };
+    if needs_extend {
+        extend_persistent_ttl(env, &key);
+    }
     track_score_entry(env, wallet, asset_pair);
+}
+
+/// Eager TTL path retained for instruction-count regression tests only.
+#[cfg(test)]
+pub fn set_score_eager_ttl(env: &Env, wallet: &Address, asset_pair: &Symbol, score: &RiskScore) {
+    let key = DataKey::Score(wallet.clone(), asset_pair.clone());
+    env.storage().persistent().set(&key, score);
+    extend_persistent_ttl(env, &key);
+    track_score_entry(env, wallet, asset_pair);
+    let touch_key = DataKey::ScoreEntryLastTouchedLedger(wallet.clone(), asset_pair.clone());
+    extend_persistent_ttl(env, &touch_key);
 }
 
 pub fn get_score(env: &Env, wallet: &Address, asset_pair: &Symbol) -> Option<RiskScore> {
@@ -116,8 +174,12 @@ pub fn track_score_entry(env: &Env, wallet: &Address, asset_pair: &Symbol) {
 
 fn touch_score_entry(env: &Env, wallet: &Address, asset_pair: &Symbol) {
     let key = DataKey::ScoreEntryLastTouchedLedger(wallet.clone(), asset_pair.clone());
+    let had_touch = env.storage().persistent().has(&key);
     env.storage().persistent().set(&key, &env.ledger().sequence());
-    env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    // Lazy TTL on the touch marker: skip extend while the entry is still tracked.
+    if !had_touch {
+        extend_persistent_ttl(env, &key);
+    }
 }
 
 /// Ledgers elapsed since `(wallet, asset_pair)` was last touched, or `None`
@@ -446,6 +508,10 @@ pub fn set_history_max_depth(env: &Env, depth: u32) {
 
 // ── Contract version ─────────────────────────────────────────────────────────
 
+pub fn set_contract_version(env: &Env, contract_version: &u32) {
+    env.storage().instance().set(&DataKey::ContractVersion, contract_version);
+}
+
 pub fn get_contract_version(env: &Env) -> u32 {
     let result: Option<u32> = env.storage().instance().get(&DataKey::ContractVersion);
     result.unwrap_or(crate::constants::CONTRACT_VERSION)
@@ -519,6 +585,136 @@ pub fn get_upgrade_delay(env: &Env) -> u64 {
 
 pub fn set_upgrade_delay(env: &Env, delay_secs: u64) {
     env.storage().instance().set(&DataKey::UpgradeDelay, &delay_secs);
+}
+
+// ── Parameter change governance ───────────────────────────────────────────────
+
+pub fn next_parameter_proposal_id(env: &Env) -> u64 {
+    let id: u64 = env
+        .storage()
+        .instance()
+        .get(&DataKey::ParameterProposalNextId)
+        .unwrap_or(1);
+    env.storage()
+        .instance()
+        .set(&DataKey::ParameterProposalNextId, &(id.saturating_add(1)));
+    id
+}
+
+pub fn get_parameter_proposal_record(env: &Env, proposal_id: u64) -> Option<ParameterProposalRecord> {
+    env.storage()
+        .instance()
+        .get(&DataKey::ParameterProposal(proposal_id))
+}
+
+pub fn set_parameter_proposal_record(env: &Env, proposal_id: u64, record: &ParameterProposalRecord) {
+    env.storage()
+        .instance()
+        .set(&DataKey::ParameterProposal(proposal_id), record);
+}
+
+pub fn get_pending_parameter_proposal_ids(env: &Env) -> Vec<u64> {
+    env.storage()
+        .instance()
+        .get(&DataKey::PendingParameterProposalIds)
+        .unwrap_or_else(|| Vec::new(env))
+}
+
+pub fn set_pending_parameter_proposal_ids(env: &Env, ids: &Vec<u64>) {
+    env.storage()
+        .instance()
+        .set(&DataKey::PendingParameterProposalIds, ids);
+}
+
+pub fn push_pending_parameter_proposal(env: &Env, proposal_id: u64) {
+    let mut ids = get_pending_parameter_proposal_ids(env);
+    ids.push_back(proposal_id);
+    set_pending_parameter_proposal_ids(env, &ids);
+}
+
+pub fn remove_pending_parameter_proposal(env: &Env, proposal_id: u64) {
+    let ids = get_pending_parameter_proposal_ids(env);
+    let mut next = Vec::new(env);
+    for i in 0..ids.len() {
+        let id = ids.get(i).unwrap();
+        if id != proposal_id {
+            next.push_back(id);
+        }
+    }
+    set_pending_parameter_proposal_ids(env, &next);
+}
+
+pub fn count_pending_parameter_proposals(env: &Env) -> u32 {
+    get_pending_parameter_proposal_ids(env).len()
+}
+
+pub fn mark_parameter_proposal_status(
+    env: &Env,
+    proposal_id: u64,
+    status: ParameterProposalStatus,
+) -> Option<ParameterProposalRecord> {
+    let mut record = get_parameter_proposal_record(env, proposal_id)?;
+    record.status = status;
+    set_parameter_proposal_record(env, proposal_id, &record);
+    remove_pending_parameter_proposal(env, proposal_id);
+    Some(record)
+}
+
+pub fn is_parameter_proposal_expired(proposal: &crate::types::ParameterProposal, now: u64) -> bool {
+    let expiry = proposal
+        .proposed_at
+        .saturating_add(proposal.time_lock_secs.saturating_mul(2));
+    now > expiry
+}
+
+/// Marks expired pending proposals and removes them from the pending index.
+pub fn prune_expired_parameter_proposals(env: &Env) {
+    let ids = get_pending_parameter_proposal_ids(env);
+    let now = env.ledger().timestamp();
+    for i in 0..ids.len() {
+        let id = ids.get(i).unwrap();
+        if let Some(record) = get_parameter_proposal_record(env, id) {
+            if record.status == ParameterProposalStatus::Pending
+                && is_parameter_proposal_expired(&record.proposal, now)
+            {
+                mark_parameter_proposal_status(env, id, ParameterProposalStatus::Expired);
+            }
+        }
+    }
+}
+
+/// Seeds `count` pending proposals directly in storage for cap tests without
+/// replaying the full propose flow (keeps Soroban test snapshots small).
+#[cfg(test)]
+pub fn test_seed_pending_parameter_proposals(
+    env: &Env,
+    count: u32,
+    proposer: &Address,
+    param_key: &Symbol,
+    new_value: &Bytes,
+) {
+    use crate::types::{ParameterProposal, ParameterProposalRecord, ParameterProposalStatus};
+
+    let now = env.ledger().timestamp();
+    let time_lock_secs = get_upgrade_delay(env);
+    for i in 1..=count {
+        let proposal = ParameterProposal {
+            param_key: param_key.clone(),
+            new_value: new_value.clone(),
+            proposer: proposer.clone(),
+            proposed_at: now,
+            time_lock_secs,
+        };
+        let record = ParameterProposalRecord {
+            proposal,
+            status: ParameterProposalStatus::Pending,
+        };
+        set_parameter_proposal_record(env, i as u64, &record);
+        push_pending_parameter_proposal(env, i as u64);
+    }
+    env.storage()
+        .instance()
+        .set(&DataKey::ParameterProposalNextId, &(count as u64 + 1));
 }
 
 // ── Multi-sig admin set ──────────────────────────────────────────────────────
@@ -765,6 +961,16 @@ pub fn get_service_pubkey(env: &Env) -> Option<soroban_sdk::Bytes> {
 
 pub fn set_service_pubkey(env: &Env, pubkey: &Bytes) {
     env.storage().instance().set(&DataKey::ServicePubKey, pubkey);
+}
+
+// ── Signer nonce tracking ───────────────────────────────────────────────────
+
+pub fn get_signer_nonce(env: &Env, signer: &Address) -> u64 {
+    env.storage().instance().get(&DataKey::SignerNonce(signer.clone())).unwrap_or(0)
+}
+
+pub fn set_signer_nonce(env: &Env, signer: &Address, nonce: u64) {
+    env.storage().instance().set(&DataKey::SignerNonce(signer.clone()), &nonce);
 }
 
 pub fn set_gate_callers(env: &Env, callers: &Vec<Address>) {
@@ -1158,6 +1364,54 @@ pub fn remove_from_embargoed_index(env: &Env, wallet: &Address) {
 pub fn clear_embargoed_index(env: &Env) {
     env.storage().temporary().remove(&DataKey::EmbargoedWalletIndex);
 }
+
+// ── Active embargo counter ────────────────────────────────────────────────────
+
+pub fn get_active_embargo_count(env: &Env) -> u32 {
+    let count: u32 = env
+        .storage()
+        .persistent()
+        .get(&DataKey::ActiveEmbargoCount)
+        .unwrap_or(0);
+    if count > 0 {
+        env.storage().persistent().extend_ttl(
+            &DataKey::ActiveEmbargoCount,
+            EMBARGO_TTL_THRESHOLD,
+            EMBARGO_TTL_EXTEND_TO,
+        );
+    }
+    count
+}
+
+pub fn increment_active_embargo_count(env: &Env) {
+    let new_count = get_active_embargo_count(env).saturating_add(1);
+    env.storage().persistent().set(&DataKey::ActiveEmbargoCount, &new_count);
+    env.storage().persistent().extend_ttl(
+        &DataKey::ActiveEmbargoCount,
+        EMBARGO_TTL_THRESHOLD,
+        EMBARGO_TTL_EXTEND_TO,
+    );
+}
+
+pub fn decrement_active_embargo_count(env: &Env) {
+    let current = get_active_embargo_count(env);
+    let new_count = current.saturating_sub(1);
+    if new_count == 0 {
+        env.storage().persistent().remove(&DataKey::ActiveEmbargoCount);
+    } else {
+        env.storage().persistent().set(&DataKey::ActiveEmbargoCount, &new_count);
+        env.storage().persistent().extend_ttl(
+            &DataKey::ActiveEmbargoCount,
+            EMBARGO_TTL_THRESHOLD,
+            EMBARGO_TTL_EXTEND_TO,
+        );
+    }
+}
+
+pub fn reset_active_embargo_count(env: &Env) {
+    env.storage().persistent().remove(&DataKey::ActiveEmbargoCount);
+}
+
 // ── Band entry timestamp ──────────────────────────────────────────────────────
 
 /// Returns the ledger timestamp at which `wallet` first entered the high-risk
@@ -1213,6 +1467,29 @@ pub fn get_consensus_epsilon(env: &Env) -> u32 {
 
 pub fn set_consensus_epsilon(env: &Env, epsilon: u32) {
     env.storage().instance().set(&DataKey::ConsensusEpsilon, &epsilon);
+}
+
+// ── Adaptive Epsilon (issue #204) ───────────────────────────────────────────
+
+pub fn set_adaptive_epsilon_enabled(env: &Env, enabled: bool) {
+    env.storage().instance().set(&DataKey::AdaptiveEpsilonEnabled, &enabled);
+}
+
+pub fn get_adaptive_epsilon_enabled(env: &Env) -> bool {
+    env.storage().instance().get(&DataKey::AdaptiveEpsilonEnabled).unwrap_or(false)
+}
+
+pub fn set_adaptive_epsilon_bounds(env: &Env, min: u32, max: u32) {
+    env.storage().instance().set(&DataKey::AdaptiveEpsilonMin, &min);
+    env.storage().instance().set(&DataKey::AdaptiveEpsilonMax, &max);
+}
+
+pub fn get_adaptive_epsilon_min(env: &Env) -> u32 {
+    env.storage().instance().get(&DataKey::AdaptiveEpsilonMin).unwrap_or(5)
+}
+
+pub fn get_adaptive_epsilon_max(env: &Env) -> u32 {
+    env.storage().instance().get(&DataKey::AdaptiveEpsilonMax).unwrap_or(75)
 }
 
 // ── Score dispute mechanism ─────────────────────────────────────────────────────
@@ -1653,132 +1930,70 @@ pub fn set_signer_rotation_grace(env: &Env, grace_secs: u64) {
     env.storage().instance().set(&DataKey::SignerGracePeriod, &grace_secs);
 }
 
+// ── Dispute commit-reveal helpers ────────────────────────────────────────────
+
+pub fn set_dispute_commit(env: &Env, challenger: &Address, wallet: &Address, pair: &Symbol, hash: &BytesN<32>) {
+    env.storage().temporary().set(&DataKey::DisputeCommit(challenger.clone(), wallet.clone(), pair.clone()), hash);
+    env.storage().temporary().set(&DataKey::DisputeCommitTime(challenger.clone(), wallet.clone(), pair.clone()), &env.ledger().timestamp());
+}
+
+pub fn get_dispute_commit(env: &Env, challenger: &Address, wallet: &Address, pair: &Symbol) -> Option<BytesN<32>> {
+    env.storage().temporary().get(&DataKey::DisputeCommit(challenger.clone(), wallet.clone(), pair.clone()))
+}
+
+pub fn get_dispute_commit_time(env: &Env, challenger: &Address, wallet: &Address, pair: &Symbol) -> u64 {
+    env.storage().temporary().get(&DataKey::DisputeCommitTime(challenger.clone(), wallet.clone(), pair.clone())).unwrap_or(0)
+}
+
+pub fn remove_dispute_commit(env: &Env, challenger: &Address, wallet: &Address, pair: &Symbol) {
+    env.storage().temporary().remove(&DataKey::DisputeCommit(challenger.clone(), wallet.clone(), pair.clone()));
+    env.storage().temporary().remove(&DataKey::DisputeCommitTime(challenger.clone(), wallet.clone(), pair.clone()));
+}
+
 pub fn set_reveal_window_secs(env: &Env, secs: u64) {
     env.storage().instance().set(&DataKey::RevealWindowSecs, &secs);
 }
 
-// ── HyperLogLog sketch ────────────────────────────────────────────────────────
+// ── Per-pair score submission counter ────────────────────────────────────────
 
-/// Returns the HLL precision (p) stored globally, defaulting to
-/// `HLL_DEFAULT_PRECISION` when unset.
-pub fn get_hll_precision(env: &Env) -> u32 {
-    env.storage()
-        .instance()
-        .get(&crate::types::DataKey::HllPrecision)
-        .unwrap_or(crate::constants::HLL_DEFAULT_PRECISION)
-}
-
-pub fn set_hll_precision(env: &Env, precision: u32) {
-    env.storage().instance().set(&crate::types::DataKey::HllPrecision, &precision);
-}
-
-/// Retrieves the HLL sketch for `asset_pair`, or `None` if no wallet has ever
-/// been scored for that pair.
-pub fn get_hll_sketch(env: &Env, asset_pair: &Symbol) -> Option<crate::types::HllSketch> {
-    let key = crate::types::DataKey::HllSketch(asset_pair.clone());
-    let sketch: Option<crate::types::HllSketch> = env.storage().persistent().get(&key);
-    if sketch.is_some() {
-        env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
-    }
-    sketch
-}
-
-pub fn set_hll_sketch(env: &Env, asset_pair: &Symbol, sketch: &crate::types::HllSketch) {
-    let key = crate::types::DataKey::HllSketch(asset_pair.clone());
-    env.storage().persistent().set(&key, sketch);
+/// Increments the running total of successful score submissions for
+/// `asset_pair` across all wallets.  Called from every write path
+/// (`write_score_with_rate_limit` and `submit_scores_batch`) on a
+/// successful write.
+pub fn increment_pair_score_count(env: &Env, asset_pair: &Symbol) {
+    let key = DataKey::PairScoreCount(asset_pair.clone());
+    let current: u64 = env.storage().persistent().get(&key).unwrap_or(0);
+    env.storage().persistent().set(&key, &(current + 1));
     env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
 }
 
-/// Hashes `wallet` to a u64 using its internal Val payload bits mixed with FNV constants.
-fn hll_hash_wallet(env: &Env, wallet: &Address) -> u64 {
-    use soroban_sdk::IntoVal as _;
-    let raw: soroban_sdk::Val = wallet.into_val(env);
-    let v: u64 = raw.get_payload();
-    let h: u64 = v ^ 14695981039346656037u64;
-    let mut x = h.wrapping_mul(1099511628211u64);
-    x = x.wrapping_add(0x9e3779b97f4a7c15);
-    x = (x ^ (x >> 30)).wrapping_mul(0xbf58476d1ce4e5b9);
-    x = (x ^ (x >> 27)).wrapping_mul(0x94d049bb133111eb);
-    x ^ (x >> 31)
+/// Returns the total number of successful score submissions ever recorded
+/// for `asset_pair` (across all wallets).  Returns `0` before any
+/// submission has been accepted for the pair.
+pub fn get_pair_score_count(env: &Env, asset_pair: &Symbol) -> u64 {
+    let key = DataKey::PairScoreCount(asset_pair.clone());
+    let result: Option<u64> = env.storage().persistent().get(&key);
+    if result.is_some() {
+        env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    }
+    result.unwrap_or(0)
 }
 
-/// Updates the HLL sketch for `asset_pair` with a new wallet observation.
-/// Only call when `wallet` is being seen for the first time for the pair.
-pub fn hll_update(env: &Env, asset_pair: &Symbol, wallet: &Address) {
-    let precision = get_hll_precision(env);
-    let num_registers: u32 = 1u32 << precision;
+// ── Total unique wallet-pair combinations ever scored ─────────────────────────
 
-    let mut sketch = get_hll_sketch(env, asset_pair).unwrap_or_else(|| {
-        let mut regs = soroban_sdk::Vec::new(env);
-        for _ in 0..num_registers {
-            regs.push_back(0u32);
-        }
-        crate::types::HllSketch { precision, registers: regs }
-    });
-
-    let hash = hll_hash_wallet(env, wallet);
-    let reg_idx = (hash >> (64 - precision)) as u32 % num_registers;
-    let remaining = hash << precision;
-    let leading_zeros = if remaining == 0 { 64 - precision } else { remaining.leading_zeros() };
-    let rho = (leading_zeros + 1) as u32;
-
-    let current = sketch.registers.get(reg_idx).unwrap_or(0);
-    if rho > current {
-        sketch.registers.set(reg_idx, rho);
-    }
-
-    set_hll_sketch(env, asset_pair, &sketch);
+/// Increments the global counter of unique `(wallet, asset_pair)`
+/// combinations ever scored.  Must be called only on the *first* successful
+/// write for a combination — callers check `peek_score` **before** writing
+/// to decide whether the combination is new.
+pub fn increment_total_wallets_scored(env: &Env) {
+    let current: u64 =
+        env.storage().instance().get(&DataKey::TotalWalletsScored).unwrap_or(0);
+    env.storage().instance().set(&DataKey::TotalWalletsScored, &(current + 1));
 }
 
-/// Estimates the number of unique wallets for `asset_pair` using HyperLogLog.
-/// Returns `0` if no sketch exists.
-pub fn hll_estimate(env: &Env, asset_pair: &Symbol) -> u64 {
-    let sketch = match get_hll_sketch(env, asset_pair) {
-        Some(s) => s,
-        None => return 0,
-    };
-
-    let m = sketch.registers.len() as u64;
-    let alpha_m: u64 = match m {
-        16 => 7_032,
-        32 => 6_971,
-        64 => 7_092,
-        _ => {
-            let denom = 10_000_u64 + 10_790_u64 / m.max(1);
-            7_213_u64 * 10_000_u64 / denom.max(1)
-        }
-    };
-
-    let mut sum_inv: u64 = 0u64;
-    for i in 0..sketch.registers.len() {
-        let reg = sketch.registers.get(i).unwrap_or(0);
-        let val: u64 = if reg >= 32 { 0 } else { (1u64 << 32) >> reg };
-        sum_inv = sum_inv.saturating_add(val);
-    }
-
-    if sum_inv == 0 {
-        return 0;
-    }
-
-    let precision = sketch.precision;
-    let m_sq = m.saturating_mul(m);
-    let numerator = alpha_m.saturating_mul(m_sq).saturating_mul(1u64 << 32);
-    let raw = numerator / 10_000 / sum_inv.max(1);
-
-    let threshold = m.saturating_mul(25) / 10;
-    if raw <= threshold {
-        let zeros: u64 =
-            (0..sketch.registers.len()).filter(|&i| sketch.registers.get(i).unwrap_or(0) == 0).count() as u64;
-        if zeros > 0 {
-            let ratio = m * 1000 / zeros.max(1);
-            let log2_ratio = if ratio <= 1 { 0u64 } else { 63 - ratio.leading_zeros() as u64 };
-            let log2_1000: u64 = 9;
-            let log2_approx = log2_ratio.saturating_sub(log2_1000);
-            let ln_approx = log2_approx * 10_000 / 14_427;
-            return m * ln_approx / 1000;
-        }
-    }
-
-    let _ = precision;
-    raw
+/// Returns the total number of unique `(wallet, asset_pair)` combinations
+/// that have ever been successfully scored.  Useful as a high-level
+/// protocol-health metric.
+pub fn get_total_wallets_scored(env: &Env) -> u64 {
+    env.storage().instance().get(&DataKey::TotalWalletsScored).unwrap_or(0)
 }
