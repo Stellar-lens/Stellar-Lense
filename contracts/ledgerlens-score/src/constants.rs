@@ -32,7 +32,10 @@ pub const DEFAULT_JUMP_THRESHOLD: u32 = 30;
 /// * `3` — `submit_scores_batch_attested` and the `batch_attested`
 ///   `supports_interface` capability were added (see
 ///   `docs/batch-attestation-spec.md`).
-pub const CONTRACT_VERSION: u32 = 3;
+/// * `4` — Added contract_id and contract_version binding to attestations (#200),
+///   Merkle audit chain for admin actions (#201), configurable decay profiles (#202),
+///   and multi-dimensional risk scores with sub-components (#203).
+pub const CONTRACT_VERSION: u32 = 4;
 
 /// Hard upper bound on Merkle proof length accepted by
 /// `submit_scores_batch_attested`. Thirty levels of a binary tree can
@@ -170,4 +173,7 @@ pub const DEFAULT_QUORUM_FAILURE_WINDOW_SECS: u64 = 86_400; // 24 hours
 
 pub const MAX_TRACKED_SCORE_ENTRIES: u32 = 500;
 pub const MAX_EXPIRING_ENTRIES_PER_CALL: u32 = 100;
+
+/// Maximum number of concurrently pending parameter-change proposals.
+pub const MAX_PENDING_PARAMETER_PROPOSALS: u32 = 10;
 
