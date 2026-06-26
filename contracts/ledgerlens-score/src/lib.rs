@@ -2480,6 +2480,57 @@ impl LedgerLensScoreContract {
         storage::get_pair_weight(&env, &asset_pair)
     }
 
+    // ── Per-pair 24h score volatility index (#270) ────────────────────────────
+
+    /// Returns the rolling score volatility index for `asset_pair`, scaled ×100.
+    /// The volatility is the population standard deviation of scores submitted
+    /// within the last `get_pair_volatility_window()` seconds, computed
+    /// incrementally via Welford's algorithm on every `submit_score`.
+    /// Returns `0` when fewer than 2 samples exist.
+    pub fn get_pair_volatility(env: Env, asset_pair: Symbol) -> u32 {
+        let state = match storage::get_pair_volatility_state(&env, &asset_pair) {
+            Some(s) => s,
+            None => return 0,
+        };
+        if state.count < 2 {
+            return 0;
+        }
+        // variance_scaled = m2_scaled / count  (m2_scaled is ×1_000_000, count is samples)
+        let variance_scaled = state.m2_scaled / state.count as i64;
+        if variance_scaled <= 0 {
+            return 0;
+        }
+        // std_dev × 100  =  sqrt(variance_scaled / 1_000_000) × 100
+        //                 =  sqrt(variance_scaled) × 100 / 1000
+        //                 =  sqrt(variance_scaled) / 10
+        let std_dev_100 = (isqrt_u64(variance_scaled as u64) as u64) / 10;
+        std_dev_100 as u32
+    }
+
+    /// Returns the rolling window duration used for volatility computation (seconds).
+    /// Defaults to 86400 (24 hours).
+    pub fn get_pair_volatility_window(env: Env) -> u64 {
+        storage::get_pair_volatility_window(&env)
+    }
+
+    /// Sets the rolling window duration for volatility computation. Admin only.
+    /// Must be in the range `[60, 604800]` (1 minute – 7 days).
+    pub fn set_pair_volatility_window(
+        env: Env,
+        admin_signers: Vec<Address>,
+        secs: u64,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        if secs < 60 || secs > 604_800 {
+            return Err(Error::InvalidStalenessWindow);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+        storage::set_pair_volatility_window(&env, secs);
+        Ok(())
+    }
+
     /// Sets the weight for multiple asset pairs in one admin call, avoiding
     /// N separate transactions during initial contract setup. Each entry is
     /// applied independently via [`set_pair_weight`]'s underlying storage
@@ -7213,6 +7264,34 @@ impl LedgerLensScoreContract {
         false
     }
 
+    /// Incremental Welford update for per-pair score volatility.
+    fn update_pair_volatility(env: &Env, asset_pair: &Symbol, score: u32) {
+        use crate::types::PairVolatilityState;
+        let now = env.ledger().timestamp();
+        let window = storage::get_pair_volatility_window(env);
+
+        let mut state = storage::get_pair_volatility_state(env, asset_pair)
+            .unwrap_or(PairVolatilityState { count: 0, mean_scaled: 0, m2_scaled: 0, last_updated: now });
+
+        // Reset if the window has elapsed since the last update.
+        if now > state.last_updated.saturating_add(window) {
+            state = PairVolatilityState { count: 0, mean_scaled: 0, m2_scaled: 0, last_updated: now };
+        }
+
+        state.count += 1;
+        state.last_updated = now;
+        // Welford's online algorithm with ×1000 fixed-point for mean.
+        let score_scaled = (score as i64) * 1_000;
+        let delta = score_scaled - state.mean_scaled;
+        state.mean_scaled += delta / state.count as i64;
+        let delta2 = score_scaled - state.mean_scaled;
+        // m2_scaled accumulates in units of (score_unit × 1000)^2 / 1_000_000 = score_unit^2 × 1
+        // Keep m2_scaled as integer approximation: delta × delta2 / 1_000_000
+        state.m2_scaled = state.m2_scaled.saturating_add((delta / 1_000).saturating_mul(delta2 / 1_000));
+
+        storage::set_pair_volatility_state(env, asset_pair, &state);
+    }
+
     // ── Proactive TTL rent management ─────────────────────────────────────────
 
     /// Returns up to `max_entries` tracked `(wallet, asset_pair)` score
@@ -8068,4 +8147,18 @@ mod storage_gate {
     pub fn verify_caller_protection(_env: &Env) -> bool {
         true
     }
+}
+
+/// Integer square root (floor) for use in volatility std-dev computation.
+fn isqrt_u64(n: u64) -> u64 {
+    if n == 0 {
+        return 0;
+    }
+    let mut x = n;
+    let mut y = (x + 1) / 2;
+    while y < x {
+        x = y;
+        y = (x + n / x) / 2;
+    }
+    x
 }
