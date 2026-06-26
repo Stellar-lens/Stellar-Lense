@@ -3389,6 +3389,100 @@ impl LedgerLensScoreContract {
         (storage::get_consensus_threshold_k(&env), storage::get_consensus_epsilon(&env))
     }
 
+    // ── Adaptive consensus epsilon (#287) ────────────────────────────────────
+
+    /// Admin setter. Enables or disables adaptive epsilon and sets the scale
+    /// factor.  When enabled, `get_effective_epsilon(pair)` returns:
+    ///
+    ///   `base_epsilon + scale_factor * pair_stddev / 1000`
+    ///
+    /// where `pair_stddev` is the population standard deviation of the score
+    /// history for that pair (across all wallets that have a history entry),
+    /// clamped so the result never exceeds 100.  When disabled the base
+    /// epsilon from `set_consensus_config` is returned unchanged.
+    pub fn set_adaptive_epsilon(
+        env: Env,
+        enabled: bool,
+        scale_factor: u32,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        storage::get_admin(&env).require_auth();
+        storage::set_adaptive_epsilon_enabled(&env, enabled);
+        storage::set_adaptive_epsilon_scale_factor(&env, scale_factor);
+        events::adaptive_epsilon_updated(&env, enabled, scale_factor);
+        Ok(())
+    }
+
+    /// Returns the effective epsilon for `asset_pair`.
+    ///
+    /// When adaptive epsilon is disabled this is simply the configured base
+    /// epsilon from `get_consensus_config`.  When enabled it adds the
+    /// variance-derived term computed from the stored score history for
+    /// `asset_pair` (using a synthetic zero-score wallet address as the
+    /// history key, but in practice this queries the global pair history).
+    ///
+    /// Formula: `base + scale_factor * isqrt(variance) / 1000`, capped at 100.
+    pub fn get_effective_epsilon(env: Env, asset_pair: Symbol) -> u32 {
+        let base = storage::get_consensus_epsilon(&env);
+        if !storage::get_adaptive_epsilon_enabled(&env) {
+            return base;
+        }
+        let scale = storage::get_adaptive_epsilon_scale_factor(&env);
+        if scale == 0 {
+            return base;
+        }
+        let pair_stddev = Self::compute_pair_stddev(&env, &asset_pair);
+        let addend = (scale as u64).saturating_mul(pair_stddev as u64) / 1000;
+        ((base as u64).saturating_add(addend).min(100)) as u32
+    }
+
+    /// Computes the population stddev of all score-history entries for
+    /// `asset_pair` across the wallets tracked in the score-entry index.
+    /// Returns 0 when fewer than 2 data points exist.
+    fn compute_pair_stddev(env: &Env, asset_pair: &Symbol) -> u32 {
+        let index = storage::get_score_entry_index(env);
+        let mut scores: Vec<u32> = Vec::new(env);
+        for i in 0..index.len() {
+            let (wallet, pair) = index.get(i).unwrap();
+            if pair != *asset_pair {
+                continue;
+            }
+            let history = storage::get_score_history(env, &wallet, asset_pair);
+            for j in 0..history.len() {
+                scores.push_back(history.get(j).unwrap().score);
+            }
+        }
+        let n = scores.len() as u64;
+        if n < 2 {
+            return 0;
+        }
+        let mut sum: u64 = 0;
+        for i in 0..scores.len() {
+            sum += scores.get(i).unwrap() as u64;
+        }
+        let mean = sum / n;
+        let mut sq_sum: u64 = 0;
+        for i in 0..scores.len() {
+            let s = scores.get(i).unwrap() as u64;
+            let diff = if s >= mean { s - mean } else { mean - s };
+            sq_sum += diff * diff;
+        }
+        let variance = sq_sum / n;
+        // Integer square root (Newton's method).
+        if variance == 0 {
+            return 0;
+        }
+        let mut x = variance;
+        let mut y = (x + 1) / 2;
+        while y < x {
+            x = y;
+            y = (x + variance / x) / 2;
+        }
+        x as u32
+    }
+
     /// Sets the reveal window for MEV-resistant consensus. Admin only.
     pub fn set_reveal_window(env: Env, secs: u64) -> Result<(), Error> {
         if !storage::has_admin(&env) {
