@@ -536,3 +536,27 @@ pub fn model_version_registered(env: &Env, version: u32) {
 pub fn entry_ttls_extended(env: &Env, renewed: u32, requested: u32) {
     env.events().publish((symbol_short!("ttl_ext"),), (renewed, requested));
 }
+
+// ── #297: IQR outlier rejection ───────────────────────────────────────────────
+
+pub fn consensus_signer_rejected(env: &Env, signer: &Address, deviation: u32) {
+    env.events().publish((symbol_short!("iqr_rej"), signer.clone()), deviation);
+}
+
+// ── #298: Upgrade approval events ────────────────────────────────────────────
+
+pub fn upgrade_approval_added(env: &Env, signer: &Address, count: u32, required: u32) {
+    env.events().publish((symbol_short!("upg_appr"), signer.clone()), (count, required));
+}
+
+// ── #299: Governance chain events ─────────────────────────────────────────────
+
+pub fn governance_action_appended(env: &Env, new_head: &soroban_sdk::BytesN<32>) {
+    env.events().publish((symbol_short!("gov_app"),), new_head.clone());
+}
+
+// ── #302: Gate enforcement mode ───────────────────────────────────────────────
+
+pub fn gate_enforcement_mode_set(env: &Env, strict: bool) {
+    env.events().publish((symbol_short!("gate_enf"),), strict);
+}

@@ -764,6 +764,47 @@ impl LedgerLensScoreContract {
         if valid_indices.is_empty() {
             return Err(Error::InsufficientConsensus);
         }
+        // ── #297: IQR-based outlier rejection ────────────────────────────────
+        // Compute Q1 (25th percentile) and Q3 (75th percentile) of scores among
+        // valid submissions, then reject any signer whose score deviates from
+        // the median by more than multiplier/100 × IQR.
+        let n = valid_indices.len();
+        if n >= 4 {
+            let q1_idx = (n - 1) / 4;
+            let q3_idx = (3 * (n - 1)) / 4;
+            if let (Some(q1), Some(q3)) = (
+                Self::kth_score_for_indices(&submissions, &valid_indices, q1_idx),
+                Self::kth_score_for_indices(&submissions, &valid_indices, q3_idx),
+            ) {
+                let iqr = q3.saturating_sub(q1);
+                let multiplier = storage::get_iqr_rejection_multiplier(&env); // scaled × 100
+                // threshold = multiplier/100 × iqr (integer arithmetic, scaled)
+                let threshold_scaled = (multiplier as u64) * (iqr as u64); // ×100 still
+                let median_idx = (n - 1) / 2;
+                if let Some(median) = Self::kth_score_for_indices(&submissions, &valid_indices, median_idx) {
+                    let mut non_outlier: Vec<u32> = Vec::new(&env);
+                    for k in 0..valid_indices.len() {
+                        let idx = valid_indices.get(k).unwrap();
+                        let sub = submissions.get(idx).unwrap();
+                        let score = sub.score;
+                        let deviation = if score >= median { score - median } else { median - score };
+                        // deviation_scaled = deviation × 100; compare with threshold_scaled
+                        if (deviation as u64) * 100 <= threshold_scaled {
+                            non_outlier.push_back(idx);
+                        } else {
+                            storage::increment_signer_rejection_count(&env, &sub.model);
+                            events::consensus_signer_rejected(&env, &sub.model, deviation);
+                        }
+                    }
+                    if !non_outlier.is_empty() {
+                        valid_indices = non_outlier;
+                    }
+                    // If all signers are rejected as outliers, fall through with
+                    // the original valid_indices (prefer imperfect consensus to none).
+                }
+            }
+        }
+        // ─────────────────────────────────────────────────────────────────────
         let median_score = Self::median_score_for_indices(&submissions, &valid_indices)
             .ok_or(Error::InsufficientConsensus)?;
         let median_confidence =
@@ -2585,6 +2626,14 @@ impl LedgerLensScoreContract {
         min_confidence: u32,
     ) -> bool {
         Self::check_service_silence(&env);
+        // #302: strict gate enforcement — reject callers not in the allowlist.
+        if storage::get_gate_enforcement_mode(&env) {
+            let caller = env.current_contract_address();
+            let callers = storage::get_gate_callers(&env);
+            if !callers.contains(&caller) {
+                return false; // CallerNotAuthorized: infallible, so return false
+            }
+        }
         if gate_threshold > 100 || min_confidence > 100 {
             return false;
         }
@@ -2827,6 +2876,11 @@ impl LedgerLensScoreContract {
         storage::set_service_set(&env, &set);
         storage::set_signer_added_at(&env, &signer, env.ledger().timestamp());
         events::signer_added(&env, &signer);
+        // #299: governance audit chain
+        let mut data = [0u8; 32];
+        data[0] = 0x02; // action: add_service_signer
+        Self::append_governance_action_raw(&env, &data);
+        Ok(())
         Ok(())
     }
 
@@ -2964,6 +3018,10 @@ impl LedgerLensScoreContract {
         storage::get_admin(&env).require_auth();
         storage::set_service(&env, &new_service);
         events::service_updated(&env, &new_service);
+        // #299: append to governance audit chain (action discriminant 0x01)
+        let mut data = [0u8; 32];
+        data[0] = 0x01; // action: set_service
+        Self::append_governance_action_raw(&env, &data);
         Ok(())
     }
 
@@ -3506,6 +3564,33 @@ impl LedgerLensScoreContract {
             return Err(Error::UpgradeAlreadyPending);
         }
 
+        // ── #298: M-of-N co-signature requirement ────────────────────────────
+        // In multisig mode we require ALL threshold signers to be present in
+        // admin_signers before storing the proposal (require_admin_auth already
+        // verified they are valid set members and called require_auth on each).
+        // In legacy (single-admin) mode this check is a no-op.
+        let admin_set = storage::get_admin_set(&env);
+        let threshold = storage::get_admin_threshold(&env);
+        if !admin_set.is_empty() && threshold > 0 {
+            let mut approvals = storage::get_upgrade_approvals(&env);
+            // Add any new signers from this call.
+            for i in 0..admin_signers.len() {
+                let s = admin_signers.get(i).unwrap();
+                if !approvals.contains(&s) {
+                    approvals.push_back(s.clone());
+                    events::upgrade_approval_added(&env, &s, approvals.len(), threshold);
+                }
+            }
+            if approvals.len() < threshold {
+                // Not enough approvals yet — persist partial state and return.
+                storage::set_upgrade_approvals(&env, &approvals);
+                return Ok(());
+            }
+            // Threshold met: clear accumulator and proceed to store proposal.
+            storage::clear_upgrade_approvals(&env);
+        }
+        // ─────────────────────────────────────────────────────────────────────
+
         let now = env.ledger().timestamp();
         let delay = storage::get_upgrade_delay(&env);
         // delay is bounded to MAX_UPGRADE_DELAY_SECS on the way in, so this
@@ -3519,6 +3604,7 @@ impl LedgerLensScoreContract {
             proposed_by: admin,
         };
         storage::set_pending_upgrade(&env, &proposal);
+        Self::append_governance_action_raw(&env, &new_wasm_hash.to_array());
 
         events::upgrade_proposed(&env, &new_wasm_hash, executable_after);
         let mut params_bytes = Bytes::new(&env);
@@ -3600,6 +3686,14 @@ impl LedgerLensScoreContract {
     /// - [`Error::NoPendingUpgrade`] if no proposal is currently pending.
     pub fn get_pending_upgrade(env: Env) -> Result<UpgradeProposal, Error> {
         storage::get_pending_upgrade(&env).ok_or(Error::NoPendingUpgrade)
+    }
+
+    /// #298: Returns the number of admin co-signatures collected so far for the
+    /// pending upgrade proposal. Returns `0` when there are no partial approvals
+    /// (either no proposal is accumulating or the counter was cleared after
+    /// the threshold was met).
+    pub fn get_upgrade_approval_count(env: Env) -> u32 {
+        storage::get_upgrade_approvals(&env).len()
     }
 
     /// Configure the upgrade time-lock delay (seconds) applied to future
@@ -5891,6 +5985,11 @@ impl LedgerLensScoreContract {
             return Err(Error::InvalidThreshold);
         }
         storage::set_admin_threshold(&env, threshold);
+        // #299: governance audit chain
+        let mut data = [0u8; 32];
+        data[0] = 0x03; // action: set_admin_threshold
+        data[28..32].copy_from_slice(&threshold.to_be_bytes());
+        Self::append_governance_action_raw(&env, &data);
         Ok(())
     }
 
