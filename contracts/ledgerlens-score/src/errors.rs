@@ -86,4 +86,6 @@ impl Error {
     pub const NotFound: Error = Error::ScoreNotFound;
     pub const FeeRecipientNotSet: Error = Error::FeeTokenNotSet;
     pub const FeeRecipientMismatch: Error = Error::Unauthorized;
+    /// Returned by `get_portfolio_var` when fewer than 2 pairs have scores.
+    pub const InsufficientPairData: Error = Error::ScoreNotFound;
 }

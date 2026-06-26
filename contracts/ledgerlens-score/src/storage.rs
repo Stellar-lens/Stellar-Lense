@@ -1656,3 +1656,49 @@ pub fn set_signer_rotation_grace(env: &Env, grace_secs: u64) {
 pub fn set_reveal_window_secs(env: &Env, secs: u64) {
     env.storage().instance().set(&DataKey::RevealWindowSecs, &secs);
 }
+
+// ── Fee-per-query (gate fee) ──────────────────────────────────────────────────
+
+/// Returns the configured per-query gate fee (in fee-token stroops).
+/// Defaults to 0 (no fee) when unset.
+pub fn get_gate_query_fee(env: &Env) -> i128 {
+    env.storage().instance().get::<_, i128>(&DataKey::GateQueryFee).unwrap_or(0)
+}
+
+pub fn set_gate_query_fee(env: &Env, amount: i128) {
+    env.storage().instance().set(&DataKey::GateQueryFee, &amount);
+}
+
+/// Returns the running total of fees collected from `query_risk_gate` calls.
+pub fn get_accumulated_fees(env: &Env) -> i128 {
+    env.storage().instance().get::<_, i128>(&DataKey::AccumulatedFees).unwrap_or(0)
+}
+
+/// Adds `delta` to the accumulated fee counter.
+pub fn increment_accumulated_fees(env: &Env, delta: i128) {
+    let current = get_accumulated_fees(env);
+    env.storage().instance().set(&DataKey::AccumulatedFees, &(current + delta));
+}
+
+// ── Portfolio VaR — pair correlation matrix ───────────────────────────────────
+
+/// Returns the stored correlation coefficient (scaled ×10 000) between
+/// `pair_a` and `pair_b`, defaulting to 0 (uncorrelated) when unset.
+/// Both orderings (a,b) and (b,a) are stored on write so reads are symmetric.
+pub fn get_pair_correlation(env: &Env, pair_a: &Symbol, pair_b: &Symbol) -> i32 {
+    let key = DataKey::PairCorrelation(pair_a.clone(), pair_b.clone());
+    env.storage().instance().get::<_, i32>(&key).unwrap_or(0)
+}
+
+/// Stores the correlation under both orderings so `get_pair_correlation` is
+/// symmetric regardless of argument order.
+pub fn set_pair_correlation(env: &Env, pair_a: &Symbol, pair_b: &Symbol, corr: i32) {
+    env.storage()
+        .instance()
+        .set(&DataKey::PairCorrelation(pair_a.clone(), pair_b.clone()), &corr);
+    if pair_a != pair_b {
+        env.storage()
+            .instance()
+            .set(&DataKey::PairCorrelation(pair_b.clone(), pair_a.clone()), &corr);
+    }
+}

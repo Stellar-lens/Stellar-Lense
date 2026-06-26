@@ -435,6 +435,16 @@ pub enum DataKey {
     ScoreEntryIndex,
     ScoreEntryLastTouchedLedger(Address, Symbol),
     ModelVersionIndex,
+    /// Per-query fee amount (i128) charged on each `query_risk_gate` call.
+    /// Zero (default) means no fee is charged.
+    GateQueryFee,
+    /// Running total of fees collected via `query_risk_gate`. Incremented each
+    /// time a non-zero fee is deducted from a caller.
+    AccumulatedFees,
+    /// Per-pair correlation coefficient (scaled ×10000) used for portfolio VaR.
+    /// Key: PairCorrelation(Symbol, Symbol) where the pair symbols are in
+    /// lexicographic order to avoid duplicate entries.
+    PairCorrelation(Symbol, Symbol),
 }
 
 impl DataKey {
@@ -546,6 +556,9 @@ impl DataKey {
             DataKey::JumpStats(w, s) => k2!("JumpStats", w, s),
             DataKey::FeeRecipient => k0!("FeeRecipient"),
             DataKey::EmbargoedWalletIndex => k0!("EmbargoedWIndex"),
+            DataKey::GateQueryFee => k0!("GateQueryFee"),
+            DataKey::AccumulatedFees => k0!("AccumFees"),
+            DataKey::PairCorrelation(a, b) => k2!("PairCorrel", a, b),
         }
     }
 }
