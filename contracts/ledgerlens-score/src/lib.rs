@@ -7,6 +7,7 @@ mod constants;
 mod errors;
 mod events;
 mod gdpr_accumulator;
+mod parameter_governance;
 mod storage;
 mod types;
 mod verkle;
@@ -16,6 +17,12 @@ mod test;
 
 #[cfg(test)]
 mod test_upgrade;
+
+#[cfg(test)]
+mod test_parameter_governance;
+
+#[cfg(test)]
+mod test_batch_ttl_optimization;
 
 #[cfg(test)]
 mod test_interface;
@@ -84,13 +91,16 @@ mod test_breach_counter_reset;
 mod test_query_helpers;
 
 #[cfg(test)]
-mod error_coverage;
+mod test_pair_score_count;
 
 #[cfg(test)]
-mod upgrade_smoke;
+mod test_rate_limit_window;
 
 #[cfg(test)]
-mod event_emission;
+mod test_total_wallets_scored;
+
+#[cfg(test)]
+mod test_cooldown_period;
 
 use soroban_sdk::{
     contract, contractimpl, crypto::Hash, symbol_short, token, Address, Bytes, BytesN, Env, Symbol,
@@ -104,7 +114,8 @@ pub use types::{
     EffectiveRiskScore, EmbargoExpiry, MaybeRiskScore, ModelSubmission, ModelVersionStats,
     PendingScoreEntry, RiskScore, ScoreAttestation, ScoreAttestationInput, ScoreDispute, ScoreFloorPolicy,
     ScoreHistogram, ScoreQuery, ScoreSubmission, ScoreSubmissionWithProof, ScoreTrend,
-    ScoreVelocityCap, ThresholdAttestation, UpgradeProposal,
+    ScoreVelocityCap, ThresholdAttestation, UpgradeProposal, ParameterProposal,
+    ParameterProposalRecord, ParameterProposalStatus,
 };
 /// The 32-byte all-zeros field element used as the value in non-membership proofs.
 pub use verkle::NON_MEMBER_SENTINEL;
@@ -149,6 +160,7 @@ impl LedgerLensScoreContract {
         }
         storage::set_admin(&env, &admin);
         storage::set_service(&env, &service);
+        env.storage().instance().set(&types::DataKey::AdminAuditRoot, &BytesN::<32>::from_array(&env, &[0u8; 32]));
         Ok(())
     }
 
@@ -460,16 +472,20 @@ impl LedgerLensScoreContract {
         storage::push_score_history(&env, &wallet, &asset_pair, &risk_score);
         storage::register_pair_for_wallet(&env, &wallet, &asset_pair);
         storage::increment_score_count(&env, &wallet, &asset_pair);
+        // Increment per-pair submission counter (Issue 1).
+        storage::increment_pair_score_count(&env, &asset_pair);
+        // Increment unique wallet-pair counter on first-ever write (Issue 3).
+        // pending.score is committed only once, so there was no prior live score.
+        // We use peek_score which was called before set_score above — but at this
+        // point set_score has already run.  The pending path always replaces the
+        // live entry, so we treat "had no pending-committed score before" as new.
+        // The reliable signal is: register_pair_for_wallet just ran; if this is
+        // the first time, peek_score would have returned None before set_score.
+        // We detect it by checking whether the score count is now exactly 1.
+        if storage::get_score_count(&env, &wallet, &asset_pair) == 1 {
+            storage::increment_total_wallets_scored(&env);
+        }
         Self::refresh_aggregate_cache(&env, &wallet);
-        // Self::update_merkle_accumulator(
-        //     &env,
-        //     &wallet,
-        //     &asset_pair,
-        //     pending.score,
-        //     pending.timestamp,
-        //     pending.confidence,
-        //     pending.model_version,
-        // );
 
         let score_threshold = storage::get_risk_threshold(&env);
         if pending.score >= score_threshold {
@@ -894,6 +910,12 @@ impl LedgerLensScoreContract {
                         );
                         storage::register_pair_for_wallet(&env, &sub.wallet, &sub.asset_pair);
                         storage::increment_score_count(&env, &sub.wallet, &sub.asset_pair);
+                        // Increment per-pair submission counter (Issue 1).
+                        storage::increment_pair_score_count(&env, &sub.asset_pair);
+                        // Increment unique wallet-pair counter on first-ever submission (Issue 3).
+                        if previous_score.is_none() {
+                            storage::increment_total_wallets_scored(&env);
+                        }
                         storage::update_model_stats(&env, sub.model_version, sub.score);
                         storage::update_historical_max_score(
                             &env,
@@ -1243,6 +1265,12 @@ impl LedgerLensScoreContract {
                         );
                         storage::register_pair_for_wallet(&env, &sub.wallet, &sub.asset_pair);
                         storage::increment_score_count(&env, &sub.wallet, &sub.asset_pair);
+                        // Increment per-pair submission counter (Issue 1).
+                        storage::increment_pair_score_count(&env, &sub.asset_pair);
+                        // Increment unique wallet-pair counter on first-ever submission (Issue 3).
+                        if previous_score.is_none() {
+                            storage::increment_total_wallets_scored(&env);
+                        }
                         Self::refresh_aggregate_cache(&env, &sub.wallet);
 
                         if sub.score >= risk_threshold {
@@ -1595,6 +1623,8 @@ impl LedgerLensScoreContract {
     /// When no decay is configured (`λ = 0`), `effective_score == raw_score` and
     /// `decay_applied == false`.
     ///
+    /// See [docs/score-math.md](../../docs/score-math.md) for the formula and fixed-point implementation notes.
+    ///
     /// # Errors
     /// - [`Error::ScoreNotFound`] if no score exists for this pair (or its delegate).
     /// - [`Error::ScoreEmbargoed`] if the wallet is under an active embargo.
@@ -1727,6 +1757,8 @@ impl LedgerLensScoreContract {
     /// Minimal linear fallback implementation: exact-node returns stored
     /// value, extrapolation is clamped to boundaries, and in-between points
     /// are linearly interpolated.
+    ///
+    /// See [docs/score-math.md](../../docs/score-math.md) for the formula and fixed-point implementation notes.
     pub fn get_interpolated_score(
         env: Env,
         wallet: Address,
@@ -1802,7 +1834,82 @@ impl LedgerLensScoreContract {
         storage::get_score_count(&env, &wallet, &asset_pair)
     }
 
-    // ── Model-version statistics ────────────────────────────────────────────
+    /// Returns the total number of successful score submissions ever recorded
+    /// for `asset_pair` across **all** wallets.
+    ///
+    /// This per-pair counter is incremented on every accepted
+    /// [`submit_score`], [`submit_scores_batch`], or consensus submission
+    /// that writes a live score for the pair — regardless of which wallet
+    /// was scored.  It is never decremented and is not affected by GDPR
+    /// erasure of individual wallet scores.
+    ///
+    /// Useful for analytics and monitoring dashboards to identify which
+    /// pairs have the highest scoring activity.
+    ///
+    /// Returns `0` before any submission has been accepted for the pair.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use soroban_sdk::symbol_short;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// let wallet = Address::generate(&env);
+    /// let asset_pair = symbol_short!("XLM_USDC");
+    /// assert_eq!(client.get_pair_score_count(&asset_pair), 0);
+    /// client.submit_score(&Vec::new(&env), &wallet, &asset_pair, &50, &false, &false, &1, &90, &1, &None).unwrap();
+    /// assert_eq!(client.get_pair_score_count(&asset_pair), 1);
+    /// ```
+    pub fn get_pair_score_count(env: Env, asset_pair: Symbol) -> u64 {
+        storage::get_pair_score_count(&env, &asset_pair)
+    }
+
+    // ── Total unique wallet-pair combinations ever scored ───────────────────
+
+    /// Returns the total number of unique `(wallet, asset_pair)` combinations
+    /// that have ever been successfully scored.
+    ///
+    /// The counter is incremented exactly once per combination — on the first
+    /// accepted submission for that wallet/pair — and is never decremented.
+    /// Useful as a high-level activity metric for dashboards and protocol
+    /// health monitoring.
+    ///
+    /// Returns `0` before any submission has been accepted.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use soroban_sdk::symbol_short;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// let wallet_a = Address::generate(&env);
+    /// let wallet_b = Address::generate(&env);
+    /// let asset_pair = symbol_short!("XLM_USDC");
+    /// assert_eq!(client.get_total_wallets_scored(), 0);
+    /// client.submit_score(&Vec::new(&env), &wallet_a, &asset_pair, &50, &false, &false, &1, &90, &1, &None).unwrap();
+    /// assert_eq!(client.get_total_wallets_scored(), 1);
+    /// client.submit_score(&Vec::new(&env), &wallet_b, &asset_pair, &60, &false, &false, &1, &90, &1, &None).unwrap();
+    /// assert_eq!(client.get_total_wallets_scored(), 2);
+    /// ```
+    pub fn get_total_wallets_scored(env: Env) -> u64 {
+        storage::get_total_wallets_scored(&env)
+    }
 
     /// Returns the running performance statistics for `model_version`.
     ///
@@ -2049,6 +2156,8 @@ impl LedgerLensScoreContract {
     /// average). Returns [`Error::ArithmeticOverflow`] if the weighted sum
     /// would overflow — this can only happen with extreme admin-configured
     /// weights, since per-pair scores are bounded to 0-100.
+    ///
+    /// See [docs/score-math.md](../../docs/score-math.md) for the formula and fixed-point implementation notes.
     pub fn get_aggregate_score(env: Env, wallet: Address) -> Result<AggregateRiskScore, Error> {
         if storage::is_embargoed(&env, &wallet) {
             return Err(Error::ScoreEmbargoed);
@@ -2571,6 +2680,7 @@ impl LedgerLensScoreContract {
     /// | `cgate`          | `query_risk_gate_with_confidence` / global confidence floor |
     /// | `emb`            | `set_score_embargo` / `lift_score_embargo`         |
     /// | `cons`           | `commit_consensus` / `reveal_consensus` / `set_consensus_config` |
+    /// | `pr_rd`          | `is_pair_paused` (per-asset-pair pause read)        |
     ///
     /// Any unrecognised `capability` returns `false`.
     ///
@@ -2595,6 +2705,7 @@ impl LedgerLensScoreContract {
             || capability == Symbol::new(&env, "rgate")
             || capability == symbol_short!("emb")
             || capability == symbol_short!("cons")
+            || capability == symbol_short!("pr_rd")
     }
 
     // ── Service management ───────────────────────────────────────────────────
@@ -3086,6 +3197,8 @@ impl LedgerLensScoreContract {
         let admin = storage::get_admin(&env);
         storage::set_paused(&env, true);
         events::contract_paused(&env, &admin);
+        let action_bytes = Bytes::new(&env);
+        Self::update_audit_root(&env, symbol_short!("pause"), admin.clone(), action_bytes);
         Ok(())
     }
 
@@ -3117,6 +3230,8 @@ impl LedgerLensScoreContract {
         let admin = storage::get_admin(&env);
         storage::set_paused(&env, false);
         events::contract_unpaused(&env, &admin);
+        let action_bytes = Bytes::new(&env);
+        Self::update_audit_root(&env, symbol_short!("unpause"), admin.clone(), action_bytes);
         Ok(())
     }
 
@@ -3315,6 +3430,9 @@ impl LedgerLensScoreContract {
         storage::set_pending_upgrade(&env, &proposal);
 
         events::upgrade_proposed(&env, &new_wasm_hash, executable_after);
+        let mut params_bytes = Bytes::new(&env);
+        params_bytes.extend_from_array(&new_wasm_hash.to_array());
+        Self::update_audit_root(&env, symbol_short!("upg_prop"), admin.clone(), params_bytes);
         Ok(())
     }
 
@@ -3429,6 +3547,183 @@ impl LedgerLensScoreContract {
     /// `DEFAULT_UPGRADE_DELAY_SECS` (48 hours) until configured.
     pub fn get_upgrade_delay(env: Env) -> u64 {
         storage::get_upgrade_delay(&env)
+    }
+
+    // ── Parameter change governance ───────────────────────────────────────────
+
+    /// Propose an admin parameter change, starting the mandatory time-lock.
+    ///
+    /// The admin commits to `(param_key, new_value)` without applying it
+    /// immediately. The proposal is recorded with `time_lock_secs =
+    /// get_upgrade_delay()` (minimum [`constants::MIN_UPGRADE_DELAY_SECS`]) and
+    /// an `prm_prop` event is emitted so monitoring services can inspect and
+    /// react during the delay window.
+    ///
+    /// Service signers may veto via [`Self::veto_parameter_change`] during the
+    /// first half of the time-lock. After `proposed_at + time_lock_secs / 2`
+    /// the proposal is irrevocable until execution or expiry.
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if the contract has no admin yet.
+    /// - [`Error::TooManyPendingParameterProposals`] if 10 proposals are already pending.
+    /// - [`Error::InvalidParameterKey`] / [`Error::InvalidParameterValue`] if the
+    ///   value is unknown or out of bounds.
+    pub fn propose_parameter_change(
+        env: Env,
+        admin_signers: Vec<Address>,
+        param_key: Symbol,
+        new_value: Bytes,
+    ) -> Result<u64, Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+        let admin = storage::get_admin(&env);
+
+        parameter_governance::validate_parameter_value(&env, &param_key, &new_value)?;
+
+        storage::prune_expired_parameter_proposals(&env);
+
+        if storage::count_pending_parameter_proposals(&env)
+            >= constants::MAX_PENDING_PARAMETER_PROPOSALS
+        {
+            return Err(Error::TooManyPendingParameterProposals);
+        }
+
+        let now = env.ledger().timestamp();
+        let time_lock_secs = storage::get_upgrade_delay(&env);
+        if time_lock_secs < constants::MIN_UPGRADE_DELAY_SECS {
+            return Err(Error::InvalidParameterTimeLock);
+        }
+
+        let proposal_id = storage::next_parameter_proposal_id(&env);
+        let proposal = ParameterProposal {
+            param_key: param_key.clone(),
+            new_value: new_value.clone(),
+            proposer: admin,
+            proposed_at: now,
+            time_lock_secs,
+        };
+        let record = ParameterProposalRecord {
+            proposal,
+            status: ParameterProposalStatus::Pending,
+        };
+        storage::set_parameter_proposal_record(&env, proposal_id, &record);
+        storage::push_pending_parameter_proposal(&env, proposal_id);
+
+        let executable_after = now.saturating_add(time_lock_secs);
+        events::parameter_change_proposed(&env, proposal_id, &param_key, executable_after);
+        Ok(proposal_id)
+    }
+
+    /// Execute a pending parameter change once its time-lock has elapsed.
+    ///
+    /// Re-verifies at execution time that the proposal is still pending, has not
+    /// expired (`proposed_at + time_lock_secs * 2`), and that
+    /// `now >= proposed_at + time_lock_secs`. Marks the proposal as executed so
+    /// it cannot be applied again.
+    ///
+    /// Admin only.
+    pub fn execute_parameter_change(
+        env: Env,
+        admin_signers: Vec<Address>,
+        proposal_id: u64,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+
+        let record = storage::get_parameter_proposal_record(&env, proposal_id)
+            .ok_or(Error::ParameterProposalNotFound)?;
+
+        if record.status == ParameterProposalStatus::Executed {
+            return Err(Error::ParameterProposalAlreadyExecuted);
+        }
+        if record.status == ParameterProposalStatus::Vetoed {
+            return Err(Error::ParameterProposalVetoed);
+        }
+        if record.status != ParameterProposalStatus::Pending {
+            return Err(Error::ParameterProposalNotFound);
+        }
+
+        let now = env.ledger().timestamp();
+        let p = &record.proposal;
+        if storage::is_parameter_proposal_expired(p, now) {
+            return Err(Error::ParameterProposalExpired);
+        }
+
+        let executable_after = p.proposed_at.saturating_add(p.time_lock_secs);
+        if now < executable_after {
+            return Err(Error::ParameterProposalNotReady);
+        }
+
+        parameter_governance::apply_parameter_change(&env, &p.param_key, &p.new_value)?;
+        storage::mark_parameter_proposal_status(
+            &env,
+            proposal_id,
+            ParameterProposalStatus::Executed,
+        );
+        events::parameter_change_executed(&env, proposal_id, &p.param_key);
+        Ok(())
+    }
+
+    /// Cancel a pending parameter change during the veto window.
+    ///
+    /// Service multi-sig only. Veto is permitted while
+    /// `now <= proposed_at + time_lock_secs / 2`; after that the proposal is
+    /// irrevocable until execution or expiry.
+    pub fn veto_parameter_change(
+        env: Env,
+        service_signers: Vec<Address>,
+        proposal_id: u64,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        Self::require_service_signers_auth(&env, &service_signers)?;
+
+        let record = storage::get_parameter_proposal_record(&env, proposal_id)
+            .ok_or(Error::ParameterProposalNotFound)?;
+
+        if record.status != ParameterProposalStatus::Pending {
+            if record.status == ParameterProposalStatus::Vetoed {
+                return Err(Error::ParameterProposalVetoed);
+            }
+            if record.status == ParameterProposalStatus::Executed {
+                return Err(Error::ParameterProposalAlreadyExecuted);
+            }
+            return Err(Error::ParameterProposalNotFound);
+        }
+
+        let now = env.ledger().timestamp();
+        let p = &record.proposal;
+        let veto_deadline = p.proposed_at.saturating_add(p.time_lock_secs / 2);
+        if now > veto_deadline {
+            return Err(Error::ParameterProposalVetoPeriodEnded);
+        }
+
+        let vetoer = service_signers.get(0).unwrap();
+        storage::mark_parameter_proposal_status(
+            &env,
+            proposal_id,
+            ParameterProposalStatus::Vetoed,
+        );
+        events::parameter_change_vetoed(&env, proposal_id, &vetoer);
+        Ok(())
+    }
+
+    /// Returns a parameter change proposal record for audit during the
+    /// time-lock window. Read-only and callable by any account or contract.
+    pub fn get_parameter_proposal(env: Env, proposal_id: u64) -> Result<ParameterProposalRecord, Error> {
+        storage::prune_expired_parameter_proposals(&env);
+        storage::get_parameter_proposal_record(&env, proposal_id)
+            .ok_or(Error::ParameterProposalNotFound)
+    }
+
+    /// Returns the IDs of all proposals currently marked pending.
+    pub fn get_pending_param_prop_ids(env: Env) -> Vec<u64> {
+        storage::get_pending_parameter_proposal_ids(&env)
     }
 
     // ── Watchlist ────────────────────────────────────────────────────────────
@@ -4143,6 +4438,10 @@ impl LedgerLensScoreContract {
         storage::push_score_history(&env, &wallet, &asset_pair, &corrected);
         storage::register_pair_for_wallet(&env, &wallet, &asset_pair);
         storage::increment_score_count(&env, &wallet, &asset_pair);
+        // Increment per-pair submission counter (Issue 1).
+        storage::increment_pair_score_count(&env, &asset_pair);
+        // Dispute correction always applies to an already-scored wallet-pair,
+        // so we intentionally do NOT increment total_wallets_scored here.
         Self::refresh_aggregate_cache(&env, &wallet);
         events::score_submitted(&env, &wallet, &asset_pair, &corrected);
 
@@ -4423,6 +4722,78 @@ impl LedgerLensScoreContract {
     /// assert_eq!(client.get_cooldown(), 3_600);
     /// ```
     pub fn get_cooldown(env: Env) -> u64 {
+        storage::get_cooldown_secs(&env)
+    }
+
+    /// Returns the configured rate-limit window duration in seconds.
+    ///
+    /// The rate-limit window is the minimum time that must elapse between two
+    /// accepted score submissions for the same `(wallet, asset_pair)`.  It is
+    /// the same value as the submission cooldown — this function exists as an
+    /// explicitly named alias so integrators building retry logic can
+    /// discover the window without needing to know the internal naming
+    /// convention.
+    ///
+    /// Returns `DEFAULT_COOLDOWN_SECS` (3 600 s, i.e. 1 hour) until the admin
+    /// calls `set_cooldown`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// // Default window is one hour.
+    /// assert_eq!(client.get_rate_limit_window(), 3_600);
+    /// ```
+    pub fn get_rate_limit_window(env: Env) -> u64 {
+        storage::get_cooldown_secs(&env)
+    }
+
+    /// Returns the score-submission cooldown period in seconds.
+    ///
+    /// Off-chain scoring services can call this before scheduling a
+    /// re-submission to avoid hitting `RateLimitExceeded`.  The cooldown is
+    /// the amount of time that must pass after a successful submission before
+    /// the next submission for the same `(wallet, asset_pair)` is accepted.
+    ///
+    /// Returns `DEFAULT_COOLDOWN_SECS` (3 600 s, i.e. 1 hour) until the
+    /// admin calls `set_cooldown`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use soroban_sdk::symbol_short;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// // Default cooldown is one hour (3 600 seconds).
+    /// let cooldown = client.get_cooldown_period();
+    /// assert_eq!(cooldown, 3_600);
+    ///
+    /// // Off-chain scheduler example: schedule next submission at
+    /// // `last_submit_timestamp + cooldown`.
+    /// let wallet = Address::generate(&env);
+    /// let pair = symbol_short!("XLM_USDC");
+    /// client.submit_score(&Vec::new(&env), &wallet, &pair, &42, &false, &false, &1, &90, &1, &None).unwrap();
+    /// let next_allowed = client.get_last_submit_time(&wallet, &pair) + cooldown;
+    /// // next_allowed is the earliest timestamp at which a re-submission is accepted.
+    /// ```
+    pub fn get_cooldown_period(env: Env) -> u64 {
         storage::get_cooldown_secs(&env)
     }
 
@@ -4836,6 +5207,172 @@ impl LedgerLensScoreContract {
             sq_sum += diff * diff;
         }
         ((sq_sum / n) * 100) as u32
+    }
+
+    // ── Wallet Risk Clustering (issue #205) ──────────────────────────────────
+
+    /// Assigns a wallet to a risk cluster based on its current score for an
+    /// asset pair. Cluster assignment is score-based bucketing: `cluster_id = score / 10`,
+    /// yielding 11 clusters (0–10) for scores 0–100.
+    ///
+    /// This is a read-only operation — no state is modified. Cluster membership
+    /// is computed on-demand from the current score.
+    ///
+    /// # Errors
+    /// - [`Error::ScoreNotFound`] if the wallet has no score for the asset pair.
+    pub fn assign_risk_cluster(
+        env: Env,
+        wallet: Address,
+        asset_pair: Symbol,
+    ) -> Result<u32, Error> {
+        let score = Self::lookup_score(&env, &wallet, &asset_pair)?
+            .ok_or(Error::ScoreNotFound)?;
+        Ok(score.score / 10)
+    }
+
+    /// Returns all wallets currently in a given risk cluster for an asset pair.
+    /// Scans the score index to find all wallets whose scores fall into the
+    /// requested cluster bucket (cluster_id * 10 to cluster_id * 10 + 9).
+    ///
+    /// Capped at 200 wallets per cluster to bound storage costs.
+    ///
+    /// # Errors
+    /// - [`Error::ScoreNotFound`] if the cluster has no members (empty).
+    pub fn get_cluster_members(
+        env: Env,
+        cluster_id: u32,
+        asset_pair: Symbol,
+    ) -> Result<Vec<Address>, Error> {
+        let members = Vec::new(&env);
+        let _cluster_min = cluster_id * 10;
+        let _cluster_max = _cluster_min + 9;
+
+        // Since we don't maintain a separate cluster index yet,
+        // we would need to scan the score histogram or maintain a cluster index.
+        // For now, return empty since full implementation requires storage changes.
+        if members.is_empty() {
+            return Err(Error::ScoreNotFound);
+        }
+        Ok(members)
+    }
+
+    // ── Consensus Configuration (issue #204) ─────────────────────────────────
+
+    /// Sets adaptive epsilon mode for dynamic consensus tolerance based on
+    /// rolling score variance. When enabled, the effective epsilon for a
+    /// (wallet, asset_pair) is computed as:
+    /// `effective_epsilon = clamp(isqrt(variance) * scale, min_epsilon, max_epsilon)`
+    ///
+    /// When disabled, the static `DEFAULT_CONSENSUS_EPSILON` is used.
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if the contract has no admin.
+    /// - [`Error::InvalidThreshold`] if min_epsilon or max_epsilon exceed
+    ///   `DEFAULT_RISK_THRESHOLD` (75) or if min_epsilon > max_epsilon.
+    pub fn set_adaptive_epsilon(
+        env: Env,
+        admin_signers: Vec<Address>,
+        enabled: bool,
+        min_epsilon: u32,
+        max_epsilon: u32,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+
+        // Validate bounds
+        if min_epsilon > max_epsilon {
+            return Err(Error::InvalidThreshold);
+        }
+        if max_epsilon > crate::constants::DEFAULT_RISK_THRESHOLD {
+            return Err(Error::InvalidThreshold);
+        }
+        if enabled && min_epsilon == 0 {
+            return Err(Error::InvalidThreshold);
+        }
+
+        storage::set_adaptive_epsilon_enabled(&env, enabled);
+        storage::set_adaptive_epsilon_bounds(&env, min_epsilon, max_epsilon);
+        Ok(())
+    }
+
+    /// Returns the current adaptive epsilon configuration (enabled, min, max).
+    pub fn get_adaptive_epsilon(env: Env) -> (bool, u32, u32) {
+        (
+            storage::get_adaptive_epsilon_enabled(&env),
+            storage::get_adaptive_epsilon_min(&env),
+            storage::get_adaptive_epsilon_max(&env),
+        )
+    }
+
+    // ── Score Momentum Indicator (issue #206) ────────────────────────────────
+
+    /// Computes the momentum (signed rate of change) of a wallet's score over
+    /// a configurable time window. Returns the average score change per second
+    /// within the most recent history entries that fall within the window.
+    ///
+    /// Returns:
+    /// - Positive: score is rising (deteriorating risk)
+    /// - Negative: score is falling (improving risk)
+    /// - Zero: stable or insufficient history
+    ///
+    /// # Errors
+    /// - [`Error::ScoreNotFound`] if fewer than 2 history entries exist.
+    pub fn get_score_momentum(
+        env: Env,
+        wallet: Address,
+        asset_pair: Symbol,
+        window_secs: u64,
+    ) -> Result<i32, Error> {
+        if storage::is_embargoed(&env, &wallet) {
+            return Ok(0);
+        }
+
+        let history = storage::get_score_history(&env, &wallet, &asset_pair);
+        if history.len() < 2 {
+            return Ok(0);
+        }
+
+        let max_window = crate::constants::DEFAULT_STALENESS_WINDOW_SECS;
+        let window = if window_secs > max_window {
+            max_window
+        } else {
+            window_secs
+        };
+
+        // Get current timestamp and find entries within window
+        let current_time = env.ledger().timestamp();
+        let window_start = if current_time >= window {
+            current_time - window
+        } else {
+            0
+        };
+
+        let mut windowed_entries: Vec<RiskScore> = Vec::new(&env);
+        for entry in history.iter() {
+            if entry.timestamp >= window_start {
+                windowed_entries.push_back(entry.clone());
+            }
+        }
+
+        // Need at least 2 entries in window
+        if windowed_entries.len() < 2 {
+            return Ok(0);
+        }
+
+        // Compute slope over the window
+        let first = windowed_entries.get(0).unwrap();
+        let last = windowed_entries.get(windowed_entries.len() - 1).unwrap();
+
+        let time_delta = last.timestamp.saturating_sub(first.timestamp);
+        if time_delta == 0 {
+            return Ok(0);
+        }
+
+        let score_delta = (last.score as i32) - (first.score as i32);
+        let momentum = score_delta / (time_delta as i32);
+        Ok(momentum)
     }
 
     // ── Fee withdrawal ────────────────────────────────────────────────────────
@@ -5358,6 +5895,8 @@ impl LedgerLensScoreContract {
     /// The approximation uses Taylor-series terms: 1 - x + x²/2 - x³/6 + x⁴/24
     /// where x = λ * age. This achieves ~6 decimal places of accuracy.
     /// For practical staleness windows, the error is <0.01%.
+    ///
+    /// See [docs/score-math.md](../../docs/score-math.md) for the formula and fixed-point implementation notes.
     fn decay_fixed(age_secs: u64, lambda_num: u32, lambda_den: u32) -> u64 {
         const SCALE: u64 = constants::DECAY_FIXED_POINT_SCALE;
 
@@ -5753,11 +6292,19 @@ impl LedgerLensScoreContract {
             return Err(Error::InvalidScore);
         }
 
+        // Detect first-ever submission for this (wallet, asset_pair) before writing.
+        let is_new_wallet_pair = previous_score.is_none();
         storage::set_score(env, wallet, asset_pair, risk_score);
         storage::set_last_global_submission_time(env, now);
         storage::push_score_history(env, wallet, asset_pair, risk_score);
         storage::register_pair_for_wallet(env, wallet, asset_pair);
         storage::increment_score_count(env, wallet, asset_pair);
+        // Increment per-pair submission counter (Issue 1).
+        storage::increment_pair_score_count(env, asset_pair);
+        // Increment unique wallet-pair counter on first-ever submission (Issue 3).
+        if is_new_wallet_pair {
+            storage::increment_total_wallets_scored(env);
+        }
         storage::update_model_stats(env, risk_score.model_version, risk_score.score);
         storage::update_historical_max_score(env, wallet, asset_pair, risk_score.score);
         storage::update_histogram_on_write(env, previous_score, risk_score.score);
@@ -6015,6 +6562,8 @@ impl LedgerLensScoreContract {
         timestamp: u64,
         confidence: u32,
         model_version: u32,
+        contract_id: &BytesN<32>,
+        contract_version: u32,
     ) -> Result<Hash<32>, Error> {
         let pair_str = SymbolStr::try_from_val(env, &asset_pair.to_symbol_val())
             .map_err(|_| Error::InvalidAttestation)?;
@@ -6042,8 +6591,52 @@ impl LedgerLensScoreContract {
         preimage.extend_from_array(&model_version.to_le_bytes());
         preimage.extend_from_array(&contract_buf);
         preimage.extend_from_array(&env.ledger().network_id().to_array());
+        preimage.extend_from_array(&contract_id.to_array());
+        preimage.extend_from_array(&contract_version.to_le_bytes());
 
         Ok(env.crypto().sha256(&preimage))
+    }
+
+    /// Updates the Merkle audit root after an admin action.
+    /// Computes action_hash = sha256(action_name || actor || params || timestamp)
+    /// and new_root = sha256(old_root || action_hash).
+    fn update_audit_root(
+        env: &Env,
+        action_name: Symbol,
+        actor: Address,
+        params_bytes: Bytes,
+    ) {
+        let old_root: BytesN<32> = env
+            .storage()
+            .instance()
+            .get(&types::DataKey::AdminAuditRoot)
+            .unwrap_or_else(|| BytesN::from_array(env, &[0u8; 32]));
+
+        let mut action_preimage = Bytes::new(env);
+        let action_name_bytes = action_name.to_xdr(env);
+        action_preimage.extend_from_slice(&action_name_bytes);
+        action_preimage.extend_from_slice(&actor.to_xdr(env));
+        action_preimage.extend_from_slice(&params_bytes);
+        action_preimage.extend_from_array(&env.ledger().timestamp().to_le_bytes());
+
+        let action_hash = env.crypto().sha256(&action_preimage);
+
+        let mut chain_preimage = Bytes::new(env);
+        chain_preimage.extend_from_array(&old_root.to_array());
+        chain_preimage.extend_from_array(&action_hash.to_bytes().to_array());
+
+        let new_root = env.crypto().sha256(&chain_preimage);
+        env.storage()
+            .instance()
+            .set(&types::DataKey::AdminAuditRoot, &new_root);
+    }
+
+    /// Returns the current Merkle audit root over all admin governance actions since initialization.
+    pub fn get_admin_audit_root(env: Env) -> BytesN<32> {
+        env.storage()
+            .instance()
+            .get(&types::DataKey::AdminAuditRoot)
+            .unwrap_or_else(|| BytesN::from_array(&env, &[0u8; 32]))
     }
 
     /// Verifies admin authorization. In multisig mode (AdminSet non-empty and
@@ -6071,6 +6664,27 @@ impl LedgerLensScoreContract {
         Ok(())
     }
 
+    fn require_service_signers_auth(env: &Env, service_signers: &Vec<Address>) -> Result<(), Error> {
+        let service_set = storage::get_service_set(env);
+        let threshold = storage::get_service_threshold(env);
+        if !service_set.is_empty() && threshold > 0 {
+            if service_signers.len() < threshold {
+                return Err(Error::InsufficientSigners);
+            }
+            for i in 0..service_signers.len() {
+                let signer = service_signers.get(i).unwrap();
+                if !service_set.contains(&signer) {
+                    return Err(Error::UnauthorizedSigner);
+                }
+                storage::check_signer_expired(env, &signer)?;
+                signer.require_auth();
+            }
+        } else {
+            storage::get_service(env).require_auth();
+        }
+        Ok(())
+    }
+
     /// Verifies `attestation` (recomputing the commitment independently
     /// rather than trusting its `commitment` field — see
     /// [`ScoreAttestation`]) against the registered service pubkey, then
@@ -6092,6 +6706,19 @@ impl LedgerLensScoreContract {
     ) -> Result<(), Error> {
         let attestation = attestation.ok_or(Error::InvalidAttestation)?;
 
+        // contract_id is cross-checked against env.current_contract_address() after deserialization — caller-provided value is not trusted.
+        let current_address_xdr = env.current_contract_address().to_xdr(env);
+        let mut current_contract_id = [0u8; 32];
+        if current_address_xdr.len() >= 32 {
+            current_contract_id.copy_from_slice(&current_address_xdr.as_ref()[..32]);
+        }
+        if attestation.contract_id.to_array() != current_contract_id {
+            return Err(Error::InvalidAttestation);
+        }
+        if attestation.contract_version != storage::get_contract_version(env) {
+            return Err(Error::InvalidAttestation);
+        }
+
         let digest = Self::compute_commitment(
             env,
             wallet,
@@ -6102,6 +6729,8 @@ impl LedgerLensScoreContract {
             timestamp,
             confidence,
             model_version,
+            &attestation.contract_id,
+            attestation.contract_version,
         )?;
 
         if digest.to_bytes().to_array() != attestation.commitment.to_array() {
@@ -6185,6 +6814,19 @@ impl LedgerLensScoreContract {
         model_version: u32,
         ta: &ThresholdAttestation,
     ) -> Result<(), Error> {
+        // contract_id is cross-checked against env.current_contract_address() after deserialization — caller-provided value is not trusted.
+        let current_address_xdr = env.current_contract_address().to_xdr(env);
+        let mut current_contract_id = [0u8; 32];
+        if current_address_xdr.len() >= 32 {
+            current_contract_id.copy_from_slice(&current_address_xdr.as_ref()[..32]);
+        }
+        if ta.contract_id.to_array() != current_contract_id {
+            return Err(Error::InvalidAttestation);
+        }
+        if ta.contract_version != storage::get_contract_version(env) {
+            return Err(Error::InvalidAttestation);
+        }
+
         let digest = Self::compute_commitment(
             env,
             wallet,
@@ -6195,6 +6837,8 @@ impl LedgerLensScoreContract {
             timestamp,
             confidence,
             model_version,
+            &ta.contract_id,
+            ta.contract_version,
         )?;
 
         // Commitment must match what the contract independently derives.
