@@ -703,6 +703,18 @@ fn test_risk_threshold_above_100_rejected() {
     assert_eq!(result, Err(Ok(Error::InvalidScore)));
 }
 
+// ── get_score_threshold ───────────────────────────────────────────────────────
+
+#[test]
+fn test_get_score_threshold_matches_admin_set_value() {
+    let (env, client, _admin, _service) = initialized();
+    // Default before any admin update.
+    assert_eq!(client.get_score_threshold(), 75);
+    // After admin sets a new threshold, get_score_threshold reflects it.
+    client.set_risk_threshold(&Vec::new(&env), &60);
+    assert_eq!(client.get_score_threshold(), 60);
+}
+
 // ── Score history ─────────────────────────────────────────────────────────────
 
 #[test]

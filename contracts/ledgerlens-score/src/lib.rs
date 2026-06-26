@@ -3719,6 +3719,40 @@ impl LedgerLensScoreContract {
         storage::get_risk_threshold(&env)
     }
 
+    /// Returns the current global risk threshold used by [`query_risk_gate`].
+    ///
+    /// External contracts can call this to reason about gate behaviour without
+    /// a separate admin call.  The value defaults to `75` until
+    /// [`set_risk_threshold`] is called.
+    ///
+    /// Read-only — callable by any account or contract without authorization.
+    ///
+    /// [`query_risk_gate`]: Self::query_risk_gate
+    /// [`set_risk_threshold`]: Self::set_risk_threshold
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// // Default threshold is 75.
+    /// assert_eq!(client.get_score_threshold(), 75);
+    /// // After admin updates it the new value is reflected immediately.
+    /// client.set_risk_threshold(&Vec::new(&env), &80);
+    /// assert_eq!(client.get_score_threshold(), 80);
+    /// ```
+    pub fn get_score_threshold(env: Env) -> u32 {
+        storage::get_risk_threshold(&env)
+    }
+
     // ── Score jump anomaly detection ──────────────────────────────────────────
 
     /// Set the score jump anomaly detection threshold (1–99). When the
