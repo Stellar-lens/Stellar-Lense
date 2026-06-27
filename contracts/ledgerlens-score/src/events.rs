@@ -567,3 +567,57 @@ pub fn governance_action_appended(env: &Env, new_head: &soroban_sdk::BytesN<32>)
 pub fn gate_enforcement_mode_set(env: &Env, strict: bool) {
     env.events().publish((symbol_short!("gate_enf"),), strict);
 }
+
+// ── Adaptive rate limit / flash protection ────────────────────────────────────
+
+pub fn suspicious_same_ledger_submission(env: &Env, wallet: &Address, pair: &Symbol, gate_seq: u32) {
+    env.events().publish((symbol_short!("flash_sub"), wallet.clone(), pair.clone()), gate_seq);
+}
+
+pub fn flash_protection_mode_updated(env: &Env, mode: u32) {
+    env.events().publish((symbol_short!("flash_mod"),), mode);
+}
+
+pub fn adaptive_rate_limit_updated(env: &Env, enabled: bool, variance_scale: u32) {
+    env.events().publish((symbol_short!("arl_upd"),), (enabled, variance_scale));
+}
+
+// ── Wallet clustering ─────────────────────────────────────────────────────────
+
+pub fn cluster_boundaries_updated(env: &Env) {
+    env.events().publish((symbol_short!("cl_bounds"),), ());
+}
+
+pub fn wallet_cluster_assigned(env: &Env, wallet: &Address, cluster: u32) {
+    env.events().publish((symbol_short!("cl_asgn"), wallet.clone()), cluster);
+}
+
+// ── Epoch lifecycle ───────────────────────────────────────────────────────────
+
+pub fn epoch_opened(env: &Env, epoch_id: u32) {
+    env.events().publish((symbol_short!("epch_opn"),), epoch_id);
+}
+
+pub fn epoch_closed(env: &Env, epoch_id: u32) {
+    env.events().publish((symbol_short!("epch_cls"),), epoch_id);
+}
+
+// ── Signer accuracy tracking ──────────────────────────────────────────────────
+
+pub fn signer_accuracy_updated(env: &Env, signer: &Address, mad_scaled: u64, count: u64) {
+    env.events().publish((symbol_short!("sgn_acc"), signer.clone()), (mad_scaled, count));
+}
+
+pub fn signer_accuracy_reset(env: &Env, signer: &Address) {
+    env.events().publish((symbol_short!("sgn_rst"), signer.clone()), ());
+}
+
+// ── Oracle registry ───────────────────────────────────────────────────────────
+
+pub fn oracle_registered(env: &Env, pair: &Symbol, oracle: &Address) {
+    env.events().publish((symbol_short!("orc_reg"), pair.clone()), oracle.clone());
+}
+
+pub fn oracle_removed(env: &Env, pair: &Symbol) {
+    env.events().publish((symbol_short!("orc_rem"), pair.clone()), ());
+}

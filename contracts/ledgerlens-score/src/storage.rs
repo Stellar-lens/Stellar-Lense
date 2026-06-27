@@ -6,9 +6,11 @@ use crate::constants::{
 };
 use crate::errors::Error;
 use crate::types::{
-    AggregateRiskScore, DataKey, EmbargoExpiry, GateDataKey, JumpStats, ModelVersionStats,
-    ParameterProposalRecord, ParameterProposalStatus, PendingScoreEntry, RiskScore, ScoreDispute,
-    ScoreFloorPolicy, ScoreHistogram, ScoreTrend, ScoreVelocityCap, UpgradeProposal,
+    AdaptiveRateLimit, AggregateRiskScore, DataKey, EmbargoExpiry, FlashProtectionMode, GateDataKey,
+    JumpStats, ModelVersionStats, PairVolatilityState, ParameterProposalRecord,
+    ParameterProposalStatus, PendingScoreEntry, RateLimitOverrideEntry, RiskScore, ScoreDispute,
+    ScoreFloorPolicy, ScoreHistogram, ScoreTrend, ScoreVelocityCap, SignerAccuracyRecord,
+    UpgradeProposal,
 };
 use soroban_sdk::{Address, Bytes, BytesN, Env, Symbol, Vec};
 
@@ -2009,4 +2011,274 @@ pub fn increment_total_wallets_scored(env: &Env) {
 /// protocol-health metric.
 pub fn get_total_wallets_scored(env: &Env) -> u64 {
     env.storage().instance().get(&DataKey::TotalWalletsScored).unwrap_or(0)
+}
+
+// ── Epoch management ──────────────────────────────────────────────────────────
+
+pub fn is_epoch_open(env: &Env) -> bool {
+    env.storage().instance().get(&DataKey::EpochOpen).unwrap_or(true)
+}
+
+pub fn set_epoch_open(env: &Env, open: bool) {
+    env.storage().instance().set(&DataKey::EpochOpen, &open);
+}
+
+pub fn get_current_epoch(env: &Env) -> u32 {
+    env.storage().instance().get(&DataKey::CurrentEpoch).unwrap_or(0)
+}
+
+pub fn set_current_epoch(env: &Env, epoch_id: u32) {
+    env.storage().instance().set(&DataKey::CurrentEpoch, &epoch_id);
+}
+
+// ── Flash-loan protection ─────────────────────────────────────────────────────
+
+pub fn get_flash_protection_mode(env: &Env) -> FlashProtectionMode {
+    env.storage().instance().get(&DataKey::FlashProtectionMode).unwrap_or(FlashProtectionMode::Warn)
+}
+
+pub fn set_flash_protection_mode(env: &Env, mode: &FlashProtectionMode) {
+    env.storage().instance().set(&DataKey::FlashProtectionMode, mode);
+}
+
+// ── Gate read-ledger tracking (flash-loan detection) ─────────────────────────
+
+pub fn get_gate_read_ledger(env: &Env, wallet: &Address, pair: &Symbol) -> Option<u32> {
+    env.storage().temporary().get(&GateDataKey::GateReadLedger(wallet.clone(), pair.clone()))
+}
+
+pub fn set_gate_read_ledger(env: &Env, wallet: &Address, pair: &Symbol) {
+    let seq = env.ledger().sequence();
+    env.storage().temporary().set(&GateDataKey::GateReadLedger(wallet.clone(), pair.clone()), &seq);
+}
+
+// ── Gate enforcement mode ────────────────────────────────────────────────────
+
+pub fn get_gate_enforcement_mode(env: &Env) -> bool {
+    env.storage().instance().get(&GateDataKey::GateEnforcementMode).unwrap_or(false)
+}
+
+pub fn set_gate_enforcement_mode(env: &Env, strict: bool) {
+    env.storage().instance().set(&GateDataKey::GateEnforcementMode, &strict);
+}
+
+// ── Gate query fee and accumulated fees ───────────────────────────────────────
+
+pub fn get_gate_query_fee(env: &Env) -> i128 {
+    env.storage().instance().get(&GateDataKey::GateQueryFee).unwrap_or(0)
+}
+
+pub fn set_gate_query_fee(env: &Env, amount: i128) {
+    env.storage().instance().set(&GateDataKey::GateQueryFee, &amount);
+}
+
+pub fn get_accumulated_fees(env: &Env) -> i128 {
+    env.storage().instance().get(&GateDataKey::AccumulatedFees).unwrap_or(0)
+}
+
+pub fn add_to_accumulated_fees(env: &Env, amount: i128) {
+    let current = get_accumulated_fees(env);
+    env.storage().instance().set(&GateDataKey::AccumulatedFees, &(current + amount));
+}
+
+// ── IQR rejection multiplier ─────────────────────────────────────────────────
+
+pub fn get_iqr_rejection_multiplier(env: &Env) -> u32 {
+    env.storage().instance().get(&DataKey::IqrRejectionMultiplier).unwrap_or(150)
+}
+
+// ── Pair volatility ───────────────────────────────────────────────────────────
+
+pub fn get_pair_volatility_state(env: &Env, pair: &Symbol) -> Option<PairVolatilityState> {
+    env.storage().persistent().get(&DataKey::PairVolatilityState(pair.clone()))
+}
+
+pub fn set_pair_volatility_state(env: &Env, pair: &Symbol, state: &PairVolatilityState) {
+    let key = DataKey::PairVolatilityState(pair.clone());
+    env.storage().persistent().set(&key, state);
+    env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+}
+
+pub fn get_pair_volatility_window(env: &Env) -> u64 {
+    env.storage().instance().get(&DataKey::PairVolatilityWindow(soroban_sdk::Symbol::new(env, ""))).unwrap_or(86_400)
+}
+
+pub fn set_pair_volatility_window(env: &Env, secs: u64) {
+    env.storage().instance().set(&DataKey::PairVolatilityWindow(soroban_sdk::Symbol::new(env, "")), &secs);
+}
+
+// ── Pair correlation ──────────────────────────────────────────────────────────
+
+pub fn get_pair_correlation(env: &Env, pair_a: &Symbol, pair_b: &Symbol) -> i32 {
+    let (a, b) = if pair_a.to_val().get_payload() <= pair_b.to_val().get_payload() {
+        (pair_a.clone(), pair_b.clone())
+    } else {
+        (pair_b.clone(), pair_a.clone())
+    };
+    env.storage().persistent().get(&DataKey::PairCorrelation(a, b)).unwrap_or(0)
+}
+
+pub fn set_pair_correlation(env: &Env, pair_a: &Symbol, pair_b: &Symbol, corr: i32) {
+    let (a, b) = if pair_a.to_val().get_payload() <= pair_b.to_val().get_payload() {
+        (pair_a.clone(), pair_b.clone())
+    } else {
+        (pair_b.clone(), pair_a.clone())
+    };
+    let key = DataKey::PairCorrelation(a, b);
+    env.storage().persistent().set(&key, &corr);
+    env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+}
+
+// ── Wallet cluster assignment ─────────────────────────────────────────────────
+
+pub fn get_cluster_boundaries(env: &Env) -> soroban_sdk::Vec<u32> {
+    env.storage().instance().get(&DataKey::ClusterBoundaries)
+        .unwrap_or_else(|| soroban_sdk::Vec::new(env))
+}
+
+pub fn set_cluster_boundaries(env: &Env, boundaries: &soroban_sdk::Vec<u32>) {
+    env.storage().instance().set(&DataKey::ClusterBoundaries, boundaries);
+}
+
+pub fn get_wallet_cluster(env: &Env, wallet: &Address) -> Option<u32> {
+    env.storage().persistent().get(&DataKey::WalletCluster(wallet.clone()))
+}
+
+pub fn set_wallet_cluster(env: &Env, wallet: &Address, cluster: u32) {
+    let key = DataKey::WalletCluster(wallet.clone());
+    env.storage().persistent().set(&key, &cluster);
+    env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+}
+
+// ── Pending service pubkey (rotation overlap) ─────────────────────────────────
+
+pub fn get_pending_service_pubkey(env: &Env) -> Option<(soroban_sdk::Bytes, u64)> {
+    env.storage().instance().get(&DataKey::PendingServicePubKey)
+}
+
+pub fn set_pending_service_pubkey(env: &Env, key: &soroban_sdk::Bytes, expiry: u64) {
+    env.storage().instance().set(&DataKey::PendingServicePubKey, &(key.clone(), expiry));
+}
+
+pub fn clear_pending_service_pubkey(env: &Env) {
+    env.storage().instance().remove(&DataKey::PendingServicePubKey);
+}
+
+/// Compare a recovered 65-byte uncompressed pubkey against a stored Bytes key
+/// which may be 33 (compressed) or 65 (uncompressed) bytes.
+pub fn pubkeys_match(recovered: &soroban_sdk::BytesN<65>, stored: &soroban_sdk::Bytes) -> bool {
+    let arr = recovered.to_array();
+    match stored.len() {
+        65 => {
+            let mut s = [0u8; 65];
+            stored.copy_into_slice(&mut s);
+            arr == s
+        }
+        33 => {
+            let mut s = [0u8; 33];
+            stored.copy_into_slice(&mut s);
+            let mut c = [0u8; 33];
+            c[0] = if arr[64].is_multiple_of(2) { 0x02 } else { 0x03 };
+            c[1..33].copy_from_slice(&arr[1..33]);
+            c == s
+        }
+        _ => false,
+    }
+}
+
+// ── Upgrade approvals (multi-sig gate) ───────────────────────────────────────
+
+pub fn get_upgrade_approvals(env: &Env) -> soroban_sdk::Vec<Address> {
+    env.storage().instance().get(&DataKey::UpgradeApprovals)
+        .unwrap_or_else(|| soroban_sdk::Vec::new(env))
+}
+
+pub fn set_upgrade_approvals(env: &Env, approvals: &soroban_sdk::Vec<Address>) {
+    env.storage().instance().set(&DataKey::UpgradeApprovals, approvals);
+}
+
+pub fn clear_upgrade_approvals(env: &Env) {
+    env.storage().instance().remove(&DataKey::UpgradeApprovals);
+}
+
+// ── Signer accuracy tracking ─────────────────────────────────────────────────
+
+pub fn get_signer_accuracy(env: &Env, signer: &Address) -> Option<SignerAccuracyRecord> {
+    env.storage().persistent().get(&DataKey::SignerAccuracy(signer.clone()))
+}
+
+pub fn set_signer_accuracy(env: &Env, signer: &Address, record: &SignerAccuracyRecord) {
+    let key = DataKey::SignerAccuracy(signer.clone());
+    env.storage().persistent().set(&key, record);
+    env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+}
+
+pub fn remove_signer_accuracy(env: &Env, signer: &Address) {
+    env.storage().persistent().remove(&DataKey::SignerAccuracy(signer.clone()));
+}
+
+pub fn increment_signer_rejection_count(env: &Env, signer: &Address) {
+    let record = get_signer_accuracy(env, signer)
+        .unwrap_or(SignerAccuracyRecord { count: 0, mad_scaled: 0 });
+    let updated = SignerAccuracyRecord {
+        count: record.count.saturating_add(1),
+        mad_scaled: record.mad_scaled,
+    };
+    set_signer_accuracy(env, signer, &updated);
+}
+
+// ── Oracle registry ───────────────────────────────────────────────────────────
+
+pub fn get_registered_oracle(env: &Env, pair: &Symbol) -> Option<Address> {
+    env.storage().persistent().get(&DataKey::OracleContract(pair.clone()))
+}
+
+pub fn set_registered_oracle(env: &Env, pair: &Symbol, oracle: &Address) {
+    let key = DataKey::OracleContract(pair.clone());
+    env.storage().persistent().set(&key, oracle);
+    env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+}
+
+pub fn remove_registered_oracle(env: &Env, pair: &Symbol) {
+    env.storage().persistent().remove(&DataKey::OracleContract(pair.clone()));
+}
+
+// ── Rate-limit override audit log ────────────────────────────────────────────
+
+const MAX_RATE_LIMIT_OVERRIDE_LOG: u32 = 200;
+
+pub fn append_rate_limit_override_log(env: &Env, entry: &RateLimitOverrideEntry) {
+    let mut log: soroban_sdk::Vec<RateLimitOverrideEntry> =
+        env.storage().instance().get(&DataKey::RateLimitOverrideLog)
+            .unwrap_or_else(|| soroban_sdk::Vec::new(env));
+    if log.len() >= MAX_RATE_LIMIT_OVERRIDE_LOG {
+        log.remove(0);
+    }
+    log.push_back(entry.clone());
+    env.storage().instance().set(&DataKey::RateLimitOverrideLog, &log);
+}
+
+pub fn get_rate_limit_override_log(env: &Env) -> soroban_sdk::Vec<RateLimitOverrideEntry> {
+    env.storage().instance().get(&DataKey::RateLimitOverrideLog)
+        .unwrap_or_else(|| soroban_sdk::Vec::new(env))
+}
+
+// ── Adaptive epsilon scale factor ─────────────────────────────────────────────
+
+pub fn get_adaptive_epsilon_scale_factor(env: &Env) -> u32 {
+    env.storage().instance().get(&DataKey::AdaptiveEpsilonScaleFactor).unwrap_or(0)
+}
+
+pub fn set_adaptive_epsilon_scale_factor(env: &Env, scale_factor: u32) {
+    env.storage().instance().set(&DataKey::AdaptiveEpsilonScaleFactor, &scale_factor);
+}
+
+// ── Admin audit root ──────────────────────────────────────────────────────────
+
+pub fn get_admin_audit_root(env: &Env) -> Option<soroban_sdk::BytesN<32>> {
+    env.storage().instance().get(&DataKey::AdminAuditRoot)
+}
+
+pub fn set_admin_audit_root(env: &Env, root: &soroban_sdk::BytesN<32>) {
+    env.storage().instance().set(&DataKey::AdminAuditRoot, root);
 }

@@ -167,6 +167,17 @@ pub struct ModelVersionStats {
 /// `FinalityBufferSecs > 0`. The score is held in this pending state
 /// (invisible to `get_score` / `query_risk_gate`) until
 /// `commit_pending_score` observes that `env.ledger().timestamp() >=
+/// Audit entry for an admin rate-limit override action.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RateLimitOverrideEntry {
+    pub admin: Address,
+    pub wallet: Address,
+    pub asset_pair: Symbol,
+    pub timestamp: u64,
+    pub justification_hash: BytesN<32>,
+}
+
 /// commit_after`.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -316,6 +327,10 @@ pub struct ScoreVelocityCap {
 pub enum GateDataKey {
     GateCallers,
     GateOpen,
+    GateEnforcementMode,
+    GateQueryFee,
+    AccumulatedFees,
+    GateReadLedger(Address, Symbol),
 }
 
 #[derive(Clone)]
@@ -500,6 +515,50 @@ pub enum DataKey {
     /// Running total of unique (wallet, asset_pair) combinations ever scored.
     /// Incremented on the *first* successful submission for each new combination.
     TotalWalletsScored,
+    /// Parameter governance proposal ID counter.
+    ParameterProposalNextId,
+    /// Single parameter governance proposal record.
+    ParameterProposal(u64),
+    /// Ordered set of pending parameter proposal IDs.
+    PendingParameterProposalIds,
+    /// Adaptive rate-limit configuration (enabled flag + variance scale).
+    AdaptiveRateLimit,
+    /// Flash-loan protection mode (0=Warn, 1=Reject).
+    FlashProtectionMode,
+    /// Current oracle epoch number.
+    CurrentEpoch,
+    /// Whether the current scoring epoch is open.
+    EpochOpen,
+    /// Wallet risk-cluster assignment. Maps a wallet to its cluster id.
+    WalletCluster(Address),
+    /// Cluster boundary thresholds vector: `Vec<(u32, u32)>` (lower, upper).
+    ClusterBoundaries,
+    /// Per-asset-pair rolling volatility state.
+    PairVolatilityState(Symbol),
+    /// Per-asset-pair volatility rolling window (number of samples).
+    PairVolatilityWindow(Symbol),
+    /// Pairwise cross-asset correlation coefficient.
+    PairCorrelation(Symbol, Symbol),
+    /// IQR outlier rejection multiplier (scaled by 100, e.g. 150 = 1.5×).
+    IqrRejectionMultiplier,
+    /// Signer accuracy record (mean absolute deviation + submission count).
+    SignerAccuracy(Address),
+    /// Registered oracle contract for a given asset pair.
+    OracleContract(Symbol),
+    /// Multisig upgrade approval set (Vec<Address>).
+    UpgradeApprovals,
+    /// Pending service pubkey during a rotation overlap window.
+    PendingServicePubKey,
+    /// Expiry timestamp for the pending service pubkey overlap window.
+    PendingServicePubKeyExpiry,
+    /// Rate-limit override audit log entry.
+    RateLimitOverrideLog,
+    /// Adaptive epsilon scale factor.
+    AdaptiveEpsilonScaleFactor,
+    /// Counter for proactive TTL extend calls (used in ttl tests).
+    TestExtendCount,
+    /// Root hash for the admin audit log.
+    AdminAuditRoot,
 }
 
 impl DataKey {
@@ -619,6 +678,29 @@ impl DataKey {
             DataKey::EmbargoedWalletIndex => k0!("EmbargoedWIndex"),
             DataKey::PairScoreCount(s) => k1!("PairScoreCnt", s),
             DataKey::TotalWalletsScored => k0!("TotalWalletsScored"),
+            DataKey::ActiveEmbargoCount => k0!("ActiveEmbargoCount"),
+            DataKey::ParameterProposalNextId => k0!("PrmPropNextId"),
+            DataKey::ParameterProposal(id) => k1!("PrmProp", id),
+            DataKey::PendingParameterProposalIds => k0!("PrmPropPending"),
+            DataKey::AdaptiveRateLimit => k0!("AdaptRateLimit"),
+            DataKey::FlashProtectionMode => k0!("FlashProtMode"),
+            DataKey::CurrentEpoch => k0!("CurrentEpoch"),
+            DataKey::EpochOpen => k0!("EpochOpen"),
+            DataKey::WalletCluster(a) => k1!("WalletCluster", a),
+            DataKey::ClusterBoundaries => k0!("ClusterBounds"),
+            DataKey::PairVolatilityState(s) => k1!("PairVolState", s),
+            DataKey::PairVolatilityWindow(s) => k1!("PairVolWin", s),
+            DataKey::PairCorrelation(s1, s2) => k2!("PairCorr", s1, s2),
+            DataKey::IqrRejectionMultiplier => k0!("IqrRejMult"),
+            DataKey::SignerAccuracy(a) => k1!("SignerAccuracy", a),
+            DataKey::OracleContract(s) => k1!("OracleContract", s),
+            DataKey::UpgradeApprovals => k0!("UpgradeApprovals"),
+            DataKey::PendingServicePubKey => k0!("PendSvcPubKey"),
+            DataKey::PendingServicePubKeyExpiry => k0!("PendSvcPubExp"),
+            DataKey::RateLimitOverrideLog => k0!("RLOvrLog"),
+            DataKey::AdaptiveEpsilonScaleFactor => k0!("AdaptEpsSF"),
+            DataKey::TestExtendCount => k0!("TestExtendCount"),
+            DataKey::AdminAuditRoot => k0!("AdminAuditRoot"),
         }
     }
 }
@@ -668,11 +750,45 @@ pub struct VerkleLeaf {
     pub model_version: u32,
 }
 
-/// Configurable score decay profile.
+/// Adaptive rate-limit configuration.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AdaptiveRateLimit {
+    pub enabled: bool,
+    pub variance_scale: u32,
+}
+
+/// Flash-loan protection mode.
+#[contracttype]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum FlashProtectionMode {
+    Warn,
+    Reject,
+}
+
+/// Signer accuracy record: tracks MAD (mean absolute deviation) scaled by 1000
+/// and the total number of consensus submissions by this signer.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SignerAccuracyRecord {
+    pub mad_scaled: u32,
+    pub count: u32,
+}
+
+/// Running state for Welford online variance on per-pair scores.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PairVolatilityState {
+    pub count: i64,
+    pub mean_scaled: i64,
+    pub m2_scaled: i64,
+    pub last_updated: u64,
+}
+
+/// Configurable score decay profile.
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DecayProfile {
-    Linear { lambda_num: u32, lambda_den: u32 },
-    Exponential { half_life_secs: u64 },
-    Step { steps: Vec<(u64, u32)> },
+    Linear(u32, u32),
+    Exponential(u64),
+    Step(Vec<(u64, u32)>),
 }
