@@ -25,8 +25,10 @@ def _configure() -> None:
     root_logger = logging.getLogger()
     root_logger.setLevel(level)
 
-    handler = logging.StreamHandler(sys.stdout)
-    
+    # Logs must stay off stdout so callers can pipe a script's stdout
+    # (e.g. JSON results) without status/info noise mixed in.
+    handler = logging.StreamHandler(sys.stderr)
+
     if config.LOG_FORMAT == "json":
         try:
             from pythonjsonlogger import jsonlogger
@@ -50,3 +52,9 @@ def get_logger(name: str) -> logging.Logger:
     """Return a configured logger for `name` (typically `__name__`)."""
     _configure()
     return logging.getLogger(name)
+
+
+def set_level(level: str) -> None:
+    """Override the root logger's verbosity, e.g. from a CLI --log-level flag."""
+    _configure()
+    logging.getLogger().setLevel(level.upper())

@@ -23,7 +23,7 @@ import pandas as pd
 from stellar_sdk import Asset as SdkAsset
 
 from config import config
-from utils.logging import get_logger
+from utils.logging import get_logger, set_level
 from detection.causal_attribution import CounterfactualAttributor
 from detection.feature_engineering import build_feature_vector
 from detection.forensic_report import ForensicReportGenerator, write_report_secure
@@ -39,15 +39,12 @@ from ingestion.orderbook_loader import (
 logger = get_logger(__name__)
 
 
-def validate_wallet_id(wallet_id: str) -> None:
+def validate_wallet_address(wallet_id: str) -> None:
     """Validate that wallet_id looks like a Stellar public key (56 chars, starts with G)."""
     if len(wallet_id) != 56 or not wallet_id.startswith("G"):
-        logger.error("Invalid wallet ID format", extra={
-            "wallet": wallet_id,
-            "error_type": "ValueError",
-            "error_message": f"Invalid wallet ID format '{wallet_id}'. Must be a 56-character Stellar public key starting with 'G'."
-        })
-        sys.exit(1)
+        raise ValueError(
+            f"Invalid Stellar address '{wallet_id}'. Must be a 56-character public key starting with 'G'."
+        )
 
 
 def parse_asset_pair(pair_str: str) -> tuple[SdkAsset, SdkAsset]:
@@ -118,6 +115,12 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Comma-separated trade IDs to remove for a counterfactual score",
     )
+    parser.add_argument(
+        "--log-level",
+        default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+        help="Verbosity for status/progress messages, written to stderr (default: INFO)",
+    )
     return parser.parse_args()
 
 
@@ -144,6 +147,7 @@ def _parse_remove_trade_ids(
 
 def main() -> None:
     args = parse_args()
+    set_level(args.log_level)
 
     if args.quiet:
         logging.disable(logging.CRITICAL)
@@ -207,6 +211,7 @@ def main() -> None:
             args.wallet, trades_df, orderbook_events=orderbook_events_df
         )
         feature_row = pd.Series(feature_vector)
+        logger.debug("Feature vector for %s: %s", args.wallet, feature_vector)
 
         # 4. Score
         try:

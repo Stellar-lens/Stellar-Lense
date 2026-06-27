@@ -1,4 +1,5 @@
 import json
+import logging
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -99,17 +100,17 @@ def test_score_wallet_invalid_wallet_address_raises_value_error(capsys):
             main()
 
 
-def test_score_wallet_missing_models_exits_1(capsys, mock_ingestion):
+def test_score_wallet_missing_models_exits_1(caplog, mock_ingestion):
     with patch(
         "scripts.score_wallet.RiskScorer", side_effect=RuntimeError("No trained models found")
     ):
         test_wallet = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
         with patch("sys.argv", ["score_wallet.py", "--wallet", test_wallet, "--pair", "USDC:G..."]):
-            with pytest.raises(SystemExit) as excinfo:
-                main()
+            with caplog.at_level(logging.INFO):
+                with pytest.raises(SystemExit) as excinfo:
+                    main()
         assert excinfo.value.code == 1
-        _, err = capsys.readouterr()
-        assert "model_training.py" in err
+        assert any("model_training.py" in r.message for r in caplog.records)
 
 
 def test_score_wallet_quiet_outputs_single_json_line_and_no_stderr(
@@ -183,6 +184,49 @@ def test_score_wallet_what_if_remove_invalid_trade_raises_value_error(
     ):
         with pytest.raises(ValueError):
             main()
+
+
+def test_score_wallet_json_stdout_has_no_log_noise(
+    capsys, caplog, mock_scorer, mock_ingestion, mock_explainer
+):
+    test_wallet = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    with caplog.at_level(logging.INFO):
+        with patch(
+            "sys.argv",
+            ["score_wallet.py", "--wallet", test_wallet, "--pair", "USDC:G...", "--json"],
+        ):
+            main()
+
+    out, _ = capsys.readouterr()
+
+    # stdout must be nothing but the JSON payload — no status messages mixed in.
+    data = json.loads(out)
+    assert data["score"] == 83
+    assert "Wallet scored" not in out
+
+    # the status message was emitted through logging (routed to stderr), not print().
+    assert any("Wallet scored" in r.message for r in caplog.records)
+
+
+def test_score_wallet_log_level_flag_sets_root_logger_level(
+    capsys, mock_scorer, mock_ingestion, mock_explainer
+):
+    test_wallet = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    with patch(
+        "sys.argv",
+        [
+            "score_wallet.py",
+            "--wallet",
+            test_wallet,
+            "--pair",
+            "USDC:G...",
+            "--log-level",
+            "DEBUG",
+        ],
+    ):
+        main()
+
+    assert logging.getLogger().level == logging.DEBUG
 
 
 def test_validate_wallet_address():
