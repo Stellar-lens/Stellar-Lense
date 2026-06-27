@@ -5037,6 +5037,18 @@ impl LedgerLensScoreContract {
         storage::is_embargoed(&env, &wallet)
     }
 
+    /// Returns `true` if `wallet` is currently under an active embargo,
+    /// without extending the embargo TTL.
+    ///
+    /// Unlike [`is_embargoed`](Self::is_embargoed), this function is
+    /// side-effect-free: it reads the embargo state but does **not** call
+    /// `extend_ttl` on the underlying storage entry. This makes it safe for
+    /// high-frequency read-only callers such as AMM guards that must not
+    /// inadvertently prolong an embargo by querying it.
+    pub fn peek_is_embargoed(env: Env, wallet: Address) -> bool {
+        storage::peek_is_embargoed(&env, &wallet)
+    }
+
     /// Returns when `wallet`'s active embargo expires, if applicable.
     ///
     /// - `None` — no embargo is active, including when a timed embargo has
