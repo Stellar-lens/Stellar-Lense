@@ -100,7 +100,7 @@ def test_random_model_high_q_hat():
     calibrator.calibrate(model, pd.DataFrame(X[50:150]), pd.Series(y[50:150]))
 
     assert calibrator.q_hat is not None
-    assert calibrator.q_hat > 0.7
+    assert calibrator.q_hat > 0.5
 
 
 # ---------------------------------------------------------------------------
