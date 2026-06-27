@@ -6656,8 +6656,44 @@ impl LedgerLensScoreContract {
         storage::get_admin_set(&env).len()
     }
 
-    /// Returns the current admin signing threshold. Zero until
-    /// `set_admin_threshold` is called (legacy mode).
+    /// Returns the minimum number of admin co-signatures required for
+    /// privileged operations.
+    ///
+    /// Returns `0` when the admin M-of-N set has not been configured yet
+    /// (legacy single-admin mode).  Once [`set_admin_threshold`] has been
+    /// called the value reflects the live configured quorum.
+    ///
+    /// This is a read-only, unauthenticated view function — any caller
+    /// (governance tooling, dashboards, co-signer UIs) can query it to know
+    /// how many admin signatures are needed before submitting a privileged
+    /// operation.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+    /// # use soroban_sdk::{testutils::Address as _, Address, Env, Vec};
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    ///
+    /// // Before any admin signers are added the threshold is 0 (legacy mode).
+    /// assert_eq!(client.get_admin_threshold(), 0);
+    ///
+    /// // Add two signers and configure a 2-of-2 quorum.
+    /// let s1 = Address::generate(&env);
+    /// let s2 = Address::generate(&env);
+    /// client.add_admin_signer(&Vec::new(&env), &s1);
+    /// client.add_admin_signer(&Vec::new(&env), &s2);
+    /// client.set_admin_threshold(&Vec::new(&env), &2);
+    ///
+    /// // Governance tooling now knows it must collect exactly 2 co-signatures.
+    /// assert_eq!(client.get_admin_threshold(), 2);
+    /// ```
     pub fn get_admin_threshold(env: Env) -> u32 {
         storage::get_admin_threshold(&env)
     }
