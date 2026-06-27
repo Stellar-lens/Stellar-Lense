@@ -349,6 +349,7 @@ pub enum ExtDataKey {
     LastGlobalSubmissionTime,
     QuorumFailureWindow,
     ConsensusCommitment(Address, Address, Symbol),
+    PrivacyEpsilon,
 }
 
 #[contracttype]

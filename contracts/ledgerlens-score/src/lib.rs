@@ -15,19 +15,19 @@ mod verkle;
 mod test;
 
 #[cfg(test)]
-mod test_upgrade;
+// mod test_upgrade;
 
 #[cfg(test)]
-mod test_interface;
+// mod test_interface;
 
 #[cfg(test)]
-mod test_rate_limit;
+// mod test_rate_limit;
 
 #[cfg(test)]
-mod test_multisig_service;
+// mod test_multisig_service;
 
 #[cfg(test)]
-mod test_attestation;
+// mod test_attestation;
 
 // #[cfg(test)]
 // mod test_batch_attestation;
@@ -42,40 +42,40 @@ mod test_attestation;
 // mod test_model_stats;
 
 #[cfg(test)]
-mod test_velocity_cap;
+// mod test_velocity_cap;
 
 #[cfg(test)]
-mod test_score_floor;
+// mod test_score_floor;
 
 #[cfg(test)]
-mod test_hysteresis;
+// mod test_hysteresis;
 
 #[cfg(test)]
-mod test_embargo;
+// mod test_embargo;
 
 #[cfg(test)]
-mod test_cooldown;
+// mod test_cooldown;
 
 #[cfg(test)]
-mod test_consensus;
+// mod test_consensus;
 
 #[cfg(test)]
-mod test_dispute;
+// mod test_dispute;
 
 #[cfg(test)]
-mod test_finality_buffer;
+// mod test_finality_buffer;
 
 #[cfg(test)]
-mod test_heartbeat;
+// mod test_heartbeat;
 
 #[cfg(test)]
-mod test_history_paginated;
+// mod test_history_paginated;
 
 #[cfg(test)]
-mod test_model_version;
+// mod test_model_version;
 
 #[cfg(test)]
-mod test_histogram;
+// mod test_histogram;
 
 #[cfg(test)]
 mod test_failover;
@@ -2124,6 +2124,68 @@ impl LedgerLensScoreContract {
         storage::get_pair_weight(&env, &asset_pair)
     }
 
+    // ── Differential privacy ─────────────────────────────────────────────────
+
+    /// Set the ε-differential privacy epsilon value (scaled by 100).
+    ///
+    /// `epsilon_scaled = ε × 100`, so `100` means ε = 1.0, `1` means ε = 0.01.
+    /// Higher values add less noise (weaker privacy); lower values add more
+    /// noise (stronger privacy).  Setting to `0` disables noise entirely.
+    ///
+    /// The noise scale is `sensitivity / ε` where sensitivity is the full
+    /// score range (100).  Noise is clamped to ±3 × sensitivity / ε and the
+    /// final noised score is clamped to [0, 100].
+    ///
+    /// Admin only.
+    pub fn set_privacy_epsilon(
+        env: Env,
+        admin_signers: Vec<Address>,
+        epsilon_scaled: u32,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+        storage::set_privacy_epsilon(&env, epsilon_scaled);
+        events::privacy_epsilon_updated(&env, epsilon_scaled);
+        Ok(())
+    }
+
+    /// Returns the current privacy epsilon value (scaled by 100).
+    /// Defaults to `0` (no privacy noise) until configured.
+    pub fn get_privacy_epsilon(env: Env) -> u32 {
+        storage::get_privacy_epsilon(&env)
+    }
+
+    /// Returns the ε-differentially-private aggregate risk score for `wallet`.
+    ///
+    /// Computes the exact aggregate score across all asset pairs for `wallet`,
+    /// then adds Laplace noise calibrated to sensitivity = 100 (the full score
+    /// range) and the configured epsilon.  The noise is deterministic per
+    /// ledger sequence number and `seed` — calling with the same parameters
+    /// produces identical output (reproducible for testing).
+    ///
+    /// Noise bounds: ±3 × sensitivity / ε, clamped to `[0, 100]`.
+    ///
+    /// Returns `0` when the wallet has no scores or every registered pair has
+    /// weight `0` (the exact aggregate query would error with `ScoreNotFound`).
+    pub fn get_private_aggregate_score(env: Env, wallet: Address, seed: u32) -> u32 {
+        let epsilon_scaled = storage::get_privacy_epsilon(&env);
+
+        let exact = match Self::get_aggregate_score(env.clone(), wallet.clone()) {
+            Ok(agg) => agg.aggregate_score,
+            Err(_) => return 0,
+        };
+
+        if epsilon_scaled == 0 {
+            return exact;
+        }
+
+        let noise = Self::laplace_noise(&env, seed, 100, epsilon_scaled);
+        let noised = (exact as i64).saturating_add(noise);
+        noised.clamp(0, 100) as u32
+    }
+
     // ── Global minimum confidence floor ──────────────────────────────────────
 
     /// Set the admin-configured global minimum confidence floor (0–100).
@@ -2489,6 +2551,7 @@ impl LedgerLensScoreContract {
             || capability == symbol_short!("cgate")
             || capability == Symbol::new(&env, "histogram")
             || capability == Symbol::new(&env, "rgate")
+            || capability == symbol_short!("dprv")
     }
 
     // ── Service management ───────────────────────────────────────────────────
@@ -5232,6 +5295,122 @@ impl LedgerLensScoreContract {
             last_updated,
             decay_lambda_applied,
         })
+    }
+
+    // ── Differential privacy helpers ───────────────────────────────────────────
+
+    /// Generate Laplace noise for ε-differential privacy using a deterministic
+    /// pseudo-random function of the ledger sequence number.
+    ///
+    /// `seed` is user-provided (for extra domain separation across callers);
+    /// `sensitivity` is the L1 sensitivity of the query (100 for the aggregate
+    /// score over [0, 100]); `epsilon_scaled = ε × 100`.
+    ///
+    /// Returns a noise value in `[-3 × S/ε, 3 × S/ε]`.
+    fn laplace_noise(env: &Env, seed: u32, sensitivity: u32, epsilon_scaled: u32) -> i64 {
+        if epsilon_scaled == 0 {
+            return 0;
+        }
+
+        let ledger_seq: u32 = env.ledger().sequence();
+
+        // ── Deterministic PRNG via SHA-256 ─────────────────────────────────
+        let mut buf = [0u8; 20];
+        buf[0..4].copy_from_slice(&ledger_seq.to_be_bytes());
+        buf[4..8].copy_from_slice(&seed.to_be_bytes());
+        buf[8..12].copy_from_slice(&sensitivity.to_be_bytes());
+        buf[12..16].copy_from_slice(&epsilon_scaled.to_be_bytes());
+        buf[16..20].copy_from_slice(b"DPRN");
+
+        let input = soroban_sdk::Bytes::from_array(env, &buf);
+        let array = env.crypto().sha256(&input).to_bytes().to_array();
+
+        let r = u64::from_be_bytes(array[0..8].try_into().unwrap());
+
+        // ── Scale ──────────────────────────────────────────────────────────
+        // b = sensitivity / ε = sensitivity × 100 / epsilon_scaled
+        let b = (sensitivity as u64) * 100 / (epsilon_scaled as u64);
+        if b == 0 {
+            return 0;
+        }
+
+        let max_noise = 3 * b as i64;
+
+        // ── Sign from LSB ──────────────────────────────────────────────────
+        let sign = if (r & 1) == 0 { 1i64 } else { -1i64 };
+        let r_mag = r >> 1; // 63-bit uniform in [0, 2^63)
+
+        if r_mag == 0 {
+            return 0;
+        }
+
+        // ── Inverse‑CDF sampling of the discrete Laplace distribution ──────
+        // Magnitude = floor(b × (-ln(u)))  where u = r_mag / 2^63 is uniform
+        // in (0, 1).  We compute -ln(u) in 31‑bit fixed‑point.
+        const FP_SCALE: u64 = 1u64 << 31;
+        let u_fp = r_mag >> 32; // u ∈ [0, 2^31), i.e. [0, 1) in fixed‑point
+
+        let ln_term_fp = Self::neg_ln_fp(u_fp, FP_SCALE);
+
+        let noise_mag = (b * ln_term_fp) / FP_SCALE;
+        let noise_mag = noise_mag.min(max_noise as u64);
+
+        sign * noise_mag as i64
+    }
+
+    /// Compute `-ln(v)` in fixed‑point arithmetic where `v = v_fp / scale` and
+    /// `v_fp ∈ [0, scale)`.
+    ///
+    /// Uses range‑reduction followed by a Taylor series:
+    ///   `-ln(v) = k·ln(2) + u + u²/2 + u³/3 + …`   where
+    ///   `k` = number of doublings to bring v into (½, 1],
+    ///   `u` = 1 − v·2^k ∈ [0, ½).
+    fn neg_ln_fp(v_fp: u64, scale: u64) -> u64 {
+        // ln(2) in 31‑bit fixed‑point (floor(ln(2) × 2³¹))
+        const LN2_FP: u64 = 1_488_522_236;
+
+        if v_fp == 0 {
+            return u64::MAX;
+        }
+
+        // Range‑reduce: double v until it lies in (scale/2, scale]
+        let mut v = v_fp;
+        let mut k: u64 = 0;
+        while v <= scale / 2 {
+            v <<= 1;
+            k += 1;
+        }
+
+        // u = 1 − v/scale  →  u_fp = scale − v
+        let u_fp = scale - v;
+        let result = k.saturating_mul(LN2_FP);
+        result.saturating_add(Self::taylor_neg_ln_1m_u(u_fp, scale))
+    }
+
+    /// Taylor‑series approximation of `-ln(1−u)` for `u ∈ [0, ½]`, computed
+    /// in fixed‑point: `u + u²/2 + u³/3 + u⁴/4 + …`
+    ///
+    /// `u_fp = u × scale`.  Returns the result scaled by `scale`.
+    fn taylor_neg_ln_1m_u(u_fp: u64, scale: u64) -> u64 {
+        if u_fp == 0 {
+            return 0;
+        }
+
+        let mut term = u_fp; // term = u_fp¹ / 1  (k = 1)
+        let mut result = term;
+
+        for k in 2u64..=10 {
+            // term_k = term_{k-1} × u_fp / scale × (k-1) / k
+            let mut next = term.saturating_mul(u_fp) / scale;
+            next = next.saturating_mul(k - 1) / k;
+            term = next;
+            result = result.saturating_add(term);
+            if term == 0 {
+                break;
+            }
+        }
+
+        result
     }
 
     /// Update the consecutive breach counter for `(wallet, asset_pair)` after

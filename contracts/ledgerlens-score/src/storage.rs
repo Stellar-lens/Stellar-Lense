@@ -33,6 +33,16 @@ pub fn get_service(env: &Env) -> Address {
     env.storage().instance().get(&DataKey::Service).unwrap()
 }
 
+// ── Differential privacy ─────────────────────────────────────────────────────
+
+pub fn set_privacy_epsilon(env: &Env, epsilon_scaled: u32) {
+    env.storage().instance().set(&ExtDataKey::PrivacyEpsilon, &epsilon_scaled);
+}
+
+pub fn get_privacy_epsilon(env: &Env) -> u32 {
+    env.storage().instance().get(&ExtDataKey::PrivacyEpsilon).unwrap_or(0)
+}
+
 // ── Latest score ─────────────────────────────────────────────────────────────
 
 pub fn set_score(env: &Env, wallet: &Address, asset_pair: &Symbol, score: &RiskScore) {

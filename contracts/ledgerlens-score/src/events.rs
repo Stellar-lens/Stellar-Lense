@@ -460,3 +460,9 @@ pub fn failover_triggered(env: &Env, wallet: &Address, asset_pair: &Symbol) {
     env.events()
         .publish((symbol_short!("failover"), wallet.clone()), asset_pair.clone());
 }
+
+// ── Differential privacy ──────────────────────────────────────────────────
+
+pub fn privacy_epsilon_updated(env: &Env, epsilon_scaled: u32) {
+    env.events().publish((symbol_short!("dp_eps"),), epsilon_scaled);
+}
