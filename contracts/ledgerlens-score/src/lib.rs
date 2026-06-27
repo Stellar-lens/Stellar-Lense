@@ -67,6 +67,9 @@ mod test_cooldown;
 mod test_consensus;
 
 #[cfg(test)]
+mod test_consensus_config;
+
+#[cfg(test)]
 mod test_dispute;
 
 #[cfg(test)]
@@ -82,10 +85,19 @@ mod test_history_paginated;
 mod test_model_version;
 
 #[cfg(test)]
+mod test_bulk_deregister;
+
+#[cfg(test)]
 mod test_histogram;
 
 #[cfg(test)]
 mod test_breach_counter_reset;
+
+#[cfg(test)]
+mod test_admin_transfer;
+
+#[cfg(test)]
+mod test_bulk_reset_pair_weight;
 
 #[cfg(test)]
 mod test_query_helpers;
@@ -2715,6 +2727,62 @@ impl LedgerLensScoreContract {
         Ok(())
     }
 
+    /// Remove custom weights for multiple asset pairs in a single admin call.
+    ///
+    /// After a reset, each affected pair falls back to the default weight of
+    /// `1` (unweighted average).  This is useful when reconfiguring the scoring
+    /// model and all previous per-pair weights must be cleared at once.
+    ///
+    /// Pairs that have no custom weight set are silently skipped — the call is
+    /// idempotent and will not error if a pair was never configured.
+    ///
+    /// One [`pair_weight_reset`](events::pair_weight_reset) event is emitted
+    /// for every pair whose custom weight is actually removed.
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if the contract has no admin yet.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, symbol_short, Env, Address, Vec};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// let pair = symbol_short!("XLM_USDC");
+    /// client.set_pair_weight(&Vec::new(&env), &pair, &3).unwrap();
+    /// assert_eq!(client.get_pair_weight(&pair), 3);
+    /// let mut pairs = Vec::new(&env);
+    /// pairs.push_back(pair.clone());
+    /// client.bulk_reset_pair_weight(&Vec::new(&env), &pairs).unwrap();
+    /// assert_eq!(client.get_pair_weight(&pair), 1); // back to default
+    /// ```
+    pub fn bulk_reset_pair_weight(
+        env: Env,
+        admin_signers: Vec<Address>,
+        pairs: Vec<Symbol>,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+        for i in 0..pairs.len() {
+            let pair = pairs.get(i).unwrap();
+            if !storage::has_pair_weight(&env, &pair) {
+                continue;
+            }
+            storage::remove_pair_weight(&env, &pair);
+            events::pair_weight_reset(&env, &pair);
+        }
+        Ok(())
+    }
+
     // ── Global minimum confidence floor ──────────────────────────────────────
 
     /// Set the admin-configured global minimum confidence floor (0–100).
@@ -3570,8 +3638,39 @@ impl LedgerLensScoreContract {
 
     // ── Consensus configuration ─────────────────────────────────────────────
 
-    /// Sets the minimum agreeing model count (`k`) and maximum score
-    /// deviation (`epsilon`) used by `reveal_consensus`. Admin only.
+    /// Atomically sets the minimum agreeing model count (`k`) and the maximum
+    /// score deviation (`epsilon`) used by `reveal_consensus`.  Admin only.
+    ///
+    /// Both parameters are updated in the same transaction, ensuring there is
+    /// never a window where an inconsistent `(k, epsilon)` combination is
+    /// active.
+    ///
+    /// # Parameters
+    /// - `k` — minimum number of models that must fall within `±epsilon` of the
+    ///   provisional median before the consensus score is accepted.  Must be ≥ 1.
+    /// - `epsilon` — maximum allowed deviation (in score points, 0–100) from the
+    ///   provisional median for a model to be counted as agreeing.  Must be ≤ 100.
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if the contract has no admin yet.
+    /// - [`Error::InvalidConsensusConfig`] if `k == 0` or `epsilon > 100`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// client.set_consensus_config(&3, &10).unwrap();
+    /// assert_eq!(client.get_consensus_config(), (3, 10));
+    /// ```
     pub fn set_consensus_config(env: Env, k: u32, epsilon: u32) -> Result<(), Error> {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
@@ -3703,10 +3802,39 @@ impl LedgerLensScoreContract {
 
     // ── Admin management ─────────────────────────────────────────────────────
 
-    /// Initiate a two-step admin transfer.  The current admin calls this to
-    /// nominate `new_admin`; `new_admin` must then call `accept_admin` to
-    /// complete the handoff.  This prevents accidental loss of admin access.
-    /// get_pending_admin() returns the nominate new_admin.
+    /// Propose transferring admin control to `new_admin` (step 1 of 2).
+    ///
+    /// The nominated address is stored as *pending* but does not gain any
+    /// privileges until it calls [`accept_admin`](Self::accept_admin).
+    /// Requiring the new admin to actively accept the transfer proves that the
+    /// key is live and prevents accidentally locking governance into an address
+    /// that cannot sign.
+    ///
+    /// Call [`cancel_admin_transfer`](Self::cancel_admin_transfer) to abort
+    /// before acceptance.  [`get_pending_admin`](Self::get_pending_admin)
+    /// returns the currently pending address.
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if the contract has no admin yet.
+    /// - [`Error::Unauthorized`] / panic if the caller is not the current admin.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// let new_admin = Address::generate(&env);
+    /// client.transfer_admin(&Vec::new(&env), &new_admin).unwrap();
+    /// assert!(client.has_pending_admin_transfer());
+    /// ```
     pub fn transfer_admin(
         env: Env,
         admin_signers: Vec<Address>,
@@ -3722,14 +3850,22 @@ impl LedgerLensScoreContract {
         Ok(())
     }
 
-    /// Complete a pending admin transfer.  Must be called by the address
-    /// nominated in `transfer_admin`.
+    /// Complete a pending admin transfer (step 2 of 2).
+    ///
+    /// Must be called by the address previously nominated via
+    /// [`transfer_admin`](Self::transfer_admin).  On success the caller becomes
+    /// the new admin and the pending-admin slot is cleared.
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if the contract has no admin yet.
+    /// - [`Error::NoPendingAdminTransfer`] if no transfer is in progress.
+    /// - Panics (host auth error) if the caller is not the pending admin.
     ///
     /// # Examples
     ///
     /// ```
     /// # use ledgerlens_score::LedgerLensScoreContractClient;
-    /// # use soroban_sdk::{testutils::Address as _, Env, Address};
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
     /// # use ledgerlens_score::LedgerLensScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
@@ -3739,8 +3875,8 @@ impl LedgerLensScoreContract {
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
     /// let new_admin = Address::generate(&env);
-    /// client.transfer_admin(&Vec::new(&env), &new_admin);
-    /// client.accept_admin();
+    /// client.transfer_admin(&Vec::new(&env), &new_admin).unwrap();
+    /// client.accept_admin().unwrap();
     /// assert_eq!(client.get_admin(), new_admin);
     /// ```
     pub fn accept_admin(env: Env) -> Result<(), Error> {
@@ -3755,13 +3891,22 @@ impl LedgerLensScoreContract {
         Ok(())
     }
 
-    /// Cancel a pending admin transfer.  Admin only.
+    /// Abort a pending admin transfer.  Admin only.
+    ///
+    /// Clears the pending-admin slot without changing the current admin.
+    /// Useful when the proposed address turns out to be wrong before it has
+    /// called [`accept_admin`](Self::accept_admin).
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if the contract has no admin yet.
+    /// - [`Error::NoPendingAdminTransfer`] if no transfer is in progress.
+    /// - [`Error::Unauthorized`] / panic if the caller is not the current admin.
     ///
     /// # Examples
     ///
     /// ```
     /// # use ledgerlens_score::LedgerLensScoreContractClient;
-    /// # use soroban_sdk::{testutils::Address as _, Env, Address};
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
     /// # use ledgerlens_score::LedgerLensScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
@@ -3771,8 +3916,9 @@ impl LedgerLensScoreContract {
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
     /// let new_admin = Address::generate(&env);
-    /// client.transfer_admin(&Vec::new(&env), &new_admin);
-    /// client.cancel_admin_transfer(&Vec::new(&env));
+    /// client.transfer_admin(&Vec::new(&env), &new_admin).unwrap();
+    /// client.cancel_admin_transfer(&Vec::new(&env)).unwrap();
+    /// assert!(!client.has_pending_admin_transfer());
     /// assert_eq!(client.get_admin(), admin);
     /// ```
     pub fn cancel_admin_transfer(env: Env, admin_signers: Vec<Address>) -> Result<(), Error> {
@@ -6754,6 +6900,69 @@ impl LedgerLensScoreContract {
         }
         storage::set_model_version_deprecated(&env, version);
         events::model_version_deprecated(&env, version);
+        Ok(())
+    }
+
+    /// Deprecates multiple model versions in a single admin transaction.
+    ///
+    /// Each entry in `versions` is validated independently:
+    /// - If the version has never been registered the call returns
+    ///   [`Error::ScoreNotFound`] immediately, leaving previously iterated
+    ///   versions deprecated.
+    /// - If the version is **already** deprecated it is silently skipped —
+    ///   idempotent batch semantics reduce friction for operator scripts that
+    ///   may run more than once.
+    ///
+    /// One [`model_version_deprecated`](events::model_version_deprecated) event
+    /// is emitted for every version that transitions from active to deprecated.
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if the contract has no admin yet.
+    /// - [`Error::ScoreNotFound`] if any version in `versions` was never
+    ///   registered (the batch is halted at that point).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// client.register_model_version(&Vec::new(&env), &1);
+    /// client.register_model_version(&Vec::new(&env), &2);
+    /// let mut versions = Vec::new(&env);
+    /// versions.push_back(1u32);
+    /// versions.push_back(2u32);
+    /// client.bulk_deregister_model_version(&Vec::new(&env), &versions).unwrap();
+    /// assert!(!client.is_model_version_active(&1));
+    /// assert!(!client.is_model_version_active(&2));
+    /// ```
+    pub fn bulk_deregister_model_version(
+        env: Env,
+        admin_signers: Vec<Address>,
+        versions: Vec<u32>,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+        for i in 0..versions.len() {
+            let version = versions.get(i).unwrap();
+            if !storage::is_model_version_registered(&env, version) {
+                return Err(Error::ScoreNotFound);
+            }
+            if storage::is_model_version_deprecated(&env, version) {
+                continue;
+            }
+            storage::set_model_version_deprecated(&env, version);
+            events::model_version_deprecated(&env, version);
+        }
         Ok(())
     }
 
