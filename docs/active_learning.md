@@ -178,3 +178,84 @@ All settings are controlled via environment variables (see `.env.example`):
 make test     # includes test_query_strategies, test_annotation_queue, test_incremental_trainer
 make lint
 ```
+
+## Multi-Annotator Workflow
+
+### Overview
+
+When a wallet is flagged as uncertain or sensitive, a second analyst independently
+labels it (blind double-annotation). The annotation queue tracks all per-annotator
+labels under a wallet's `"annotations"` list and automatically computes
+inter-rater agreement metrics when at least two verified labels are present.
+
+### Agreement Metrics
+
+| Metric | When used | Threshold |
+|---|---|---|
+| **Cohen's Kappa** | Binary labels (0 = clean, 1 = wash trading) | κ ≥ 0.6 = acceptable |
+| **Krippendorff's Alpha** | Ordinal / multi-class extensions; handles missing annotations | α ≥ 0.667 = acceptable (Krippendorff, 2004) |
+
+**Why Cohen's Kappa for binary labels?**  Kappa corrects for chance agreement,
+making it more reliable than raw percent agreement when label base rates are
+skewed (which they are in LedgerLens: genuine wash trading is rare).
+
+**Why Krippendorff's Alpha for multi-class?**  Alpha generalises across
+measurement levels (nominal, ordinal, interval) and gracefully handles the
+common case where not every wallet is annotated by every annotator — only
+doubly-annotated wallets appear in the reliability matrix.
+
+### Adding a Second Annotation
+
+```python
+from detection.active_learning.annotation_queue import AnnotationQueue
+
+queue = AnnotationQueue()
+
+# First annotator
+queue.multi_annotate("GABCD...", label=1, annotator_id="anon-7f3a", notes="clear wash pattern")
+
+# Second annotator (blind — different session)
+queue.multi_annotate("GABCD...", label=0, annotator_id="anon-2b9c")
+
+# Check agreement
+result = queue.compute_inter_annotator_agreement("GABCD...")
+# {"kappa": -1.0, "alpha": -1.0, "n_annotators": 2, "disputed": True}
+```
+
+Annotator IDs **must be pseudonymous opaque strings** (e.g. `"anon-7f3a"`).
+Email addresses and real names are explicitly forbidden to protect annotator
+privacy in the queue file.
+
+### Dispute Resolution Process
+
+1. When `compute_inter_annotator_agreement()` returns `disputed=True`
+   (Kappa < 0.6), the wallet's queue status is automatically set to
+   `"disputed"`.
+
+2. A senior analyst retrieves the disputed wallets:
+
+   ```python
+   disputed = queue.get_senior_review_queue()
+   # ["GABCD...", ...]
+   ```
+
+3. The senior analyst reviews the original annotations plus SHAP
+   explanations and casts a tie-breaking label via `queue.annotate()`.
+
+4. The resolved label is included in the next `export_labelled()` run and
+   used for model retraining.
+
+### Grafana Dashboard
+
+A **"Inter-annotator Kappa (rolling)"** panel is available in the
+`LedgerLens Kafka Streaming` Grafana dashboard (`monitoring/grafana/dashboards/ledgerlens-kafka.json`).
+It plots the mean Cohen's Kappa over time (Prometheus metric: `inter_annotator_kappa`)
+and the cumulative count of disputed wallets (`inter_annotator_disputed_total`).
+Threshold lines at κ = 0.4 (red), 0.6 (yellow), and 0.8 (green) give instant
+visual feedback on annotation quality.
+
+### Configuration
+
+| Variable | Default | Description |
+|---|---|---|
+| `DISPUTE_KAPPA_THRESHOLD` | `0.6` | Kappa below which a wallet is routed to senior review |

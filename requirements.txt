@@ -64,6 +64,9 @@ cryptography>=42.0.0
 # Static type checking
 mypy>=1.10.0
 
+# Inter-annotator agreement (annotation_queue.py)
+krippendorff>=0.6.1
+
 # Testing
 pytest>=8.0.0
 pytest-asyncio>=0.23.0
