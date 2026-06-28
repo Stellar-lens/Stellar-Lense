@@ -532,6 +532,10 @@ pub fn staleness_window_updated(env: &Env, window_secs: u64) {
     env.events().publish((symbol_short!("sw_upd"),), window_secs);
 }
 
+pub fn jump_threshold_updated(env: &Env, threshold: u32) {
+    env.events().publish((symbol_short!("jt_upd"),), threshold);
+}
+
 pub fn signer_ttl_updated(env: &Env, ttl_secs: u64) {
     env.events().publish((symbol_short!("sg_ttl"),), ttl_secs);
 }

@@ -105,6 +105,9 @@ mod test_cooldown_period;
 #[cfg(test)]
 mod test_staleness_window;
 
+#[cfg(test)]
+mod test_jump_threshold;
+
 use soroban_sdk::{
     contract, contractimpl, crypto::Hash, symbol_short, token, Address, Bytes, BytesN, Env, Symbol,
     SymbolStr, TryFromVal, Vec,
@@ -4855,6 +4858,7 @@ impl LedgerLensScoreContract {
         }
         Self::require_admin_auth(&env, &admin_signers)?;
         storage::set_jump_threshold(&env, threshold);
+        events::jump_threshold_updated(&env, threshold);
         Ok(())
     }
 
