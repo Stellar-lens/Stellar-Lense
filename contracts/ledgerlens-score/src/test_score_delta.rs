@@ -1,4 +1,4 @@
-//! Tests for structured score delta events and get_score_trend (issue #51).
+﻿//! Tests for structured score delta events and get_score_trend (issue #51).
 
 use soroban_sdk::{
     symbol_short,

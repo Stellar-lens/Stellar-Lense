@@ -167,7 +167,7 @@
                 "bytes": "0000000000000000000000000000000000000000000000000000000000000001"
               },
               {
-                "symbol": "get_version"
+                "symbol": "get_hysteresis_margin"
               }
             ],
             "data": "void"
@@ -188,11 +188,11 @@
                 "symbol": "fn_return"
               },
               {
-                "symbol": "get_version"
+                "symbol": "get_hysteresis_margin"
               }
             ],
             "data": {
-              "u32": 3
+              "u32": 0
             }
           }
         }
