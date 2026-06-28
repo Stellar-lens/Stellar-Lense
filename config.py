@@ -93,6 +93,8 @@ class Config:
 
     # Forensic reporting
     REPORT_CONCURRENCY: int = int(os.getenv("REPORT_CONCURRENCY", "4"))
+    # Narrative summary output format (reporting/narrative_builder.py): "plain_text" or "markdown".
+    REPORT_NARRATIVE_FORMAT: str = os.getenv("REPORT_NARRATIVE_FORMAT", "plain_text")
 
     # Wallet funding graph — multi-hop traversal + wash-trading ring detection
     WALLET_GRAPH_MAX_DEPTH: int = int(os.getenv("WALLET_GRAPH_MAX_DEPTH", "4"))
