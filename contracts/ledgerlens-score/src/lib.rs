@@ -102,6 +102,9 @@ mod test_total_wallets_scored;
 #[cfg(test)]
 mod test_cooldown_period;
 
+#[cfg(test)]
+mod test_staleness_window;
+
 use soroban_sdk::{
     contract, contractimpl, crypto::Hash, symbol_short, token, Address, Bytes, BytesN, Env, Symbol,
     SymbolStr, TryFromVal, Vec,
@@ -5406,8 +5409,35 @@ impl LedgerLensScoreContract {
         }
     }
 
-    /// Set the staleness window in seconds. A value of `0` is rejected with
-    /// `InvalidStalenessWindow`. Admin only.
+    /// Update the score staleness threshold at runtime without a contract upgrade.
+    ///
+    /// Scores older than `window_secs` seconds are reported as stale by
+    /// [`is_score_stale`](Self::is_score_stale).  Different deployment
+    /// environments may need different staleness windows; this setter lets the
+    /// admin tune the value live.  Emits a `staleness_window_updated` event on
+    /// success.
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if the contract has no admin yet.
+    /// - [`Error::InvalidStalenessWindow`] if `window_secs == 0`.
+    /// - [`Error::Unauthorized`] if the caller is not the admin.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// client.set_staleness_window(&Vec::new(&env), &3_600);
+    /// assert_eq!(client.get_staleness_window(), 3_600);
+    /// ```
     pub fn set_staleness_window(
         env: Env,
         admin_signers: Vec<Address>,
@@ -5421,6 +5451,7 @@ impl LedgerLensScoreContract {
         }
         Self::require_admin_auth(&env, &admin_signers)?;
         storage::set_staleness_window(&env, window_secs);
+        events::staleness_window_updated(&env, window_secs);
         Ok(())
     }
 

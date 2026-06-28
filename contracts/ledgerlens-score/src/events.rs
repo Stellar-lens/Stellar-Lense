@@ -528,6 +528,10 @@ pub fn pair_cooldown_updated(env: &Env, asset_pair: &Symbol, secs: u64) {
     env.events().publish((symbol_short!("pc_upd"), asset_pair.clone()), secs);
 }
 
+pub fn staleness_window_updated(env: &Env, window_secs: u64) {
+    env.events().publish((symbol_short!("sw_upd"),), window_secs);
+}
+
 pub fn signer_ttl_updated(env: &Env, ttl_secs: u64) {
     env.events().publish((symbol_short!("sg_ttl"),), ttl_secs);
 }
