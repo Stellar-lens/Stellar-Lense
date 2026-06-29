@@ -467,6 +467,34 @@ impl LedgerLensScoreContract {
         storage::get_finality_buffer_secs(&env)
     }
 
+    /// Alias for `set_finality_buffer`. Configures the escrow hold window in
+    /// seconds. `0` disables the hold window and causes `submit_score` to
+    /// commit immediately.
+    pub fn set_escrow_hold_window(
+        env: Env,
+        admin_signers: Vec<Address>,
+        secs: u64,
+    ) -> Result<(), Error> {
+        Self::set_finality_buffer(env, admin_signers, secs)
+    }
+
+    /// Public alias for `commit_pending_score`.
+    /// Callable by anyone once the escrow hold window has elapsed.
+    pub fn auto_commit_score(
+        env: Env,
+        wallet: Address,
+        asset_pair: Symbol,
+    ) -> Result<(), Error> {
+        Self::commit_pending_score(env, wallet, asset_pair)
+    }
+
+    /// Returns an estimate of the number of unique wallets that have a live
+    /// score for `asset_pair`. Uses a per-pair HyperLogLog sketch to avoid
+    /// storing full wallet lists on-chain.
+    pub fn estimate_unique_wallets(env: Env, asset_pair: Symbol) -> u64 {
+        storage::estimate_unique_wallets(&env, &asset_pair)
+    }
+
     /// Read-only lookup of the pending score held for `(wallet, asset_pair)`,
     /// if any. Returns `None` when the buffer is disabled or no score is
     /// currently in the hold window.
