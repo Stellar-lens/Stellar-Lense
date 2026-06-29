@@ -341,3 +341,75 @@ Security note: `top_interactions` is an internal forensic report field. It is
 | `LEDGERLENS_CONTRACT_ID` | _(required for anchoring)_ | Contract ID of the `ledgerlens-score` Soroban contract. |
 | `LEDGERLENS_SUBMITTER_SECRET` | _(required for anchoring)_ | Secret key of the service account authorised to anchor reports. |
 | `SHAP_INTERACTIONS_ENABLED` | `false` | Enable SHAP pairwise interaction values in forensic reports (O(n·d²) cost). |
+| `FEATURE_PROVENANCE_ENABLED` | `false` | Enable data provenance tracking (see below). |
+
+---
+
+## Data Provenance Tracking (Issue #244)
+
+When SHAP output identifies `benford_chi_square_24h` as the top contributor to a wallet's risk score, investigators need to know *which specific trades* produced that chi-square value. Data provenance tracking links each feature computation back to the Horizon paging-token trade IDs that contributed to it.
+
+### Enabling Provenance
+
+Set the environment variable before running the pipeline:
+
+```bash
+FEATURE_PROVENANCE_ENABLED=true python -m scripts.stream
+```
+
+When enabled, each call to `compute_benford_features` records the trade IDs in each window's aggregate. The provenance is stored as a JSON blob in the `provenance_json` column of the `risk_scores` table alongside the feature vector.
+
+### Tracked Features
+
+Only **base window-aggregate Benford features** are tracked; derived features (ratios, calibrated variants, GNN embeddings) are excluded:
+
+- `benford_chi_square_{1,4,24,168,720}h`
+- `benford_mad_{1,4,24,168,720}h`
+- `benford_z_max_{1,4,24,168,720}h`
+
+Trade IDs stored are Horizon **paging tokens** (opaque strings) — not internal DB IDs.
+
+### Forensic Report Integration
+
+When provenance is available, the top-5 SHAP features in a forensic report include an `evidence_links` list of Horizon explorer URLs:
+
+```json
+{
+  "feature": "benford_chi_square_24h",
+  "shap_value": 12.4,
+  "description": "Chi-square goodness-of-fit ...",
+  "evidence_links": [
+    "https://horizon.stellar.org/trades/1234567890-0",
+    "https://horizon.stellar.org/trades/1234567890-1"
+  ]
+}
+```
+
+Investigators can click each link to view the raw on-chain trade in Horizon.
+
+### CLI: trace_feature.py
+
+Print the contributing trade IDs for a specific feature and wallet:
+
+```bash
+python -m scripts.trace_feature \
+    --wallet GAABC...XYZ \
+    --feature benford_chi_square_24h \
+    --asset-pair XLM/USDC
+```
+
+Output:
+
+```
+Feature:    benford_chi_square_24h
+Wallet:     GAABC...XYZ
+Asset pair: XLM/USDC
+Trade IDs (3):
+  1234567890-0  https://horizon.stellar.org/trades/1234567890-0
+  1234567890-1  https://horizon.stellar.org/trades/1234567890-1
+  1234567890-2  https://horizon.stellar.org/trades/1234567890-2
+```
+
+### Storage Cost
+
+Each provenance record stores up to 15 feature-window entries, each containing a list of trade IDs (strings of ~20 chars each). For a typical 24-hour window with 500 trades, a single record is roughly 12 KB of JSON. At 1 million scored wallets the total storage is approximately 12 GB — use `FEATURE_PROVENANCE_ENABLED=false` (the default) in high-throughput deployments where storage is constrained.
