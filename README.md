@@ -14,7 +14,7 @@ LedgerLens detects wash trading and artificial volume on the Stellar Decentralis
 
 - **On-Chain Risk Score Registry**: Stores the latest LedgerLens risk score, flags, confidence, and timestamp per wallet/asset-pair
 - **Authorized Score Submission**: Only the authorised LedgerLens off-chain service account can write scores
-- **Composable Read Access**: Any Soroban contract can query risk scores to gate suspicious activity
+- **Composable Read Access**: Any Soroban contract can query risk scores to gate suspicious activity via `query_risk_gate` (score-only) or `query_risk_gate_with_confidence` (score + confidence floor) — both infallible, side-effect free, and safe to call directly inside another protocol's guard clause
 - **Benford & ML Flags**: Distinguishes between statistical anomaly flags and ML classifier flags
 - **Confidence Scoring**: Each risk score carries a model confidence value (0-100)
 - **Open and Auditable**: Methodology, scores, and contract logic are fully transparent
@@ -102,10 +102,16 @@ Returns a `BatchResult` containing per-entry outcomes so the caller knows exactl
 **ABI change in contract version 2:** The return type changed from `u32` (count of accepted entries) to the structured `BatchResult`. Callers built against the old ABI must regenerate their client bindings.
 
 ### `query_risk_gate(wallet: Address, asset_pair: Symbol, gate_threshold: u32) -> bool`
-The cross-contract integration primitive. Returns `true` when the wallet's score is **strictly below** `gate_threshold` (safe to proceed), and `false` when the score is `>= gate_threshold` **or no score exists**. It is **infallible** (returns `bool`, never an error), **never panics**, and is **side-effect free** — designed to be called directly from inside another protocol's guard clause. See [Composability](#composability) and [`docs/interface-spec.md`](docs/interface-spec.md).
+The cross-contract integration primitive. Returns `true` when the wallet's score is **strictly below** `gate_threshold` (safe to proceed), and `false` when the score is `>= gate_threshold` **or no score exists**. It is **infallible** (returns `bool`, never an error), **never panics**, and is **side-effect free** — designed to be called directly from inside another protocol's guard clause. Delegates internally to `query_risk_gate_with_confidence` with `min_confidence = 0`. See [Composability](#composability) and [`docs/interface-spec.md`](docs/interface-spec.md).
+
+### `query_risk_gate_with_confidence(wallet: Address, asset_pair: Symbol, gate_threshold: u32, min_confidence: u32) -> bool`
+Confidence-gated extension of `query_risk_gate`. Returns `true` only when a score exists **and** `score < gate_threshold` **and** `score.confidence >= effective_min_confidence`. A score whose confidence falls below the floor is treated as epistemically equivalent to "no data" — the gate returns `false` regardless of risk value, preventing low-confidence "safe" signals from passing high-value guard clauses. The effective floor is `max(min_confidence, global_min_confidence)` where `global_min_confidence` is set by the admin. Like `query_risk_gate`, this function is **infallible**, **never panics** (including for `u32::MAX` inputs), and **side-effect free**. Registered under capability `cgate` in `supports_interface`.
+
+### `set_global_min_confidence(min_confidence: u32)` / `get_global_min_confidence() -> u32`
+Admin sets a system-wide minimum confidence floor (0–100). When configured, `query_risk_gate_with_confidence` uses `max(caller_param, global_floor)` as the effective floor, letting the contract operator enforce a baseline confidence requirement without requiring every integrating protocol to specify one. Defaults to `0` (no global floor). Returns `InvalidMinConfidence` for values above 100.
 
 ### `supports_interface(capability: Symbol) -> bool`
-Runtime capability detection for the composability interface. Returns `true` for the registered capabilities `score`, `history`, `batch`, `gate`, and `aggr`, letting integrators feature-detect instead of hardcoding contract version numbers.
+Runtime capability detection for the composability interface. Returns `true` for the registered capabilities `score`, `history`, `batch`, `gate`, `aggr`, `count`, `cgate`, and `pr_rd`, letting integrators feature-detect instead of hardcoding contract version numbers.
 
 ### `propose_upgrade(new_wasm_hash: BytesN<32>)`
 Admin only. Starts a time-locked contract upgrade by committing to `new_wasm_hash`. Stores an `UpgradeProposal` with `executable_after = now + get_upgrade_delay()` and emits `upgrade_proposed`. Does not change the code. Rejected with `UpgradeAlreadyPending` if a proposal is already in flight. See [Upgrade Governance](#upgrade-governance).
@@ -131,6 +137,18 @@ Admin-only emergency escape hatch. Immediately clears the stored cooldown deadli
 ### `get_last_submit_time(wallet: Address, asset_pair: Symbol) -> u64`
 Read-only lookup of the ledger timestamp of the last accepted submission for `(wallet, asset_pair)`, or `0` if none has ever been accepted (or it was cleared by `override_rate_limit`).
 
+### `set_score_floor_policy(admin_signers: Vec<Address>, enabled: bool, high_water_mark: u32, floor_value: u32)`
+Admin-only (M-of-N). Configures the per-wallet score submission floor. When `enabled`, any `(wallet, asset_pair)` whose historical peak score has reached `high_water_mark` can no longer receive a submission below `floor_value` — such a submission is rejected with `BelowScoreFloor`. `high_water_mark` must be in `[50, 100]` and `floor_value` strictly below it (`[0, high_water_mark - 1]`); out-of-range values are rejected with `InvalidScoreFloorPolicy`. Disabled by default. Emits `sf_upd`. See [Score Submission Floor](#score-submission-floor).
+
+### `get_score_floor_policy() -> ScoreFloorPolicy`
+Read-only. Returns the current floor policy. Defaults to `{ enabled: false, high_water_mark: 80, floor_value: 20 }` until the admin opts in.
+
+### `get_historical_max_score(wallet: Address, asset_pair: Symbol) -> u32`
+Read-only. Returns the highest score ever recorded for `(wallet, asset_pair)`, or `0` if none. This running peak is what the floor compares against `high_water_mark`.
+
+### `override_score_floor(admin_signers: Vec<Address>, wallet: Address, asset_pair: Symbol)`
+Admin-only (M-of-N) emergency escape hatch, analogous to `override_rate_limit`. Clears the stored historical maximum for `(wallet, asset_pair)`, dropping it below the high-water mark so the next submission is accepted regardless of its score — for correcting a genuinely mis-flagged wallet. The peak is rebuilt from subsequent submissions, so the floor's protection resumes once a high score is recorded again. Emits `sf_ovrd`.
+
 ### `clear_score_history(wallet: Address, asset_pair: Symbol)` ⚠️ irreversible
 Admin only. Permanently erases the score history ring buffer for `wallet` / `asset_pair`. No-op if no history exists. Emits `clr_hist` for the on-chain audit trail. **Keep off-chain backups before calling — this cannot be undone on-chain.**
 
@@ -138,6 +156,24 @@ Admin only. Permanently erases the score history ring buffer for `wallet` / `ass
 Admin only. Permanently erases the latest score entry for `wallet` / `asset_pair`. After this call, `get_score` returns `ScoreNotFound`. No-op if no score exists. Emits `clr_scr` for the on-chain audit trail. **Keep off-chain backups before calling — this cannot be undone on-chain.**
 ### `set_service_pubkey(pubkey: Bytes)` / `get_service_pubkey() -> Bytes`
 Admin sets (or rotates) the off-chain detection pipeline's secp256k1 public key — 33 bytes compressed or 65 bytes uncompressed, rejected otherwise with `InvalidPubkeyLength` — used to verify `ScoreAttestation`s. Once set it cannot be unset, only rotated. `get_service_pubkey` returns `ServicePubkeyNotSet` before one has been configured. See [Score Attestation](#score-attestation).
+
+### `set_pair_paused(asset_pair: Symbol, paused: bool)`
+Admin only. Freezes or unfreezes score submissions for a single `asset_pair`, without touching any other pair or the global circuit breaker. Pausing a new pair is rejected with `PausedPairIndexFull` once `MAX_PAUSED_PAIRS` (50) pairs are paused simultaneously. Emits `pr_pause` with the pair and the new `paused` state. See [Pause Circuit Breaker](#pause-circuit-breaker).
+
+### `is_pair_paused(asset_pair: Symbol) -> bool`
+Read-only. Returns `true` only while `asset_pair` is individually paused. `false` for any pair that has never been paused.
+
+### `get_paused_pairs() -> Vec<Symbol>`
+Read-only. Returns every asset pair currently paused, in no particular order. O(1) — backed by the incrementally-maintained `PausedPairIndex`, not a scan.
+
+### `get_expiring_entries(max_entries: u32) -> Vec<(Address, Symbol)>`
+Read-only, callable by anyone. Returns up to `max_entries` (capped at `MAX_EXPIRING_ENTRIES_PER_CALL`, 100) tracked `(wallet, asset_pair)` score entries whose estimated remaining TTL has dropped to or below `SCORE_TTL_THRESHOLD`, most overdue first. Feed the result into `extend_entry_ttls`. See [Storage Rent Management](#storage-rent-management).
+
+### `get_entry_ttl(wallet: Address, asset_pair: Symbol) -> u32`
+Read-only. Returns the estimated number of ledgers remaining before the entry should be proactively renewed. Returns `ScoreNotFound` if the wallet/pair has never been scored.
+
+### `extend_entry_ttls(admin_signers: Vec<Address>, entries: Vec<(Address, Symbol)>) -> u32`
+Admin only. Bulk-renews the TTL of every entry in `entries` that still has a live score, skipping any that don't (already archived, or never existed) rather than failing the whole call. Returns the number actually renewed. Rejects with `BatchTooLarge` if `entries` exceeds `MAX_EXPIRING_ENTRIES_PER_CALL`. Emits `ttl_ext` with the renewed and requested counts.
 
 ### `RiskScore` Structure
 
@@ -241,7 +277,7 @@ A wallet scoring 60-70 on three pairs individually might not breach the per-pair
 | 7 | `ContractPaused` | Submission attempted while admin circuit-breaker is active |
 | 8 | `NoPendingAdminTransfer` | `accept_admin` / `cancel_admin_transfer` with no transfer in flight |
 | 9 | `EmptyBatch` | `submit_scores_batch` called with zero entries |
-| 10 | `BatchTooLarge` | Batch exceeds `MAX_BATCH_SIZE` (20) |
+| 10 | `BatchTooLarge` | `submit_scores_batch` exceeds `MAX_BATCH_SIZE` (20), or `extend_entry_ttls` exceeds `MAX_EXPIRING_ENTRIES_PER_CALL` (100) |
 | 11 | `ArithmeticOverflow` | Weighted aggregate computation overflows |
 | 12 | `UpgradeAlreadyPending` | `propose_upgrade` while a proposal is already pending |
 | 13 | `NoPendingUpgrade` | `execute_upgrade` / `veto_upgrade` / `get_pending_upgrade` with no proposal |
@@ -257,6 +293,40 @@ A wallet scoring 60-70 on three pairs individually might not breach the per-pair
 | 23 | `RateLimitExceeded` | Submission before the per-pair cooldown has elapsed |
 | 24 | `InvalidCooldown` | `set_cooldown` value outside `[MIN_COOLDOWN_SECS, MAX_COOLDOWN_SECS]` |
 | 25 | `InvalidTimestamp` | `submit_score` called with `timestamp = 0` |
+ feat/confidence-gated-risk-gate
+| 30 | `InvalidMinConfidence` | `set_global_min_confidence` called with a value above 100 |
+=======
+| 30 | `PairPaused` | Submission attempted while this `asset_pair` is individually paused — see [Pause Circuit Breaker](#pause-circuit-breaker) |
+| 31 | `PausedPairIndexFull` | `set_pair_paused` would pause a new pair beyond `MAX_PAUSED_PAIRS` (50) |
+| 43 | `BelowScoreFloor` | Submission below the configured floor for a high-risk wallet — see [Score Submission Floor](#score-submission-floor) |
+| 44 | `InvalidScoreFloorPolicy` | `set_score_floor_policy` given `high_water_mark` outside `[50, 100]` or `floor_value` not strictly below it |
+
+## Pause Circuit Breaker
+
+The admin has two levels of emergency stop over score submissions:
+
+- **Global**: `pause()` / `unpause()` / `is_paused()` block *every* `submit_score` and `submit_scores_batch` call across *every* wallet and asset pair. This is the blunt, contract-wide escape hatch — necessary when something is broadly wrong (e.g. a compromised service key), but it silences fraud detection for every pair while active, not just the one under investigation.
+- **Per-pair**: see below.
+
+Submissions are checked against the global breaker first; see [Per-Pair Circuit Breaker](#per-pair-circuit-breaker) for the per-pair check and how the two interact.
+
+### Per-Pair Circuit Breaker
+
+A compromised or malfunctioning detection signal for a *single* asset pair (e.g. a bad `XLM_USDC` model run feeding bogus scores) doesn't need the entire registry silenced while it's investigated. `set_pair_paused(asset_pair, paused)` gives the admin surgical control: freeze writes for one pair while every other pair keeps accepting submissions normally.
+
+```rust
+client.set_pair_paused(&symbol_short!("XLM_USDC"), &true);   // freeze just this pair
+client.submit_score(...);                                     // XLM_BTC, XLM_EURC, etc. — unaffected
+client.submit_score(/* asset_pair: XLM_USDC, ... */);         // -> Error::PairPaused
+client.set_pair_paused(&symbol_short!("XLM_USDC"), &false);   // resume
+```
+
+**Reads are never affected.** `get_score`, `get_score_history`, `query_risk_gate`, and `get_aggregate_score` all keep returning existing data for a paused pair — only `submit_score` and `submit_scores_batch` consult the per-pair flag. In a batch call, an entry targeting a paused pair is rejected with `rejection_code = PairPaused` in its `BatchEntryResult` rather than failing the whole batch — every other entry is still processed normally, exactly like `RateLimitExceeded`.
+
+**Interaction with the global pause.** The global breaker is checked first: if `pause()` is active, every submission returns `ContractPaused` regardless of any pair's individual state — pausing a pair on top of a global pause has no additional effect until the global pause is lifted, at which point the per-pair pause still applies. A pair can be paused or unpaused independently of the global breaker's state at any time.
+
+**`MAX_PAUSED_PAIRS` limit.** `get_paused_pairs()` returns every currently paused pair via an incrementally-maintained index, bounded at 50 entries. Pausing a pair *not already paused* once the index is full returns `PausedPairIndexFull` — re-pausing an already-paused pair, or unpausing any pair, never hits this limit. The cap keeps the index's (and the rare admin pause/unpause operation's) storage and compute cost bounded; the hot path consulted on every submission, `is_pair_paused`, is a direct O(1) key lookup that never touches the index at all.
+ main
 
 ## Upgrade Governance
 
@@ -307,6 +377,66 @@ The cooldown defaults to **1 hour** and is admin-configurable via `set_cooldown`
 
 Like the upgrade time-lock, the cooldown deadline is computed from `env.ledger().timestamp()` — deterministic and not caller-settable — so it cannot be bypassed by manipulating submission metadata such as the `timestamp` field on `RiskScore` itself.
 
+## Score Submission Floor
+
+A compromised or colluding service signer could submit an artificially low score (e.g. `0` or `1`) for a wallet that has historically carried a high risk score — effectively laundering the wallet's on-chain reputation. The rate limiter bounds *how often* scores change; attestation proves *who* signed them; the score floor bounds *how far down* a known high-risk wallet's score can be revised. Together they form three independent lines of defence: even a compromised service key cannot simply zero out a known-fraudulent wallet to whitewash it.
+
+**How it works:**
+
+1. On every accepted submission, the contract updates `HistoricalMaxScore(wallet, asset_pair) = max(current_max, new_score)` — a per-pair running peak that is never lowered by a subsequent submission.
+2. When the policy is **enabled** and a pair's historical peak has reached the `high_water_mark`, any submission with `score < floor_value` is rejected with `BelowScoreFloor` (in a batch, that entry is rejected with `rejection_code = BelowScoreFloor` while the rest of the batch proceeds, exactly like `RateLimitExceeded`). The check runs **before** any state is written, so a blocked submission leaves the stored score, the cooldown timer, and the historical peak untouched.
+3. The policy is **disabled by default** — no floor is enforced until the admin opts in via `set_score_floor_policy`. `high_water_mark` is bounded to `[50, 100]` and `floor_value` must be strictly below it.
+
+For correcting a genuinely mis-flagged wallet, the admin can call `override_score_floor(wallet, asset_pair)` to clear that pair's historical peak — the same emergency-escape-hatch pattern as `override_rate_limit`. The protection resumes naturally once a high score is recorded for the pair again.
+
+```rust
+client.set_score_floor_policy(&admin_signers, &true, &80, &20); // opt in: HWM 80, floor 20
+// wallet's XLM_USDC peaks at 90 over time...
+client.submit_score(/* score: 1, ... */);   // -> Error::BelowScoreFloor (laundering blocked)
+client.submit_score(/* score: 25, ... */);  // accepted (>= floor of 20)
+client.override_score_floor(&admin_signers, &wallet, &symbol_short!("XLM_USDC")); // emergency reset
+client.submit_score(/* score: 1, ... */);   // now accepted
+```
+
+### `ScoreFloorPolicy` Structure
+
+```rust
+pub struct ScoreFloorPolicy {
+    pub enabled: bool,         // kill-switch; false = no floor enforced
+    pub high_water_mark: u32,  // historical peak [50,100] at/above which the floor applies
+    pub floor_value: u32,      // minimum score [0, high_water_mark-1] for a high-risk wallet
+}
+```
+
+## Storage Rent Management
+
+Soroban silently **archives** a persistent ledger entry once its TTL reaches zero. Every `submit_score` write extends the written entry's TTL, so high-traffic wallet/pair pairs stay alive automatically — but a wallet that was scored once and then goes quiet has no further writes to trigger that extension, and its score entry counts down to expiry unnoticed. The next read returns `ScoreNotFound` for a wallet that was clearly scored before, with no warning beforehand. `get_expiring_entries` / `extend_entry_ttls` let an admin sweep and proactively renew entries before that happens.
+
+**The flow:**
+
+1. Every accepted `submit_score` / `submit_scores_batch` write registers the `(wallet, asset_pair)` in an incrementally-maintained index (capped at `MAX_TRACKED_SCORE_ENTRIES`, 500) and stamps the ledger sequence it was last touched at.
+2. Periodically (see cadence below), an off-chain job calls `get_expiring_entries(max_entries)` — a free, read-only call — to get back the entries that have gone dormant long enough to be at risk, most urgent first.
+3. The job feeds that list straight into `extend_entry_ttls(admin_signers, entries)`. The admin call renews each entry's on-chain TTL and resets its dormancy clock; entries that turn out to have already been archived (or never existed) are skipped rather than failing the whole batch.
+
+```
+  off-chain cron                 contract
+        │                           │
+        │  get_expiring_entries(N)  │
+        ├──────────────────────────►│  scan ScoreEntryIndex,
+        │◄──────────────────────────┤  return entries due for renewal
+        │  [(wallet, pair), ...]    │
+        │                           │
+        │  extend_entry_ttls(       │
+        │    admin_signers, list)   │
+        ├──────────────────────────►│  extend_ttl() per entry,
+        │◄──────────────────────────┤  refresh dormancy clock
+        │  renewed_count            │
+```
+
+Soroban contracts have no host function to read another entry's *actual* remaining TTL from inside a running contract, so "remaining TTL" here (returned by `get_entry_ttl`, and the ordering used by `get_expiring_entries`) is a conservative estimate based on ledgers elapsed since the entry's last write or renewal, not a literal on-chain read. The estimate can only flag an entry as due *early*, never late — see the rustdoc on `storage::get_expiring_entries` for the full reasoning.
+
+**Recommended operational cadence:** run the sweep (`get_expiring_entries` → `extend_entry_ttls`) on a schedule comfortably shorter than `SCORE_TTL_THRESHOLD` (~30 days at 5s/ledger) — daily is a reasonable default for most deployments, and even weekly leaves a wide safety margin before any entry would actually be at risk of archival.
+
 ## Score Attestation
 
 The service account's `require_auth` proves a transaction was sent by the authorised key, but says nothing about whether the score payload inside that transaction matches what the off-chain detection pipeline actually computed — relevant when the service key is held by infrastructure (a relayer, a batching service, a multisig signer) that's trusted to submit transactions but shouldn't be able to silently alter scores in transit.
@@ -319,6 +449,35 @@ The service account's `require_auth` proves a transaction was sent by the author
 4. The signature is then verified via `secp256k1_recover` against the registered pubkey, supporting both compressed and uncompressed key formats.
 
 The full byte layout and verification algorithm are specified in [`docs/attestation-spec.md`](docs/attestation-spec.md).
+
+## Batch Attestation
+
+`submit_scores_batch` enforces the service account's `require_auth` for the whole batch but leaves a *payload integrity* gap: a compromised or unauthorised service key can fill a batch with arbitrary scores. `submit_scores_batch_attested` closes that gap for batch submissions specifically.
+
+The off-chain pipeline builds a Merkle tree over every entry's per-score commitment (the same 175-byte SHA-256 preimage `submit_score` already binds) with **domain-separated prefix hashing** (RFC 9162 style: `0x00` for leaves, `0x01` for internal nodes), then signs `SHA256(merkle_root)` — *not* `merkle_root` directly — with the same secp256k1 key registered via `set_service_pubkey`. The pipeline submits the batch with one `BatchAttestation { merkle_root, signature }`. The contract performs one `secp256k1_recover` over the SHA-256-wrapped root (a soroban-sdk 21.x compatibility shim — see the spec for why), then walks each entry's inclusion proof `O(log N)` style. The result is one signature per batch (instead of one per entry) plus per-entry cryptographic payload integrity.
+
+Key properties:
+
+- **Single secp256k1 signature per batch.** One `secp256k1_recover` on-chain call regardless of batch size.
+- **Same key as `submit_score`.** No key rotation needed — the same `set_service_pubkey`-registered key signs both per-score and per-batch attestations.
+- **Backward-compatible surface.** `submit_scores_batch` is unchanged; `submit_scores_batch_attested` is a new opt-in entry point.
+- **Cost-bounded.** Per-entry Merkle proofs are capped at `MAX_MERKLE_PROOF_DEPTH` (30 levels = up to ~2^30 leaves, far above `MAX_BATCH_SIZE` of 20) and the loop walks the proof in constant gas regardless of intermediate hash mismatches.
+- **Domain-separated Merkle scheme.** Leaves (`0x00`-prefixed 33-byte preimage) and internal nodes (`0x01`-prefixed 65-byte preimage) cannot collide at any level.
+- **Capability-detectable.** `supports_interface(Symbol::new(&env, "batch_attested"))` returns `true` on deployments that include this feature.
+
+Detection: integrators can feature-detect before using it —
+
+```rust
+let cap = soroban_sdk::Symbol::new(&env, "batch_attested");
+let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+if client.supports_interface(&cap) {
+    // Use the attested batch path (one signature per batch, per-entry proofs).
+} else {
+    // Fall back to the plain `submit_scores_batch` (no payload integrity).
+}
+```
+
+Full specification (off-chain tree-construction algorithm, on-chain verification, XDR layout, reference Python/TypeScript snippets, edge cases) is in [`docs/batch-attestation-spec.md`](docs/batch-attestation-spec.md).
 
 ## Composability
 
@@ -362,6 +521,29 @@ fn swap(env: Env, user: Address, amount: i128) -> Result<(), AmmError> {
 
 A complete, compiling reference contract lives in [`examples/amm_gate.rs`](examples/amm_gate.rs) (build it with `cargo build --example amm_gate -p ledgerlens-score`). For versioning, error-code stability, threshold selection, and caching guidance, read the full [interface specification](docs/interface-spec.md).
 
+### Gated liquidity provision
+
+For liquidity adds — where a low-confidence score is as dangerous as a high-risk
+score — use `query_risk_gate_with_confidence` and reject before moving funds:
+
+```rust
+let is_safe = client.query_risk_gate_with_confidence(
+    &provider,
+    &symbol_short!("XLM_USDC"),
+    &75,  // gate_threshold
+    &50,  // min_confidence
+);
+if !is_safe {
+    return Err(AmmError::HighRiskWallet);
+}
+// ... proceed with liquidity provision ...
+```
+
+When no score exists, the gate fails closed (`false`) and liquidity is rejected.
+See [`examples/amm_gate_example.rs`](examples/amm_gate_example.rs) and
+[`contracts/mock-amm/`](contracts/mock-amm/) (`provide_liquidity_gated`,
+`set_risk_oracle`).
+
 ## Security Features
 
 1. **Authorization Checks**: Only the authorised LedgerLens service account can submit scores
@@ -371,6 +553,7 @@ A complete, compiling reference contract lives in [`examples/amm_gate.rs`](examp
 5. **Time-Locked Upgrades**: Contract WASM upgrades require a mandatory delay (≥48 h) with a public proposal anyone can inspect and an admin veto — see [Upgrade Governance](#upgrade-governance)
 6. **Submission Rate Limiting**: A configurable per-`(wallet, asset_pair)` cooldown (default 1 h) bounds how often the service account can overwrite a score — see [Rate Limiting](#rate-limiting)
 7. **Score Attestation**: An opt-in secp256k1 signature over the score payload lets the off-chain pipeline vouch for its contents independent of `require_auth` — see [Score Attestation](#score-attestation)
+8. **Score Submission Floor**: An opt-in per-wallet floor that blocks downward score-revision attacks on wallets whose historical peak crossed a danger level — see [Score Submission Floor](#score-submission-floor)
 
 ## Testing
 

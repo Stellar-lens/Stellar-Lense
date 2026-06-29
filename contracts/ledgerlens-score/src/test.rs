@@ -1,20 +1,19 @@
-#![cfg(test)]
-
-use soroban_sdk::{
-    symbol_short,
+use soroban_sdk::{symbol_short,
     testutils::{Address as _, Ledger as _},
     Address, Env, Symbol, Vec,
 };
 
 use crate::{
-    BatchResult, Error, LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreSubmission,
+    BatchResult, Error, LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreQuery,
+    ScoreSubmission,
 };
 
 // ── Test helpers ──────────────────────────────────────────────────────────────
 
-fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
+pub fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
     let env = Env::default();
     env.mock_all_auths();
+    env.budget().reset_unlimited();
 
     let contract_id = env.register_contract(None, LedgerLensScoreContract);
     let client = LedgerLensScoreContractClient::new(&env, &contract_id);
@@ -25,8 +24,9 @@ fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
     (env, client, admin, service)
 }
 
-fn initialized<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
+pub fn initialized<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
     let (env, client, admin, service) = setup();
+    env.ledger().with_mut(|l| l.timestamp = 100_000);
     client.initialize(&admin, &service);
     (env, client, admin, service)
 }
@@ -82,6 +82,37 @@ fn test_submit_and_get_score() {
 }
 
 #[test]
+fn test_get_score_exists_returns_true_when_score_present() {
+    let (env, client, admin, service) = initialized();
+    let wallet = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &asset_pair,
+        &50,
+        &false,
+        &false,
+        &1_700_000_000,
+        &80,
+        &1,
+        &None,
+    );
+
+    assert!(client.get_score_exists(&wallet, &asset_pair));
+}
+
+#[test]
+fn test_get_score_exists_returns_false_when_no_score() {
+    let (env, client, admin, service) = initialized();
+    let wallet = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+
+    assert!(!client.get_score_exists(&wallet, &asset_pair));
+}
+
+#[test]
 fn test_get_score_not_found() {
     let (env, client, admin, service) = setup();
     client.initialize(&admin, &service);
@@ -91,6 +122,206 @@ fn test_get_score_not_found() {
 
     let result = client.try_get_score(&wallet, &asset_pair);
     assert_eq!(result, Err(Ok(Error::ScoreNotFound)));
+}
+
+#[test]
+fn test_get_scores_batch_empty() {
+    let (env, client, admin, service) = setup();
+    client.initialize(&admin, &service);
+
+    let queries = Vec::new(&env);
+    let results = client.get_scores_batch(&queries);
+    assert_eq!(results.len(), 0);
+}
+
+#[test]
+fn test_get_scores_batch_single_entry() {
+    let (env, client, admin, service) = setup();
+    client.initialize(&admin, &service);
+
+    let wallet = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &asset_pair,
+        &64,
+        &false,
+        &true,
+        &1,
+        &88,
+        &1,
+        &None,
+    );
+
+    let mut queries = Vec::new(&env);
+    queries.push_back(ScoreQuery { wallet, asset_pair });
+
+    let results = client.get_scores_batch(&queries);
+    let entry = results.get(0).unwrap();
+    assert_eq!(entry.index, 0);
+    assert!(entry.found);
+    assert_eq!(entry.score.clone().unwrap().score, 64);
+}
+
+#[test]
+fn test_get_scores_batch_max_batch() {
+    let (env, client, admin, service) = setup();
+    client.initialize(&admin, &service);
+
+    let asset_pair = symbol_short!("XLM_USDC");
+    let mut queries = Vec::new(&env);
+    for i in 0..crate::constants::BATCH_READ_MAX {
+        let wallet = Address::generate(&env);
+        client.submit_score(
+            &Vec::new(&env),
+            &wallet,
+            &asset_pair,
+            &(i % 100),
+            &false,
+            &false,
+            &(i as u64 + 1),
+            &90,
+            &1,
+            &None,
+        );
+        queries.push_back(ScoreQuery { wallet, asset_pair: asset_pair.clone() });
+    }
+
+    let results = client.get_scores_batch(&queries);
+    assert_eq!(results.len(), crate::constants::BATCH_READ_MAX);
+    for i in 0..results.len() {
+        let entry = results.get(i).unwrap();
+        assert_eq!(entry.index, i);
+        assert!(entry.found);
+        assert_eq!(entry.score.clone().unwrap().score, i % 100);
+    }
+}
+
+#[test]
+fn test_get_scores_batch_too_large() {
+    let (env, client, admin, service) = setup();
+    client.initialize(&admin, &service);
+
+    let asset_pair = symbol_short!("XLM_USDC");
+    let mut queries = Vec::new(&env);
+    for _ in 0..=crate::constants::BATCH_READ_MAX {
+        queries.push_back(ScoreQuery {
+            wallet: Address::generate(&env),
+            asset_pair: asset_pair.clone(),
+        });
+    }
+
+    let result = client.try_get_scores_batch(&queries);
+    assert_eq!(result, Err(Ok(Error::BatchTooLarge)));
+}
+
+#[test]
+fn test_get_scores_batch_partial_hit_miss() {
+    let (env, client, admin, service) = setup();
+    client.initialize(&admin, &service);
+
+    let wallet_hit = Address::generate(&env);
+    let wallet_miss = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet_hit,
+        &asset_pair,
+        &71,
+        &false,
+        &false,
+        &1,
+        &90,
+        &1,
+        &None,
+    );
+
+    let mut queries = Vec::new(&env);
+    queries.push_back(ScoreQuery { wallet: wallet_hit, asset_pair: asset_pair.clone() });
+    queries.push_back(ScoreQuery { wallet: wallet_miss, asset_pair });
+
+    let results = client.get_scores_batch(&queries);
+    assert!(results.get(0).unwrap().found);
+    assert_eq!(results.get(0).unwrap().score.unwrap().score, 71);
+    assert!(!results.get(1).unwrap().found);
+    assert_eq!(results.get(1).unwrap().score, crate::MaybeRiskScore::None);
+}
+
+#[test]
+fn test_get_scores_batch_embargoed_entry() {
+    let (env, client, admin, service) = setup();
+    client.initialize(&admin, &service);
+
+    let wallet = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &asset_pair,
+        &55,
+        &false,
+        &false,
+        &1,
+        &90,
+        &1,
+        &None,
+    );
+    client.set_score_embargo(&wallet, &None);
+
+    let mut queries = Vec::new(&env);
+    queries.push_back(ScoreQuery { wallet, asset_pair });
+
+    let results = client.get_scores_batch(&queries);
+    let entry = results.get(0).unwrap();
+    assert_eq!(entry.index, 0);
+    assert!(!entry.found);
+    assert_eq!(entry.score, crate::MaybeRiskScore::None);
+}
+
+#[test]
+fn test_get_scores_batch_delegated_wallet() {
+    let (env, client, admin, service) = setup();
+    client.initialize(&admin, &service);
+
+    let sub_wallet = Address::generate(&env);
+    let custodian = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+    client.set_score_delegate(&sub_wallet, &custodian);
+    client.submit_score(
+        &Vec::new(&env),
+        &custodian,
+        &asset_pair,
+        &82,
+        &true,
+        &false,
+        &1,
+        &95,
+        &1,
+        &None,
+    );
+
+    let mut queries = Vec::new(&env);
+    queries.push_back(ScoreQuery { wallet: sub_wallet, asset_pair });
+
+    let results = client.get_scores_batch(&queries);
+    let entry = results.get(0).unwrap();
+    assert!(entry.found);
+    assert_eq!(entry.score.clone().unwrap().score, 82);
+}
+
+#[test]
+fn test_get_min_score_returns_zero() {
+    let (_env, client, admin, service) = setup();
+    client.initialize(&admin, &service);
+    assert_eq!(client.get_min_score(), 0);
+}
+
+#[test]
+fn test_get_max_score_returns_hundred() {
+    let (_env, client, admin, service) = setup();
+    client.initialize(&admin, &service);
+    assert_eq!(client.get_max_score(), 100);
 }
 
 #[test]
@@ -521,6 +752,18 @@ fn test_risk_threshold_above_100_rejected() {
     let (env, client, _admin, _service) = initialized();
     let result = client.try_set_risk_threshold(&Vec::new(&env), &101);
     assert_eq!(result, Err(Ok(Error::InvalidScore)));
+}
+
+// ── get_score_threshold ───────────────────────────────────────────────────────
+
+#[test]
+fn test_get_score_threshold_matches_admin_set_value() {
+    let (env, client, _admin, _service) = initialized();
+    // Default before any admin update.
+    assert_eq!(client.get_score_threshold(), 75);
+    // After admin sets a new threshold, get_score_threshold reflects it.
+    client.set_risk_threshold(&Vec::new(&env), &60);
+    assert_eq!(client.get_score_threshold(), 60);
 }
 
 // ── Score history ─────────────────────────────────────────────────────────────
@@ -1193,9 +1436,15 @@ fn test_batch_result_vec_length_matches_input() {
 // ── Contract version ──────────────────────────────────────────────────────────
 
 #[test]
-fn test_get_version_returns_two() {
+fn test_get_version_returns_three() {
     let (_env, client, _admin, _service) = initialized();
     assert_eq!(client.get_version(), 4);
+}
+
+#[test]
+fn test_get_contract_version_returns_three() {
+    let (_env, client, _admin, _service) = initialized();
+    assert_eq!(client.get_contract_version(), 3);
 }
 
 // ── Not-initialized guards ────────────────────────────────────────────────────
@@ -1444,6 +1693,73 @@ fn test_get_pair_weight_defaults_to_one() {
     assert_eq!(client.get_pair_weight(&pair), 1);
 }
 
+#[test]
+fn test_set_pair_weight_batch() {
+    let (env, client, _admin, _service) = initialized();
+    let pair_a = symbol_short!("XLM_USDC");
+    let pair_b = symbol_short!("XLM_BTC");
+
+    let mut entries: Vec<(Symbol, u32)> = Vec::new(&env);
+    entries.push_back((pair_a.clone(), 2));
+    entries.push_back((pair_b.clone(), 5));
+
+    client.set_pair_weight_batch(&Vec::new(&env), &entries);
+
+    assert_eq!(client.get_pair_weight(&pair_a), 2);
+    assert_eq!(client.get_pair_weight(&pair_b), 5);
+}
+
+#[test]
+fn test_set_pair_weight_batch_partial_overlap_updates_only_changed_pairs() {
+    let (env, client, _admin, _service) = initialized();
+    let pair_a = symbol_short!("XLM_USDC");
+    let pair_b = symbol_short!("XLM_BTC");
+    let pair_c = symbol_short!("XLM_ETH");
+
+    client.set_pair_weight(&Vec::new(&env), &pair_a, &1);
+    client.set_pair_weight(&Vec::new(&env), &pair_b, &1);
+
+    // Second batch only touches pair_b and introduces pair_c; pair_a must
+    // remain at its previously configured weight.
+    let mut entries: Vec<(Symbol, u32)> = Vec::new(&env);
+    entries.push_back((pair_b.clone(), 9));
+    entries.push_back((pair_c.clone(), 4));
+
+    client.set_pair_weight_batch(&Vec::new(&env), &entries);
+
+    assert_eq!(client.get_pair_weight(&pair_a), 1);
+    assert_eq!(client.get_pair_weight(&pair_b), 9);
+    assert_eq!(client.get_pair_weight(&pair_c), 4);
+}
+
+#[test]
+fn test_set_pair_weight_batch_empty_returns_error() {
+    let (env, client, _admin, _service) = initialized();
+
+    let empty: Vec<(Symbol, u32)> = Vec::new(&env);
+    let result = client.try_set_pair_weight_batch(&Vec::new(&env), &empty);
+    assert_eq!(result, Err(Ok(Error::EmptyBatch)));
+}
+
+#[test]
+fn test_set_pair_weight_batch_too_large_returns_error() {
+    let (env, client, _admin, _service) = initialized();
+
+    let pair_names = [
+        "P0", "P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "PA", "PB", "PC", "PD", "PE",
+        "PF", "PG", "PH", "PI", "PJ", "PK",
+    ];
+    assert_eq!(pair_names.len(), 21); // one over the MAX_BATCH_SIZE (20) cap.
+
+    let mut entries: Vec<(Symbol, u32)> = Vec::new(&env);
+    for name in pair_names.iter() {
+        entries.push_back((Symbol::new(&env, name), 1));
+    }
+
+    let result = client.try_set_pair_weight_batch(&Vec::new(&env), &entries);
+    assert_eq!(result, Err(Ok(Error::BatchTooLarge)));
+}
+
 // ── M-of-N multi-signature service authorization ──────────────────────────────
 
 /// Helper: add N signers and set threshold M on an already-initialized client.
@@ -1532,6 +1848,27 @@ fn test_multisig_unauthorized_signer_rejected() {
     let result =
         client.try_submit_score(&signers, &wallet, &pair, &55, &false, &false, &1, &80, &1, &None);
     assert_eq!(result, Err(Ok(Error::UnauthorizedSigner)));
+}
+
+#[test]
+fn test_get_admin_signer_count_tracks_set_size() {
+    let (env, client, admin, service) = setup();
+    client.initialize(&admin, &service);
+
+    assert_eq!(client.get_admin_signer_count(), 0);
+
+    let s1 = Address::generate(&env);
+    let s2 = Address::generate(&env);
+    client.add_admin_signer(&Vec::new(&env), &s1);
+    client.add_admin_signer(&Vec::new(&env), &s2);
+    assert_eq!(client.get_admin_signer_count(), 2);
+
+    client.set_admin_threshold(&Vec::new(&env), &2);
+    let mut admin_signers = Vec::new(&env);
+    admin_signers.push_back(s1.clone());
+    admin_signers.push_back(s2.clone());
+    client.remove_admin_signer(&admin_signers, &s2);
+    assert_eq!(client.get_admin_signer_count(), 1);
 }
 
 #[test]
@@ -1639,6 +1976,37 @@ fn test_remove_signer_reduces_set() {
     assert_eq!(client.get_score(&wallet, &pair).score, 33);
 }
 
+#[test]
+fn test_get_service_signer_count_zero() {
+    // No signers added — count must be 0.
+    let (env, client, admin, service) = setup();
+    client.initialize(&admin, &service);
+    assert_eq!(client.get_service_signer_count(), 0);
+}
+
+#[test]
+fn test_get_service_signer_count_one() {
+    let (env, client, admin, service) = setup();
+    client.initialize(&admin, &service);
+    let s1 = Address::generate(&env);
+    client.add_service_signer(&Vec::new(&env), &s1);
+    assert_eq!(client.get_service_signer_count(), 1);
+}
+
+#[test]
+fn test_get_service_signer_count_n() {
+    let (env, client, admin, service) = setup();
+    client.initialize(&admin, &service);
+    for _ in 0..3 {
+        client.add_service_signer(&Vec::new(&env), &Address::generate(&env));
+    }
+    assert_eq!(client.get_service_signer_count(), 3);
+    // Count decreases on removal.
+    let signers = client.get_service_signers();
+    client.remove_service_signer(&Vec::new(&env), &signers.get(0).unwrap());
+    assert_eq!(client.get_service_signer_count(), 2);
+}
+
 // ── Staleness window ──────────────────────────────────────────────────────────
 
 #[test]
@@ -1742,6 +2110,7 @@ fn test_score_count_increments_on_submit() {
     );
     assert_eq!(client.get_score_count(&wallet, &asset_pair), 1);
 
+    env.ledger().with_mut(|l| l.timestamp += 3_601);
     client.submit_score(
         &Vec::new(&env),
         &wallet,
@@ -1766,6 +2135,7 @@ fn test_score_count_exceeds_history_depth() {
 
     // Submit 15 scores — the ring buffer caps at 10, but count should be 15.
     for i in 0u32..15 {
+        env.ledger().with_mut(|l| l.timestamp += 3_601); // past the default cooldown
         client.submit_score(
             &Vec::new(&env),
             &wallet,
@@ -1833,11 +2203,150 @@ fn test_score_count_is_per_pair() {
     let pair2 = symbol_short!("XLM_BTC");
 
     client.submit_score(&Vec::new(&env), &wallet, &pair1, &30, &false, &false, &1, &60, &1, &None);
+    env.ledger().with_mut(|l| l.timestamp += 3_601);
     client.submit_score(&Vec::new(&env), &wallet, &pair1, &40, &false, &false, &2, &70, &1, &None);
     client.submit_score(&Vec::new(&env), &wallet, &pair2, &90, &true, &true, &3, &95, &1, &None);
 
     assert_eq!(client.get_score_count(&wallet, &pair1), 2);
     assert_eq!(client.get_score_count(&wallet, &pair2), 1);
+}
+
+// ── Wallet pair list / count ──────────────────────────────────────────────────
+
+#[test]
+fn test_wallet_pair_list_empty_initially() {
+    let (env, client, _admin, _service) = initialized();
+    let wallet = Address::generate(&env);
+    let pairs = client.get_wallet_pair_list(&wallet);
+    assert_eq!(pairs.len(), 0);
+}
+
+#[test]
+fn test_wallet_pair_count_empty_initially() {
+    let (env, client, _admin, _service) = initialized();
+    let wallet = Address::generate(&env);
+    assert_eq!(client.get_wallet_pair_count(&wallet), 0);
+}
+
+#[test]
+fn test_wallet_pair_list_single_pair() {
+    let (env, client, _admin, _service) = initialized();
+    let wallet = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+    client.submit_score(&Vec::new(&env), &wallet, &pair, &50, &false, &false, &1, &90, &1, &None);
+    let pairs = client.get_wallet_pair_list(&wallet);
+    assert_eq!(pairs.len(), 1);
+    assert_eq!(pairs.get(0).unwrap(), pair);
+}
+
+#[test]
+fn test_wallet_pair_count_single_pair() {
+    let (env, client, _admin, _service) = initialized();
+    let wallet = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+    client.submit_score(&Vec::new(&env), &wallet, &pair, &50, &false, &false, &1, &90, &1, &None);
+    assert_eq!(client.get_wallet_pair_count(&wallet), 1);
+}
+
+#[test]
+fn test_wallet_pair_list_multiple_pairs() {
+    let (env, client, _admin, _service) = initialized();
+    let wallet = Address::generate(&env);
+    let pair1 = symbol_short!("XLM_USDC");
+    let pair2 = symbol_short!("XLM_BTC");
+    let pair3 = symbol_short!("XLM_ETH");
+
+    client.submit_score(&Vec::new(&env), &wallet, &pair1, &50, &false, &false, &1, &90, &1, &None);
+    client.submit_score(&Vec::new(&env), &wallet, &pair2, &30, &false, &true, &2, &85, &1, &None);
+    client.submit_score(&Vec::new(&env), &wallet, &pair3, &70, &true, &true, &3, &95, &1, &None);
+
+    let pairs = client.get_wallet_pair_list(&wallet);
+    assert_eq!(pairs.len(), 3);
+
+    // All three pairs should be present (order may vary).
+    let mut found = 0u32;
+    for i in 0..pairs.len() {
+        let p = pairs.get(i).unwrap();
+        if p == pair1 || p == pair2 || p == pair3 {
+            found += 1;
+        }
+    }
+    assert_eq!(found, 3);
+}
+
+#[test]
+fn test_wallet_pair_count_multiple_pairs() {
+    let (env, client, _admin, _service) = initialized();
+    let wallet = Address::generate(&env);
+
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &symbol_short!("XLM_USDC"),
+        &50,
+        &false,
+        &false,
+        &1,
+        &90,
+        &1,
+        &None,
+    );
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &symbol_short!("XLM_BTC"),
+        &30,
+        &false,
+        &true,
+        &2,
+        &85,
+        &1,
+        &None,
+    );
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &symbol_short!("XLM_ETH"),
+        &70,
+        &true,
+        &true,
+        &3,
+        &95,
+        &1,
+        &None,
+    );
+
+    assert_eq!(client.get_wallet_pair_count(&wallet), 3);
+}
+
+#[test]
+fn test_wallet_pair_list_is_per_wallet() {
+    let (env, client, _admin, _service) = initialized();
+    let wallet_a = Address::generate(&env);
+    let wallet_b = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+
+    client.submit_score(&Vec::new(&env), &wallet_a, &pair, &50, &false, &false, &1, &90, &1, &None);
+
+    assert_eq!(client.get_wallet_pair_list(&wallet_a).len(), 1);
+    assert_eq!(client.get_wallet_pair_list(&wallet_b).len(), 0);
+    assert_eq!(client.get_wallet_pair_count(&wallet_a), 1);
+    assert_eq!(client.get_wallet_pair_count(&wallet_b), 0);
+}
+
+#[test]
+fn test_wallet_pair_list_deduplicates() {
+    let (env, client, _admin, _service) = initialized();
+    let wallet = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+
+    // Submit twice for the same pair — should still count as 1.
+    client.submit_score(&Vec::new(&env), &wallet, &pair, &50, &false, &false, &1, &90, &1, &None);
+    env.ledger().with_mut(|l| l.timestamp += 3_601);
+    client.submit_score(&Vec::new(&env), &wallet, &pair, &60, &false, &false, &2, &90, &1, &None);
+
+    assert_eq!(client.get_wallet_pair_list(&wallet).len(), 1);
+    assert_eq!(client.get_wallet_pair_count(&wallet), 1);
 }
 
 #[test]
@@ -1955,4 +2464,653 @@ fn test_clear_score_does_not_affect_history() {
     // History ring must still contain the entry.
     assert_eq!(client.get_score_history(&wallet, &pair).len(), 1);
     assert_eq!(client.get_score_history(&wallet, &pair).get(0).unwrap().score, 33);
+}
+
+// ── Wallet Score Delegation ───────────────────────────────────────────────────
+
+#[test]
+fn test_delegate_inherits_custodian_score() {
+    let (env, client, _admin, _service) = initialized();
+    let custodian = Address::generate(&env);
+    let sub_wallet = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+
+    // 1. Set delegate
+    client.set_score_delegate(&sub_wallet, &custodian);
+
+    // 2. Submit score to custodian
+    client.submit_score(
+        &Vec::new(&env),
+        &custodian,
+        &pair,
+        &40,
+        &false,
+        &false,
+        &1,
+        &80,
+        &1,
+        &None,
+    );
+
+    // 3. Sub-wallet inherits score
+    let score = client.get_score(&sub_wallet, &pair);
+    assert_eq!(score.score, 40);
+
+    // 4. Sub-wallet inherits gate check
+    let is_safe = client.query_risk_gate(&sub_wallet, &pair, &50);
+    assert!(is_safe);
+
+    // 5. Sub-wallet inherits aggregate score
+    let aggregate = client.get_aggregate_score(&sub_wallet);
+    assert_eq!(aggregate.aggregate_score, 40);
+}
+
+#[test]
+fn test_delegate_direct_score_overrides_delegation() {
+    let (env, client, _admin, _service) = initialized();
+    let custodian = Address::generate(&env);
+    let sub_wallet = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+
+    client.set_score_delegate(&sub_wallet, &custodian);
+    client.submit_score(
+        &Vec::new(&env),
+        &custodian,
+        &pair,
+        &80,
+        &false,
+        &false,
+        &1,
+        &80,
+        &1,
+        &None,
+    );
+
+    // Sub-wallet overrides with its own score
+    client.submit_score(
+        &Vec::new(&env),
+        &sub_wallet,
+        &pair,
+        &10,
+        &false,
+        &false,
+        &1,
+        &80,
+        &1,
+        &None,
+    );
+
+    let score = client.get_score(&sub_wallet, &pair);
+    assert_eq!(score.score, 10); // Not 80
+}
+
+#[test]
+fn test_cyclic_delegation_rejected() {
+    let (env, client, _admin, _service) = initialized();
+    let wallet_a = Address::generate(&env);
+    let wallet_b = Address::generate(&env);
+
+    // A -> A is rejected
+    assert_eq!(
+        client.try_set_score_delegate(&wallet_a, &wallet_a),
+        Err(Ok(Error::CyclicDelegation))
+    );
+
+    // A -> B -> A is rejected
+    client.set_score_delegate(&wallet_a, &wallet_b);
+    assert_eq!(
+        client.try_set_score_delegate(&wallet_b, &wallet_a),
+        Err(Ok(Error::CyclicDelegation))
+    );
+}
+
+#[test]
+fn test_remove_delegate_clears_fallback() {
+    let (env, client, _admin, _service) = initialized();
+    let custodian = Address::generate(&env);
+    let sub_wallet = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+
+    client.set_score_delegate(&sub_wallet, &custodian);
+    client.submit_score(
+        &Vec::new(&env),
+        &custodian,
+        &pair,
+        &40,
+        &false,
+        &false,
+        &1,
+        &80,
+        &1,
+        &None,
+    );
+
+    // Works with delegate
+    assert_eq!(client.get_score(&sub_wallet, &pair).score, 40);
+
+    client.remove_score_delegate(&sub_wallet);
+
+    // Fallback is gone
+    assert_eq!(client.try_get_score(&sub_wallet, &pair), Err(Ok(Error::ScoreNotFound)));
+}
+
+#[test]
+fn test_delegate_propagates_embargo() {
+    let (env, client, _admin, _service) = initialized();
+    let custodian = Address::generate(&env);
+    let sub_wallet = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+
+    client.set_score_delegate(&sub_wallet, &custodian);
+    // Submit embargo score (e.g. 90) which is >= gate_threshold of 75
+    client.submit_score(
+        &Vec::new(&env),
+        &custodian,
+        &pair,
+        &90,
+        &false,
+        &false,
+        &1,
+        &80,
+        &1,
+        &None,
+    );
+
+    let is_safe = client.query_risk_gate(&sub_wallet, &pair, &75);
+    assert!(!is_safe); // Embargo propagates
+}
+
+#[test]
+fn test_delegate_snapshot() {
+    let (env, client, _admin, _service) = initialized();
+    let custodian = Address::generate(&env);
+    let sub_wallet = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+
+    client.set_score_delegate(&sub_wallet, &custodian);
+    client.submit_score(
+        &Vec::new(&env),
+        &custodian,
+        &pair,
+        &20,
+        &false,
+        &false,
+        &1,
+        &80,
+        &1,
+        &None,
+    );
+
+    assert_eq!(client.get_score(&sub_wallet, &pair).score, 20);
+
+    // Update custodian's score
+    env.ledger().with_mut(|l| l.timestamp += 3_601);
+    client.submit_score(
+        &Vec::new(&env),
+        &custodian,
+        &pair,
+        &50,
+        &false,
+        &false,
+        &2,
+        &80,
+        &1,
+        &None,
+    );
+
+    // Sub-wallet immediately sees the new score without any update to itself
+    assert_eq!(client.get_score(&sub_wallet, &pair).score, 50);
+}
+
+// ─── Wallet Relationship Graph Tests ────────────────────────────────────────
+
+#[test]
+fn test_add_link_is_bidirectional() {
+    let (env, client, _admin, _service) = initialized();
+
+    let wallet_a = Address::generate(&env);
+    let wallet_b = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+
+    client.add_counterparty_link(&wallet_a, &wallet_b, &asset_pair);
+
+    let links_a = client.get_counterparties(&wallet_a, &asset_pair);
+    let links_b = client.get_counterparties(&wallet_b, &asset_pair);
+
+    assert_eq!(links_a.len(), 1);
+    assert_eq!(links_b.len(), 1);
+    assert_eq!(links_a.get(0).unwrap(), wallet_b);
+    assert_eq!(links_b.get(0).unwrap(), wallet_a);
+}
+
+#[test]
+fn test_self_link_rejected() {
+    let (env, client, _admin, _service) = initialized();
+
+    let wallet = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+
+    let result = client.try_add_counterparty_link(&wallet, &wallet, &asset_pair);
+    assert_eq!(result, Err(Ok(Error::CounterpartyLinkFull)));
+}
+
+#[test]
+fn test_contagion_boosts_linked_wallets() {
+    let (env, client, _admin, _service) = initialized();
+
+    let anchor = Address::generate(&env);
+    let counterparty = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+
+    // Submit a score for the counterparty (score: 40)
+    client.submit_score(
+        &Vec::new(&env),
+        &counterparty,
+        &asset_pair,
+        &40,
+        &false,
+        &false,
+        &1,
+        &80,
+        &1,
+        &None,
+    );
+
+    // Add counterparty link
+    client.add_counterparty_link(&anchor, &counterparty, &asset_pair);
+
+    // Propagate contagion with boost of 30
+    let affected = client.propagate_contagion(&anchor, &asset_pair, &30);
+
+    assert_eq!(affected, 1);
+
+    // Counterparty score should be boosted to 70 (40 + 30)
+    let score = client.get_score(&counterparty, &asset_pair);
+    assert_eq!(score.score, 70);
+}
+
+#[test]
+fn test_contagion_boost_capped_at_100() {
+    let (env, client, _admin, _service) = initialized();
+
+    let anchor = Address::generate(&env);
+    let counterparty = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+
+    // Submit a score for the counterparty (score: 90)
+    client.submit_score(
+        &Vec::new(&env),
+        &counterparty,
+        &asset_pair,
+        &90,
+        &false,
+        &false,
+        &1,
+        &80,
+        &1,
+        &None,
+    );
+
+    // Add counterparty link
+    client.add_counterparty_link(&anchor, &counterparty, &asset_pair);
+
+    // Propagate contagion with boost of 30 (should cap at 100)
+    let affected = client.propagate_contagion(&anchor, &asset_pair, &30);
+
+    assert_eq!(affected, 1);
+
+    // Counterparty score should be capped at 100
+    let score = client.get_score(&counterparty, &asset_pair);
+    assert_eq!(score.score, 100);
+}
+
+#[test]
+fn test_contagion_missing_score_treated_as_zero() {
+    let (env, client, _admin, _service) = initialized();
+
+    let anchor = Address::generate(&env);
+    let counterparty = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+
+    // No score submitted for counterparty
+
+    // Add counterparty link
+    client.add_counterparty_link(&anchor, &counterparty, &asset_pair);
+
+    // Propagate contagion with boost of 50
+    let affected = client.propagate_contagion(&anchor, &asset_pair, &50);
+
+    assert_eq!(affected, 1);
+
+    // Counterparty score should be 50 (0 + 50)
+    let score = client.get_score(&counterparty, &asset_pair);
+    assert_eq!(score.score, 50);
+}
+
+#[test]
+fn test_counterparty_link_cap_enforced() {
+    let (env, client, _admin, _service) = initialized();
+
+    let wallet_a = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+
+    // Add 50 counterparties (MAX_COUNTERPARTY_LINKS_PER_WALLET = 50)
+    for _i in 0..50 {
+        let counterparty = Address::generate(&env);
+        client.add_counterparty_link(&wallet_a, &counterparty, &asset_pair);
+    }
+
+    let links = client.get_counterparties(&wallet_a, &asset_pair);
+    assert_eq!(links.len(), 50);
+
+    // The 51st should fail
+    let extra = Address::generate(&env);
+    let result = client.try_add_counterparty_link(&wallet_a, &extra, &asset_pair);
+    assert_eq!(result, Err(Ok(Error::ServiceSetFull)));
+}
+
+#[test]
+fn test_contagion_events_per_affected_wallet() {
+    let (env, client, _admin, _service) = initialized();
+
+    let anchor = Address::generate(&env);
+    let counterparty1 = Address::generate(&env);
+    let counterparty2 = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+
+    client.add_counterparty_link(&anchor, &counterparty1, &asset_pair);
+    client.add_counterparty_link(&anchor, &counterparty2, &asset_pair);
+
+    // Submit scores for both counterparties
+    client.submit_score(
+        &Vec::new(&env),
+        &counterparty1,
+        &asset_pair,
+        &20,
+        &false,
+        &false,
+        &1,
+        &80,
+        &1,
+        &None,
+    );
+    client.submit_score(
+        &Vec::new(&env),
+        &counterparty2,
+        &asset_pair,
+        &30,
+        &false,
+        &false,
+        &1,
+        &80,
+        &1,
+        &None,
+    );
+
+    let affected = client.propagate_contagion(&anchor, &asset_pair, &40);
+
+    assert_eq!(affected, 2);
+
+    // Both scores should be boosted
+    let score1 = client.get_score(&counterparty1, &asset_pair);
+    let score2 = client.get_score(&counterparty2, &asset_pair);
+    assert_eq!(score1.score, 60); // 20 + 40
+    assert_eq!(score2.score, 70); // 30 + 40
+}
+
+#[test]
+fn test_contagion_does_not_affect_unlinked_wallets() {
+    let (env, client, _admin, _service) = initialized();
+
+    let anchor = Address::generate(&env);
+    let linked = Address::generate(&env);
+    let unlinked = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+
+    client.add_counterparty_link(&anchor, &linked, &asset_pair);
+
+    // Submit scores for both wallets
+    client.submit_score(
+        &Vec::new(&env),
+        &linked,
+        &asset_pair,
+        &20,
+        &false,
+        &false,
+        &1,
+        &80,
+        &1,
+        &None,
+    );
+    client.submit_score(
+        &Vec::new(&env),
+        &unlinked,
+        &asset_pair,
+        &20,
+        &false,
+        &false,
+        &1,
+        &80,
+        &1,
+        &None,
+    );
+
+    let affected = client.propagate_contagion(&anchor, &asset_pair, &50);
+
+    assert_eq!(affected, 1);
+
+    // Linked wallet boosted, unlinked unchanged
+    let linked_score = client.get_score(&linked, &asset_pair);
+    let unlinked_score = client.get_score(&unlinked, &asset_pair);
+    assert_eq!(linked_score.score, 70); // 20 + 50
+    assert_eq!(unlinked_score.score, 20); // Unchanged
+}
+
+#[test]
+fn test_contagion_bypasses_rate_limits() {
+    let (env, client, _admin, _service) = initialized();
+
+    let anchor = Address::generate(&env);
+    let counterparty = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+
+    // Add link and submit score
+    client.add_counterparty_link(&anchor, &counterparty, &asset_pair);
+    client.submit_score(
+        &Vec::new(&env),
+        &counterparty,
+        &asset_pair,
+        &30,
+        &false,
+        &false,
+        &1,
+        &80,
+        &1,
+        &None,
+    );
+
+    // Verify the score was set
+    let initial_score = client.get_score(&counterparty, &asset_pair);
+    assert_eq!(initial_score.score, 30);
+
+    // Contagion propagation works regardless of cooldown
+    let affected = client.propagate_contagion(&anchor, &asset_pair, &40);
+    assert_eq!(affected, 1);
+
+    let score = client.get_score(&counterparty, &asset_pair);
+    assert_eq!(score.score, 70); // 30 + 40, despite cooldown not having elapsed
+}
+
+#[test]
+fn test_contagion_depth_returns_graph_degree() {
+    let (env, client, _admin, _service) = initialized();
+
+    let wallet = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+
+    // Initially 0
+    assert_eq!(client.get_contagion_depth(&wallet, &asset_pair), 0);
+
+    // Add 3 counterparties
+    let c1 = Address::generate(&env);
+    let c2 = Address::generate(&env);
+    let c3 = Address::generate(&env);
+
+    client.add_counterparty_link(&wallet, &c1, &asset_pair);
+    assert_eq!(client.get_contagion_depth(&wallet, &asset_pair), 1);
+
+    client.add_counterparty_link(&wallet, &c2, &asset_pair);
+    assert_eq!(client.get_contagion_depth(&wallet, &asset_pair), 2);
+
+    client.add_counterparty_link(&wallet, &c3, &asset_pair);
+    assert_eq!(client.get_contagion_depth(&wallet, &asset_pair), 3);
+}
+
+#[test]
+fn test_remove_counterparty_link() {
+    let (env, client, _admin, _service) = initialized();
+
+    let wallet_a = Address::generate(&env);
+    let wallet_b = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+
+    client.add_counterparty_link(&wallet_a, &wallet_b, &asset_pair);
+
+    // Verify link exists
+    let links_a = client.get_counterparties(&wallet_a, &asset_pair);
+    assert_eq!(links_a.len(), 1);
+
+    // Remove the link
+    client.remove_counterparty_link(&wallet_a, &wallet_b, &asset_pair);
+
+    let links_a = client.get_counterparties(&wallet_a, &asset_pair);
+    let links_b = client.get_counterparties(&wallet_b, &asset_pair);
+    assert_eq!(links_a.len(), 0);
+    assert_eq!(links_b.len(), 0);
+}
+
+#[test]
+fn test_remove_nonexistent_link_fails() {
+    let (env, client, _admin, _service) = initialized();
+
+    let wallet_a = Address::generate(&env);
+    let wallet_b = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+
+    let result = client.try_remove_counterparty_link(&wallet_a, &wallet_b, &asset_pair);
+    assert_eq!(result, Err(Ok(Error::CounterpartyLinkFull)));
+}
+
+// ── get_score_variance tests ──────────────────────────────────────────────────
+
+#[test]
+fn test_get_score_variance_empty() {
+    let (env, client, _admin, _service) = initialized();
+    let wallet = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+    assert_eq!(client.get_score_variance(&wallet, &asset_pair), 0);
+}
+
+#[test]
+fn test_get_score_variance_single_entry() {
+    let (env, client, _admin, _service) = initialized();
+    let wallet = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &asset_pair,
+        &50,
+        &false,
+        &false,
+        &1,
+        &80,
+        &1,
+        &None,
+    );
+    assert_eq!(client.get_score_variance(&wallet, &asset_pair), 0);
+}
+
+#[test]
+fn test_get_score_variance_identical_scores() {
+    let (env, client, _admin, _service) = initialized();
+    let wallet = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+    for i in 0u32..4 {
+        env.ledger().with_mut(|l| l.timestamp += 3_601);
+        client.submit_score(
+            &Vec::new(&env),
+            &wallet,
+            &asset_pair,
+            &42,
+            &false,
+            &false,
+            &(i as u64 + 1),
+            &80,
+            &1,
+            &None,
+        );
+    }
+    assert_eq!(client.get_score_variance(&wallet, &asset_pair), 0);
+}
+
+#[test]
+fn test_get_score_variance_known_values() {
+    let (env, client, _admin, _service) = initialized();
+    let wallet = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+    // scores: [2, 4, 6, 8]; mean=5; var=((3^2)+(1^2)+(1^2)+(3^2))/4 = 20/4 = 5; scaled = 5*100 = 500
+    for i in 0u32..4 {
+        env.ledger().with_mut(|l| l.timestamp += 3_601);
+        client.submit_score(
+            &Vec::new(&env),
+            &wallet,
+            &asset_pair,
+            &(2 + i * 2),
+            &false,
+            &false,
+            &(i as u64 + 1),
+            &80,
+            &1,
+            &None,
+        );
+    }
+    assert_eq!(client.get_score_variance(&wallet, &asset_pair), 500);
+}
+
+#[test]
+fn test_get_score_variance_embargoed() {
+    let (env, client, _admin, _service) = initialized();
+    let wallet = Address::generate(&env);
+    let asset_pair = symbol_short!("XLM_USDC");
+    env.ledger().with_mut(|l| l.timestamp += 3_601);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &asset_pair,
+        &10,
+        &false,
+        &false,
+        &1,
+        &80,
+        &1,
+        &None,
+    );
+    env.ledger().with_mut(|l| l.timestamp += 3_601);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &asset_pair,
+        &20,
+        &false,
+        &false,
+        &2,
+        &80,
+        &1,
+        &None,
+    );
+    let admin = client.get_admin();
+    env.ledger().with_mut(|l| l.timestamp += 1);
+    client.set_score_embargo(&wallet, &None);
+    assert_eq!(client.get_score_variance(&wallet, &asset_pair), 0);
 }
