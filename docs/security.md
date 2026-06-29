@@ -100,3 +100,62 @@ Each entry in `data/annotation_queue.json` carries an `annotation_hmac` field: H
 ```bash
 python -c "import secrets; print(secrets.token_hex(32))"
 ```
+
+## Field-Level Encryption for Forensic Reports
+
+Forensic reports (`detection/forensic_report.py`) contain raw Stellar wallet
+addresses that identify subjects under investigation.  To prevent premature
+exposure, wallet addresses should be encrypted at rest using AES-256-GCM
+field-level encryption provided by `utils/field_encryption.py`.
+
+### Encryption Scheme
+
+- **Algorithm**: AES-256-GCM (authenticated encryption with 128-bit tag).
+- **IV**: A fresh 12-byte random IV is generated per field per encryption call.
+  This guarantees that encrypting the same wallet address twice produces
+  different ciphertexts (IV-reuse attack prevention).
+- **Stored format**: `iv (12 bytes) || ciphertext || GCM tag (16 bytes)` as a
+  binary blob.
+- **Authentication**: Decryption raises `cryptography.exceptions.InvalidTag`
+  on any authentication failure.  Silent corruption is impossible.
+
+### Key Management
+
+Set `FORENSIC_REPORT_ENCRYPTION_KEY` to a 64-character lowercase hex string
+representing 32 random bytes:
+
+```bash
+python -c "import secrets; print(secrets.token_hex(32))"
+```
+
+- The key must be **exactly 32 bytes**; a shorter key raises a startup error.
+- If the variable is absent, a warning is emitted and plaintext is stored
+  (development only — never acceptable in production).
+- Store the key in a secrets manager (Vault, AWS Secrets Manager, etc.),
+  never in `.env` committed to version control.
+
+### Key Rotation
+
+To re-encrypt existing forensic reports when the key changes:
+
+1. Decrypt all stored blobs with the **old** key.
+2. Re-encrypt each field value with the **new** key.
+3. Atomically swap the updated blobs in the database.
+4. Revoke the old key.
+
+Run this as a migration script with the old key available as a temporary
+environment variable (e.g. `OLD_FORENSIC_KEY`), then set
+`FORENSIC_REPORT_ENCRYPTION_KEY` to the new key.
+
+### Export Authorisation
+
+Before generating a PDF that includes decrypted wallet addresses, call:
+
+```python
+from utils.field_encryption import check_export_permission
+
+check_export_permission(current_user.permissions)  # raises PermissionError if not authorised
+```
+
+Only users with the `forensic_export` permission may trigger exports with
+decrypted addresses.
