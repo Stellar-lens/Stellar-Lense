@@ -83,6 +83,11 @@ class Config:
     LEDGERLENS_CONTRACT_ID: str = os.getenv("LEDGERLENS_CONTRACT_ID", "")
     LEDGERLENS_SUBMITTER_SECRET: str = os.getenv("LEDGERLENS_SUBMITTER_SECRET", "")
 
+    # Solana RPC endpoint for cross-chain resolution
+    SOLANA_RPC_URL: str = os.getenv(
+        "SOLANA_RPC_URL", "https://api.mainnet-beta.solana.com"
+    )
+
     MIN_TRADES_FOR_SCORING: int = int(os.getenv("MIN_TRADES_FOR_SCORING", "20"))
     LIST_RELOAD_INTERVAL_SECONDS: int = int(os.getenv("LIST_RELOAD_INTERVAL_SECONDS", "60"))
 
@@ -93,6 +98,8 @@ class Config:
 
     # Forensic reporting
     REPORT_CONCURRENCY: int = int(os.getenv("REPORT_CONCURRENCY", "4"))
+    # SHAP interaction values are O(n * d^2) — disable by default.
+    SHAP_INTERACTIONS_ENABLED: bool = os.getenv("SHAP_INTERACTIONS_ENABLED", "false").lower() == "true"
 
     # Wallet funding graph — multi-hop traversal + wash-trading ring detection
     WALLET_GRAPH_MAX_DEPTH: int = int(os.getenv("WALLET_GRAPH_MAX_DEPTH", "4"))
@@ -155,6 +162,9 @@ class Config:
     BFT_MIN_CONSENSUS: int = int(os.getenv("BFT_MIN_CONSENSUS", "2"))
     POISON_LABEL_RATIO_THRESHOLD: float = float(os.getenv("POISON_LABEL_RATIO_THRESHOLD", "0.15"))
     ZERO_SHOT_WEIGHT: float = float(os.getenv("ZERO_SHOT_WEIGHT", "0.0"))
+    ZERO_SHOT_MIN_LABELLED_EXAMPLES: int = int(os.getenv("ZERO_SHOT_MIN_LABELLED_EXAMPLES", "20"))
+    BENFORD_CI_ENABLED: bool = os.getenv("BENFORD_CI_ENABLED", "false").lower() == "true"
+    BRIDGE_ROUNDTRIP_WINDOW_HOURS: int = int(os.getenv("BRIDGE_ROUNDTRIP_WINDOW_HOURS", "72"))
 
     # Graph Neural Network encoder (detection/gnn_encoder.py)
     GNN_EMBEDDING_DIM: int = int(os.getenv("GNN_EMBEDDING_DIM", "32"))
@@ -182,19 +192,21 @@ class Config:
     GNN_HIDDEN_DIM: int = int(os.getenv("GNN_HIDDEN_DIM", "64"))
     GNN_NUM_LAYERS: int = int(os.getenv("GNN_NUM_LAYERS", "2"))
 
-    # CUSUM change-point detector (monitoring/cusum_detector.py)
-    # Target in-control mean of the risk score stream.
-    CUSUM_TARGET_MEAN: float = float(os.getenv("CUSUM_TARGET_MEAN", "30.0"))
-    # Allowable slack (k): typically half the minimum detectable shift.
-    # k = 5 targets a shift of 10 score points; gives in-control ARL ~500.
-    CUSUM_ALLOWABLE_SLACK: float = float(os.getenv("CUSUM_ALLOWABLE_SLACK", "5.0"))
-    # Decision threshold (h): crossing h triggers an alarm.
-    # h = 25 gives out-of-control ARL ~10 for a 10-point shift (σ≈15).
-    CUSUM_DECISION_THRESHOLD: float = float(os.getenv("CUSUM_DECISION_THRESHOLD", "25.0"))
+    # Dynamic ensemble weight adjustment (#268)
+    ENSEMBLE_WEIGHT_SMOOTHING_ALPHA: float = float(os.getenv("ENSEMBLE_WEIGHT_SMOOTHING_ALPHA", "0.1"))
+    ENSEMBLE_SYSTEMIC_FP_THRESHOLD: float = float(os.getenv("ENSEMBLE_SYSTEMIC_FP_THRESHOLD", "0.5"))
 
-    # Platt scaling calibration (training/calibration.py)
-    CALIBRATION_SPLIT: float = float(os.getenv("CALIBRATION_SPLIT", "0.2"))
-    CALIBRATION_RANDOM_SEED: int = int(os.getenv("CALIBRATION_RANDOM_SEED", "42"))
+    # GNN DiffPool cluster scoring (#269)
+    GNN_DIFFPOOL_CLUSTERS: int = int(os.getenv("GNN_DIFFPOOL_CLUSTERS", "10"))
+
+    # Async federated learning (#270)
+    FEDERATED_ASYNC_TRIGGER_N: int = int(os.getenv("FEDERATED_ASYNC_TRIGGER_N", "3"))
+    FEDERATED_ASYNC_TRIGGER_SECONDS: int = int(os.getenv("FEDERATED_ASYNC_TRIGGER_SECONDS", "300"))
+    FEDERATED_MAX_STALENESS: int = int(os.getenv("FEDERATED_MAX_STALENESS", "5"))
+
+    # Label quality estimation (#271)
+    LABEL_QUALITY_NOISE_THRESHOLD: float = float(os.getenv("LABEL_QUALITY_NOISE_THRESHOLD", "0.1"))
+    ANNOTATOR_NOISE_RATE_ALERT_THRESHOLD: float = float(os.getenv("ANNOTATOR_NOISE_RATE_ALERT_THRESHOLD", "0.2"))
 
     @classmethod
     def validate(cls, require_onchain: bool = False):
@@ -209,10 +221,11 @@ class Config:
         if not cls.MODEL_DIR.strip():
             errors.append("MODEL_DIR is not set.")
 
-        if cls.CUSUM_ALLOWABLE_SLACK < 0:
-            errors.append("CUSUM_ALLOWABLE_SLACK must be >= 0.")
-        if cls.CUSUM_DECISION_THRESHOLD <= 0:
-            errors.append("CUSUM_DECISION_THRESHOLD must be > 0.")
+        if cls.DP_AGGREGATOR_EPSILON <= 0:
+            errors.append("DP_AGGREGATOR_EPSILON must be > 0.")
+
+        if not (0 < cls.DP_AGGREGATOR_DELTA < 0.5):
+            errors.append("DP_AGGREGATOR_DELTA must be in (0, 0.5).")
 
         if require_onchain:
             if not cls.LEDGERLENS_CONTRACT_ID.strip():
