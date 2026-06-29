@@ -159,6 +159,12 @@ class Config:
     WS_REPLAY_BUFFER_SIZE: int = int(os.getenv("WS_REPLAY_BUFFER_SIZE", "1000"))
     WS_RATE_LIMIT_MSGS_PER_SECOND: int = int(os.getenv("WS_RATE_LIMIT_MSGS_PER_SECOND", "100"))
 
+    # WebSocket abuse detection (issue #223)
+    WS_ABUSE_MAX_REQUESTS_PER_MINUTE: int = int(os.getenv("WS_ABUSE_MAX_REQUESTS_PER_MINUTE", "300"))
+    WS_ABUSE_MAX_DISTINCT_WALLETS: int = int(os.getenv("WS_ABUSE_MAX_DISTINCT_WALLETS", "50"))
+    WS_ABUSE_WALLET_WINDOW_SECONDS: int = int(os.getenv("WS_ABUSE_WALLET_WINDOW_SECONDS", "60"))
+    WS_ABUSE_BLOCK_DURATION_SECONDS: int = int(os.getenv("WS_ABUSE_BLOCK_DURATION_SECONDS", "300"))
+
     # Differentially private neural training (DP-SGD via Opacus)
     DP_TARGET_EPSILON: float = float(os.getenv("DP_TARGET_EPSILON", "8.0"))
     DP_TARGET_DELTA: float = float(os.getenv("DP_TARGET_DELTA", "1e-5"))
