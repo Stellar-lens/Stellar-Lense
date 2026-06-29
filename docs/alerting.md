@@ -1,44 +1,32 @@
-# Alerting
+# Alerting Architecture
 
-## Correlated alert deduplication
+LedgerLens uses a consensus-driven alert escalation model to reduce false positives while maintaining sensitivity.
 
-Independent detectors (Benford engine, GNN embedder, Isolation Forest, ...)
-can each flag the same underlying wallet activity within seconds of one
-another. Without correlation, an analyst receives one notification per
-detector for what is really a single event. `alerts/deduplicator.py` groups
-these correlated signals into a single enriched alert.
+## Consensus Escalation
 
-### Architecture
+The alerting system requires agreement from multiple detectors before escalating to high-severity alerts:
 
-```
- Benford engine ──┐
- GNN embedder ────┼──► alert_stream ──► deduplicate() ──► grouped alert ──► AlertDispatcher
- Isolation Forest ┘                         │
-                                             ▼
-                                   in-memory sliding window,
-                                   keyed by (wallet_address, asset_pair)
-```
+- **Single-detector alerts**: Emitted on the `low_confidence_alerts` channel when one detector fires
+- **Consensus alerts**: Emitted when `MIN_DETECTOR_CONSENSUS` (default 2) distinct detectors fire within `CONSENSUS_WINDOW_SECONDS` (default 120)
 
-* Alerts are buffered per `(wallet_address, asset_pair)` key.
-* A group is flushed once `ALERT_DEDUP_WINDOW_SECONDS` (default 60s, clamped
-  to 5-300s) of silence has elapsed for that key, measured against each
-  alert's `detected_at` event time rather than wall-clock time. This keeps
-  the function deterministic for both replay and live use.
-* The flushed alert contains the union of contributing detector names, the
-  maximum risk score across signals, the union of evidence fields, and the
-  earliest `detected_at` timestamp in the group.
-* Buffering is purely in-memory and is not persisted across process
-  restarts -- a restart simply starts new groups.
-* The `ledgerlens_alerts_deduplicated_total` Prometheus counter tracks how
-  many raw alerts were folded into an existing group rather than emitted
-  standalone.
+## Sliding Window
 
-### Continuous alerting with no silence gap
+The consensus window is a sliding window, not a tumbling window. Signals arriving 119 seconds apart still trigger consensus if they meet the threshold.
 
-If a wallet keeps generating alerts back-to-back with no gap longer than
-`ALERT_DEDUP_WINDOW_SECONDS`, the group never flushes on its own and keeps
-absorbing new signals indefinitely (bounded only by stream end). For a truly
-unbounded live stream, pair `deduplicate()` with an external max-group-age
-or periodic forced-flush check upstream if you need a hard upper bound on
-notification latency; the current implementation intentionally favours
-correctness of grouping over a hard latency ceiling.
+## Redis Buffer Architecture
+
+Detector signals are buffered in Redis with the following structure:
+
+- Key: `consensus:{wallet}:{pair}`
+- Fields: `{detector_name: timestamp}`
+- TTL: `CONSENSUS_WINDOW_SECONDS + 10` seconds
+
+This ensures state is preserved across restarts and automatically expires old signals.
+
+## Configuration
+
+Consensus thresholds can be configured per alert severity level in `config.py`.
+
+## Detector Allowlist
+
+Detector names are validated against a known allowlist to prevent injection attacks. Valid detectors include: benford, ml, graph, liquidity, cross_pair.

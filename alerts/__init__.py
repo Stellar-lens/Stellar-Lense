@@ -1,1 +1,1 @@
-"""Alert correlation and deduplication layer."""
+"""Alerts module."""
