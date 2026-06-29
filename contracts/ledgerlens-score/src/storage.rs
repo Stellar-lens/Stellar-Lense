@@ -6,6 +6,9 @@ use crate::constants::{
 };
 use crate::errors::Error;
 use crate::types::{
+    AggregateRiskScore, DataKey, DecayCurve, EmbargoExpiry, GateDataKey, JumpStats,
+    ModelVersionStats, PendingScoreEntry, RiskScore, ScoreDispute, ScoreFloorPolicy,
+    ScoreHistogram, ScoreTrend, ScoreVelocityCap, SubscorePayload, UpgradeProposal,
     AggregateRiskScore, DataKey, EmbargoExpiry, GateDataKey, JumpStats, ModelVersionStats,
     ParameterProposalRecord, ParameterProposalStatus, PendingScoreEntry, RiskScore, ScoreDispute,
     ScoreFloorPolicy, ScoreHistogram, ScoreTrend, ScoreVelocityCap, UpgradeProposal,
@@ -2076,6 +2079,89 @@ pub fn set_reveal_window_secs(env: &Env, secs: u64) {
     env.storage().instance().set(&DataKey::RevealWindowSecs, &secs);
 }
 
+// ── Issue #285: Decay curve ──────────────────────────────────────────────────
+
+pub fn set_decay_curve(env: &Env, curve: &DecayCurve) {
+    env.storage().instance().set(&DataKey::DecayCurveConfig, curve);
+}
+
+pub fn get_decay_curve(env: &Env) -> DecayCurve {
+    env.storage()
+        .instance()
+        .get(&DataKey::DecayCurveConfig)
+        .unwrap_or(DecayCurve::Exponential)
+}
+
+// ── Issue #283: Dormancy decay ───────────────────────────────────────────────
+
+pub fn set_dormancy_inactivity_secs(env: &Env, secs: u64) {
+    env.storage().instance().set(&DataKey::DormancyInactivitySecs, &secs);
+}
+
+pub fn get_dormancy_inactivity_secs(env: &Env) -> u64 {
+    env.storage().instance().get(&DataKey::DormancyInactivitySecs).unwrap_or(0)
+}
+
+pub fn set_dormancy_decay_fraction_bps(env: &Env, bps: u32) {
+    env.storage().instance().set(&DataKey::DormancyDecayFractionBps, &bps);
+}
+
+pub fn get_dormancy_decay_fraction_bps(env: &Env) -> u32 {
+    env.storage().instance().get(&DataKey::DormancyDecayFractionBps).unwrap_or(0)
+}
+
+pub fn set_decay_checkpoint(env: &Env, wallet: &Address, asset_pair: &Symbol, ts: u64) {
+    let key = DataKey::DecayCheckpoint(wallet.clone(), asset_pair.clone());
+    env.storage().persistent().set(&key, &ts);
+    env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+}
+
+pub fn get_decay_checkpoint(env: &Env, wallet: &Address, asset_pair: &Symbol) -> u64 {
+    let key = DataKey::DecayCheckpoint(wallet.clone(), asset_pair.clone());
+    env.storage().persistent().get(&key).unwrap_or(0)
+}
+
+// ── Issue #284: Finality depth ───────────────────────────────────────────────
+
+pub fn set_finality_depth(env: &Env, ledgers: u32) {
+    env.storage().instance().set(&DataKey::FinalityDepth, &ledgers);
+}
+
+pub fn get_finality_depth(env: &Env) -> u32 {
+    env.storage().instance().get(&DataKey::FinalityDepth).unwrap_or(0)
+}
+
+pub fn set_score_submission_ledger(env: &Env, wallet: &Address, asset_pair: &Symbol, seq: u32) {
+    let key = DataKey::ScoreSubmissionLedger(wallet.clone(), asset_pair.clone());
+    env.storage().persistent().set(&key, &seq);
+    env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+}
+
+pub fn get_score_submission_ledger(env: &Env, wallet: &Address, asset_pair: &Symbol) -> u32 {
+    let key = DataKey::ScoreSubmissionLedger(wallet.clone(), asset_pair.clone());
+    env.storage().persistent().get(&key).unwrap_or(0)
+}
+
+// ── Issue #286: Score breakdown ──────────────────────────────────────────────
+
+pub fn set_score_breakdown(
+    env: &Env,
+    wallet: &Address,
+    asset_pair: &Symbol,
+    payload: &SubscorePayload,
+) {
+    let key = DataKey::ScoreBreakdown(wallet.clone(), asset_pair.clone());
+    env.storage().persistent().set(&key, payload);
+    env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+}
+
+pub fn get_score_breakdown(
+    env: &Env,
+    wallet: &Address,
+    asset_pair: &Symbol,
+) -> Option<SubscorePayload> {
+    let key = DataKey::ScoreBreakdown(wallet.clone(), asset_pair.clone());
+    env.storage().persistent().get(&key)
 // ── Per-pair score submission counter ────────────────────────────────────────
 
 /// Increments the running total of successful score submissions for

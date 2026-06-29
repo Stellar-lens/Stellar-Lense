@@ -501,6 +501,20 @@ pub enum DataKey {
     ScoreEntryIndex,
     ScoreEntryLastTouchedLedger(Address, Symbol),
     ModelVersionIndex,
+    /// Configured decay curve profile for score interpolation.
+    DecayCurveConfig,
+    /// Per-(wallet, asset_pair) dormancy decay checkpoint timestamp.
+    DecayCheckpoint(Address, Symbol),
+    /// Dormancy config: seconds of inactivity before decay applies.
+    DormancyInactivitySecs,
+    /// Dormancy config: fraction of (score - mean) to decay per checkpoint, in basis points.
+    DormancyDecayFractionBps,
+    /// Number of Stellar ledger closures required before a submitted score is final.
+    FinalityDepth,
+    /// Ledger sequence at which the current score for (wallet, asset_pair) was last written.
+    ScoreSubmissionLedger(Address, Symbol),
+    /// Optional sub-score breakdown for (wallet, asset_pair).
+    ScoreBreakdown(Address, Symbol),
     /// Running total of score submissions for an asset pair (all wallets combined).
     /// Incremented on every successful submission for `asset_pair`.
     PairScoreCount(Symbol),
@@ -625,6 +639,13 @@ impl DataKey {
             DataKey::JumpStats(w, s) => k2!("JumpStats", w, s),
             DataKey::FeeRecipient => k0!("FeeRecipient"),
             DataKey::EmbargoedWalletIndex => k0!("EmbargoedWIndex"),
+            DataKey::DecayCurveConfig => k0!("DecayCurveConf"),
+            DataKey::DecayCheckpoint(a, s) => k2!("DecayChkpt", a, s),
+            DataKey::DormancyInactivitySecs => k0!("DrmInactSecs"),
+            DataKey::DormancyDecayFractionBps => k0!("DrmFracBps"),
+            DataKey::FinalityDepth => k0!("FinalityDepth"),
+            DataKey::ScoreSubmissionLedger(a, s) => k2!("SubLedger", a, s),
+            DataKey::ScoreBreakdown(a, s) => k2!("ScoreBreak", a, s),
             DataKey::PairScoreCount(s) => k1!("PairScoreCnt", s),
             DataKey::TotalWalletsScored => k0!("TotalWalletsScored"),
         }
@@ -676,6 +697,50 @@ pub struct VerkleLeaf {
     pub model_version: u32,
 }
 
+/// A single step entry for the `StepWise` decay curve.
+/// When elapsed seconds since the score was recorded reaches `time_threshold_secs`,
+/// the score is set to `score_value`.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct StepWiseEntry {
+    pub time_threshold_secs: u64,
+    pub score_value: u32,
+}
+
+/// Selectable decay curve applied in `get_interpolated_score` and `get_effective_score`.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum DecayCurve {
+    /// Linear interpolation between history points (existing default behaviour).
+    Exponential,
+    /// Quadratic easing: slow initial change, fast later (f² weighting).
+    Quadratic,
+    /// Logarithmic easing: fast initial drop, then levels off.
+    Logarithmic,
+    /// Discrete tier drops at configurable time thresholds.
+    StepWise(Vec<StepWiseEntry>),
+}
+
+/// Optional sub-score breakdown submitted alongside a composite score.
+/// Off-chain models populate whichever dimensions they compute.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SubscorePayload {
+    pub benford_score: Option<u32>,
+    pub ml_score: Option<u32>,
+    pub network_score: Option<u32>,
+}
+
+/// A risk score paired with its ledger-finality status.
+/// Returned by `get_score_with_finality`.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ScoreWithFinality {
+    pub score: RiskScore,
+    /// `true` when the configured `finality_depth` ledgers have not yet
+    /// elapsed since the score was submitted — consumers should treat the
+    /// score as provisional.
+    pub finality_pending: bool,
 /// Configurable score decay profile.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]

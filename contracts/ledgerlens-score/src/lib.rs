@@ -1861,22 +1861,47 @@ impl LedgerLensScoreContract {
             }
         };
 
+        // Issue #284: if finality depth is configured and not yet reached,
+        // fall back to the previous confirmed score from history.
+        let confirmed_score = {
+            let depth = storage::get_finality_depth(&env);
+            if depth > 0 {
+                let sub_ledger = storage::get_score_submission_ledger(&env, &wallet, &asset_pair);
+                let current_seq = env.ledger().sequence();
+                let is_pending = (sub_ledger as u64)
+                    .saturating_add(depth as u64)
+                    > current_seq as u64;
+                if is_pending {
+                    let history = storage::get_score_history(&env, &wallet, &asset_pair);
+                    if history.len() >= 2 {
+                        history.get(history.len() - 2).unwrap()
+                    } else {
+                        return Err(Error::FinalityWindowNotElapsed);
+                    }
+                } else {
+                    score.clone()
+                }
+            } else {
+                score.clone()
+            }
+        };
+
         let ledger_ts = env.ledger().timestamp();
-        let elapsed_secs = ledger_ts.saturating_sub(score.timestamp);
+        let elapsed_secs = ledger_ts.saturating_sub(confirmed_score.timestamp);
         let (lambda_num, lambda_den) = storage::get_decay_rate(&env);
         let decay_applied = lambda_num != 0;
 
         let effective_score = if decay_applied {
             let decay_factor = Self::decay_fixed(elapsed_secs, lambda_num, lambda_den);
             let fixed_scale = constants::DECAY_FIXED_POINT_SCALE;
-            let effective = (score.score as u64)
+            let effective = (confirmed_score.score as u64)
                 .checked_mul(decay_factor)
                 .ok_or(Error::ArithmeticOverflow)?
                 .checked_div(fixed_scale)
                 .ok_or(Error::ArithmeticOverflow)?;
             effective as u32
         } else {
-            score.score
+            confirmed_score.score
         };
 
         // ── Oracle confidence adjustment ───────────────────────────────────
@@ -1906,6 +1931,8 @@ impl LedgerLensScoreContract {
         Ok(EffectiveRiskScore {
             original_score: score.score,
             effective_score,
+            original_confidence: confirmed_score.confidence,
+            confidence_floor: 0,
             original_confidence: score.confidence,
             confidence_floor: oracle_confidence_floor,
             delegated_to: None,
@@ -2000,19 +2027,73 @@ impl LedgerLensScoreContract {
         if timestamp >= last.timestamp {
             return last.score;
         }
+        let curve = storage::get_decay_curve(&env);
         for i in 0..(history.len() - 1) {
             let a = history.get(i).unwrap();
             let b = history.get(i + 1).unwrap();
             if a.timestamp <= timestamp && timestamp <= b.timestamp {
-                let dt = (b.timestamp - a.timestamp) as i128;
+                let dt = b.timestamp.saturating_sub(a.timestamp);
                 if dt == 0 {
                     return a.score;
                 }
-                let num = (timestamp - a.timestamp) as i128 * (b.score as i128 - a.score as i128);
-                return (a.score as i128 + num / dt) as u32;
+                let elapsed = timestamp.saturating_sub(a.timestamp);
+                return Self::apply_curve_interp(elapsed, dt, a.score, b.score, &curve);
             }
         }
         last.score
+    }
+
+    /// Fixed-point curve interpolation between two score points.
+    /// `elapsed` and `dt` are both in seconds; result is clamped to 0–100.
+    fn apply_curve_interp(
+        elapsed: u64,
+        dt: u64,
+        score_a: u32,
+        score_b: u32,
+        curve: &DecayCurve,
+    ) -> u32 {
+        const SCALE: i128 = 1_000_000;
+        let f = (elapsed as i128 * SCALE) / (dt as i128); // 0..SCALE
+        let sa = score_a as i128;
+        let sb = score_b as i128;
+        let delta = sb - sa;
+
+        let result = match curve {
+            // Linear — preserves existing behaviour.
+            DecayCurve::Exponential => sa + (f * delta) / SCALE,
+            // Convex: slow initial change, accelerates toward the end.
+            DecayCurve::Quadratic => {
+                let f2 = (f * f) / SCALE;
+                sa + (f2 * delta) / SCALE
+            }
+            // Concave: fast initial change, decelerates — y = 2f − f².
+            // Passes through (0,0) and (1,1) so the endpoints are exact.
+            DecayCurve::Logarithmic => {
+                let f2 = (f * f) / SCALE;
+                let y = (2 * f - f2).clamp(0, SCALE);
+                sa + (y * delta) / SCALE
+            }
+            // Discrete tier drops: pick the step with the highest
+            // time_threshold_secs that is still ≤ elapsed.
+            DecayCurve::StepWise(steps) => {
+                let mut best_thr: u64 = 0;
+                let mut best_found = false;
+                let mut step_score = sa;
+                for j in 0..steps.len() {
+                    let step = steps.get(j).unwrap();
+                    if step.time_threshold_secs <= elapsed
+                        && (!best_found
+                            || step.time_threshold_secs >= best_thr)
+                    {
+                        best_thr = step.time_threshold_secs;
+                        step_score = step.score_value as i128;
+                        best_found = true;
+                    }
+                }
+                step_score
+            }
+        };
+        result.clamp(0, 100) as u32
     }
 
     /// Returns the total number of score submissions ever recorded for
@@ -7401,6 +7482,7 @@ impl LedgerLensScoreContract {
         // Detect first-ever submission for this (wallet, asset_pair) before writing.
         let is_new_wallet_pair = previous_score.is_none();
         storage::set_score(env, wallet, asset_pair, risk_score);
+        storage::set_score_submission_ledger(env, wallet, asset_pair, env.ledger().sequence());
         storage::set_last_global_submission_time(env, now);
         storage::push_score_history(env, wallet, asset_pair, risk_score);
         storage::register_pair_for_wallet(env, wallet, asset_pair);
