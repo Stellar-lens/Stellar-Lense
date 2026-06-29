@@ -25,6 +25,7 @@ Zero-shot routing (Issue #274):
   ensemble score via config.ZERO_SHOT_WEIGHT when both are available.
 """
 
+import hashlib
 import json
 import math
 import os
@@ -36,6 +37,7 @@ import numpy as np
 import pandas as pd
 
 from config import config
+from detection.conformal import ConformalCalibrator
 from detection.list_override import ListOverride
 from detection.model_training import (
     FEATURE_COLUMNS_EXCLUDE,
@@ -61,8 +63,13 @@ try:
         "bft_divergence_detected_total",
         "Number of times BFT divergence was detected during ensemble scoring",
     )
+    ledgerlens_cluster_scored_total: Counter | None = Counter(
+        "ledgerlens_cluster_scored_total",
+        "Total number of wallet clusters scored by score_cluster()",
+    )
 except Exception:  # pragma: no cover
     bft_divergence_detected_total = None
+    ledgerlens_cluster_scored_total = None
 
 
 def _increment_bft_counter() -> None:
@@ -148,10 +155,47 @@ class RiskScorer:
         self.list_override = ListOverride()
         self.metadata = self._load_metadata()
         self.models = self._load_models()
+        self.calibrators: dict[str, ConformalCalibrator] = {}
+        self._load_calibrators()
         from detection.meta_learner import LeafEmbeddingExtractor
 
         self.extractor = LeafEmbeddingExtractor(self.models)
         self.maml_adapter, self.proto_classifier = self._load_meta_learners()
+
+    def _load_calibrators(self) -> None:
+        """Load conformal calibration artifacts for each model.
+
+        Missing artifacts are logged as warnings but do not crash — a
+        maximally conservative interval is used as fallback.
+        """
+        from detection.conformal import CalibrationIntegrityError
+
+        for name in MODEL_REGISTRY:
+            path = os.path.join(self.model_dir, f"{name}_conformal.json")
+            try:
+                calibrator = ConformalCalibrator.load(path)
+                self.calibrators[name] = calibrator
+                logger.info("Loaded conformal calibration for %s", name)
+            except FileNotFoundError:
+                logger.warning(
+                    "No conformal calibration artifact for %s at %s — "
+                    "uncertainty scoring will use maximally conservative fallback",
+                    name,
+                    path,
+                )
+            except CalibrationIntegrityError:
+                logger.warning(
+                    "Conformal calibration artifact for %s failed integrity check — "
+                    "uncertainty scoring will use maximally conservative fallback",
+                    name,
+                )
+            except Exception:
+                logger.warning(
+                    "Failed to load conformal calibration for %s — "
+                    "uncertainty scoring will use maximally conservative fallback",
+                    name,
+                    exc_info=True,
+                )
 
     def _load_meta_learners(self):
         maml = None
@@ -374,6 +418,73 @@ class RiskScorer:
             result["bft_divergence"] = True
         return result
 
+    def score_with_uncertainty(self, feature_row: pd.Series) -> dict:
+        """Compute risk score with conformal prediction uncertainty bounds.
+
+        Returns the existing score dict plus:
+        ``score_lower``, ``score_upper``, ``prediction_set``, ``coverage_guarantee``.
+
+        Falls back to maximally conservative bounds when calibration artifacts
+        are not available.
+        """
+        base_score = self.score(feature_row)
+
+        if not self.calibrators or not self.models:
+            return {
+                **base_score,
+                "score_lower": 0.0,
+                "score_upper": 100.0,
+                "prediction_set": [],
+                "coverage_guarantee": 1.0,
+            }
+
+        feature_cols = [c for c in feature_row.index if c not in FEATURE_COLUMNS_EXCLUDE]
+        X = feature_row[feature_cols].to_frame().T.astype(float)
+
+        lowers: list[float] = []
+        uppers: list[float] = []
+        for name, model in self.models.items():
+            calibrator = self.calibrators.get(name)
+            if calibrator is None:
+                lowers.append(0.0)
+                uppers.append(100.0)
+                continue
+            try:
+                intervals = calibrator.predict_with_interval(model, X)
+                lowers.append(intervals[0]["lower"])
+                uppers.append(intervals[0]["upper"])
+            except Exception:
+                lowers.append(0.0)
+                uppers.append(100.0)
+
+        score_lower = max(0.0, min(lowers))
+        score_upper = min(100.0, max(uppers))
+
+        coverage_guarantee = 1.0
+        if self.calibrators:
+            coverage_guarantee = 1.0 - next(iter(self.calibrators.values())).alpha
+
+        prediction_set: list[int] = []
+        for name, model in self.models.items():
+            calibrator = self.calibrators.get(name)
+            if calibrator is None:
+                continue
+            try:
+                sets = calibrator.predict_set(model, X)
+                if sets:
+                    prediction_set = sets[0].get("prediction_set", [])
+                    break
+            except Exception:
+                continue
+
+        return {
+            **base_score,
+            "score_lower": score_lower,
+            "score_upper": score_upper,
+            "prediction_set": prediction_set,
+            "coverage_guarantee": coverage_guarantee,
+        }
+
     def score_continuous(self, feature_row: pd.Series) -> float:
         """Continuous ensemble risk score in `[0, 100]` (unrounded).
 
@@ -444,3 +555,127 @@ def _score_one(wallet: str) -> dict:
     # Placeholder — replace with RiskScorer.score() once feature pipeline wired in
     score = min(xlm_balance / 10_000, 1.0)
     return {"wallet": wallet, "score": round(score, 4), "xlm_balance": xlm_balance}
+
+
+# ---------------------------------------------------------------------------
+# Cluster-level risk scoring via DiffPool graph pooling (issue #269)
+# ---------------------------------------------------------------------------
+
+
+def _cluster_id(wallet_ids: list[str]) -> str:
+    """Stable cluster identifier: SHA-256 of the sorted wallet address set.
+
+    Prevents duplicate cluster scoring and lets results be deduplicated.
+    """
+    key = "|".join(sorted(wallet_ids))
+    return hashlib.sha256(key.encode()).hexdigest()
+
+
+def score_cluster(
+    wallet_ids: list[str],
+    graph,
+    scorer: RiskScorer,
+    feature_matrix: pd.DataFrame | None = None,
+    pooler=None,
+    encoder=None,
+    wallet_metadata: dict[str, dict] | None = None,
+) -> dict:
+    """Score an entire suspected wash-trade ring as a unit.
+
+    Extracts the subgraph for ``wallet_ids``, optionally runs DiffPool
+    graph pooling (``pooler``) to capture ring-level topology, and returns a
+    cluster-level risk score (0–100) alongside individual wallet scores.
+
+    The cluster score is permutation-invariant: the result is the same
+    regardless of the order of ``wallet_ids``.
+
+    A Prometheus counter ``ledgerlens_cluster_scored_total`` is incremented
+    on each call.
+
+    Parameters
+    ----------
+    wallet_ids:
+        Wallet addresses forming the suspected ring.
+    graph:
+        ``networkx.DiGraph`` of the full wallet interaction graph.
+    scorer:
+        Loaded ``RiskScorer`` instance.
+    feature_matrix:
+        Optional ``pd.DataFrame`` keyed by wallet, used to obtain individual
+        per-wallet risk scores via ``scorer.score()``.
+    pooler:
+        Optional ``GraphLevelPooling`` instance.  When supplied together with
+        ``encoder``, the DiffPool architecture contributes to the cluster score.
+    encoder:
+        Optional ``GNNEncoder`` instance.
+    wallet_metadata:
+        Optional per-node metadata forwarded to the encoder.
+
+    Returns
+    -------
+    dict with keys:
+        cluster_id, cluster_score (0–100), individual_scores, wallet_count.
+    """
+    if not wallet_ids:
+        raise ValueError("wallet_ids must not be empty")
+
+    cid = _cluster_id(wallet_ids)
+
+    # Increment Prometheus counter
+    if ledgerlens_cluster_scored_total is not None:
+        try:
+            ledgerlens_cluster_scored_total.inc()
+        except Exception:  # pragma: no cover
+            pass
+
+    # --- Individual wallet scores (when feature matrix is available) ---
+    individual_scores: dict[str, int] = {}
+    if feature_matrix is not None:
+        for wallet in sorted(wallet_ids):
+            if wallet in feature_matrix.index:
+                try:
+                    row = feature_matrix.loc[wallet]
+                    individual_scores[wallet] = scorer.score(row)["score"]
+                except Exception as exc:
+                    logger.warning("score_cluster: failed to score wallet %s: %s", wallet, exc)
+
+    # --- Graph pooling contribution (when pooler + encoder are available) ---
+    pooling_score: float | None = None
+    if pooler is not None and encoder is not None:
+        try:
+            pooling_score = pooler.compute_cluster_score(
+                graph, wallet_ids, encoder, wallet_metadata=wallet_metadata
+            )
+        except Exception as exc:
+            logger.warning("score_cluster: DiffPool pooling failed: %s", exc)
+
+    # --- Final cluster score aggregation ---
+    if pooling_score is not None and individual_scores:
+        # Blend: 50% pooling score + 50% mean individual score
+        mean_ind = float(np.mean(list(individual_scores.values())))
+        cluster_score = int(round(0.5 * pooling_score + 0.5 * mean_ind))
+    elif pooling_score is not None:
+        cluster_score = int(round(pooling_score))
+    elif individual_scores:
+        # No pooler: use the 90th-percentile of individual scores to reflect
+        # that rings tend to have uniformly high-scoring members
+        cluster_score = int(round(float(np.percentile(list(individual_scores.values()), 90))))
+    else:
+        # No features and no encoder: cannot score
+        cluster_score = 0
+
+    cluster_score = max(0, min(100, cluster_score))
+
+    result = {
+        "cluster_id": cid,
+        "cluster_score": cluster_score,
+        "individual_scores": individual_scores,
+        "wallet_count": len(wallet_ids),
+    }
+    logger.info(
+        "Cluster scored: cluster_id=%s wallet_count=%d cluster_score=%d",
+        cid,
+        len(wallet_ids),
+        cluster_score,
+    )
+    return result
