@@ -3570,6 +3570,28 @@ impl LedgerLensScoreContract {
         storage::get_signer_age(&env, &signer)
     }
 
+    /// Returns the number of service signers whose age (time since they were
+    /// added) is within the configured signer-rotation TTL.
+    ///
+    /// A signer is considered *active* when
+    /// `get_signer_age(signer) <= get_signer_rotation_ttl()`.  Signers whose
+    /// `SignerAddedAt` record is missing are excluded from the count.
+    ///
+    /// Returns `0` when the service set is empty or when the rotation TTL has
+    /// not been configured (defaults to `0`, which means no signer whose age
+    /// is greater than zero is counted).
+    pub fn get_active_signer_count(env: Env) -> u32 {
+        let ttl = storage::get_signer_rotation_ttl(&env);
+        storage::get_service_set(&env)
+            .iter()
+            .filter(|s| {
+                storage::get_signer_age(&env, s)
+                    .map(|age| age <= ttl)
+                    .unwrap_or(false)
+            })
+            .count() as u32
+    }
+
     /// Set the grace period in seconds that is added to the TTL before a
     /// signer is considered expired. Admin only.
     pub fn set_signer_rotation_grace(
