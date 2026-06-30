@@ -1,124 +1,127 @@
-# LedgerLens Incident Response Runbook
+# LedgerLens Incident Response — Emergency Pause Runbook
 
-This document is the authoritative runbook for LedgerLens security incidents.
-Automated steps are executed by `monitoring/incident_responder.py`; manual
-escalation steps follow.
+## Purpose
 
----
+This runbook covers the procedure for activating the **emergency pause**
+on the `ledgerlens-score` Soroban oracle contract when a critical defect in
+the scoring pipeline is detected (e.g. scores are wildly incorrect, the
+pipeline has been compromised, or downstream applications are being harmed
+by bad data).
 
-## Automated Steps (IncidentResponder)
+## When to Use the Emergency Pause
 
-The `IncidentResponder` class subscribes to the alert dispatcher and, for any
-alert that meets the **high-severity threshold**, automatically executes the
-playbook defined in `data/playbooks/high_risk_wallet.yaml`.
+Activate the pause when **all** of the following are true:
 
-### High-severity thresholds
+- The scoring pipeline is producing incorrect or harmful scores.
+- The defect cannot be fixed within the current Stellar ledger cycle.
+- Downstream applications are acting on the corrupted scores.
 
-| Condition | Threshold |
+Do **not** use the emergency pause as a routine maintenance tool.
+
+## Emergency Keyholders
+
+| Role | Custody |
 |---|---|
-| Risk score | > 90 |
-| Benford MAD | > 0.05 |
-| Alert type | `high_risk_wallet` or `emergency_drift` |
+| Emergency Key 1 | Security lead (HSM) |
+| Emergency Key 2 | On-call engineer (hardware wallet) |
+| Emergency Key 3 | CISO delegate (hardware wallet) |
 
-### Step 1 — Snapshot risk score history
+Two of the three keyholders must independently sign approval transactions for
+the pause to take effect.
 
-`IncidentResponder` calls `RiskScoreStore.get_history(wallet, days=30)` and
-stores the result in the incident record.  This preserves the pre-investigation
-state of the wallet's score curve in case subsequent trades alter it.
+## Pause Procedure
 
-### Step 2 — Generate preliminary forensic report
+### Step 1 — Detect the anomaly
 
-`ForensicReportGenerator.generate()` is called with cached features.  The
-summary (report ID, risk score, verdict, top 5 SHAP features) is stored in the
-incident record.  The full report is available in `reports/forensic/`.
+The `EmergencyWatchdog` (`monitoring/emergency_watchdog.py`) automatically
+proposes a pause when > 90% of scores in a 60-second window exceed 95.  If
+the watchdog is offline or the anomaly does not meet that threshold, a
+keyholder can manually initiate.
 
-**SLA**: must complete within 60 seconds of the alert firing.
+### Step 2 — Initiate the pause (Keyholder 1)
 
-### Step 3 — Create DB incident record
+```python
+from integrations.contract_client import LedgerLensContractClient
 
-An `IncidentRecord` is persisted to the incident store with the following
-fields: `incident_id`, `wallet_hash` (SHA-256 of the raw address), `alert_fingerprint`,
-`alert_type`, `risk_score`, `created_at`, `status`.
-
-**Idempotency**: re-triggering the same `(wallet_hash, alert_fingerprint)` pair
-within the deduplication window (default 3600 s) is a no-op; no second record
-is created.
-
-### Step 4 — Send webhook notification
-
-A JSON payload is POSTed to the URL in `INCIDENT_WEBHOOK_URL` (env var).
-The raw wallet address is **never** included; only the SHA-256 hash appears.
-
-```json
-{
-  "incident_id": "<uuid>",
-  "wallet_hash": "<sha256[:16]>",
-  "alert_type": "high_risk_wallet",
-  "risk_score": 95,
-  "created_at": "2026-06-29T10:00:00+00:00",
-  "status": "open",
-  "report_summary": {
-    "report_id": "<uuid>",
-    "risk_score": 95,
-    "verdict": "wash_trade",
-    "top_features": ["benford_mad_24h", "counterparty_concentration_ratio"]
-  }
-}
+client = LedgerLensContractClient(
+    contract_id="<score_contract_id>",
+    rpc_url="https://soroban-testnet.stellar.org",
+)
+proposal_id = client.initiate_emergency_pause(
+    pause_contract_id="<pause_contract_id>",
+    reason="Scoring pipeline producing anomalous scores — see incident #XYZ",
+    signing_key="<keyholder_1_secret>",   # sign on HSM/hardware wallet
+)
+print(f"Pause proposed: proposal_id={proposal_id}")
 ```
 
-Supported webhook targets: Slack incoming webhooks, PagerDuty Events API v2,
-or any generic HTTPS endpoint.
+Share `proposal_id` with Keyholder 2 via the secure channel.
 
----
+### Step 3 — Approve the pause (Keyholder 2)
 
-## Simulating the Playbook
-
-To verify the playbook or generate a test incident without a live alert:
-
-```bash
-python -m scripts.generate_reports --simulate --wallet GABC1234... \
-    --output-dir reports/forensic --output-format json
+```python
+applied = client.approve_emergency_pause(
+    pause_contract_id="<pause_contract_id>",
+    proposal_id=proposal_id,
+    signing_key="<keyholder_2_secret>",
+)
+print(f"Paused: {applied}")
 ```
 
-The `--simulate` flag runs identical code to a live alert execution (with the
-same mocked data sources), so the output can be used to regression-test the
-report format.
+### Step 4 — Verify the pause
 
----
+The Soroban event listener (`integrations/soroban_event_listener.py`) receives
+the `contract_paused` event and halts the local scoring pipeline within two
+Stellar ledger closes (10–15 seconds).  Verify in the monitoring dashboard
+that score submissions have stopped.
 
-## Configuration
+### Step 5 — Investigate and fix
 
-| Env var | Purpose | Default |
-|---|---|---|
-| `INCIDENT_WEBHOOK_URL` | HTTPS URL to POST notifications to | (none — notifications skipped) |
-| Playbook: `deduplication.window_seconds` | Dedup window | 3600 s |
-| Playbook: `severity_triggers.risk_score_threshold` | Minimum score for high-severity | 90 |
+- Root-cause the defect.
+- Deploy a fix in a staging environment.
+- Obtain sign-off from the security lead.
 
----
+### Step 6 — Unpause
 
-## Manual Escalation Steps
+After the fix is deployed and verified:
 
-After the automated steps complete, an analyst must:
+```python
+client._client.invoke(
+    "unpause",
+    [scval.to_address(keyholder_1_pubkey), scval.to_uint64(proposal_id)],
+    source=keyholder_1_pubkey,
+    signer=keyholder_1_signer,
+).sign_and_submit()
+```
 
-1. **Acknowledge the incident** — update `status` to `investigating` in the
-   incident store or your ticketing system.
-2. **Review the full forensic report** — open the JSON report in
-   `reports/forensic/` and cross-reference the SHAP features with on-chain
-   evidence via Horizon URLs in `trade_evidence`.
-3. **Check for related wallets** — use `scripts/score_wallet.py --propagate`
-   to identify wallets with elevated risk propagation scores connected to this
-   wallet.
-4. **Escalate to compliance** — if `verdict == "wash_trade"` and risk score
-   > 95, file a SAR or exchange notification per your jurisdiction's regulatory
-   requirements.
-5. **Close or re-open the incident** — update `status` to `closed` or
-   `escalated` and attach any external ticket reference.
+Verify that the event listener resumes the pipeline.
 
----
+## Proposal Expiry
 
-## Security considerations
+Pause proposals expire after **15 minutes** (≈180 ledger closes).  A stale
+proposal (e.g. one submitted but not yet approved when the incident was
+resolved) cannot be used to re-pause the contract after expiry.
 
-- The webhook URL is treated as a secret.  Set it via the `INCIDENT_WEBHOOK_URL`
-  environment variable only.  Never log it or include it in error messages.
-- Webhook payloads contain hashed wallet identifiers, not raw Stellar account IDs.
-- Incident records store only the SHA-256 hash of the wallet address.
+## DoS Prevention
+
+A compromised keyholder cannot unilaterally pause the contract — they can
+only propose, not approve.  To prevent an attacker from spamming proposals
+and cluttering the contract storage, proposals are keyed by a monotonically
+incrementing ID and the contract rejects approval of an expired proposal.
+
+## Key Custody
+
+Emergency keyholder secrets are stored in an HSM or hardware wallet.  They
+are **never** written to disk, environment variables, or CI secrets.  The
+`signing_key` parameter to `initiate_emergency_pause` and
+`approve_emergency_pause` is expected to be passed by the keyholder operator
+at the time of the incident, not pre-loaded.
+
+## Post-Incident Checklist
+
+- [ ] Document root cause in incident log.
+- [ ] Confirm fix deployed and verified in staging.
+- [ ] Unpause and confirm pipeline resumes.
+- [ ] Run full test suite post-unpause.
+- [ ] Schedule post-mortem within 48 hours.
+- [ ] Update this runbook if procedures changed.

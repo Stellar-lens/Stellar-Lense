@@ -1,22 +1,17 @@
 """Configuration module.
 
-Re-exports ``config`` and ``Config`` from the root ``config.py`` so that
-``from config import config`` resolves correctly even though a ``config/``
-package directory exists alongside the module file.
+Re-exports ``Config`` and ``config`` from the project-root ``config.py`` so
+that ``from config import config`` and ``from config import Config`` continue
+to work even though a ``config/`` sub-package also exists at the project root.
 """
 
-from __future__ import annotations
-
 import importlib.util
-from pathlib import Path
+import os as _os
 
-_spec = importlib.util.spec_from_file_location(
-    "_config_root", Path(__file__).parent.parent / "config.py"
-)
+_root_config_path = _os.path.join(_os.path.dirname(__file__), "..", "config.py")
+_spec = importlib.util.spec_from_file_location("_config_root", _root_config_path)
 _mod = importlib.util.module_from_spec(_spec)  # type: ignore[arg-type]
 _spec.loader.exec_module(_mod)  # type: ignore[union-attr]
 
-config = _mod.config
 Config = _mod.Config
-
-__all__ = ["config", "Config"]
+config = _mod.config
