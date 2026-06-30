@@ -87,6 +87,14 @@ impl Error {
     pub const FeeRecipientNotSet: Error = Error::FeeTokenNotSet;
     pub const FeeRecipientMismatch: Error = Error::Unauthorized;
 
+    // ── Score embargo ──────────────────────────────────────────────────────
+    /// Returned by read-path functions (`get_score`, `get_aggregate_score`)
+    /// when the requested wallet is under an active regulatory embargo.
+    ScoreEmbargoed = 42,
+
+    // ── Adaptive Threshold ─────────────────────────────────────────────────
+    /// Returned when an invalid target percentile is provided (must be 50-99).
+    InvalidPercentile = 43,
     pub const ParameterProposalNotFound: Error = Error::ScoreNotFound;
     pub const ParameterProposalNotReady: Error = Error::UpgradeNotReady;
     pub const ParameterProposalVetoPeriodEnded: Error = Error::QuorumFailureWindowNotElapsed;

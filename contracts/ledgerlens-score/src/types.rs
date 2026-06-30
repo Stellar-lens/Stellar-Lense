@@ -292,6 +292,20 @@ pub struct ScoreTrend {
     pub consecutive: u32,
 }
 
+/// Configuration and state for the adaptive threshold feature.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AdaptiveThresholdConfig {
+    /// Whether adaptive threshold mode is enabled.
+    pub enabled: bool,
+    /// Target percentile to set as threshold (e.g., 90 = top 10% are risky).
+    pub target_percentile: u32,
+    /// Minimum allowed threshold value.
+    pub min_value: u32,
+    /// Maximum allowed threshold value.
+    pub max_value: u32,
+    /// Last computed adaptive threshold value.
+    pub last_computed: u32,
 /// Largest score-jump anomaly observed so far for a (wallet, asset_pair)
 /// pair. See `get_jump_stats`.
 #[contracttype]
@@ -400,6 +414,16 @@ pub enum DataKey {
     AdminThreshold,
     ScoreDelegate(Address),
     TrendState(Address, Symbol),
+    /// Whether adaptive threshold mode is enabled.
+    AdaptiveThresholdEnabled,
+    /// Target percentile for adaptive threshold (e.g., 90 = top 10% are risky).
+    AdaptiveThresholdTargetPercentile,
+    /// Minimum value for adaptive threshold.
+    AdaptiveThresholdMinValue,
+    /// Maximum value for adaptive threshold.
+    AdaptiveThresholdMaxValue,
+    /// Last computed adaptive threshold value.
+    LastComputedThreshold,
     Counterparties(Address, Symbol),
     ScoreVelocityCapEnabled,
     ScoreVelocityCapPointsPerHour,

@@ -1264,6 +1264,62 @@ pub fn remove_score_delegate(env: &Env, sub_wallet: &Address) {
     env.storage().persistent().remove(&key);
 }
 
+// ── Adaptive Threshold ─────────────────────────────────────────────────────
+
+pub fn is_adaptive_threshold_enabled(env: &Env) -> bool {
+    let result: Option<bool> = env.storage().instance().get(&DataKey::AdaptiveThresholdEnabled);
+    result.unwrap_or(false)
+}
+
+pub fn set_adaptive_threshold_enabled(env: &Env, enabled: bool) {
+    env.storage().instance().set(&DataKey::AdaptiveThresholdEnabled, &enabled);
+}
+
+pub fn get_adaptive_threshold_target_percentile(env: &Env) -> u32 {
+    let result: Option<u32> = env.storage().instance().get(&DataKey::AdaptiveThresholdTargetPercentile);
+    result.unwrap_or(0)
+}
+
+pub fn set_adaptive_threshold_target_percentile(env: &Env, percentile: u32) {
+    env.storage().instance().set(&DataKey::AdaptiveThresholdTargetPercentile, &percentile);
+}
+
+pub fn get_adaptive_threshold_min_value(env: &Env) -> u32 {
+    let result: Option<u32> = env.storage().instance().get(&DataKey::AdaptiveThresholdMinValue);
+    result.unwrap_or(0)
+}
+
+pub fn set_adaptive_threshold_min_value(env: &Env, min: u32) {
+    env.storage().instance().set(&DataKey::AdaptiveThresholdMinValue, &min);
+}
+
+pub fn get_adaptive_threshold_max_value(env: &Env) -> u32 {
+    let result: Option<u32> = env.storage().instance().get(&DataKey::AdaptiveThresholdMaxValue);
+    result.unwrap_or(100)
+}
+
+pub fn set_adaptive_threshold_max_value(env: &Env, max: u32) {
+    env.storage().instance().set(&DataKey::AdaptiveThresholdMaxValue, &max);
+}
+
+pub fn get_last_computed_threshold(env: &Env) -> u32 {
+    let result: Option<u32> = env.storage().instance().get(&DataKey::LastComputedThreshold);
+    result.unwrap_or(0)
+}
+
+pub fn set_last_computed_threshold(env: &Env, threshold: u32) {
+    env.storage().instance().set(&DataKey::LastComputedThreshold, &threshold);
+}
+
+pub fn get_adaptive_threshold_config(env: &Env) -> crate::types::AdaptiveThresholdConfig {
+    crate::types::AdaptiveThresholdConfig {
+        enabled: is_adaptive_threshold_enabled(env),
+        target_percentile: get_adaptive_threshold_target_percentile(env),
+        min_value: get_adaptive_threshold_min_value(env),
+        max_value: get_adaptive_threshold_max_value(env),
+        last_computed: get_last_computed_threshold(env),
+    }
+}
 // ── Wallet Relationship Graph ───────────────────────────────────────────────
 
 pub fn get_counterparties(env: &Env, wallet: &Address, asset_pair: &Symbol) -> Vec<Address> {
