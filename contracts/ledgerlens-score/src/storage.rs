@@ -1156,6 +1156,14 @@ pub fn get_gate_open(env: &Env) -> bool {
     env.storage().instance().get(&ExtDataKey::GateOpen).unwrap_or(true)
 }
 
+pub fn get_gate_enforcement_mode(env: &Env) -> bool {
+    env.storage().instance().get(&GateDataKey::GateOpen).unwrap_or(false)
+}
+
+pub fn set_gate_enforcement_mode(env: &Env, strict: bool) {
+    env.storage().instance().set(&GateDataKey::GateOpen, &strict);
+}
+
 // ── Time-weighted exponential decay ──────────────────────────────────────────
 
 pub fn get_decay_rate(env: &Env) -> (u32, u32) {
