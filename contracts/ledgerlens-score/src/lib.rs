@@ -4020,7 +4020,29 @@ impl LedgerLensScoreContract {
         Ok(())
     }
 
-    /// Returns the current signer rotation TTL in seconds. Default is 30 days.
+    /// Returns the TTL in seconds after which a service signer is considered
+    /// expired and will be rejected on score submission.  Returns `0` when TTL
+    /// enforcement is disabled.  Default: 2 592 000 s (30 days).
+    ///
+    /// Signer operators should schedule key-refresh operations before this
+    /// deadline to avoid submission failures.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// // Default is 30 days (2 592 000 s).
+    /// assert_eq!(client.get_signer_rotation_ttl(), 2_592_000);
+    /// ```
     pub fn get_signer_rotation_ttl(env: Env) -> u64 {
         storage::get_signer_rotation_ttl(&env)
     }
@@ -5770,6 +5792,7 @@ impl LedgerLensScoreContract {
         }
         Self::require_admin_auth(&env, &admin_signers)?;
         storage::set_jump_threshold(&env, threshold);
+        events::jump_threshold_updated(&env, threshold);
         Ok(())
     }
 
@@ -5824,8 +5847,7 @@ impl LedgerLensScoreContract {
 
     // ── Hysteresis layer ─────────────────────────────────────────────────────
 
-    /// Set the hysteresis margin (0-50) used to widen the exit threshold
-    /// below the entry threshold, preventing event oscillation at the boundary.
+    /// Configure the exit-band margin at runtime without a contract upgrade.
     ///
     /// When `margin > 0`, a wallet that entered the high-risk band
     /// (`score >= risk_threshold`) only exits when
@@ -5833,13 +5855,40 @@ impl LedgerLensScoreContract {
     /// recovery before the band is cleared.  When `margin == 0` the exit
     /// threshold equals the entry threshold (no hysteresis).
     ///
-    /// The value is rejected with [`Error::InvalidThreshold`] when it
-    /// exceeds [`constants::MAX_HYSTERESIS_MARGIN`] (50). Admin only.
+    /// Emits a `hysteresis_margin_updated` (`hys_upd`) event on success.
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if the contract has no admin yet.
+    /// - [`Error::InvalidHysteresisMargin`] if `margin` exceeds
+    ///   [`constants::MAX_HYSTERESIS_MARGIN`] (50) or is `>=` the current
+    ///   risk threshold (which would invert the exit band).
+    /// - [`Error::Unauthorized`] if the caller is not the admin.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// client.set_hysteresis_margin(&10);
+    /// assert_eq!(client.get_hysteresis_margin(), 10);
+    /// ```
     pub fn set_hysteresis_margin(env: Env, margin: u32) -> Result<(), Error> {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
         if margin > constants::MAX_HYSTERESIS_MARGIN {
+            return Err(Error::InvalidHysteresisMargin);
+        }
+        let risk_threshold = storage::get_risk_threshold(&env);
+        if margin >= risk_threshold {
             return Err(Error::InvalidHysteresisMargin);
         }
         let admin = storage::get_admin(&env);
@@ -6355,8 +6404,35 @@ impl LedgerLensScoreContract {
         }
     }
 
-    /// Set the staleness window in seconds. A value of `0` is rejected with
-    /// `InvalidStalenessWindow`. Admin only.
+    /// Update the score staleness threshold at runtime without a contract upgrade.
+    ///
+    /// Scores older than `window_secs` seconds are reported as stale by
+    /// [`is_score_stale`](Self::is_score_stale).  Different deployment
+    /// environments may need different staleness windows; this setter lets the
+    /// admin tune the value live.  Emits a `staleness_window_updated` event on
+    /// success.
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if the contract has no admin yet.
+    /// - [`Error::InvalidStalenessWindow`] if `window_secs == 0`.
+    /// - [`Error::Unauthorized`] if the caller is not the admin.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
+    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// client.set_staleness_window(&Vec::new(&env), &3_600);
+    /// assert_eq!(client.get_staleness_window(), 3_600);
+    /// ```
     pub fn set_staleness_window(
         env: Env,
         admin_signers: Vec<Address>,
@@ -6370,6 +6446,7 @@ impl LedgerLensScoreContract {
         }
         Self::require_admin_auth(&env, &admin_signers)?;
         storage::set_staleness_window(&env, window_secs);
+        events::staleness_window_updated(&env, window_secs);
         Ok(())
     }
 
