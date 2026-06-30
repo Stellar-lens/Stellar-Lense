@@ -1324,6 +1324,21 @@ pub fn get_historical_max_score(env: &Env, wallet: &Address, asset_pair: &Symbol
     result.unwrap_or(0)
 }
 
+/// Like [`get_historical_max_score`] but returns `None` when no score has ever
+/// been recorded for the pair instead of collapsing that case to `0`.
+pub fn get_historical_max_score_opt(
+    env: &Env,
+    wallet: &Address,
+    asset_pair: &Symbol,
+) -> Option<u32> {
+    let key = DataKey::HistoricalMaxScore(wallet.clone(), asset_pair.clone());
+    let result: Option<u32> = env.storage().persistent().get(&key);
+    if result.is_some() {
+        env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    }
+    result
+}
+
 pub fn update_historical_max_score(env: &Env, wallet: &Address, asset_pair: &Symbol, score: u32) {
     let key = DataKey::HistoricalMaxScore(wallet.clone(), asset_pair.clone());
     let current: Option<u32> = env.storage().persistent().get(&key);

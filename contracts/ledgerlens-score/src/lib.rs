@@ -6320,9 +6320,11 @@ impl LedgerLensScoreContract {
     }
 
     /// Returns the highest score ever recorded for `(wallet, asset_pair)`, or
-    /// `0` if no score has ever been accepted. This running peak is what the
-    /// floor compares against `high_water_mark`. Read-only, callable by any
-    /// account or contract.
+    /// `None` if no score has ever been accepted. This running peak is what the
+    /// floor compares against `high_water_mark`; exposing it as an `Option`
+    /// lets off-chain tooling distinguish "never scored" from a recorded peak
+    /// of `0` and predict when the floor policy will activate. Read-only,
+    /// callable by any account or contract.
     ///
     /// # Examples
     ///
@@ -6340,12 +6342,12 @@ impl LedgerLensScoreContract {
     /// client.initialize(&admin, &service);
     /// let wallet = Address::generate(&env);
     /// let pair = symbol_short!("XLM_USDC");
-    /// assert_eq!(client.get_historical_max_score(&wallet, &pair), 0);
+    /// assert_eq!(client.get_historical_max_score(&wallet, &pair), None);
     /// client.submit_score(&Vec::new(&env), &wallet, &pair, &85, &false, &false, &1, &90, &1, &None);
-    /// assert_eq!(client.get_historical_max_score(&wallet, &pair), 85);
+    /// assert_eq!(client.get_historical_max_score(&wallet, &pair), Some(85));
     /// ```
-    pub fn get_historical_max_score(env: Env, wallet: Address, asset_pair: Symbol) -> u32 {
-        storage::get_historical_max_score(&env, &wallet, &asset_pair)
+    pub fn get_historical_max_score(env: Env, wallet: Address, asset_pair: Symbol) -> Option<u32> {
+        storage::get_historical_max_score_opt(&env, &wallet, &asset_pair)
     }
 
     /// Returns the minimum allowable score value (`0`). All `submit_score`
