@@ -127,6 +127,9 @@ mod test_cooldown_period;
 #[cfg(test)]
 mod test_signer_tier;
 
+#[cfg(test)]
+mod test_verkle;
+
 use soroban_sdk::{
     contract, contractimpl, crypto::Hash, symbol_short, token, Address, Bytes, BytesN, Env,
     IntoVal, Symbol, SymbolStr, TryFromVal, Vec,
