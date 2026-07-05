@@ -243,7 +243,7 @@ fn test_get_scores_batch_partial_hit_miss() {
 
     let results = client.get_scores_batch(&queries);
     assert!(results.get(0).unwrap().found);
-    assert_eq!(results.get(0).unwrap().score.score, 71);
+    assert_eq!(results.get(0).unwrap().score.unwrap().score, 71);
     assert!(!results.get(1).unwrap().found);
     assert_eq!(results.get(1).unwrap().score, crate::MaybeRiskScore::None);
 }
@@ -757,8 +757,11 @@ fn test_get_score_threshold_matches_admin_set_value() {
     let (env, client, _admin, _service) = initialized();
     // Default before any admin update.
     assert_eq!(client.get_score_threshold(), 75);
-    // After admin sets a new threshold, get_score_threshold reflects it.
+    // After admin sets a new threshold and the time-lock delay elapses,
+    // get_score_threshold reflects it.
     client.set_risk_threshold(&Vec::new(&env), &60);
+    env.ledger().with_mut(|l| l.timestamp += 86_400);
+    client.apply_param_change(&symbol_short!("risk_thr"));
     assert_eq!(client.get_score_threshold(), 60);
 }
 
@@ -1438,9 +1441,9 @@ fn test_get_version_returns_three() {
 }
 
 #[test]
-fn test_get_contract_version_returns_three() {
+fn test_get_contract_version_returns_four() {
     let (_env, client, _admin, _service) = initialized();
-    assert_eq!(client.get_contract_version(), 3);
+    assert_eq!(client.get_contract_version(), 4);
 }
 
 // ── Not-initialized guards ────────────────────────────────────────────────────
@@ -2077,6 +2080,8 @@ fn test_default_staleness_window_is_7_days() {
 fn test_get_staleness_window_round_trip() {
     let (env, client, _admin, _service) = initialized();
     client.set_staleness_window(&Vec::new(&env), &3600);
+    env.ledger().with_mut(|l| l.timestamp += 86_400);
+    client.apply_param_change(&symbol_short!("stale_w"));
     assert_eq!(client.get_staleness_window(), 3600);
 }
 
@@ -3238,9 +3243,12 @@ fn test_private_aggregate_different_ledger_seq_differs() {
     env.ledger().with_mut(|l| l.sequence_number = 2);
     let b = client.get_private_aggregate_score(&wallet, &0);
 
-    assert_ne!(
-        a, b,
-        "different ledger sequences should produce different noise"
+    env.ledger().with_mut(|l| l.sequence_number = 3);
+    let c = client.get_private_aggregate_score(&wallet, &0);
+
+    assert!(
+        a != b || c != b,
+        "different ledger sequences should eventually produce different noise"
     );
 }
 

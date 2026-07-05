@@ -128,7 +128,8 @@ fn payload_commitment(
             timestamp,
             confidence,
             model_version,
-            0, // nonce for test
+            &BytesN::from_array(env, &[0u8; 32]),
+            0,
         )
         .unwrap()
         .to_bytes()

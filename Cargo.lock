@@ -883,6 +883,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "ledgerlens-aggregator"
+version = "0.1.0"
+dependencies = [
+ "ledgerlens-score",
+ "soroban-sdk",
+]
+
+[[package]]
 name = "ledgerlens-score"
 version = "0.1.0"
 dependencies = [

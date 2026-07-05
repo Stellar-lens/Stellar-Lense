@@ -81,7 +81,7 @@ fn both_mock_contracts_deploy_alongside_ledgerlens() {
     // mock-amm and mock-lending compile, link against ledgerlens-score, and
     // register in the same Env as a real LedgerLens deployment.
     let fixture = setup();
-    assert_eq!(fixture.ledgerlens.get_version(), 3);
+    assert_eq!(fixture.ledgerlens.get_version(), 4);
 }
 
 // ── Acceptance criterion: AMM swap rejected/accepted by risk score ─────────

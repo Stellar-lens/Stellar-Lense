@@ -23,15 +23,15 @@ fn test_bulk_reset_removes_custom_weights() {
     let pair_a = symbol_short!("XLM_USDC");
     let pair_b = symbol_short!("XLM_BTC");
 
-    client.set_pair_weight(&Vec::new(&env), &pair_a, &3).unwrap();
-    client.set_pair_weight(&Vec::new(&env), &pair_b, &5).unwrap();
+    client.set_pair_weight(&Vec::new(&env), &pair_a, &3);
+    client.set_pair_weight(&Vec::new(&env), &pair_b, &5);
     assert_eq!(client.get_pair_weight(&pair_a), 3);
     assert_eq!(client.get_pair_weight(&pair_b), 5);
 
     let mut pairs = Vec::new(&env);
     pairs.push_back(pair_a.clone());
     pairs.push_back(pair_b.clone());
-    client.bulk_reset_pair_weight(&Vec::new(&env), &pairs).unwrap();
+    client.bulk_reset_pair_weight(&Vec::new(&env), &pairs);
 
     // Both pairs fall back to the default weight of 1.
     assert_eq!(client.get_pair_weight(&pair_a), 1);
@@ -44,14 +44,14 @@ fn test_bulk_reset_skips_pairs_without_custom_weight() {
     let pair_a = symbol_short!("XLM_USDC");
     let pair_b = symbol_short!("XLM_BTC"); // never had a custom weight
 
-    client.set_pair_weight(&Vec::new(&env), &pair_a, &7).unwrap();
+    client.set_pair_weight(&Vec::new(&env), &pair_a, &7);
 
     let mut pairs = Vec::new(&env);
     pairs.push_back(pair_a.clone());
     pairs.push_back(pair_b.clone());
 
     // Must not error even though pair_b has no custom weight.
-    client.bulk_reset_pair_weight(&Vec::new(&env), &pairs).unwrap();
+    client.bulk_reset_pair_weight(&Vec::new(&env), &pairs);
 
     assert_eq!(client.get_pair_weight(&pair_a), 1);
     assert_eq!(client.get_pair_weight(&pair_b), 1);
@@ -62,10 +62,10 @@ fn test_bulk_reset_empty_list_is_noop() {
     let (env, client) = setup();
     let pair = symbol_short!("XLM_USDC");
 
-    client.set_pair_weight(&Vec::new(&env), &pair, &4).unwrap();
+    client.set_pair_weight(&Vec::new(&env), &pair, &4);
 
     let empty: Vec<soroban_sdk::Symbol> = Vec::new(&env);
-    client.bulk_reset_pair_weight(&Vec::new(&env), &empty).unwrap();
+    client.bulk_reset_pair_weight(&Vec::new(&env), &empty);
 
     // Custom weight must still be in place — nothing was reset.
     assert_eq!(client.get_pair_weight(&pair), 4);
@@ -76,13 +76,13 @@ fn test_bulk_reset_idempotent() {
     let (env, client) = setup();
     let pair = symbol_short!("XLM_USDC");
 
-    client.set_pair_weight(&Vec::new(&env), &pair, &2).unwrap();
+    client.set_pair_weight(&Vec::new(&env), &pair, &2);
 
     let mut pairs = Vec::new(&env);
     pairs.push_back(pair.clone());
-    client.bulk_reset_pair_weight(&Vec::new(&env), &pairs).unwrap();
+    client.bulk_reset_pair_weight(&Vec::new(&env), &pairs);
     // Calling again on an already-reset pair must not error.
-    client.bulk_reset_pair_weight(&Vec::new(&env), &pairs).unwrap();
+    client.bulk_reset_pair_weight(&Vec::new(&env), &pairs);
 
     assert_eq!(client.get_pair_weight(&pair), 1);
 }

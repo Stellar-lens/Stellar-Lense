@@ -948,7 +948,7 @@ fn test_error_disputenotfound() {
 // ── Error::DisputeNotYetTimedOut (48) ──────────────────────────────────────────
 
 #[test]
-fn test_error_disputenottimed out() {
+fn test_error_disputenottimedout() {
     let (env, client, admin, service) = setup();
     env.ledger().with_mut(|l| l.timestamp = 100_000);
     client.initialize(&admin, &service);

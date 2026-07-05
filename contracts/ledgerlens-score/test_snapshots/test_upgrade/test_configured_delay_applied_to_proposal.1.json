@@ -101,6 +101,18 @@
                         "key": {
                           "vec": [
                             {
+                              "symbol": "AdminAuditRoot"
+                            }
+                          ]
+                        },
+                        "val": {
+                          "bytes": "a12abcd9c0c82c8a6244b5db3021628448abfbe4548fc327a0dbff0957dd106a"
+                        }
+                      },
+                      {
+                        "key": {
+                          "vec": [
+                            {
                               "symbol": "PendingUpgrade"
                             }
                           ]
@@ -363,13 +375,17 @@
             "topics": [
               {
                 "symbol": "pc_prop"
-              },
-              {
-                "symbol": "upg_dly"
               }
             ],
             "data": {
-              "u64": 1700086400
+              "vec": [
+                {
+                  "symbol": "upg_dly"
+                },
+                {
+                  "u64": 1700086400
+                }
+              ]
             }
           }
         }
@@ -413,26 +429,6 @@
               },
               {
                 "symbol": "apply_param_change"
-              }
-            ],
-            "data": {
-              "symbol": "upg_dly"
-            }
-          }
-        }
-      },
-      "failed_call": false
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
-        "type_": "contract",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "pc_appl"
               }
             ],
             "data": {

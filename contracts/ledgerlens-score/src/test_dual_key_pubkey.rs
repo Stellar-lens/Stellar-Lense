@@ -44,6 +44,7 @@ fn sign(env: &Env, contract_id: &Address, key: &SigningKey, wallet: &Address, pa
     let digest = env.as_contract(contract_id, || {
         LedgerLensScoreContract::compute_commitment(
             env, wallet, pair, 50, false, false, START_TS, 90, 1,
+            &BytesN::from_array(env, &[0u8; 32]), 0,
         )
         .unwrap()
         .to_bytes()
@@ -56,6 +57,9 @@ fn sign(env: &Env, contract_id: &Address, key: &SigningKey, wallet: &Address, pa
     ScoreAttestation {
         commitment: BytesN::from_array(env, &digest),
         signature: BytesN::from_array(env, &sig_bytes),
+        contract_id: BytesN::from_array(env, &[0u8; 32]),
+        contract_version: 0,
+        nonce: 0,
     }
 }
 

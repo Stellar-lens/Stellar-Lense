@@ -84,7 +84,31 @@
                                   "symbol": "commitment"
                                 },
                                 "val": {
-                                  "bytes": "f5ce85967c2d28b66f447e24404a68381e70fbb540f07fe67559e62302261d1a"
+                                  "bytes": "620355ac935b2e4a38b8f8e11cb688afa35c178bbbac22c1270f9b9b9ae2462f"
+                                }
+                              },
+                              {
+                                "key": {
+                                  "symbol": "contract_id"
+                                },
+                                "val": {
+                                  "bytes": "0000000000000000000000000000000000000000000000000000000000000000"
+                                }
+                              },
+                              {
+                                "key": {
+                                  "symbol": "contract_version"
+                                },
+                                "val": {
+                                  "u32": 4
+                                }
+                              },
+                              {
+                                "key": {
+                                  "symbol": "nonce"
+                                },
+                                "val": {
+                                  "u64": 0
                                 }
                               },
                               {
@@ -92,7 +116,7 @@
                                   "symbol": "signature"
                                 },
                                 "val": {
-                                  "bytes": "98e692d106079668478005a9a412f645e0443b1637ae8a0acb97645b22234e9049a0a247210f9388c0aba40fd1c2f355bbdb715239ee6048a85d7b18d1221fe201"
+                                  "bytes": "9bb0b3363777f0ccbfe6c541b5959b458fafda1bbf24c51c818e15fb617393a33f3efcde3fd87e39fd97662b18b5fc035f54c1a8da77314b5cac135d2d6aee6000"
                                 }
                               }
                             ]
@@ -162,7 +186,31 @@
                                   "symbol": "commitment"
                                 },
                                 "val": {
-                                  "bytes": "f1b9ee26c2706fbe22252aa035fc0f927f46cf782579e27420a56bcc4fae8875"
+                                  "bytes": "f125d170ca36cb8575476e559069434ab7c0d219e549533f9a984553ea39b105"
+                                }
+                              },
+                              {
+                                "key": {
+                                  "symbol": "contract_id"
+                                },
+                                "val": {
+                                  "bytes": "0000000000000000000000000000000000000000000000000000000000000000"
+                                }
+                              },
+                              {
+                                "key": {
+                                  "symbol": "contract_version"
+                                },
+                                "val": {
+                                  "u32": 4
+                                }
+                              },
+                              {
+                                "key": {
+                                  "symbol": "nonce"
+                                },
+                                "val": {
+                                  "u64": 0
                                 }
                               },
                               {
@@ -170,7 +218,7 @@
                                   "symbol": "signature"
                                 },
                                 "val": {
-                                  "bytes": "f3aeb6ae8d7962107da8de52d33c2865f4e068466c7d52e3de814e74d3f098676a7053b02541f1b743372e9726fdca932327d0b67f75c60fc193266e1ef3bcf100"
+                                  "bytes": "86dc5bf2ee3e0a9b20fd5aab542bafd35a075b0d974d98c8193b0aa47d8a00381958b8d97788578021a369821b803f631b4a80a1ba741be54b4ae3e27a8177db01"
                                 }
                               }
                             ]
@@ -239,7 +287,31 @@
                                   "symbol": "commitment"
                                 },
                                 "val": {
-                                  "bytes": "df0d61ad4b377810dc327805a9feec9073d8700b8e0921eddf5c23af896d1e38"
+                                  "bytes": "6ac2cf8edcedce4542541b5542b1d6b078f1d4888475ae3b7f42aa5a410205aa"
+                                }
+                              },
+                              {
+                                "key": {
+                                  "symbol": "contract_id"
+                                },
+                                "val": {
+                                  "bytes": "0000000000000000000000000000000000000000000000000000000000000000"
+                                }
+                              },
+                              {
+                                "key": {
+                                  "symbol": "contract_version"
+                                },
+                                "val": {
+                                  "u32": 4
+                                }
+                              },
+                              {
+                                "key": {
+                                  "symbol": "nonce"
+                                },
+                                "val": {
+                                  "u64": 0
                                 }
                               },
                               {
@@ -247,7 +319,7 @@
                                   "symbol": "signature"
                                 },
                                 "val": {
-                                  "bytes": "84de3345faf96c32e1748c98fcaafb2cd03b2737e91dd4f9a4ec76c185e881fa22033ac9769f6d0fe3a98cf7b5fbf97c5c68003cd8f2536385bfb661eba71f9800"
+                                  "bytes": "33385ef373309a7e8952d2c265db99c0b24fbd7b545fddfccee0361a9fb942bb205fea56ff2c83fb249d4a04c09aee92eb589ad18b9c68c69a53a55b647f86bf00"
                                 }
                               }
                             ]
@@ -544,7 +616,7 @@
             "key": {
               "vec": [
                 {
-                  "symbol": "HistMaxScore"
+                  "symbol": "HistoricalMaxScore"
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
@@ -567,7 +639,7 @@
                 "key": {
                   "vec": [
                     {
-                      "symbol": "HistMaxScore"
+                      "symbol": "HistoricalMaxScore"
                     },
                     {
                       "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
@@ -595,7 +667,10 @@
             "key": {
               "vec": [
                 {
-                  "symbol": "HllSketch"
+                  "symbol": "LastSubmitTime"
+                },
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                 },
                 {
                   "symbol": "XLM_USDC"
@@ -615,7 +690,717 @@
                 "key": {
                   "vec": [
                     {
-                      "symbol": "HllSketch"
+                      "symbol": "LastSubmitTime"
+                    },
+                    {
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                    },
+                    {
+                      "symbol": "XLM_USDC"
+                    }
+                  ]
+                },
+                "durability": "persistent",
+                "val": {
+                  "u64": 1700003600
+                }
+              }
+            },
+            "ext": "v0"
+          },
+          777600
+        ]
+      ],
+      [
+        {
+          "contract_data": {
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+            "key": {
+              "vec": [
+                {
+                  "symbol": "PairScoreCount"
+                },
+                {
+                  "symbol": "XLM_USDC"
+                }
+              ]
+            },
+            "durability": "persistent"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+                "key": {
+                  "vec": [
+                    {
+                      "symbol": "PairScoreCount"
+                    },
+                    {
+                      "symbol": "XLM_USDC"
+                    }
+                  ]
+                },
+                "durability": "persistent",
+                "val": {
+                  "u64": 2
+                }
+              }
+            },
+            "ext": "v0"
+          },
+          777600
+        ]
+      ],
+      [
+        {
+          "contract_data": {
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+            "key": {
+              "vec": [
+                {
+                  "symbol": "Score"
+                },
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                },
+                {
+                  "symbol": "XLM_USDC"
+                }
+              ]
+            },
+            "durability": "persistent"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+                "key": {
+                  "vec": [
+                    {
+                      "symbol": "Score"
+                    },
+                    {
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                    },
+                    {
+                      "symbol": "XLM_USDC"
+                    }
+                  ]
+                },
+                "durability": "persistent",
+                "val": {
+                  "map": [
+                    {
+                      "key": {
+                        "symbol": "benford_flag"
+                      },
+                      "val": {
+                        "bool": false
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "benford_score"
+                      },
+                      "val": {
+                        "u32": 0
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "commitment"
+                      },
+                      "val": "void"
+                    },
+                    {
+                      "key": {
+                        "symbol": "confidence"
+                      },
+                      "val": {
+                        "u32": 90
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "ml_flag"
+                      },
+                      "val": {
+                        "bool": false
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "ml_score"
+                      },
+                      "val": {
+                        "u32": 0
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "model_version"
+                      },
+                      "val": {
+                        "u32": 0
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "network_score"
+                      },
+                      "val": {
+                        "u32": 0
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "score"
+                      },
+                      "val": {
+                        "u32": 70
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "timestamp"
+                      },
+                      "val": {
+                        "u64": 1700003600
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "ext": "v0"
+          },
+          777600
+        ]
+      ],
+      [
+        {
+          "contract_data": {
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+            "key": {
+              "vec": [
+                {
+                  "symbol": "ScoreCount"
+                },
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                },
+                {
+                  "symbol": "XLM_USDC"
+                }
+              ]
+            },
+            "durability": "persistent"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+                "key": {
+                  "vec": [
+                    {
+                      "symbol": "ScoreCount"
+                    },
+                    {
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                    },
+                    {
+                      "symbol": "XLM_USDC"
+                    }
+                  ]
+                },
+                "durability": "persistent",
+                "val": {
+                  "u32": 2
+                }
+              }
+            },
+            "ext": "v0"
+          },
+          777600
+        ]
+      ],
+      [
+        {
+          "contract_data": {
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+            "key": {
+              "vec": [
+                {
+                  "symbol": "ScoreEntryIndex"
+                }
+              ]
+            },
+            "durability": "persistent"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+                "key": {
+                  "vec": [
+                    {
+                      "symbol": "ScoreEntryIndex"
+                    }
+                  ]
+                },
+                "durability": "persistent",
+                "val": {
+                  "vec": [
+                    {
+                      "vec": [
+                        {
+                          "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                        },
+                        {
+                          "symbol": "XLM_USDC"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            "ext": "v0"
+          },
+          777600
+        ]
+      ],
+      [
+        {
+          "contract_data": {
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+            "key": {
+              "vec": [
+                {
+                  "symbol": "ScoreEntryLastTouchedLedger"
+                },
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                },
+                {
+                  "symbol": "XLM_USDC"
+                }
+              ]
+            },
+            "durability": "persistent"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+                "key": {
+                  "vec": [
+                    {
+                      "symbol": "ScoreEntryLastTouchedLedger"
+                    },
+                    {
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                    },
+                    {
+                      "symbol": "XLM_USDC"
+                    }
+                  ]
+                },
+                "durability": "persistent",
+                "val": {
+                  "u32": 0
+                }
+              }
+            },
+            "ext": "v0"
+          },
+          777600
+        ]
+      ],
+      [
+        {
+          "contract_data": {
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+            "key": {
+              "vec": [
+                {
+                  "symbol": "ScoreHistory"
+                },
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                },
+                {
+                  "symbol": "XLM_USDC"
+                }
+              ]
+            },
+            "durability": "persistent"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+                "key": {
+                  "vec": [
+                    {
+                      "symbol": "ScoreHistory"
+                    },
+                    {
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                    },
+                    {
+                      "symbol": "XLM_USDC"
+                    }
+                  ]
+                },
+                "durability": "persistent",
+                "val": {
+                  "vec": [
+                    {
+                      "map": [
+                        {
+                          "key": {
+                            "symbol": "benford_flag"
+                          },
+                          "val": {
+                            "bool": false
+                          }
+                        },
+                        {
+                          "key": {
+                            "symbol": "benford_score"
+                          },
+                          "val": {
+                            "u32": 0
+                          }
+                        },
+                        {
+                          "key": {
+                            "symbol": "commitment"
+                          },
+                          "val": "void"
+                        },
+                        {
+                          "key": {
+                            "symbol": "confidence"
+                          },
+                          "val": {
+                            "u32": 90
+                          }
+                        },
+                        {
+                          "key": {
+                            "symbol": "ml_flag"
+                          },
+                          "val": {
+                            "bool": false
+                          }
+                        },
+                        {
+                          "key": {
+                            "symbol": "ml_score"
+                          },
+                          "val": {
+                            "u32": 0
+                          }
+                        },
+                        {
+                          "key": {
+                            "symbol": "model_version"
+                          },
+                          "val": {
+                            "u32": 1
+                          }
+                        },
+                        {
+                          "key": {
+                            "symbol": "network_score"
+                          },
+                          "val": {
+                            "u32": 0
+                          }
+                        },
+                        {
+                          "key": {
+                            "symbol": "score"
+                          },
+                          "val": {
+                            "u32": 50
+                          }
+                        },
+                        {
+                          "key": {
+                            "symbol": "timestamp"
+                          },
+                          "val": {
+                            "u64": 1700000000
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "map": [
+                        {
+                          "key": {
+                            "symbol": "benford_flag"
+                          },
+                          "val": {
+                            "bool": false
+                          }
+                        },
+                        {
+                          "key": {
+                            "symbol": "benford_score"
+                          },
+                          "val": {
+                            "u32": 0
+                          }
+                        },
+                        {
+                          "key": {
+                            "symbol": "commitment"
+                          },
+                          "val": "void"
+                        },
+                        {
+                          "key": {
+                            "symbol": "confidence"
+                          },
+                          "val": {
+                            "u32": 90
+                          }
+                        },
+                        {
+                          "key": {
+                            "symbol": "ml_flag"
+                          },
+                          "val": {
+                            "bool": false
+                          }
+                        },
+                        {
+                          "key": {
+                            "symbol": "ml_score"
+                          },
+                          "val": {
+                            "u32": 0
+                          }
+                        },
+                        {
+                          "key": {
+                            "symbol": "model_version"
+                          },
+                          "val": {
+                            "u32": 0
+                          }
+                        },
+                        {
+                          "key": {
+                            "symbol": "network_score"
+                          },
+                          "val": {
+                            "u32": 0
+                          }
+                        },
+                        {
+                          "key": {
+                            "symbol": "score"
+                          },
+                          "val": {
+                            "u32": 70
+                          }
+                        },
+                        {
+                          "key": {
+                            "symbol": "timestamp"
+                          },
+                          "val": {
+                            "u64": 1700003600
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            "ext": "v0"
+          },
+          777600
+        ]
+      ],
+      [
+        {
+          "contract_data": {
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+            "key": {
+              "vec": [
+                {
+                  "symbol": "ScoreSubmissionLedger"
+                },
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                },
+                {
+                  "symbol": "XLM_USDC"
+                }
+              ]
+            },
+            "durability": "persistent"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+                "key": {
+                  "vec": [
+                    {
+                      "symbol": "ScoreSubmissionLedger"
+                    },
+                    {
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                    },
+                    {
+                      "symbol": "XLM_USDC"
+                    }
+                  ]
+                },
+                "durability": "persistent",
+                "val": {
+                  "u32": 0
+                }
+              }
+            },
+            "ext": "v0"
+          },
+          777600
+        ]
+      ],
+      [
+        {
+          "contract_data": {
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+            "key": {
+              "vec": [
+                {
+                  "symbol": "TrendState"
+                },
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                },
+                {
+                  "symbol": "XLM_USDC"
+                }
+              ]
+            },
+            "durability": "persistent"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+                "key": {
+                  "vec": [
+                    {
+                      "symbol": "TrendState"
+                    },
+                    {
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                    },
+                    {
+                      "symbol": "XLM_USDC"
+                    }
+                  ]
+                },
+                "durability": "persistent",
+                "val": {
+                  "map": [
+                    {
+                      "key": {
+                        "symbol": "consecutive"
+                      },
+                      "val": {
+                        "u32": 1
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "trend"
+                      },
+                      "val": {
+                        "i32": 1
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "ext": "v0"
+          },
+          777600
+        ]
+      ],
+      [
+        {
+          "contract_data": {
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+            "key": {
+              "vec": [
+                {
+                  "symbol": "UniqueWalletsHll"
+                },
+                {
+                  "symbol": "XLM_USDC"
+                }
+              ]
+            },
+            "durability": "persistent"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+                "key": {
+                  "vec": [
+                    {
+                      "symbol": "UniqueWalletsHll"
                     },
                     {
                       "symbol": "XLM_USDC"
@@ -630,7 +1415,7 @@
                         "symbol": "precision"
                       },
                       "val": {
-                        "u32": 10
+                        "u32": 8
                       }
                     },
                     {
@@ -682,2311 +1467,7 @@
                             "u32": 0
                           },
                           {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
                             "u32": 1
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
                           },
                           {
                             "u32": 0
@@ -3730,551 +2211,6 @@
             "key": {
               "vec": [
                 {
-                  "symbol": "LastSubmitTime"
-                },
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
-                },
-                {
-                  "symbol": "XLM_USDC"
-                }
-              ]
-            },
-            "durability": "persistent"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-                "key": {
-                  "vec": [
-                    {
-                      "symbol": "LastSubmitTime"
-                    },
-                    {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
-                    },
-                    {
-                      "symbol": "XLM_USDC"
-                    }
-                  ]
-                },
-                "durability": "persistent",
-                "val": {
-                  "u64": 1700003600
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          777600
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-            "key": {
-              "vec": [
-                {
-                  "symbol": "Score"
-                },
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
-                },
-                {
-                  "symbol": "XLM_USDC"
-                }
-              ]
-            },
-            "durability": "persistent"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-                "key": {
-                  "vec": [
-                    {
-                      "symbol": "Score"
-                    },
-                    {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
-                    },
-                    {
-                      "symbol": "XLM_USDC"
-                    }
-                  ]
-                },
-                "durability": "persistent",
-                "val": {
-                  "map": [
-                    {
-                      "key": {
-                        "symbol": "benford_flag"
-                      },
-                      "val": {
-                        "bool": false
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "commitment"
-                      },
-                      "val": "void"
-                    },
-                    {
-                      "key": {
-                        "symbol": "confidence"
-                      },
-                      "val": {
-                        "u32": 90
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "ml_flag"
-                      },
-                      "val": {
-                        "bool": false
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "model_version"
-                      },
-                      "val": {
-                        "u32": 0
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "score"
-                      },
-                      "val": {
-                        "u32": 70
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "timestamp"
-                      },
-                      "val": {
-                        "u64": 1700003600
-                      }
-                    }
-                  ]
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          777600
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-            "key": {
-              "vec": [
-                {
-                  "symbol": "ScoreCount"
-                },
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
-                },
-                {
-                  "symbol": "XLM_USDC"
-                }
-              ]
-            },
-            "durability": "persistent"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-                "key": {
-                  "vec": [
-                    {
-                      "symbol": "ScoreCount"
-                    },
-                    {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
-                    },
-                    {
-                      "symbol": "XLM_USDC"
-                    }
-                  ]
-                },
-                "durability": "persistent",
-                "val": {
-                  "u32": 2
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          777600
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-            "key": {
-              "vec": [
-                {
-                  "symbol": "ScoreEntryIndex"
-                }
-              ]
-            },
-            "durability": "persistent"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-                "key": {
-                  "vec": [
-                    {
-                      "symbol": "ScoreEntryIndex"
-                    }
-                  ]
-                },
-                "durability": "persistent",
-                "val": {
-                  "vec": [
-                    {
-                      "vec": [
-                        {
-                          "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
-                        },
-                        {
-                          "symbol": "XLM_USDC"
-                        }
-                      ]
-                    }
-                  ]
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          777600
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-            "key": {
-              "vec": [
-                {
-                  "symbol": "ScoreEntryLTL"
-                },
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
-                },
-                {
-                  "symbol": "XLM_USDC"
-                }
-              ]
-            },
-            "durability": "persistent"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-                "key": {
-                  "vec": [
-                    {
-                      "symbol": "ScoreEntryLTL"
-                    },
-                    {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
-                    },
-                    {
-                      "symbol": "XLM_USDC"
-                    }
-                  ]
-                },
-                "durability": "persistent",
-                "val": {
-                  "u32": 0
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          777600
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-            "key": {
-              "vec": [
-                {
-                  "symbol": "ScoreHistory"
-                },
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
-                },
-                {
-                  "symbol": "XLM_USDC"
-                }
-              ]
-            },
-            "durability": "persistent"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-                "key": {
-                  "vec": [
-                    {
-                      "symbol": "ScoreHistory"
-                    },
-                    {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
-                    },
-                    {
-                      "symbol": "XLM_USDC"
-                    }
-                  ]
-                },
-                "durability": "persistent",
-                "val": {
-                  "vec": [
-                    {
-                      "map": [
-                        {
-                          "key": {
-                            "symbol": "benford_flag"
-                          },
-                          "val": {
-                            "bool": false
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "commitment"
-                          },
-                          "val": "void"
-                        },
-                        {
-                          "key": {
-                            "symbol": "confidence"
-                          },
-                          "val": {
-                            "u32": 90
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "ml_flag"
-                          },
-                          "val": {
-                            "bool": false
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "model_version"
-                          },
-                          "val": {
-                            "u32": 1
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "score"
-                          },
-                          "val": {
-                            "u32": 50
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "timestamp"
-                          },
-                          "val": {
-                            "u64": 1700000000
-                          }
-                        }
-                      ]
-                    },
-                    {
-                      "map": [
-                        {
-                          "key": {
-                            "symbol": "benford_flag"
-                          },
-                          "val": {
-                            "bool": false
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "commitment"
-                          },
-                          "val": "void"
-                        },
-                        {
-                          "key": {
-                            "symbol": "confidence"
-                          },
-                          "val": {
-                            "u32": 90
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "ml_flag"
-                          },
-                          "val": {
-                            "bool": false
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "model_version"
-                          },
-                          "val": {
-                            "u32": 0
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "score"
-                          },
-                          "val": {
-                            "u32": 70
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "timestamp"
-                          },
-                          "val": {
-                            "u64": 1700003600
-                          }
-                        }
-                      ]
-                    }
-                  ]
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          777600
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-            "key": {
-              "vec": [
-                {
-                  "symbol": "TrendState"
-                },
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
-                },
-                {
-                  "symbol": "XLM_USDC"
-                }
-              ]
-            },
-            "durability": "persistent"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-                "key": {
-                  "vec": [
-                    {
-                      "symbol": "TrendState"
-                    },
-                    {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
-                    },
-                    {
-                      "symbol": "XLM_USDC"
-                    }
-                  ]
-                },
-                "durability": "persistent",
-                "val": {
-                  "map": [
-                    {
-                      "key": {
-                        "symbol": "consecutive"
-                      },
-                      "val": {
-                        "u32": 1
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "trend"
-                      },
-                      "val": {
-                        "i32": 1
-                      }
-                    }
-                  ]
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          777600
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-            "key": {
-              "vec": [
-                {
                   "symbol": "VerkleLeaf"
                 },
                 {
@@ -4358,7 +2294,31 @@
                         "key": {
                           "vec": [
                             {
-                              "symbol": "LastGlobalSub"
+                              "symbol": "AdminAuditRoot"
+                            }
+                          ]
+                        },
+                        "val": {
+                          "bytes": "0000000000000000000000000000000000000000000000000000000000000000"
+                        }
+                      },
+                      {
+                        "key": {
+                          "vec": [
+                            {
+                              "symbol": "ExtendCount"
+                            }
+                          ]
+                        },
+                        "val": {
+                          "u32": 2
+                        }
+                      },
+                      {
+                        "key": {
+                          "vec": [
+                            {
+                              "symbol": "LastGlobalSubmissionTime"
                             }
                           ]
                         },
@@ -4370,7 +2330,7 @@
                         "key": {
                           "vec": [
                             {
-                              "symbol": "LastSvcActivity"
+                              "symbol": "LastServiceActivityAt"
                             }
                           ]
                         },
@@ -4391,6 +2351,14 @@
                         },
                         "val": {
                           "map": [
+                            {
+                              "key": {
+                                "symbol": "average_score"
+                              },
+                              "val": {
+                                "u32": 0
+                              }
+                            },
                             {
                               "key": {
                                 "symbol": "model_version"
@@ -4414,6 +2382,14 @@
                               "val": {
                                 "u32": 1
                               }
+                            },
+                            {
+                              "key": {
+                                "symbol": "total_submissions"
+                              },
+                              "val": {
+                                "u64": 0
+                              }
                             }
                           ]
                         }
@@ -4431,6 +2407,14 @@
                         },
                         "val": {
                           "map": [
+                            {
+                              "key": {
+                                "symbol": "average_score"
+                              },
+                              "val": {
+                                "u32": 0
+                              }
+                            },
                             {
                               "key": {
                                 "symbol": "model_version"
@@ -4454,6 +2438,14 @@
                               "val": {
                                 "u32": 1
                               }
+                            },
+                            {
+                              "key": {
+                                "symbol": "total_submissions"
+                              },
+                              "val": {
+                                "u64": 0
+                              }
                             }
                           ]
                         }
@@ -4462,7 +2454,7 @@
                         "key": {
                           "vec": [
                             {
-                              "symbol": "MvIndex"
+                              "symbol": "ModelVersionIndex"
                             }
                           ]
                         },
@@ -4548,7 +2540,98 @@
                         "key": {
                           "vec": [
                             {
-                              "symbol": "VerkleCommit"
+                              "symbol": "SignerAccuracy"
+                            },
+                            {
+                              "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
+                            }
+                          ]
+                        },
+                        "val": {
+                          "map": [
+                            {
+                              "key": {
+                                "symbol": "count"
+                              },
+                              "val": {
+                                "u32": 1
+                              }
+                            },
+                            {
+                              "key": {
+                                "symbol": "mad_scaled"
+                              },
+                              "val": {
+                                "u32": 0
+                              }
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "key": {
+                          "vec": [
+                            {
+                              "symbol": "SignerAccuracy"
+                            },
+                            {
+                              "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4"
+                            }
+                          ]
+                        },
+                        "val": {
+                          "map": [
+                            {
+                              "key": {
+                                "symbol": "count"
+                              },
+                              "val": {
+                                "u32": 1
+                              }
+                            },
+                            {
+                              "key": {
+                                "symbol": "mad_scaled"
+                              },
+                              "val": {
+                                "u32": 2000
+                              }
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "key": {
+                          "vec": [
+                            {
+                              "symbol": "SignerNonce"
+                            },
+                            {
+                              "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
+                            }
+                          ]
+                        },
+                        "val": {
+                          "u64": 1
+                        }
+                      },
+                      {
+                        "key": {
+                          "vec": [
+                            {
+                              "symbol": "TotalWalletsScored"
+                            }
+                          ]
+                        },
+                        "val": {
+                          "u64": 1
+                        }
+                      },
+                      {
+                        "key": {
+                          "vec": [
+                            {
+                              "symbol": "VerkleCommitment"
                             }
                           ]
                         },
@@ -4929,7 +3012,31 @@
                                   "symbol": "commitment"
                                 },
                                 "val": {
-                                  "bytes": "f5ce85967c2d28b66f447e24404a68381e70fbb540f07fe67559e62302261d1a"
+                                  "bytes": "620355ac935b2e4a38b8f8e11cb688afa35c178bbbac22c1270f9b9b9ae2462f"
+                                }
+                              },
+                              {
+                                "key": {
+                                  "symbol": "contract_id"
+                                },
+                                "val": {
+                                  "bytes": "0000000000000000000000000000000000000000000000000000000000000000"
+                                }
+                              },
+                              {
+                                "key": {
+                                  "symbol": "contract_version"
+                                },
+                                "val": {
+                                  "u32": 4
+                                }
+                              },
+                              {
+                                "key": {
+                                  "symbol": "nonce"
+                                },
+                                "val": {
+                                  "u64": 0
                                 }
                               },
                               {
@@ -4937,7 +3044,7 @@
                                   "symbol": "signature"
                                 },
                                 "val": {
-                                  "bytes": "98e692d106079668478005a9a412f645e0443b1637ae8a0acb97645b22234e9049a0a247210f9388c0aba40fd1c2f355bbdb715239ee6048a85d7b18d1221fe201"
+                                  "bytes": "9bb0b3363777f0ccbfe6c541b5959b458fafda1bbf24c51c818e15fb617393a33f3efcde3fd87e39fd97662b18b5fc035f54c1a8da77314b5cac135d2d6aee6000"
                                 }
                               }
                             ]
@@ -5121,7 +3228,31 @@
                                   "symbol": "commitment"
                                 },
                                 "val": {
-                                  "bytes": "f1b9ee26c2706fbe22252aa035fc0f927f46cf782579e27420a56bcc4fae8875"
+                                  "bytes": "f125d170ca36cb8575476e559069434ab7c0d219e549533f9a984553ea39b105"
+                                }
+                              },
+                              {
+                                "key": {
+                                  "symbol": "contract_id"
+                                },
+                                "val": {
+                                  "bytes": "0000000000000000000000000000000000000000000000000000000000000000"
+                                }
+                              },
+                              {
+                                "key": {
+                                  "symbol": "contract_version"
+                                },
+                                "val": {
+                                  "u32": 4
+                                }
+                              },
+                              {
+                                "key": {
+                                  "symbol": "nonce"
+                                },
+                                "val": {
+                                  "u64": 0
                                 }
                               },
                               {
@@ -5129,7 +3260,7 @@
                                   "symbol": "signature"
                                 },
                                 "val": {
-                                  "bytes": "f3aeb6ae8d7962107da8de52d33c2865f4e068466c7d52e3de814e74d3f098676a7053b02541f1b743372e9726fdca932327d0b67f75c60fc193266e1ef3bcf100"
+                                  "bytes": "86dc5bf2ee3e0a9b20fd5aab542bafd35a075b0d974d98c8193b0aa47d8a00381958b8d97788578021a369821b803f631b4a80a1ba741be54b4ae3e27a8177db01"
                                 }
                               }
                             ]
@@ -5198,7 +3329,31 @@
                                   "symbol": "commitment"
                                 },
                                 "val": {
-                                  "bytes": "df0d61ad4b377810dc327805a9feec9073d8700b8e0921eddf5c23af896d1e38"
+                                  "bytes": "6ac2cf8edcedce4542541b5542b1d6b078f1d4888475ae3b7f42aa5a410205aa"
+                                }
+                              },
+                              {
+                                "key": {
+                                  "symbol": "contract_id"
+                                },
+                                "val": {
+                                  "bytes": "0000000000000000000000000000000000000000000000000000000000000000"
+                                }
+                              },
+                              {
+                                "key": {
+                                  "symbol": "contract_version"
+                                },
+                                "val": {
+                                  "u32": 4
+                                }
+                              },
+                              {
+                                "key": {
+                                  "symbol": "nonce"
+                                },
+                                "val": {
+                                  "u64": 0
                                 }
                               },
                               {
@@ -5206,7 +3361,7 @@
                                   "symbol": "signature"
                                 },
                                 "val": {
-                                  "bytes": "84de3345faf96c32e1748c98fcaafb2cd03b2737e91dd4f9a4ec76c185e881fa22033ac9769f6d0fe3a98cf7b5fbf97c5c68003cd8f2536385bfb661eba71f9800"
+                                  "bytes": "33385ef373309a7e8952d2c265db99c0b24fbd7b545fddfccee0361a9fb942bb205fea56ff2c83fb249d4a04c09aee92eb589ad18b9c68c69a53a55b647f86bf00"
                                 }
                               }
                             ]
@@ -5362,6 +3517,66 @@
       "event": {
         "ext": "v0",
         "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
+        "type_": "contract",
+        "body": {
+          "v0": {
+            "topics": [
+              {
+                "symbol": "sa_upd"
+              },
+              {
+                "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
+              }
+            ],
+            "data": {
+              "vec": [
+                {
+                  "u64": 0
+                },
+                {
+                  "u64": 1
+                }
+              ]
+            }
+          }
+        }
+      },
+      "failed_call": false
+    },
+    {
+      "event": {
+        "ext": "v0",
+        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
+        "type_": "contract",
+        "body": {
+          "v0": {
+            "topics": [
+              {
+                "symbol": "sa_upd"
+              },
+              {
+                "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4"
+              }
+            ],
+            "data": {
+              "vec": [
+                {
+                  "u64": 2000
+                },
+                {
+                  "u64": 1
+                }
+              ]
+            }
+          }
+        }
+      },
+      "failed_call": false
+    },
+    {
+      "event": {
+        "ext": "v0",
+        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
         "type_": "diagnostic",
         "body": {
           "v0": {
@@ -5439,6 +3654,14 @@
                 },
                 {
                   "key": {
+                    "symbol": "benford_score"
+                  },
+                  "val": {
+                    "u32": 0
+                  }
+                },
+                {
+                  "key": {
                     "symbol": "commitment"
                   },
                   "val": "void"
@@ -5461,7 +3684,23 @@
                 },
                 {
                   "key": {
+                    "symbol": "ml_score"
+                  },
+                  "val": {
+                    "u32": 0
+                  }
+                },
+                {
+                  "key": {
                     "symbol": "model_version"
+                  },
+                  "val": {
+                    "u32": 0
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "network_score"
                   },
                   "val": {
                     "u32": 0

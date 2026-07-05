@@ -1,8 +1,13 @@
 #![no_std]
 
-use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, Symbol, Vec, TryFromVal};
+#[cfg(test)]
+extern crate std;
+
+#[cfg(test)]
+mod test;
+
+use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, vec, Address, Env, Symbol, Vec};
 use ledgerlens_score::{RiskScore, AggregateRiskScore, Error as ScoreError};
-use soroban_sdk::{contract, contractimpl, symbol_short, Env, Symbol};
 
 pub const MAX_SHARDS: usize = 10;
 
@@ -24,13 +29,13 @@ impl LedgerLensAggregator {
     }
 
     /// Returns the fixed-point exponential decay lambda as (numerator, denominator)
-    /// 
+    ///
     /// Example:
-    /// ```
+    /// ```ignore
     /// let (num, den) = env.invoke_contract(&contract_id, &symbol_short!("get_decay_rate"), ());
     /// // decay_factor = num / den  (e.g. 999 / 1000 = 0.999)
     /// ```
-    pub fn get_decay_rate(env: Env) -> (u64, u64) {
+    pub fn get_decay_rate(_env: Env) -> (u64, u64) {
         // These values should match your internal decay logic
         // Adjust if your decay formula changes
         const DECAY_NUMERATOR: u64 = 999;     // e.g. for 0.999 decay per period
@@ -41,13 +46,13 @@ impl LedgerLensAggregator {
 
     /// Returns the minimum number of model submissions (K) that must agree
     /// within epsilon for consensus to be accepted.
-    /// 
+    ///
     /// Example:
-    /// ```
+    /// ```ignore
     /// let k = env.invoke_contract(&contract_id, &symbol_short!("get_consensus_threshold_k"), ());
     /// // e.g. k = 5 means at least 5 models must agree
     /// ```
-    pub fn get_consensus_threshold_k(env: Env) -> u32 {
+    pub fn get_consensus_threshold_k(_env: Env) -> u32 {
         // Adjust this value based on your actual consensus parameters
         const CONSENSUS_THRESHOLD_K: u32 = 5;   // Minimum agreeing models required
 
@@ -55,12 +60,12 @@ impl LedgerLensAggregator {
     }
 
     /// Returns whether the given wallet is currently on the monitoring watchlist.
-    /// 
+    ///
     /// Example:
-    /// ```
+    /// ```ignore
     /// let is_watched = env.invoke_contract(&contract_id, &symbol_short!("get_watchlist_status"), vec![&env, wallet]);
     /// ```
-    pub fn get_watchlist_status(env: Env, wallet: Address) -> bool {
+    pub fn get_watchlist_status(_env: Env, _wallet: Address) -> bool {
         // TODO: Replace with your actual storage key / logic
         // For example:
         // let key = DataKey::Watchlist(wallet);
@@ -74,8 +79,7 @@ impl LedgerLensAggregator {
         let admin: Address = env.storage().instance().get(&DataKey::Admin).ok_or(ScoreError::NotInitialized)?;
         admin.require_auth();
         // Prevent self-reference
-        let me = env.current_contract_address();
-        if Address::Contract(me.clone()) == shard {
+        if env.current_contract_address() == shard {
             return Err(ScoreError::InvalidAttestation); // reuse an error for self-ref guard
         }
         let mut shards: Vec<Address> = env.storage().instance().get(&DataKey::Shards).unwrap_or_else(|| Vec::new(&env));
@@ -96,7 +100,7 @@ impl LedgerLensAggregator {
     pub fn remove_shard(env: Env, shard: Address) -> Result<(), ScoreError> {
         let admin: Address = env.storage().instance().get(&DataKey::Admin).ok_or(ScoreError::NotInitialized)?;
         admin.require_auth();
-        let mut shards: Vec<Address> = env.storage().instance().get(&DataKey::Shards).unwrap_or_else(|| Vec::new(&env));
+        let shards: Vec<Address> = env.storage().instance().get(&DataKey::Shards).unwrap_or_else(|| Vec::new(&env));
         let mut found = false;
         let mut out: Vec<Address> = Vec::new(&env);
         for i in 0..shards.len() {
@@ -125,15 +129,14 @@ impl LedgerLensAggregator {
         }
         for i in 0..shards.len() {
             let shard = shards.get(i).unwrap();
-            // build client
             let client = ledgerlens_score::LedgerLensScoreContractClient::new(&env, &shard);
-            // try call
-            let ok: Result<bool, _> = client.try_query_risk_gate(&wallet, &asset_pair, &gate_threshold);
-            match ok {
-                Ok(res) => {
-                    if !res { return false; }
+            match client.try_query_risk_gate(&wallet, &asset_pair, &gate_threshold) {
+                Ok(Ok(res)) => {
+                    if !res {
+                        return false;
+                    }
                 }
-                Err(_) => { return false; }
+                _ => return false,
             }
         }
         true
@@ -145,8 +148,7 @@ impl LedgerLensAggregator {
         for i in 0..shards.len() {
             let shard = shards.get(i).unwrap();
             let client = ledgerlens_score::LedgerLensScoreContractClient::new(&env, &shard);
-            let res: Result<RiskScore, _> = client.try_get_score(&wallet, &asset_pair);
-            if let Ok(score) = res {
+            if let Ok(Ok(score)) = client.try_get_score(&wallet, &asset_pair) {
                 match &best {
                     None => best = Some(score),
                     Some(b) => {
@@ -166,8 +168,7 @@ impl LedgerLensAggregator {
         for i in 0..shards.len() {
             let shard = shards.get(i).unwrap();
             let client = ledgerlens_score::LedgerLensScoreContractClient::new(&env, &shard);
-            let res: Result<AggregateRiskScore, _> = client.try_get_aggregate_score(&wallet);
-            if let Ok(agg) = res {
+            if let Ok(Ok(agg)) = client.try_get_aggregate_score(&wallet) {
                 match &best {
                     None => best = Some(agg),
                     Some(b) => {
@@ -182,7 +183,7 @@ impl LedgerLensAggregator {
     }
 
     pub fn supports_interface(env: Env, capability: Symbol) -> bool {
-        let caps = vec![symbol_short!("score"), symbol_short!("gate"), symbol_short!("aggr"), symbol_short!("federated")];
+        let caps = vec![&env, symbol_short!("score"), symbol_short!("gate"), symbol_short!("aggr"), symbol_short!("federated")];
         for i in 0..caps.len() {
             if caps.get(i).unwrap() == capability {
                 return true;
@@ -197,11 +198,9 @@ impl LedgerLensAggregator {
         for i in 0..shards.len() {
             let shard = shards.get(i).unwrap();
             let client = ledgerlens_score::LedgerLensScoreContractClient::new(&env, &shard);
-            let res: Result<RiskScore, _> = client.try_get_score(&wallet, &asset_pair);
-            if let Ok(score) = res {
-                out.push_back((shard.clone(), Some(score)));
-            } else {
-                out.push_back((shard.clone(), None));
+            match client.try_get_score(&wallet, &asset_pair) {
+                Ok(Ok(score)) => out.push_back((shard.clone(), Some(score))),
+                _ => out.push_back((shard.clone(), None)),
             }
         }
         out
@@ -210,7 +209,7 @@ impl LedgerLensAggregator {
     /// Queries the contagion depth across all shards, returning the maximum depth found.
     ///
     /// Returns the highest counterparty count for the wallet/pair across all registered shards.
-    pub fn get_contagion_depth_across_shards(
+    pub fn contagion_depth_across_shards(
         env: Env,
         wallet: Address,
         asset_pair: Symbol,
@@ -220,8 +219,7 @@ impl LedgerLensAggregator {
         for i in 0..shards.len() {
             let shard = shards.get(i).unwrap();
             let client = ledgerlens_score::LedgerLensScoreContractClient::new(&env, &shard);
-            let res: Result<u32, _> = client.try_get_contagion_depth(&wallet, &asset_pair);
-            if let Ok(depth) = res {
+            if let Ok(Ok(depth)) = client.try_get_contagion_depth(&wallet, &asset_pair) {
                 if depth > max_depth {
                     max_depth = depth;
                 }

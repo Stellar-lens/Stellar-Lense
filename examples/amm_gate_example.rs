@@ -9,10 +9,15 @@
 
 #![no_std]
 
-use soroban_sdk::{
-    contract, contractimpl, symbol_short, Address, BytesN, Env, Symbol,
-};
+use soroban_sdk::{contract, contracterror, contractimpl, Address, Env, Symbol};
 use ledgerlens_score::LedgerLensScoreContractClient;
+
+#[contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[repr(u32)]
+pub enum AmmError {
+    UserHighRisk = 1,
+}
 
 #[contract]
 pub struct SimpleAMM;
@@ -32,7 +37,7 @@ impl SimpleAMM {
         amount_in: u64,
         ledgerlens_id: Address,
         gate_threshold: u32,
-    ) -> Result<u64, u32> {
+    ) -> Result<u64, AmmError> {
         // 1. Build the LedgerLens client
         let client = LedgerLensScoreContractClient::new(&env, &ledgerlens_id);
 
@@ -43,8 +48,7 @@ impl SimpleAMM {
 
         // 3. Reject the swap if the user's risk gate fails
         if !passes_gate {
-            // Return error code: 1 = UserHighRisk
-            return Err(1);
+            return Err(AmmError::UserHighRisk);
         }
 
         // 4. User passed the gate; proceed with swap logic
@@ -104,6 +108,6 @@ mod tests {
         //     &llens_id,
         //     &75,
         // );
-        // assert_eq!(result, Err(1)); // UserHighRisk error
+        // assert_eq!(result, Err(AmmError::UserHighRisk));
     }
 }

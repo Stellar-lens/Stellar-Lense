@@ -25,14 +25,14 @@ fn test_full_two_step_transfer() {
     let (env, client, old_admin) = setup();
     let new_admin = Address::generate(&env);
 
-    client.transfer_admin(&Vec::new(&env), &new_admin).unwrap();
+    client.transfer_admin(&Vec::new(&env), &new_admin);
     assert!(client.has_pending_admin_transfer());
     assert_eq!(client.get_pending_admin().unwrap(), new_admin);
 
     // Old admin is still active until acceptance.
     assert_eq!(client.get_admin(), old_admin);
 
-    client.accept_admin().unwrap();
+    client.accept_admin();
 
     assert_eq!(client.get_admin(), new_admin);
     assert!(!client.has_pending_admin_transfer());
@@ -45,10 +45,10 @@ fn test_cancel_clears_pending_admin() {
     let (env, client, old_admin) = setup();
     let new_admin = Address::generate(&env);
 
-    client.transfer_admin(&Vec::new(&env), &new_admin).unwrap();
+    client.transfer_admin(&Vec::new(&env), &new_admin);
     assert!(client.has_pending_admin_transfer());
 
-    client.cancel_admin_transfer(&Vec::new(&env)).unwrap();
+    client.cancel_admin_transfer(&Vec::new(&env));
 
     assert!(!client.has_pending_admin_transfer());
     // Original admin remains unchanged after cancellation.
@@ -104,13 +104,13 @@ fn test_transfer_admin_overwrites_previous_pending() {
     let candidate_a = Address::generate(&env);
     let candidate_b = Address::generate(&env);
 
-    client.transfer_admin(&Vec::new(&env), &candidate_a).unwrap();
+    client.transfer_admin(&Vec::new(&env), &candidate_a);
     assert_eq!(client.get_pending_admin().unwrap(), candidate_a);
 
     // Proposing a new candidate replaces the old one.
-    client.transfer_admin(&Vec::new(&env), &candidate_b).unwrap();
+    client.transfer_admin(&Vec::new(&env), &candidate_b);
     assert_eq!(client.get_pending_admin().unwrap(), candidate_b);
 
-    client.accept_admin().unwrap();
+    client.accept_admin();
     assert_eq!(client.get_admin(), candidate_b);
 }

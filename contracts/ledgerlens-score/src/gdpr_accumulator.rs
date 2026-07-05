@@ -32,8 +32,8 @@ pub type DeletionProofBytes = BytesN<256>;
 /// This scaffold uses the low 64-bits of the hash as an exponent.
 pub fn exponent_from_entry_digest(_env: &Env, digest: &[u8; 32]) -> u64 {
     let mut v: u64 = 0;
-    for i in 0..8 {
-        v |= (digest[i] as u64) << (8 * i);
+    for (i, byte) in digest.iter().enumerate().take(8) {
+        v |= (*byte as u64) << (8 * i);
     }
     // Ensure non-zero.
     if v == 0 {

@@ -106,6 +106,7 @@ fn attest(env: &Env, key: &SigningKey, digest: [u8; 32], contract_id: BytesN<32>
         signature: BytesN::from_array(env, &sig_bytes),
         contract_id,
         contract_version,
+        nonce: 0,
     }
 }
 

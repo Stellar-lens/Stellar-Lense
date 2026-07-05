@@ -98,6 +98,8 @@ pub const DEFAULT_CONSENSUS_EPSILON: u32 = 5;
 pub const ESCALATION_BREACH_TTL_THRESHOLD: u32 = 518_400;
 pub const ESCALATION_BREACH_TTL_EXTEND_TO: u32 = 777_600;
 pub const DEFAULT_ESCALATION_THRESHOLD: u32 = 5;
+pub const MIN_ESCALATION_THRESHOLD: u32 = 2;
+pub const MAX_ESCALATION_THRESHOLD: u32 = 20;
 
 // ── Model version registry ────────────────────────────────────────────────────
 
@@ -121,14 +123,22 @@ pub const DEFAULT_DISPUTE_REVEAL_WINDOW_SECS: u64 = 600;
 
 // ── Finality buffer (pending score commit window) ────────────────────────────
 
+/// Maximum finality buffer duration — 24 hours.
+pub const MAX_FINALITY_BUFFER_SECS: u64 = 86_400;
+
 /// Default heartbeat alert threshold — 1 hour.
 pub const DEFAULT_HEARTBEAT_ALERT_THRESHOLD_SECS: u64 = 3_600;
 
-// ── Quorum reduction ──────────────────────────────────────────────────────────
+// ── HyperLogLog unique-wallet estimation ─────────────────────────────────────
 
-/// Default heartbeat alert threshold (seconds) until the admin configures
-/// one explicitly via `set_heartbeat_alert_threshold` — 1 hour.
-pub const DEFAULT_HEARTBEAT_ALERT_THRESHOLD_SECS: u64 = 3_600; // 1 hour
+/// Minimum allowed HLL precision (2^4 = 16 registers).
+pub const HLL_MIN_PRECISION: u32 = 4;
+/// Maximum allowed HLL precision (2^16 = 65536 registers).
+pub const HLL_MAX_PRECISION: u32 = 16;
+/// Default HLL precision until the admin configures one explicitly.
+pub const HLL_DEFAULT_PRECISION: u32 = 8;
+
+// ── Quorum reduction ──────────────────────────────────────────────────────────
 
 // ── Quorum / consensus ────────────────────────────────────────────────────────
 
@@ -141,3 +151,9 @@ pub const MAX_EXPIRING_ENTRIES_PER_CALL: u32 = 100;
 
 /// Maximum number of concurrently pending parameter-change proposals.
 pub const MAX_PENDING_PARAMETER_PROPOSALS: u32 = 10;
+
+/// Time-lock delay before a pending simple parameter change may be applied.
+pub const DEFAULT_PARAM_CHANGE_DELAY_SECS: u64 = 86_400;
+
+/// Maximum number of entries retained in the rate-limit override audit log.
+pub const MAX_RATE_LIMIT_OVERRIDE_LOG: u32 = 100;

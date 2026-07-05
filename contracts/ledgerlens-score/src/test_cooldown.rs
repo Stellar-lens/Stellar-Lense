@@ -133,6 +133,7 @@ fn pubkey_bytes(env: &Env, key: &SigningKey) -> Bytes {
     Bytes::from_slice(env, point.as_bytes())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn commitment(
     env: &Env,
     contract_id: &Address,
@@ -154,7 +155,8 @@ fn commitment(
             timestamp,
             confidence,
             model_version,
-            0, // nonce for test
+            &BytesN::from_array(env, &[0u8; 32]),
+            crate::constants::CONTRACT_VERSION,
         )
         .unwrap()
         .to_bytes()
@@ -170,6 +172,8 @@ fn attest(env: &Env, key: &SigningKey, digest: [u8; 32]) -> ScoreAttestation {
     ScoreAttestation {
         commitment: BytesN::from_array(env, &digest),
         signature: BytesN::from_array(env, &sig_bytes),
+        contract_id: BytesN::from_array(env, &[0u8; 32]),
+        contract_version: crate::constants::CONTRACT_VERSION,
         nonce: 0,
     }
 }

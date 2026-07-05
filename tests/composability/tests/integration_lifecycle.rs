@@ -67,7 +67,7 @@ fn initialize_phase(lc: &Lifecycle) {
 
     // Assert admin is stored
     assert_eq!(lc.client.get_admin(), lc.admin);
-    assert_eq!(lc.client.get_version(), 3);
+    assert_eq!(lc.client.get_version(), 4);
 }
 
 /// Phase 2: Add service signers and set multisig threshold
@@ -195,7 +195,7 @@ fn test_full_lifecycle_end_to_end() {
     score_submission_phase(&lc);
 
     // Final assertion: contract is still operational
-    assert_eq!(lc.client.get_version(), 3);
+    assert_eq!(lc.client.get_version(), 4);
 }
 
 /// Test: Wallet risk cluster assignment (issue #205)
@@ -269,7 +269,7 @@ fn test_score_momentum_indicator() {
     );
 
     // Get momentum with 1-hour window (function should return 0 or valid value)
-    let momentum: i32 = lc.client.get_score_momentum(&lc.wallet_under_test, &lc.asset_pair, &3600u64);
+    let momentum: i32 = lc.client.get_score_momentum(&lc.wallet_under_test, &lc.asset_pair);
     // With only 1 entry, momentum returns 0
     assert_eq!(momentum, 0);
 }
@@ -283,18 +283,18 @@ fn test_adaptive_consensus_epsilon() {
     let admin_signers = Vec::from_array(&lc.env, [lc.admin.clone()]);
 
     // Enable adaptive epsilon with bounds [3, 20]
-    lc.client.set_adaptive_epsilon(&admin_signers, &true, &3u32, &20u32);
+    lc.client.set_adaptive_epsilon_bounds(&admin_signers, &true, &3u32, &20u32);
 
     // Verify configuration is stored
-    let (enabled, min, max) = lc.client.get_adaptive_epsilon();
+    let (enabled, min, max) = lc.client.get_adaptive_epsilon_bounds();
     assert!(enabled);
     assert_eq!(min, 3);
     assert_eq!(max, 20);
 
     // Disable adaptive epsilon
-    lc.client.set_adaptive_epsilon(&admin_signers, &false, &5u32, &75u32);
+    lc.client.set_adaptive_epsilon_bounds(&admin_signers, &false, &5u32, &75u32);
 
-    let (enabled, _, _) = lc.client.get_adaptive_epsilon();
+    let (enabled, _, _) = lc.client.get_adaptive_epsilon_bounds();
     assert!(!enabled);
 }
 

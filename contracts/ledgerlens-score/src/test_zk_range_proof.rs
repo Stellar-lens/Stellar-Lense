@@ -242,8 +242,8 @@ fn test_verify_score_range_proof_tampered_proof() {
 
     // Tamper with proof bytes
     let mut arr = [0u8; 800];
-    for i in 0..800 {
-        arr[i] = proof_bytes.get(i as u32).unwrap();
+    for (i, slot) in arr.iter_mut().enumerate() {
+        *slot = proof_bytes.get(i as u32).unwrap();
     }
     arr[200] ^= 1; // tamper with one byte
     let tampered_proof = Bytes::from_array(&env, &arr);

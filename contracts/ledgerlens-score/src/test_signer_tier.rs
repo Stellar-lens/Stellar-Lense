@@ -51,7 +51,7 @@ fn test_set_and_get_signer_tier() {
     let signer = Address::generate(&env);
     let no_admins: Vec<Address> = Vec::new(&env);
 
-    client.set_signer_tier(&no_admins, &signer, &20, &80).unwrap();
+    client.set_signer_tier(&no_admins, &signer, &20, &80);
     assert_eq!(client.get_signer_tier(&signer), (20_u32, 80_u32));
 }
 
@@ -61,11 +61,11 @@ fn test_set_signer_tier_overwrites_previous() {
     let signer = Address::generate(&env);
     let no_admins: Vec<Address> = Vec::new(&env);
 
-    client.set_signer_tier(&no_admins, &signer, &10, &50).unwrap();
+    client.set_signer_tier(&no_admins, &signer, &10, &50);
     assert_eq!(client.get_signer_tier(&signer), (10_u32, 50_u32));
 
     // Overwrite with a new range.
-    client.set_signer_tier(&no_admins, &signer, &60, &90).unwrap();
+    client.set_signer_tier(&no_admins, &signer, &60, &90);
     assert_eq!(client.get_signer_tier(&signer), (60_u32, 90_u32));
 }
 
@@ -79,8 +79,8 @@ fn test_signer_tiers_are_independent() {
     let no_admins: Vec<Address> = Vec::new(&env);
 
     // Partition: signer_a covers low-risk, signer_b covers high-risk.
-    client.set_signer_tier(&no_admins, &signer_a, &0, &49).unwrap();
-    client.set_signer_tier(&no_admins, &signer_b, &50, &100).unwrap();
+    client.set_signer_tier(&no_admins, &signer_a, &0, &49);
+    client.set_signer_tier(&no_admins, &signer_b, &50, &100);
 
     assert_eq!(client.get_signer_tier(&signer_a), (0_u32, 49_u32));
     assert_eq!(client.get_signer_tier(&signer_b), (50_u32, 100_u32));
@@ -93,7 +93,7 @@ fn test_unconfigured_signer_unaffected_by_other_signer_tier() {
     let signer_b = Address::generate(&env);
     let no_admins: Vec<Address> = Vec::new(&env);
 
-    client.set_signer_tier(&no_admins, &signer_a, &30, &70).unwrap();
+    client.set_signer_tier(&no_admins, &signer_a, &30, &70);
     // signer_b was never configured — must still return the default.
     assert_eq!(client.get_signer_tier(&signer_b), (0_u32, 100_u32));
 }
@@ -107,7 +107,7 @@ fn test_set_signer_tier_min_equals_max() {
     let signer = Address::generate(&env);
     let no_admins: Vec<Address> = Vec::new(&env);
 
-    client.set_signer_tier(&no_admins, &signer, &50, &50).unwrap();
+    client.set_signer_tier(&no_admins, &signer, &50, &50);
     assert_eq!(client.get_signer_tier(&signer), (50_u32, 50_u32));
 }
 
@@ -117,7 +117,7 @@ fn test_set_signer_tier_zero_zero() {
     let signer = Address::generate(&env);
     let no_admins: Vec<Address> = Vec::new(&env);
 
-    client.set_signer_tier(&no_admins, &signer, &0, &0).unwrap();
+    client.set_signer_tier(&no_admins, &signer, &0, &0);
     assert_eq!(client.get_signer_tier(&signer), (0_u32, 0_u32));
 }
 
@@ -127,7 +127,7 @@ fn test_set_signer_tier_hundred_hundred() {
     let signer = Address::generate(&env);
     let no_admins: Vec<Address> = Vec::new(&env);
 
-    client.set_signer_tier(&no_admins, &signer, &100, &100).unwrap();
+    client.set_signer_tier(&no_admins, &signer, &100, &100);
     assert_eq!(client.get_signer_tier(&signer), (100_u32, 100_u32));
 }
 
@@ -137,7 +137,7 @@ fn test_set_signer_tier_full_range_explicit() {
     let signer = Address::generate(&env);
     let no_admins: Vec<Address> = Vec::new(&env);
 
-    client.set_signer_tier(&no_admins, &signer, &0, &100).unwrap();
+    client.set_signer_tier(&no_admins, &signer, &0, &100);
     assert_eq!(client.get_signer_tier(&signer), (0_u32, 100_u32));
 }
 

@@ -28,6 +28,9 @@ fn dummy_attestation(env: &Env) -> ScoreAttestation {
     ScoreAttestation {
         commitment: BytesN::from_array(env, &[0u8; 32]),
         signature: BytesN::from_array(env, &[0u8; 65]),
+        contract_id: BytesN::from_array(env, &[0u8; 32]),
+        contract_version: 0,
+        nonce: 0,
     }
 }
 

@@ -207,10 +207,6 @@ pub fn model_version_deprecated(env: &Env, version: u32) {
     env.events().publish((symbol_short!("mv_depr"),), version);
 }
 
-/// Emitted when the admin updates the consensus configuration.
-
-// (intentionally empty: kept for backward compatibility of the symbol)
-
 // ── History depth ─────────────────────────────────────────────────────────────
 
 pub fn history_depth_updated(env: &Env, depth: u32) {
@@ -278,6 +274,8 @@ pub fn delegate_removed(env: &Env, sub_wallet: &Address) {
 /// Emitted when the adaptive threshold is recomputed and changes.
 pub fn adaptive_threshold_updated(env: &Env, new_threshold: u32) {
     env.events().publish((symbol_short!("at_upd"),), new_threshold);
+}
+
 pub fn counterparty_link_added(
     env: &Env,
     wallet_a: &Address,
@@ -468,10 +466,6 @@ pub fn heartbeat_threshold_updated(env: &Env, secs: u64) {
     env.events().publish((symbol_short!("hb_upd"),), secs);
 }
 
-pub fn pair_cooldown_updated(env: &Env, asset_pair: &Symbol, secs: u64) {
-    env.events().publish((symbol_short!("pc_upd"), asset_pair.clone()), secs);
-}
-
 pub fn signer_expiring(env: &Env, signer: &Address) {
     env.events().publish((symbol_short!("sig_exp"),), signer.clone());
 }
@@ -549,4 +543,106 @@ pub fn momentum_threshold_crossed(
         (symbol_short!("mom_cross"), wallet.clone()),
         (asset_pair.clone(), momentum, threshold),
     );
+}
+
+pub fn adaptive_epsilon_updated(env: &Env, enabled: bool, scale_factor: u32) {
+    env.events().publish((symbol_short!("ae_upd"),), (enabled, scale_factor));
+}
+
+pub fn adaptive_rate_limit_updated(env: &Env, enabled: bool, variance_scale: u32) {
+    env.events().publish((symbol_short!("arl_upd"),), (enabled, variance_scale));
+}
+
+pub fn cluster_boundaries_updated(env: &Env) {
+    env.events().publish((symbol_short!("clb_upd"),), ());
+}
+
+pub fn epoch_opened(env: &Env, epoch_id: u32) {
+    env.events().publish((symbol_short!("epo_open"),), epoch_id);
+}
+
+pub fn epoch_closed(env: &Env, epoch_id: u32) {
+    env.events().publish((symbol_short!("epo_cls"),), epoch_id);
+}
+
+pub fn escalation_resolved(env: &Env, wallet: &Address, asset_pair: &Symbol, breach_count: u32, score: u32) {
+    env.events().publish(
+        (symbol_short!("esc_res"), wallet.clone(), asset_pair.clone()),
+        (breach_count, score),
+    );
+}
+
+pub fn escalation_threshold_updated(env: &Env, old: u32, new: u32) {
+    env.events().publish((symbol_short!("esc_thr"),), (old, new));
+}
+
+pub fn escalation_triggered(env: &Env, wallet: &Address, asset_pair: &Symbol, breach_count: u32, score: u32, threshold: u32) {
+    env.events().publish(
+        (symbol_short!("esc_trg"), wallet.clone(), asset_pair.clone()),
+        (breach_count, score, threshold),
+    );
+}
+
+pub fn failover_triggered(env: &Env, wallet: &Address, asset_pair: &Symbol) {
+    env.events().publish((symbol_short!("failover"), wallet.clone()), asset_pair.clone());
+}
+
+pub fn flash_protection_mode_updated(env: &Env, mode: u32) {
+    env.events().publish((symbol_short!("fp_upd"),), mode);
+}
+
+pub fn jump_threshold_updated(env: &Env, threshold: u32) {
+    env.events().publish((symbol_short!("jt_upd"),), threshold);
+}
+
+pub fn oracle_registered(env: &Env, asset_pair: &Symbol, oracle: &Address) {
+    env.events().publish((symbol_short!("orc_reg"), asset_pair.clone()), oracle.clone());
+}
+
+pub fn oracle_removed(env: &Env, asset_pair: &Symbol) {
+    env.events().publish((symbol_short!("orc_rem"),), asset_pair.clone());
+}
+
+pub fn param_change_proposed(env: &Env, key: &Symbol, apply_after: u64) {
+    env.events().publish((symbol_short!("pc_prop"),), (key.clone(), apply_after));
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn score_jump_anomaly(
+    env: &Env,
+    wallet: &Address,
+    asset_pair: &Symbol,
+    previous_score: u32,
+    new_score: u32,
+    delta: i64,
+    model_version: u32,
+    timestamp: u64,
+) {
+    env.events().publish(
+        (symbol_short!("jump"), wallet.clone(), asset_pair.clone()),
+        (previous_score, new_score, delta, model_version, timestamp),
+    );
+}
+
+pub fn signer_accuracy_reset(env: &Env, signer: &Address) {
+    env.events().publish((symbol_short!("sa_rst"), signer.clone()), ());
+}
+
+pub fn signer_accuracy_updated(env: &Env, signer: &Address, mad_scaled: u64, count: u64) {
+    env.events().publish((symbol_short!("sa_upd"), signer.clone()), (mad_scaled, count));
+}
+
+pub fn staleness_window_updated(env: &Env, window_secs: u64) {
+    env.events().publish((symbol_short!("sw_upd"),), window_secs);
+}
+
+pub fn suspicious_same_ledger_submission(env: &Env, wallet: &Address, asset_pair: &Symbol, ledger_seq: u32) {
+    env.events().publish(
+        (symbol_short!("susp_gate"), wallet.clone(), asset_pair.clone()),
+        ledger_seq,
+    );
+}
+
+pub fn wallet_cluster_assigned(env: &Env, wallet: &Address, cluster: u32) {
+    env.events().publish((symbol_short!("wc_asgn"), wallet.clone()), cluster);
 }

@@ -62,18 +62,18 @@ impl Fe {
     pub fn add(self, other: Self) -> Self {
         let mut res = [0u64; 4];
         let mut carry = 0u128;
-        for i in 0..4 {
+        for (i, r) in res.iter_mut().enumerate() {
             let sum = (self.0[i] as u128) + (other.0[i] as u128) + carry;
-            res[i] = sum as u64;
+            *r = sum as u64;
             carry = sum >> 64;
         }
         let h = (res[3] >> 63) + (carry << 1) as u64;
         res[3] &= 0x7fffffffffffffff;
-        
+
         let mut carry2 = (h as u128) * 19;
-        for i in 0..4 {
-            let sum = (res[i] as u128) + carry2;
-            res[i] = sum as u64;
+        for r in &mut res {
+            let sum = (*r as u128) + carry2;
+            *r = sum as u64;
             carry2 = sum >> 64;
         }
         let mut out = Fe(res);
@@ -86,16 +86,16 @@ impl Fe {
     pub fn sub(self, other: Self) -> Self {
         let mut res = [0u64; 4];
         let mut borrow = 0u128;
-        for i in 0..4 {
+        for (i, r) in res.iter_mut().enumerate() {
             let diff = (self.0[i] as u128).wrapping_sub(other.0[i] as u128).wrapping_sub(borrow);
-            res[i] = diff as u64;
+            *r = diff as u64;
             borrow = if diff >> 64 > 0 { 1 } else { 0 };
         }
         if borrow > 0 {
             let mut carry = 0u128;
-            for i in 0..4 {
-                let sum = (res[i] as u128) + (Self::P.0[i] as u128) + carry;
-                res[i] = sum as u64;
+            for (i, r) in res.iter_mut().enumerate() {
+                let sum = (*r as u128) + (Self::P.0[i] as u128) + carry;
+                *r = sum as u64;
                 carry = sum >> 64;
             }
         }
@@ -144,9 +144,9 @@ impl Fe {
         res[3] &= 0x7fffffffffffffff;
 
         let mut carry3 = (h2 as u128) * 19;
-        for i in 0..4 {
-            let sum = (res[i] as u128) + carry3;
-            res[i] = sum as u64;
+        for r in &mut res {
+            let sum = (*r as u128) + carry3;
+            *r = sum as u64;
             carry3 = sum >> 64;
         }
 
@@ -191,7 +191,7 @@ impl Fe {
         self.pow(pm2)
     }
 
-    pub fn to_bytes(&self) -> [u8; 32] {
+    pub fn to_bytes(self) -> [u8; 32] {
         let mut out = [0u8; 32];
         for i in 0..4 {
             out[i*8 .. i*8 + 8].copy_from_slice(&self.0[i].to_le_bytes());
@@ -252,9 +252,9 @@ impl Sc {
     pub fn add(self, other: Self) -> Self {
         let mut res = [0u64; 4];
         let mut carry = 0u128;
-        for i in 0..4 {
+        for (i, r) in res.iter_mut().enumerate() {
             let sum = (self.0[i] as u128) + (other.0[i] as u128) + carry;
-            res[i] = sum as u64;
+            *r = sum as u64;
             carry = sum >> 64;
         }
         let mut out = Sc(res);
@@ -267,16 +267,16 @@ impl Sc {
     pub fn sub(self, other: Self) -> Self {
         let mut res = [0u64; 4];
         let mut borrow = 0u128;
-        for i in 0..4 {
+        for (i, r) in res.iter_mut().enumerate() {
             let diff = (self.0[i] as u128).wrapping_sub(other.0[i] as u128).wrapping_sub(borrow);
-            res[i] = diff as u64;
+            *r = diff as u64;
             borrow = if diff >> 64 > 0 { 1 } else { 0 };
         }
         if borrow > 0 {
             let mut carry = 0u128;
-            for i in 0..4 {
-                let sum = (res[i] as u128) + (Self::L.0[i] as u128) + carry;
-                res[i] = sum as u64;
+            for (i, r) in res.iter_mut().enumerate() {
+                let sum = (*r as u128) + (Self::L.0[i] as u128) + carry;
+                *r = sum as u64;
                 carry = sum >> 64;
             }
         }
@@ -302,9 +302,9 @@ impl Sc {
         let mut r = [0u64; 4];
         for i in (0..512).rev() {
             let mut carry_r = 0u64;
-            for j in 0..4 {
-                let next_carry = r[j] >> 63;
-                r[j] = (r[j] << 1) | carry_r;
+            for limb in &mut r {
+                let next_carry = *limb >> 63;
+                *limb = (*limb << 1) | carry_r;
                 carry_r = next_carry;
             }
             let limb_idx = i / 64;
@@ -352,7 +352,7 @@ impl Sc {
         self.pow(lm2)
     }
 
-    pub fn to_bytes(&self) -> [u8; 32] {
+    pub fn to_bytes(self) -> [u8; 32] {
         let mut out = [0u8; 32];
         for i in 0..4 {
             out[i*8 .. i*8 + 8].copy_from_slice(&self.0[i].to_le_bytes());
@@ -605,16 +605,16 @@ impl Bulletproof {
             let mut y_limbs = [0u64; 4];
             for i in 0..4 {
                 let mut b = [0u8; 8];
-                for j in 0..8 {
-                    b[j] = bytes.get(*offset + (i as u32)*8 + j as u32)?;
+                for (j, byte) in b.iter_mut().enumerate() {
+                    *byte = bytes.get(*offset + (i as u32)*8 + j as u32)?;
                 }
                 x_limbs[i as usize] = u64::from_le_bytes(b);
             }
             *offset += 32;
             for i in 0..4 {
                 let mut b = [0u8; 8];
-                for j in 0..8 {
-                    b[j] = bytes.get(*offset + (i as u32)*8 + j as u32)?;
+                for (j, byte) in b.iter_mut().enumerate() {
+                    *byte = bytes.get(*offset + (i as u32)*8 + j as u32)?;
                 }
                 y_limbs[i as usize] = u64::from_le_bytes(b);
             }
@@ -633,8 +633,8 @@ impl Bulletproof {
             let mut limbs = [0u64; 4];
             for i in 0..4 {
                 let mut b = [0u8; 8];
-                for j in 0..8 {
-                    b[j] = bytes.get(*offset + (i as u32)*8 + j as u32)?;
+                for (j, byte) in b.iter_mut().enumerate() {
+                    *byte = bytes.get(*offset + (i as u32)*8 + j as u32)?;
                 }
                 limbs[i as usize] = u64::from_le_bytes(b);
             }
@@ -652,13 +652,13 @@ impl Bulletproof {
         let mu = read_sc(bytes, &mut offset)?;
         
         let mut L = [Pt::identity(); 3];
-        for i in 0..3 {
-            L[i] = read_pt(bytes, &mut offset)?;
+        for item in &mut L {
+            *item = read_pt(bytes, &mut offset)?;
         }
-        
+
         let mut R = [Pt::identity(); 3];
-        for i in 0..3 {
-            R[i] = read_pt(bytes, &mut offset)?;
+        for item in &mut R {
+            *item = read_pt(bytes, &mut offset)?;
         }
         
         let a = read_sc(bytes, &mut offset)?;
@@ -884,8 +884,8 @@ pub fn prove_range_proof(env: &Env, v: u32, r: Sc, mut prng: SeededPrng) -> Bull
     let mut hs_ip = hs;
     let y_inv = y.invert();
     let mut y_inv_pow = Sc::one();
-    for i in 0..8 {
-        hs_ip[i] = hs_ip[i].mul(y_inv_pow, d);
+    for item in &mut hs_ip {
+        *item = item.mul(y_inv_pow, d);
         y_inv_pow = y_inv_pow.mul(y_inv);
     }
     
@@ -1015,8 +1015,8 @@ pub fn verify_range_proof(env: &Env, V: Pt, proof: &Bulletproof) -> bool {
     let gs_ip = gs;
     let mut hs_ip = hs;
     let mut y_inv_pow = Sc::one();
-    for i in 0..8 {
-        hs_ip[i] = hs_ip[i].mul(y_inv_pow, d);
+    for item in &mut hs_ip {
+        *item = item.mul(y_inv_pow, d);
         y_inv_pow = y_inv_pow.mul(y_inv);
     }
     
@@ -1039,14 +1039,14 @@ pub fn verify_range_proof(env: &Env, V: Pt, proof: &Bulletproof) -> bool {
     for i in 0..8 {
         let mut s = Sc::one();
         let mut s_prime = Sc::one();
-        for round in 0..3 {
+        for (round, challenge) in challenges.iter().enumerate() {
             let bit = (i >> (2 - round)) & 1;
             if bit == 1 {
-                s = s.mul(challenges[round]);
-                s_prime = s_prime.mul(challenges[round].invert());
+                s = s.mul(*challenge);
+                s_prime = s_prime.mul(challenge.invert());
             } else {
-                s = s.mul(challenges[round].invert());
-                s_prime = s_prime.mul(challenges[round]);
+                s = s.mul(challenge.invert());
+                s_prime = s_prime.mul(*challenge);
             }
         }
         gs_final = gs_final.add(gs_ip[i].mul(s, d), d);
