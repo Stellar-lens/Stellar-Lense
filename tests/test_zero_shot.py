@@ -1,5 +1,7 @@
 import numpy as np
-from detection.zero_shot import cosine_distance, PrototypeDetector
+
+from detection.zero_shot import PrototypeDetector, cosine_distance
+
 
 def test_cosine_distance():
     a = np.array([1, 0, 0])

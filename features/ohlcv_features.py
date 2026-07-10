@@ -6,11 +6,10 @@ using vectorised pandas operations.
 
 from __future__ import annotations
 
-from typing import Iterable
+from collections.abc import Iterable
 
 import numpy as np
 import pandas as pd
-
 
 _RESOLUTION_ALLOWLIST = ["1m", "5m", "15m", "1h", "4h"]
 

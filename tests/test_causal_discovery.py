@@ -9,17 +9,15 @@ Acceptance Criteria verified:
 
 import json
 import os
-import tempfile
+
+import networkx as nx
 import numpy as np
 import pandas as pd
-import networkx as nx
-import pytest
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import precision_score
 from sklearn.model_selection import train_test_split
 
 from detection.causal_discovery import WashTradeCausalDiscovery
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -166,19 +164,12 @@ class TestCausalFeaturePrecision:
         y = df["label"]
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
 
-        # Model with all features (including noise)
-        model_all = RandomForestClassifier(n_estimators=50, random_state=42)
-        model_all.fit(X_train, y_train)
-        preds_all = model_all.predict(X_test)
-        prec_all = precision_score(y_test, preds_all, zero_division=0)
-
         # Model with only X8 (the true causal feature)
         model_causal = RandomForestClassifier(n_estimators=50, random_state=42)
         model_causal.fit(X_train[["X8"]], y_train)
         preds_causal = model_causal.predict(X_test[["X8"]])
         prec_causal = precision_score(y_test, preds_causal, zero_division=0)
 
-        diff = prec_causal - prec_all
         # The causal feature should outperform or match features plus noise
         assert prec_causal >= 0.80, f"Expected high precision with direct cause, got {prec_causal:.4f}"
 

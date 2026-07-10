@@ -6,11 +6,10 @@ and atomic write to disk.
 
 import os
 
-import numpy as np
 import pandas as pd
 import pytest
 
-from data.reservoir_sampler import DriftAwareReservoirSampler, RESERVOIR_SIZE
+from data.reservoir_sampler import DriftAwareReservoirSampler
 
 
 class MockCUSUMDetector:

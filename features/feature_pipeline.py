@@ -7,15 +7,14 @@ call ``build_extended_feature_vector``.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pandas as pd
 
 from detection.feature_engineering import build_feature_vector
-from features.velocity_features import compute_token_velocity
 from features.ohlcv_features import compute_ohlcv_features
+from features.velocity_features import compute_token_velocity
 from features.wallet_lifecycle_features import compute_lifecycle_features
-
 
 
 def build_extended_feature_vector(
@@ -42,7 +41,7 @@ def build_extended_feature_vector(
         velocity feature groups.
     """
     if now is None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
     features = build_feature_vector(wallet, wallet_trades, **kwargs)
     features.update(

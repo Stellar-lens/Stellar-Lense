@@ -24,27 +24,18 @@ Run with:
 """
 
 import os
-import pytest
-import threading
 import time
-from datetime import datetime, UTC, timedelta
-from typing import Optional
-from unittest.mock import MagicMock, patch
+from datetime import UTC, datetime, timedelta
 
-from stellar_sdk import Asset as SdkAsset, Keypair
+import pytest
 
 # Only load these if running integration tests
 if os.getenv("LEDGERLENS_INTEGRATION_TESTS") == "1":
-    from detection.persistence import get_engine, RiskScoreRecord
-    from ingestion.horizon_streamer import stream_trades
-    from streaming.alert_dispatcher import AlertDispatcher
-    from streaming.feature_buffer import FeatureBuffer
-    from streaming.pipeline import StreamingPipeline
-    from streaming.streaming_scorer import StreamingScorer
-    from tests.factories import WashTradeFactory, CleanTradeFactory, RingTradeFactory
-    from config import config
-    from sqlalchemy.orm import Session
     from sqlalchemy import select
+    from sqlalchemy.orm import Session
+
+    from detection.persistence import RiskScoreRecord, get_engine
+    from tests.factories import CleanTradeFactory, RingTradeFactory, WashTradeFactory
 
 
 @pytest.mark.skipif(
@@ -79,7 +70,7 @@ class TestFullPipelineE2E:
                 session.delete(record)
             session.commit()
 
-    def _get_risk_score(self, wallet: str, pair: str, timeout_seconds: int = 60) -> Optional[float]:
+    def _get_risk_score(self, wallet: str, pair: str, timeout_seconds: int = 60) -> float | None:
         """Poll the database for a risk score, up to timeout_seconds."""
         engine = get_engine()
         start = time.time()
@@ -132,7 +123,7 @@ class TestFullPipelineE2E:
             pytest.skip("No wallets generated")
         
         wallet = wallets[0]
-        pair = f"USDC:native/XLM:native"  # Common test pair
+        pair = "USDC:native/XLM:native"  # Common test pair
         
         # Score should appear within 60 seconds
         score = self._get_risk_score(wallet, pair, timeout_seconds=60)
@@ -151,7 +142,7 @@ class TestFullPipelineE2E:
             pytest.skip("No wallets generated")
         
         wallet = wallets[0]
-        pair = f"USDC:native/XLM:native"
+        pair = "USDC:native/XLM:native"
         
         score = self._get_risk_score(wallet, pair, timeout_seconds=60)
         
@@ -169,7 +160,7 @@ class TestFullPipelineE2E:
             pytest.skip("No wallets generated")
         
         wallet = wallets[0]
-        pair = f"USDC:native/XLM:native"
+        pair = "USDC:native/XLM:native"
         
         score = self._get_risk_score(wallet, pair, timeout_seconds=60)
         
@@ -183,7 +174,7 @@ class TestFullPipelineE2E:
         """Test that timeout assertion fires when scores don't appear."""
         # Use a fake wallet that won't trade
         fake_wallet = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF"
-        pair = f"USDC:native/XLM:native"
+        pair = "USDC:native/XLM:native"
         
         # Should timeout and return None
         start = time.time()

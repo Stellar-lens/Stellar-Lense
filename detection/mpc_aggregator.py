@@ -83,9 +83,10 @@ logger = logging.getLogger("ledgerlens.mpc_aggregator")
 # mpyc import — graceful absence
 # ---------------------------------------------------------------------------
 try:
-    from mpyc.runtime import Mpc, mpc as _global_mpc
-    from mpyc.seclists import seclist
-    import mpyc.sectypes as sectypes
+    import mpyc.sectypes as sectypes  # noqa: F401
+    from mpyc.runtime import Mpc  # noqa: F401
+    from mpyc.runtime import mpc as _global_mpc
+    from mpyc.seclists import seclist  # noqa: F401
 
     _MPYC_AVAILABLE = True
 except ImportError:  # pragma: no cover
@@ -219,7 +220,7 @@ async def mpc_aggregate_scores_local(
 
     # mpyc local mode: create one Mpc instance per party, all sharing the
     # same in-process communication channels.
-    from mpyc.runtime import Party, Mpc
+    from mpyc.runtime import Mpc, Party
 
     parties = [Party(pid=i) for i in range(n_parties)]
 
@@ -289,7 +290,7 @@ async def mpc_aggregate_scores(
     if threshold is None:
         threshold = (n_parties - 1) // 2
 
-    from mpyc.runtime import Party, Mpc
+    from mpyc.runtime import Mpc, Party
 
     if peers is not None:
         parties = [

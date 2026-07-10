@@ -17,12 +17,11 @@ Coverage:
 from __future__ import annotations
 
 import asyncio
-import math
 from unittest.mock import patch
 
 import pytest
 
-from detection.mpc_aggregator import plaintext_aggregate, AggregateResult
+from detection.mpc_aggregator import plaintext_aggregate
 
 mpyc = pytest.importorskip("mpyc", reason="mpyc not installed")
 
@@ -257,10 +256,8 @@ class TestAllPartiesIdenticalOutput:
     def test_three_parties_same_mean(self):
         scores = [[10.0, 20.0], [30.0, 40.0], [50.0, 60.0]]
 
-        results: list[AggregateResult] = [{}] * 3  # type: ignore[list-item]
-
         async def _collect():
-            from mpyc.runtime import Party, Mpc
+            from mpyc.runtime import Mpc, Party
             parties = [Party(pid=i) for i in range(3)]
             party_results = []
             async def _run_one(pid):
@@ -298,13 +295,12 @@ class TestErrorConditions:
 
     def test_warning_for_four_parties(self):
         """4-party should log a warning but still work."""
-        scores = [[10.0], [20.0], [30.0], [40.0]]
-        import logging
-        with patch("detection.mpc_aggregator.logger") as mock_logger:
+        with patch("detection.mpc_aggregator.logger"):
             # We can't easily test 4-party in local mode without more setup;
             # just verify the warning path is wired up by checking distributed entry
-            from detection.mpc_aggregator import mpc_aggregate_scores
             import inspect
+
+            from detection.mpc_aggregator import mpc_aggregate_scores
             src = inspect.getsource(mpc_aggregate_scores)
             assert "n_parties" in src
             assert "warning" in src.lower()

@@ -13,10 +13,10 @@ from __future__ import annotations
 import pytest
 
 from detection.ensemble_calibrator import (
-    EnsembleDynamicWeightController,
     _DYNAMIC_WEIGHT_MAX,
     _DYNAMIC_WEIGHT_MIN,
     _MIN_FP_FEEDBACK,
+    EnsembleDynamicWeightController,
 )
 
 

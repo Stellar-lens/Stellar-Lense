@@ -12,8 +12,6 @@ References:
 
 from __future__ import annotations
 
-import hashlib
-import logging
 import re
 import struct
 from typing import Any
@@ -231,8 +229,9 @@ def extract_stellar_address_from_vaa(vaa_data: dict[str, Any]) -> str | None:
         # If already hex, try to convert back to Stellar format
         if len(dest_addr) == 56:  # 28 bytes in hex
             # This is likely a Stellar address in hex format
-            # Decode and verify it looks like a Stellar address
-            decoded = bytes.fromhex(dest_addr)
+            # Decode (raises ValueError below if not valid hex) and verify it
+            # looks like a Stellar address
+            bytes.fromhex(dest_addr)
 
             # Stellar addresses are base32-encoded with 'G' prefix
             # They encode to 56 characters (28 bytes × 8/5)

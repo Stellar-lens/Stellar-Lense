@@ -12,13 +12,11 @@ Covers:
 from __future__ import annotations
 
 import threading
-import time
 
 import numpy as np
 import pytest
 
 from detection.federated.coordinator import AsyncFederatedCoordinator
-
 
 # ---------------------------------------------------------------------------
 # Test: staleness-aware weight correctness
@@ -189,7 +187,6 @@ class TestThreadSafety:
     def test_global_weights_integrity_under_concurrent_load(self):
         """Global weights must not contain NaN/Inf after concurrent writes."""
         coord = AsyncFederatedCoordinator(weight_dim=2, trigger_n=2, max_staleness=1000)
-        done = threading.Event()
 
         def flood(tid):
             for _ in range(20):

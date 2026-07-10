@@ -8,11 +8,8 @@ Tests verify:
   5. Score storage with replay tag
 """
 
-import json
-from datetime import UTC, datetime, timedelta
-from unittest.mock import MagicMock, Mock, patch
-
-import pytest
+from datetime import UTC, datetime
+from unittest.mock import Mock, patch
 
 
 class TestNoOpAlertDispatcher:
@@ -37,7 +34,7 @@ class TestStreamReplayerInitialization:
 
     def test_replayer_initializes_with_noop_dispatcher(self):
         """Replayer should use no-op dispatcher in replay mode."""
-        from scripts.replay_stream import StreamReplayer, NoOpAlertDispatcher
+        from scripts.replay_stream import NoOpAlertDispatcher, StreamReplayer
 
         with patch("scripts.replay_stream.KafkaConsumer"):
             with patch("scripts.replay_stream.RiskScorer"):

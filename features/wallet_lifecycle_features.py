@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pandas as pd
 
@@ -36,10 +36,10 @@ def _validate_wallet(wallet_address: str) -> None:
 
 def _fetch_account_created_at(wallet_address: str, horizon_url: str) -> datetime | None:
     """Fetch account creation timestamp from Horizon, with 24h TTL cache."""
-    import urllib.request
     import json
+    import urllib.request
 
-    now_utc = datetime.now(timezone.utc)
+    now_utc = datetime.now(UTC)
     cached = _account_cache.get(wallet_address)
     if cached is not None:
         created_at, fetched_at = cached
@@ -95,9 +95,9 @@ def compute_lifecycle_features(
 
     nan = float("nan")
     if now is None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
     if now.tzinfo is None:
-        now = now.replace(tzinfo=timezone.utc)
+        now = now.replace(tzinfo=UTC)
 
     # --- age features (require account_created_at) ---
     if account_created_at is None:
@@ -105,7 +105,7 @@ def compute_lifecycle_features(
         active_days_ratio = nan
     else:
         if account_created_at.tzinfo is None:
-            account_created_at = account_created_at.replace(tzinfo=timezone.utc)
+            account_created_at = account_created_at.replace(tzinfo=UTC)
         wallet_age_days = max((now - account_created_at).total_seconds() / 86_400.0, 0.0)
 
         if not trades_df.empty:

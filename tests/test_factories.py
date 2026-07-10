@@ -5,12 +5,10 @@ WashTradeFactory generates non-conforming trades. Tests factory isolation
 and Stellar account ID validity.
 """
 
-import numpy as np
 import pandas as pd
 import pytest
-from scipy import stats
 
-from detection.benford_engine import chi_square_statistic, leading_digits, mad_score
+from detection.benford_engine import chi_square_statistic, mad_score
 from tests.factories import (
     CleanTradeFactory,
     RingTradeFactory,

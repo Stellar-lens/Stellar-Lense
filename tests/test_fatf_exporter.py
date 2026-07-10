@@ -1,6 +1,5 @@
 """Tests for reporting/fatf_exporter.py and reporting/fatf_risk_codes.py."""
 
-import os
 
 import pytest
 
@@ -16,7 +15,6 @@ from reporting.fatf_risk_codes import (
     Severity,
     map_to_risk_codes,
 )
-
 
 # ---------------------------------------------------------------------------
 # Shared fixtures
@@ -308,8 +306,6 @@ class TestExportIvms101:
     def test_invalid_document_raises_export_validation_error(self, monkeypatch):
         """Corrupting the assembled doc before validation triggers ExportValidationError."""
         import reporting.fatf_exporter as exporter
-
-        real_validate = exporter._validate
 
         def bad_validate(doc):
             import jsonschema

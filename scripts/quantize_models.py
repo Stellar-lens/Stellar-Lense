@@ -72,8 +72,8 @@ logging.basicConfig(
 try:
     import torch
     import torch.nn as nn
-    import torch.quantization as tq
     import torch.nn.utils.prune as prune
+    import torch.quantization as tq
 
     _TORCH_AVAILABLE = True
 except ImportError:
@@ -176,7 +176,6 @@ def _quantise_xgb_leaves(model: Any) -> int:
         logger.warning("xgboost not installed — skipping XGBoost leaf quantisation")
         return 0
 
-    config_str = model.get_booster().save_config()
     # XGBoost's JSON config doesn't expose leaf values directly; use dump_model
     model_dump = model.get_booster().get_dump(dump_format="json")
     total = 0
@@ -610,7 +609,6 @@ def _prune_and_save(
     """Generic prune-and-save helper for a PyTorch model."""
     sparsity_pct = int(round(sparsity * 100))
     suffix = suffix_override or f"_pruned_s{sparsity_pct}"
-    artifact_key_prefix = model_name.replace("_encoder", "")
     artifact_key = f"{model_name}{suffix}"
     dst_name = f"{model_name}{suffix}.pt"
     dst = os.path.join(model_dir, dst_name)

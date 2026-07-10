@@ -35,7 +35,6 @@ import hashlib
 import hmac
 import logging
 import os
-from typing import Optional
 
 import numpy as np
 
@@ -83,7 +82,7 @@ class _ANN:
 
     def __init__(self, dim: int) -> None:
         self._dim = dim
-        self._embeddings: Optional[np.ndarray] = None  # (n, dim) float32
+        self._embeddings: np.ndarray | None = None  # (n, dim) float32
         self._index = None
 
         try:
@@ -165,7 +164,7 @@ class RingRegistry:
         self._rings: list[list[str]] = []
 
     @classmethod
-    def from_rings(cls, rings: list[list[str]]) -> "RingRegistry":
+    def from_rings(cls, rings: list[list[str]]) -> RingRegistry:
         """Build from a list of raw-address ring groups."""
         registry = cls()
         for ring_idx, members in enumerate(rings):
@@ -224,7 +223,7 @@ class HardNegativeMiner:
         self.curriculum_epochs = curriculum_epochs
         self._rng = np.random.default_rng(rng_seed)
         self._ann = _ANN(embedding_dim)
-        self._ring_registry: Optional[RingRegistry] = None
+        self._ring_registry: RingRegistry | None = None
         # Total number of clean wallets in the index
         self._n_clean: int = 0
 

@@ -38,7 +38,7 @@ class TokenBucketLimiter:
         capacity: int | None = None,
         refill_rate_per_sec: float | None = None,
         poll_interval_seconds: float = 0.02,
-        client: "redis.Redis | None" = None,
+        client: redis.Redis | None = None,
     ):
         self._key = key
         self._capacity = float(capacity if capacity is not None else config.HORIZON_MAX_RPS)

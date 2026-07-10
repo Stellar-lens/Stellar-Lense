@@ -4,7 +4,6 @@ import logging
 
 import pytest
 
-from config import config
 
 def test_json_logging_format():
     """Verify that score events are logged as valid JSON with required fields."""

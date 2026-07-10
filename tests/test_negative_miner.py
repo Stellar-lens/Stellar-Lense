@@ -22,13 +22,12 @@ import pytest
 torch = pytest.importorskip("torch", reason="torch not installed")
 
 from detection.contrastive.negative_miner import (
+    _ANN,
     EVENT_HMAC_SECRET,
     HardNegativeMiner,
     RingRegistry,
-    _ANN,
     _hash_wallet,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -118,7 +117,7 @@ class TestCurriculumSchedule:
     def test_monotone_increase(self):
         miner = HardNegativeMiner(embedding_dim=8, curriculum_epochs=8)
         fracs = [miner.hard_fraction(e) for e in range(10)]
-        for a, b in zip(fracs, fracs[1:]):
+        for a, b in zip(fracs, fracs[1:], strict=False):
             assert b >= a
 
     def test_midpoint(self):
@@ -297,7 +296,7 @@ class TestLabeledFeatureDataset:
         raw_ids = [f"GWALLET{i:04d}" for i in range(10)]
         ds = LabeledFeatureDataset(X, y, wallet_ids=raw_ids)
 
-        for stored, raw in zip(ds.hashed_ids, raw_ids):
+        for stored, raw in zip(ds.hashed_ids, raw_ids, strict=True):
             assert raw not in stored, f"Raw wallet ID {raw!r} found in stored hash"
             assert stored == _expected_hash(raw)
 

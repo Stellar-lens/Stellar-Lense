@@ -15,14 +15,13 @@ Regression test
 
 from __future__ import annotations
 
+import sys
+import types
+
 import numpy as np
-import pytest
 from sklearn.datasets import make_classification
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import log_loss
-
-import sys
-import types
 
 # Stub out detection.__init__ so we don't pull in networkx/dotenv/etc.
 # The module under test only needs detection.federated.gradient_compression.
@@ -36,7 +35,6 @@ from detection.federated.gradient_compression import (  # noqa: E402
     TopKSparsifier,
     bandwidth_ratio,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers

@@ -11,13 +11,13 @@ and the worker (``streaming/kafka_worker.py``) in lock-step on field names,
 types, and the canonical ``asset_pair`` string format.
 """
 
-from typing import Any, cast
 import io
 import json
 import struct
 import time
 from datetime import UTC, datetime
 from functools import lru_cache
+from typing import Any, cast
 
 import fastavro
 

@@ -1,5 +1,5 @@
 import numpy as np
-import pandas as pd
+
 
 def drop_trades(df_trades, drop_prob=0.2):
     """Randomly drop a percentage of trades."""

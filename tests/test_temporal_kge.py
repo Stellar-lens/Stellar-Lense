@@ -3,22 +3,22 @@
 Tests cover temporal KG construction, link prediction scoring, and inference performance.
 """
 
-import pytest
-from datetime import datetime, timedelta, timezone
-import pandas as pd
-import numpy as np
+from datetime import UTC, datetime, timedelta
 
+import numpy as np
+import pandas as pd
+import pytest
+
+from detection.feature_engineering import compute_temporal_kge_features
 from detection.temporal_kge import (
     TemporalKGEncoder,
-    TemporalKGEError,
     build_temporal_kg_from_trades,
 )
-from detection.feature_engineering import compute_temporal_kge_features
 
 
 def sample_trades_3wallet_ring() -> pd.DataFrame:
     """Create sample trades showing a 3-wallet wash-trading ring."""
-    base_time = datetime(2024, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+    base_time = datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC)
     wallets = ["GAAAA" + "A" * 49, "GBBBB" + "B" * 49, "GCCCC" + "C" * 49]
 
     trades = []
@@ -44,7 +44,7 @@ def sample_trades_3wallet_ring() -> pd.DataFrame:
 
 def sample_trades_random_wallets(n_wallets=10, n_trades=100) -> pd.DataFrame:
     """Create sample trades between random wallet pairs."""
-    base_time = datetime(2024, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+    base_time = datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC)
     wallets = [f"GXXXX{i:04d}{'X' * 45}" for i in range(n_wallets)]
 
     trades = []
@@ -103,7 +103,7 @@ class TestBuildTemporalKG:
 
     def test_timestamps_binned_to_hours(self):
         """Test that timestamps are correctly binned to 1-hour intervals."""
-        base_time = datetime(2024, 1, 1, 12, 30, 0, tzinfo=timezone.utc)
+        base_time = datetime(2024, 1, 1, 12, 30, 0, tzinfo=UTC)
         trades_df = pd.DataFrame([
             {
                 "trade_id": "1",
@@ -141,7 +141,7 @@ class TestBuildTemporalKG:
 
     def test_reject_future_timestamps(self):
         """Test that future timestamps are rejected."""
-        future_time = datetime.now(timezone.utc) + timedelta(hours=1)
+        future_time = datetime.now(UTC) + timedelta(hours=1)
         trades_df = pd.DataFrame([{
             "trade_id": "1",
             "ledger_close_time": future_time.isoformat(),

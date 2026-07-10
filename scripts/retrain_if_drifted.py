@@ -19,14 +19,13 @@ Incremental training mode (``--incremental``):
 """
 
 import argparse
-import uuid
-from typing import Any, cast
-
 import json
 import os
 import shutil
 import sys
+import uuid
 from datetime import UTC, datetime, timedelta
+from typing import Any, cast
 
 import joblib
 import pandas as pd
@@ -42,7 +41,6 @@ from detection.model_training import (
     load_training_data,
     save_models,
     save_training_artifacts,
-    split_features_labels,
     train_models,
 )
 from utils.logging import get_logger
@@ -233,7 +231,6 @@ def compute_false_positive_rate(model_dir: str, test_data_path: str) -> float | 
     or None if the model cannot be loaded or the test set is missing.
     """
     try:
-        import numpy as np
 
         from detection.model_inference import RiskScorer
 

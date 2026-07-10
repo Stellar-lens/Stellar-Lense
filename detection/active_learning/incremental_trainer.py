@@ -98,7 +98,6 @@ def _detect_and_quarantine_backdoors(
             return new_df, quarantined_indices
 
         # Check safety threshold for each class
-        flagged_set = set(flagged_indices)
         safety_triggered = False
 
         for label in sorted(y.unique()):

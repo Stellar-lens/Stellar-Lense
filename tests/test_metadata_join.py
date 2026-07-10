@@ -258,7 +258,7 @@ class TestMetadataJoinStateLateArrival:
         first = _make_metadata_update(effect_type="account_created")
         state.apply_update(first)
         # Promote to active, immediately expires (window=0).
-        result_before = state.get_metadata(WALLET_A)
+        state.get_metadata(WALLET_A)
         # Window is 0 s so the entry may or may not be returned depending on
         # exact timing — but after a tiny sleep it will definitely be stale.
         time.sleep(0.01)
@@ -463,6 +463,7 @@ class TestPipelineMetadataEnrichment:
     def test_pipeline_enriches_both_wallets_on_trade(self, monkeypatch):
         """_stream_pair calls _enrich_from_metadata for both trade wallets."""
         from stellar_sdk import Asset as SdkAsset
+
         from streaming.pipeline import StreamingPipeline
 
         state = MetadataJoinState(join_window_seconds=3600)

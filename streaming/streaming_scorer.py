@@ -43,13 +43,14 @@ _DEFAULT_KI = float(os.getenv("STREAM_PID_KI", "0.1"))
 _DEFAULT_KD = float(os.getenv("STREAM_PID_KD", "0.05"))
 
 try:
-    from prometheus_client import Gauge, REGISTRY as _PROM_REGISTRY
+    from prometheus_client import REGISTRY as _PROM_REGISTRY
+    from prometheus_client import Gauge
 
-    _batch_size_gauge: "Gauge | None" = (
+    _batch_size_gauge: Gauge | None = (
         _PROM_REGISTRY._names_to_collectors.get("ledgerlens_adaptive_batch_size")  # type: ignore[attr-defined]
         or Gauge("ledgerlens_adaptive_batch_size", "Current adaptive micro-batch size")
     )
-    _target_latency_gauge: "Gauge | None" = (
+    _target_latency_gauge: Gauge | None = (
         _PROM_REGISTRY._names_to_collectors.get("ledgerlens_batch_target_latency_seconds")  # type: ignore[attr-defined]
         or Gauge(
             "ledgerlens_batch_target_latency_seconds",
@@ -191,6 +192,9 @@ class StreamingScorer:
         self._gnn_encoder = gnn_encoder
         self._funding_graph: nx.DiGraph = (
             funding_graph if funding_graph is not None else nx.DiGraph()
+        )
+        self._feature_cache: FeatureCache = (
+            feature_cache if feature_cache is not None else FeatureCache()
         )
 
     # ------------------------------------------------------------------

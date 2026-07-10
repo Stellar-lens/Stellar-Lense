@@ -1,8 +1,6 @@
 import math
 
-import numpy as np
 import pandas as pd
-
 import pytest
 
 from features.ohlcv_features import compute_ohlcv_features
@@ -33,7 +31,6 @@ def test_compute_ohlcv_features_expected_values_1m_known_5_trades():
     v = sum(trades["amount"].tolist())
 
     price_range_ratio = (h - l) / o
-    candle_body_ratio = (c - o) / (h - l) if (h - l) != 0 else math.nan
 
     vwap = float((trades["price"] * trades["amount"]).sum() / v)
     vwap_deviation = (c - vwap) / vwap

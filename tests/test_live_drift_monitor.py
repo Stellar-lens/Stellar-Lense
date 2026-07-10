@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from detection.drift_monitor import LiveDriftMonitor, compute_psi
+from detection.drift_monitor import LiveDriftMonitor
 
 
 def _build_reference(values: np.ndarray, n_bins: int = 10) -> dict:

@@ -39,7 +39,6 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
-
 # ---------------------------------------------------------------------------
 # Internals shared by attack and defence
 # ---------------------------------------------------------------------------
@@ -197,7 +196,7 @@ def suggest_early_stopping_epochs(
     if not train_losses:
         raise ValueError("Loss lists must not be empty")
 
-    for epoch, (t_loss, v_loss) in enumerate(zip(train_losses, val_losses)):
+    for epoch, (t_loss, v_loss) in enumerate(zip(train_losses, val_losses, strict=True)):
         gap = v_loss - t_loss
         if gap > gap_threshold:
             return EarlyStoppingRecommendation(

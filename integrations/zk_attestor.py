@@ -62,7 +62,7 @@ logger = logging.getLogger(__name__)
 
 # Optional py_ecc import for Pedersen commitments (graceful degradation)
 try:
-    from py_ecc.bn128 import G1, G2, add, multiply, neg, curve_order  # type: ignore[import-untyped]
+    from py_ecc.bn128 import G1, add, curve_order, multiply  # type: ignore[import-untyped]
 
     _PY_ECC_AVAILABLE = True
 except ImportError:
@@ -280,9 +280,8 @@ def _pedersen_commit(value: int, blinding: int) -> tuple | None:
     if not _PY_ECC_AVAILABLE:
         return None
     p1 = multiply(G1, value % curve_order)
-    p2 = multiply(G2, blinding % curve_order)  # type: ignore[arg-type]
-    # G2 is on the twisted curve; we add G1 and G2 projections symbolically
-    # by hashing to G1 for a concrete commitment
+    # G2 is on the twisted curve and can't be added to a G1 point directly, so
+    # the blinding factor is committed via a second G1 generator instead.
     h_g1 = multiply(G1, int.from_bytes(
         hashlib.sha256(b"benford-h-generator").digest(), "big"
     ) % curve_order)

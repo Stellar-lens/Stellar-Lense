@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import time
 from collections import deque
-from typing import Callable
+from collections.abc import Callable
 
 from utils.logging import get_logger
 

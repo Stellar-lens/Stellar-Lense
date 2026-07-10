@@ -21,11 +21,10 @@ Also provides:
 
 import hashlib
 import re
-import threading
 import warnings
 from collections import Counter, defaultdict, deque
 from collections.abc import Iterable, Mapping, Sequence
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from itertools import combinations
 from typing import Literal
 
@@ -221,70 +220,6 @@ def to_pyg_data(
     data.wallet_ids = wallet_ids
     data.node_index = node_index
     return data
-
-
-def build_co_trade_graph(
-    trades_df: pd.DataFrame,
-    window_hours: int,
-) -> nx.DiGraph:
-    """Build a directed co-trade graph from a trades DataFrame."""
-    graph: nx.DiGraph = nx.DiGraph()
-    if trades_df.empty:
-        return graph
-
-    required_cols = {
-        "base_account",
-        "counter_account",
-        "base_asset",
-        "counter_asset",
-        "ledger_close_time",
-        "amount",
-    }
-    if not required_cols.issubset(trades_df.columns):
-        return graph
-
-    df = trades_df.copy()
-    df["ledger_close_time"] = pd.to_datetime(df["ledger_close_time"], utc=True, errors="coerce")
-    df = df.dropna(subset=["ledger_close_time"])
-
-    if "pair_id" not in df.columns:
-        df["pair_id"] = df.apply(
-            lambda row: "/".join(sorted([str(row["base_asset"]), str(row["counter_asset"])])),
-            axis=1,
-        )
-
-    window_td = pd.Timedelta(hours=window_hours)
-    for _, pair_df in df.groupby("pair_id"):
-        pair_df = pair_df.sort_values("ledger_close_time")
-        events: list[tuple[str, pd.Timestamp]] = []
-        for _, row in pair_df.iterrows():
-            for account in (row["base_account"], row["counter_account"]):
-                if _validate_account_id(str(account)):
-                    events.append((str(account), row["ledger_close_time"]))
-
-        if len(events) < 2:
-            continue
-
-        events.sort(key=lambda item: item[1])
-        for index, (wallet_a, time_a) in enumerate(events):
-            for wallet_b, time_b in events[index + 1 :]:
-                if time_b - time_a > window_td:
-                    break
-                if wallet_a == wallet_b:
-                    continue
-                for source, target in ((wallet_a, wallet_b), (wallet_b, wallet_a)):
-                    if graph.has_edge(source, target):
-                        graph[source][target]["weight"] += 1
-                    else:
-                        graph.add_edge(
-                            source,
-                            target,
-                            edge_type="co_trade",
-                            weight=1,
-                            timestamp=time_a.isoformat(),
-                        )
-
-    return graph
 
 
 def multi_hop_ancestors(graph: nx.DiGraph, wallet: str, max_depth: int) -> set[str]:

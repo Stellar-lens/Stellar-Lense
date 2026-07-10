@@ -46,7 +46,7 @@ import json
 import math
 import os
 import time
-from typing import TYPE_CHECKING, NamedTuple
+from typing import NamedTuple
 
 import numpy as np
 
@@ -115,7 +115,7 @@ class TradeEvent(NamedTuple):
 # Sinusoidal positional encoding
 # ---------------------------------------------------------------------------
 
-def _sinusoidal_pe(max_len: int, embed_dim: int) -> "torch.Tensor":
+def _sinusoidal_pe(max_len: int, embed_dim: int) -> torch.Tensor:
     """Build a (max_len, embed_dim) sinusoidal positional encoding matrix."""
     pe = torch.zeros(max_len, embed_dim)
     position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
@@ -219,9 +219,9 @@ class TradeSequenceTransformer(nn.Module if _TORCH_AVAILABLE else object):  # ty
 
     def forward(
         self,
-        x: "torch.Tensor",
-        padding_mask: "torch.Tensor | None" = None,
-    ) -> "torch.Tensor":
+        x: torch.Tensor,
+        padding_mask: torch.Tensor | None = None,
+    ) -> torch.Tensor:
         """Encode a batch of trade sequences.
 
         Parameters
@@ -299,7 +299,7 @@ class TradeSequenceTransformer(nn.Module if _TORCH_AVAILABLE else object):  # ty
     def events_to_tensor(
         self,
         events: list[TradeEvent],
-    ) -> "torch.Tensor":
+    ) -> torch.Tensor:
         """Convert a single sequence of TradeEvents to a (seq_len, input_dim) tensor.
 
         The pair index is one-hot encoded.  Time-deltas are normalised by
@@ -320,7 +320,7 @@ class TradeSequenceTransformer(nn.Module if _TORCH_AVAILABLE else object):  # ty
     def encode_trades(
         self,
         event_sequences: list[list[TradeEvent]],
-    ) -> "torch.Tensor":
+    ) -> torch.Tensor:
         """Encode a batch of variable-length trade sequences.
 
         Sequences are padded to the length of the longest sequence in the
@@ -403,7 +403,7 @@ class TradeSequenceTransformer(nn.Module if _TORCH_AVAILABLE else object):  # ty
         cls,
         model_dir: str | None = None,
         verify_integrity: bool = True,
-    ) -> "TradeSequenceTransformer":
+    ) -> TradeSequenceTransformer:
         """Load weights from *model_dir* with optional SHA-256 integrity check.
 
         Falls back gracefully when the artifact is absent (returns an
@@ -525,9 +525,9 @@ def _sha256_file(path: str) -> str:
 # ---------------------------------------------------------------------------
 
 def build_sequence_embedding(
-    trades_df: "pd.DataFrame",  # type: ignore[name-defined]  # noqa: F821
-    model: "TradeSequenceTransformer | None",
-    pair_vocab: "dict[str, int] | None" = None,
+    trades_df: pd.DataFrame,  # type: ignore[name-defined]  # noqa: F821
+    model: TradeSequenceTransformer | None,
+    pair_vocab: dict[str, int] | None = None,
 ) -> np.ndarray:
     """Convert a wallet's trades DataFrame to a sequence embedding vector.
 
@@ -562,7 +562,6 @@ def build_sequence_embedding(
     if trades_df is None or len(trades_df) == 0:
         return np.zeros(embed_dim, dtype=np.float32)
 
-    import pandas as pd
 
     # ---- Build TradeEvent list ----
     df = trades_df.sort_values("ledger_close_time").reset_index(drop=True)

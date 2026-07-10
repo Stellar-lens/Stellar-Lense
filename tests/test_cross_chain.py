@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import base64
-from datetime import datetime, UTC
+
 import networkx as nx
 import pytest
 
-from detection.cross_chain.behavioral_matcher import BehavioralMatcher, to_timestamp
+from detection.cross_chain.behavioral_matcher import BehavioralMatcher
 from detection.cross_chain.bridge_detector import BridgeDetector, bytes_to_base58
 from detection.cross_chain.identity_graph import IdentityGraph
 from detection.cross_chain.resolver import resolve, resolve_risk_scores

@@ -4,18 +4,19 @@ Tests cover path reconstruction, round-trip detection, and feature engineering
 integration for payment path operations on Stellar DEX.
 """
 
-import pytest
 from datetime import datetime
 
+import pytest
+
+from detection.feature_engineering import compute_payment_path_features
 from ingestion.payment_path_analyzer import (
+    MAX_PATH_LENGTH,
     ReconstructedPathFlow,
     compute_path_payment_round_trip_frequency,
+    merge_path_flows,
     reconstruct_path_flow,
     validate_path_schema,
-    merge_path_flows,
-    MAX_PATH_LENGTH,
 )
-from detection.feature_engineering import compute_payment_path_features
 
 
 def sample_path_payment_strict_send() -> dict:

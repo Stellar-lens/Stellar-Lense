@@ -73,15 +73,15 @@ def print_summary(queue_path: str | None = None) -> None:
         by_label[label_name] += 1
 
     print(f"\n{'='*100}")
-    print(f"QUARANTINE SUMMARY")
+    print("QUARANTINE SUMMARY")
     print(f"{'='*100}\n")
 
     print(f"Total quarantined: {len(quarantined)}")
-    print(f"\nBy Quarantine Reason:")
+    print("\nBy Quarantine Reason:")
     for reason, count in sorted(by_reason.items()):
         print(f"  {reason}: {count}")
 
-    print(f"\nBy Label:")
+    print("\nBy Label:")
     for label, count in sorted(by_label.items()):
         print(f"  {label}: {count}")
 

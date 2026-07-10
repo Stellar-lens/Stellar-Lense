@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+
 class NTXentLoss(nn.Module):
     """NT-Xent (Normalized Temperature-scaled Cross Entropy) loss.
     

@@ -1,7 +1,8 @@
 import numpy as np
 import pandas as pd
 import pytest
-from hypothesis import given, settings, strategies as st
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from detection.benford_engine import (
     BENFORD_EXPECTED,
@@ -117,7 +118,7 @@ def test_asset_classifier_classifies_volatile():
 
 def test_unknown_asset_falls_back_to_theoretical_benford():
     """An asset not in the classifier must use the theoretical Benford distribution."""
-    from detection.benford_engine import AssetClassifier, BENFORD_EXPECTED
+    from detection.benford_engine import BENFORD_EXPECTED, AssetClassifier
 
     clf = AssetClassifier()
     baseline = clf.get_baseline("MYSTERY")
@@ -128,7 +129,7 @@ def test_stablecoin_round_amounts_lower_chi_square_against_stablecoin_baseline()
     """Stablecoin amounts clustered around 100, 1000, 10000 must produce lower
     chi-square against the stablecoin baseline than against the theoretical
     Benford distribution (issue #279 acceptance criterion)."""
-    from detection.benford_engine import AssetClassifier, chi_square_statistic, BENFORD_EXPECTED
+    from detection.benford_engine import BENFORD_EXPECTED, AssetClassifier, chi_square_statistic
 
     # Round-number stablecoin amounts — elevated digit-1 frequency
     amounts = pd.Series(
@@ -149,8 +150,11 @@ def test_stablecoin_round_amounts_lower_chi_square_against_stablecoin_baseline()
 
 def test_compute_benford_metrics_uses_asset_class_baseline():
     """compute_benford_metrics with asset_code='USDC' must use stablecoin baseline."""
-    from config import config
-    from detection.benford_engine import compute_benford_metrics, chi_square_statistic, BENFORD_EXPECTED, AssetClassifier
+    from detection.benford_engine import (
+        AssetClassifier,
+        chi_square_statistic,
+        compute_benford_metrics,
+    )
 
     # Enough samples to exceed MIN_TRADES_FOR_SCORING
     amounts = pd.Series([100.0] * 400 + [1000.0] * 300 + [10000.0] * 300)
@@ -332,8 +336,8 @@ def test_benford_boundary_single_trade(amounts_list):
         z = z_scores(single_amount)
         
         # Values should be either valid numbers or NaN, never inf
-        assert not np.isinf(chi), f"chi-square is inf for single trade"
-        assert not np.isinf(mad), f"MAD is inf for single trade"
+        assert not np.isinf(chi), "chi-square is inf for single trade"
+        assert not np.isinf(mad), "MAD is inf for single trade"
         for digit, score in z.items():
             assert not np.isinf(score), f"z-score for digit {digit} is inf"
         

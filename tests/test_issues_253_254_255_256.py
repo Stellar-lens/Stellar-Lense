@@ -11,12 +11,11 @@ from __future__ import annotations
 import asyncio
 import math
 import time
-from datetime import datetime, timedelta, timezone
-from unittest.mock import MagicMock, patch
+from datetime import UTC, datetime, timedelta
+from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
-import pytest
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -166,8 +165,7 @@ class TestSlidingWindowBenfordAggregator:
         from detection.sliding_window_benford import SlidingWindowBenfordAggregator
 
         agg = SlidingWindowBenfordAggregator(window_hours=1.0)
-        t0 = datetime(2024, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
-        window_seconds = 3600.0
+        t0 = datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC)
 
         rng = np.random.default_rng(42)
         amounts = (rng.random(100) * 999 + 1).tolist()  # [1, 1000)
@@ -204,7 +202,7 @@ class TestSlidingWindowBenfordAggregator:
         from detection.sliding_window_benford import SlidingWindowBenfordAggregator
 
         agg = SlidingWindowBenfordAggregator(window_hours=24.0)
-        t0 = datetime(2024, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+        t0 = datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC)
         amounts = np.random.default_rng(1).random(10_000) * 999 + 1
 
         async def _run():
@@ -221,7 +219,7 @@ class TestSlidingWindowBenfordAggregator:
         from detection.sliding_window_benford import SlidingWindowBenfordAggregator
 
         agg = SlidingWindowBenfordAggregator(window_hours=1.0)
-        t0 = datetime(2024, 1, 1, tzinfo=timezone.utc)
+        t0 = datetime(2024, 1, 1, tzinfo=UTC)
 
         async def _run():
             await agg.add_trade(float("nan"), t0)
@@ -245,7 +243,7 @@ class TestSlidingWindowBenfordAggregator:
         from detection.sliding_window_benford import SlidingWindowBenfordAggregator
 
         agg = SlidingWindowBenfordAggregator(window_hours=1.0)
-        t0 = datetime(2024, 1, 1, tzinfo=timezone.utc)
+        t0 = datetime(2024, 1, 1, tzinfo=UTC)
         t1 = t0 + timedelta(hours=2)  # outside window
 
         async def _run():
@@ -314,7 +312,6 @@ class TestCausalTransfer:
         from detection.causal_transfer import CausalTransfer
 
         df = self._make_two_env_data(n_per_env=200, seed=1)
-        train = df[df["pair_id"] == "PAIR_A"]
         test = self._make_two_env_data(n_per_env=80, seed=5)
         test = test[test["pair_id"] == "PAIR_B"]
 
@@ -414,9 +411,8 @@ class TestStoppingCriterion:
 
     def test_convergence_report_excludes_labels(self, tmp_path):
         """Convergence report must not include raw label values."""
-        import json
 
-        from detection.active_learning.annotation_queue import AnnotationQueue, StoppingCriterion
+        from detection.active_learning.annotation_queue import AnnotationQueue
 
         queue_path = str(tmp_path / "q.json")
         q = AnnotationQueue(queue_path=queue_path)

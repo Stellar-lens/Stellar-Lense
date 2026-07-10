@@ -18,15 +18,14 @@ from __future__ import annotations
 
 import datetime
 import os
-from pathlib import Path
-from typing import Sequence
+from collections.abc import Sequence
 
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
-from sqlalchemy import Boolean, Column, DateTime, String, create_engine, text
-from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+from sqlalchemy import Boolean, Column, DateTime, String, create_engine
+from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from utils.logging import get_logger
 

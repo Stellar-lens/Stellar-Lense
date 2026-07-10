@@ -28,8 +28,6 @@ Usage
 
 from __future__ import annotations
 
-import hashlib
-import hmac
 import os
 from typing import Any
 
@@ -44,7 +42,6 @@ from detection.contrastive.augmentations import augment_trade_sequence
 from detection.contrastive.encoder import TransactionEncoder
 from detection.contrastive.negative_miner import (
     CONTRASTIVE_CURRICULUM_EPOCHS,
-    EVENT_HMAC_SECRET,
     HardNegativeMiner,
     RingRegistry,
     _hash_wallet,
@@ -135,7 +132,7 @@ class LabeledFeatureDataset(Dataset):
 
     @property
     def wash_hashed_ids(self) -> list[str]:
-        return [h for h, m in zip(self.hashed_ids, self.wash_mask) if m]
+        return [h for h, m in zip(self.hashed_ids, self.wash_mask, strict=True) if m]
 
 
 # ---------------------------------------------------------------------------
@@ -339,7 +336,6 @@ def _pretrain_domain_aware(
             hashed_ids_list = list(hashed_ids)
 
             wash_mask = labels_np == 1
-            clean_mask = labels_np == 0
 
             if wash_mask.sum() == 0:
                 # No wash samples in this batch — fall back to standard NT-Xent
@@ -438,9 +434,8 @@ def benchmark_auc(
         for _ in range(len(X_train))
     ]
     rand_dataset = UnlabeledWalletDataset(dummy_wallets)
-    # patch feature dim to match X_train
-    original_getitem = rand_dataset.__getitem__
 
+    # patch feature dim to match X_train
     def _patched_getitem(idx):
         return (
             X_train[idx].astype(np.float32),

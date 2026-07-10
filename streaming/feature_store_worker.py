@@ -94,8 +94,8 @@ class FeatureStoreWorker:
     def __init__(
         self,
         feature_store: RedisFeatureStore,
-        feature_buffer: "FeatureBuffer",
-        pubsub_router: "PubSubRouter | None" = None,
+        feature_buffer: FeatureBuffer,
+        pubsub_router: PubSubRouter | None = None,
         max_queue_depth: int = 1000,
         min_trade_threshold: int | None = None,
     ) -> None:

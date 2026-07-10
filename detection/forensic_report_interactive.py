@@ -30,7 +30,6 @@ import html
 import json
 import os
 from pathlib import Path
-from typing import Any
 
 _PLOTLY_CDN_STUB = ""  # populated by _get_plotly_js()
 
@@ -56,8 +55,8 @@ def _hash_wallet(wallet: str) -> str:
 def _get_plotly_js() -> str:
     """Return inline Plotly JS.  Falls back to a minimal stub when plotly is not installed."""
     try:
-        import plotly.offline as po  # noqa: F401
         import plotly
+        import plotly.offline as po  # noqa: F401
 
         bundle = Path(plotly.__file__).parent / "package_data" / "plotly.min.js"
         if bundle.exists() and bundle.stat().st_size < 5_000_000:
@@ -79,7 +78,7 @@ def _build_shap_chart(shap_features: list[dict]) -> str:
 
         hover_texts = [
             f"Feature: {feat}<br>Contribution: {contrib:.4f}<br>Value: {val:.4f}"
-            for feat, contrib, val in zip(features, contributions, values_raw)
+            for feat, contrib, val in zip(features, contributions, values_raw, strict=True)
         ]
 
         fig = go.Figure(
@@ -151,7 +150,7 @@ def _build_wallet_graph_html(wallet_hash: str, graph_edges: list[dict]) -> str:
         return body_match.group(1) if body_match else graph_html
 
     except ImportError:
-        return f'<p class="placeholder">Wallet graph (pyvis not installed — pip install pyvis)</p>'
+        return '<p class="placeholder">Wallet graph (pyvis not installed — pip install pyvis)</p>'
     except Exception as exc:
         return f'<p class="placeholder">Wallet graph unavailable: {html.escape(str(exc))}</p>'
 

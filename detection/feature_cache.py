@@ -29,7 +29,7 @@ import pandas as pd
 from config import config
 
 if TYPE_CHECKING:
-    from detection.wallet_graph import IncrementalWalletGraph
+    pass
 
 try:
     from prometheus_client import Counter

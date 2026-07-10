@@ -1,6 +1,5 @@
 """Unit tests for AdaptiveBatchController PID logic (Issue #243)."""
 
-import pytest
 
 from streaming.streaming_scorer import AdaptiveBatchController
 

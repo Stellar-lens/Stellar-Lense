@@ -57,7 +57,7 @@ from __future__ import annotations
 
 import logging
 import secrets
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -97,7 +97,6 @@ def _sss_split(secret_bytes: bytes, k: int, n: int) -> list[tuple[int, bytes]]:
     Each share byte string is the same length as *secret_bytes*.
     """
     p = _SSS_PRIME
-    length = len(secret_bytes)
     result: list[tuple[int, bytes]] = []
 
     # Process each byte independently (simplifies implementation; fine for key bytes)
@@ -158,7 +157,7 @@ class SecureAggregationContext:
     n_participants: int
     k_threshold: int
 
-    def to_tenseal_context(self) -> "ts.Context":
+    def to_tenseal_context(self) -> ts.Context:
         if not _TENSEAL_AVAILABLE:
             raise RuntimeError("tenseal is not installed; run: pip install tenseal")
         return ts.context_from(self.serialised_context)
@@ -322,7 +321,7 @@ class SecureAggregator:
         public_ctx = self._ctx.to_tenseal_context()
 
         # Homomorphically sum all ciphertexts
-        enc_sum: "ts.CKKSVector" | None = None
+        enc_sum: ts.CKKSVector | None = None
         for ct_bytes in self._ciphertexts:
             enc = ts.ckks_vector_from(public_ctx, ct_bytes)
             if enc_sum is None:

@@ -43,6 +43,7 @@ from ingestion.horizon_streamer import stream_trades
 from streaming.alert_dispatcher import AlertDispatcher
 from streaming.feature_buffer import FeatureBuffer
 from streaming.streaming_scorer import StreamingScorer
+from utils.circuit_breaker import CircuitBreaker
 from utils.logging import get_logger
 
 if TYPE_CHECKING:
@@ -311,6 +312,7 @@ class StreamingPipeline:
         role: str = "all",
         metadata_join_state: MetadataJoinState | None = None,
         metadata_stream=None,  # AccountMetadataStream | None
+        circuit_breakers: dict[str, CircuitBreaker] | None = None,
     ):
         if role not in ("all", "producer", "worker"):
             raise ValueError(f"Unknown role: {role!r}")

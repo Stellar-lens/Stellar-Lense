@@ -11,16 +11,17 @@ This module provides:
     per asset using labelled wash-trade data.
 """
 
+import json
 import logging
 import math
-import json
 import os
+
 import numpy as np
 import pandas as pd
+from scipy.stats import norm
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import Matern
-from scipy.stats import norm
-from sklearn.metrics import precision_recall_curve, auc, f1_score
+from sklearn.metrics import auc, f1_score, precision_recall_curve
 
 from config import config
 from detection.benford_engine import mad_score
@@ -321,7 +322,7 @@ def optimize_windows_for_asset(
     preds = gp.predict(X_all)
 
     # Select top 5 candidates with the highest GP predicted score
-    cand_preds = list(zip(candidates, preds))
+    cand_preds = list(zip(candidates, preds, strict=True))
     cand_preds.sort(key=lambda x: x[1], reverse=True)
 
     top_5 = [cand for cand, score in cand_preds[:5]]

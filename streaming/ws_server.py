@@ -26,7 +26,7 @@ from pydantic import BaseModel, Field, ValidationError
 
 from config import config
 from streaming.pubsub_router import PubSubRouter
-from streaming.ws_abuse_detector import AbuseDetector, AbuseVerdict
+from streaming.ws_abuse_detector import AbuseDetector
 from streaming.ws_auth import JWTAuthenticator
 from utils.logging import get_logger
 

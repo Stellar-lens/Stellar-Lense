@@ -9,7 +9,6 @@ Covers:
 
 from __future__ import annotations
 
-import hashlib
 import time
 from unittest.mock import MagicMock, patch
 
@@ -58,8 +57,6 @@ def test_idempotency_single_incident_on_duplicate_alert():
 def test_idempotency_no_duplicate_notification():
     responder = _make_responder()
     notifications: list[dict] = []
-
-    original_post = responder._post_webhook
 
     def mock_post(incident, params):
         notifications.append(incident.to_dict())
@@ -142,8 +139,6 @@ def test_benford_mad_above_threshold_is_high_severity():
 
 
 def test_webhook_payload_contains_no_raw_wallet():
-    posted_payloads: list[dict] = []
-
     with patch("requests.post") as mock_post:
         mock_resp = MagicMock()
         mock_resp.raise_for_status.return_value = None
@@ -153,7 +148,7 @@ def test_webhook_payload_contains_no_raw_wallet():
             webhook_url="https://hooks.example.com/test",
             incident_store={},
         )
-        incident = responder.handle_alert(WALLET, HIGH_RISK_ALERT)
+        responder.handle_alert(WALLET, HIGH_RISK_ALERT)
 
         assert mock_post.called
         call_kwargs = mock_post.call_args

@@ -5,18 +5,15 @@ import time
 import networkx as nx
 import pytest
 
+from detection.community_detector import enrich_communities_with_motifs
 from detection.motif_census import (
-    MotifCensusResult,
+    _compute_reciprocity,
     _count_4_cycles,
     _count_star_motifs,
     _count_triangles_matrix,
-    _compute_reciprocity,
-    _to_undirected_simple,
     _validate_subgraph,
     compute_motif_census,
 )
-from detection.community_detector import enrich_communities_with_motifs
-
 
 # ---------------------------------------------------------------------------
 # _validate_subgraph

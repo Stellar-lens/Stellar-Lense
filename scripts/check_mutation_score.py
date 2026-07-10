@@ -125,7 +125,7 @@ def main() -> None:
     score = (killed / total) * 100.0
 
     print(f"\n{'=' * 60}")
-    print(f"  Mutation Testing Report")
+    print("  Mutation Testing Report")
     print(f"{'=' * 60}")
     print(f"  Total mutations:  {total:>5}")
     print(f"  Killed:           {killed:>5}  ({score:.1f}%)")

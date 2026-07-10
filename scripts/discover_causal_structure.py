@@ -1,8 +1,8 @@
 """Script to discover causal structure in LedgerLens data and generate visualizations and metrics."""
 
 import argparse
-import json
 import os
+
 import matplotlib.pyplot as plt
 import networkx as nx
 import pandas as pd
@@ -10,7 +10,6 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import precision_score
 from sklearn.model_selection import train_test_split
 
-from config import config
 from detection.causal_discovery import WashTradeCausalDiscovery
 from scripts.generate_synthetic_dataset import generate_synthetic_dataset
 

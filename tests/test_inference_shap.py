@@ -125,7 +125,7 @@ def test_shap_explainer_explain(trained_models):
 
     assert len(explanation) == 3
     for entry in explanation:
-        assert set(entry) == {"feature", "contribution", "value"}
+        assert {"feature", "contribution", "value"}.issubset(set(entry))
 
 
 def test_shap_explainer_explain_ensemble(trained_models):
@@ -139,7 +139,7 @@ def test_shap_explainer_explain_ensemble(trained_models):
 
     assert len(explanation) == 3
     for entry in explanation:
-        assert set(entry) == {"feature", "contribution", "value"}
+        assert {"feature", "contribution", "value"}.issubset(set(entry))
 
 
 # ---------------------------------------------------------------------------
@@ -188,8 +188,9 @@ def test_interaction_values_zero_for_non_informative_pairs(monkeypatch):
 
 def test_format_top_interactions_produces_five_strings():
     """format_top_interactions must return exactly 5 correctly formatted strings."""
-    from detection.shap_explainer import format_top_interactions
     import re
+
+    from detection.shap_explainer import format_top_interactions
 
     raw = [
         {"feature_a": f"feat_{i}", "feature_b": f"feat_{i+1}", "interaction": float(i) * 0.1}

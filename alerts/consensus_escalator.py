@@ -2,12 +2,9 @@
 
 import time
 from dataclasses import dataclass
-from typing import Any
 
 import redis
 from prometheus_client import Counter
-
-from config import config
 
 MIN_DETECTOR_CONSENSUS = 2
 CONSENSUS_WINDOW_SECONDS = 120

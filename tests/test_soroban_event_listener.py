@@ -2,29 +2,27 @@
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import hmac
 import json
-import os
-from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from integrations.soroban_event_listener import (
+    EVENT_HMAC_SECRET,
     ContractEvent,
     ContractEventRecord,
-    EventWatermark,
-    SorobanEventListener,
+    ScoreOracleEventListener,
+    _get_session_factory,
     _hash_address,
     check_stale_score_alert,
     get_watermark,
     parse_contract_event,
     persist_event,
     set_watermark,
-    _get_session_factory,
-    EVENT_HMAC_SECRET,
 )
 
 # ---------------------------------------------------------------------------
@@ -264,7 +262,7 @@ class TestWatermark:
 
 class TestStaleScoreAlert:
     def _make_score_read_event(self, score: int) -> ContractEvent:
-        raw = dict(FIXTURES["score_read"])
+        raw = copy.deepcopy(FIXTURES["score_read"])
         # Override score in value map
         raw["value"]["value"][0]["val"]["value"] = score
         return parse_contract_event(raw)
@@ -331,12 +329,12 @@ class TestStaleScoreAlert:
 
 
 # ---------------------------------------------------------------------------
-# 10. SorobanEventListener.process_batch integration
+# 10. ScoreOracleEventListener.process_batch integration
 # ---------------------------------------------------------------------------
 
 class TestProcessBatch:
     def test_process_batch_persists_and_returns_events(self, db, tmp_path):
-        listener = SorobanEventListener(
+        listener = ScoreOracleEventListener(
             contract_id="CTEST",
             db_url=f"sqlite:///{tmp_path}/batch.db",
         )
@@ -346,7 +344,7 @@ class TestProcessBatch:
         assert {e.event_type for e in parsed} == {"score_read", "score_updated"}
 
     def test_process_batch_advances_watermark(self, tmp_path):
-        listener = SorobanEventListener(
+        listener = ScoreOracleEventListener(
             contract_id="CTEST",
             db_url=f"sqlite:///{tmp_path}/wm.db",
         )
@@ -360,7 +358,7 @@ class TestProcessBatch:
         def _current_score(wallet_hash):
             return 99  # far from consumed score of 75 → delta = 24 > 20
 
-        listener = SorobanEventListener(
+        listener = ScoreOracleEventListener(
             contract_id="CTEST",
             db_url=f"sqlite:///{tmp_path}/alert.db",
             dispatcher=dispatcher,
@@ -371,7 +369,7 @@ class TestProcessBatch:
         dispatcher.dispatch.assert_called_once()
 
     def test_process_batch_skips_unknown_events(self, tmp_path):
-        listener = SorobanEventListener(
+        listener = ScoreOracleEventListener(
             contract_id="CTEST",
             db_url=f"sqlite:///{tmp_path}/unk.db",
         )
@@ -379,7 +377,7 @@ class TestProcessBatch:
         assert parsed == []
 
     def test_process_batch_empty(self, tmp_path):
-        listener = SorobanEventListener(
+        listener = ScoreOracleEventListener(
             contract_id="CTEST",
             db_url=f"sqlite:///{tmp_path}/empty.db",
         )
@@ -393,9 +391,9 @@ class TestProcessBatch:
 
 class TestListenerLifecycle:
     def test_stop_halts_loop(self, tmp_path):
-        import threading, time
+        import time
 
-        listener = SorobanEventListener(
+        listener = ScoreOracleEventListener(
             contract_id="CTEST",
             db_url=f"sqlite:///{tmp_path}/lc.db",
             poll_interval=0.05,

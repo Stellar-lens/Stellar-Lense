@@ -13,7 +13,6 @@ Coverage:
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -22,7 +21,6 @@ from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import train_test_split
 
 from detection.hyperparameter_search import (
-    HyperparameterSearchError,
     get_search_space,
     load_best_hyperparams,
     load_best_params,
@@ -32,7 +30,6 @@ from detection.hyperparameter_search import (
     select_pareto_point,
     validate_hyperparams,
 )
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Shared fixtures
@@ -477,7 +474,7 @@ class TestOptimisedParamsProduceTrainableModel:
         monkeypatch.setattr("detection.hyperparameter_search.MODEL_DIR", tmp_path)
         X_train, y_train, X_val, y_val = synthetic_data
 
-        params = run_study(
+        run_study(
             model_name,
             n_trials=5,
             validation_data=synthetic_data,

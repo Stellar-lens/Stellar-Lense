@@ -22,10 +22,9 @@ Or via libFuzzer (requires building with address sanitizer):
 See tests/fuzz/README.md for full setup instructions.
 """
 
-import sys
 import io
 import json
-import os
+import sys
 from functools import lru_cache
 from pathlib import Path
 
@@ -77,7 +76,7 @@ def _test_avro_deserialiser(data: bytes) -> None:
         result = _deserialize(data, schema)
         # If it succeeds, result should be a dict
         assert isinstance(result, dict), f"Expected dict, got {type(result)}"
-    except (ValueError, KeyError, TypeError) as e:
+    except (ValueError, KeyError, TypeError):
         # Expected exceptions for malformed input
         # These are gracefully caught in production ingestion workers
         pass

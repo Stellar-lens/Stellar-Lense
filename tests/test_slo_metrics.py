@@ -1,6 +1,5 @@
 """Unit tests for SLO dashboard Prometheus counters (issue #197)."""
 
-import pytest
 
 
 def test_confirmed_wash_trades_counter_registered():
@@ -18,8 +17,8 @@ def test_confirmed_clean_wallets_counter_registered():
 def test_record_confirmed_wash_trade_increments_counter():
     """Verify that record_confirmed_wash_trade increments the counter."""
     from detection.per_pair_metrics import (
-        record_confirmed_wash_trade,
         ledgerlens_confirmed_wash_trades_total,
+        record_confirmed_wash_trade,
     )
 
     asset_pair = "USDC:GA5Z/XLM:native"
@@ -42,8 +41,8 @@ def test_record_confirmed_wash_trade_increments_counter():
 def test_record_confirmed_clean_wallet_increments_counter():
     """Verify that record_confirmed_clean_wallet increments the counter."""
     from detection.per_pair_metrics import (
-        record_confirmed_clean_wallet,
         ledgerlens_confirmed_clean_wallets_total,
+        record_confirmed_clean_wallet,
     )
 
     asset_pair = "BTC:GA5Z/XLM:native"

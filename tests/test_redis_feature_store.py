@@ -25,20 +25,18 @@ Test coverage
 from __future__ import annotations
 
 import pickle
-import time
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import fakeredis
 import msgpack
 import pytest
 
 from streaming.feature_store import (
-    RedisFeatureStore,
     _FORMAT_VERSION,
+    RedisFeatureStore,
     _make_key,
     _validate_features,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

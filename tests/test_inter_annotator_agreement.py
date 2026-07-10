@@ -6,10 +6,9 @@ Covers:
 - Disputed wallet (Kappa < 0.6) appears in senior review queue
 """
 
-import os
 import pytest
 
-from detection.active_learning.annotation_queue import AnnotationQueue, DISPUTE_KAPPA_THRESHOLD
+from detection.active_learning.annotation_queue import DISPUTE_KAPPA_THRESHOLD, AnnotationQueue
 
 
 @pytest.fixture
@@ -18,6 +17,7 @@ def queue(tmp_path, monkeypatch):
     monkeypatch.setenv("ANNOTATION_HMAC_SECRET", "test-secret-key-265")
     # Reload config so the env var is picked up
     import importlib
+
     import config as cfg_module
     importlib.reload(cfg_module)
     from config import config as cfg
@@ -113,7 +113,6 @@ def test_duplicate_annotator_rejected(queue):
     queue.multi_annotate(wallet, label=1, annotator_id="anon-alice")
     queue.multi_annotate(wallet, label=0, annotator_id="anon-alice")  # duplicate
 
-    result = queue.compute_inter_annotator_agreement.__func__  # access but don't call
     # Only 1 annotation should be stored
     labels = queue._verified_labels(wallet)
     assert len(labels) == 1

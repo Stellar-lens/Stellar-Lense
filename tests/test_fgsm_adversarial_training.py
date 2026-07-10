@@ -11,20 +11,17 @@ Covers:
   - clean accuracy degradation stays within 3 pp tolerance.
 """
 
-import numpy as np
-import pandas as pd
 import pytest
 
 from detection.adversarial.attack import feature_space_fgsm
 from detection.adversarial.robustness import (
     adversarial_training_step,
-    run_adversarial_training,
     feature_scale_from_matrix,
+    run_adversarial_training,
 )
 from detection.model_inference import RiskScorer
 from detection.model_training import save_models, split_features_labels, train_models
 from scripts.generate_synthetic_dataset import generate_synthetic_dataset
-
 
 # ---------------------------------------------------------------------------
 # Shared fixtures

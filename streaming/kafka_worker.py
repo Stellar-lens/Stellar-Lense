@@ -49,8 +49,6 @@ running rather than crashing.
 
 from __future__ import annotations
 
-import os
-import socket
 import time
 from collections import defaultdict
 
@@ -427,6 +425,20 @@ class KafkaWorker:
             )
 
 
+def _sasl_conf() -> dict:
+    """SASL_SSL/PLAIN credentials for Kafka clients, or {} when unset."""
+    user = config.KAFKA_SASL_USERNAME
+    password = config.KAFKA_SASL_PASSWORD
+    if user and password:
+        return {
+            "security.protocol": "SASL_SSL",
+            "sasl.mechanisms": "PLAIN",
+            "sasl.username": user,
+            "sasl.password": password,
+        }
+    return {}
+
+
 def _build_consumer_conf(bootstrap_servers: str, group_id: str) -> dict:
     conf: dict = {
         "bootstrap.servers": bootstrap_servers,
@@ -435,15 +447,5 @@ def _build_consumer_conf(bootstrap_servers: str, group_id: str) -> dict:
         # Manual commits only — we commit after successful dispatch.
         "enable.auto.commit": False,
     }
-    user = config.KAFKA_SASL_USERNAME
-    password = config.KAFKA_SASL_PASSWORD
-    if user and password:
-        conf.update(
-            {
-                "security.protocol": "SASL_SSL",
-                "sasl.mechanisms": "PLAIN",
-                "sasl.username": user,
-                "sasl.password": password,
-            }
-        )
+    conf.update(_sasl_conf())
     return conf

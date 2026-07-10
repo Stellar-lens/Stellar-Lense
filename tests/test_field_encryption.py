@@ -1,10 +1,8 @@
 """Tests for AES-256-GCM field-level encryption (issue #239)."""
 
-import os
 import secrets
 
 import pytest
-
 
 _VALID_KEY_HEX = secrets.token_hex(32)  # 32 bytes = 64 hex chars
 
@@ -49,6 +47,7 @@ def test_wrong_key_raises_invalid_tag(monkeypatch):
 
     # Re-import to reload the env var
     import importlib
+
     import utils.field_encryption as fe_module
     importlib.reload(fe_module)
 
@@ -61,6 +60,7 @@ def test_wrong_key_raises_invalid_tag(monkeypatch):
 def test_short_key_raises_value_error(monkeypatch):
     monkeypatch.setenv("FORENSIC_REPORT_ENCRYPTION_KEY", "deadbeef")  # 4 bytes only
     import importlib
+
     import utils.field_encryption as fe_module
     importlib.reload(fe_module)
 
@@ -71,6 +71,7 @@ def test_short_key_raises_value_error(monkeypatch):
 def test_no_key_warns_and_stores_plaintext(monkeypatch):
     monkeypatch.delenv("FORENSIC_REPORT_ENCRYPTION_KEY", raising=False)
     import importlib
+
     import utils.field_encryption as fe_module
     importlib.reload(fe_module)
 

@@ -38,14 +38,13 @@ import json
 import re
 import threading
 import time
-from datetime import datetime, timezone
-from typing import Callable
+from collections.abc import Callable
+from datetime import UTC, datetime
 
 from pydantic import BaseModel, Field, field_validator
 
 from config import config
 from utils.logging import get_logger
-from utils.retry import retry_with_backoff
 
 logger = get_logger(__name__)
 
@@ -100,7 +99,7 @@ class AccountMetadataUpdate(BaseModel):
     effect_type: str = Field(description="Horizon effect type string, e.g. 'trustline_created'")
     effect_id: str = Field(default="", description="Horizon paging token for this effect")
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(tz=timezone.utc),
+        default_factory=lambda: datetime.now(tz=UTC),
         description="Ledger-close timestamp for the effect",
     )
     funding_account: str | None = Field(
@@ -165,14 +164,14 @@ def validate_metadata_event(record: dict) -> AccountMetadataUpdate | None:
 
 def _parse_created_at(value) -> datetime:
     if value is None:
-        return datetime.now(tz=timezone.utc)
+        return datetime.now(tz=UTC)
     if isinstance(value, datetime):
-        return value if value.tzinfo is not None else value.replace(tzinfo=timezone.utc)
+        return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
     try:
         dt = datetime.fromisoformat(str(value))
-        return dt if dt.tzinfo is not None else dt.replace(tzinfo=timezone.utc)
+        return dt if dt.tzinfo is not None else dt.replace(tzinfo=UTC)
     except (ValueError, TypeError):
-        return datetime.now(tz=timezone.utc)
+        return datetime.now(tz=UTC)
 
 
 # ---------------------------------------------------------------------------

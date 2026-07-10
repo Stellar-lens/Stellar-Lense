@@ -28,9 +28,9 @@ except ImportError:  # pragma: no cover
 # Metric definitions — registered once on import
 # ---------------------------------------------------------------------------
 
-CPU_USAGE_RATIO: "Gauge | None" = None
-MEMORY_USAGE_BYTES: "Gauge | None" = None
-TRADES_PER_SECOND: "Gauge | None" = None
+CPU_USAGE_RATIO: Gauge | None = None
+MEMORY_USAGE_BYTES: Gauge | None = None
+TRADES_PER_SECOND: Gauge | None = None
 
 if _PROM_AVAILABLE:
     try:

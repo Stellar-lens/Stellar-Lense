@@ -32,9 +32,7 @@ from __future__ import annotations
 import asyncio
 import heapq
 import math
-from datetime import datetime, timezone
-
-import numpy as np
+from datetime import UTC, datetime
 
 from detection.benford_engine import BENFORD_EXPECTED, MAD_NONCONFORMITY_THRESHOLD, BenfordMetrics
 from utils.logging import get_logger
@@ -172,5 +170,5 @@ class SlidingWindowBenfordAggregator:
 
 def _to_utc_float(ts: datetime) -> float:
     if ts.tzinfo is None:
-        ts = ts.replace(tzinfo=timezone.utc)
+        ts = ts.replace(tzinfo=UTC)
     return ts.timestamp()

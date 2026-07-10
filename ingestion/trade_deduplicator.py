@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import hashlib
 import time
-from typing import Optional
 
 from config import config
 from utils.logging import get_logger
@@ -72,7 +71,7 @@ class SeenEventCache:
         self.ttl_seconds = ttl_seconds or config.TRADE_DEDUP_TTL_SECONDS
         self.key_prefix = key_prefix or config.TRADE_DEDUP_CACHE_KEY_PREFIX
 
-        self._redis: Optional[redis.Redis] = None
+        self._redis: redis.Redis | None = None
         self._redis_available = False
 
         self._init_redis()
@@ -245,7 +244,7 @@ class SeenEventCache:
 
 
 # Global singleton cache instance
-_cache_instance: Optional[SeenEventCache] = None
+_cache_instance: SeenEventCache | None = None
 
 
 def get_trade_dedup_cache() -> SeenEventCache:

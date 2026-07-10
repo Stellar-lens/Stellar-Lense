@@ -1,10 +1,9 @@
 """Unit tests for ProvenanceTracker (Issue #244)."""
 
-import json
 import datetime
+import json
 
 import pandas as pd
-import pytest
 
 from detection.feature_engineering import ProvenanceTracker, compute_benford_features
 
@@ -13,7 +12,7 @@ def _make_trades(n: int, trade_ids: list[str] | None = None) -> pd.DataFrame:
     """Build a minimal trade DataFrame suitable for compute_benford_features."""
     if trade_ids is None:
         trade_ids = [f"tok_{i}" for i in range(n)]
-    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    now = datetime.datetime.now(tz=datetime.UTC)
     return pd.DataFrame(
         {
             "trade_id": trade_ids,
@@ -82,7 +81,6 @@ def test_provenance_json_round_trips():
 
 def test_derived_features_not_tracked():
     """Non-base-window features (calibrated, residual) must not appear in provenance."""
-    trades = _make_trades(5)
     tracker = ProvenanceTracker(enabled=True)
     tracker.record("benford_deviation_from_regime", ["t1"])  # derived — should be ignored
     assert tracker.get("benford_deviation_from_regime") == []

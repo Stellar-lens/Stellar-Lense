@@ -129,6 +129,7 @@ def _score_wallet(
         if output_format == "csv":
             import csv
             import io
+
             from detection.forensic_report import CSV_COLUMNS
 
             buf = io.StringIO()

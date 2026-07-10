@@ -156,8 +156,8 @@ def _build_scorer(model_dir: str):
         if not os.path.exists(os.path.join(model_dir, "random_forest.joblib")):
             return _heuristic_score
 
-        from detection.model_inference import RiskScorer  # lazy import
         from detection.feature_engineering import build_feature_matrix  # lazy import
+        from detection.model_inference import RiskScorer  # lazy import
 
         scorer_obj = RiskScorer(model_dir=model_dir)
 

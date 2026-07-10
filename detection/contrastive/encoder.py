@@ -1,5 +1,5 @@
-import torch
 import torch.nn as nn
+
 
 class TransactionEncoder(nn.Module):
     """2-layer MLP on aggregated features -> 128-dim embedding."""

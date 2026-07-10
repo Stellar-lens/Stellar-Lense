@@ -20,17 +20,14 @@ import pytest
 
 # Import under test — heavy pipeline deps are NOT imported here.
 from scripts.load_test_pipeline import (
+    MEMORY_THRESHOLD_BYTES,
     InProcessDriver,
     Metrics,
-    PassFailResult,
     TokenBucket,
+    _synthetic_wallet,
     evaluate_pass_fail,
     make_synthetic_trade,
-    _synthetic_wallet,
-    P99_LATENCY_THRESHOLD_S,
-    MEMORY_THRESHOLD_BYTES,
 )
-
 
 # ---------------------------------------------------------------------------
 # 1. TokenBucket rate limiting

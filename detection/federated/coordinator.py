@@ -126,7 +126,12 @@ class FederatedAuditTrail:
             provided.
         """
         if session_factory is None:
-            from detection.persistence import get_engine, get_session_factory, Base, FederatedAuditRecord  # noqa: F401
+            from detection.persistence import (  # noqa: F401
+                Base,
+                FederatedAuditRecord,
+                get_engine,
+                get_session_factory,
+            )
             engine = get_engine(db_url)
             Base.metadata.create_all(engine, checkfirst=True)
             session_factory = get_session_factory(engine)
@@ -219,7 +224,7 @@ class FederatedAuditTrail:
         ts = timestamp or datetime.now(UTC).isoformat().replace("+00:00", "Z")
         round_id = _deterministic_round_id(ts, participant_fingerprints, model_version)
 
-        from detection.persistence import FederatedAuditRecord, get_session_factory
+        from detection.persistence import FederatedAuditRecord
 
         # Read the previous record's canonical hash to build the chain.
         prev_hash = self._get_latest_record_hash()

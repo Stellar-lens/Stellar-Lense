@@ -56,10 +56,11 @@ class TestActivationExtraction:
         model.fit(X, y)
         return model
 
-    @pytest.mark.skipif(not HAS_LGBM, reason="LightGBM not installed")
     @pytest.fixture
     def lgbm_model(self, sample_data):
         """Train a LightGBM model."""
+        if not HAS_LGBM:
+            pytest.skip("LightGBM not installed")
         X, y = sample_data
         model = LGBMClassifier(n_estimators=10, random_state=42, verbose=-1)
         model.fit(X, y)

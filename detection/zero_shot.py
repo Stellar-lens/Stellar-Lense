@@ -138,7 +138,7 @@ class ZeroShotPatternDetector:
         feature_names: list[str],
         patterns_path: str | None = None,
         expected_hash: str | None = None,
-    ) -> "ZeroShotPatternDetector":
+    ) -> ZeroShotPatternDetector:
         """Load patterns from disk and build pattern vectors.
 
         If ``expected_hash`` is supplied (e.g. stored in a side-car file),

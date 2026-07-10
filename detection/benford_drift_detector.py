@@ -17,7 +17,6 @@ Welford, B.P. (1962) "Note on a method for calculating corrected sums of
 squares and products." Technometrics, 4(3), 419–420.
 """
 
-import json
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
@@ -25,19 +24,14 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-from sqlalchemy import (
-    Column, Float, Integer, String, DateTime, Boolean, JSON,
-    create_engine, select
-)
-from sqlalchemy.orm import declarative_base, Session
+from sqlalchemy import JSON, Column, DateTime, Float, Integer, String, create_engine, select
+from sqlalchemy.orm import Session, declarative_base
 from sqlalchemy.pool import NullPool
 
 from config import config
 from detection.benford_engine import (
-    BenfordMetrics,
     chi_square_statistic,
     mad_score,
-    compute_benford_metrics_for_windows,
 )
 
 logger = logging.getLogger(__name__)

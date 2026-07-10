@@ -13,11 +13,10 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import Column, DateTime, Integer, String, Text, create_engine, event
-from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
-
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
+from sqlalchemy import Column, DateTime, Integer, String, create_engine, event
+from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from config import config
 from detection.forensic_report import ForensicReport

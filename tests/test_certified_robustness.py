@@ -5,14 +5,12 @@ import pytest
 
 from detection.certified_robustness import (
     Layer,
-    certify_ibp,
+    _ibp_batchnorm,
     _ibp_linear,
     _ibp_relu,
-    _ibp_batchnorm,
-    _propagate,
+    certify_ibp,
     layers_from_neural_process,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helper: build a trivial all-class-0 model (always outputs score < threshold)
@@ -119,7 +117,6 @@ def test_sensitive_model_small_certified_radius():
     W = np.array([[1000.0, 0.0, 0.0, 0.0]])
     b = np.array([50.0])  # at x=0 the score is exactly 50.0 (on the boundary)
     layers = [{"type": "linear", "W": W, "b": b}]
-    x = np.array([0.0, 0.0, 0.0, 0.0])  # score = 50.0 — exactly at threshold, not certified
     # At x[0] = 0 the score is 50 = threshold, so both labels fail clean classification.
     # Use x[0] = 0.01 so score = 60 (correctly classified as fraud).
     x2 = np.array([0.01, 0.0, 0.0, 0.0])

@@ -20,7 +20,7 @@ import json
 from datetime import UTC, datetime
 from typing import Literal
 
-from sqlalchemy import Column, DateTime, Float, Integer, String, Text, create_engine, event, text
+from sqlalchemy import Column, DateTime, Float, Integer, String, create_engine, event
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from config import config
@@ -184,7 +184,9 @@ class DPBudgetTracker:
 
     def _fire_alert(self, remaining: float, cumulative: float) -> None:
         try:
-            from streaming.alert_dispatcher import AlertDispatcher  # local import avoids circular dep
+            from streaming.alert_dispatcher import (
+                AlertDispatcher,  # local import avoids circular dep
+            )
             dispatcher = AlertDispatcher(channel=getattr(config, "ALERT_CHANNEL", "stdout"))
             dispatcher.dispatch(
                 wallet="__system__",

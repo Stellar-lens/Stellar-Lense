@@ -20,7 +20,7 @@ import pytest
 
 # Skip entire module when torch is absent (same pattern as test_gnn_encoder.py)
 try:
-    import torch
+    import torch  # noqa: F401
     _TORCH_AVAILABLE = True
 except ImportError:
     _TORCH_AVAILABLE = False
@@ -31,7 +31,6 @@ pytestmark = pytest.mark.skipif(
 
 from detection.gnn_encoder import GNNEncoder, GraphLevelPooling
 from detection.model_inference import _cluster_id, score_cluster
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

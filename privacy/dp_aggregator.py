@@ -7,10 +7,9 @@ DP noise using the Laplace mechanism (mean, count) or Gaussian mechanism
 
 from __future__ import annotations
 
-import math
 import logging
-from dataclasses import dataclass, field
-from typing import Optional
+import math
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -45,7 +44,7 @@ class DPAggregator:
         self,
         epsilon: float,
         delta: float,
-        random_seed: Optional[int] = None,
+        random_seed: int | None = None,
     ) -> None:
         self._validate_params(epsilon, delta)
         self.epsilon = epsilon

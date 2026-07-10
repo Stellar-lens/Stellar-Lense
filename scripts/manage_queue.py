@@ -37,12 +37,12 @@ from tabulate import tabulate
 
 from config import config
 from detection.active_learning.annotation_queue import (
+    DEFAULT_QUEUE_PATH,
     _atomic_write,
     _compute_hmac,
-    _load_queue,
-    DEFAULT_QUEUE_PATH,
 )
-from detection.active_learning.queue_io import load_queue as load_queue_signed, save_queue
+from detection.active_learning.queue_io import load_queue as load_queue_signed
+from detection.active_learning.queue_io import save_queue
 from utils.logging import get_logger
 
 logger = get_logger(__name__)

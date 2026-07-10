@@ -15,12 +15,11 @@ automatically when more than one endpoint is configured.
 
 from __future__ import annotations
 
-import statistics
 import threading
 import time
 import urllib.parse
 import urllib.request
-from collections import defaultdict, deque
+from collections import deque
 from collections.abc import Iterator
 
 from stellar_sdk import Asset as SdkAsset
@@ -29,7 +28,7 @@ from stellar_sdk import Server
 from config import config
 from ingestion.data_models import Asset, Trade
 from utils.logging import get_logger
-from utils.tracing import get_tracer, hash_span_id, inject_trace_context
+from utils.tracing import get_tracer, hash_span_id
 
 logger = get_logger(__name__)
 _tracer = get_tracer(__name__)

@@ -8,8 +8,7 @@ Tests verify:
   5. Cross-chain resolution via identity graph
 """
 
-import json
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -297,10 +296,10 @@ class TestSolanaLinkedFeature:
 
     def test_solana_linked_wash_score_with_cache(self):
         """Should compute max risk score from linked Solana addresses."""
-        from detection.feature_engineering import compute_solana_linked_features
         from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker
 
+        from detection.feature_engineering import compute_solana_linked_features
         from detection.persistence import Base
 
         # Create in-memory SQLite
@@ -335,10 +334,10 @@ class TestSolanaLinkedFeature:
 
     def test_solana_linked_wash_score_no_links(self):
         """Should return 0 if no Solana links found."""
-        from detection.feature_engineering import compute_solana_linked_features
         from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker
 
+        from detection.feature_engineering import compute_solana_linked_features
         from detection.persistence import Base
 
         engine = create_engine("sqlite:///:memory:")

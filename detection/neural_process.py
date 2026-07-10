@@ -19,7 +19,7 @@ run without a GPU on the inference path.
 from __future__ import annotations
 
 import math
-from typing import Sequence
+from collections.abc import Sequence
 
 import numpy as np
 
@@ -112,7 +112,7 @@ class NeuralProcess:
             return np.zeros(_LATENT_DIM, dtype=np.float32)
 
         encodings = np.stack(
-            [self._encode_one(f, l) for f, l in zip(context_features, context_labels)]
+            [self._encode_one(f, l) for f, l in zip(context_features, context_labels, strict=True)]
         )
         return encodings.mean(axis=0)
 

@@ -1,28 +1,26 @@
 """Tests for Issues #178, #179, #180, #181: Benford enhancements and conformal prediction."""
 
-import json
-import pytest
+from unittest.mock import patch
+
 import numpy as np
 import pandas as pd
-from unittest.mock import Mock, patch
+import pytest
 
 from config import config
-from detection.benford_engine import (
-    BENFORD_EXPECTED_2ND,
-    second_digit_distribution,
-    chi_square_second_digit,
-    z_scores_second_digit,
-    mad_score_second_digit,
-    compute_benford_metrics_for_windows,
-)
-from detection.benford_window_optimizer import select_optimal_window
 from detection.benford_drift_detector import (
-    BenfordDriftDetector,
     BenfordBaseline,
+    BenfordDriftDetector,
     DriftStatus,
 )
+from detection.benford_engine import (
+    BENFORD_EXPECTED_2ND,
+    chi_square_second_digit,
+    mad_score_second_digit,
+    second_digit_distribution,
+    z_scores_second_digit,
+)
+from detection.benford_window_optimizer import select_optimal_window
 from detection.conformal import ConformalCalibrator
-
 
 # ============================================================================
 # Issue #178: Adaptive Benford Window Selection

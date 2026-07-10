@@ -626,7 +626,7 @@ class StoppingCriterion:
     def should_stop(
         self,
         model=None,
-        unlabelled_pool: "pd.DataFrame | None" = None,
+        unlabelled_pool: pd.DataFrame | None = None,
     ) -> bool:
         """Return True if the stopping criterion has fired.
 

@@ -31,9 +31,8 @@ Or via libFuzzer:
 See tests/fuzz/README.md for full setup instructions.
 """
 
-import sys
 import json
-from typing import Any
+import sys
 
 try:
     import atheris
@@ -42,7 +41,7 @@ except ImportError:
 
 from pydantic import ValidationError
 
-from ingestion.data_models import Trade, OrderBookEvent, AccountActivity, Asset, BotFingerprint
+from ingestion.data_models import AccountActivity, Asset, BotFingerprint, OrderBookEvent, Trade
 
 
 def _fuzz_horizon_parsing(data: bytes) -> None:

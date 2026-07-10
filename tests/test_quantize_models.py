@@ -12,12 +12,8 @@ Tests cover:
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
-import tempfile
-from pathlib import Path
-from typing import Any
 
 import numpy as np
 import pytest
@@ -30,21 +26,15 @@ import torch.nn as nn  # noqa: E402
 
 from scripts.quantize_models import (  # noqa: E402
     _count_nonzero,
-    _get_prunable_layers,
     _load_metrics,
-    _quantise_rf_leaves,
-    _register_artifact,
-    _save_metrics,
     _sha256_file,
     prune_dann_encoder,
     prune_gnn_encoder,
     prune_pytorch_model,
     quantise_dann_int8,
-    quantise_gnn_int8,
     quantise_tree_models,
     run_all,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -61,7 +51,7 @@ def _tiny_dann(input_dim: int = 8) -> nn.Module:
 def _tiny_gnn() -> nn.Module:
     """Construct a minimal _GraphSAGEModel for fast testing."""
     try:
-        from torch_geometric.nn import SAGEConv
+        from torch_geometric.nn import SAGEConv  # noqa: F401
     except ImportError:
         pytest.skip("torch_geometric not installed")
 

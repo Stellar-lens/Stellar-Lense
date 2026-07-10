@@ -33,9 +33,9 @@ collision probability across millions of wallets.
 from __future__ import annotations
 
 import hashlib
-import logging
 import ssl
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 import msgpack
 import redis
@@ -371,7 +371,7 @@ class RedisFeatureStore:
             raise
 
         result: dict[tuple[str, str], dict[str, Any] | None] = {}
-        for (w, p), raw in zip(wallet_pair_list, raw_values):
+        for (w, p), raw in zip(wallet_pair_list, raw_values, strict=True):
             if raw is None:
                 _inc(_cache_misses, self._store_name)
                 result[(w, p)] = None

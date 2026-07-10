@@ -17,8 +17,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from detection.causal_discovery import CausalPriorConstraints, WashTradeCausalDiscovery, _Constraint
-
+from detection.causal_discovery import CausalPriorConstraints, WashTradeCausalDiscovery
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -254,7 +253,7 @@ class TestCausalPriorConstraintsGraphEnforcement:
             {"constraints": [{"cause": "A", "effect": "B", "kind": "forbidden"}]}
         )
         dag = self._dag_with_edges([("A", "B")])
-        with warnings.catch_warnings(record=True) as caught:
+        with warnings.catch_warnings(record=True):
             warnings.simplefilter("always")
             messages = priors.warn_soft_conflicts(dag)
 

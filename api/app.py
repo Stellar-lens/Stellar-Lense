@@ -7,7 +7,6 @@ Endpoints:
 """
 
 import re
-from typing import Optional
 
 import bcrypt
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Security
@@ -41,7 +40,7 @@ def _validate_stellar_address(address: str) -> str:
 _api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
-def _check_api_key(api_key: Optional[str] = Security(_api_key_header)) -> str:
+def _check_api_key(api_key: str | None = Security(_api_key_header)) -> str:
     if api_key is None:
         raise HTTPException(status_code=401, detail="Missing API key")
     for hashed in config.API_KEYS:
@@ -76,14 +75,14 @@ class RiskScoreResponse(BaseModel):
     benford_flag: bool
     ml_flag: bool
     confidence: int
-    propagated_risk: Optional[float] = None
-    ring_id: Optional[str] = None
+    propagated_risk: float | None = None
+    ring_id: str | None = None
     updated_at: str
 
 
 class PaginatedScoresResponse(BaseModel):
     items: list[RiskScoreResponse]
-    next_cursor: Optional[int] = Field(None, description="score_id cursor for next page")
+    next_cursor: int | None = Field(None, description="score_id cursor for next page")
     total: int
 
 
@@ -158,11 +157,11 @@ async def health(request: Request):
 async def get_wallet_scores(
     request: Request,
     address: str,
-    start_ts: Optional[int] = Query(None, description="Unix timestamp lower bound"),
-    end_ts: Optional[int] = Query(None, description="Unix timestamp upper bound"),
-    asset_pair: Optional[str] = Query(None),
-    min_score: Optional[int] = Query(None, ge=0, le=100),
-    cursor: Optional[int] = Query(None, description="Cursor from previous page (score_id)"),
+    start_ts: int | None = Query(None, description="Unix timestamp lower bound"),
+    end_ts: int | None = Query(None, description="Unix timestamp upper bound"),
+    asset_pair: str | None = Query(None),
+    min_score: int | None = Query(None, ge=0, le=100),
+    cursor: int | None = Query(None, description="Cursor from previous page (score_id)"),
     limit: int = Query(50, ge=1, le=200),
     _key: str = Depends(_check_api_key),
 ):
@@ -214,7 +213,7 @@ async def get_wallet_scores(
 async def get_latest_score(
     request: Request,
     address: str,
-    asset_pair: Optional[str] = Query(None),
+    asset_pair: str | None = Query(None),
     _key: str = Depends(_check_api_key),
 ):
     """Latest risk score and top-3 contributing features for a wallet."""

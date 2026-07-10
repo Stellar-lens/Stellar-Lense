@@ -18,7 +18,6 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 
 from detection.privacy.membership_inference import (
-    DefenceResult,
     EarlyStoppingRecommendation,
     MembershipInferenceDefender,
     PredictionSmoother,

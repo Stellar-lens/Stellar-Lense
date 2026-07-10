@@ -143,7 +143,7 @@ class LiveDriftMonitor:
             self.window_size = 1000 if window_size is None else int(window_size)
 
 
-        with open(reference_path, "r", encoding="utf-8") as f:
+        with open(reference_path, encoding="utf-8") as f:
             raw = json.load(f)
 
         # Support either the raw dict or wrapper under "feature_distributions".

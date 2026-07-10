@@ -7,10 +7,9 @@ Pool IDs are validated as 64-character hex strings before any API call.
 import re
 from collections.abc import Generator
 from datetime import datetime
-
-import pandas as pd
 from typing import Any, cast
 
+import pandas as pd
 import requests
 from stellar_sdk import Server
 

@@ -8,9 +8,19 @@ import os
 import threading
 from datetime import UTC, datetime
 
+import numpy as np
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
-from sqlalchemy import Boolean, DateTime, Integer, String, Text, UniqueConstraint, create_engine
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    Float,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    create_engine,
+)
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 from sqlalchemy.pool import QueuePool
@@ -51,10 +61,6 @@ class RiskScoreRecord(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )
-
-    @property
-    def propagated_risk_score(self) -> float | None:
-        return self.propagated_risk
 
     @property
     def propagated_risk_score(self) -> float | None:
@@ -404,6 +410,32 @@ class TransparencyLogRecord(Base):
     )
 
 
+class FederatedAuditRecord(Base):
+    """Append-only audit trail row for one federated learning round (issue #227).
+
+    See `detection.federated.coordinator.FederatedAuditTrail` for the writer.
+    Rows are never updated or deleted; ``prev_hash`` chains each record to its
+    predecessor so retroactive tampering is detectable.
+    """
+
+    __tablename__ = "federated_audit_trail"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    round_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    round_timestamp: Mapped[str] = mapped_column(String, nullable=False)
+    participant_fingerprints: Mapped[str] = mapped_column(Text, nullable=False)
+    gradient_norms: Mapped[str] = mapped_column(Text, nullable=False)
+    aggregation_algorithm: Mapped[str] = mapped_column(String, nullable=False)
+    aggregate_model_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    round_outcome: Mapped[str] = mapped_column(String, nullable=False)
+    model_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    participant_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    prev_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    recorded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+    )
+
+
 class TransparencyLog:
     """Append-only store for known-good model artifact hashes.
 
@@ -580,8 +612,6 @@ def verify_watermark(
             "threshold": float,
         }
     """
-    import numpy as np
-
     preds = model.predict(trigger_set)
     agreement = float(np.mean(preds == target_label))
     return {

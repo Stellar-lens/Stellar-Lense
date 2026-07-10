@@ -37,7 +37,7 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(status, indent=2))
         return 0
 
-    print(f"DP Budget Status")
+    print("DP Budget Status")
     print(f"  Total epsilon:       {status['total_epsilon']:.4f}")
     print(f"  Cumulative epsilon:  {status['cumulative_epsilon']:.4f}")
     print(f"  Remaining epsilon:   {status['remaining_epsilon']:.4f}")

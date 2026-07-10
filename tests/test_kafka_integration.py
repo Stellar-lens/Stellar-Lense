@@ -10,10 +10,11 @@ Tests verify:
   4. Cross-pair aggregator reads from all partitions
 """
 
-import json
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, Mock, patch
 
-import pytest
+from streaming.alert_dispatcher import AlertDispatcher
+from streaming.feature_buffer import FeatureBuffer
+from streaming.streaming_scorer import StreamingScorer
 
 
 class TestProducerConsumerIntegration:
@@ -22,8 +23,8 @@ class TestProducerConsumerIntegration:
     @patch("ingestion.kafka_producer.KafkaProducer")
     def test_producer_sends_with_partition_key(self, mock_producer_class):
         """Producer sends events with canonical pair ID as partition key."""
+        from ingestion.data_models import Asset, Trade
         from ingestion.kafka_producer import KafkaTradeProducer
-        from ingestion.data_models import Trade, Asset
 
         # Mock Kafka producer
         mock_producer_instance = Mock()
@@ -62,8 +63,8 @@ class TestProducerConsumerIntegration:
     @patch("ingestion.kafka_producer.KafkaProducer")
     def test_producer_sends_invalid_pair_to_dlq(self, mock_producer_class):
         """Producer sends events with invalid pairs to dead-letter queue."""
+        from ingestion.data_models import Asset, Trade
         from ingestion.kafka_producer import KafkaTradeProducer
-        from ingestion.data_models import Trade, Asset
 
         mock_producer_instance = Mock()
         mock_producer_class.return_value = mock_producer_instance
@@ -101,10 +102,10 @@ class TestWorkerProcessing:
 
     def test_worker_processes_message(self):
         """Worker correctly processes a single trade message."""
-        from streaming.kafka_worker import KafkaWorker
-        from streaming.feature_buffer import FeatureBuffer
-        from streaming.streaming_scorer import StreamingScorer
         from streaming.alert_dispatcher import AlertDispatcher
+        from streaming.feature_buffer import FeatureBuffer
+        from streaming.kafka_worker import KafkaWorker
+        from streaming.streaming_scorer import StreamingScorer
 
         buffer = FeatureBuffer()
         

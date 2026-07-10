@@ -18,7 +18,6 @@ environment setup.
 from __future__ import annotations
 
 import importlib.util
-import math
 import os
 import pathlib
 import re
@@ -57,31 +56,42 @@ def _load(name: str, rel_path: str):
     return mod
 
 
-# Provide a minimal config stub so benford_engine and feature_engineering load
-_cfg_stub = types.SimpleNamespace(
-    MIN_TRADES_FOR_SCORING=5,
-    BENFORD_WINDOWS_HOURS=[1, 4, 24, 168, 720],
-    BENFORD_CI_ENABLED=False,
-    GNN_EMBEDDING_DIM=32,
-    ASSET_BENFORD_WINDOWS={},
-    CROSS_PAIR_SYNCHRONY_WINDOW_SECONDS=30,
-    SHAP_INTERACTIONS_ENABLED=False,
-    DP_EPSILON=1.0,
-    DP_DELTA=1e-5,
-    DP_RENYI_QUERY_THRESHOLD=100,
-    DP_RENYI_NOISE_MULTIPLIER=3.0,
-    DP_DEFAULT_SENSITIVITY=0.05,
-    SHAP_SENSITIVITY_PATH="models/shap_sensitivity.json",
-)
-_cfg_module = types.ModuleType("config")
-_cfg_module.config = _cfg_stub
-sys.modules.setdefault("config", _cfg_module)
+# Provide a minimal config stub so benford_engine and feature_engineering load.
+# Only installed (and later removed — see below) when the real `config` module
+# isn't already imported; otherwise this incomplete stub would permanently
+# shadow the real config for every test that runs after this one.
+_STUBBED_CONFIG = "config" not in sys.modules
+if _STUBBED_CONFIG:
+    _cfg_stub = types.SimpleNamespace(
+        MIN_TRADES_FOR_SCORING=5,
+        BENFORD_WINDOWS_HOURS=[1, 4, 24, 168, 720],
+        BENFORD_CI_ENABLED=False,
+        GNN_EMBEDDING_DIM=32,
+        ASSET_BENFORD_WINDOWS={},
+        CROSS_PAIR_SYNCHRONY_WINDOW_SECONDS=30,
+        SHAP_INTERACTIONS_ENABLED=False,
+        DP_EPSILON=1.0,
+        DP_DELTA=1e-5,
+        DP_RENYI_QUERY_THRESHOLD=100,
+        DP_RENYI_NOISE_MULTIPLIER=3.0,
+        DP_DEFAULT_SENSITIVITY=0.05,
+        SHAP_SENSITIVITY_PATH="models/shap_sensitivity.json",
+    )
+    _cfg_module = types.ModuleType("config")
+    _cfg_module.config = _cfg_stub
+    sys.modules["config"] = _cfg_module
 
 # Load benford_engine first (feature_engineering depends on it)
 _load("benford_engine", "detection/benford_engine.py")
 sys.modules.setdefault("detection.benford_engine", sys.modules["benford_engine"])
 
-# Minimal stubs for heavy transitive dependencies
+# Minimal stubs for heavy transitive dependencies. These are only needed to
+# satisfy feature_engineering's imports while it is exec'd below — they are
+# popped from sys.modules again immediately afterwards (see below) so this
+# file doesn't shadow the real modules for every test that runs after it in
+# the same pytest process (e.g. a later test doing `import networkx` for
+# real, or `from detection.ts_decomposition import decompose_amounts`).
+_STUBBED_MODULE_NAMES = []
 for _stub_name in [
     "detection.streaming_benford",
     "detection.wallet_graph",
@@ -94,6 +104,7 @@ for _stub_name in [
     if _stub_name not in sys.modules:
         _m = types.ModuleType(_stub_name)
         sys.modules[_stub_name] = _m
+        _STUBBED_MODULE_NAMES.append(_stub_name)
 
 # Minimal NetworkX stub (feature_engineering type-hints use nx.DiGraph)
 _nx = sys.modules["networkx"]
@@ -114,8 +125,23 @@ _sb.StreamingBenfordSketch = type("StreamingBenfordSketch", (), {})  # type: ign
 _dm = sys.modules["ingestion.data_models"]
 _dm.AccountActivity = type("AccountActivity", (), {})  # type: ignore[attr-defined]
 
-# Load feature_engineering
+# Load feature_engineering. `_load` always overwrites sys.modules[name], which
+# would clobber a real cached `detection.feature_engineering` for every test
+# that imports it normally afterwards — so save and restore it around the call.
+_prev_fe = sys.modules.get("detection.feature_engineering")
 fe = _load("detection.feature_engineering", "detection/feature_engineering.py")
+if _prev_fe is not None:
+    sys.modules["detection.feature_engineering"] = _prev_fe
+else:
+    del sys.modules["detection.feature_engineering"]
+
+# Remove the transient stubs now that feature_engineering has been exec'd —
+# leaving them in sys.modules would shadow the real modules for the rest of
+# the pytest process.
+for _stub_name in _STUBBED_MODULE_NAMES:
+    del sys.modules[_stub_name]
+if _STUBBED_CONFIG:
+    del sys.modules["config"]
 
 FEATURE_RANGES = fe.FEATURE_RANGES
 _FEATURE_ANCHORS = fe._FEATURE_ANCHORS
@@ -320,46 +346,6 @@ def _load_shap_explainer():
 
     se_mod = _load("detection.shap_explainer", "detection/shap_explainer.py")
     return se_mod.ShapExplainer
-
-
-def test_shap_explain_includes_dict_url():
-    """explain() must include a dict_url key in every returned entry."""
-    ShapExplainer = _load_shap_explainer()
-
-    feature_cols = [
-        "benford_mad_24h", "counterparty_concentration_ratio",
-        "account_age_days", "entropy_of_amounts", "inter_arrival_cv",
-    ]
-    row = pd.Series({col: 0.5 for col in feature_cols})
-    mock_explainer = types.SimpleNamespace(
-        shap_values=lambda X: np.array([[0.1, 0.2, 0.3, 0.05, 0.15]])
-    )
-    se = ShapExplainer()
-    se._get_explainer = lambda model: mock_explainer  # type: ignore[method-assign]
-
-    results = se.explain(row, top_n=3, model=object())
-    assert len(results) > 0
-    for entry in results:
-        assert "dict_url" in entry, f"dict_url missing from: {entry}"
-        assert entry["dict_url"] is None or entry["dict_url"].startswith("https://")
-
-
-def test_shap_explain_ensemble_includes_dict_url():
-    """explain_ensemble() must also include dict_url in each entry."""
-    ShapExplainer = _load_shap_explainer()
-
-    feature_cols = ["benford_mad_24h", "counterparty_concentration_ratio", "account_age_days"]
-    row = pd.Series({col: 0.5 for col in feature_cols})
-    mock_explainer = types.SimpleNamespace(
-        shap_values=lambda X: np.array([[0.1, 0.2, 0.3]])
-    )
-    se = ShapExplainer()
-    se._get_explainer = lambda model: mock_explainer  # type: ignore[method-assign]
-
-    results = se.explain_ensemble(row, models={"rf": object(), "xgb": object()}, top_n=3)
-    assert len(results) > 0
-    for entry in results:
-        assert "dict_url" in entry
 
 
 def test_shap_explain_includes_dict_url():

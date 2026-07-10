@@ -25,7 +25,6 @@ and never aborts the rest of the batch.
 import argparse
 import json
 import logging
-import re
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -36,7 +35,6 @@ import pandas as pd
 from stellar_sdk import Asset as SdkAsset
 
 from config import config
-from utils.logging import get_logger, set_level
 from detection.causal_attribution import CounterfactualAttributor
 from detection.feature_engineering import build_feature_vector
 from detection.forensic_report import ForensicReportGenerator, write_report_secure
@@ -47,7 +45,7 @@ from ingestion.orderbook_loader import (
     load_orderbook_events,
     orderbook_events_to_dataframe,
 )
-
+from utils.logging import get_logger, set_level
 
 logger = get_logger(__name__)
 

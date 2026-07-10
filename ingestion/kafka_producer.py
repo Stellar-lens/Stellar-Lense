@@ -35,7 +35,9 @@ Failure handling
 
 from __future__ import annotations
 
+import json
 import os
+import re
 import socket
 
 from confluent_kafka import KafkaException, Producer
@@ -50,10 +52,46 @@ logger = get_logger(__name__)
 
 _SANITISE_RE = re.compile(r"[^a-zA-Z0-9._-]+")
 
+_ASSET_CODE_RE = re.compile(r"^[A-Z0-9]{1,12}$")
+_ISSUER_RE = re.compile(r"^G[A-Z0-9]{55}$")
+
 
 def sanitise_pair(asset_pair: str) -> str:
     """Turn an ``asset_pair`` string into a Kafka-topic-safe suffix."""
     return _SANITISE_RE.sub("_", asset_pair).strip("_")
+
+
+def _validate_asset_code(code: str) -> bool:
+    """Stellar asset codes are 1-12 uppercase alphanumeric characters."""
+    return bool(_ASSET_CODE_RE.match(code))
+
+
+def _validate_issuer(issuer: str) -> bool:
+    """Accept ``"native"`` or a 56-char Stellar account ID (``G`` + 55 chars)."""
+    if issuer == "native":
+        return True
+    return bool(_ISSUER_RE.match(issuer))
+
+
+def _to_canonical_pair_id(code_a: str, issuer_a: str, code_b: str, issuer_b: str) -> str:
+    """Return a deterministic ``CODE:ISSUER/CODE:ISSUER`` partition key.
+
+    The two assets are sorted alphabetically by ``CODE:ISSUER`` so the same
+    pair always produces the same key regardless of input order — this keeps
+    all trades for a pair on the same Kafka partition.
+    """
+    if not _validate_asset_code(code_a):
+        raise ValueError(f"Invalid asset A code: {code_a!r}")
+    if not _validate_issuer(issuer_a):
+        raise ValueError(f"Invalid asset A issuer: {issuer_a!r}")
+    if not _validate_asset_code(code_b):
+        raise ValueError(f"Invalid asset B code: {code_b!r}")
+    if not _validate_issuer(issuer_b):
+        raise ValueError(f"Invalid asset B issuer: {issuer_b!r}")
+
+    asset_a = f"{code_a}:{issuer_a}"
+    asset_b = f"{code_b}:{issuer_b}"
+    return "/".join(sorted([asset_a, asset_b]))
 
 
 def _build_transactional_id() -> str:

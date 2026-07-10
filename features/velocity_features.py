@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 import math
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pandas as pd
 
@@ -51,7 +51,7 @@ def fetch_asset_supply(asset_code: str, asset_issuer: str, horizon_url: str) -> 
     import urllib.request
 
     cache_key = f"{asset_code}:{asset_issuer}"
-    now_utc = datetime.now(timezone.utc)
+    now_utc = datetime.now(UTC)
     cached = _supply_cache.get(cache_key)
     if cached is not None:
         supply, fetched_at = cached
@@ -104,9 +104,9 @@ def compute_token_velocity(
         return {k: nan for k in _VELOCITY_WINDOWS}
 
     if now is None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
     if now.tzinfo is None:
-        now = now.replace(tzinfo=timezone.utc)
+        now = now.replace(tzinfo=UTC)
 
     supply = float(asset_supply)  # validated above
     result: dict[str, float] = {}

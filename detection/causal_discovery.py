@@ -12,7 +12,7 @@ import json
 import logging
 import os
 import warnings
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Literal
 
 import networkx as nx

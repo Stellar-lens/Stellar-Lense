@@ -16,18 +16,17 @@ buffered into a DataFrame) for a single wallet.
 
 from __future__ import annotations
 
+import json as _json
 import logging
 import math
+import os as _os
+from typing import Any
 
 import networkx as nx
 import numpy as np
 import pandas as pd
 
 from config import config
-from utils.tracing import get_tracer, hash_span_id
-
-logger = logging.getLogger(__name__)
-_tracer = get_tracer(__name__)
 from detection.benford_engine import (
     BenfordMetrics,
     compute_benford_metrics_for_windows,
@@ -41,13 +40,14 @@ from detection.wallet_graph import (
     detect_wash_trading_rings,
 )
 from ingestion.data_models import AccountActivity
+from utils.tracing import get_tracer, hash_span_id
+
+logger = logging.getLogger(__name__)
+_tracer = get_tracer(__name__)
 
 # ---------------------------------------------------------------------------
 # Provenance tracking (Issue #244)
 # ---------------------------------------------------------------------------
-
-import json as _json
-import os as _os
 
 _PROVENANCE_ENABLED = _os.getenv("FEATURE_PROVENANCE_ENABLED", "false").lower() == "true"
 
@@ -265,7 +265,7 @@ def compute_benford_features(
     liquidity_profiler=None,
     asset: str | None = None,
     precomputed_metrics: dict[int, BenfordMetrics] | None = None,
-    provenance: "ProvenanceTracker | None" = None,
+    provenance: ProvenanceTracker | None = None,
 ) -> dict:
     """Flatten per-window Benford metrics into a feature row.
 
@@ -418,40 +418,6 @@ def _compute_residual_benford_for_windows(
             results[hours] = compute_benford_metrics(pos_residuals)
 
     return results
-
-
-def compute_graph_embedding_features(
-    wallet: str,
-    funding_graph: nx.DiGraph,
-    gnn_encoder: object,
-) -> dict[str, float]:
-    """Return GNN embedding features for a wallet.
-
-    This function attempts to compute an embedding for ``wallet`` using the
-    provided ``gnn_encoder`` and ``funding_graph``. If embedding computation
-    fails (e.g., missing wallet node, encoder error), it returns a zero vector
-    of length ``config.GNN_EMBEDDING_DIM``.
-
-    Args:
-        wallet: Stellar account id to compute embeddings for.
-        funding_graph: Directed funding graph used as input to the encoder.
-        gnn_encoder: Encoder instance that provides an ``encode(graph, wallet)``
-            method returning an indexable embedding vector.
-
-    Returns:
-        A dictionary mapping feature names ``gnn_0``..``gnn_{N-1}`` to floats,
-        where ``N`` is ``config.GNN_EMBEDDING_DIM``.
-
-    Raises:
-        Any exceptions raised by the encoder are caught and will not be
-        propagated.
-    """
-    try:
-
-        emb = gnn_encoder.encode(funding_graph, wallet)  # type: ignore[attr-defined]
-        return {f"gnn_{i}": float(emb[i]) for i in range(len(emb))}
-    except Exception:
-        return {f"gnn_{i}": 0.0 for i in range(config.GNN_EMBEDDING_DIM)}
 
 
 def compute_order_cancellation_rate(wallet: str, orderbook_events: pd.DataFrame | None) -> float:
@@ -1285,7 +1251,7 @@ def build_feature_vector(
             wallet, wallet_trades, activity, orderbook_events, funding_graph,
             all_pairs_df, amm_trades, gnn_encoder, benford_metrics,
             pair_benford_sketches, community_map, ring_stats, path_flows,
-            kge_encoder, wallet_counterparties,
+            kge_encoder, wallet_counterparties, seq_model, pair_vocab,
         )
 
 
@@ -1305,6 +1271,8 @@ def _build_feature_vector_inner(
     path_flows=None,
     kge_encoder=None,
     wallet_counterparties=None,
+    seq_model=None,
+    pair_vocab=None,
 ):
     reference_time = (
         pd.to_datetime(wallet_trades["ledger_close_time"], utc=True).max()
@@ -1668,7 +1636,7 @@ def validate_feature_ranges(
 
     if raise_on_violation and violations:
         raise ValueError(
-            f"Feature range violations detected:\n" + "\n".join(f"  {v}" for v in violations)
+            "Feature range violations detected:\n" + "\n".join(f"  {v}" for v in violations)
         )
 
     return violations

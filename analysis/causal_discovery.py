@@ -15,9 +15,7 @@ import logging
 import os
 import signal
 from contextlib import contextmanager
-from typing import Optional
 
-import numpy as np
 import pandas as pd
 
 logger = logging.getLogger(__name__)

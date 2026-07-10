@@ -26,11 +26,7 @@ Test coverage
 
 from __future__ import annotations
 
-import math
 import os
-import struct
-import tempfile
-import time
 
 import numpy as np
 import pytest
@@ -38,12 +34,13 @@ import pytest
 # Mark the whole module as requiring torch
 torch = pytest.importorskip("torch", reason="torch not installed")
 
+from datetime import UTC
+
 from detection.trade_sequence_transformer import (
     TradeEvent,
     TradeSequenceTransformer,
     build_sequence_embedding,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -325,11 +322,12 @@ class TestSaveLoad:
 
 class TestBuildSequenceEmbedding:
     def test_returns_zeros_when_model_none(self):
+        from datetime import datetime
+
         import pandas as pd
-        from datetime import datetime, timedelta, timezone
 
         trades = pd.DataFrame([{
-            "ledger_close_time": datetime.now(timezone.utc),
+            "ledger_close_time": datetime.now(UTC),
             "amount": 100.0,
         }])
         result = build_sequence_embedding(trades, model=None)
@@ -337,8 +335,9 @@ class TestBuildSequenceEmbedding:
         assert (result == 0).all()
 
     def test_returns_embedding_shape_with_model(self):
+        from datetime import datetime
+
         import pandas as pd
-        from datetime import datetime, timezone
 
         model = TradeSequenceTransformer(
             num_pairs=4, embed_dim=16, num_heads=2, num_layers=1,
@@ -346,7 +345,7 @@ class TestBuildSequenceEmbedding:
         )
         model.eval()
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         trades = pd.DataFrame([
             {"ledger_close_time": now, "amount": 100.0, "base_account": "GFOO"},
             {"ledger_close_time": now, "amount": 200.0, "base_account": "GBAR"},

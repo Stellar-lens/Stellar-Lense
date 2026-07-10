@@ -36,7 +36,6 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-from typing import TYPE_CHECKING
 
 import networkx as nx
 import numpy as np
@@ -449,7 +448,8 @@ if _TORCH_AVAILABLE:
 
         def __init__(self, hidden_channels: int, out_channels: int) -> None:
             super().__init__()
-            from torch_geometric.nn import HeteroConv, SAGEConv as _SAGEConv
+            from torch_geometric.nn import HeteroConv
+            from torch_geometric.nn import SAGEConv as _SAGEConv
 
             self.conv1 = HeteroConv(
                 {
@@ -862,8 +862,8 @@ class TemporalGNNEncoder:
         self,
         src_wallet: str,
         dst_wallet: str,
-        src_features: "list[float] | np.ndarray",
-        dst_features: "list[float] | np.ndarray",
+        src_features: list[float] | np.ndarray,
+        dst_features: list[float] | np.ndarray,
         timestamp: float,
     ) -> None:
         """Record a timestamped edge into the per-wallet memory.

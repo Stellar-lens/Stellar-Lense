@@ -15,7 +15,7 @@ def _reload_module():
 def test_metrics_registered_on_import():
     """Prometheus metrics are registered as Gauge instances when prometheus_client is available."""
     pytest = __import__("pytest")
-    cm = _reload_module()
+    _reload_module()
     try:
         from prometheus_client import REGISTRY
     except ImportError:
@@ -31,9 +31,10 @@ def test_set_cpu_usage_updates_gauge():
     """set_cpu_usage sets the labelled gauge value without raising."""
     cm = _reload_module()
     try:
-        from prometheus_client import REGISTRY
+        import prometheus_client  # noqa: F401
     except ImportError:
-        import pytest; pytest.skip("prometheus_client not installed")
+        import pytest
+        pytest.skip("prometheus_client not installed")
 
     cm.set_cpu_usage("benford", 0.42)
     gauge = cm.CPU_USAGE_RATIO
@@ -48,9 +49,10 @@ def test_set_memory_usage_updates_gauge():
     """set_memory_usage sets the bytes gauge without raising."""
     cm = _reload_module()
     try:
-        from prometheus_client import REGISTRY
+        import prometheus_client  # noqa: F401
     except ImportError:
-        import pytest; pytest.skip("prometheus_client not installed")
+        import pytest
+        pytest.skip("prometheus_client not installed")
 
     cm.set_memory_usage(123_456_789)
     gauge = cm.MEMORY_USAGE_BYTES
@@ -63,9 +65,10 @@ def test_set_trades_per_second_updates_gauge():
     """set_trades_per_second sets the labelled gauge without raising."""
     cm = _reload_module()
     try:
-        from prometheus_client import REGISTRY
+        import prometheus_client  # noqa: F401
     except ImportError:
-        import pytest; pytest.skip("prometheus_client not installed")
+        import pytest
+        pytest.skip("prometheus_client not installed")
 
     cm.set_trades_per_second("XLM/USDC", 17.5)
     gauge = cm.TRADES_PER_SECOND

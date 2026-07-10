@@ -21,7 +21,7 @@ import numpy as np
 from sklearn.linear_model import SGDClassifier
 
 from .crypto import generate_masks, mask_delta
-from .gradient_compression import ErrorFeedbackCompressor, TopKSparsifier, TopKPayload
+from .gradient_compression import ErrorFeedbackCompressor, TopKPayload, TopKSparsifier
 from .secure_aggregation import SecureAggregationContext, encrypt_gradient
 
 logger = logging.getLogger(__name__)

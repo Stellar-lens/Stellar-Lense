@@ -40,14 +40,14 @@ class TestAssetValidation:
 
     def test_valid_issuer_account_id(self):
         """Accept 56-char Stellar account IDs."""
-        valid_id = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF46Q6"
+        valid_id = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF46Q6"
         assert _validate_issuer(valid_id)
 
     def test_invalid_issuer(self):
         """Reject invalid issuer formats."""
         assert not _validate_issuer("")
-        assert not _validate_issuer("GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF46Q6X")  # 57 chars
-        assert not _validate_issuer("GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF46Q")  # 55 chars
+        assert not _validate_issuer("GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF46Q6")  # 57 chars
+        assert not _validate_issuer("GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF46Q6")  # 55 chars
         assert not _validate_issuer("invalid")
 
 
@@ -62,7 +62,7 @@ class TestCanonicalPairId:
 
     def test_canonical_pair_with_issuer(self):
         """Canonical pair with issued assets."""
-        issuer = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF46Q6"
+        issuer = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF46Q6"
         pair_id = _to_canonical_pair_id("USDC", issuer, "XLM", "native")
         # Sort: "USDC:<issuer>" < "XLM:native"
         expected = f"USDC:{issuer}/XLM:native"
@@ -70,15 +70,15 @@ class TestCanonicalPairId:
 
     def test_canonical_pair_deterministic(self):
         """Same pair should always map to the same partition key."""
-        issuer = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF46Q6"
+        issuer = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF46Q6"
         pair_id_1 = _to_canonical_pair_id("USDC", issuer, "XLM", "native")
         pair_id_2 = _to_canonical_pair_id("XLM", "native", "USDC", issuer)
         assert pair_id_1 == pair_id_2
 
     def test_canonical_pair_alphabetic_sorting(self):
         """Pair IDs are sorted alphabetically regardless of input order."""
-        issuer_a = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF46Q6"
-        issuer_b = "GBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBWHF46Q6"
+        issuer_a = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF46Q6"
+        issuer_b = "GBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBWHF46Q6"
 
         # Forward order
         pair_1 = _to_canonical_pair_id("BTC", issuer_a, "USD", issuer_b)
@@ -96,7 +96,7 @@ class TestCanonicalPairId:
     def test_invalid_asset_b_raises(self):
         """Invalid asset B raises ValueError."""
         with pytest.raises(ValueError, match="Invalid asset B"):
-            _to_canonical_pair_id("XLM", "native", "USD123456", "native")
+            _to_canonical_pair_id("XLM", "native", "USD1234567890", "native")  # 13 chars, too long
 
     def test_invalid_issuer_raises(self):
         """Invalid issuer raises ValueError."""

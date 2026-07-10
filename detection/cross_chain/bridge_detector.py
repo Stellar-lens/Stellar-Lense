@@ -16,7 +16,7 @@ import json
 import logging
 import os
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -280,7 +280,7 @@ def detect_bridge_wash_trade(
             continue
         ts = datetime.fromisoformat(str(ts_raw)) if isinstance(ts_raw, str) else ts_raw
         if ts.tzinfo is None:
-            ts = ts.replace(tzinfo=timezone.utc)
+            ts = ts.replace(tzinfo=UTC)
 
         anchor_addr = tx_from if tx_from in anchors else (tx_to if tx_to in anchors else None)
         if anchor_addr is None:

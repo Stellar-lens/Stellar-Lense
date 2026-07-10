@@ -16,7 +16,7 @@ from typing import Any
 
 import numpy as np
 from factory import Factory, LazyAttribute, Sequence, SubFactory
-from factory.fuzzy import FuzzyFloat, FuzzyInteger
+from factory.fuzzy import FuzzyFloat
 
 from ingestion.data_models import Asset, Trade
 

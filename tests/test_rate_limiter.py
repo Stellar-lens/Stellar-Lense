@@ -3,7 +3,6 @@
 import threading
 
 import fakeredis
-import pytest
 
 from ingestion.rate_limiter import TokenBucketLimiter
 

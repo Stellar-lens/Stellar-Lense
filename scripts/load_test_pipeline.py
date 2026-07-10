@@ -47,7 +47,7 @@ import os
 import sys
 import time
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -416,6 +416,7 @@ class KafkaDriver:
         if self._producer is not None:
             return
         from confluent_kafka import Producer
+
         from ingestion.avro_codec import load_schema
 
         self._schema = load_schema()
@@ -543,7 +544,6 @@ async def run_load_test(
 
     bucket = TokenBucket(rate=1.0)  # will be updated dynamically during ramp
     test_start = time.monotonic()
-    sustain_end = test_start + duration
 
     # Background tasks
     tasks = [asyncio.create_task(_memory_sampler(metrics))]
@@ -719,7 +719,7 @@ def main() -> None:
         )
         args.ramp_time = args.duration
 
-    print(f"LedgerLens Load Test")
+    print("LedgerLens Load Test")
     print(f"  Rate:     {args.rate} tps  |  Duration: {args.duration}s  |  "
           f"Ramp: {args.ramp_time}s")
     print(f"  Backend:  {'in-process (--no-kafka)' if args.no_kafka else args.bootstrap_servers}")

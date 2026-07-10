@@ -21,7 +21,12 @@ All gradients flow through `RiskScorer.score_continuous` (see
 import numpy as np
 import pandas as pd
 
-from detection.adversarial.attack import DEFAULT_TARGET_SCORE, FGSMAttack, PGDAttack, feature_space_fgsm
+from detection.adversarial.attack import (
+    DEFAULT_TARGET_SCORE,
+    FGSMAttack,
+    PGDAttack,
+    feature_space_fgsm,
+)
 from detection.model_training import FEATURE_COLUMNS_EXCLUDE
 from utils.logging import get_logger
 
@@ -378,13 +383,14 @@ def run_adversarial_training(
     if epochs < 1:
         raise ValueError(f"epochs must be >= 1, got {epochs}")
 
-    from sklearn.model_selection import train_test_split
+    import os
+    import tempfile
+
     from sklearn.metrics import roc_auc_score
+    from sklearn.model_selection import train_test_split
 
-    from detection.model_training import split_features_labels, save_models, train_models
     from detection.model_inference import RiskScorer
-
-    import tempfile, os
+    from detection.model_training import save_models, split_features_labels, train_models
 
     train_df, test_df = train_test_split(
         df, test_size=test_size, random_state=random_state, stratify=df["label"]

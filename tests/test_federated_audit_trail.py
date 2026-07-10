@@ -22,7 +22,6 @@ import json
 
 import numpy as np
 import pytest
-from sqlalchemy import text
 
 from detection.federated.coordinator import (
     AsyncFederatedCoordinator,
@@ -31,7 +30,6 @@ from detection.federated.coordinator import (
     _hash_weights,
 )
 from detection.persistence import Base, FederatedAuditRecord, get_engine, get_session_factory
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

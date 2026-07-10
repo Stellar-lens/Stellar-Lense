@@ -192,7 +192,6 @@ def test_build_feature_matrix_accepts_gnn_embedding_features():
 # Needed for approx assertions
 import pytest  # noqa: E402 (placed after test functions intentionally for clarity)
 
-
 # ---------------------------------------------------------------------------
 # counterparty_variance — worked example from docs/contributor_feature_guide.md
 # ---------------------------------------------------------------------------

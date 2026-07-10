@@ -21,15 +21,334 @@ Usage::
 
 from __future__ import annotations
 
+import hashlib
+import hmac as _hmac
+import os
+import threading
 import time
-from typing import Callable
+from collections.abc import Callable
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Any
 
 import requests
+from sqlalchemy import Integer, String, create_engine
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
 from config import config
 from utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+# ---------------------------------------------------------------------------
+# Score-oracle event parsing, persistence, and stale-score alerting
+# ---------------------------------------------------------------------------
+#
+# Separate from the governance/pause polling above: this section listens for
+# score-oracle contract events (``score_read``, ``score_updated``,
+# ``threshold_updated``) emitted by the on-chain LedgerLens score consumer
+# contract, persists them (with wallet/consumer addresses HMAC-hashed for
+# privacy) and raises a "stale score consumption" alert when a caller reads a
+# score that has since drifted materially from the current score.
+
+EVENT_HMAC_SECRET = os.getenv("EVENT_HMAC_SECRET", "ledgerlens-soroban-event-hmac-default")
+
+STALE_SCORE_ALERT_THRESHOLD = 20
+
+_KNOWN_EVENT_TYPES = {"score_read", "score_updated", "threshold_updated"}
+
+
+def _hash_address(address: str) -> str:
+    """HMAC-SHA256 hex digest of a Stellar address, keyed by EVENT_HMAC_SECRET."""
+    return _hmac.new(EVENT_HMAC_SECRET.encode(), address.encode(), hashlib.sha256).hexdigest()
+
+
+def _parse_timestamp(raw: str) -> datetime:
+    return datetime.fromisoformat(raw.replace("Z", "+00:00"))
+
+
+def _decode_value_map(value: dict | None) -> dict[str, Any]:
+    """Flatten a Soroban ScVal map (``{"type": "map", "value": [...]}``) into
+    a plain ``{key: value}`` dict, keyed by each entry's symbol name."""
+    if not value or value.get("type") != "map":
+        return {}
+    result: dict[str, Any] = {}
+    for entry in value.get("value", []):
+        key = entry.get("key", {}).get("value")
+        if key is None:
+            continue
+        result[key] = entry.get("val", {}).get("value")
+    return result
+
+
+@dataclass
+class ContractEvent:
+    """A parsed, privacy-scrubbed score-oracle contract event."""
+
+    event_type: str
+    ledger_sequence: int
+    timestamp: datetime
+    score: int | None = None
+    asset_pair: str | None = None
+    wallet_id_hash: str | None = None
+    consumer_address_hash: str | None = None
+    old_threshold: int | None = None
+    new_threshold: int | None = None
+
+
+class _EventBase(DeclarativeBase):
+    pass
+
+
+class ContractEventRecord(_EventBase):
+    """Append-only persisted record of one score-oracle contract event."""
+
+    __tablename__ = "soroban_contract_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    event_type: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    ledger_sequence: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    timestamp: Mapped[str] = mapped_column(String, nullable=False)
+    score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    asset_pair: Mapped[str | None] = mapped_column(String, nullable=True)
+    wallet_id_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    consumer_address_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    old_threshold: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    new_threshold: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
+class _WatermarkRecord(_EventBase):
+    """Per-contract last-processed ledger sequence, for resumable polling."""
+
+    __tablename__ = "soroban_event_watermarks"
+
+    contract_id: Mapped[str] = mapped_column(String, primary_key=True)
+    ledger_sequence: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+
+def _get_session_factory(db_url: str) -> sessionmaker:
+    engine = create_engine(db_url)
+    _EventBase.metadata.create_all(engine)
+    return sessionmaker(bind=engine)
+
+
+def parse_contract_event(raw: dict) -> ContractEvent | None:
+    """Parse a raw Soroban RPC (or Horizon effects fallback) event dict.
+
+    Returns ``None`` for events with no topics or an unrecognised event type
+    (topic[0]) — these are ignored rather than raising, since new on-chain
+    event types may be added without breaking the listener.
+    """
+    if not raw:
+        return None
+
+    # Horizon effects shape nests the Soroban payload under "data" and puts
+    # the close timestamp at the top level under "created_at".
+    if "data" in raw and "topic" in raw.get("data", {}):
+        payload = raw["data"]
+        timestamp_str = raw.get("created_at")
+    else:
+        payload = raw
+        timestamp_str = raw.get("ledgerClosedAt")
+
+    topics = payload.get("topic") or []
+    if not topics:
+        return None
+
+    event_type = topics[0].get("value")
+    if event_type not in _KNOWN_EVENT_TYPES:
+        return None
+
+    ledger_sequence = int(payload.get("ledger", 0))
+    timestamp = _parse_timestamp(timestamp_str) if timestamp_str else datetime.now(UTC)
+
+    wallet_id_hash = None
+    if len(topics) > 1 and topics[1].get("type") == "address":
+        wallet_id_hash = _hash_address(topics[1]["value"])
+
+    fields = _decode_value_map(payload.get("value"))
+    consumer_raw = fields.get("consumer")
+
+    return ContractEvent(
+        event_type=event_type,
+        ledger_sequence=ledger_sequence,
+        timestamp=timestamp,
+        score=fields.get("score"),
+        asset_pair=fields.get("asset_pair"),
+        wallet_id_hash=wallet_id_hash,
+        consumer_address_hash=_hash_address(consumer_raw) if consumer_raw else None,
+        old_threshold=fields.get("old_threshold"),
+        new_threshold=fields.get("new_threshold"),
+    )
+
+
+def persist_event(event: ContractEvent, session_factory: sessionmaker) -> None:
+    """Append *event* to the ``soroban_contract_events`` table."""
+    with session_factory() as session:
+        session.add(
+            ContractEventRecord(
+                event_type=event.event_type,
+                ledger_sequence=event.ledger_sequence,
+                timestamp=event.timestamp.isoformat(),
+                score=event.score,
+                asset_pair=event.asset_pair,
+                wallet_id_hash=event.wallet_id_hash,
+                consumer_address_hash=event.consumer_address_hash,
+                old_threshold=event.old_threshold,
+                new_threshold=event.new_threshold,
+            )
+        )
+        session.commit()
+
+
+def get_watermark(contract_id: str, session_factory: sessionmaker) -> int:
+    """Return the last-processed ledger sequence for *contract_id* (0 if none)."""
+    with session_factory() as session:
+        row = session.get(_WatermarkRecord, contract_id)
+        return row.ledger_sequence if row is not None else 0
+
+
+def set_watermark(contract_id: str, ledger_sequence: int, session_factory: sessionmaker) -> None:
+    """Persist the last-processed ledger sequence for *contract_id*."""
+    with session_factory() as session:
+        row = session.get(_WatermarkRecord, contract_id)
+        if row is None:
+            session.add(_WatermarkRecord(contract_id=contract_id, ledger_sequence=ledger_sequence))
+        else:
+            row.ledger_sequence = ledger_sequence
+        session.commit()
+
+
+def check_stale_score_alert(
+    event: ContractEvent,
+    current_score: int | None,
+    dispatcher: Any,
+    threshold: int = STALE_SCORE_ALERT_THRESHOLD,
+) -> bool:
+    """Fire a stale-score-consumption alert if *event* is a ``score_read``
+    whose consumed score has since drifted from *current_score* by more than
+    *threshold* points. Returns whether the alert fired.
+    """
+    if event is None or event.event_type != "score_read":
+        return False
+    if current_score is None or event.score is None:
+        return False
+
+    delta = abs(current_score - event.score)
+    if delta <= threshold:
+        return False
+
+    dispatcher.dispatch(
+        event,
+        {
+            "delta": delta,
+            "stale_consumption": True,
+            "consumed_score": event.score,
+            "current_score": current_score,
+            "wallet_id_hash": event.wallet_id_hash,
+        },
+    )
+    return True
+
+
+class ScoreOracleEventListener:
+    """Polls a Soroban score-oracle contract, persisting events and raising
+    stale-score-consumption alerts.
+
+    Distinct from :class:`SorobanEventListener` (governance/pause polling
+    above): this listener tracks a per-contract watermark for resumable
+    polling and can run its poll loop on a background thread via
+    :meth:`start_background` / :meth:`stop`.
+    """
+
+    def __init__(
+        self,
+        contract_id: str,
+        db_url: str,
+        rpc_url: str | None = None,
+        dispatcher: Any | None = None,
+        current_score_fn: Callable[[str], int | None] | None = None,
+        stale_threshold: int = STALE_SCORE_ALERT_THRESHOLD,
+        poll_interval: float = 5.0,
+    ) -> None:
+        self.contract_id = contract_id
+        self.rpc_url = rpc_url or config.SOROBAN_RPC_URL
+        self.poll_interval = poll_interval
+        self._session_factory = _get_session_factory(db_url)
+        self._dispatcher = dispatcher
+        self._current_score_fn = current_score_fn
+        self._stale_threshold = stale_threshold
+        self._stop_event = threading.Event()
+        self._thread: threading.Thread | None = None
+
+    def _fetch_raw_events(self) -> list[dict]:
+        """Fetch raw events since the last watermark via Soroban RPC getEvents."""
+        watermark = get_watermark(self.contract_id, self._session_factory)
+        payload = {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "getEvents",
+            "params": {
+                "startLedger": watermark,
+                "filters": [{"type": "contract", "contractIds": [self.contract_id]}],
+                "pagination": {"limit": 200},
+            },
+        }
+        resp = requests.post(self.rpc_url, json=payload, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+        return data.get("result", {}).get("events", [])
+
+    def process_batch(self, raw_events: list[dict]) -> list[ContractEvent]:
+        """Parse, persist, and alert on a batch of raw events; advance the
+        watermark to the highest ledger sequence seen. Returns the parsed
+        events (unrecognised raw events are silently skipped)."""
+        parsed_events: list[ContractEvent] = []
+        max_ledger: int | None = None
+
+        for raw in raw_events:
+            event = parse_contract_event(raw)
+            if event is None:
+                continue
+
+            persist_event(event, self._session_factory)
+            parsed_events.append(event)
+            max_ledger = event.ledger_sequence if max_ledger is None else max(
+                max_ledger, event.ledger_sequence
+            )
+
+            if (
+                event.event_type == "score_read"
+                and self._dispatcher is not None
+                and self._current_score_fn is not None
+            ):
+                current_score = self._current_score_fn(event.wallet_id_hash)
+                check_stale_score_alert(
+                    event, current_score, self._dispatcher, threshold=self._stale_threshold
+                )
+
+        if max_ledger is not None:
+            set_watermark(self.contract_id, max_ledger, self._session_factory)
+        return parsed_events
+
+    def start_background(self) -> threading.Thread:
+        """Start the poll loop on a daemon background thread."""
+        self._stop_event.clear()
+        self._thread = threading.Thread(target=self._run_loop, daemon=True)
+        self._thread.start()
+        return self._thread
+
+    def stop(self) -> None:
+        """Signal the background poll loop to stop after its current iteration."""
+        self._stop_event.set()
+
+    def _run_loop(self) -> None:
+        while not self._stop_event.is_set():
+            try:
+                self.process_batch(self._fetch_raw_events())
+            except Exception:
+                logger.exception("ScoreOracleEventListener: poll error")
+            self._stop_event.wait(self.poll_interval)
 
 _DEFAULT_POLL_INTERVAL = 5  # seconds (≈1 Stellar ledger close)
 

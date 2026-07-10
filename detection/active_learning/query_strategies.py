@@ -232,8 +232,6 @@ class CoresetHybrid(BaseQueryStrategy):
         labelled_pool: pd.DataFrame | None = None,
         alpha: float | None = None,
     ) -> list[str]:
-        from detection.active_learning.coreset_selector import CoresetSelector
-
         if alpha is None:
             alpha = float(getattr(config, "ACTIVE_LEARNING_ALPHA", 0.5))
 
@@ -255,10 +253,6 @@ class CoresetHybrid(BaseQueryStrategy):
         labelled_X: np.ndarray | None = None
         if labelled_pool is not None and len(labelled_pool) > 0:
             labelled_X = labelled_pool[_feature_cols(labelled_pool)].astype(float).fillna(0.0).values.astype("float32")
-
-        selector = CoresetSelector(
-            min_distance=float(getattr(config, "CORESET_MIN_DISTANCE", 0.1)),
-        )
 
         # We need distance scores for ALL candidates, not just the top-k.
         # Compute min-dist from each candidate to the labelled set.

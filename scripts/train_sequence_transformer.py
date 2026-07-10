@@ -43,7 +43,6 @@ from __future__ import annotations
 import argparse
 import math
 import os
-import sys
 import time
 
 import numpy as np
@@ -108,7 +107,7 @@ class TradeSequenceDataset(Dataset if _TORCH_AVAILABLE else object):  # type: ig
 def _collate_fn(
     batch: list[tuple[list[TradeEvent], int]],
     model: TradeSequenceTransformer,
-) -> tuple["torch.Tensor", "torch.Tensor", "torch.Tensor"]:
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """Collate variable-length sequences into a padded batch.
 
     Returns
@@ -117,7 +116,7 @@ def _collate_fn(
     mask : torch.Tensor of shape (batch, max_seq) — True = padding
     labels : torch.Tensor of shape (batch,)
     """
-    sequences, labels = zip(*batch)
+    sequences, labels = zip(*batch, strict=True)
     max_seq = max(len(s) for s in sequences)
     input_dim = 3 + model.num_pairs  # base dims + one-hot pairs
     batch_size = len(sequences)
@@ -313,9 +312,9 @@ class _SequenceClassifier(nn.Module):
 
     def forward(
         self,
-        x: "torch.Tensor",
-        mask: "torch.Tensor",
-    ) -> "torch.Tensor":
+        x: torch.Tensor,
+        mask: torch.Tensor,
+    ) -> torch.Tensor:
         embedding = self.encoder(x, mask)  # (batch, embed_dim)
         return self.head(embedding).squeeze(-1)  # (batch,)
 

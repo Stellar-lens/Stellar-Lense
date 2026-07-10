@@ -11,7 +11,7 @@ This module extracts these patterns from raw Horizon effects and trade history.
 from __future__ import annotations
 
 import math
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TypedDict
 
 import numpy as np
@@ -31,7 +31,7 @@ class Effect(TypedDict, total=False):
 
 
 MIN_TRADES_FOR_INTERVAL_CV = 5
-STELLAR_GENESIS_TIMESTAMP = datetime(2015, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+STELLAR_GENESIS_TIMESTAMP = datetime(2015, 1, 1, 0, 0, 0, tzinfo=UTC)
 
 
 def extract_bot_fingerprint(
@@ -222,7 +222,7 @@ def _is_plausible_timestamp(ts: datetime) -> bool:
     if not isinstance(ts, datetime):
         return False
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     future_bound = now.replace(microsecond=0) + pd.Timedelta(seconds=60)
 
     return STELLAR_GENESIS_TIMESTAMP <= ts <= future_bound

@@ -10,7 +10,7 @@ Attributes:
     ROUND_TRIP_WINDOW_HOURS: Time window for detecting round-trip path flows.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import TypedDict
 
 import pandas as pd

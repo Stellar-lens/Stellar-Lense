@@ -5,7 +5,6 @@ import pytest
 
 from monitoring.drift_detector import CovarianceShiftDetector
 
-
 RNG = np.random.default_rng(42)
 
 

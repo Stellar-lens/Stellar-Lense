@@ -19,9 +19,9 @@ import time
 
 from config import config
 from detection.model_inference import RiskScorer
-from streaming.kafka_worker import KafkaWorker
 from streaming.alert_dispatcher import AlertDispatcher
 from streaming.feature_buffer import FeatureBuffer
+from streaming.kafka_worker import KafkaWorker
 from streaming.streaming_scorer import StreamingScorer
 from utils.logging import get_logger
 

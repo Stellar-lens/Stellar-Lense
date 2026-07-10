@@ -12,26 +12,23 @@ Architecture:
     Per-partition workers compute: per-pair Benford, trade patterns (partition-specific)
     Aggregator consumer computes: cross-pair statistics (all partitions)
     → Features fed into ML model for final risk score
-"""Cross-DEX coordination detection between SDEX and AMM liquidity pools.
 
-Computes cross-venue features and coordination graphs that detect wash traders
+Also includes cross-DEX coordination detection between SDEX and AMM liquidity
+pools: cross-venue features and coordination graphs that detect wash traders
 operating across both the Stellar SDEX (order book) and AMM pool venues.
 """
 
 from __future__ import annotations
 
+import bisect
 import json
-from typing import TYPE_CHECKING
 
+import networkx as nx
+import numpy as np
 import pandas as pd
 from kafka import KafkaConsumer
-from kafka.errors import KafkaError
 
-from config import config
 from utils.logging import get_logger
-
-if TYPE_CHECKING:
-    from kafka.structs import TopicPartition
 
 logger = get_logger(__name__)
 
@@ -90,7 +87,7 @@ class CrossVenueAggregator:
                 logger.debug("No messages in batch %d", batch_idx)
                 continue
 
-            for topic_partition, records in messages.items():
+            for _topic_partition, records in messages.items():
                 for record in records:
                     payload = record.value
                     self._buffer_trade(payload)
@@ -275,11 +272,7 @@ def compute_cross_pair_features(
         "cross_pair_volume_concentration": float(concentration),
         "venue_diversity_score": float(diversity),
     }
-import bisect
 
-import networkx as nx
-import numpy as np  # noqa: F401 — kept for potential downstream use
-import pandas as pd
 
 # ---------------------------------------------------------------------------
 # Cross-venue feature computation

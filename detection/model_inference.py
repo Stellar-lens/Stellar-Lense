@@ -42,7 +42,7 @@ import pandas as pd
 
 from config import config
 from detection.conformal import ConformalCalibrator
-from detection.differential_privacy import laplace_scale, add_laplace_noise
+from detection.differential_privacy import add_laplace_noise, laplace_scale
 from detection.list_override import ListOverride
 from detection.model_training import (
     FEATURE_COLUMNS_EXCLUDE,
@@ -411,7 +411,20 @@ class RiskScorer:
                 raise RuntimeError(msg)
 
         X = feature_row[feature_cols].to_frame().T.astype(float)
-        return [model.predict_proba(X)[0, 1] for model in self.models.values()]
+
+        probs = []
+        for model in self.models.values():
+            # Align to each model's fitted schema: newer scikit-learn/XGBoost/
+            # LightGBM versions raise if X has columns the model wasn't fit on
+            # (e.g. features added to the pipeline after this model was
+            # trained). The feature-schema-hash check above already guards
+            # against *meaningful* drift when metadata is present; this just
+            # keeps scoring robust when it isn't (or columns merely differ in
+            # a way the model doesn't need).
+            model_features = getattr(model, "feature_names_in_", None)
+            X_model = X.reindex(columns=model_features, fill_value=0.0) if model_features is not None else X
+            probs.append(model.predict_proba(X_model)[0, 1])
+        return probs
 
     def _check_override(self, feature_row: pd.Series) -> dict | None:
         wallet = feature_row.get("wallet") if isinstance(feature_row, pd.Series) else None
@@ -431,12 +444,13 @@ class RiskScorer:
         self,
         feature_row: pd.Series,
         labelled_count: int | None = None,
+        caller_id: str = "internal",
     ) -> dict:  # type: ignore[override]
         """Compute the LedgerLens Risk Score for a single feature row."""
         wallet = str(feature_row.get("wallet", ""))
         with _tracer.start_as_current_span("model.scored") as span:
             span.set_attribute("wallet.id", hash_span_id(wallet) if wallet else "unknown")
-            result = self._score_impl(feature_row, labelled_count)
+            result = self._score_impl(feature_row, labelled_count, caller_id)
             span.set_attribute("model.score", result.get("score", -1))
             return result
 
@@ -444,6 +458,7 @@ class RiskScorer:
         self,
         feature_row: pd.Series,
         labelled_count: int | None = None,
+        caller_id: str = "internal",
     ) -> dict:
         """Internal scoring logic (called from score() inside an OTel span)."""
         override = self._check_override(feature_row)

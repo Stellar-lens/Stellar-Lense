@@ -32,7 +32,6 @@ import time
 from pathlib import Path
 from typing import Any
 
-import numpy as np
 import optuna
 import pandas as pd
 from lightgbm import LGBMClassifier

@@ -28,7 +28,7 @@ logger = get_logger(__name__)
 _CORESET_MIN_DISTANCE_DEFAULT = 0.1
 
 
-def _build_hnsw_index(vectors: np.ndarray) -> "hnswlib.Index":
+def _build_hnsw_index(vectors: np.ndarray) -> hnswlib.Index:
     dim = vectors.shape[1]
     index = hnswlib.Index(space="l2", dim=dim)
     index.init_index(max_elements=len(vectors), ef_construction=200, M=16)
@@ -39,7 +39,7 @@ def _build_hnsw_index(vectors: np.ndarray) -> "hnswlib.Index":
 
 def _nearest_distances_hnsw(
     query_vectors: np.ndarray,
-    index: "hnswlib.Index",
+    index: hnswlib.Index,
 ) -> np.ndarray:
     """Return the L2 distance to the nearest neighbour in *index* for each query."""
     labels, distances = index.knn_query(query_vectors, k=1)

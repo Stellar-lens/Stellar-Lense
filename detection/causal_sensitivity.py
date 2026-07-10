@@ -21,7 +21,6 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-
 EVALUE_LOW_CONFIDENCE_THRESHOLD = 2.0
 
 

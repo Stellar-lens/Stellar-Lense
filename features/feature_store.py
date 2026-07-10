@@ -2,13 +2,12 @@
 
 import hashlib
 import logging
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 import msgpack
 import redis
 from prometheus_client import Counter
-
-from config import config
 
 FEATURE_STORE_TTL_SECONDS = 300
 SCHEMA_VERSION = "1"
@@ -72,7 +71,7 @@ class WalletFeatureStore:
             pipe.hget(key, "data")
         cached_values = pipe.execute()
 
-        for key, cached in zip(keys.keys(), cached_values):
+        for key, cached in zip(keys.keys(), cached_values, strict=True):
             wallet, pair = keys[key]
             if cached:
                 try:

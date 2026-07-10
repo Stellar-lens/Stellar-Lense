@@ -11,20 +11,21 @@ Usage:
     python tests/fuzz/generate_corpus.py
 """
 
-import json
-import sys
 import io
-import time
+import json
 import os
+import sys
+import time
+from datetime import UTC, datetime
 from pathlib import Path
-from datetime import datetime, UTC
 
 # Add repo root to path so we can import modules
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 import fastavro
-from ingestion.data_models import Asset, Trade
-from tests.factories import WashTradeFactory, CleanTradeFactory, RingTradeFactory
+
+from ingestion.data_models import Trade
+from tests.factories import CleanTradeFactory, RingTradeFactory, WashTradeFactory
 
 
 def _trade_to_record(trade: Trade) -> dict:

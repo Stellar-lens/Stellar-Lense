@@ -16,7 +16,7 @@ os.environ.setdefault("BENFORD_WINDOWS_HOURS", "1,4,24,168,720")
 os.environ.setdefault("MIN_TRADES_FOR_SCORING", "20")
 
 # Hypothesis configuration for property-based tests (issue #205)
-from hypothesis import settings, HealthCheck
+from hypothesis import HealthCheck, settings
 
 # Configure Hypothesis for CI environment
 settings.register_profile(
@@ -34,6 +34,7 @@ settings.register_profile(
 
 # Select profile based on environment
 import os
+
 if os.environ.get("CI") or os.environ.get("GITHUB_ACTIONS"):
     settings.load_profile("ci")
 else:

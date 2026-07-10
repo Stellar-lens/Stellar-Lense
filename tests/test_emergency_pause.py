@@ -1,12 +1,8 @@
 """Tests for emergency pause watchdog and contract client methods (issue #241)."""
 
-import time
-from unittest.mock import MagicMock, call, patch
-
-import pytest
+from unittest.mock import MagicMock, patch
 
 from monitoring.emergency_watchdog import EmergencyWatchdog
-
 
 _PAUSE_CONTRACT = "CPAUSE5678"
 _SIGNING_KEY = "SAUQSDM4BPSOWVJJM7RAHPSGXDX5YLRYNZCZ5QP33EVB6WDAAVJJRJHG"

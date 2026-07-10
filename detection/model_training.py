@@ -54,6 +54,8 @@ FEATURE_COLUMNS_EXCLUDE = {"wallet", "label", "profile"}
 PSI_N_BINS = 10
 PSI_EPSILON = 1e-4
 
+LABEL_DISTRIBUTION_BASELINE_PATH = os.path.join(config.MODEL_DIR, "label_distribution_baseline.json")
+
 # ---------------------------------------------------------------------------
 # Feature schema validation helpers for incremental training
 # ---------------------------------------------------------------------------
@@ -933,41 +935,6 @@ def save_training_artifacts(
     logger.info("Saved model metadata to %s", metadata_path)
 
 
-def save_training_artifacts(
-    training_output: dict,
-    data_path: str,
-    model_dir: str | None = None,
-) -> None:
-    """Write metrics.json and model_metadata.json to the model directory."""
-    model_dir = model_dir or config.MODEL_DIR
-    os.makedirs(model_dir, exist_ok=True)
-
-    results = training_output["results"]
-    feature_columns = training_output["feature_columns"]
-    feature_distributions = training_output.get("feature_distributions")
-
-    metrics_path = os.path.join(model_dir, "metrics.json")
-    with open(metrics_path, "w") as f:
-        json.dump({name: result["metrics"] for name, result in results.items()}, f, indent=2)
-
-    metadata = {
-        "trained_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
-        "data_path": data_path,
-        "n_training_rows": training_output["n_train"],
-        "n_test_rows": training_output["n_test"],
-        "feature_columns": feature_columns,
-        "feature_schema_hash": compute_feature_schema_hash(feature_columns),
-        "model_names": list(results.keys()),
-        "python_version": sys.version.split()[0],
-        "ledgerlens_version": "0.2.0",
-        "feature_distributions": feature_distributions,
-    }
-
-    metadata_path = os.path.join(model_dir, "model_metadata.json")
-    with open(metadata_path, "w") as f:
-        json.dump(metadata, f, indent=2)
-
-
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train the LedgerLens ensemble classifiers")
     parser.add_argument("--data-path", required=True)
@@ -1045,7 +1012,11 @@ def main() -> None:
     if os.path.exists(raw_trades_path):
         logger.info("Running offline Benford window optimization per asset...")
         try:
-            from detection.benford_window_optimizer import optimize_windows_for_asset, estimate_trades_per_hour, get_candidate_grid
+            from detection.benford_window_optimizer import (
+                estimate_trades_per_hour,
+                get_candidate_grid,
+                optimize_windows_for_asset,
+            )
             trades_df = pd.read_parquet(raw_trades_path)
             assets = set()
             if "base_asset" in trades_df.columns:
@@ -1256,7 +1227,6 @@ def main() -> None:
     if adv_training_enabled:
         try:
             from detection.adversarial.robustness import run_adversarial_training
-            from detection.model_inference import RiskScorer
 
             logger.info(
                 "ADV_TRAINING_ENABLED=true — starting FGSM adversarial training loop "
@@ -1407,8 +1377,13 @@ def main() -> None:
                     ),
                     "dataset_fingerprint": data_sha,
                 }
+                per_model_metadata_path = os.path.join(
+                    model_dir, f"model_metadata_{model_name}.json"
+                )
+                with open(per_model_metadata_path, "w") as _pf:
+                    json.dump(per_model_meta, _pf)
                 card_path = os.path.join(model_dir, f"MODEL_CARD_{model_name}_{version}.md")
-                generate_model_card(metadata_path, card_path)
+                generate_model_card(per_model_metadata_path, card_path)
                 logger.info("Model card written to %s", card_path)
     except Exception as _mc_exc:
         logger.warning("Model card generation skipped: %s", _mc_exc)

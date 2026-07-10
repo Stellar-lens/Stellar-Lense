@@ -13,7 +13,7 @@ from __future__ import annotations
 import json
 import logging
 import urllib.request
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +44,7 @@ def get_asset_supply(
         Circulating supply as a float, or ``None`` if unavailable.
     """
     cache_key = f"ledgerlens:asset_supply:{asset_code}:{asset_issuer}"
-    now_utc = datetime.now(timezone.utc)
+    now_utc = datetime.now(UTC)
 
     # --- check Redis cache ---
     if redis_client is not None:

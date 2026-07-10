@@ -17,7 +17,6 @@ Assumptions:
 
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -28,7 +27,7 @@ from sklearn.preprocessing import StandardScaler
 from utils.logging import get_logger
 
 if TYPE_CHECKING:
-    from detection.model_inference import RiskScorer
+    pass
 
 logger = get_logger(__name__)
 

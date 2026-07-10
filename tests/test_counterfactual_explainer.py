@@ -16,7 +16,6 @@ Covers:
 import json
 import time
 
-import numpy as np
 import pandas as pd
 import pytest
 
@@ -24,13 +23,11 @@ from detection.counterfactual_explainer import (
     IMMUTABLE_FEATURES,
     NON_NEGATIVE_FEATURES,
     CounterfactualExplainer,
-    CounterfactualResult,
     _interpret_action,
 )
 from detection.model_inference import RiskScorer
 from detection.model_training import save_models, train_models
 from scripts.generate_synthetic_dataset import generate_synthetic_dataset
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -296,7 +293,7 @@ class TestInterpretAction:
 class TestForensicReportIntegration:
     def test_forensic_report_accepts_counterfactual_result(self, scorer_and_data, explainer):
         """ForensicReport can hold and serialise a CounterfactualResult."""
-        from detection.forensic_report import ForensicReport, TradeEvidence
+        from detection.forensic_report import ForensicReport
 
         scorer, df = scorer_and_data
         row = _high_risk_row(scorer, df)
