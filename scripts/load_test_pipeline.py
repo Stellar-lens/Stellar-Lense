@@ -87,9 +87,13 @@ def _synthetic_wallet(idx: int) -> str:
     Addresses use the GLOAD prefix so they are trivially distinguishable from
     real Stellar accounts (which start with G but never GLOAD).
     """
-    seed = hashlib.sha256(f"load-test-wallet-{idx}".encode()).hexdigest()
+    # GLOAD (5 chars) + a 51-char suffix = 56 chars total, matching a real
+    # Stellar public key's length. sha512 gives 128 hex digits, enough for
+    # the 51 * 2 = 102 hex digits this consumes (sha256's 64 digits ran out
+    # partway through, since the loop originally assumed 100 were available).
+    seed = hashlib.sha512(f"load-test-wallet-{idx}".encode()).hexdigest()
     suffix = "".join(_WALLET_ALPHABET[int(seed[i : i + 2], 16) % len(_WALLET_ALPHABET)]
-                     for i in range(0, 100, 2))[:50]
+                     for i in range(0, 102, 2))[:51]
     return f"GLOAD{suffix}"
 
 
@@ -161,14 +165,19 @@ class TokenBucket:
 
         Returns 0.0 when tokens are available immediately.  Callers are
         responsible for sleeping the returned duration before sending.
+
+        Tokens are allowed to go negative (debt) rather than being clamped to
+        zero on a deficit — clamping loses track of how much was overdrawn,
+        so a caller that sleeps exactly the returned delay and calls again
+        would find the bucket "fully" refilled from empty and get 0 delay,
+        oscillating between full-delay and zero-delay calls and averaging
+        out to roughly double the target rate instead of limiting to it.
         """
         self._refill()
-        if self._tokens >= n:
-            self._tokens -= n
+        self._tokens -= n
+        if self._tokens >= 0:
             return 0.0
-        deficit = n - self._tokens
-        self._tokens = 0.0
-        return deficit / self.rate
+        return -self._tokens / self.rate
 
     async def wait_and_consume(self, n: int = 1) -> None:
         """Async wrapper — refill, then await the required delay if any."""
@@ -206,7 +215,11 @@ class Metrics:
     def percentile(self, samples: list[float], pct: float) -> float:
         if not samples:
             return float("nan")
-        return float(np.percentile(samples, pct))
+        # "higher" (nearest-rank, rounding up) rather than numpy's default
+        # linear interpolation: for a tail-latency SLO gate we want a single
+        # slow outlier among many fast samples to actually show up at p99,
+        # not get diluted toward the fast samples by interpolation.
+        return float(np.percentile(samples, pct, method="higher"))
 
     def throughput(self) -> float:
         elapsed = (self.end_time or time.monotonic()) - self.start_time

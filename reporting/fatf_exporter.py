@@ -280,7 +280,10 @@ def export_ivms101(
         "transactionReference": _build_transaction_reference(forensic_report),
     }
 
-    _validate(doc)
+    try:
+        _validate(doc)
+    except jsonschema.ValidationError as exc:
+        raise ExportValidationError(f"IVMS101 export failed schema validation: {exc.message}") from exc
     return doc
 
 

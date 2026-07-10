@@ -98,6 +98,16 @@ class AlertDispatcher:
             self._deliver_websocket(wallet, risk_score, pair_id)
 
     def _deliver_stdout(self, wallet: str, risk_score: dict, pair_id: str) -> None:
+        # Human-readable line on real stdout — this is what the "stdout" channel
+        # name promises, and what operators tailing the process expect to see.
+        print(
+            f"[ALERT] wallet={wallet} pair={pair_id}"
+            f" score={risk_score['score']}"
+            f" benford={risk_score.get('benford_flag')}"
+            f" ml={risk_score.get('ml_flag')}"
+            f" confidence={risk_score.get('confidence')}"
+        )
+        # Structured JSON log for aggregation/observability tooling.
         logger.info("Alert dispatched", extra={
             "wallet": wallet,
             "pair_id": pair_id,

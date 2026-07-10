@@ -121,7 +121,7 @@ class TestDANNOutputAgreement:
             tq.fuse_modules(wrapper_q, [["feature_extractor.2", "feature_extractor.3"]], inplace=True)
         except Exception:
             pass
-        wrapper_q.qconfig = tq.get_default_qconfig("fbgemm")
+        wrapper_q.qconfig = tq.get_default_qconfig(torch.backends.quantized.engine)
         tq.prepare(wrapper_q, inplace=True)
         rng = np.random.default_rng(42)
         calib = torch.tensor(rng.standard_normal((64, input_dim)).astype(np.float32))

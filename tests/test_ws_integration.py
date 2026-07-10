@@ -181,9 +181,9 @@ async def test_valid_jwt_connects_successfully(ws_server):
     uri = f"ws://127.0.0.1:{port}"
     headers = {"Authorization": f"Bearer {token}"}
 
-    async with websockets.connect(uri, extra_headers=headers) as websocket:
+    async with websockets.connect(uri, additional_headers=headers) as websocket:
         # If we get here, connection was successful (HTTP 101)
-        assert websocket.open
+        assert websocket.state == websockets.State.OPEN
         # Send a ping to verify connection is working
         await websocket.ping()
 
@@ -198,12 +198,14 @@ async def test_expired_jwt_returns_401(ws_server):
     uri = f"ws://127.0.0.1:{port}"
     headers = {"Authorization": f"Bearer {token}"}
 
-    with pytest.raises(websockets.exceptions.InvalidStatusCode) as exc_info:
-        async with websockets.connect(uri, extra_headers=headers):
-            pass
+    # Server accepts the handshake then closes with 1008 (policy violation)
+    # rather than rejecting at the HTTP level, so the client sees the
+    # connection open successfully followed by a ConnectionClosedError.
+    async with websockets.connect(uri, additional_headers=headers) as websocket:
+        with pytest.raises(websockets.exceptions.ConnectionClosedError) as exc_info:
+            await websocket.recv()
 
-    # Should receive 1008 (policy violation) close code instead of HTTP 101
-    assert exc_info.value.status_code == 1008
+    assert exc_info.value.code == 1008
 
 
 @pytest.mark.asyncio
@@ -216,12 +218,11 @@ async def test_wrong_issuer_claim_rejected(ws_server):
     uri = f"ws://127.0.0.1:{port}"
     headers = {"Authorization": f"Bearer {token}"}
 
-    with pytest.raises(websockets.exceptions.InvalidStatusCode) as exc_info:
-        async with websockets.connect(uri, extra_headers=headers):
-            pass
+    async with websockets.connect(uri, additional_headers=headers) as websocket:
+        with pytest.raises(websockets.exceptions.ConnectionClosedError) as exc_info:
+            await websocket.recv()
 
-    # Should receive 1008 (policy violation) close code
-    assert exc_info.value.status_code == 1008
+    assert exc_info.value.code == 1008
 
 
 @pytest.mark.asyncio
@@ -234,12 +235,12 @@ async def test_missing_scores_read_scope_rejected(ws_server):
     uri = f"ws://127.0.0.1:{port}"
     headers = {"Authorization": f"Bearer {token}"}
 
-    with pytest.raises(websockets.exceptions.InvalidStatusCode) as exc_info:
-        async with websockets.connect(uri, extra_headers=headers):
-            pass
+    async with websockets.connect(uri, additional_headers=headers) as websocket:
+        with pytest.raises(websockets.exceptions.ConnectionClosedError) as exc_info:
+            await websocket.recv()
 
     # Should receive 1008 (policy violation) close code
-    assert exc_info.value.status_code == 1008
+    assert exc_info.value.code == 1008
 
 
 @pytest.mark.asyncio
@@ -254,7 +255,7 @@ async def test_subscribe_to_wallet_channel_successfully(ws_server):
     wallet_id = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF"
     channel = f"wallet/{wallet_id}"
 
-    async with websockets.connect(uri, extra_headers=headers) as websocket:
+    async with websockets.connect(uri, additional_headers=headers) as websocket:
         # Send subscribe message
         subscribe_msg = {"type": "subscribe", "channels": [channel]}
         await websocket.send(json.dumps(subscribe_msg))
@@ -302,7 +303,7 @@ async def test_wallet_scoped_jwt_rejected_for_all_channel(ws_server):
     uri = f"ws://127.0.0.1:{port}"
     headers = {"Authorization": f"Bearer {token}"}
 
-    async with websockets.connect(uri, extra_headers=headers) as websocket:
+    async with websockets.connect(uri, additional_headers=headers) as websocket:
         # Try to subscribe to 'all' channel (should be rejected)
         subscribe_msg = {"type": "subscribe", "channels": ["all"]}
         await websocket.send(json.dumps(subscribe_msg))
@@ -337,7 +338,7 @@ async def test_rate_limit_error_after_threshold(ws_server):
     ws_module.config.WS_RATE_LIMIT_MSGS_PER_SECOND = 5  # 5 messages per second
 
     try:
-        async with websockets.connect(uri, extra_headers=headers) as websocket:
+        async with websockets.connect(uri, additional_headers=headers) as websocket:
             # Subscribe to channel
             subscribe_msg = {"type": "subscribe", "channels": [channel]}
             await websocket.send(json.dumps(subscribe_msg))
@@ -393,11 +394,11 @@ async def test_connection_without_token_rejected(ws_server):
     port, _, _ = ws_server
     uri = f"ws://127.0.0.1:{port}"
 
-    with pytest.raises(websockets.exceptions.InvalidStatusCode) as exc_info:
-        async with websockets.connect(uri):
-            pass
+    async with websockets.connect(uri) as websocket:
+        with pytest.raises(websockets.exceptions.ConnectionClosedError) as exc_info:
+            await websocket.recv()
 
-    assert exc_info.value.status_code == 1008
+    assert exc_info.value.code == 1008
 
 
 @pytest.mark.asyncio
@@ -409,7 +410,7 @@ async def test_invalid_channel_format_rejected(ws_server):
     uri = f"ws://127.0.0.1:{port}"
     headers = {"Authorization": f"Bearer {token}"}
 
-    async with websockets.connect(uri, extra_headers=headers) as websocket:
+    async with websockets.connect(uri, additional_headers=headers) as websocket:
         # Try to subscribe to invalid channel
         subscribe_msg = {"type": "subscribe", "channels": ["invalid-channel-format"]}
         await websocket.send(json.dumps(subscribe_msg))

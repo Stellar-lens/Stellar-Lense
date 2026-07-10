@@ -31,6 +31,7 @@ def test_compute_ohlcv_features_expected_values_1m_known_5_trades():
     v = sum(trades["amount"].tolist())
 
     price_range_ratio = (h - l) / o
+    candle_body_ratio = (c - o) / (h - l)
 
     vwap = float((trades["price"] * trades["amount"]).sum() / v)
     vwap_deviation = (c - vwap) / vwap
@@ -42,8 +43,9 @@ def test_compute_ohlcv_features_expected_values_1m_known_5_trades():
     feats = compute_ohlcv_features(trades, resolutions=["1m"])
 
     assert feats["price_range_ratio_1m"] == pytest.approx(price_range_ratio)
-    # If high == low, body ratio should be NaN per denom=0 => our implementation yields NaN
-    assert math.isnan(feats["candle_body_ratio_1m"])
+    # high (14) != low (10) here, so denom != 0 and this is a normal ratio,
+    # not the high==low NaN edge case.
+    assert feats["candle_body_ratio_1m"] == pytest.approx(candle_body_ratio)
     assert feats["vwap_deviation_1m"] == pytest.approx(vwap_deviation)
     assert math.isnan(feats["volume_spike_ratio_1m"])
 

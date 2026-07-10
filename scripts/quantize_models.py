@@ -415,8 +415,15 @@ def quantise_dann_int8(
     )
     if first_w is not None:
         input_dim = first_w.shape[1]
+    # Infer hidden_dim/embedding_dim from the checkpoint too — defaulting to
+    # DANNEncoder's constructor defaults (128/64) causes a state_dict size
+    # mismatch whenever the checkpoint was trained with different dims.
+    hidden_w = state.get("feature_extractor.0.weight")
+    embed_w = state.get("feature_extractor.2.weight")
+    hidden_dim = hidden_w.shape[0] if hidden_w is not None else 128
+    embedding_dim = embed_w.shape[0] if embed_w is not None else 64
 
-    model = DANNEncoder(input_dim=input_dim)
+    model = DANNEncoder(input_dim=input_dim, hidden_dim=hidden_dim, embedding_dim=embedding_dim)
     model.load_state_dict(state)
     model.eval()
 
@@ -431,7 +438,12 @@ def quantise_dann_int8(
     except Exception:
         pass  # Fusion is best-effort
 
-    wrapper.qconfig = tq.get_default_qconfig("fbgemm")  # CPU-optimised
+    # Use whichever quantized backend is actually active on this machine —
+    # hardcoding "fbgemm" silently produces a model that can be saved but
+    # raises NotImplementedError on inference when the runtime engine
+    # (torch.backends.quantized.engine) is something else, e.g. "x86" or
+    # "qnnpack".
+    wrapper.qconfig = tq.get_default_qconfig(torch.backends.quantized.engine)
     tq.prepare(wrapper, inplace=True)
 
     # Calibration pass
@@ -547,9 +559,19 @@ def quantise_gnn_int8(
 
 def _get_prunable_layers(model: nn.Module) -> list[tuple[nn.Module, str]]:
     """Return (module, param_name) pairs for all prunable Linear/Conv layers."""
+    linear_types: tuple[type, ...] = (nn.Linear,)
+    try:
+        # torch_geometric.nn.SAGEConv (used by the GNN encoder) wraps its
+        # weights in its own Linear class, which is not an nn.Linear subclass.
+        from torch_geometric.nn.dense.linear import Linear as _PygLinear
+
+        linear_types = (nn.Linear, _PygLinear)
+    except ImportError:
+        pass
+
     layers = []
     for module in model.modules():
-        if isinstance(module, nn.Linear):
+        if isinstance(module, linear_types):
             layers.append((module, "weight"))
         elif isinstance(module, nn.Conv2d):
             layers.append((module, "weight"))
@@ -711,7 +733,11 @@ def prune_dann_encoder(
             None,
         )
         input_dim = first_w.shape[1] if first_w is not None else 37
-        m = DANNEncoder(input_dim=input_dim)
+        hidden_w = state.get("feature_extractor.0.weight")
+        embed_w = state.get("feature_extractor.2.weight")
+        hidden_dim = hidden_w.shape[0] if hidden_w is not None else 128
+        embedding_dim = embed_w.shape[0] if embed_w is not None else 64
+        m = DANNEncoder(input_dim=input_dim, hidden_dim=hidden_dim, embedding_dim=embedding_dim)
         m.load_state_dict(state)
         return m
 
@@ -797,7 +823,11 @@ def benchmark_dann(model_dir: str, input_dim: int = 37) -> dict[str, float]:
             None,
         )
         actual_dim = first_w.shape[1] if first_w is not None else input_dim
-        m = DANNEncoder(input_dim=actual_dim)
+        hidden_w = state.get("feature_extractor.0.weight")
+        embed_w = state.get("feature_extractor.2.weight")
+        hidden_dim = hidden_w.shape[0] if hidden_w is not None else 128
+        embedding_dim = embed_w.shape[0] if embed_w is not None else 64
+        m = DANNEncoder(input_dim=actual_dim, hidden_dim=hidden_dim, embedding_dim=embedding_dim)
         m.load_state_dict(state)
         m.eval()
 

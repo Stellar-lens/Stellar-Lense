@@ -16,7 +16,7 @@ from detection.feature_engineering import (
     compute_trade_pattern_features,
     compute_volume_timing_features,
 )
-from tests.factories import make_clean_trades
+from tests.factories import CleanTradeFactory
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -24,9 +24,23 @@ from tests.factories import make_clean_trades
 
 
 def _sample_trades() -> pd.DataFrame:
-    """Use factory to generate realistic sample trades."""
-    trades = make_clean_trades(n=2)
-    return pd.DataFrame(trades)
+    """Two trades between fixed wallets "A" and "B" (both tests below assume
+    exactly these two wallets, with all of A's volume concentrated on B).
+
+    The factory builds raw Trade objects with base_asset/counter_asset as
+    Asset instances and only base_amount/counter_amount — the feature
+    engineering pipeline expects assets pre-flattened to "CODE:ISSUER"
+    strings (as real ingestion produces) and a unified "amount" column.
+    """
+    trades = [
+        CleanTradeFactory.build(base_account="A", counter_account="B").__dict__
+        for _ in range(2)
+    ]
+    df = pd.DataFrame(trades)
+    df["base_asset"] = df["base_asset"].apply(lambda a: f"{a.code}:{a.issuer or 'native'}")
+    df["counter_asset"] = df["counter_asset"].apply(lambda a: f"{a.code}:{a.issuer or 'native'}")
+    df["amount"] = df["base_amount"]
+    return df
 
 
 # ---------------------------------------------------------------------------

@@ -494,10 +494,18 @@ def compute_trade_pattern_features(
             "counterparty_variance": 0.0,
         }
 
+    # Accept raw trade records that only have base_amount (no unified
+    # "amount" column yet) — same fallback convention as scripts/mine_roundtrips.py.
+    amount_col = (
+        wallet_trades["amount"]
+        if "amount" in wallet_trades.columns
+        else wallet_trades["base_amount"]
+    )
+
     counterparty_col = wallet_trades["base_account"].where(
         wallet_trades["base_account"] != wallet, wallet_trades["counter_account"]
     )
-    volume_by_counterparty = wallet_trades.groupby(counterparty_col)["amount"].sum()
+    volume_by_counterparty = amount_col.groupby(counterparty_col).sum()
     total_volume = volume_by_counterparty.sum()
     concentration = (volume_by_counterparty.max() / total_volume) if total_volume else 0.0
 
@@ -897,7 +905,7 @@ def compute_cross_asset_features(
             # Average MAD across all windows for this pair
             per_pair_metrics[pair_id] = BenfordMetrics(
                 chi_square=0.0,
-                mad=(sum(m.mad for m in metrics.values()) / len(metrics) if metrics else 0.0),
+                mad=(sum(m["mad"] for m in metrics.values()) / len(metrics) if metrics else 0.0),
                 mad_nonconforming=False,
                 z_scores={},
                 sample_size=0,

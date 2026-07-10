@@ -106,24 +106,35 @@ for _stub_name in [
         sys.modules[_stub_name] = _m
         _STUBBED_MODULE_NAMES.append(_stub_name)
 
-# Minimal NetworkX stub (feature_engineering type-hints use nx.DiGraph)
+# Minimal NetworkX stub (feature_engineering type-hints use nx.DiGraph).
+# Only patch DiGraph when we own a fresh stub module for "networkx" (i.e. it
+# wasn't already imported for real) — otherwise this would permanently
+# clobber the real networkx.DiGraph class for every test that runs afterward
+# in the same pytest process.
 _nx = sys.modules["networkx"]
-_nx.DiGraph = type("DiGraph", (), {})  # type: ignore[attr-defined]
+if "networkx" in _STUBBED_MODULE_NAMES:
+    _nx.DiGraph = type("DiGraph", (), {})  # type: ignore[attr-defined]
 
-# Minimal wallet_graph stubs
-_wg = sys.modules["detection.wallet_graph"]
-_wg.NO_RING = -1  # type: ignore[attr-defined]
-_wg.compute_wallet_graph_metrics = lambda w, g: {"funding_source_similarity": 0.0, "network_centrality": 0.0}  # type: ignore[attr-defined]
-_wg.detect_wash_trading_rings = lambda g, **kw: {}  # type: ignore[attr-defined]
-_wg.build_ring_statistics = lambda cm, g: {}  # type: ignore[attr-defined]
+# Minimal wallet_graph stubs — guarded the same way as the DiGraph stub above:
+# only attach these fake attributes to a module we freshly stubbed, never to
+# an already-imported real module (which would corrupt it for every test
+# that runs afterward in the same pytest process).
+if "detection.wallet_graph" in _STUBBED_MODULE_NAMES:
+    _wg = sys.modules["detection.wallet_graph"]
+    _wg.NO_RING = -1  # type: ignore[attr-defined]
+    _wg.compute_wallet_graph_metrics = lambda w, g: {"funding_source_similarity": 0.0, "network_centrality": 0.0}  # type: ignore[attr-defined]
+    _wg.detect_wash_trading_rings = lambda g, **kw: {}  # type: ignore[attr-defined]
+    _wg.build_ring_statistics = lambda cm, g: {}  # type: ignore[attr-defined]
 
 # Minimal streaming_benford stub
-_sb = sys.modules["detection.streaming_benford"]
-_sb.StreamingBenfordSketch = type("StreamingBenfordSketch", (), {})  # type: ignore[attr-defined]
+if "detection.streaming_benford" in _STUBBED_MODULE_NAMES:
+    _sb = sys.modules["detection.streaming_benford"]
+    _sb.StreamingBenfordSketch = type("StreamingBenfordSketch", (), {})  # type: ignore[attr-defined]
 
 # ingestion.data_models stub
-_dm = sys.modules["ingestion.data_models"]
-_dm.AccountActivity = type("AccountActivity", (), {})  # type: ignore[attr-defined]
+if "ingestion.data_models" in _STUBBED_MODULE_NAMES:
+    _dm = sys.modules["ingestion.data_models"]
+    _dm.AccountActivity = type("AccountActivity", (), {})  # type: ignore[attr-defined]
 
 # Load feature_engineering. `_load` always overwrites sys.modules[name], which
 # would clobber a real cached `detection.feature_engineering` for every test
@@ -325,27 +336,46 @@ def test_validate_multiple_violations():
 # ---------------------------------------------------------------------------
 
 def _load_shap_explainer():
-    """Load ShapExplainer with all dependencies stubbed out."""
-    # Stub detection.model_training (don't try to exec it — heavy chain)
-    _mt = types.ModuleType("detection.model_training")
-    _mt.FEATURE_COLUMNS_EXCLUDE = set()  # type: ignore[attr-defined]
-    sys.modules["detection.model_training"] = _mt
+    """Load ShapExplainer with all dependencies stubbed out.
 
-    # Stub shap with TreeExplainer
-    _shap = types.ModuleType("shap")
-    _shap.TreeExplainer = type("TreeExplainer", (), {})  # type: ignore[attr-defined]
-    sys.modules["shap"] = _shap
+    Only stubs modules that aren't already genuinely imported, and restores
+    the previous sys.modules entry afterward — otherwise this permanently
+    shadows detection.model_training / shap / detection.differential_privacy
+    for every test that runs afterward in the same pytest process (e.g.
+    `from detection.model_training import save_models` starts failing with
+    ImportError because the real module got replaced by this bare stub).
+    """
+    _prev_modules = {}
+    for _name in ("detection.model_training", "shap", "detection.differential_privacy"):
+        _prev_modules[_name] = sys.modules.get(_name)
 
-    # Stub differential_privacy
-    _dp = types.ModuleType("detection.differential_privacy")
-    _dp.feature_sensitivity = lambda sens, feat: 0.05  # type: ignore[attr-defined]
-    _dp.gaussian_sigma = lambda sensitivity, eps, delta: 0.1  # type: ignore[attr-defined]
-    _dp.load_shap_sensitivity = lambda: {}  # type: ignore[attr-defined]
-    _dp.renyi_noise_multiplier = lambda count: 1.0  # type: ignore[attr-defined]
-    sys.modules["detection.differential_privacy"] = _dp
+    if "detection.model_training" not in sys.modules:
+        _mt = types.ModuleType("detection.model_training")
+        _mt.FEATURE_COLUMNS_EXCLUDE = set()  # type: ignore[attr-defined]
+        sys.modules["detection.model_training"] = _mt
 
-    se_mod = _load("detection.shap_explainer", "detection/shap_explainer.py")
-    return se_mod.ShapExplainer
+    if "shap" not in sys.modules:
+        _shap = types.ModuleType("shap")
+        _shap.TreeExplainer = type("TreeExplainer", (), {})  # type: ignore[attr-defined]
+        sys.modules["shap"] = _shap
+
+    if "detection.differential_privacy" not in sys.modules:
+        _dp = types.ModuleType("detection.differential_privacy")
+        _dp.feature_sensitivity = lambda sens, feat: 0.05  # type: ignore[attr-defined]
+        _dp.gaussian_sigma = lambda sensitivity, eps, delta: 0.1  # type: ignore[attr-defined]
+        _dp.load_shap_sensitivity = lambda: {}  # type: ignore[attr-defined]
+        _dp.renyi_noise_multiplier = lambda count: 1.0  # type: ignore[attr-defined]
+        sys.modules["detection.differential_privacy"] = _dp
+
+    try:
+        se_mod = _load("detection.shap_explainer", "detection/shap_explainer.py")
+        return se_mod.ShapExplainer
+    finally:
+        for _name, _prev in _prev_modules.items():
+            if _prev is None:
+                sys.modules.pop(_name, None)
+            else:
+                sys.modules[_name] = _prev
 
 
 def test_shap_explain_includes_dict_url():

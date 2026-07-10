@@ -375,6 +375,96 @@ class Config:
     # Fallback to direct feature computation when Redis is unavailable.
     FEATURE_STORE_FALLBACK_ENABLED: bool = os.getenv("FEATURE_STORE_FALLBACK_ENABLED", "true").lower() in ("1", "true", "yes")
 
+    # ---------------------------------------------------------------------------
+    # Restored config attributes (2026-07-10)
+    #
+    # These were referenced throughout the codebase (and in DP_AGGREGATOR_*'s own
+    # validate() checks below) but had no definition on this class — a merge
+    # conflict on this shared file silently dropped them while the call sites
+    # that used them survived. Values below were reconstructed from the
+    # docstrings/comments at each call site where documented, otherwise set to
+    # a reasonable engineering default; tune via the env var if these don't
+    # match production requirements.
+    # ---------------------------------------------------------------------------
+
+    # Differential-privacy aggregation of training statistics (Issue #299)
+    DP_AGGREGATOR_EPSILON: float = float(os.getenv("DP_AGGREGATOR_EPSILON", "1.0"))
+    DP_AGGREGATOR_DELTA: float = float(os.getenv("DP_AGGREGATOR_DELTA", "1e-5"))
+
+    # Active learning
+    # Aleatoric uncertainty above this cutoff is treated as label noise, not a
+    # useful annotation target (detection/active_learning/annotation_queue.py).
+    ACTIVE_LEARNING_ALEATORIC_THRESHOLD: float = float(
+        os.getenv("ACTIVE_LEARNING_ALEATORIC_THRESHOLD", "0.7")
+    )
+    # Monte Carlo Dropout forward passes for epistemic uncertainty (Gal & Ghahramani, 2016).
+    ACTIVE_LEARNING_MC_DROPOUT_PASSES: int = int(
+        os.getenv("ACTIVE_LEARNING_MC_DROPOUT_PASSES", "20")
+    )
+
+    # REST API auth / rate limiting (api/app.py)
+    # Comma-separated list of bcrypt-hashed API keys.
+    API_KEYS: list[str] = [k.strip() for k in os.getenv("API_KEYS", "").split(",") if k.strip()]
+    API_RATE_LIMIT_RPM: int = int(os.getenv("API_RATE_LIMIT_RPM", "60"))
+
+    # Model calibration holdout (training/train.py, training/calibration.py)
+    CALIBRATION_SPLIT: float = float(os.getenv("CALIBRATION_SPLIT", "0.20"))
+    CALIBRATION_RANDOM_SEED: int = int(os.getenv("CALIBRATION_RANDOM_SEED", "42"))
+
+    # CUSUM change-point detection (monitoring/cusum_detector.py, Issue #289)
+    CUSUM_TARGET_MEAN: float = float(os.getenv("CUSUM_TARGET_MEAN", "0.0"))
+    CUSUM_ALLOWABLE_SLACK: float = float(os.getenv("CUSUM_ALLOWABLE_SLACK", "0.5"))
+    CUSUM_DECISION_THRESHOLD: float = float(os.getenv("CUSUM_DECISION_THRESHOLD", "5.0"))
+
+    # Horizon multi-endpoint failover (ingestion/horizon_streamer.py)
+    HORIZON_FAILOVER_URLS: list[str] = [
+        u.strip() for u in os.getenv("HORIZON_FAILOVER_URLS", "").split(",") if u.strip()
+    ]
+    HORIZON_DEV_MODE: bool = os.getenv("HORIZON_DEV_MODE", "") == "1"
+    HORIZON_FAILOVER_TIMEOUT_SECONDS: float = float(
+        os.getenv("HORIZON_FAILOVER_TIMEOUT_SECONDS", "5.0")
+    )
+    HORIZON_HEALTH_CHECK_INTERVAL_SECONDS: float = float(
+        os.getenv("HORIZON_HEALTH_CHECK_INTERVAL_SECONDS", "30.0")
+    )
+
+    # Kafka consumer back-pressure + dead-letter routing (streaming/kafka_worker.py)
+    KAFKA_BACKPRESSURE_HWM: int = int(os.getenv("KAFKA_BACKPRESSURE_HWM", "1000"))
+    KAFKA_BACKPRESSURE_LWM: int = int(os.getenv("KAFKA_BACKPRESSURE_LWM", "500"))
+    KAFKA_MAX_RETRIES: int = int(os.getenv("KAFKA_MAX_RETRIES", "5"))
+    KAFKA_DEAD_LETTER_TOPIC: str = os.getenv("KAFKA_DEAD_LETTER_TOPIC", KAFKA_DLQ_TOPIC)
+    KAFKA_DEDUP_TTL_SECONDS: int = int(os.getenv("KAFKA_DEDUP_TTL_SECONDS", "3600"))
+    # Producer transactional-ID prefix — deliberately not the hostname (ingestion/kafka_producer.py).
+    KAFKA_TRANSACTIONAL_ID_PREFIX: str = os.getenv(
+        "KAFKA_TRANSACTIONAL_ID_PREFIX", "ledgerlens-producer"
+    )
+    KAFKA_TRANSACTION_TIMEOUT_MS: int = int(os.getenv("KAFKA_TRANSACTION_TIMEOUT_MS", "60000"))
+
+    # Model watermarking for IP theft detection (detection/model_training.py)
+    MODEL_WATERMARK_KEY: str = os.getenv("MODEL_WATERMARK_KEY", "")
+    MODEL_WATERMARK_TRIGGER_COUNT: int = int(os.getenv("MODEL_WATERMARK_TRIGGER_COUNT", "10"))
+    MODEL_WATERMARK_TRIGGER_PATH: str = os.getenv(
+        "MODEL_WATERMARK_TRIGGER_PATH", "data/watermark_triggers.json"
+    )
+
+    # Forensic report narrative rendering (reporting/narrative_builder.py)
+    REPORT_NARRATIVE_FORMAT: str = os.getenv("REPORT_NARRATIVE_FORMAT", "plain_text")
+
+    # FATF regulatory export filter (reporting/fatf_exporter.py) — confirmed by
+    # tests/test_fatf_exporter.py, do not change without updating that test.
+    FATF_EXPORT_THRESHOLD: float = float(os.getenv("FATF_EXPORT_THRESHOLD", "0.85"))
+
+    # Weighted personalised PageRank convergence (detection/risk_propagation.py)
+    RISK_PROP_CONVERGENCE_THRESHOLD: float = float(
+        os.getenv("RISK_PROP_CONVERGENCE_THRESHOLD", "0.01")
+    )
+
+    # Trade ingestion dedup cache (ingestion/trade_deduplicator.py)
+    TRADE_DEDUP_TTL_SECONDS: int = int(os.getenv("TRADE_DEDUP_TTL_SECONDS", str(24 * 3600)))
+    TRADE_DEDUP_CACHE_KEY_PREFIX: str = os.getenv(
+        "TRADE_DEDUP_CACHE_KEY_PREFIX", "ledgerlens:trades:"
+    )
+
     @classmethod
     def validate(cls, require_onchain: bool = False):
         errors = []

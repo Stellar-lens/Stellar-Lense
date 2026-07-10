@@ -390,6 +390,10 @@ class TradeSequenceTransformer(nn.Module if _TORCH_AVAILABLE else object):  # ty
         metrics["sequence_transformer"]["embed_dim"] = self.embed_dim
         metrics["sequence_transformer"]["num_layers"] = self.num_layers
         metrics["sequence_transformer"]["num_pairs"] = self.num_pairs
+        metrics["sequence_transformer"]["num_heads"] = self.num_heads
+        metrics["sequence_transformer"]["ffn_dim"] = self.ffn_dim
+        metrics["sequence_transformer"]["dropout"] = self.dropout_p
+        metrics["sequence_transformer"]["max_length"] = self.max_length
         with open(metrics_path, "w") as f:
             json.dump(metrics, f, indent=2)
 
@@ -442,6 +446,11 @@ class TradeSequenceTransformer(nn.Module if _TORCH_AVAILABLE else object):  # ty
                 model = cls(
                     num_pairs=st_meta.get("num_pairs"),
                     embed_dim=st_meta.get("embed_dim"),
+                    num_heads=st_meta.get("num_heads"),
+                    num_layers=st_meta.get("num_layers"),
+                    ffn_dim=st_meta.get("ffn_dim"),
+                    dropout=st_meta.get("dropout"),
+                    max_length=st_meta.get("max_length"),
                 )
             else:
                 model = cls()

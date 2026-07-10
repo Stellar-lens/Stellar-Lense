@@ -56,7 +56,7 @@ def extract_bot_fingerprint(
         - account_management_cluster_score: Entropy of operation type distribution
     """
     effects = effects or []
-    trades_df = trades_df or pd.DataFrame()
+    trades_df = trades_df if trades_df is not None else pd.DataFrame()
 
     fingerprint = BotFingerprint(account_id=account_id)
 

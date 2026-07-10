@@ -186,7 +186,7 @@
     "beneficiaryVASP": {
       "description": "Beneficiary VASP details; populated as data-unavailable sentinel when unknown.",
       "oneOf": [
-        { "type": "object" },
+        { "type": "object", "not": { "$ref": "#/definitions/unavailableField" } },
         { "$ref": "#/definitions/unavailableField" }
       ]
     },

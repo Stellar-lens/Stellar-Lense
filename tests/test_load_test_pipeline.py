@@ -61,8 +61,14 @@ class TestTokenBucket:
         assert delay == 0.0
 
     def test_rate_limiting_actual_throughput(self):
-        """Emit 50 events at 200 tps; wall-clock should be ≥ 0.2s."""
-        bucket = TokenBucket(rate=200.0)
+        """Emit 50 events at 200 tps; wall-clock should be ≥ 0.2s.
+
+        burst=1.0 is required here: burst defaults to rate (200), and with
+        50 events < 200 burst tokens every consume() would return immediately
+        from the initial burst allowance, never exercising the rate limit at
+        all (see test_immediate_tokens_available_at_start for that behavior).
+        """
+        bucket = TokenBucket(rate=200.0, burst=1.0)
         n_events = 50
         start = time.perf_counter()
         for _ in range(n_events):

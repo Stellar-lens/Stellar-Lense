@@ -294,6 +294,23 @@ class GNNEncoder:
                 f"GNN encoder SHA-256 mismatch: expected {expected_sha}, got {actual_sha}"
             )
 
+        # save() records the dims the artifact was actually trained with;
+        # rebuild _model to match if this instance was constructed with
+        # different (e.g. default) dims, otherwise load_state_dict raises a
+        # size-mismatch error.
+        saved_embedding_dim = entry.get("embedding_dim")
+        saved_hidden_dim = entry.get("hidden_dim")
+        if (saved_embedding_dim is not None and saved_embedding_dim != self.embedding_dim) or (
+            saved_hidden_dim is not None and saved_hidden_dim != self.hidden_dim
+        ):
+            self.embedding_dim = saved_embedding_dim or self.embedding_dim
+            self.hidden_dim = saved_hidden_dim or self.hidden_dim
+            self._model = _GraphSAGEModel(
+                in_channels=_NODE_FEATURE_DIM,
+                hidden_channels=self.hidden_dim,
+                out_channels=self.embedding_dim,
+            )
+
         state_dict = torch.load(artifact_path, map_location="cpu", weights_only=True)
         self._model.load_state_dict(state_dict)
         self._model.eval()

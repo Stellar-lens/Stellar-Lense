@@ -648,9 +648,16 @@ def train_models(
     # Reserve a calibration split (10% of training data, stratified by label)
     # This is separate from the test split and is never used during model training.
     cal_size = max(1, int(len(X_train) * 0.1))
+    n_classes = y_train.nunique()
+    # Stratified splitting requires at least n_classes samples on *both* sides
+    # of the split. On very small datasets (e.g. early adversarial-loop
+    # rounds) a fixed 10% calibration split can be smaller than n_classes,
+    # which sklearn rejects outright — fall back to an unstratified split
+    # rather than crashing model training.
+    stratify_cal = y_train if cal_size >= n_classes and (len(X_train) - cal_size) >= n_classes else None
     X_cal, X_train, y_cal, y_train = train_test_split(
         X_train, y_train, test_size=len(X_train) - cal_size,
-        random_state=random_state, stratify=y_train,
+        random_state=random_state, stratify=stratify_cal,
     )
     logger.info(
         "Reserved calibration split: %d rows (indices 0..%d) — stratified by label",
@@ -658,7 +665,23 @@ def train_models(
         cal_size - 1,
     )
 
-    smote = SMOTE(random_state=random_state)
+    # SMOTE can't handle NaN features (e.g. sparse synthetic wallets with too
+    # little trade history for a window-based feature to be computed).
+    nan_mask = X_train.isnull().any(axis=1)
+    if nan_mask.any():
+        logger.warning(
+            "train_models: dropping %d training row(s) with NaN features before SMOTE",
+            int(nan_mask.sum()),
+        )
+        X_train = X_train[~nan_mask]
+        y_train = y_train[~nan_mask]
+
+    # SMOTE's default k_neighbors=5 requires at least 6 samples in the
+    # minority class; cap it for small training sets (e.g. early
+    # adversarial-loop rounds) rather than letting fit_resample crash.
+    min_class_count = y_train.value_counts().min()
+    smote_k_neighbors = min(5, max(1, min_class_count - 1))
+    smote = SMOTE(random_state=random_state, k_neighbors=smote_k_neighbors)
     X_train_res, y_train_res = smote.fit_resample(X_train, y_train)
 
     rng = np.random.default_rng(random_state)

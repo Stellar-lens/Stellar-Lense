@@ -110,10 +110,18 @@ class DriftAwareReservoirSampler:
         return self._drift_detector.is_alarm
 
     def _standard_replace(self, example: dict[str, Any], timestamp: float) -> None:
-        """Standard reservoir sampling replacement (Algorithm R)."""
+        """Standard reservoir sampling replacement (Algorithm R).
+
+        Draw j uniformly from [0, total_seen). Only replace buffer[j] when j
+        falls inside the reservoir (j < reservoir_size) — this is what keeps
+        every seen example equally likely to end up in the final sample;
+        unconditionally indexing self._buffer[idx] would both break that
+        guarantee and raise IndexError once total_seen exceeds reservoir_size.
+        """
         idx = np.random.randint(0, self._total_seen)
-        self._buffer[idx] = example
-        self._timestamps[idx] = timestamp
+        if idx < self.reservoir_size:
+            self._buffer[idx] = example
+            self._timestamps[idx] = timestamp
 
     def _recency_biased_replace(self, example: dict[str, Any], timestamp: float) -> None:
         """Recency-biased replacement: newer examples replace older ones with higher probability."""

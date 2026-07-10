@@ -420,13 +420,13 @@ async def _extract_token(websocket) -> str | None:
         Token string if found, None otherwise
     """
     # Try Authorization header
-    auth_header = websocket.request_headers.get("Authorization", "")
+    auth_header = websocket.request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer "):
         return str(auth_header[7:])
 
     # Try query parameter
-    if websocket.request_headers.get("Path"):
-        path = websocket.request_headers.get("Path", "")
+    if websocket.request.path:
+        path = websocket.request.path
         if "?token=" in path:
             try:
                 token = path.split("?token=")[1].split("&")[0]

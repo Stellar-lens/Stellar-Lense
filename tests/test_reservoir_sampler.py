@@ -215,7 +215,10 @@ def test_atomic_write_on_flush(tmp_path):
     assert os.path.exists(buffer_path)
 
     df = pd.read_parquet(buffer_path)
-    assert len(df) == 100
+    # flush_interval=10 triggers the (only) flush right after the 10th
+    # update; the buffer can only ever hold as many rows as updates seen so
+    # far, so 10 here — not reservoir_size (100), which is just the cap.
+    assert len(df) == 10
     assert "timestamp" in df.columns
 
 

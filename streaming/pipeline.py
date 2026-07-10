@@ -43,7 +43,7 @@ from ingestion.horizon_streamer import stream_trades
 from streaming.alert_dispatcher import AlertDispatcher
 from streaming.feature_buffer import FeatureBuffer
 from streaming.streaming_scorer import StreamingScorer
-from utils.circuit_breaker import CircuitBreaker
+from utils.circuit_breaker import CircuitBreaker, CircuitOpenError
 from utils.logging import get_logger
 
 if TYPE_CHECKING:
@@ -329,6 +329,10 @@ class StreamingPipeline:
         self._circuit_breakers: dict[str, CircuitBreaker] = circuit_breakers or {}
         # Wallet → last successfully computed score (used as fallback when OPEN)
         self._score_cache: dict[str, dict] = {}
+        self._metadata_join_state = metadata_join_state
+        self._metadata_stream = metadata_stream
+        self._subscribed_wallets: set[str] = set()
+        self._subscribed_wallets_lock = threading.Lock()
 
     # ------------------------------------------------------------------
     # Public API
@@ -566,6 +570,26 @@ class StreamingPipeline:
                 time.sleep(0.1)
             if self._metadata_join_state is not None:
                 self._metadata_join_state.evict_inactive_wallets()
+
+    def _dispatch_with_cb(self, wallet: str, score: dict, pair_id: str) -> None:
+        """Dispatch *score* through the ``"db_write"`` circuit breaker, if configured.
+
+        On success the score is cached for *wallet* so a subsequent OPEN circuit
+        can still deliver a (stale) alert. When OPEN, falls back to the last
+        cached score instead of dropping the wallet silently.
+        """
+        breaker = self._circuit_breakers.get("db_write")
+        if breaker is None:
+            self._dispatcher.dispatch(wallet, score, pair_id)
+            self._score_cache[wallet] = score
+            return
+        try:
+            breaker.call(self._dispatcher.dispatch, wallet, score, pair_id)
+            self._score_cache[wallet] = score
+        except CircuitOpenError:
+            cached = self._score_cache.get(wallet)
+            if cached is not None:
+                self._dispatcher.dispatch(wallet, cached, pair_id)
 
     def _stream_pair(self, base_asset: SdkAsset, counter_asset: SdkAsset) -> None:
         pair_label = (

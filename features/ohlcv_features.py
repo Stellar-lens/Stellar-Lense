@@ -13,6 +13,12 @@ import pandas as pd
 
 _RESOLUTION_ALLOWLIST = ["1m", "5m", "15m", "1h", "4h"]
 
+# pandas deprecated (and later removed) the lowercase "m" minute alias in
+# favour of "min", to avoid ambiguity with capital "M" (month-end). Feature
+# key suffixes still use "1m"/"5m"/"15m" (see _feature_keys_for_resolutions),
+# so this only converts the string actually passed to resample()/Grouper.
+_PANDAS_FREQ = {"1m": "1min", "5m": "5min", "15m": "15min", "1h": "1h", "4h": "4h"}
+
 
 def _validate_resolutions(resolutions: Iterable[str]) -> list[str]:
     res = list(resolutions)
@@ -75,8 +81,10 @@ def compute_ohlcv_features(
     out: dict[str, float] = {}
 
     for res in resolutions:
+        pandas_freq = _PANDAS_FREQ[res]
         # Window start labels; anchor to the trade timestamps.
-        g = df.set_index("ledger_close_time").resample(res, label="left", closed="left")
+        df_indexed = df.set_index("ledger_close_time")
+        g = df_indexed.resample(pandas_freq, label="left", closed="left")
 
         open_ = g["price"].first()
         high_ = g["price"].max()
@@ -87,9 +95,11 @@ def compute_ohlcv_features(
         volume_ = g["amount"].sum()
         trade_count = g["price"].count()
 
-        # VWAP: sum(price*amount)/sum(amount)
-        pv = df["price"] * df["amount"]
-        vwap_ = pv.groupby(pd.Grouper(freq=res, level=0)).sum() / volume_.replace(0.0, np.nan)
+        # VWAP: sum(price*amount)/sum(amount). Grouper(level=0) requires a
+        # DatetimeIndex, so this must use the same datetime-indexed frame as
+        # resample() above, not the original RangeIndex-ed df.
+        pv = df_indexed["price"] * df_indexed["amount"]
+        vwap_ = pv.groupby(pd.Grouper(freq=pandas_freq, level=0)).sum() / volume_.replace(0.0, np.nan)
 
         # Features per candle.
         denom_range = (high_ - low_).replace(0.0, np.nan)
