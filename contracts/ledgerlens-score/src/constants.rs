@@ -1,112 +1,159 @@
-// Ledger TTL constants assume ~5 s per ledger on Stellar mainnet.
-pub const SCORE_TTL_THRESHOLD: u32 = 518_400; // ~30 days
-pub const SCORE_TTL_EXTEND_TO: u32 = 777_600; // ~45 days
+pub const SCORE_TTL_THRESHOLD: u32 = 518_400;
+pub const SCORE_TTL_EXTEND_TO: u32 = 777_600;
+
+/// Maximum number of allowed gate callers in the allowlist.
+pub const MAX_GATE_CALLERS: u32 = 20;
+
+/// Hard lower bound for all score values submitted to the contract.
+/// `submit_score` accepts scores in `[MIN_SCORE, MAX_SCORE]`; any value
+/// below this is rejected with [`Error::InvalidScore`].
+pub const MIN_SCORE: u32 = 0;
+
+/// Hard upper bound for all score values submitted to the contract.
+pub const MAX_SCORE: u32 = 100;
 
 /// Hard ceiling on the ring-buffer depth to bound storage costs.
-/// The admin cannot configure a depth above this value.
 pub const MAX_HISTORY_DEPTH: u32 = 50;
-
-/// Default depth used when no admin configuration exists.
 pub const DEFAULT_HISTORY_MAX_DEPTH: u32 = 10;
-
-/// Maximum number of entries accepted in a single batch submission call.
 pub const MAX_BATCH_SIZE: u32 = 20;
+
+/// Maximum number of entries accepted in a single batch score read call.
+pub const BATCH_READ_MAX: u32 = 50;
 
 /// Default risk threshold used when no threshold has been configured by admin.
 pub const DEFAULT_RISK_THRESHOLD: u32 = 75;
 
+/// Default threshold for score jump anomaly detection.
+pub const DEFAULT_JUMP_THRESHOLD: u32 = 30;
+
 /// Semantic contract version; bump on breaking ABI changes.
 ///
-/// Bumped to 2 when `submit_score` gained its `attestation` parameter (see
-/// `docs/attestation-spec.md`).
-/// Bumped to 3 when `AggregateRiskScore` gained `decay_lambda_applied` field.
-/// Bumped to 3 when all admin-tier functions gained `admin_signers: Vec<Address>`
-/// for M-of-N governance and the `AdminSet` / `AdminThreshold` storage keys
-/// were introduced.
-pub const CONTRACT_VERSION: u32 = 3;
+/// History:
+///
+/// * `1` — initial release (`submit_score` / `get_score`).
+/// * `2` — `submit_score` gained the `attestation: Option<ScoreAttestation>`
+///   parameter and `set_service_pubkey` / `get_service_pubkey` were added
+///   (see `docs/attestation-spec.md`).
+/// * `3` — `submit_scores_batch_attested` and the `batch_attested`
+///   `supports_interface` capability were added (see
+///   `docs/batch-attestation-spec.md`).
+/// * `4` — Added contract_id and contract_version binding to attestations (#200),
+///   Merkle audit chain for admin actions (#201), configurable decay profiles (#202),
+///   and multi-dimensional risk scores with sub-components (#203).
+pub const CONTRACT_VERSION: u32 = 4;
 
-/// Practical upper bound on the number of distinct asset pairs tracked per
-/// wallet. `get_aggregate_score` iterates the wallet's full `AssetPairs`
-/// list, so its cost is O(N) in this value; it is not enforced on-chain,
-/// but documents the assumption the aggregate engine is designed around.
-/// See the rustdoc on `get_aggregate_score` for detail.
+/// Hard upper bound on Merkle proof length.
+pub const MAX_MERKLE_PROOF_DEPTH: u32 = 30;
 pub const MAX_WALLET_PAIRS: u32 = 20;
-
-// ── Per-wallet/pair submission rate limiting ──────────────────────────────────
-//
-// A compromised or malfunctioning off-chain service could otherwise flood the
-// contract with submissions for the same wallet/asset-pair, exhausting
-// storage rent, overwhelming indexers, and poisoning the score signal with
-// rapid fluctuations. See `submit_score` / `set_cooldown` and the Rate
-// Limiting section of the README.
-
-/// Default cooldown applied between accepted submissions for the same
-/// (wallet, asset_pair) until the admin configures one explicitly — 1 hour.
-pub const DEFAULT_COOLDOWN_SECS: u64 = 3_600; // 1 hour
-
-/// Minimum configurable cooldown — 1 minute floor, so the admin cannot
-/// disable rate limiting entirely by setting it arbitrarily low.
-pub const MIN_COOLDOWN_SECS: u64 = 60; // 1 minute
-
-/// Maximum configurable cooldown — 24 hour ceiling, so a misconfigured admin
-/// cannot lock a wallet/pair out of re-scoring for an unreasonable length of
-/// time.
-pub const MAX_COOLDOWN_SECS: u64 = 86_400; // 24 hours
-
-// ── Time-locked upgrade governance ────────────────────────────────────────────
-//
-// A WASM upgrade can replace the entire contract logic in one transaction, so
-// it is gated behind a mandatory delay during which the community can inspect
-// the pending proposal and react. These bounds frame the admin-configurable
-// delay; see `propose_upgrade` / `set_upgrade_delay` and the Upgrade Governance
-// section of the README.
-
-/// Minimum mandatory delay between proposing and executing an upgrade —
-/// 48 hours. The delay can be raised (safer) but never lowered below this.
-pub const MIN_UPGRADE_DELAY_SECS: u64 = 172_800; // 48 hours
-
-/// Maximum configurable upgrade delay — 14 days. Caps the lock so a
-/// legitimate, urgent fix is not stalled indefinitely.
-pub const MAX_UPGRADE_DELAY_SECS: u64 = 1_209_600; // 14 days
-
-/// Delay applied to a proposal when the admin has not configured one
-/// explicitly. Equal to the minimum (most conservative) by default.
-pub const DEFAULT_UPGRADE_DELAY_SECS: u64 = 172_800; // 48 hours
-
-/// Maximum number of addresses in the M-of-N service signer set.
+pub const DEFAULT_COOLDOWN_SECS: u64 = 3_600;
+pub const MIN_COOLDOWN_SECS: u64 = 60;
+pub const MAX_COOLDOWN_SECS: u64 = 86_400;
+pub const MIN_UPGRADE_DELAY_SECS: u64 = 172_800;
+pub const MAX_UPGRADE_DELAY_SECS: u64 = 1_209_600;
+pub const DEFAULT_UPGRADE_DELAY_SECS: u64 = 172_800;
 pub const MAX_SERVICE_SIGNERS: u32 = 10;
-
-/// Maximum number of addresses in the M-of-N admin signer set.
 pub const MAX_ADMIN_SIGNERS: u32 = 5;
-
-/// Default staleness window: 7 days in seconds.
 pub const DEFAULT_STALENESS_WINDOW_SECS: u64 = 604_800;
 
-// ── Per-asset-pair circuit breaker ────────────────────────────────────────────
+/// Maximum age (seconds) of a secondary score for it to be accepted during
+/// failover. Secondary scores older than this window cause the gate to
+/// return `false` (fail-closed). Default: 1 hour.
+pub const FAILOVER_STALENESS_WINDOW: u64 = 3_600;
 
-/// Hard ceiling on the number of distinct asset pairs that may be paused at
-/// once. Bounds `PausedPairIndex`'s storage cost and the O(N) work done on
-/// the rare admin pause/unpause path; the hot `is_pair_paused` read used by
-/// every submission never touches the index. See `set_pair_paused`.
 pub const MAX_PAUSED_PAIRS: u32 = 50;
-
-// ── Time-weighted exponential decay ───────────────────────────────────────────
-
-/// Fixed-point scale factor used in decay computations (1_000_000 = 6 decimal
-/// places of precision). Decay factors are computed as fixed-point integers
-/// in the range [0, DECAY_FIXED_POINT_SCALE].
 pub const DECAY_FIXED_POINT_SCALE: u64 = 1_000_000;
+pub const DEFAULT_DECAY_LAMBDA_NUM: u64 = 0;
+pub const DEFAULT_DECAY_LAMBDA_DEN: u64 = 1;
+pub const MAX_DECAY_LAMBDA_NUM: u64 = 1;
+pub const MAX_DECAY_LAMBDA_DEN: u64 = 1;
 
-/// Default decay rate numerator — 0 means no decay until configured.
-pub const DEFAULT_DECAY_LAMBDA_NUM: u32 = 0;
+/// Maximum number of counterparty links allowed per wallet per asset pair.
+pub const MAX_COUNTERPARTY_LINKS_PER_WALLET: u32 = 50;
 
-/// Default decay rate denominator — 1 avoids division-by-zero in the default.
-pub const DEFAULT_DECAY_LAMBDA_DEN: u32 = 1;
+/// Maximum delegation chain depth to prevent unbounded traversal.
+/// Prevents DoS attacks via deep circular delegation chains.
+pub const MAX_DELEGATION_DEPTH: u32 = 5;
 
-/// Maximum allowed decay rate numerator. Caps λ at 1/1 (full decay per
-/// unit time), preventing scores from being instantly zeroed by a
-/// misconfigured rate.
-pub const MAX_DECAY_LAMBDA_NUM: u32 = 1;
+// ── Score submission floor ─────────────────────────────────────────────────────
 
-/// Maximum allowed decay rate denominator (paired with MAX_DECAY_LAMBDA_NUM).
-pub const MAX_DECAY_LAMBDA_DEN: u32 = 1;
+/// Default high-water mark for the score floor policy.
+pub const DEFAULT_SCORE_FLOOR_HWM: u32 = 80;
+pub const DEFAULT_SCORE_FLOOR_MIN: u32 = 20;
+pub const MIN_SCORE_FLOOR_HWM: u32 = 50;
+pub const MAX_SCORE_FLOOR_HWM: u32 = 100;
+pub const MAX_HYSTERESIS_MARGIN: u32 = 50;
+pub const BAND_STATE_TTL_THRESHOLD: u32 = 518_400;
+pub const BAND_STATE_TTL_EXTEND_TO: u32 = 777_600;
+pub const EMBARGO_TTL_THRESHOLD: u32 = 1_555_200;
+pub const EMBARGO_TTL_EXTEND_TO: u32 = 3_110_400;
+
+/// Hard ceiling on the `EmbargoedWalletIndex` so `revoke_all_embargoes` stays
+/// within a single transaction's resource budget.
+pub const MAX_EMBARGOED_WALLETS: u32 = 100;
+pub const DEFAULT_CONSENSUS_THRESHOLD_K: u32 = 2;
+pub const DEFAULT_CONSENSUS_EPSILON: u32 = 5;
+
+// ── Escalation / consecutive breach ──────────────────────────────────────────
+
+pub const ESCALATION_BREACH_TTL_THRESHOLD: u32 = 518_400;
+pub const ESCALATION_BREACH_TTL_EXTEND_TO: u32 = 777_600;
+pub const DEFAULT_ESCALATION_THRESHOLD: u32 = 5;
+pub const MIN_ESCALATION_THRESHOLD: u32 = 2;
+pub const MAX_ESCALATION_THRESHOLD: u32 = 20;
+
+// ── Model version registry ────────────────────────────────────────────────────
+
+/// Hard upper bound on the number of model versions that can be registered.
+pub const MAX_MODEL_VERSIONS: u32 = 20;
+
+/// Challenge period in seconds (7 days).
+pub const DISPUTE_CHALLENGE_PERIOD_SECS: u64 = 604_800;
+
+/// Bonus percentage added to the returned bond on timeout settlement.
+pub const DISPUTE_BONUS_PCT: i128 = 10;
+
+/// Maximum simultaneously open disputes.
+pub const MAX_OPEN_DISPUTES: u32 = 100;
+
+pub const DISPUTE_TTL_THRESHOLD: u32 = 518_400;
+pub const DISPUTE_TTL_EXTEND_TO: u32 = 777_600;
+
+/// Default reveal window for sealed-bid dispute bond: 10 minutes (600 seconds).
+pub const DEFAULT_DISPUTE_REVEAL_WINDOW_SECS: u64 = 600;
+
+// ── Finality buffer (pending score commit window) ────────────────────────────
+
+/// Maximum finality buffer duration — 24 hours.
+pub const MAX_FINALITY_BUFFER_SECS: u64 = 86_400;
+
+/// Default heartbeat alert threshold — 1 hour.
+pub const DEFAULT_HEARTBEAT_ALERT_THRESHOLD_SECS: u64 = 3_600;
+
+// ── HyperLogLog unique-wallet estimation ─────────────────────────────────────
+
+/// Minimum allowed HLL precision (2^4 = 16 registers).
+pub const HLL_MIN_PRECISION: u32 = 4;
+/// Maximum allowed HLL precision (2^16 = 65536 registers).
+pub const HLL_MAX_PRECISION: u32 = 16;
+/// Default HLL precision until the admin configures one explicitly.
+pub const HLL_DEFAULT_PRECISION: u32 = 8;
+
+// ── Quorum reduction ──────────────────────────────────────────────────────────
+
+// ── Quorum / consensus ────────────────────────────────────────────────────────
+
+/// Default window (seconds) for which a quorum-failure is considered recent.
+/// After this window the failure state is cleared automatically.
+pub const DEFAULT_QUORUM_FAILURE_WINDOW_SECS: u64 = 86_400; // 24 hours
+
+pub const MAX_TRACKED_SCORE_ENTRIES: u32 = 500;
+pub const MAX_EXPIRING_ENTRIES_PER_CALL: u32 = 100;
+
+/// Maximum number of concurrently pending parameter-change proposals.
+pub const MAX_PENDING_PARAMETER_PROPOSALS: u32 = 10;
+
+/// Time-lock delay before a pending simple parameter change may be applied.
+pub const DEFAULT_PARAM_CHANGE_DELAY_SECS: u64 = 86_400;
+
+/// Maximum number of entries retained in the rate-limit override audit log.
+pub const MAX_RATE_LIMIT_OVERRIDE_LOG: u32 = 100;

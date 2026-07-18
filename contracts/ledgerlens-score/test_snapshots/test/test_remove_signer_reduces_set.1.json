@@ -321,6 +321,108 @@
             "key": {
               "vec": [
                 {
+                  "symbol": "BreachCount"
+                },
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4"
+                },
+                {
+                  "symbol": "XLM_USDC"
+                }
+              ]
+            },
+            "durability": "temporary"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+                "key": {
+                  "vec": [
+                    {
+                      "symbol": "BreachCount"
+                    },
+                    {
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4"
+                    },
+                    {
+                      "symbol": "XLM_USDC"
+                    }
+                  ]
+                },
+                "durability": "temporary",
+                "val": {
+                  "u32": 0
+                }
+              }
+            },
+            "ext": "v0"
+          },
+          15
+        ]
+      ],
+      [
+        {
+          "contract_data": {
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+            "key": {
+              "vec": [
+                {
+                  "symbol": "HistoricalMaxScore"
+                },
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4"
+                },
+                {
+                  "symbol": "XLM_USDC"
+                }
+              ]
+            },
+            "durability": "persistent"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+                "key": {
+                  "vec": [
+                    {
+                      "symbol": "HistoricalMaxScore"
+                    },
+                    {
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4"
+                    },
+                    {
+                      "symbol": "XLM_USDC"
+                    }
+                  ]
+                },
+                "durability": "persistent",
+                "val": {
+                  "u32": 33
+                }
+              }
+            },
+            "ext": "v0"
+          },
+          777600
+        ]
+      ],
+      [
+        {
+          "contract_data": {
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+            "key": {
+              "vec": [
+                {
                   "symbol": "LastSubmitTime"
                 },
                 {
@@ -357,6 +459,51 @@
                 "durability": "persistent",
                 "val": {
                   "u64": 0
+                }
+              }
+            },
+            "ext": "v0"
+          },
+          777600
+        ]
+      ],
+      [
+        {
+          "contract_data": {
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+            "key": {
+              "vec": [
+                {
+                  "symbol": "PairScoreCount"
+                },
+                {
+                  "symbol": "XLM_USDC"
+                }
+              ]
+            },
+            "durability": "persistent"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+                "key": {
+                  "vec": [
+                    {
+                      "symbol": "PairScoreCount"
+                    },
+                    {
+                      "symbol": "XLM_USDC"
+                    }
+                  ]
+                },
+                "durability": "persistent",
+                "val": {
+                  "u64": 1
                 }
               }
             },
@@ -418,6 +565,20 @@
                     },
                     {
                       "key": {
+                        "symbol": "benford_score"
+                      },
+                      "val": {
+                        "u32": 0
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "commitment"
+                      },
+                      "val": "void"
+                    },
+                    {
+                      "key": {
                         "symbol": "confidence"
                       },
                       "val": {
@@ -434,10 +595,26 @@
                     },
                     {
                       "key": {
+                        "symbol": "ml_score"
+                      },
+                      "val": {
+                        "u32": 0
+                      }
+                    },
+                    {
+                      "key": {
                         "symbol": "model_version"
                       },
                       "val": {
                         "u32": 1
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "network_score"
+                      },
+                      "val": {
+                        "u32": 0
                       }
                     },
                     {
@@ -523,6 +700,107 @@
             "key": {
               "vec": [
                 {
+                  "symbol": "ScoreEntryIndex"
+                }
+              ]
+            },
+            "durability": "persistent"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+                "key": {
+                  "vec": [
+                    {
+                      "symbol": "ScoreEntryIndex"
+                    }
+                  ]
+                },
+                "durability": "persistent",
+                "val": {
+                  "vec": [
+                    {
+                      "vec": [
+                        {
+                          "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4"
+                        },
+                        {
+                          "symbol": "XLM_USDC"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            "ext": "v0"
+          },
+          777600
+        ]
+      ],
+      [
+        {
+          "contract_data": {
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+            "key": {
+              "vec": [
+                {
+                  "symbol": "ScoreEntryLastTouchedLedger"
+                },
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4"
+                },
+                {
+                  "symbol": "XLM_USDC"
+                }
+              ]
+            },
+            "durability": "persistent"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+                "key": {
+                  "vec": [
+                    {
+                      "symbol": "ScoreEntryLastTouchedLedger"
+                    },
+                    {
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4"
+                    },
+                    {
+                      "symbol": "XLM_USDC"
+                    }
+                  ]
+                },
+                "durability": "persistent",
+                "val": {
+                  "u32": 0
+                }
+              }
+            },
+            "ext": "v0"
+          },
+          777600
+        ]
+      ],
+      [
+        {
+          "contract_data": {
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+            "key": {
+              "vec": [
+                {
                   "symbol": "ScoreHistory"
                 },
                 {
@@ -571,6 +849,20 @@
                         },
                         {
                           "key": {
+                            "symbol": "benford_score"
+                          },
+                          "val": {
+                            "u32": 0
+                          }
+                        },
+                        {
+                          "key": {
+                            "symbol": "commitment"
+                          },
+                          "val": "void"
+                        },
+                        {
+                          "key": {
                             "symbol": "confidence"
                           },
                           "val": {
@@ -587,10 +879,26 @@
                         },
                         {
                           "key": {
+                            "symbol": "ml_score"
+                          },
+                          "val": {
+                            "u32": 0
+                          }
+                        },
+                        {
+                          "key": {
                             "symbol": "model_version"
                           },
                           "val": {
                             "u32": 1
+                          }
+                        },
+                        {
+                          "key": {
+                            "symbol": "network_score"
+                          },
+                          "val": {
+                            "u32": 0
                           }
                         },
                         {
@@ -612,6 +920,57 @@
                       ]
                     }
                   ]
+                }
+              }
+            },
+            "ext": "v0"
+          },
+          777600
+        ]
+      ],
+      [
+        {
+          "contract_data": {
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+            "key": {
+              "vec": [
+                {
+                  "symbol": "ScoreSubmissionLedger"
+                },
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4"
+                },
+                {
+                  "symbol": "XLM_USDC"
+                }
+              ]
+            },
+            "durability": "persistent"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+                "key": {
+                  "vec": [
+                    {
+                      "symbol": "ScoreSubmissionLedger"
+                    },
+                    {
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4"
+                    },
+                    {
+                      "symbol": "XLM_USDC"
+                    }
+                  ]
+                },
+                "durability": "persistent",
+                "val": {
+                  "u32": 0
                 }
               }
             },
@@ -692,6 +1051,888 @@
         {
           "contract_data": {
             "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+            "key": {
+              "vec": [
+                {
+                  "symbol": "UniqueWalletsHll"
+                },
+                {
+                  "symbol": "XLM_USDC"
+                }
+              ]
+            },
+            "durability": "persistent"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+                "key": {
+                  "vec": [
+                    {
+                      "symbol": "UniqueWalletsHll"
+                    },
+                    {
+                      "symbol": "XLM_USDC"
+                    }
+                  ]
+                },
+                "durability": "persistent",
+                "val": {
+                  "map": [
+                    {
+                      "key": {
+                        "symbol": "precision"
+                      },
+                      "val": {
+                        "u32": 8
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "registers"
+                      },
+                      "val": {
+                        "vec": [
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 1
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "ext": "v0"
+          },
+          777600
+        ]
+      ],
+      [
+        {
+          "contract_data": {
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+            "key": {
+              "vec": [
+                {
+                  "symbol": "VerkleLeaf"
+                },
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4"
+                },
+                {
+                  "symbol": "XLM_USDC"
+                }
+              ]
+            },
+            "durability": "persistent"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+                "key": {
+                  "vec": [
+                    {
+                      "symbol": "VerkleLeaf"
+                    },
+                    {
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4"
+                    },
+                    {
+                      "symbol": "XLM_USDC"
+                    }
+                  ]
+                },
+                "durability": "persistent",
+                "val": {
+                  "bytes": "bb2b7ab59578d8acf7a570d19a75c5064f8aa51996ee317e9d5f7c928d8724d6"
+                }
+              }
+            },
+            "ext": "v0"
+          },
+          4095
+        ]
+      ],
+      [
+        {
+          "contract_data": {
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
             "key": "ledger_key_contract_instance",
             "durability": "persistent"
           }
@@ -721,6 +1962,169 @@
                         },
                         "val": {
                           "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                        }
+                      },
+                      {
+                        "key": {
+                          "vec": [
+                            {
+                              "symbol": "AdminAuditRoot"
+                            }
+                          ]
+                        },
+                        "val": {
+                          "bytes": "264e68a5822d7bdfbdd7c9657c40672bda280aa228f1fa62a2a48c4de9cc577c"
+                        }
+                      },
+                      {
+                        "key": {
+                          "vec": [
+                            {
+                              "symbol": "ExtendCount"
+                            }
+                          ]
+                        },
+                        "val": {
+                          "u32": 2
+                        }
+                      },
+                      {
+                        "key": {
+                          "vec": [
+                            {
+                              "symbol": "LastGlobalSubmissionTime"
+                            }
+                          ]
+                        },
+                        "val": {
+                          "u64": 0
+                        }
+                      },
+                      {
+                        "key": {
+                          "vec": [
+                            {
+                              "symbol": "LastServiceActivityAt"
+                            }
+                          ]
+                        },
+                        "val": {
+                          "u64": 0
+                        }
+                      },
+                      {
+                        "key": {
+                          "vec": [
+                            {
+                              "symbol": "ModelStats"
+                            },
+                            {
+                              "u32": 1
+                            }
+                          ]
+                        },
+                        "val": {
+                          "map": [
+                            {
+                              "key": {
+                                "symbol": "average_score"
+                              },
+                              "val": {
+                                "u32": 0
+                              }
+                            },
+                            {
+                              "key": {
+                                "symbol": "model_version"
+                              },
+                              "val": {
+                                "u32": 1
+                              }
+                            },
+                            {
+                              "key": {
+                                "symbol": "score_sum"
+                              },
+                              "val": {
+                                "u64": 33
+                              }
+                            },
+                            {
+                              "key": {
+                                "symbol": "submission_count"
+                              },
+                              "val": {
+                                "u32": 1
+                              }
+                            },
+                            {
+                              "key": {
+                                "symbol": "total_submissions"
+                              },
+                              "val": {
+                                "u64": 0
+                              }
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "key": {
+                          "vec": [
+                            {
+                              "symbol": "ModelVersionIndex"
+                            }
+                          ]
+                        },
+                        "val": {
+                          "vec": [
+                            {
+                              "u32": 1
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "key": {
+                          "vec": [
+                            {
+                              "symbol": "ScoreHistogram"
+                            }
+                          ]
+                        },
+                        "val": {
+                          "vec": [
+                            {
+                              "u64": 0
+                            },
+                            {
+                              "u64": 0
+                            },
+                            {
+                              "u64": 0
+                            },
+                            {
+                              "u64": 1
+                            },
+                            {
+                              "u64": 0
+                            },
+                            {
+                              "u64": 0
+                            },
+                            {
+                              "u64": 0
+                            },
+                            {
+                              "u64": 0
+                            },
+                            {
+                              "u64": 0
+                            },
+                            {
+                              "u64": 0
+                            }
+                          ]
                         }
                       },
                       {
@@ -761,6 +2165,45 @@
                         },
                         "val": {
                           "u32": 1
+                        }
+                      },
+                      {
+                        "key": {
+                          "vec": [
+                            {
+                              "symbol": "SignerAddedAt"
+                            },
+                            {
+                              "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                            }
+                          ]
+                        },
+                        "val": {
+                          "u64": 0
+                        }
+                      },
+                      {
+                        "key": {
+                          "vec": [
+                            {
+                              "symbol": "TotalWalletsScored"
+                            }
+                          ]
+                        },
+                        "val": {
+                          "u64": 1
+                        }
+                      },
+                      {
+                        "key": {
+                          "vec": [
+                            {
+                              "symbol": "VerkleCommitment"
+                            }
+                          ]
+                        },
+                        "val": {
+                          "bytes": "152a0f66b500ed1c0c985d5a1f21591116ae0bfce8f153a31eed96acc273fc7a"
                         }
                       }
                     ]
@@ -1675,6 +3118,20 @@
                 },
                 {
                   "key": {
+                    "symbol": "benford_score"
+                  },
+                  "val": {
+                    "u32": 0
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "commitment"
+                  },
+                  "val": "void"
+                },
+                {
+                  "key": {
                     "symbol": "confidence"
                   },
                   "val": {
@@ -1691,10 +3148,26 @@
                 },
                 {
                   "key": {
+                    "symbol": "ml_score"
+                  },
+                  "val": {
+                    "u32": 0
+                  }
+                },
+                {
+                  "key": {
                     "symbol": "model_version"
                   },
                   "val": {
                     "u32": 1
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "network_score"
+                  },
+                  "val": {
+                    "u32": 0
                   }
                 },
                 {
