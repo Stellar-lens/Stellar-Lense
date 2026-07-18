@@ -1239,6 +1239,9 @@
             "topics": [
               {
                 "symbol": "sig_add"
+              },
+              {
+                "u32": 1
               }
             ],
             "data": {
@@ -1313,6 +1316,9 @@
             "topics": [
               {
                 "symbol": "sig_add"
+              },
+              {
+                "u32": 1
               }
             ],
             "data": {
@@ -1387,6 +1393,9 @@
             "topics": [
               {
                 "symbol": "sig_add"
+              },
+              {
+                "u32": 1
               }
             ],
             "data": {
@@ -1461,6 +1470,9 @@
             "topics": [
               {
                 "symbol": "sig_thr"
+              },
+              {
+                "u32": 1
               }
             ],
             "data": {
@@ -1569,6 +1581,9 @@
                 "symbol": "scr_dlt"
               },
               {
+                "u32": 1
+              },
+              {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOLZM"
               },
               {
@@ -1609,6 +1624,9 @@
             "topics": [
               {
                 "symbol": "score"
+              },
+              {
+                "u32": 1
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOLZM"

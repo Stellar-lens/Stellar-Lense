@@ -2101,6 +2101,9 @@
             "topics": [
               {
                 "symbol": "decay_upd"
+              },
+              {
+                "u32": 1
               }
             ],
             "data": {
@@ -2187,6 +2190,9 @@
                 "symbol": "pw_upd"
               },
               {
+                "u32": 1
+              },
+              {
                 "symbol": "PXL1"
               }
             ],
@@ -2286,6 +2292,9 @@
                 "symbol": "scr_dlt"
               },
               {
+                "u32": 1
+              },
+              {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
               },
               {
@@ -2326,6 +2335,9 @@
             "topics": [
               {
                 "symbol": "score"
+              },
+              {
+                "u32": 1
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
@@ -2427,6 +2439,9 @@
                 "symbol": "pw_upd"
               },
               {
+                "u32": 1
+              },
+              {
                 "symbol": "PXL2"
               }
             ],
@@ -2526,6 +2541,9 @@
                 "symbol": "scr_dlt"
               },
               {
+                "u32": 1
+              },
+              {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
               },
               {
@@ -2566,6 +2584,9 @@
             "topics": [
               {
                 "symbol": "score"
+              },
+              {
+                "u32": 1
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
@@ -2667,6 +2688,9 @@
                 "symbol": "pw_upd"
               },
               {
+                "u32": 1
+              },
+              {
                 "symbol": "PXL3"
               }
             ],
@@ -2766,6 +2790,9 @@
                 "symbol": "scr_dlt"
               },
               {
+                "u32": 1
+              },
+              {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
               },
               {
@@ -2806,6 +2833,9 @@
             "topics": [
               {
                 "symbol": "score"
+              },
+              {
+                "u32": 1
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"

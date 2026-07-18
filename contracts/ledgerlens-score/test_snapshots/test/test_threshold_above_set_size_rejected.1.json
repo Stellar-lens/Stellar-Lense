@@ -324,6 +324,9 @@
             "topics": [
               {
                 "symbol": "sig_add"
+              },
+              {
+                "u32": 1
               }
             ],
             "data": {
@@ -398,6 +401,9 @@
             "topics": [
               {
                 "symbol": "sig_add"
+              },
+              {
+                "u32": 1
               }
             ],
             "data": {

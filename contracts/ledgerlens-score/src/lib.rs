@@ -11,6 +11,9 @@ mod types;
 mod test;
 
 #[cfg(test)]
+mod event_emission;
+
+#[cfg(test)]
 mod test_upgrade;
 
 #[cfg(test)]

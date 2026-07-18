@@ -262,6 +262,9 @@
             "topics": [
               {
                 "symbol": "thresh"
+              },
+              {
+                "u32": 1
               }
             ],
             "data": {

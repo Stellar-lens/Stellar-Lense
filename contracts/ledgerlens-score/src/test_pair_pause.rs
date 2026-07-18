@@ -343,7 +343,7 @@ fn test_pair_paused_event_emitted() {
         topics,
         Vec::from_array(
             &env,
-            [symbol_short!("pr_pause").into_val(&env), pair.clone().into_val(&env)]
+            [symbol_short!("pr_pause").into_val(&env), 1u32.into_val(&env), pair.clone().into_val(&env)]
         )
     );
     assert!(bool::try_from_val(&env, &data).unwrap());
@@ -355,7 +355,7 @@ fn test_pair_paused_event_emitted() {
         topics,
         Vec::from_array(
             &env,
-            [symbol_short!("pr_pause").into_val(&env), pair.clone().into_val(&env)]
+            [symbol_short!("pr_pause").into_val(&env), 1u32.into_val(&env), pair.clone().into_val(&env)]
         )
     );
     assert!(!bool::try_from_val(&env, &data).unwrap());

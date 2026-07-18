@@ -315,6 +315,9 @@
             "topics": [
               {
                 "symbol": "watch"
+              },
+              {
+                "u32": 1
               }
             ],
             "data": {
@@ -448,6 +451,9 @@
             "topics": [
               {
                 "symbol": "watch"
+              },
+              {
+                "u32": 1
               }
             ],
             "data": {

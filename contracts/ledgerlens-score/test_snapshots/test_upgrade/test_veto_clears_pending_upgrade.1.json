@@ -302,6 +302,9 @@
             "topics": [
               {
                 "symbol": "upg_prop"
+              },
+              {
+                "u32": 1
               }
             ],
             "data": {
@@ -376,6 +379,9 @@
             "topics": [
               {
                 "symbol": "upg_veto"
+              },
+              {
+                "u32": 1
               }
             ],
             "data": {
