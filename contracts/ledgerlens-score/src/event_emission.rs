@@ -24,14 +24,11 @@ mod test_event_schema {
         client.set_watchlist(&Vec::new(&env), &wallet, &true);
 
         let all_events = env.events().all();
-        
+
         // Assert every single event emitted by this contract has EVENT_VERSION as its second topic.
         for (addr, topics, _data) in all_events.iter() {
             if addr == contract_id {
-                assert!(
-                    topics.len() >= 2,
-                    "event topic array too short to contain schema version"
-                );
+                assert!(topics.len() >= 2, "event topic array too short to contain schema version");
                 // First topic is event name, second is schema version
                 let version_topic: u32 = topics.get(1).unwrap().into_val(&env);
                 assert_eq!(

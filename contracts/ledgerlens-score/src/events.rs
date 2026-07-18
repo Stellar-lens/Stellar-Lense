@@ -3,10 +3,10 @@ use soroban_sdk::{contracttype, symbol_short, Address, Bytes, BytesN, Env, Symbo
 use crate::types::RiskScore;
 
 /// Event Schema Versioning
-/// 
+///
 /// All events emitted by this contract carry an explicit schema version in their topic array.
 /// The current version for all events is `1`.
-/// 
+///
 /// Process for bumping:
 /// - Append-only changes (adding a new field to the end of the data payload) do not require a version bump.
 /// - Any change that alters existing field meaning, order, or removes a field, MUST increment the `EVENT_VERSION`
@@ -31,15 +31,15 @@ pub fn score_submitted(env: &Env, wallet: &Address, asset_pair: &Symbol, score: 
 }
 
 pub fn service_updated(env: &Env, new_service: &Address) {
-    env.events().publish((symbol_short!("svc_upd"), EVENT_VERSION,), new_service.clone());
+    env.events().publish((symbol_short!("svc_upd"), EVENT_VERSION), new_service.clone());
 }
 
 pub fn contract_paused(env: &Env, by: &Address) {
-    env.events().publish((symbol_short!("paused"), EVENT_VERSION,), by.clone());
+    env.events().publish((symbol_short!("paused"), EVENT_VERSION), by.clone());
 }
 
 pub fn contract_unpaused(env: &Env, by: &Address) {
-    env.events().publish((symbol_short!("unpaused"), EVENT_VERSION,), by.clone());
+    env.events().publish((symbol_short!("unpaused"), EVENT_VERSION), by.clone());
 }
 
 pub fn pair_paused(env: &Env, asset_pair: &Symbol, paused: bool) {
@@ -47,23 +47,23 @@ pub fn pair_paused(env: &Env, asset_pair: &Symbol, paused: bool) {
 }
 
 pub fn admin_transfer_initiated(env: &Env, from: &Address, to: &Address) {
-    env.events().publish((symbol_short!("adm_init"), EVENT_VERSION,), (from.clone(), to.clone()));
+    env.events().publish((symbol_short!("adm_init"), EVENT_VERSION), (from.clone(), to.clone()));
 }
 
 pub fn admin_transfer_accepted(env: &Env, new_admin: &Address) {
-    env.events().publish((symbol_short!("adm_done"), EVENT_VERSION,), new_admin.clone());
+    env.events().publish((symbol_short!("adm_done"), EVENT_VERSION), new_admin.clone());
 }
 
 pub fn admin_transfer_cancelled(env: &Env, admin: &Address) {
-    env.events().publish((symbol_short!("adm_canc"), EVENT_VERSION,), admin.clone());
+    env.events().publish((symbol_short!("adm_canc"), EVENT_VERSION), admin.clone());
 }
 
 pub fn watchlist_updated(env: &Env, wallet: &Address, flagged: bool) {
-    env.events().publish((symbol_short!("watch"), EVENT_VERSION,), (wallet.clone(), flagged));
+    env.events().publish((symbol_short!("watch"), EVENT_VERSION), (wallet.clone(), flagged));
 }
 
 pub fn threshold_updated(env: &Env, old_threshold: u32, new_threshold: u32) {
-    env.events().publish((symbol_short!("thresh"), EVENT_VERSION,), (old_threshold, new_threshold));
+    env.events().publish((symbol_short!("thresh"), EVENT_VERSION), (old_threshold, new_threshold));
 }
 
 pub fn threshold_breached(
@@ -73,8 +73,10 @@ pub fn threshold_breached(
     score: u32,
     threshold: u32,
 ) {
-    env.events()
-        .publish((symbol_short!("breach"), EVENT_VERSION, wallet.clone()), (asset_pair.clone(), score, threshold));
+    env.events().publish(
+        (symbol_short!("breach"), EVENT_VERSION, wallet.clone()),
+        (asset_pair.clone(), score, threshold),
+    );
 }
 
 /// Emitted by `reset_breach_counter` once the consecutive-breach counter for
@@ -88,27 +90,30 @@ pub fn breach_counter_reset(env: &Env, wallet: &Address, asset_pair: &Symbol, by
 }
 
 pub fn signer_added(env: &Env, signer: &Address) {
-    env.events().publish((symbol_short!("sig_add"), EVENT_VERSION,), signer.clone());
+    env.events().publish((symbol_short!("sig_add"), EVENT_VERSION), signer.clone());
 }
 
 pub fn signer_removed(env: &Env, signer: &Address) {
-    env.events().publish((symbol_short!("sig_rem"), EVENT_VERSION,), signer.clone());
+    env.events().publish((symbol_short!("sig_rem"), EVENT_VERSION), signer.clone());
 }
 
 pub fn service_threshold_updated(env: &Env, threshold: u32) {
-    env.events().publish((symbol_short!("sig_thr"), EVENT_VERSION,), threshold);
+    env.events().publish((symbol_short!("sig_thr"), EVENT_VERSION), threshold);
 }
 
 pub fn upgrade_proposed(env: &Env, new_wasm_hash: &BytesN<32>, executable_after: u64) {
-    env.events().publish((symbol_short!("upg_prop"), EVENT_VERSION,), (new_wasm_hash.clone(), executable_after));
+    env.events().publish(
+        (symbol_short!("upg_prop"), EVENT_VERSION),
+        (new_wasm_hash.clone(), executable_after),
+    );
 }
 
 pub fn upgrade_executed(env: &Env, new_wasm_hash: &BytesN<32>) {
-    env.events().publish((symbol_short!("upg_exec"), EVENT_VERSION,), new_wasm_hash.clone());
+    env.events().publish((symbol_short!("upg_exec"), EVENT_VERSION), new_wasm_hash.clone());
 }
 
 pub fn upgrade_vetoed(env: &Env, by: &Address) {
-    env.events().publish((symbol_short!("upg_veto"), EVENT_VERSION,), by.clone());
+    env.events().publish((symbol_short!("upg_veto"), EVENT_VERSION), by.clone());
 }
 
 pub fn parameter_change_proposed(
@@ -132,15 +137,17 @@ pub fn parameter_change_vetoed(env: &Env, proposal_id: u64, by: &Address) {
 }
 
 pub fn score_history_cleared(env: &Env, wallet: &Address, asset_pair: &Symbol) {
-    env.events().publish((symbol_short!("clr_hist"), EVENT_VERSION, wallet.clone()), asset_pair.clone());
+    env.events()
+        .publish((symbol_short!("clr_hist"), EVENT_VERSION, wallet.clone()), asset_pair.clone());
 }
 
 pub fn score_cleared(env: &Env, wallet: &Address, asset_pair: &Symbol) {
-    env.events().publish((symbol_short!("clr_scr"), EVENT_VERSION, wallet.clone()), asset_pair.clone());
+    env.events()
+        .publish((symbol_short!("clr_scr"), EVENT_VERSION, wallet.clone()), asset_pair.clone());
 }
 
 pub fn cooldown_updated(env: &Env, cooldown_secs: u64) {
-    env.events().publish((symbol_short!("cd_upd"), EVENT_VERSION,), cooldown_secs);
+    env.events().publish((symbol_short!("cd_upd"), EVENT_VERSION), cooldown_secs);
 }
 
 pub fn pair_cooldown_updated(env: &Env, asset_pair: &Symbol, cooldown_secs: u64) {
@@ -148,8 +155,10 @@ pub fn pair_cooldown_updated(env: &Env, asset_pair: &Symbol, cooldown_secs: u64)
 }
 
 pub fn rate_limit_overridden(env: &Env, by: &Address, wallet: &Address, asset_pair: &Symbol) {
-    env.events()
-        .publish((symbol_short!("rl_ovrd"), EVENT_VERSION, wallet.clone(), asset_pair.clone()), by.clone());
+    env.events().publish(
+        (symbol_short!("rl_ovrd"), EVENT_VERSION, wallet.clone(), asset_pair.clone()),
+        by.clone(),
+    );
 }
 
 pub fn score_velocity_cap_set(env: &Env, enabled: bool, points_per_hour: u32) {
@@ -162,7 +171,7 @@ pub fn velocity_cap_overridden(env: &Env, admin: &Address, wallet: &Address, ass
 }
 
 pub fn service_pubkey_updated(env: &Env, pubkey: &Bytes) {
-    env.events().publish((symbol_short!("pk_upd"), EVENT_VERSION,), pubkey.clone());
+    env.events().publish((symbol_short!("pk_upd"), EVENT_VERSION), pubkey.clone());
 }
 
 pub fn aggregate_service_pubkey_updated(env: &Env, pubkey: &Bytes) {
@@ -223,7 +232,7 @@ pub fn model_version_deprecated(env: &Env, version: u32) {
 // ── History depth ─────────────────────────────────────────────────────────────
 
 pub fn history_depth_updated(env: &Env, depth: u32) {
-    env.events().publish((symbol_short!("hd_upd"), EVENT_VERSION,), depth);
+    env.events().publish((symbol_short!("hd_upd"), EVENT_VERSION), depth);
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -247,7 +256,7 @@ pub fn score_delta(
 
 /// Emitted when the admin sets the exponential decay rate via `set_decay_rate`.
 pub fn decay_rate_updated(env: &Env, numerator: u32, denominator: u32) {
-    env.events().publish((symbol_short!("decay_upd"), EVENT_VERSION,), (numerator, denominator));
+    env.events().publish((symbol_short!("decay_upd"), EVENT_VERSION), (numerator, denominator));
 }
 
 pub fn signer_tier_updated(env: &Env, signer: &soroban_sdk::Address, min_score: u32, max_score: u32) {
@@ -255,7 +264,7 @@ pub fn signer_tier_updated(env: &Env, signer: &soroban_sdk::Address, min_score: 
 }
 
 pub fn fee_token_set(env: &Env, token: &Address) {
-    env.events().publish((symbol_short!("ft_set"), EVENT_VERSION,), token.clone());
+    env.events().publish((symbol_short!("ft_set"), EVENT_VERSION), token.clone());
 }
 
 pub fn fee_withdrawn(
@@ -266,31 +275,35 @@ pub fn fee_withdrawn(
     amount: i128,
 ) {
     env.events().publish(
-        (symbol_short!("fee_out"), EVENT_VERSION,),
+        (symbol_short!("fee_out"), EVENT_VERSION),
         (admin.clone(), recipient.clone(), fee_token.clone(), amount),
     );
 }
 
 pub fn withdrawal_locked(env: &Env, admin: &Address) {
-    env.events().publish((symbol_short!("wdl_lck"), EVENT_VERSION,), admin.clone());
+    env.events().publish((symbol_short!("wdl_lck"), EVENT_VERSION), admin.clone());
 }
 
 // ── Score embargo (regulatory hold) ──────────────────────────────────────────
 
 pub fn embargo_set(env: &Env, wallet: &Address, expiry: &Option<u64>) {
-    env.events().publish((symbol_short!("emb_set"), EVENT_VERSION,), (wallet.clone(), *expiry));
+    env.events().publish((symbol_short!("emb_set"), EVENT_VERSION), (wallet.clone(), *expiry));
 }
 
 pub fn embargo_lifted(env: &Env, wallet: &Address, lifted_by: &Address) {
-    env.events().publish((symbol_short!("emb_lift"), EVENT_VERSION,), (wallet.clone(), lifted_by.clone()));
+    env.events()
+        .publish((symbol_short!("emb_lift"), EVENT_VERSION), (wallet.clone(), lifted_by.clone()));
 }
 
 pub fn delegate_set(env: &Env, sub_wallet: &Address, custodian: &Address) {
-    env.events().publish((symbol_short!("dlg_set"), EVENT_VERSION,), (sub_wallet.clone(), custodian.clone()));
+    env.events().publish(
+        (symbol_short!("dlg_set"), EVENT_VERSION),
+        (sub_wallet.clone(), custodian.clone()),
+    );
 }
 
 pub fn delegate_removed(env: &Env, sub_wallet: &Address) {
-    env.events().publish((symbol_short!("dlg_rem"), EVENT_VERSION,), sub_wallet.clone());
+    env.events().publish((symbol_short!("dlg_rem"), EVENT_VERSION), sub_wallet.clone());
 }
 
 /// Emitted when the adaptive threshold is recomputed and changes.
