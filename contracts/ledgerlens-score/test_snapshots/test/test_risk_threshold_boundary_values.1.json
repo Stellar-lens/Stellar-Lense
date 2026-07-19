@@ -331,10 +331,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "thresh"
-              },
-              {
-                "u32": 1
+                "symbol": "pc_prop"
               }
             ],
             "data": {
@@ -509,10 +506,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "thresh"
-              },
-              {
-                "u32": 1
+                "symbol": "pc_prop"
               }
             ],
             "data": {

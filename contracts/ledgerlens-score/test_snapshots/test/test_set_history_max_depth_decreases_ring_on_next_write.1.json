@@ -4317,10 +4317,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "hd_upd"
-              },
-              {
-                "u32": 1
+                "symbol": "pc_prop"
               }
             ],
             "data": {
