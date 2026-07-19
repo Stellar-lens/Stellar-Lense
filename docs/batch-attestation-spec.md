@@ -82,7 +82,7 @@ the explicit `proof_flags` field below.
 
 ### Why not double-hash leaves?
 
-* `compute_commitment` already returns the SHA-256 of a 175-byte preimage.
+* `compute_commitment` already returns the SHA-256 of a 243-byte preimage.
   The Merkle leaf could plausibly be that digest *unmodified*, since
   leaves (32 bytes) and internal nodes (32 bytes) collide on output
   length and would need separate prefixes anyway. We hash once more
@@ -98,7 +98,7 @@ For a batch of `N` entries (the contract enforces `N ≤ MAX_BATCH_SIZE` =
 `2^30`):
 
 1. For each entry `i`, compute `commit_i = compute_commitment(submission_i)`
-   — the same 175-byte preimage `submit_score` already binds.
+   — the same 243-byte preimage `submit_score` already binds.
 2. For each entry, hash it into a leaf:
    `Le_i = SHA-256(0x00 || commit_i)`.
 3. Pad the leaf list to a power of two (`leaf_count` is rounded up to

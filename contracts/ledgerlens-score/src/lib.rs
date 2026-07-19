@@ -9940,7 +9940,7 @@ impl LedgerLensScoreContract {
     /// right`) at every level of the tree, cheap second-preimage resistance
     /// without the extra hashing a sorted-pair scheme would need.
     ///
-    /// The underlying commitment is the same 175-byte preimage
+    /// The underlying commitment is the same 243-byte preimage
     /// [`ScoreAttestation`] binds (binding every leaf to one specific
     /// deployment on one specific network), so a single secp256k1 signature
     /// over the Merkle root cryptographically links every accepted entry
