@@ -8,7 +8,6 @@ mod constants;
 extern crate std;
 mod errors;
 mod events;
-mod gdpr_accumulator;
 #[cfg(any(test, feature = "testutils"))]
 mod invariants;
 mod parameter_governance;
