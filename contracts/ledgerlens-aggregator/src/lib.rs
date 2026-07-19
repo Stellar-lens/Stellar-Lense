@@ -30,20 +30,29 @@ impl LedgerLensAggregator {
         env.storage().instance().get(&DataKey::Admin).ok_or(ScoreError::NotInitialized)
     }
 
-    /// Returns the fixed-point exponential decay lambda as (numerator, denominator)
+    /// Returns the fixed-point exponential decay lambda as (numerator, denominator).
+    ///
+    /// Aggregation policy: singleton configuration is read from the primary
+    /// shard, defined as the first registered shard. If shards diverge, the
+    /// aggregator does not average or reconcile the values; operators must keep
+    /// shard configuration aligned or intentionally choose the primary shard's
+    /// value for integrators.
     ///
     /// Example:
     /// ```ignore
     /// let (num, den) = env.invoke_contract(&contract_id, &symbol_short!("get_decay_rate"), ());
     /// // decay_factor = num / den  (e.g. 999 / 1000 = 0.999)
     /// ```
-    pub fn get_decay_rate(_env: Env) -> (u64, u64) {
-        // These values should match your internal decay logic
-        // Adjust if your decay formula changes
-        const DECAY_NUMERATOR: u64 = 999; // e.g. for 0.999 decay per period
-        const DECAY_DENOMINATOR: u64 = 1000;
+    pub fn get_decay_rate(env: Env) -> Result<(u64, u64), ScoreError> {
+        let shards: Vec<Address> =
+            env.storage().instance().get(&DataKey::Shards).unwrap_or_else(|| Vec::new(&env));
+        let primary = shards.get(0).ok_or(ScoreError::ScoreNotFound)?;
+        let client = ledgerlens_score::LedgerLensScoreContractClient::new(&env, &primary);
 
-        (DECAY_NUMERATOR, DECAY_DENOMINATOR)
+        match client.try_get_decay_rate() {
+            Ok(Ok(rate)) => Ok(rate),
+            _ => Err(ScoreError::ScoreNotFound),
+        }
     }
 
     /// Returns the minimum number of model submissions (K) that must agree
