@@ -5,7 +5,22 @@ use soroban_sdk::{
 };
 
 use crate::constants::SCORE_TTL_THRESHOLD;
-use crate::{Error, LedgerLensScoreContract, LedgerLensScoreContractClient};
+use crate::{storage, types::RiskScore, Error, LedgerLensScoreContract, LedgerLensScoreContractClient};
+
+fn dormant_score() -> RiskScore {
+    RiskScore {
+        score: 10,
+        benford_flag: false,
+        ml_flag: false,
+        timestamp: 1,
+        confidence: 90,
+        model_version: 1,
+        benford_score: 0,
+        ml_score: 0,
+        network_score: 0,
+        commitment: None,
+    }
+}
 
 const START_SEQ: u32 = 1_000;
 
@@ -220,6 +235,118 @@ fn test_extend_entry_ttls_before_init_fails() {
         client.try_extend_entry_ttls(&Vec::new(&env), &Vec::new(&env)),
         Err(Ok(Error::NotInitialized))
     );
+}
+
+// ── Index reordering (queue invariant) ──────────────────────────────────────
+
+#[test]
+fn test_index_moves_entry_to_back_on_retouch() {
+    let (env, client, _, _) = setup();
+    let pair = symbol_short!("XLM_USDC");
+    let a = Address::generate(&env);
+    let b = Address::generate(&env);
+    let c = Address::generate(&env);
+
+    client.submit_score(&Vec::new(&env), &a, &pair, &10, &false, &false, &1, &90, &1, &None);
+    client.submit_score(&Vec::new(&env), &b, &pair, &10, &false, &false, &1, &90, &1, &None);
+    client.submit_score(&Vec::new(&env), &c, &pair, &10, &false, &false, &1, &90, &1, &None);
+
+    let contract_id = client.address.clone();
+    env.as_contract(&contract_id, || {
+        let index = storage::get_score_entry_index(&env);
+        assert_eq!(
+            index,
+            Vec::from_array(&env, [(a.clone(), pair.clone()), (b.clone(), pair.clone()), (c.clone(), pair.clone())])
+        );
+    });
+
+    // Re-writing `a` should move it to the back — it's now the
+    // most-recently touched, not the most overdue.
+    client.submit_score(&Vec::new(&env), &a, &pair, &11, &false, &false, &1, &90, &1, &None);
+
+    env.as_contract(&contract_id, || {
+        let index = storage::get_score_entry_index(&env);
+        assert_eq!(
+            index,
+            Vec::from_array(&env, [(b.clone(), pair.clone()), (c.clone(), pair.clone()), (a.clone(), pair.clone())])
+        );
+    });
+}
+
+#[test]
+fn test_index_moves_entry_to_back_on_admin_renewal() {
+    let (env, client, admin, _) = setup();
+    let pair = symbol_short!("XLM_USDC");
+    let a = Address::generate(&env);
+    let b = Address::generate(&env);
+
+    client.submit_score(&Vec::new(&env), &a, &pair, &10, &false, &false, &1, &90, &1, &None);
+    client.submit_score(&Vec::new(&env), &b, &pair, &10, &false, &false, &1, &90, &1, &None);
+
+    let mut admin_signers = Vec::new(&env);
+    admin_signers.push_back(admin);
+    let mut entries = Vec::new(&env);
+    entries.push_back((a.clone(), pair.clone()));
+    client.extend_entry_ttls(&admin_signers, &entries);
+
+    let contract_id = client.address.clone();
+    env.as_contract(&contract_id, || {
+        let index = storage::get_score_entry_index(&env);
+        assert_eq!(
+            index,
+            Vec::from_array(&env, [(b.clone(), pair.clone()), (a.clone(), pair.clone())])
+        );
+    });
+}
+
+// ── Early-exit sweep cost ────────────────────────────────────────────────────
+
+#[test]
+fn test_get_expiring_entries_short_circuits_full_index_scan() {
+    let (env, client, _, _) = setup();
+    let pair = symbol_short!("XLM_USDC");
+    let contract_id = client.address.clone();
+    let old_wallet = Address::generate(&env);
+
+    // One dormant entry, touched at START_SEQ.
+    env.as_contract(&contract_id, || {
+        storage::set_score(&env, &old_wallet, &pair, &dormant_score());
+    });
+
+    // Everything else is touched right before the sweep, filling the index
+    // to its cap — realistic worst case for the old unconditional full scan.
+    env.ledger().set_sequence_number(START_SEQ + SCORE_TTL_THRESHOLD);
+    env.as_contract(&contract_id, || {
+        for _ in 0..(crate::constants::MAX_TRACKED_SCORE_ENTRIES - 1) {
+            let wallet = Address::generate(&env);
+            storage::set_score(&env, &wallet, &pair, &dormant_score());
+        }
+
+        env.budget().reset_default();
+        env.budget().reset_tracker();
+        let optimized = storage::get_expiring_entries(&env, 50);
+        let optimized_cost = env.budget().cpu_instruction_cost();
+
+        env.budget().reset_default();
+        env.budget().reset_tracker();
+        let baseline = storage::get_expiring_entries_full_scan_baseline(&env, 50);
+        let baseline_cost = env.budget().cpu_instruction_cost();
+
+        assert_eq!(optimized.len(), 1);
+        assert_eq!(optimized.get(0).unwrap(), (old_wallet.clone(), pair.clone()));
+        assert_eq!(optimized, baseline, "early-exit scan must return the same result as the full scan");
+
+        let reduction_pct =
+            (baseline_cost.saturating_sub(optimized_cost) as f64 / baseline_cost as f64) * 100.0;
+        assert!(
+            reduction_pct >= 50.0,
+            "expected the early-exit scan over a {n}-entry index with only 1 \
+             entry due to cost substantially less than the unconditional full \
+             scan; baseline={baseline_cost}, optimized={optimized_cost}, \
+             reduction={reduction_pct:.1}%",
+            n = crate::constants::MAX_TRACKED_SCORE_ENTRIES,
+        );
+    });
 }
 
 #[test]

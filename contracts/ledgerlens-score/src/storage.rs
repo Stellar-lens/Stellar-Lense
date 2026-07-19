@@ -136,17 +136,40 @@ pub fn get_score_entry_index(env: &Env) -> Vec<(Address, Symbol)> {
 /// last-touched ledger is always refreshed regardless of index capacity.
 pub fn track_score_entry(env: &Env, wallet: &Address, asset_pair: &Symbol) {
     let entry = (wallet.clone(), asset_pair.clone());
-    let mut index = get_score_entry_index(env);
-    if !index.contains(&entry) && index.len() < crate::constants::MAX_TRACKED_SCORE_ENTRIES {
-        index.push_back(entry);
-        env.storage().persistent().set(&DataKeyB::ScoreEntryIndex, &index);
-        env.storage().persistent().extend_ttl(
-            &DataKeyB::ScoreEntryIndex,
-            SCORE_TTL_THRESHOLD,
-            SCORE_TTL_EXTEND_TO,
-        );
-    }
+    reindex_entry_to_back(env, &entry);
     touch_score_entry(env, wallet, asset_pair);
+}
+
+/// Moves `entry` to the back of the rent-management index, or appends it if
+/// it isn't tracked yet and the index has room. Called every time an
+/// entry's last-touched ledger is refreshed (`track_score_entry` and
+/// `extend_score_entry_ttl`), so the index is always maintained as a queue
+/// ordered from least-recently-touched (front) to most-recently-touched
+/// (back) — i.e. in descending order of estimated remaining TTL.
+///
+/// `get_expiring_entries` relies on this invariant to stop scanning as soon
+/// as it reaches an entry that isn't due yet: everything after it was
+/// touched more recently and can't be due either.
+fn reindex_entry_to_back(env: &Env, entry: &(Address, Symbol)) {
+    let mut index = get_score_entry_index(env);
+    match index.first_index_of(entry) {
+        Some(pos) => {
+            index.remove(pos);
+            index.push_back(entry.clone());
+        }
+        None => {
+            if index.len() >= crate::constants::MAX_TRACKED_SCORE_ENTRIES {
+                return;
+            }
+            index.push_back(entry.clone());
+        }
+    }
+    env.storage().persistent().set(&DataKeyB::ScoreEntryIndex, &index);
+    env.storage().persistent().extend_ttl(
+        &DataKeyB::ScoreEntryIndex,
+        SCORE_TTL_THRESHOLD,
+        SCORE_TTL_EXTEND_TO,
+    );
 }
 
 fn touch_score_entry(env: &Env, wallet: &Address, asset_pair: &Symbol) {
@@ -204,7 +227,47 @@ pub fn estimate_entry_ttl(env: &Env, wallet: &Address, asset_pair: &Symbol) -> O
 /// has dropped to or below `SCORE_TTL_THRESHOLD` — i.e. entries `set_score`'s
 /// own extend-on-write would now renew if it were called again — ordered
 /// most-urgent (longest elapsed since last touch) first.
+///
+/// `track_score_entry`/`extend_score_entry_ttl` maintain the index as a
+/// queue ordered from least- to most-recently-touched (see
+/// `reindex_entry_to_back`), which is the same thing as descending order of
+/// elapsed-since-touch. That lets this scan stop the moment it reaches an
+/// entry that isn't due yet, instead of always walking all
+/// `MAX_TRACKED_SCORE_ENTRIES` entries: everything after it was touched
+/// more recently and can't be due either. See `test_ttl_rent_manager` for
+/// the instruction-count regression test against the old unconditional
+/// full-scan-plus-selection-sort behavior (kept for comparison as
+/// `get_expiring_entries_full_scan_baseline`, test-only).
 pub fn get_expiring_entries(env: &Env, max_entries: u32) -> Vec<(Address, Symbol)> {
+    let index = get_score_entry_index(env);
+    let capped = max_entries.min(crate::constants::MAX_EXPIRING_ENTRIES_PER_CALL);
+
+    let mut result = Vec::new(env);
+    for i in 0..index.len() {
+        if result.len() >= capped {
+            break;
+        }
+        let (wallet, asset_pair) = index.get(i).unwrap();
+        match ledgers_since_touch(env, &wallet, &asset_pair) {
+            Some(elapsed) if elapsed >= SCORE_TTL_THRESHOLD => {
+                result.push_back((wallet, asset_pair));
+            }
+            // Front-to-back the queue is sorted by descending elapsed time,
+            // so the first not-yet-due entry means nothing after it is due
+            // either — safe to stop here.
+            _ => break,
+        }
+    }
+    result
+}
+
+/// Pre-fix baseline kept for the instruction-count regression test in
+/// `test_ttl_rent_manager`: unconditionally scans the entire index and
+/// selection-sorts the due entries, regardless of how many are actually
+/// due. This is what `get_expiring_entries` did before the index was
+/// restructured into an expiry-ordered queue.
+#[cfg(test)]
+pub fn get_expiring_entries_full_scan_baseline(env: &Env, max_entries: u32) -> Vec<(Address, Symbol)> {
     let index = get_score_entry_index(env);
     let capped = max_entries.min(crate::constants::MAX_EXPIRING_ENTRIES_PER_CALL);
 
@@ -218,9 +281,6 @@ pub fn get_expiring_entries(env: &Env, max_entries: u32) -> Vec<(Address, Symbol
         }
     }
 
-    // Selection sort by descending urgency. `due` is bounded by
-    // `MAX_TRACKED_SCORE_ENTRIES`, and only this infrequent admin-sweep path
-    // pays the O(n^2) — simplicity wins over an asymptotically better sort.
     let mut result = Vec::new(env);
     let take = capped.min(due.len());
     for _ in 0..take {
@@ -252,6 +312,7 @@ pub fn extend_score_entry_ttl(env: &Env, wallet: &Address, asset_pair: &Symbol) 
     }
     let key = DataKey::Score(wallet.clone(), asset_pair.clone());
     env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    reindex_entry_to_back(env, &(wallet.clone(), asset_pair.clone()));
     touch_score_entry(env, wallet, asset_pair);
     true
 }
