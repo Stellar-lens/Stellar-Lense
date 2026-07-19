@@ -41,7 +41,16 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --workspace
 
-
+  error-discriminants:
+    name: Error discriminant stability
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check Error enum discriminants are append-only
+        run: tools/check_error_discriminants.sh "${{ github.event.pull_request.base.sha }}" HEAD
 
   build:
     name: WASM build
