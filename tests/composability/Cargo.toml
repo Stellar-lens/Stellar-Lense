@@ -8,5 +8,6 @@ description = "Cross-contract composability integration tests (issue #121): depl
 [dev-dependencies]
 soroban-sdk = { version = "21.0.0", features = ["testutils"] }
 ledgerlens-score = { path = "../../contracts/ledgerlens-score" }
+ledgerlens-aggregator = { path = "../../contracts/ledgerlens-aggregator" }
 mock-amm = { path = "../../contracts/mock-amm" }
 mock-lending = { path = "../../contracts/mock-lending" }
