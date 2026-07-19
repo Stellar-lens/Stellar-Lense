@@ -91,14 +91,81 @@ fn test_get_consensus_threshold_k() {
 #[test]
 fn test_get_watchlist_status() {
     let env = Env::default();
+    env.mock_all_auths();
     let agg_id = env.register_contract(None, LedgerLensAggregator);
     let client = LedgerLensAggregatorClient::new(&env, &agg_id);
+    let admin = Address::generate(&env);
+    let service = Address::generate(&env);
+    let (shard_id, shard_client) = register_score_shard(&env, &admin, &service);
 
-    let unwatched_wallet = Address::generate(&env);
+    client.initialize(&admin);
+    client.add_shard(&shard_id);
 
-    // Test unwatched (default)
-    assert!(!client.get_watchlist_status(&unwatched_wallet));
+    let wallet = Address::generate(&env);
+    shard_client.set_watchlist(&soroban_sdk::Vec::new(&env), &wallet, &true);
 
-    // TODO: Add logic to add to watchlist and test true case
-    // For now, this verifies the function signature and basic behavior
+    assert!(client.get_watchlist_status(&wallet));
+}
+
+#[test]
+fn test_get_watchlist_status_returns_false_when_watchlisted_nowhere() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let agg_id = env.register_contract(None, LedgerLensAggregator);
+    let client = LedgerLensAggregatorClient::new(&env, &agg_id);
+    let admin = Address::generate(&env);
+    let service = Address::generate(&env);
+    let (shard_a_id, _) = register_score_shard(&env, &admin, &service);
+    let (shard_b_id, _) = register_score_shard(&env, &admin, &service);
+
+    client.initialize(&admin);
+    client.add_shard(&shard_a_id);
+    client.add_shard(&shard_b_id);
+
+    let wallet = Address::generate(&env);
+
+    assert!(!client.get_watchlist_status(&wallet));
+}
+
+#[test]
+fn test_get_watchlist_status_returns_true_when_any_shard_watchlists_wallet() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let agg_id = env.register_contract(None, LedgerLensAggregator);
+    let client = LedgerLensAggregatorClient::new(&env, &agg_id);
+    let admin = Address::generate(&env);
+    let service = Address::generate(&env);
+    let (shard_a_id, _) = register_score_shard(&env, &admin, &service);
+    let (shard_b_id, shard_b_client) = register_score_shard(&env, &admin, &service);
+
+    client.initialize(&admin);
+    client.add_shard(&shard_a_id);
+    client.add_shard(&shard_b_id);
+
+    let wallet = Address::generate(&env);
+    shard_b_client.set_watchlist(&soroban_sdk::Vec::new(&env), &wallet, &true);
+
+    assert!(client.get_watchlist_status(&wallet));
+}
+
+#[test]
+fn test_get_watchlist_status_returns_true_when_all_shards_watchlist_wallet() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let agg_id = env.register_contract(None, LedgerLensAggregator);
+    let client = LedgerLensAggregatorClient::new(&env, &agg_id);
+    let admin = Address::generate(&env);
+    let service = Address::generate(&env);
+    let (shard_a_id, shard_a_client) = register_score_shard(&env, &admin, &service);
+    let (shard_b_id, shard_b_client) = register_score_shard(&env, &admin, &service);
+
+    client.initialize(&admin);
+    client.add_shard(&shard_a_id);
+    client.add_shard(&shard_b_id);
+
+    let wallet = Address::generate(&env);
+    shard_a_client.set_watchlist(&soroban_sdk::Vec::new(&env), &wallet, &true);
+    shard_b_client.set_watchlist(&soroban_sdk::Vec::new(&env), &wallet, &true);
+
+    assert!(client.get_watchlist_status(&wallet));
 }

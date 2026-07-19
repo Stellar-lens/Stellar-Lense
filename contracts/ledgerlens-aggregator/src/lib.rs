@@ -70,19 +70,26 @@ impl LedgerLensAggregator {
         CONSENSUS_THRESHOLD_K
     }
 
-    /// Returns whether the given wallet is currently on the monitoring watchlist.
+    /// Returns whether the given wallet is currently on any shard's monitoring watchlist.
+    ///
+    /// Aggregation policy: watchlist is a conservative risk signal, so shard
+    /// results are OR'd. A wallet is considered watchlisted if any registered
+    /// shard reports `true`.
     ///
     /// Example:
     /// ```ignore
     /// let is_watched = env.invoke_contract(&contract_id, &symbol_short!("get_watchlist_status"), vec![&env, wallet]);
     /// ```
-    pub fn get_watchlist_status(_env: Env, _wallet: Address) -> bool {
-        // TODO: Replace with your actual storage key / logic
-        // For example:
-        // let key = DataKey::Watchlist(wallet);
-        // env.storage().instance().get(&key).unwrap_or(false)
-
-        // Placeholder implementation - update with real storage check
+    pub fn get_watchlist_status(env: Env, wallet: Address) -> bool {
+        let shards: Vec<Address> =
+            env.storage().instance().get(&DataKey::Shards).unwrap_or_else(|| Vec::new(&env));
+        for i in 0..shards.len() {
+            let shard = shards.get(i).unwrap();
+            let client = ledgerlens_score::LedgerLensScoreContractClient::new(&env, &shard);
+            if let Ok(Ok(true)) = client.try_is_watchlisted(&wallet) {
+                return true;
+            }
+        }
         false
     }
 
