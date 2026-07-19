@@ -1052,14 +1052,14 @@ pub fn hll_estimate(env: &Env, asset_pair: &Symbol) -> u64 {
         if r == 0 {
             zeros += 1;
         }
-        sum += 2.0_f64.powf(-(r as f64));
+        sum += libm::pow(2.0, -(r as f64));
     }
-    let estimate = hll_alpha(sketch.precision) * (m as f64).powi(2) / sum;
+    let estimate = hll_alpha(sketch.precision) * libm::pow(m as f64, 2.0) / sum;
     if zeros > 0 && estimate <= 2.5 * (m as f64) {
-        let corrected = (m as f64) * ((m as f64) / (zeros as f64)).ln();
-        corrected.round() as u64
+        let corrected = (m as f64) * libm::log((m as f64) / (zeros as f64));
+        libm::round(corrected) as u64
     } else {
-        estimate.round() as u64
+        libm::round(estimate) as u64
     }
 }
 
