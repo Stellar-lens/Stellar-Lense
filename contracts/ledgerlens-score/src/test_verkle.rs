@@ -15,6 +15,11 @@ use soroban_sdk::{
 };
 
 use crate::{
+    verkle::{
+        self, xor32, derive_evaluation_point, derive_value_element, hash_leaf,
+        encode_proof, decode_proof, commitment_to_bytes48, bytes48_to_commitment,
+        verify_proof,
+    },
     LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreSubmission,
 };
 
@@ -776,4 +781,169 @@ fn range_proof_all_scores_below_80() {
     }
 
     assert!(all_below_80, "range claim 'all < 80' must hold");
+}
+
+// ── Pure verkle primitive tests (catch mutants in verkle.rs) ───────────────
+
+#[test]
+fn test_xor32_commutative() {
+    let a = [1u8; 32];
+    let b = [2u8; 32];
+    let ab = xor32(&a, &b);
+    let ba = xor32(&b, &a);
+    assert_eq!(ab, ba, "xor32 must be commutative");
+}
+
+#[test]
+fn test_xor32_identity() {
+    let a = [0xABu8; 32];
+    let zero = [0u8; 32];
+    assert_eq!(xor32(&a, &zero), a, "a XOR 0 == a");
+}
+
+#[test]
+fn test_xor32_self_inverse() {
+    let a = [0xABu8; 32];
+    let zero = [0u8; 32];
+    assert_eq!(xor32(&a, &a), zero, "a XOR a == 0");
+}
+
+#[test]
+fn test_derive_evaluation_point_deterministic() {
+    let env = Env::default();
+    let wallet_bytes = [3u8; 56];
+    let pair_bytes = [4u8; 9];
+    let z1 = derive_evaluation_point(&env, &wallet_bytes, &pair_bytes);
+    let z2 = derive_evaluation_point(&env, &wallet_bytes, &pair_bytes);
+    assert_eq!(z1, z2, "derive_evaluation_point must be deterministic");
+}
+
+#[test]
+fn test_derive_evaluation_point_differs_for_diff_inputs() {
+    let env = Env::default();
+    let wallet_a = [1u8; 56];
+    let wallet_b = [2u8; 56];
+    let pair = [3u8; 9];
+    let za = derive_evaluation_point(&env, &wallet_a, &pair);
+    let zb = derive_evaluation_point(&env, &wallet_b, &pair);
+    assert_ne!(za, zb, "different wallets must produce different z");
+}
+
+#[test]
+fn test_derive_value_element_deterministic() {
+    let env = Env::default();
+    let z = [5u8; 32];
+    let v1 = derive_value_element(&env, 42, 1000, &z);
+    let v2 = derive_value_element(&env, 42, 1000, &z);
+    assert_eq!(v1, v2, "derive_value_element must be deterministic");
+}
+
+#[test]
+fn test_derive_value_element_differs_for_diff_scores() {
+    let env = Env::default();
+    let z = [5u8; 32];
+    let v1 = derive_value_element(&env, 42, 1000, &z);
+    let v2 = derive_value_element(&env, 99, 1000, &z);
+    assert_ne!(v1, v2, "different scores must produce different v");
+}
+
+#[test]
+fn test_hash_leaf_deterministic() {
+    let env = Env::default();
+    let z = [6u8; 32];
+    let v = [7u8; 32];
+    let h1 = hash_leaf(&env, &z, &v);
+    let h2 = hash_leaf(&env, &z, &v);
+    assert_eq!(h1, h2, "hash_leaf must be deterministic");
+}
+
+#[test]
+fn test_encode_decode_roundtrip_member() {
+    let env = Env::default();
+    let z = [8u8; 32];
+    let v = [9u8; 32];
+    let witness = [10u8; 32];
+    let encoded = encode_proof(&env, true, &z, &v, &witness);
+    let decoded = decode_proof(&encoded);
+    assert!(decoded.is_some(), "decode must succeed for valid proof");
+    let (is_member, dz, dv, dw) = decoded.unwrap();
+    assert!(is_member, "round-tripped is_member must be true");
+    assert_eq!(dz, z, "round-tripped z must match");
+    assert_eq!(dv, v, "round-tripped v must match");
+    assert_eq!(dw, witness, "round-tripped witness must match");
+}
+
+#[test]
+fn test_encode_decode_roundtrip_nonmember() {
+    let env = Env::default();
+    let z = [11u8; 32];
+    let v = [0u8; 32];
+    let witness = [12u8; 32];
+    let encoded = encode_proof(&env, false, &z, &v, &witness);
+    let decoded = decode_proof(&encoded);
+    assert!(decoded.is_some(), "decode must succeed for non-member proof");
+    let (is_member, _dz, _dv, _dw) = decoded.unwrap();
+    assert!(!is_member, "round-tripped is_member must be false");
+}
+
+#[test]
+fn test_decode_fails_for_short_input() {
+    let env = Env::default();
+    let short = Bytes::from_array(&env, &[1u8, 2u8]);
+    assert!(decode_proof(&short).is_none(), "decode must fail for too-short input");
+}
+
+#[test]
+fn test_commitment_bytes48_roundtrip() {
+    let env = Env::default();
+    let commit = [13u8; 32];
+    let b48 = commitment_to_bytes48(&env, &commit);
+    let decoded = bytes48_to_commitment(&b48);
+    assert!(decoded.is_some(), "bytes48_to_commitment must succeed for valid prefix");
+    assert_eq!(decoded.unwrap(), commit, "round-tripped commitment must match");
+}
+
+#[test]
+fn test_commitment_bytes48_prefix_check() {
+    let env = Env::default();
+    // A 48-byte array without the correct prefix should be rejected.
+    let bad = BytesN::<48>::from_array(&env, &[0xFFu8; 48]);
+    assert!(bytes48_to_commitment(&bad).is_none(), "must reject missing prefix");
+}
+
+#[test]
+fn test_verify_proof_with_bogus_witness() {
+    let env = Env::default();
+    let commitment = [0u8; 32];
+    let z = [14u8; 32];
+    let v = [15u8; 32];
+    let bogus_witness = [16u8; 32];
+    // A random witness should not verify against empty commitment.
+    assert!(
+        !verify_proof(&env, &commitment, &z, &v, &bogus_witness),
+        "bogus witness must not verify"
+    );
+}
+
+#[test]
+fn test_update_commitment_is_deterministic() {
+    let env = Env::default();
+    let prev = [17u8; 32];
+    let z = [18u8; 32];
+    let v = [19u8; 32];
+    let c1 = verkle::update_commitment(&env, &prev, &z, &v);
+    let c2 = verkle::update_commitment(&env, &prev, &z, &v);
+    assert_eq!(c1, c2, "update_commitment must be deterministic");
+}
+
+#[test]
+fn test_update_commitment_different_z_different_result() {
+    let env = Env::default();
+    let prev = [20u8; 32];
+    let v = [22u8; 32];
+    let z1 = [21u8; 32];
+    let z2 = [23u8; 32];
+    let c1 = verkle::update_commitment(&env, &prev, &z1, &v);
+    let c2 = verkle::update_commitment(&env, &prev, &z2, &v);
+    assert_ne!(c1, c2, "different z must produce different commitments");
 }

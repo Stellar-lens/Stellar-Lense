@@ -1,7 +1,7 @@
 extern crate std;
 
 use crate::{
-    zk_range_proof::{Sc, SeededPrng, get_generators, compress_pt, prove_range_proof},
+    zk_range_proof::{Fe, Pt, Sc, SeededPrng, Bulletproof, get_generators, compress_pt, decompress_pt_32, is_on_curve, prove_range_proof},
     LedgerLensScoreContract, LedgerLensScoreContractClient,
 };
 use soroban_sdk::{testutils::Address as _, Address, Bytes, BytesN, Env, Symbol, Vec};
@@ -256,4 +256,138 @@ fn test_verify_score_range_proof_tampered_proof() {
         &threshold,
     );
     assert!(!result);
+}
+
+// ── Pure arithmetic tests (catch mutants in Fe/Sc operations) ──────────────
+
+#[test]
+fn test_fe_arithmetic_add_identity() {
+    let a = Fe::from_u64(42);
+    let zero = Fe::zero();
+    assert_eq!(a.add(zero).to_bytes(), a.to_bytes(), "a + 0 == a");
+}
+
+#[test]
+fn test_fe_arithmetic_mul_identity() {
+    let a = Fe::from_u64(7);
+    let one = Fe::one();
+    let r = a.mul(one);
+    assert_eq!(r.to_bytes(), a.to_bytes(), "a * 1 == a");
+}
+
+#[test]
+fn test_fe_arithmetic_mul_zero() {
+    let a = Fe::from_u64(99);
+    let zero = Fe::zero();
+    let r = a.mul(zero);
+    assert!(r.is_zero(), "a * 0 == 0");
+}
+
+#[test]
+fn test_fe_arithmetic_neg_add() {
+    let a = Fe::from_u64(123);
+    let neg = a.neg();
+    let r = a.add(neg);
+    assert!(r.is_zero(), "a + (-a) == 0");
+}
+
+#[test]
+fn test_fe_arithmetic_mul_invert() {
+    let env = Env::default();
+    let a = Fe::from_u64(5);
+    let inv = a.invert();
+    let r = a.mul(inv);
+    let one = Fe::one();
+    assert_eq!(r.to_bytes(), one.to_bytes(), "a * a^(-1) == 1");
+}
+
+#[test]
+fn test_fe_arithmetic_sub_self() {
+    let a = Fe::from_u64(77);
+    let r = a.sub(a);
+    assert!(r.is_zero(), "a - a == 0");
+}
+
+#[test]
+fn test_sc_arithmetic_mul_identity() {
+    let a = Sc::from_u64(42);
+    let one = Sc::one();
+    let r = a.mul(one);
+    assert_eq!(r.to_bytes(), a.to_bytes(), "a * 1 == a");
+}
+
+#[test]
+fn test_sc_arithmetic_mul_zero() {
+    let a = Sc::from_u64(99);
+    let zero = Sc::zero();
+    let r = a.mul(zero);
+    assert!(r.is_zero(), "a * 0 == 0");
+}
+
+#[test]
+fn test_sc_arithmetic_add_neg() {
+    let a = Sc::from_u64(7);
+    let r = a.add(a.neg());
+    assert!(r.is_zero(), "a + (-a) == 0");
+}
+
+// ── Curve point tests ──────────────────────────────────────────────────────
+
+#[test]
+fn test_is_on_curve_valid_points() {
+    let (g_pt, h_pt, d) = get_generators();
+    assert!(is_on_curve(g_pt.x, g_pt.y, d), "generator G is on curve");
+    assert!(is_on_curve(h_pt.x, h_pt.y, d), "generator H is on curve");
+}
+
+#[test]
+fn test_point_add_identity() {
+    let (g_pt, _h_pt, d) = get_generators();
+    let id = Pt::identity();
+    let r = g_pt.add(id, d);
+    assert_eq!(r.x.to_bytes(), g_pt.x.to_bytes(), "G + identity == G (x)");
+    assert_eq!(r.y.to_bytes(), g_pt.y.to_bytes(), "G + identity == G (y)");
+}
+
+#[test]
+fn test_point_mul_scalar_zero() {
+    let (g_pt, _h_pt, d) = get_generators();
+    let zero = Sc::zero();
+    let r = g_pt.mul(zero, d);
+    assert!(r.is_identity(), "G * 0 == identity");
+}
+
+#[test]
+fn test_point_mul_scalar_one() {
+    let (g_pt, _h_pt, d) = get_generators();
+    let one = Sc::one();
+    let r = g_pt.mul(one, d);
+    assert_eq!(r.x.to_bytes(), g_pt.x.to_bytes(), "G * 1 == G (x)");
+    assert_eq!(r.y.to_bytes(), g_pt.y.to_bytes(), "G * 1 == G (y)");
+}
+
+// ── Serialisation round-trip tests ─────────────────────────────────────────
+
+#[test]
+fn test_compress_decompress_roundtrip() {
+    let env = Env::default();
+    let (g_pt, _h_pt, _d) = get_generators();
+    let compressed = compress_pt(&env, &g_pt);
+    let decompressed = decompress_pt_32(&env, &compressed);
+    assert!(decompressed.is_some(), "decompress must succeed");
+    let pt = decompressed.unwrap();
+    assert_eq!(pt.x.to_bytes(), g_pt.x.to_bytes(), "x must match after round-trip");
+    assert_eq!(pt.y.to_bytes(), g_pt.y.to_bytes(), "y must match after round-trip");
+}
+
+#[test]
+fn test_bulletproof_roundtrip() {
+    let env = Env::default();
+    let v = 9u32;
+    let r = Sc::from_u64(123456789);
+    let prng = SeededPrng::new([2u8; 32]);
+    let proof = prove_range_proof(&env, v, r, prng);
+    let bytes = proof.to_bytes(&env);
+    let decoded = Bulletproof::from_bytes(&bytes);
+    assert!(decoded.is_some(), "deserialize must succeed");
 }
