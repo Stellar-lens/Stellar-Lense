@@ -28,6 +28,7 @@ cargo build --target wasm32-unknown-unknown --release
 - Add or update tests in `src/test.rs` for any behavioral change.
 - Keep error codes in `errors.rs` stable; append new variants rather than reordering or removing existing ones, since their numeric values are part of the deployed contract's ABI.
 - Update `README.md` if you change contract function signatures, events, or the deployment flow in `deploy.sh`.
+- **Interface-breaking changes** (see [`docs/interface-versioning-policy.md`](docs/interface-versioning-policy.md) for what counts as breaking) require a minimum 30-day notice period between the `Unreleased` changelog entry and mainnet deployment. The announcement must include a migration guide in `CHANGELOG.md`.
 
 ## Submitting a Pull Request
 
