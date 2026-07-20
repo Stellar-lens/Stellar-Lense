@@ -175,6 +175,15 @@ pub struct ModelVersionStats {
     pub average_score: u32,
 }
 
+/// Governance status for an off-chain ML model version.
+#[contracttype]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum ModelVersionStatus {
+    Proposed = 0,
+    Active = 1,
+    Deprecated = 2,
+}
+
 /// Pending, time-locked risk score submission.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -639,6 +648,8 @@ pub enum DataKeyD {
     RateLimitOverrideLog,
     IqrRejectionMultiplier,
     PendingParamChange(Symbol),
+    ModelVersionExecutableAfter(u32),
+    ModelVersionDescription(u32),
 }
 
 

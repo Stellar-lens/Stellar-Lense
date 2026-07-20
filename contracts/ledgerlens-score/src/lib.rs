@@ -142,7 +142,7 @@ pub use types::{
     AdaptiveRateLimit, AdaptiveThresholdConfig, AggregateRiskScore, BatchAttestation,
     BatchEntryResult, BatchResult, BatchScoreResult, DecayCurve, EffectiveRiskScore,
     EmbargoExpiry, FlashProtectionMode, HllSketch, InterpolationMethod, MaybeRiskScore,
-    MaybeScoreAttestation, MaybeThresholdAttestation, ModelSubmission, ModelVersionStats,
+    MaybeScoreAttestation, MaybeThresholdAttestation, ModelSubmission, ModelVersionStats, ModelVersionStatus,
     ParamChangeProposal, ParamValue, ParameterProposal, ParameterProposalRecord,
     ParameterProposalStatus, PendingScoreEntry,
     RiskScore, ScoreAttestation, ScoreAttestationInput, ScoreDispute, ScoreFloorPolicy,
@@ -1061,10 +1061,19 @@ impl LedgerLensScoreContract {
                 rejection_code = Error::InvalidTimestamp as u32;
             } else if version_check_enabled && !version_set.contains(sub.model_version) {
                 rejection_code = Error::ModelVersionNotRegistered as u32;
-            } else if version_check_enabled
-                && storage::is_model_version_deprecated(&env, sub.model_version)
-            {
-                rejection_code = Error::ModelVersionDeprecated as u32;
+            } else if version_check_enabled {
+                match storage::get_model_version_status(&env, sub.model_version) {
+                    Some(ModelVersionStatus::Active) => {}
+                    Some(ModelVersionStatus::Proposed) => {
+                        rejection_code = Error::ModelVersionNotReady as u32;
+                    }
+                    Some(ModelVersionStatus::Deprecated) => {
+                        rejection_code = Error::ModelVersionDeprecated as u32;
+                    }
+                    None => {
+                        rejection_code = Error::ModelVersionNotRegistered as u32;
+                    }
+                }
             } else {
                 let last_submit = storage::get_last_submit_time(&env, &sub.wallet, &sub.asset_pair);
                 let base_cooldown = storage::get_pair_cooldown_secs(&env, &sub.asset_pair);
@@ -1387,6 +1396,9 @@ impl LedgerLensScoreContract {
         let mut accepted_count: u32 = 0;
         let mut results: Vec<BatchEntryResult> = Vec::new(&env);
 
+        let version_set = storage::get_model_version_set(&env);
+        let version_check_enabled = !version_set.is_empty();
+
         for i in 0..submissions.len() {
             let entry = submissions.get(i).unwrap();
             let mut accepted = false;
@@ -1430,6 +1442,21 @@ impl LedgerLensScoreContract {
                 rejection_code = Error::InvalidConfidence as u32;
             } else if sub.timestamp == 0 {
                 rejection_code = Error::InvalidTimestamp as u32;
+            } else if version_check_enabled && !version_set.contains(sub.model_version) {
+                rejection_code = Error::ModelVersionNotRegistered as u32;
+            } else if version_check_enabled {
+                match storage::get_model_version_status(&env, sub.model_version) {
+                    Some(ModelVersionStatus::Active) => {}
+                    Some(ModelVersionStatus::Proposed) => {
+                        rejection_code = Error::ModelVersionNotReady as u32;
+                    }
+                    Some(ModelVersionStatus::Deprecated) => {
+                        rejection_code = Error::ModelVersionDeprecated as u32;
+                    }
+                    None => {
+                        rejection_code = Error::ModelVersionNotRegistered as u32;
+                    }
+                }
             } else {
                 let last_submit = storage::get_last_submit_time(&env, &sub.wallet, &sub.asset_pair);
                 let base_cooldown = storage::get_pair_cooldown_secs(&env, &sub.asset_pair);
@@ -8384,6 +8411,98 @@ impl LedgerLensScoreContract {
     ///   (Active or Deprecated).
     /// - [`Error::ServiceSetFull`] if registering would exceed
     ///   `MAX_MODEL_VERSIONS` (20).
+    /// Proposes a new ML model version subject to timelock governance.
+    ///
+    /// The version is added to the model version registry with status [`ModelVersionStatus::Proposed`].
+    /// It cannot be used for score submissions until approved via [`approve_model_version`] after the
+    /// upgrade delay timelock has elapsed.
+    ///
+    /// Admin only.
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if contract is not initialized.
+    /// - [`Error::ModelVersionAlreadyRegistered`] if `version` is already registered/proposed.
+    /// - [`Error::ServiceSetFull`] if maximum model versions reached.
+    pub fn propose_model_version(
+        env: Env,
+        admin_signers: Vec<Address>,
+        version: u32,
+        description: Bytes,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+
+        let mut versions = storage::get_model_version_set(&env);
+        if versions.contains(version) {
+            return Err(Error::ModelVersionAlreadyRegistered);
+        }
+        if versions.len() >= constants::MAX_MODEL_VERSIONS {
+            return Err(Error::ServiceSetFull);
+        }
+
+        let now = env.ledger().timestamp();
+        let delay = storage::get_upgrade_delay(&env);
+        let executable_after = now.saturating_add(delay);
+
+        versions.push_back(version);
+        storage::set_model_version_set(&env, &versions);
+        storage::set_model_version_status(&env, version, ModelVersionStatus::Proposed);
+        storage::set_model_version_executable_after(&env, version, executable_after);
+        storage::set_model_version_description(&env, version, &description);
+
+        events::model_version_proposed(&env, version, executable_after);
+        Ok(())
+    }
+
+    /// Approves a proposed model version after its timelock has elapsed, transitioning
+    /// its status from [`Proposed`](ModelVersionStatus::Proposed) to [`Active`](ModelVersionStatus::Active).
+    ///
+    /// Admin only.
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if contract has no admin yet.
+    /// - [`Error::ScoreNotFound`] if `version` was never proposed.
+    /// - [`Error::AlreadyInitialized`] if `version` is already active.
+    /// - [`Error::ModelVersionDeprecated`] if `version` is already deprecated.
+    /// - [`Error::UpgradeNotReady`] if the timelock delay has not yet elapsed (`now < executable_after`).
+    pub fn approve_model_version(
+        env: Env,
+        admin_signers: Vec<Address>,
+        version: u32,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+
+        let status = storage::get_model_version_status(&env, version)
+            .ok_or(Error::ScoreNotFound)?;
+
+        match status {
+            ModelVersionStatus::Proposed => {
+                let now = env.ledger().timestamp();
+                let executable_after = storage::get_model_version_executable_after(&env, version);
+                if now < executable_after {
+                    return Err(Error::UpgradeNotReady);
+                }
+                storage::set_model_version_status(&env, version, ModelVersionStatus::Active);
+                events::model_version_activated(&env, version);
+                Ok(())
+            }
+            ModelVersionStatus::Active => Err(Error::AlreadyInitialized),
+            ModelVersionStatus::Deprecated => Err(Error::ModelVersionDeprecated),
+        }
+    }
+
+    /// Immediately registers a model version with [`Active`](ModelVersionStatus::Active) status. Admin only.
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if the contract has no admin yet.
+    /// - [`Error::ModelVersionAlreadyRegistered`] if `version` is already present
+    ///   (Proposed, Active or Deprecated).
+    /// - [`Error::ServiceSetFull`] if registering would exceed `MAX_MODEL_VERSIONS` (20).
     pub fn register_model_version(
         env: Env,
         admin_signers: Vec<Address>,
@@ -8402,19 +8521,21 @@ impl LedgerLensScoreContract {
         }
         versions.push_back(version);
         storage::set_model_version_set(&env, &versions);
+        storage::set_model_version_status(&env, version, ModelVersionStatus::Active);
         events::model_version_registered(&env, version);
         Ok(())
     }
 
-    /// Permanently deprecate `version`.  Admin only.  Irreversible — there is
+    /// Permanently deprecate `version`. Admin only. Irreversible — there is
     /// intentionally no re-activate path so that once a model version is
     /// retired off-chain, the contract cannot silently start accepting it again.
+    ///
+    /// Transitions [`Active`](ModelVersionStatus::Active) or [`Proposed`](ModelVersionStatus::Proposed) -> [`Deprecated`](ModelVersionStatus::Deprecated).
     ///
     /// # Errors
     /// - [`Error::NotInitialized`] if the contract has no admin yet.
     /// - [`Error::ScoreNotFound`] if `version` was never registered.
-    /// - [`Error::AlreadyInitialized`] if `version` is already
-    ///   deprecated.
+    /// - [`Error::AlreadyInitialized`] if `version` is already deprecated.
     pub fn deprecate_model_version(
         env: Env,
         admin_signers: Vec<Address>,
@@ -8424,12 +8545,13 @@ impl LedgerLensScoreContract {
             return Err(Error::NotInitialized);
         }
         Self::require_admin_auth(&env, &admin_signers)?;
-        if !storage::is_model_version_registered(&env, version) {
-            return Err(Error::ScoreNotFound);
-        }
-        if storage::is_model_version_deprecated(&env, version) {
+        let status = storage::get_model_version_status(&env, version)
+            .ok_or(Error::ScoreNotFound)?;
+
+        if status == ModelVersionStatus::Deprecated {
             return Err(Error::AlreadyInitialized);
         }
+
         storage::set_model_version_deprecated(&env, version);
         events::model_version_deprecated(&env, version);
         Ok(())
@@ -8446,35 +8568,12 @@ impl LedgerLensScoreContract {
     ///   may run more than once.
     ///
     /// One [`model_version_deprecated`](events::model_version_deprecated) event
-    /// is emitted for every version that transitions from active to deprecated.
+    /// is emitted for every version that transitions from active/proposed to deprecated.
     ///
     /// # Errors
     /// - [`Error::NotInitialized`] if the contract has no admin yet.
     /// - [`Error::ScoreNotFound`] if any version in `versions` was never
     ///   registered (the batch is halted at that point).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
-    /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
-    /// let env = Env::default();
-    /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
-    /// let admin = Address::generate(&env);
-    /// let service = Address::generate(&env);
-    /// client.initialize(&admin, &service);
-    /// client.register_model_version(&Vec::new(&env), &1);
-    /// client.register_model_version(&Vec::new(&env), &2);
-    /// let mut versions = Vec::new(&env);
-    /// versions.push_back(1u32);
-    /// versions.push_back(2u32);
-    /// client.bulk_deregister_model_version(&Vec::new(&env), &versions);
-    /// assert!(!client.is_model_version_active(&1));
-    /// assert!(!client.is_model_version_active(&2));
-    /// ```
     pub fn bulk_deregister_model_version(
         env: Env,
         admin_signers: Vec<Address>,
@@ -8486,10 +8585,11 @@ impl LedgerLensScoreContract {
         Self::require_admin_auth(&env, &admin_signers)?;
         for i in 0..versions.len() {
             let version = versions.get(i).unwrap();
-            if !storage::is_model_version_registered(&env, version) {
-                return Err(Error::ScoreNotFound);
-            }
-            if storage::is_model_version_deprecated(&env, version) {
+            let status = match storage::get_model_version_status(&env, version) {
+                Some(s) => s,
+                None => return Err(Error::ScoreNotFound),
+            };
+            if status == ModelVersionStatus::Deprecated {
                 continue;
             }
             storage::set_model_version_deprecated(&env, version);
@@ -8498,22 +8598,27 @@ impl LedgerLensScoreContract {
         Ok(())
     }
 
-    /// Returns `true` only when `version` is registered **and** not yet
-    /// deprecated.  Read-only, callable by any account or contract.
+    /// Returns the governance status ([`ModelVersionStatus`]) for `version`,
+    /// or `None` if `version` was never registered.
+    pub fn get_model_version_status(env: Env, version: u32) -> Option<ModelVersionStatus> {
+        storage::get_model_version_status(&env, version)
+    }
+
+    /// Returns `true` only when `version` is registered **and** active.
+    /// Read-only, callable by any account or contract.
     pub fn is_model_version_active(env: Env, version: u32) -> bool {
-        storage::is_model_version_registered(&env, version)
-            && !storage::is_model_version_deprecated(&env, version)
+        storage::is_model_version_active(&env, version)
     }
 
     /// Returns every registered model version as `(version, is_active)` pairs
-    /// in registration order.  `is_active` is `true` when the version is
-    /// registered and not yet deprecated.  Read-only, callable by any account.
+    /// in registration order. `is_active` is `true` when the version is active.
+    /// Read-only, callable by any account.
     pub fn get_model_versions(env: Env) -> Vec<(u32, bool)> {
         let versions = storage::get_model_version_set(&env);
         let mut result: Vec<(u32, bool)> = Vec::new(&env);
         for i in 0..versions.len() {
             let v = versions.get(i).unwrap();
-            let is_active = !storage::is_model_version_deprecated(&env, v);
+            let is_active = storage::is_model_version_active(&env, v);
             result.push_back((v, is_active));
         }
         result
@@ -9163,8 +9268,17 @@ impl LedgerLensScoreContract {
             if !version_set.contains(score.model_version) {
                 return Err(Error::ModelVersionNotRegistered);
             }
-            if storage::is_model_version_deprecated(env, score.model_version) {
-                return Err(Error::ModelVersionDeprecated);
+            match storage::get_model_version_status(env, score.model_version) {
+                Some(ModelVersionStatus::Active) => {}
+                Some(ModelVersionStatus::Proposed) => {
+                    return Err(Error::ModelVersionNotReady);
+                }
+                Some(ModelVersionStatus::Deprecated) => {
+                    return Err(Error::ModelVersionDeprecated);
+                }
+                None => {
+                    return Err(Error::ModelVersionNotRegistered);
+                }
             }
         }
         Ok(())

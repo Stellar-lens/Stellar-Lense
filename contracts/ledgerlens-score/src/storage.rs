@@ -8,7 +8,7 @@ use crate::errors::Error;
 use crate::types::{
     AdaptiveRateLimit, AggregateRiskScore, DataKey, DataKeyB, DataKeyC, DataKeyD, DecayCurve,
     EmbargoExpiry, FlashProtectionMode, GateDataKey, HllSketch, InterpolationMethod,
-    JumpStats, ModelVersionStats, ParamChangeProposal, ParameterProposalRecord,
+    JumpStats, ModelVersionStats, ModelVersionStatus, ParamChangeProposal, ParameterProposalRecord,
     ParameterProposalStatus, PairVolatilityState, PendingScoreEntry, RateLimitOverrideEntry,
     RiskScore, ScoreDispute, ScoreFloorPolicy, ScoreHistogram,
     ScoreTrend, ScoreVelocityCap, SignerAccuracyRecord, SubscorePayload, TokenBucket,
@@ -2072,14 +2072,57 @@ pub fn is_model_version_registered(env: &Env, version: u32) -> bool {
     get_model_version_set(env).contains(version)
 }
 
-pub fn is_model_version_deprecated(env: &Env, version: u32) -> bool {
+pub fn get_model_version_status(env: &Env, version: u32) -> Option<ModelVersionStatus> {
+    if !is_model_version_registered(env, version) {
+        return None;
+    }
     let key = DataKeyB::ModelVersionStatus(version);
-    let status: Option<u32> = env.storage().instance().get(&key);
-    status.unwrap_or(0) == 1
+    if let Some(status) = env.storage().instance().get(&key) {
+        Some(status)
+    } else {
+        Some(ModelVersionStatus::Active)
+    }
+}
+
+pub fn set_model_version_status(env: &Env, version: u32, status: ModelVersionStatus) {
+    let key = DataKeyB::ModelVersionStatus(version);
+    env.storage().instance().set(&key, &status);
+}
+
+pub fn get_model_version_executable_after(env: &Env, version: u32) -> u64 {
+    let key = DataKeyD::ModelVersionExecutableAfter(version);
+    env.storage().instance().get(&key).unwrap_or(0)
+}
+
+pub fn set_model_version_executable_after(env: &Env, version: u32, timestamp: u64) {
+    let key = DataKeyD::ModelVersionExecutableAfter(version);
+    env.storage().instance().set(&key, &timestamp);
+}
+
+pub fn get_model_version_description(env: &Env, version: u32) -> Bytes {
+    let key = DataKeyD::ModelVersionDescription(version);
+    env.storage().instance().get(&key).unwrap_or_else(|| Bytes::new(env))
+}
+
+pub fn set_model_version_description(env: &Env, version: u32, description: &Bytes) {
+    let key = DataKeyD::ModelVersionDescription(version);
+    env.storage().instance().set(&key, description);
+}
+
+pub fn is_model_version_active(env: &Env, version: u32) -> bool {
+    get_model_version_status(env, version) == Some(ModelVersionStatus::Active)
+}
+
+pub fn is_model_version_deprecated(env: &Env, version: u32) -> bool {
+    get_model_version_status(env, version) == Some(ModelVersionStatus::Deprecated)
+}
+
+pub fn is_model_version_proposed(env: &Env, version: u32) -> bool {
+    get_model_version_status(env, version) == Some(ModelVersionStatus::Proposed)
 }
 
 pub fn set_model_version_deprecated(env: &Env, version: u32) {
-    env.storage().instance().set(&DataKeyB::ModelVersionStatus(version), &1u32);
+    set_model_version_status(env, version, ModelVersionStatus::Deprecated);
 }
 
 // ── Bayesian model posterior weights ─────────────────────────────────────────
