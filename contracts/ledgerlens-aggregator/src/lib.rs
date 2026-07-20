@@ -44,19 +44,38 @@ impl LedgerLensAggregator {
         (DECAY_NUMERATOR, DECAY_DENOMINATOR)
     }
 
-    /// Returns the minimum number of model submissions (K) that must agree
-    /// within epsilon for consensus to be accepted.
+    /// Returns the minimum K across all registered shards' consensus
+    /// configurations, or a conservative default (2) if none are available.
+    ///
+    /// Uses min-K reconciliation: taking the minimum K across shards ensures
+    /// that the strictest shard's requirement is always satisfied, which is
+    /// the conservative choice for safety.
     ///
     /// Example:
     /// ```ignore
     /// let k = env.invoke_contract(&contract_id, &symbol_short!("get_consensus_threshold_k"), ());
-    /// // e.g. k = 5 means at least 5 models must agree
     /// ```
-    pub fn get_consensus_threshold_k(_env: Env) -> u32 {
-        // Adjust this value based on your actual consensus parameters
-        const CONSENSUS_THRESHOLD_K: u32 = 5;   // Minimum agreeing models required
-
-        CONSENSUS_THRESHOLD_K
+    pub fn get_consensus_threshold_k(env: Env) -> u32 {
+        const DEFAULT_K: u32 = 2;
+        let shards: Vec<Address> = env.storage().instance().get(&DataKey::Shards).unwrap_or_else(|| Vec::new(&env));
+        if shards.is_empty() {
+            return DEFAULT_K;
+        }
+        let mut min_k: Option<u32> = None;
+        for i in 0..shards.len() {
+            let shard = shards.get(i).unwrap();
+            let client = ledgerlens_score::LedgerLensScoreContractClient::new(&env, &shard);
+            if let Ok(Ok((k, _))) = client.try_get_consensus_config() {
+                if k == 0 {
+                    continue;
+                }
+                min_k = Some(match min_k {
+                    None => k,
+                    Some(cur) => if k < cur { k } else { cur },
+                });
+            }
+        }
+        min_k.unwrap_or(DEFAULT_K)
     }
 
     /// Returns whether the given wallet is currently on the monitoring watchlist.
