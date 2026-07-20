@@ -10301,15 +10301,6 @@ impl LedgerLensScoreContract {
     }
 }
 
-// ── Query gate allowlist (stub — full implementation pending) ────────────────
-mod storage_gate {
-    use soroban_sdk::Env;
-
-    pub fn verify_caller_protection(_env: &Env) -> bool {
-        true
-    }
-}
-
 /// Integer square root (floor) for use in volatility std-dev computation.
 fn isqrt_u64(n: u64) -> u64 {
     if n == 0 {
