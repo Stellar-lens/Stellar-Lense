@@ -7,31 +7,6 @@
     [],
     [
       [
-        "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
-        {
-          "function": {
-            "contract_fn": {
-              "contract_address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-              "function_name": "set_pair_weight",
-              "args": [
-                {
-                  "vec": []
-                },
-                {
-                  "symbol": "XLM_BTC"
-                },
-                {
-                  "u32": 0
-                }
-              ]
-            }
-          },
-          "sub_invocations": []
-        }
-      ]
-    ],
-    [
-      [
         "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
         {
           "function": {
@@ -46,19 +21,19 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                 },
                 {
-                  "symbol": "XLM_USDC"
+                  "symbol": "XLMUSDC"
                 },
                 {
-                  "u32": 70
-                },
-                {
-                  "bool": false
+                  "u32": 50
                 },
                 {
                   "bool": false
                 },
                 {
-                  "u64": 1
+                  "bool": false
+                },
+                {
+                  "u64": 10
                 },
                 {
                   "u32": 90
@@ -90,22 +65,22 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                 },
                 {
-                  "symbol": "XLM_BTC"
+                  "symbol": "ETHUSDC"
                 },
                 {
-                  "u32": 10
-                },
-                {
-                  "bool": false
+                  "u32": 30
                 },
                 {
                   "bool": false
                 },
                 {
-                  "u64": 2
+                  "bool": false
                 },
                 {
-                  "u32": 90
+                  "u64": 20
+                },
+                {
+                  "u32": 85
                 },
                 {
                   "u32": 1
@@ -123,7 +98,7 @@
   "ledger": {
     "protocol_version": 21,
     "sequence_number": 0,
-    "timestamp": 100000,
+    "timestamp": 0,
     "network_id": "0000000000000000000000000000000000000000000000000000000000000000",
     "base_reserve": 0,
     "min_persistent_entry_ttl": 4096,
@@ -172,7 +147,7 @@
                         "symbol": "aggregate_score"
                       },
                       "val": {
-                        "u32": 70
+                        "u32": 40
                       }
                     },
                     {
@@ -196,7 +171,7 @@
                         "symbol": "last_updated"
                       },
                       "val": {
-                        "u64": 2
+                        "u64": 20
                       }
                     },
                     {
@@ -204,7 +179,7 @@
                         "symbol": "max_pair"
                       },
                       "val": {
-                        "symbol": "XLM_USDC"
+                        "symbol": "XLMUSDC"
                       }
                     },
                     {
@@ -212,7 +187,7 @@
                         "symbol": "max_pair_score"
                       },
                       "val": {
-                        "u32": 70
+                        "u32": 50
                       }
                     },
                     {
@@ -278,10 +253,10 @@
                 "val": {
                   "vec": [
                     {
-                      "symbol": "XLM_USDC"
+                      "symbol": "XLMUSDC"
                     },
                     {
-                      "symbol": "XLM_BTC"
+                      "symbol": "ETHUSDC"
                     }
                   ]
                 }
@@ -305,7 +280,7 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                 },
                 {
-                  "symbol": "XLM_BTC"
+                  "symbol": "ETHUSDC"
                 }
               ]
             },
@@ -328,7 +303,7 @@
                       "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                     },
                     {
-                      "symbol": "XLM_BTC"
+                      "symbol": "ETHUSDC"
                     }
                   ]
                 },
@@ -356,7 +331,7 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                 },
                 {
-                  "symbol": "XLM_USDC"
+                  "symbol": "XLMUSDC"
                 }
               ]
             },
@@ -379,7 +354,7 @@
                       "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                     },
                     {
-                      "symbol": "XLM_USDC"
+                      "symbol": "XLMUSDC"
                     }
                   ]
                 },
@@ -407,7 +382,7 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                 },
                 {
-                  "symbol": "XLM_BTC"
+                  "symbol": "ETHUSDC"
                 }
               ]
             },
@@ -430,13 +405,13 @@
                       "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                     },
                     {
-                      "symbol": "XLM_BTC"
+                      "symbol": "ETHUSDC"
                     }
                   ]
                 },
                 "durability": "persistent",
                 "val": {
-                  "u32": 10
+                  "u32": 30
                 }
               }
             },
@@ -458,7 +433,7 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                 },
                 {
-                  "symbol": "XLM_USDC"
+                  "symbol": "XLMUSDC"
                 }
               ]
             },
@@ -481,13 +456,13 @@
                       "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                     },
                     {
-                      "symbol": "XLM_USDC"
+                      "symbol": "XLMUSDC"
                     }
                   ]
                 },
                 "durability": "persistent",
                 "val": {
-                  "u32": 70
+                  "u32": 50
                 }
               }
             },
@@ -509,7 +484,7 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                 },
                 {
-                  "symbol": "XLM_BTC"
+                  "symbol": "ETHUSDC"
                 }
               ]
             },
@@ -532,13 +507,13 @@
                       "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                     },
                     {
-                      "symbol": "XLM_BTC"
+                      "symbol": "ETHUSDC"
                     }
                   ]
                 },
                 "durability": "persistent",
                 "val": {
-                  "u64": 100000
+                  "u64": 0
                 }
               }
             },
@@ -560,7 +535,7 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                 },
                 {
-                  "symbol": "XLM_USDC"
+                  "symbol": "XLMUSDC"
                 }
               ]
             },
@@ -583,13 +558,13 @@
                       "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                     },
                     {
-                      "symbol": "XLM_USDC"
+                      "symbol": "XLMUSDC"
                     }
                   ]
                 },
                 "durability": "persistent",
                 "val": {
-                  "u64": 100000
+                  "u64": 0
                 }
               }
             },
@@ -608,7 +583,7 @@
                   "symbol": "PairScoreCount"
                 },
                 {
-                  "symbol": "XLM_BTC"
+                  "symbol": "ETHUSDC"
                 }
               ]
             },
@@ -628,7 +603,7 @@
                       "symbol": "PairScoreCount"
                     },
                     {
-                      "symbol": "XLM_BTC"
+                      "symbol": "ETHUSDC"
                     }
                   ]
                 },
@@ -653,7 +628,7 @@
                   "symbol": "PairScoreCount"
                 },
                 {
-                  "symbol": "XLM_USDC"
+                  "symbol": "XLMUSDC"
                 }
               ]
             },
@@ -673,58 +648,13 @@
                       "symbol": "PairScoreCount"
                     },
                     {
-                      "symbol": "XLM_USDC"
+                      "symbol": "XLMUSDC"
                     }
                   ]
                 },
                 "durability": "persistent",
                 "val": {
                   "u64": 1
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          777600
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-            "key": {
-              "vec": [
-                {
-                  "symbol": "PairWeight"
-                },
-                {
-                  "symbol": "XLM_BTC"
-                }
-              ]
-            },
-            "durability": "persistent"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-                "key": {
-                  "vec": [
-                    {
-                      "symbol": "PairWeight"
-                    },
-                    {
-                      "symbol": "XLM_BTC"
-                    }
-                  ]
-                },
-                "durability": "persistent",
-                "val": {
-                  "u32": 0
                 }
               }
             },
@@ -746,7 +676,7 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                 },
                 {
-                  "symbol": "XLM_BTC"
+                  "symbol": "ETHUSDC"
                 }
               ]
             },
@@ -769,7 +699,137 @@
                       "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                     },
                     {
-                      "symbol": "XLM_BTC"
+                      "symbol": "ETHUSDC"
+                    }
+                  ]
+                },
+                "durability": "persistent",
+                "val": {
+                  "map": [
+                    {
+                      "key": {
+                        "symbol": "benford_flag"
+                      },
+                      "val": {
+                        "bool": false
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "benford_score"
+                      },
+                      "val": {
+                        "u32": 0
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "commitment"
+                      },
+                      "val": "void"
+                    },
+                    {
+                      "key": {
+                        "symbol": "confidence"
+                      },
+                      "val": {
+                        "u32": 85
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "ml_flag"
+                      },
+                      "val": {
+                        "bool": false
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "ml_score"
+                      },
+                      "val": {
+                        "u32": 0
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "model_version"
+                      },
+                      "val": {
+                        "u32": 1
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "network_score"
+                      },
+                      "val": {
+                        "u32": 0
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "score"
+                      },
+                      "val": {
+                        "u32": 30
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "timestamp"
+                      },
+                      "val": {
+                        "u64": 20
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "ext": "v0"
+          },
+          777600
+        ]
+      ],
+      [
+        {
+          "contract_data": {
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+            "key": {
+              "vec": [
+                {
+                  "symbol": "Score"
+                },
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                },
+                {
+                  "symbol": "XLMUSDC"
+                }
+              ]
+            },
+            "durability": "persistent"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+                "key": {
+                  "vec": [
+                    {
+                      "symbol": "Score"
+                    },
+                    {
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                    },
+                    {
+                      "symbol": "XLMUSDC"
                     }
                   ]
                 },
@@ -843,7 +903,7 @@
                         "symbol": "score"
                       },
                       "val": {
-                        "u32": 10
+                        "u32": 50
                       }
                     },
                     {
@@ -851,137 +911,7 @@
                         "symbol": "timestamp"
                       },
                       "val": {
-                        "u64": 2
-                      }
-                    }
-                  ]
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          777600
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-            "key": {
-              "vec": [
-                {
-                  "symbol": "Score"
-                },
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
-                },
-                {
-                  "symbol": "XLM_USDC"
-                }
-              ]
-            },
-            "durability": "persistent"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-                "key": {
-                  "vec": [
-                    {
-                      "symbol": "Score"
-                    },
-                    {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
-                    },
-                    {
-                      "symbol": "XLM_USDC"
-                    }
-                  ]
-                },
-                "durability": "persistent",
-                "val": {
-                  "map": [
-                    {
-                      "key": {
-                        "symbol": "benford_flag"
-                      },
-                      "val": {
-                        "bool": false
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "benford_score"
-                      },
-                      "val": {
-                        "u32": 0
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "commitment"
-                      },
-                      "val": "void"
-                    },
-                    {
-                      "key": {
-                        "symbol": "confidence"
-                      },
-                      "val": {
-                        "u32": 90
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "ml_flag"
-                      },
-                      "val": {
-                        "bool": false
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "ml_score"
-                      },
-                      "val": {
-                        "u32": 0
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "model_version"
-                      },
-                      "val": {
-                        "u32": 1
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "network_score"
-                      },
-                      "val": {
-                        "u32": 0
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "score"
-                      },
-                      "val": {
-                        "u32": 70
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "timestamp"
-                      },
-                      "val": {
-                        "u64": 1
+                        "u64": 10
                       }
                     }
                   ]
@@ -1006,7 +936,7 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                 },
                 {
-                  "symbol": "XLM_BTC"
+                  "symbol": "ETHUSDC"
                 }
               ]
             },
@@ -1029,7 +959,7 @@
                       "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                     },
                     {
-                      "symbol": "XLM_BTC"
+                      "symbol": "ETHUSDC"
                     }
                   ]
                 },
@@ -1057,7 +987,7 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                 },
                 {
-                  "symbol": "XLM_USDC"
+                  "symbol": "XLMUSDC"
                 }
               ]
             },
@@ -1080,7 +1010,7 @@
                       "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                     },
                     {
-                      "symbol": "XLM_USDC"
+                      "symbol": "XLMUSDC"
                     }
                   ]
                 },
@@ -1132,7 +1062,7 @@
                           "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                         },
                         {
-                          "symbol": "XLM_USDC"
+                          "symbol": "XLMUSDC"
                         }
                       ]
                     },
@@ -1142,7 +1072,7 @@
                           "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                         },
                         {
-                          "symbol": "XLM_BTC"
+                          "symbol": "ETHUSDC"
                         }
                       ]
                     }
@@ -1168,7 +1098,7 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                 },
                 {
-                  "symbol": "XLM_BTC"
+                  "symbol": "ETHUSDC"
                 }
               ]
             },
@@ -1191,7 +1121,7 @@
                       "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                     },
                     {
-                      "symbol": "XLM_BTC"
+                      "symbol": "ETHUSDC"
                     }
                   ]
                 },
@@ -1219,7 +1149,7 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                 },
                 {
-                  "symbol": "XLM_USDC"
+                  "symbol": "XLMUSDC"
                 }
               ]
             },
@@ -1242,7 +1172,7 @@
                       "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                     },
                     {
-                      "symbol": "XLM_USDC"
+                      "symbol": "XLMUSDC"
                     }
                   ]
                 },
@@ -1270,7 +1200,7 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                 },
                 {
-                  "symbol": "XLM_BTC"
+                  "symbol": "ETHUSDC"
                 }
               ]
             },
@@ -1293,7 +1223,141 @@
                       "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                     },
                     {
-                      "symbol": "XLM_BTC"
+                      "symbol": "ETHUSDC"
+                    }
+                  ]
+                },
+                "durability": "persistent",
+                "val": {
+                  "vec": [
+                    {
+                      "map": [
+                        {
+                          "key": {
+                            "symbol": "benford_flag"
+                          },
+                          "val": {
+                            "bool": false
+                          }
+                        },
+                        {
+                          "key": {
+                            "symbol": "benford_score"
+                          },
+                          "val": {
+                            "u32": 0
+                          }
+                        },
+                        {
+                          "key": {
+                            "symbol": "commitment"
+                          },
+                          "val": "void"
+                        },
+                        {
+                          "key": {
+                            "symbol": "confidence"
+                          },
+                          "val": {
+                            "u32": 85
+                          }
+                        },
+                        {
+                          "key": {
+                            "symbol": "ml_flag"
+                          },
+                          "val": {
+                            "bool": false
+                          }
+                        },
+                        {
+                          "key": {
+                            "symbol": "ml_score"
+                          },
+                          "val": {
+                            "u32": 0
+                          }
+                        },
+                        {
+                          "key": {
+                            "symbol": "model_version"
+                          },
+                          "val": {
+                            "u32": 1
+                          }
+                        },
+                        {
+                          "key": {
+                            "symbol": "network_score"
+                          },
+                          "val": {
+                            "u32": 0
+                          }
+                        },
+                        {
+                          "key": {
+                            "symbol": "score"
+                          },
+                          "val": {
+                            "u32": 30
+                          }
+                        },
+                        {
+                          "key": {
+                            "symbol": "timestamp"
+                          },
+                          "val": {
+                            "u64": 20
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            "ext": "v0"
+          },
+          777600
+        ]
+      ],
+      [
+        {
+          "contract_data": {
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+            "key": {
+              "vec": [
+                {
+                  "symbol": "ScoreHistory"
+                },
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                },
+                {
+                  "symbol": "XLMUSDC"
+                }
+              ]
+            },
+            "durability": "persistent"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+                "key": {
+                  "vec": [
+                    {
+                      "symbol": "ScoreHistory"
+                    },
+                    {
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                    },
+                    {
+                      "symbol": "XLMUSDC"
                     }
                   ]
                 },
@@ -1369,7 +1433,7 @@
                             "symbol": "score"
                           },
                           "val": {
-                            "u32": 10
+                            "u32": 50
                           }
                         },
                         {
@@ -1377,141 +1441,7 @@
                             "symbol": "timestamp"
                           },
                           "val": {
-                            "u64": 2
-                          }
-                        }
-                      ]
-                    }
-                  ]
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          777600
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-            "key": {
-              "vec": [
-                {
-                  "symbol": "ScoreHistory"
-                },
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
-                },
-                {
-                  "symbol": "XLM_USDC"
-                }
-              ]
-            },
-            "durability": "persistent"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-                "key": {
-                  "vec": [
-                    {
-                      "symbol": "ScoreHistory"
-                    },
-                    {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
-                    },
-                    {
-                      "symbol": "XLM_USDC"
-                    }
-                  ]
-                },
-                "durability": "persistent",
-                "val": {
-                  "vec": [
-                    {
-                      "map": [
-                        {
-                          "key": {
-                            "symbol": "benford_flag"
-                          },
-                          "val": {
-                            "bool": false
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "benford_score"
-                          },
-                          "val": {
-                            "u32": 0
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "commitment"
-                          },
-                          "val": "void"
-                        },
-                        {
-                          "key": {
-                            "symbol": "confidence"
-                          },
-                          "val": {
-                            "u32": 90
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "ml_flag"
-                          },
-                          "val": {
-                            "bool": false
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "ml_score"
-                          },
-                          "val": {
-                            "u32": 0
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "model_version"
-                          },
-                          "val": {
-                            "u32": 1
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "network_score"
-                          },
-                          "val": {
-                            "u32": 0
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "score"
-                          },
-                          "val": {
-                            "u32": 70
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "timestamp"
-                          },
-                          "val": {
-                            "u64": 1
+                            "u64": 10
                           }
                         }
                       ]
@@ -1538,7 +1468,7 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                 },
                 {
-                  "symbol": "XLM_BTC"
+                  "symbol": "ETHUSDC"
                 }
               ]
             },
@@ -1561,7 +1491,7 @@
                       "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                     },
                     {
-                      "symbol": "XLM_BTC"
+                      "symbol": "ETHUSDC"
                     }
                   ]
                 },
@@ -1589,7 +1519,7 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                 },
                 {
-                  "symbol": "XLM_USDC"
+                  "symbol": "XLMUSDC"
                 }
               ]
             },
@@ -1612,7 +1542,7 @@
                       "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                     },
                     {
-                      "symbol": "XLM_USDC"
+                      "symbol": "XLMUSDC"
                     }
                   ]
                 },
@@ -1640,7 +1570,7 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                 },
                 {
-                  "symbol": "XLM_BTC"
+                  "symbol": "ETHUSDC"
                 }
               ]
             },
@@ -1663,7 +1593,7 @@
                       "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                     },
                     {
-                      "symbol": "XLM_BTC"
+                      "symbol": "ETHUSDC"
                     }
                   ]
                 },
@@ -1708,7 +1638,7 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                 },
                 {
-                  "symbol": "XLM_USDC"
+                  "symbol": "XLMUSDC"
                 }
               ]
             },
@@ -1731,7 +1661,7 @@
                       "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                     },
                     {
-                      "symbol": "XLM_USDC"
+                      "symbol": "XLMUSDC"
                     }
                   ]
                 },
@@ -1773,7 +1703,7 @@
                   "symbol": "UniqueWalletsHll"
                 },
                 {
-                  "symbol": "XLM_BTC"
+                  "symbol": "ETHUSDC"
                 }
               ]
             },
@@ -1793,7 +1723,7 @@
                       "symbol": "UniqueWalletsHll"
                     },
                     {
-                      "symbol": "XLM_BTC"
+                      "symbol": "ETHUSDC"
                     }
                   ]
                 },
@@ -2604,7 +2534,7 @@
                   "symbol": "UniqueWalletsHll"
                 },
                 {
-                  "symbol": "XLM_USDC"
+                  "symbol": "XLMUSDC"
                 }
               ]
             },
@@ -2624,7 +2554,7 @@
                       "symbol": "UniqueWalletsHll"
                     },
                     {
-                      "symbol": "XLM_USDC"
+                      "symbol": "XLMUSDC"
                     }
                   ]
                 },
@@ -3438,7 +3368,7 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                 },
                 {
-                  "symbol": "XLM_BTC"
+                  "symbol": "ETHUSDC"
                 }
               ]
             },
@@ -3461,13 +3391,13 @@
                       "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                     },
                     {
-                      "symbol": "XLM_BTC"
+                      "symbol": "ETHUSDC"
                     }
                   ]
                 },
                 "durability": "persistent",
                 "val": {
-                  "bytes": "719d27c1c58f27665dffceff227d1239e00d1780dab80442051e02e51be7c3c7"
+                  "bytes": "d4d45efd26b62aeef5242e9203c513867f240999689914a84e5204d216179ab4"
                 }
               }
             },
@@ -3489,7 +3419,7 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                 },
                 {
-                  "symbol": "XLM_USDC"
+                  "symbol": "XLMUSDC"
                 }
               ]
             },
@@ -3512,13 +3442,13 @@
                       "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                     },
                     {
-                      "symbol": "XLM_USDC"
+                      "symbol": "XLMUSDC"
                     }
                   ]
                 },
                 "durability": "persistent",
                 "val": {
-                  "bytes": "523a2e84763e8e95f5af01647612a07b34bd94f8c27159090b2c02ccad051881"
+                  "bytes": "b12b08bfa4dfa48150192717db16fea5fc5a5ccdecb814f6601fd28941d23ec6"
                 }
               }
             },
@@ -3595,7 +3525,7 @@
                           ]
                         },
                         "val": {
-                          "u64": 100000
+                          "u64": 0
                         }
                       },
                       {
@@ -3607,7 +3537,7 @@
                           ]
                         },
                         "val": {
-                          "u64": 100000
+                          "u64": 0
                         }
                       },
                       {
@@ -3696,18 +3626,6 @@
                               "u64": 0
                             },
                             {
-                              "u64": 1
-                            },
-                            {
-                              "u64": 0
-                            },
-                            {
-                              "u64": 0
-                            },
-                            {
-                              "u64": 0
-                            },
-                            {
                               "u64": 0
                             },
                             {
@@ -3715,6 +3633,18 @@
                             },
                             {
                               "u64": 1
+                            },
+                            {
+                              "u64": 0
+                            },
+                            {
+                              "u64": 1
+                            },
+                            {
+                              "u64": 0
+                            },
+                            {
+                              "u64": 0
                             },
                             {
                               "u64": 0
@@ -3758,7 +3688,7 @@
                           ]
                         },
                         "val": {
-                          "bytes": "23a70945b3b1a9f3a850cf9b546fb242d4b0837818c95d4b0e320029b6e2db46"
+                          "bytes": "65ff564282698e6fa53d0985d8d3ed23837e55548421005e2e4dd65b57c5a472"
                         }
                       },
                       {
@@ -3768,10 +3698,10 @@
                               "symbol": "WelfordCorrState"
                             },
                             {
-                              "symbol": "XLM_BTC"
+                              "symbol": "ETHUSDC"
                             },
                             {
-                              "symbol": "XLM_USDC"
+                              "symbol": "XLMUSDC"
                             }
                           ]
                         },
@@ -3790,7 +3720,7 @@
                                 "symbol": "sum_a"
                               },
                               "val": {
-                                "i64": 10
+                                "i64": 30
                               }
                             },
                             {
@@ -3798,7 +3728,7 @@
                                 "symbol": "sum_aa"
                               },
                               "val": {
-                                "i64": 100
+                                "i64": 900
                               }
                             },
                             {
@@ -3806,7 +3736,7 @@
                                 "symbol": "sum_ab"
                               },
                               "val": {
-                                "i64": 700
+                                "i64": 1500
                               }
                             },
                             {
@@ -3814,7 +3744,7 @@
                                 "symbol": "sum_b"
                               },
                               "val": {
-                                "i64": 70
+                                "i64": 50
                               }
                             },
                             {
@@ -3822,7 +3752,7 @@
                                 "symbol": "sum_bb"
                               },
                               "val": {
-                                "i64": 4900
+                                "i64": 2500
                               }
                             }
                           ]
@@ -3841,7 +3771,7 @@
       [
         {
           "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
             "key": {
               "ledger_key_nonce": {
                 "nonce": 801925984706572462
@@ -3856,43 +3786,10 @@
             "data": {
               "contract_data": {
                 "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
-                "key": {
-                  "ledger_key_nonce": {
-                    "nonce": 801925984706572462
-                  }
-                },
-                "durability": "temporary",
-                "val": "void"
-              }
-            },
-            "ext": "v0"
-          },
-          6311999
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
-            "key": {
-              "ledger_key_nonce": {
-                "nonce": 1033654523790656264
-              }
-            },
-            "durability": "temporary"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
                 "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
                 "key": {
                   "ledger_key_nonce": {
-                    "nonce": 1033654523790656264
+                    "nonce": 801925984706572462
                   }
                 },
                 "durability": "temporary",
@@ -4030,86 +3927,6 @@
                 "bytes": "0000000000000000000000000000000000000000000000000000000000000001"
               },
               {
-                "symbol": "set_pair_weight"
-              }
-            ],
-            "data": {
-              "vec": [
-                {
-                  "vec": []
-                },
-                {
-                  "symbol": "XLM_BTC"
-                },
-                {
-                  "u32": 0
-                }
-              ]
-            }
-          }
-        }
-      },
-      "failed_call": false
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
-        "type_": "contract",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "pw_upd"
-              },
-              {
-                "symbol": "XLM_BTC"
-              }
-            ],
-            "data": {
-              "u32": 0
-            }
-          }
-        }
-      },
-      "failed_call": false
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
-        "type_": "diagnostic",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "fn_return"
-              },
-              {
-                "symbol": "set_pair_weight"
-              }
-            ],
-            "data": "void"
-          }
-        }
-      },
-      "failed_call": false
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": null,
-        "type_": "diagnostic",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "fn_call"
-              },
-              {
-                "bytes": "0000000000000000000000000000000000000000000000000000000000000001"
-              },
-              {
                 "symbol": "submit_score"
               }
             ],
@@ -4122,19 +3939,19 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                 },
                 {
-                  "symbol": "XLM_USDC"
+                  "symbol": "XLMUSDC"
                 },
                 {
-                  "u32": 70
-                },
-                {
-                  "bool": false
+                  "u32": 50
                 },
                 {
                   "bool": false
                 },
                 {
-                  "u64": 1
+                  "bool": false
+                },
+                {
+                  "u64": 10
                 },
                 {
                   "u32": 90
@@ -4165,7 +3982,7 @@
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
               },
               {
-                "symbol": "XLM_USDC"
+                "symbol": "XLMUSDC"
               }
             ],
             "data": {
@@ -4174,7 +3991,7 @@
                   "u32": 0
                 },
                 {
-                  "u32": 70
+                  "u32": 50
                 },
                 {
                   "u32": 0
@@ -4207,13 +4024,13 @@
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
               },
               {
-                "symbol": "XLM_USDC"
+                "symbol": "XLMUSDC"
               }
             ],
             "data": {
               "vec": [
                 {
-                  "u32": 70
+                  "u32": 50
                 },
                 {
                   "bool": false
@@ -4225,7 +4042,7 @@
                   "u32": 90
                 },
                 {
-                  "u64": 1
+                  "u64": 10
                 }
               ]
             }
@@ -4282,22 +4099,22 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                 },
                 {
-                  "symbol": "XLM_BTC"
+                  "symbol": "ETHUSDC"
                 },
                 {
-                  "u32": 10
-                },
-                {
-                  "bool": false
+                  "u32": 30
                 },
                 {
                   "bool": false
                 },
                 {
-                  "u64": 2
+                  "bool": false
                 },
                 {
-                  "u32": 90
+                  "u64": 20
+                },
+                {
+                  "u32": 85
                 },
                 {
                   "u32": 1
@@ -4325,7 +4142,7 @@
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
               },
               {
-                "symbol": "XLM_BTC"
+                "symbol": "ETHUSDC"
               }
             ],
             "data": {
@@ -4334,7 +4151,7 @@
                   "u32": 0
                 },
                 {
-                  "u32": 10
+                  "u32": 30
                 },
                 {
                   "u32": 0
@@ -4367,13 +4184,13 @@
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
               },
               {
-                "symbol": "XLM_BTC"
+                "symbol": "ETHUSDC"
               }
             ],
             "data": {
               "vec": [
                 {
-                  "u32": 10
+                  "u32": 30
                 },
                 {
                   "bool": false
@@ -4382,10 +4199,10 @@
                   "bool": false
                 },
                 {
-                  "u32": 90
+                  "u32": 85
                 },
                 {
-                  "u64": 2
+                  "u64": 20
                 }
               ]
             }
@@ -4430,12 +4247,10 @@
                 "bytes": "0000000000000000000000000000000000000000000000000000000000000001"
               },
               {
-                "symbol": "get_aggregate_score"
+                "symbol": "get_state_commitment"
               }
             ],
-            "data": {
-              "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
-            }
+            "data": "void"
           }
         }
       },
@@ -4453,76 +4268,11 @@
                 "symbol": "fn_return"
               },
               {
-                "symbol": "get_aggregate_score"
+                "symbol": "get_state_commitment"
               }
             ],
             "data": {
-              "map": [
-                {
-                  "key": {
-                    "symbol": "aggregate_score"
-                  },
-                  "val": {
-                    "u32": 70
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "benford_flag_count"
-                  },
-                  "val": {
-                    "u32": 0
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "decay_lambda_applied"
-                  },
-                  "val": {
-                    "bool": false
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "last_updated"
-                  },
-                  "val": {
-                    "u64": 2
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "max_pair"
-                  },
-                  "val": {
-                    "symbol": "XLM_USDC"
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "max_pair_score"
-                  },
-                  "val": {
-                    "u32": 70
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "ml_flag_count"
-                  },
-                  "val": {
-                    "u32": 0
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "pair_count"
-                  },
-                  "val": {
-                    "u32": 2
-                  }
-                }
-              ]
+              "bytes": "4c45444745524c454e535f4b5a475f318e9817375076516bf9b276cc5aa3a818e82fbc3fff62adce4845242e96856efe"
             }
           }
         }
