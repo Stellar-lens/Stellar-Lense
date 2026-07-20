@@ -6,99 +6,81 @@ extern crate std;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, vec, Address, Env, Symbol, Vec};
-use ledgerlens_score::{RiskScore, AggregateRiskScore, Error as ScoreError};
+use soroban_sdk::{contract, contractimpl, contracterror, contracttype, symbol_short, vec, Address, Env, Symbol, Vec};
+use ledgerlens_score::{AggregateRiskScore, RiskScore};
 
 pub const MAX_SHARDS: usize = 10;
+
+#[contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[repr(u32)]
+pub enum Error {
+    AlreadyInitialized = 1,
+    NotInitialized = 2,
+    Unauthorized = 3,
+    SelfReference = 4,
+    ShardAlreadyRegistered = 5,
+    ShardNotRegistered = 6,
+    ShardLimitReached = 7,
+    ScoreNotFound = 8,
+    NoShards = 9,
+    ShardFailure = 10,
+}
 
 #[contract]
 pub struct LedgerLensAggregator;
 
 #[contractimpl]
 impl LedgerLensAggregator {
-    pub fn initialize(env: Env, admin: Address) -> Result<(), ScoreError> {
+    pub fn initialize(env: Env, admin: Address) -> Result<(), Error> {
         if env.storage().instance().has(&DataKey::Admin) {
-            return Err(ScoreError::AlreadyInitialized);
+            return Err(Error::AlreadyInitialized);
         }
         env.storage().instance().set(&DataKey::Admin, &admin);
         Ok(())
     }
 
-    pub fn get_admin(env: Env) -> Result<Address, ScoreError> {
-        env.storage().instance().get(&DataKey::Admin).ok_or(ScoreError::NotInitialized)
+    pub fn get_admin(env: Env) -> Result<Address, Error> {
+        env.storage().instance().get(&DataKey::Admin).ok_or(Error::NotInitialized)
     }
 
-    /// Returns the fixed-point exponential decay lambda as (numerator, denominator)
-    ///
-    /// Example:
-    /// ```ignore
-    /// let (num, den) = env.invoke_contract(&contract_id, &symbol_short!("get_decay_rate"), ());
-    /// // decay_factor = num / den  (e.g. 999 / 1000 = 0.999)
-    /// ```
     pub fn get_decay_rate(_env: Env) -> (u64, u64) {
-        // These values should match your internal decay logic
-        // Adjust if your decay formula changes
-        const DECAY_NUMERATOR: u64 = 999;     // e.g. for 0.999 decay per period
+        const DECAY_NUMERATOR: u64 = 999;
         const DECAY_DENOMINATOR: u64 = 1000;
-
         (DECAY_NUMERATOR, DECAY_DENOMINATOR)
     }
 
-    /// Returns the minimum number of model submissions (K) that must agree
-    /// within epsilon for consensus to be accepted.
-    ///
-    /// Example:
-    /// ```ignore
-    /// let k = env.invoke_contract(&contract_id, &symbol_short!("get_consensus_threshold_k"), ());
-    /// // e.g. k = 5 means at least 5 models must agree
-    /// ```
     pub fn get_consensus_threshold_k(_env: Env) -> u32 {
-        // Adjust this value based on your actual consensus parameters
-        const CONSENSUS_THRESHOLD_K: u32 = 5;   // Minimum agreeing models required
-
+        const CONSENSUS_THRESHOLD_K: u32 = 5;
         CONSENSUS_THRESHOLD_K
     }
 
-    /// Returns whether the given wallet is currently on the monitoring watchlist.
-    ///
-    /// Example:
-    /// ```ignore
-    /// let is_watched = env.invoke_contract(&contract_id, &symbol_short!("get_watchlist_status"), vec![&env, wallet]);
-    /// ```
     pub fn get_watchlist_status(_env: Env, _wallet: Address) -> bool {
-        // TODO: Replace with your actual storage key / logic
-        // For example:
-        // let key = DataKey::Watchlist(wallet);
-        // env.storage().instance().get(&key).unwrap_or(false)
-
-        // Placeholder implementation - update with real storage check
         false
     }
 
-    pub fn add_shard(env: Env, shard: Address) -> Result<(), ScoreError> {
-        let admin: Address = env.storage().instance().get(&DataKey::Admin).ok_or(ScoreError::NotInitialized)?;
+    pub fn add_shard(env: Env, shard: Address) -> Result<(), Error> {
+        let admin: Address = env.storage().instance().get(&DataKey::Admin).ok_or(Error::NotInitialized)?;
         admin.require_auth();
-        // Prevent self-reference
         if env.current_contract_address() == shard {
-            return Err(ScoreError::InvalidAttestation); // reuse an error for self-ref guard
+            return Err(Error::SelfReference);
         }
         let mut shards: Vec<Address> = env.storage().instance().get(&DataKey::Shards).unwrap_or_else(|| Vec::new(&env));
-        // Check duplicate
         for i in 0..shards.len() {
             if shards.get(i).unwrap() == shard {
-                return Err(ScoreError::Unauthorized); // reuse
+                return Err(Error::ShardAlreadyRegistered);
             }
         }
         if shards.len() as usize >= MAX_SHARDS {
-            return Err(ScoreError::ServiceSetFull); // reuse
+            return Err(Error::ShardLimitReached);
         }
         shards.push_back(shard);
         env.storage().instance().set(&DataKey::Shards, &shards);
         Ok(())
     }
 
-    pub fn remove_shard(env: Env, shard: Address) -> Result<(), ScoreError> {
-        let admin: Address = env.storage().instance().get(&DataKey::Admin).ok_or(ScoreError::NotInitialized)?;
+    pub fn remove_shard(env: Env, shard: Address) -> Result<(), Error> {
+        let admin: Address = env.storage().instance().get(&DataKey::Admin).ok_or(Error::NotInitialized)?;
         admin.require_auth();
         let shards: Vec<Address> = env.storage().instance().get(&DataKey::Shards).unwrap_or_else(|| Vec::new(&env));
         let mut found = false;
@@ -112,7 +94,7 @@ impl LedgerLensAggregator {
             }
         }
         if !found {
-            return Err(ScoreError::SignerNotInSet); // reuse
+            return Err(Error::ShardNotRegistered);
         }
         env.storage().instance().set(&DataKey::Shards, &out);
         Ok(())
@@ -122,64 +104,80 @@ impl LedgerLensAggregator {
         env.storage().instance().get(&DataKey::Shards).unwrap_or_else(|| Vec::new(&env))
     }
 
-    pub fn query_risk_gate(env: Env, wallet: Address, asset_pair: Symbol, gate_threshold: u32) -> bool {
+    pub fn query_risk_gate(env: Env, wallet: Address, asset_pair: Symbol, gate_threshold: u32) -> Result<bool, Error> {
         let shards: Vec<Address> = env.storage().instance().get(&DataKey::Shards).unwrap_or_else(|| Vec::new(&env));
         if shards.is_empty() {
-            return false;
+            return Err(Error::NoShards);
         }
         for i in 0..shards.len() {
             let shard = shards.get(i).unwrap();
             let client = ledgerlens_score::LedgerLensScoreContractClient::new(&env, &shard);
             match client.try_query_risk_gate(&wallet, &asset_pair, &gate_threshold) {
-                Ok(Ok(res)) => {
-                    if !res {
-                        return false;
-                    }
+                Ok(Ok(true)) => {}
+                Ok(Ok(false)) => return Ok(false),
+                _ => {
+                    env.storage().instance().set(&DataKey::LastShardFailure, &(shard.clone(), 0u32));
+                    return Err(Error::ShardFailure);
                 }
-                _ => return false,
             }
         }
-        true
+        Ok(true)
     }
 
-    pub fn get_score(env: Env, wallet: Address, asset_pair: Symbol) -> Result<RiskScore, ScoreError> {
+    pub fn get_score(env: Env, wallet: Address, asset_pair: Symbol) -> Result<RiskScore, Error> {
         let shards: Vec<Address> = env.storage().instance().get(&DataKey::Shards).unwrap_or_else(|| Vec::new(&env));
         let mut best: Option<RiskScore> = None;
         for i in 0..shards.len() {
             let shard = shards.get(i).unwrap();
             let client = ledgerlens_score::LedgerLensScoreContractClient::new(&env, &shard);
-            if let Ok(Ok(score)) = client.try_get_score(&wallet, &asset_pair) {
-                match &best {
-                    None => best = Some(score),
-                    Some(b) => {
-                        if score.score > b.score {
-                            best = Some(score);
+            match client.try_get_score(&wallet, &asset_pair) {
+                Ok(Ok(score)) => {
+                    match &best {
+                        None => best = Some(score),
+                        Some(b) => {
+                            if score.score > b.score {
+                                best = Some(score);
+                            }
                         }
                     }
                 }
+                Ok(Err(_conv_err)) => {
+                    env.storage().instance().set(&DataKey::LastShardFailure, &(shard.clone(), 1u32));
+                }
+                Err(_) => {
+                    env.storage().instance().set(&DataKey::LastShardFailure, &(shard.clone(), 0u32));
+                }
             }
         }
-        best.ok_or(ScoreError::ScoreNotFound)
+        best.ok_or(Error::ScoreNotFound)
     }
 
-    pub fn get_aggregate_score(env: Env, wallet: Address) -> Result<AggregateRiskScore, ScoreError> {
+    pub fn get_aggregate_score(env: Env, wallet: Address) -> Result<AggregateRiskScore, Error> {
         let shards: Vec<Address> = env.storage().instance().get(&DataKey::Shards).unwrap_or_else(|| Vec::new(&env));
         let mut best: Option<AggregateRiskScore> = None;
         for i in 0..shards.len() {
             let shard = shards.get(i).unwrap();
             let client = ledgerlens_score::LedgerLensScoreContractClient::new(&env, &shard);
-            if let Ok(Ok(agg)) = client.try_get_aggregate_score(&wallet) {
-                match &best {
-                    None => best = Some(agg),
-                    Some(b) => {
-                        if agg.aggregate_score > b.aggregate_score {
-                            best = Some(agg);
+            match client.try_get_aggregate_score(&wallet) {
+                Ok(Ok(agg)) => {
+                    match &best {
+                        None => best = Some(agg),
+                        Some(b) => {
+                            if agg.aggregate_score > b.aggregate_score {
+                                best = Some(agg);
+                            }
                         }
                     }
                 }
+                Ok(Err(_conv_err)) => {
+                    env.storage().instance().set(&DataKey::LastShardFailure, &(shard.clone(), 1u32));
+                }
+                Err(_) => {
+                    env.storage().instance().set(&DataKey::LastShardFailure, &(shard.clone(), 0u32));
+                }
             }
         }
-        best.ok_or(ScoreError::ScoreNotFound)
+        best.ok_or(Error::ScoreNotFound)
     }
 
     pub fn supports_interface(env: Env, capability: Symbol) -> bool {
@@ -206,9 +204,6 @@ impl LedgerLensAggregator {
         out
     }
 
-    /// Queries the contagion depth across all shards, returning the maximum depth found.
-    ///
-    /// Returns the highest counterparty count for the wallet/pair across all registered shards.
     pub fn contagion_depth_across_shards(
         env: Env,
         wallet: Address,
@@ -219,13 +214,22 @@ impl LedgerLensAggregator {
         for i in 0..shards.len() {
             let shard = shards.get(i).unwrap();
             let client = ledgerlens_score::LedgerLensScoreContractClient::new(&env, &shard);
-            if let Ok(Ok(depth)) = client.try_get_contagion_depth(&wallet, &asset_pair) {
-                if depth > max_depth {
-                    max_depth = depth;
+            match client.try_get_contagion_depth(&wallet, &asset_pair) {
+                Ok(Ok(depth)) => {
+                    if depth > max_depth {
+                        max_depth = depth;
+                    }
+                }
+                _ => {
+                    env.storage().instance().set(&DataKey::LastShardFailure, &(shard.clone(), 0u32));
                 }
             }
         }
         max_depth
+    }
+
+    pub fn get_last_shard_failure(env: Env) -> Option<(Address, u32)> {
+        env.storage().instance().get(&DataKey::LastShardFailure)
     }
 }
 
@@ -234,4 +238,5 @@ impl LedgerLensAggregator {
 enum DataKey {
     Admin,
     Shards,
+    LastShardFailure,
 }
