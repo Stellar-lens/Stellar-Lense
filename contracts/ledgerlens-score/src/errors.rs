@@ -75,6 +75,7 @@ impl Error {
     pub const BelowScoreFloor: Error = Error::InvalidScore;
     pub const InvalidScoreFloorPolicy: Error = Error::InvalidThreshold;
     pub const DisputeIndexFull: Error = Error::ServiceSetFull;
+    pub const ActorDisputeLimitExceeded: Error = Error::RateLimitExceeded;
     pub const EmbargoedWalletIndexFull: Error = Error::ServiceSetFull;
 
     pub const ModelVersionNotRegistered: Error = Error::InvalidScore;
