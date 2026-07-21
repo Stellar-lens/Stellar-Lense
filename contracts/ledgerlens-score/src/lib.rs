@@ -130,6 +130,9 @@ mod test_signer_tier;
 #[cfg(test)]
 mod test_verkle;
 
+#[cfg(test)]
+mod test_replay_audit;
+
 use soroban_sdk::{
     contract, contractimpl, crypto::Hash, symbol_short, token, Address, Bytes, BytesN, Env,
     IntoVal, Symbol, SymbolStr, TryFromVal, Vec,
