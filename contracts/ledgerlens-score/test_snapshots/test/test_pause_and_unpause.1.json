@@ -365,6 +365,9 @@
             "topics": [
               {
                 "symbol": "paused"
+              },
+              {
+                "u32": 1
               }
             ],
             "data": {
@@ -479,6 +482,9 @@
             "topics": [
               {
                 "symbol": "unpaused"
+              },
+              {
+                "u32": 1
               }
             ],
             "data": {

@@ -1,4 +1,4 @@
-﻿//! Tests for the model version registry feature.
+//! Tests for the model version registry feature.
 //!
 //! Covers: register_model_version, deprecate_model_version,
 //! is_model_version_active, get_model_versions, and version enforcement inside
@@ -7,12 +7,13 @@
 use soroban_sdk::{
     symbol_short,
     testutils::{Address as _, Ledger as _},
-    Address, Env, Vec,
+    Address, Bytes, Env, Vec,
 };
 
 use crate::{
-    constants::MAX_MODEL_VERSIONS, BatchResult, Error, LedgerLensScoreContract,
-    LedgerLensScoreContractClient, ScoreSubmission,
+    constants::{DEFAULT_UPGRADE_DELAY_SECS, MAX_MODEL_VERSIONS},
+    types::ModelVersionStatus,
+    BatchResult, Error, LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreSubmission,
 };
 
 const START_TS: u64 = 1_700_000_000;
@@ -381,3 +382,179 @@ fn test_model_version_list_multiple_wallets_and_pairs() {
     assert_eq!(versions.get(1).unwrap(), 3);
     assert_eq!(client.get_model_version_count(), 2);
 }
+
+// ── Model Version Governance Lifecycle ───────────────────────────────────────
+
+#[test]
+fn test_model_version_governance_full_lifecycle() {
+    let (env, client, admin) = setup();
+    let wallet = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+    let version = 100u32;
+    let desc = Bytes::from_slice(&env, b"ML Model v1.0.0");
+
+    // 1. Propose model version
+    client.propose_model_version(&Vec::new(&env), &version, &desc);
+    assert_eq!(
+        client.get_model_version_status(&version),
+        Some(ModelVersionStatus::Proposed)
+    );
+    assert!(!client.is_model_version_active(&version));
+
+    // 2. Submission with Proposed version must be rejected
+    let res_prop = client.try_submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &50,
+        &false,
+        &false,
+        &START_TS,
+        &90,
+        &version,
+        &None,
+    );
+    assert_eq!(res_prop, Err(Ok(Error::ModelVersionNotReady)));
+
+    // 3. Approve before timelock elapses must fail
+    let res_too_early = client.try_approve_model_version(&Vec::new(&env), &version);
+    assert_eq!(res_too_early, Err(Ok(Error::UpgradeNotReady)));
+
+    // 4. Advance time past timelock delay
+    let future_ts = START_TS + DEFAULT_UPGRADE_DELAY_SECS + 1;
+    env.ledger().with_mut(|l| l.timestamp = future_ts);
+
+    // 5. Approve model version
+    client.approve_model_version(&Vec::new(&env), &version);
+    assert_eq!(
+        client.get_model_version_status(&version),
+        Some(ModelVersionStatus::Active)
+    );
+    assert!(client.is_model_version_active(&version));
+
+    // 6. Submission with Active version succeeds
+    let res_active = client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &75,
+        &false,
+        &false,
+        &future_ts,
+        &90,
+        &version,
+        &None,
+    );
+    assert!(res_active.is_ok());
+    assert_eq!(client.get_score(&wallet, &pair).score, 75);
+
+    // 7. Deprecate model version
+    client.deprecate_model_version(&Vec::new(&env), &version);
+    assert_eq!(
+        client.get_model_version_status(&version),
+        Some(ModelVersionStatus::Deprecated)
+    );
+    assert!(!client.is_model_version_active(&version));
+
+    // 8. Submission with Deprecated version must be rejected
+    let after_depr_ts = future_ts + 3601;
+    env.ledger().with_mut(|l| l.timestamp = after_depr_ts);
+    let res_depr = client.try_submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &80,
+        &false,
+        &false,
+        &after_depr_ts,
+        &90,
+        &version,
+        &None,
+    );
+    assert_eq!(res_depr, Err(Ok(Error::ModelVersionDeprecated)));
+}
+
+#[test]
+fn test_deprecate_proposed_version_directly() {
+    let (env, client, _) = setup();
+    let version = 200u32;
+    let desc = Bytes::from_slice(&env, b"Experimental model");
+
+    client.propose_model_version(&Vec::new(&env), &version, &desc);
+    assert_eq!(
+        client.get_model_version_status(&version),
+        Some(ModelVersionStatus::Proposed)
+    );
+
+    // Directly deprecate proposed version
+    client.deprecate_model_version(&Vec::new(&env), &version);
+    assert_eq!(
+        client.get_model_version_status(&version),
+        Some(ModelVersionStatus::Deprecated)
+    );
+}
+
+#[test]
+fn test_batch_submission_rejection_for_proposed_and_deprecated() {
+    let (env, client, _) = setup();
+    let wallet1 = Address::generate(&env);
+    let wallet2 = Address::generate(&env);
+    let wallet3 = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+
+    // Version 1: Proposed
+    client.propose_model_version(&Vec::new(&env), &1, &Bytes::from_slice(&env, b"v1"));
+    // Version 2: Active
+    client.register_model_version(&Vec::new(&env), &2);
+    // Version 3: Deprecated
+    client.register_model_version(&Vec::new(&env), &3);
+    client.deprecate_model_version(&Vec::new(&env), &3);
+
+    let mut batch: Vec<ScoreSubmission> = Vec::new(&env);
+    batch.push_back(ScoreSubmission {
+        wallet: wallet1,
+        asset_pair: pair.clone(),
+        score: 50,
+        benford_flag: false,
+        ml_flag: false,
+        timestamp: START_TS,
+        confidence: 90,
+        model_version: 1, // Proposed -> reject
+    });
+    batch.push_back(ScoreSubmission {
+        wallet: wallet2,
+        asset_pair: pair.clone(),
+        score: 50,
+        benford_flag: false,
+        ml_flag: false,
+        timestamp: START_TS,
+        confidence: 90,
+        model_version: 2, // Active -> accept
+    });
+    batch.push_back(ScoreSubmission {
+        wallet: wallet3,
+        asset_pair: pair.clone(),
+        score: 50,
+        benford_flag: false,
+        ml_flag: false,
+        timestamp: START_TS,
+        confidence: 90,
+        model_version: 3, // Deprecated -> reject
+    });
+
+    let result: BatchResult = client.submit_scores_batch(&batch);
+    assert_eq!(result.accepted_count, 1);
+    assert_eq!(result.rejected_count, 2);
+
+    let e0 = result.results.get(0).unwrap();
+    assert!(!e0.accepted);
+    assert_eq!(e0.rejection_code, Error::ModelVersionNotReady as u32);
+
+    let e1 = result.results.get(1).unwrap();
+    assert!(e1.accepted);
+
+    let e2 = result.results.get(2).unwrap();
+    assert!(!e2.accepted);
+    assert_eq!(e2.rejection_code, Error::ModelVersionDeprecated as u32);
+}
+

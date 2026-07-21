@@ -390,6 +390,9 @@
             "topics": [
               {
                 "symbol": "cd_upd"
+              },
+              {
+                "u32": 1
               }
             ],
             "data": {
@@ -601,6 +604,9 @@
             "topics": [
               {
                 "symbol": "cd_upd"
+              },
+              {
+                "u32": 1
               }
             ],
             "data": {

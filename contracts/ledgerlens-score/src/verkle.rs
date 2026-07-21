@@ -195,33 +195,42 @@ pub fn xor32(a: &[u8; 32], b: &[u8; 32]) -> [u8; 32] {
 
 // ─── Commitment operations ────────────────────────────────────────────────────
 
-/// Incorporate one `(z, v)` leaf into the running commitment `prev_commit`.
+/// Hash a raw XOR accumulator into the final commitment value.
 ///
-/// The incremental update rule is:
+/// ```text
+/// commitment = SHA-256(0x06 || accumulator)
+/// ```
+pub fn finalize_commitment(env: &Env, accumulator: &[u8; 32]) -> [u8; 32] {
+    let mut buf = [0u8; 33];
+    buf[0] = DOMAIN_COMMIT;
+    buf[1..33].copy_from_slice(accumulator);
+    env.crypto().sha256(&Bytes::from_array(env, &buf)).to_bytes().to_array()
+}
+
+/// Incorporate one `(z, v)` leaf into the running XOR accumulator.
+///
+/// The running commitment is maintained as a raw XOR accumulator of all live
+/// leaves:
 ///
 /// ```text
 /// leaf_i     = H(0x02 || z || v)
-/// new_commit = H(0x06 || prev_commit XOR leaf_i)
+/// accumulator = accumulator XOR leaf_i
 /// ```
 ///
-/// XOR-before-hash provides commutativity (order of insertion does not affect
-/// the commitment) and incremental updates (one SHA-256 per write).
+/// The commitment exposed to callers is `H(0x06 || accumulator)`, computed
+/// by [`finalize_commitment`].
 ///
 /// **Removal** uses the same function: XOR is its own inverse, so to remove an
-/// entry, call `update_commitment(env, &old_commit, z, old_v)` — the old leaf
+/// entry, call `update_accumulator(env, &old_accum, z, old_v)` — the old leaf
 /// XORs out.
-pub fn update_commitment(
+pub fn update_accumulator(
     env: &Env,
-    prev_commit: &[u8; 32],
+    accum: &[u8; 32],
     z: &[u8; 32],
     v: &[u8; 32],
 ) -> [u8; 32] {
     let leaf = hash_leaf(env, z, v);
-    let xored = xor32(prev_commit, &leaf);
-    let mut buf = [0u8; 33]; // 1 + 32
-    buf[0] = DOMAIN_COMMIT;
-    buf[1..33].copy_from_slice(&xored);
-    env.crypto().sha256(&Bytes::from_array(env, &buf)).to_bytes().to_array()
+    xor32(accum, &leaf)
 }
 
 // ─── Proof generation ─────────────────────────────────────────────────────────

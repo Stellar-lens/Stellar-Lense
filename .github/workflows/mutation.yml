@@ -1,0 +1,57 @@
+name: Mutation Testing
+
+on:
+  schedule:
+    # Nightly at 03:00 UTC — mutation testing is slow so not run per-PR
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    # Allow manual trigger from the Actions tab
+    inputs:
+      filter:
+        description: 'Test name filter (optional)'
+        required: false
+        default: ''
+        type: string
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+jobs:
+  mutants:
+    name: cargo-mutants (zk_range_proof.rs, verkle.rs)
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-mutants
+        run: cargo install cargo-mutants --locked
+
+      - name: Run mutation tests
+        run: |
+          FILTER="${{ inputs.filter }}"
+          if [ -n "$FILTER" ]; then
+            cargo mutants \
+              --file src/zk_range_proof.rs \
+              --file src/verkle.rs \
+              --timeout 300 \
+              -- -- "$FILTER"
+          else
+            cargo mutants \
+              --file src/zk_range_proof.rs \
+              --file src/verkle.rs \
+              --timeout 300
+          fi
+        working-directory: contracts/ledgerlens-score
+
+      - name: Upload mutation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-report
+          path: contracts/ledgerlens-score/mutants.out
+          retention-days: 30

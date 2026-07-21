@@ -1958,7 +1958,7 @@
                           ]
                         },
                         "val": {
-                          "bytes": "0971390bb5f16d4bc3b755bbc46936c06285b62aaefa3017db69b9202a940c49"
+                          "bytes": "512bc16b85be53cef2989aac84d5622f3260afa58a0d347da5bccb955d5bc442"
                         }
                       }
                     ]
@@ -2182,6 +2182,9 @@
                 "symbol": "scr_dlt"
               },
               {
+                "u32": 1
+              },
+              {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
               },
               {
@@ -2222,6 +2225,9 @@
             "topics": [
               {
                 "symbol": "score"
+              },
+              {
+                "u32": 1
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
@@ -2321,6 +2327,9 @@
             "topics": [
               {
                 "symbol": "clr_hist"
+              },
+              {
+                "u32": 1
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
