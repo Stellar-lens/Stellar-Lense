@@ -6,8 +6,8 @@
 
 use soroban_sdk::{
     symbol_short,
-    testutils::{Address as _, Ledger as _},
-    Address, Env, Vec,
+    testutils::{Address as _, Ledger as _, Events as _},
+    Address, Env, Vec, Symbol, TryFromVal,
 };
 
 use crate::{
@@ -18,13 +18,8 @@ const START_TS: u64 = 1_700_000_000;
 
 /// Set up two independent contract instances in the same `Env`.
 /// Returns `(env, primary_client, secondary_client, admin, service)`.
-fn setup_two<'a>() -> (
-    Env,
-    LedgerLensScoreContractClient<'a>,
-    LedgerLensScoreContractClient<'a>,
-    Address,
-    Address,
-) {
+fn setup_two<'a>(
+) -> (Env, LedgerLensScoreContractClient<'a>, LedgerLensScoreContractClient<'a>, Address, Address) {
     let env = Env::default();
     env.mock_all_auths();
     env.ledger().with_mut(|l| l.timestamp = START_TS);
@@ -114,6 +109,32 @@ fn test_gate_falls_back_to_secondary_when_paused() {
 
     // Gate should pass via secondary (score 20 < threshold 75).
     assert!(primary.query_risk_gate(&wallet, &pair, &75));
+
+    // Verify that the failover_triggered event was published.
+    let events = env.events().all();
+    let mut found = false;
+    for e in events.iter() {
+        if e.0 == primary.address {
+            let topics = e.1.clone();
+            if topics.len() >= 2 {
+                if let Ok(topic_sym) = Symbol::try_from_val(&env, &topics.get(0).unwrap()) {
+                    if topic_sym == symbol_short!("failover") {
+                        if let Ok(topic_wallet) = Address::try_from_val(&env, &topics.get(1).unwrap()) {
+                            if topic_wallet == wallet {
+                                if let Ok(data_pair) = Symbol::try_from_val(&env, &e.2) {
+                                    if data_pair == pair {
+                                        found = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    assert!(found, "failover_triggered event was not emitted during failover");
 }
 
 #[test]
@@ -197,8 +218,7 @@ fn test_fresh_secondary_score_passes() {
     primary.pause(&Vec::new(&env));
 
     // Advance time within the staleness window.
-    env.ledger()
-        .with_mut(|l| l.timestamp = START_TS + FAILOVER_STALENESS_WINDOW);
+    env.ledger().with_mut(|l| l.timestamp = START_TS + FAILOVER_STALENESS_WINDOW);
 
     // Score is fresh — gate passes.
     assert!(primary.query_risk_gate(&wallet, &pair, &75));

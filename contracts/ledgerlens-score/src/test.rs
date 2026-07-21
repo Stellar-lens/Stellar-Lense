@@ -1,4 +1,5 @@
-use soroban_sdk::{symbol_short,
+use soroban_sdk::{
+    symbol_short,
     testutils::{Address as _, Ledger as _},
     Address, Env, Symbol, Vec,
 };
@@ -167,6 +168,7 @@ fn test_get_scores_batch_single_entry() {
 #[test]
 fn test_get_scores_batch_max_batch() {
     let (env, client, admin, service) = setup();
+    env.budget().reset_unlimited();
     client.initialize(&admin, &service);
 
     let asset_pair = symbol_short!("XLM_USDC");
@@ -2213,6 +2215,9 @@ fn test_score_count_is_per_pair() {
     client.submit_score(&Vec::new(&env), &wallet, &pair1, &30, &false, &false, &1, &60, &1, &None);
     env.ledger().with_mut(|l| l.timestamp += 3_601);
     client.submit_score(&Vec::new(&env), &wallet, &pair1, &40, &false, &false, &2, &70, &1, &None);
+
+    env.ledger().with_mut(|l| l.timestamp += 3_601);
+
     client.submit_score(&Vec::new(&env), &wallet, &pair2, &90, &true, &true, &3, &95, &1, &None);
 
     assert_eq!(client.get_score_count(&wallet, &pair1), 2);
@@ -3147,7 +3152,18 @@ fn test_private_aggregate_score_differs_from_exact() {
     let pair = symbol_short!("XLM_USDC");
 
     env.ledger().with_mut(|l| l.timestamp = 100_000);
-    client.submit_score(&Vec::new(&env), &wallet, &pair, &70, &true, &false, &100_000, &80, &1, &None);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &70,
+        &true,
+        &false,
+        &100_000,
+        &80,
+        &1,
+        &None,
+    );
 
     let exact = client.get_aggregate_score(&wallet).aggregate_score;
     assert_eq!(exact, 70);
@@ -3168,7 +3184,18 @@ fn test_private_aggregate_noise_within_bounds() {
     let pair = symbol_short!("XLM_USDC");
 
     env.ledger().with_mut(|l| l.timestamp = 100_000);
-    client.submit_score(&Vec::new(&env), &wallet, &pair, &50, &false, &false, &100_000, &80, &1, &None);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &50,
+        &false,
+        &false,
+        &100_000,
+        &80,
+        &1,
+        &None,
+    );
 
     let exact = client.get_aggregate_score(&wallet).aggregate_score;
     client.set_privacy_epsilon(&Vec::new(&env), &100); // ε = 1.0
@@ -3188,7 +3215,18 @@ fn test_private_aggregate_reproducible() {
     let pair = symbol_short!("XLM_USDC");
 
     env.ledger().with_mut(|l| l.timestamp = 100_000);
-    client.submit_score(&Vec::new(&env), &wallet, &pair, &60, &false, &true, &100_000, &90, &1, &None);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &60,
+        &false,
+        &true,
+        &100_000,
+        &90,
+        &1,
+        &None,
+    );
 
     client.set_privacy_epsilon(&Vec::new(&env), &100);
 
@@ -3205,7 +3243,18 @@ fn test_private_aggregate_different_seeds_differ() {
     let pair = symbol_short!("XLM_USDC");
 
     env.ledger().with_mut(|l| l.timestamp = 100_000);
-    client.submit_score(&Vec::new(&env), &wallet, &pair, &50, &true, &false, &100_000, &85, &1, &None);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &50,
+        &true,
+        &false,
+        &100_000,
+        &85,
+        &1,
+        &None,
+    );
 
     client.set_privacy_epsilon(&Vec::new(&env), &100);
 
@@ -3233,7 +3282,18 @@ fn test_private_aggregate_different_ledger_seq_differs() {
     let pair = symbol_short!("XLM_USDC");
 
     env.ledger().with_mut(|l| l.timestamp = 100_000);
-    client.submit_score(&Vec::new(&env), &wallet, &pair, &40, &false, &false, &100_000, &75, &1, &None);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &40,
+        &false,
+        &false,
+        &100_000,
+        &75,
+        &1,
+        &None,
+    );
 
     client.set_privacy_epsilon(&Vec::new(&env), &100);
 

@@ -2347,7 +2347,7 @@
                           ]
                         },
                         "val": {
-                          "bytes": "15f698843533f5b6b9246aa80c7cbd0db260f3746825ceb0152a15a6bfbcaf2c"
+                          "bytes": "32edf6e72aa2087d3badc98f60043144032011c0ce776e8f995703d4492abde3"
                         }
                       }
                     ]
@@ -2712,6 +2712,9 @@
             "topics": [
               {
                 "symbol": "sig_add"
+              },
+              {
+                "u32": 1
               }
             ],
             "data": {
@@ -2786,6 +2789,9 @@
             "topics": [
               {
                 "symbol": "sig_add"
+              },
+              {
+                "u32": 1
               }
             ],
             "data": {
@@ -2860,6 +2866,9 @@
             "topics": [
               {
                 "symbol": "sig_add"
+              },
+              {
+                "u32": 1
               }
             ],
             "data": {
@@ -2934,6 +2943,9 @@
             "topics": [
               {
                 "symbol": "sig_thr"
+              },
+              {
+                "u32": 1
               }
             ],
             "data": {
@@ -3042,6 +3054,9 @@
                 "symbol": "scr_dlt"
               },
               {
+                "u32": 1
+              },
+              {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOLZM"
               },
               {
@@ -3082,6 +3097,9 @@
             "topics": [
               {
                 "symbol": "score"
+              },
+              {
+                "u32": 1
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOLZM"

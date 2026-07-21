@@ -2370,7 +2370,7 @@
                           ]
                         },
                         "val": {
-                          "bytes": "a41e00fd46ee8e4aa06f8503bbe9f0d8dc8422933fe16e5062c9445559ba1901"
+                          "bytes": "6a31626243edddce48dffb9b74a1a6f6b8cf0572e24528120405483c96b13abf"
                         }
                       }
                     ]
@@ -2594,6 +2594,9 @@
                 "symbol": "scr_dlt"
               },
               {
+                "u32": 1
+              },
+              {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
               },
               {
@@ -2634,6 +2637,9 @@
             "topics": [
               {
                 "symbol": "score"
+              },
+              {
+                "u32": 1
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
@@ -2992,6 +2998,9 @@
                 "symbol": "breach"
               },
               {
+                "u32": 1
+              },
+              {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
               }
             ],
@@ -3056,6 +3065,9 @@
             "topics": [
               {
                 "symbol": "scr_dlt"
+              },
+              {
+                "u32": 1
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
@@ -3140,6 +3152,9 @@
             "topics": [
               {
                 "symbol": "score"
+              },
+              {
+                "u32": 1
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
@@ -3233,7 +3248,7 @@
               }
             ],
             "data": {
-              "bytes": "4c45444745524c454e535f4b5a475f31a41e00fd46ee8e4aa06f8503bbe9f0d8dc8422933fe16e5062c9445559ba1901"
+              "bytes": "4c45444745524c454e535f4b5a475f313c72accb43253a3ac3cd1300ea0c4667994bc20705fc08f1a2da63f8e9a9a0d5"
             }
           }
         }
@@ -3289,7 +3304,7 @@
               }
             ],
             "data": {
-              "bytes": "01fb58fd91b27282ffe6137fd346628945cdf77b4346d68f865fa05b2306f038145419f673513205a6dea063180b8f8fec8a7962fbbe14df62b5df6d466c752210fddd6d8dd4aa103b4ce65c89c6764c21760716de7154d6f9102611abf4b47825"
+              "bytes": "01fb58fd91b27282ffe6137fd346628945cdf77b4346d68f865fa05b2306f038145419f673513205a6dea063180b8f8fec8a7962fbbe14df62b5df6d466c752210e9be0f5ba9ebe7143f2a9a00e79b30b28afc7ab90a8af2e5d271feea35176764"
             }
           }
         }
@@ -3452,7 +3467,7 @@
             "data": {
               "vec": [
                 {
-                  "bytes": "4c45444745524c454e535f4b5a475f31a41e00fd46ee8e4aa06f8503bbe9f0d8dc8422933fe16e5062c9445559ba1901"
+                  "bytes": "4c45444745524c454e535f4b5a475f313c72accb43253a3ac3cd1300ea0c4667994bc20705fc08f1a2da63f8e9a9a0d5"
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
@@ -3467,7 +3482,7 @@
                   "u64": 3602
                 },
                 {
-                  "bytes": "01fb58fd91b27282ffe6137fd346628945cdf77b4346d68f865fa05b2306f038145419f673513205a6dea063180b8f8fec8a7962fbbe14df62b5df6d466c752210fddd6d8dd4aa103b4ce65c89c6764c21760716de7154d6f9102611abf4b47825"
+                  "bytes": "01fb58fd91b27282ffe6137fd346628945cdf77b4346d68f865fa05b2306f038145419f673513205a6dea063180b8f8fec8a7962fbbe14df62b5df6d466c752210e9be0f5ba9ebe7143f2a9a00e79b30b28afc7ab90a8af2e5d271feea35176764"
                 }
               ]
             }
@@ -3520,7 +3535,7 @@
             "data": {
               "vec": [
                 {
-                  "bytes": "4c45444745524c454e535f4b5a475f31a41e00fd46ee8e4aa06f8503bbe9f0d8dc8422933fe16e5062c9445559ba1901"
+                  "bytes": "4c45444745524c454e535f4b5a475f313c72accb43253a3ac3cd1300ea0c4667994bc20705fc08f1a2da63f8e9a9a0d5"
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
