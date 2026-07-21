@@ -333,6 +333,9 @@
                 "symbol": "pw_upd"
               },
               {
+                "u32": 1
+              },
+              {
                 "symbol": "XLM_USDC"
               }
             ],

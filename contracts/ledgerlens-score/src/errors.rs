@@ -75,6 +75,7 @@ impl Error {
     pub const BelowScoreFloor: Error = Error::InvalidScore;
     pub const InvalidScoreFloorPolicy: Error = Error::InvalidThreshold;
     pub const DisputeIndexFull: Error = Error::ServiceSetFull;
+    pub const ActorDisputeLimitExceeded: Error = Error::RateLimitExceeded;
     pub const EmbargoedWalletIndexFull: Error = Error::ServiceSetFull;
 
     pub const ModelVersionNotRegistered: Error = Error::InvalidScore;
@@ -82,6 +83,10 @@ impl Error {
     pub const ModelVersionAlreadyDeprecated: Error = Error::AlreadyInitialized;
     pub const ModelVersionAlreadyRegistered: Error = Error::SignerAlreadyInSet;
     pub const ModelVersionRegistryFull: Error = Error::ServiceSetFull;
+    pub const ModelVersionNotReady: Error = Error::UpgradeNotReady;
+    pub const ModelVersionAlreadyProposed: Error = Error::UpgradeAlreadyPending;
+    pub const ModelVersionNotProposed: Error = Error::NoPendingUpgrade;
+    pub const ModelVersionNotActive: Error = Error::Unauthorized;
 
     pub const NotFound: Error = Error::ScoreNotFound;
     pub const FeeRecipientNotSet: Error = Error::FeeTokenNotSet;
@@ -107,4 +112,12 @@ impl Error {
     pub const GateCallerListFull: Error = Error::ServiceSetFull;
     pub const GateCallerNotInList: Error = Error::ScoreNotFound;
     pub const ParamChangeAlreadyPending: Error = Error::UpgradeAlreadyPending;
+
+    // ── Aggregator composability ────────────────────────────────────────────
+    /// Returned by `ledgerlens-aggregator`'s `add_shard` when a candidate shard
+    /// does not advertise the `ILedgerLensScore` capabilities the aggregator
+    /// invokes across every shard. It signals that the shard's interface has
+    /// drifted from the version the aggregator targets, so registering it would
+    /// lead to failed or subtly incorrect cross-contract calls.
+    pub const IncompatibleInterface: Error = Error::InvalidAttestation;
 }

@@ -2354,7 +2354,7 @@
                           ]
                         },
                         "val": {
-                          "bytes": "5ed5df12929d2a019cacc6bf541031c11b1e3c55fe876a15373d3c404fde56d3"
+                          "bytes": "81b1bcf6a721c2c8b0863a94594aa649b97c470ebdb8f0beadbae97f1a63c715"
                         }
                       }
                     ]
@@ -2665,6 +2665,9 @@
                 "symbol": "breach"
               },
               {
+                "u32": 1
+              },
+              {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
               }
             ],
@@ -2731,6 +2734,9 @@
                 "symbol": "scr_dlt"
               },
               {
+                "u32": 1
+              },
+              {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
               },
               {
@@ -2771,6 +2777,9 @@
             "topics": [
               {
                 "symbol": "score"
+              },
+              {
+                "u32": 1
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
@@ -2914,6 +2923,9 @@
             "topics": [
               {
                 "symbol": "paused"
+              },
+              {
+                "u32": 1
               }
             ],
             "data": {

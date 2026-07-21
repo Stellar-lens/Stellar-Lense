@@ -115,6 +115,9 @@ pub const DISPUTE_BONUS_PCT: i128 = 10;
 /// Maximum simultaneously open disputes.
 pub const MAX_OPEN_DISPUTES: u32 = 100;
 
+/// Maximum concurrently open disputes allowed per single challenger actor.
+pub const MAX_DISPUTES_PER_ACTOR: u32 = 5;
+
 pub const DISPUTE_TTL_THRESHOLD: u32 = 518_400;
 pub const DISPUTE_TTL_EXTEND_TO: u32 = 777_600;
 

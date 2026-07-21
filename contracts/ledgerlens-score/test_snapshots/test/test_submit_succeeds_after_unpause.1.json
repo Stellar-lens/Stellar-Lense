@@ -2116,7 +2116,7 @@
                           ]
                         },
                         "val": {
-                          "bytes": "ef21065b80fc21c68decbf357f8a3c7a2fab6f6d2015bfac6a970b069b7686a3"
+                          "bytes": "aef6e6135aa4a6309ad2a057519904874baedc36fa114fd054b70b07c2dc255c"
                         }
                       }
                     ]
@@ -2342,6 +2342,9 @@
             "topics": [
               {
                 "symbol": "paused"
+              },
+              {
+                "u32": 1
               }
             ],
             "data": {
@@ -2409,6 +2412,9 @@
             "topics": [
               {
                 "symbol": "unpaused"
+              },
+              {
+                "u32": 1
               }
             ],
             "data": {
@@ -2507,6 +2513,9 @@
                 "symbol": "scr_dlt"
               },
               {
+                "u32": 1
+              },
+              {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
               },
               {
@@ -2547,6 +2556,9 @@
             "topics": [
               {
                 "symbol": "score"
+              },
+              {
+                "u32": 1
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
