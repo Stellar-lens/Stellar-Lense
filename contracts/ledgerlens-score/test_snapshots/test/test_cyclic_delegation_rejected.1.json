@@ -433,6 +433,9 @@
             "topics": [
               {
                 "symbol": "dlg_set"
+              },
+              {
+                "u32": 1
               }
             ],
             "data": {

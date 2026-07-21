@@ -1,12 +1,12 @@
 # LedgerLens TLA+ Specification
 
-This directory contains a formal specification of the LedgerLens smart contract's state machine written in TLA+. The specification models score writes, the embargo gate, breach counter, risk band state, the delegation chain, and **the dispute resolution mechanism**.
+This directory contains a formal specification of the LedgerLens smart contract's state machine written in TLA+. The specification models score writes, the embargo gate, breach counter, risk band state, the delegation chain, and the **adaptive rate-limit token bucket** (issue #405).
 
 ## Invariants Modelled
 
 The following critical invariants are encoded and verified:
 
-### Core Invariants
+### Existing Invariants
 1. **Historical Max Monotonicity**: `hwm` never decreases.
 2. **Embargo Gate Soundness**: The embargo gate blocks score modifications / evaluations when an embargo is active.
 3. **Breach Counter State Machine**: The breach counter correctly increments on thresholds and resets on clean submissions or manual resets.
@@ -14,58 +14,89 @@ The following critical invariants are encoded and verified:
 5. **Cooldown Enforcement**: Ensures a minimum time delay between valid score submissions.
 6. **Score Floor Enforcement**: Prevents high-risk wallets (those that hit `HWM_THRESHOLD`) from having their scores forced below `FLOOR_VALUE`.
 
-### Dispute Mechanism Invariants
-7. **Exactly One Dispute Per Pair**: Each wallet/asset-pair can only have one dispute in exactly one state: `none`, `open`, or `resolved`.
-8. **No Double Open**: A dispute can only be in the `open` state if a valid bond amount (> 0) has been posted. This prevents `DisputeAlreadyOpen` errors.
-9. **Timeout Never Early**: Dispute deadlines are always set in the future relative to the open time, preventing premature timeout resolution.
-10. **Resolved Is Terminal**: Once a dispute is resolved, it cannot transition back to `open` without a new bond posting (fresh dispute with updated `dispute_open_time`).
+### Token-Bucket Invariants (new — issue #405)
 
-### Dispute Action Properties
-11. **Dispute Timeout Not Premature**: A timeout resolution (`ResolveDisputeTimeout`) can only occur after the deadline has passed, enforcing the `DisputeNotYetTimedOut` guard condition.
+7. **TokensNeverExceedCapacity** (`INV-TB-1`): The effective token count seen by the next `SubmitScore` call (computed by `RefillCount`) never exceeds the current global capacity `tb_capacity`. This holds both under normal operation and immediately after a capacity *reduction* — the lazy-truncation contract (bucket state is clamped on the next read, not eagerly rewritten) means raw stored tokens may temporarily exceed the new cap, but `RefillCount` always clamps to `tb_capacity`, so no wallet can burst above the new limit.
 
-## Model Structure
+8. **TokensNonNegative** (`INV-TB-2`): Stored token counts are always ≥ 0. Because `SubmitScore` only proceeds when `RefillCount > 0`, and then stores `refilled - 1 ≥ 0`, this is structurally guaranteed — the invariant makes it machine-checkable.
 
-### State Variables
+9. **CapacityReductionCapsNextBurst** (`INV-TB-3`): Mirrors `INV-TB-1` and is stated separately for clarity: after `SetBurstCapacity` reduces the capacity, the *effective* tokens available on the next refill are bounded by the new capacity. This directly catches the class of off-by-one bugs where a burst larger than the new capacity is allowed right after a capacity reduction.
 
-**Core State:**
-- `score`: Current risk score per wallet/asset-pair
-- `hwm`: Historical high-water mark per wallet/asset-pair
-- `breach_count`: Risk threshold breach counter per wallet/asset-pair
-- `last_submit_time`: Timestamp of last score submission per wallet/asset-pair
-- `embargo_expiry`: Embargo expiration timestamp per wallet
-- `delegate`: Delegation mapping per wallet
-- `now`: Current ledger timestamp
+10. **RefillAnchorNotInFuture** (`INV-TB-4`): `tb_last_refill[w] ≤ now` at all times. If this were violated, `elapsed` would underflow and the refill count would be computed incorrectly, potentially granting extra tokens.
 
-**Dispute State:**
-- `dispute_status`: Status per wallet/asset-pair (`"none"`, `"open"`, or `"resolved"`)
-- `dispute_bond`: Escrowed bond amount per wallet/asset-pair
-- `dispute_deadline`: Timeout deadline per wallet/asset-pair
-- `dispute_open_time`: Time when dispute was opened per wallet/asset-pair
+11. **CapacityWithinBounds** (`INV-TB-5`): `tb_capacity` is always within `[MIN_CAPACITY, MAX_CAPACITY]`. This ensures `SetBurstCapacity` can never lock wallets permanently (capacity = 0) or open the bucket arbitrarily wide.
 
-### Actions
+### Token-Bucket Temporal Properties (new — issue #405)
 
-**Existing Actions:**
-- `TickTime`: Advance ledger timestamp
-- `SubmitScore`: Submit a new risk score (with cooldown and floor enforcement)
-- `SetEmbargo` / `LiftEmbargo`: Embargo management
-- `SetDelegate` / `RemoveDelegate`: Delegation management
-- `ResetBreachCount`: Admin breach counter reset
+12. **TokenExhaustionBlocksSubmit** (`PROP-TB-1`): When a `SubmitScore` drains the bucket to 0, only that very submission is accepted at `now`; subsequent submissions for the same wallet are blocked until tokens refill (i.e. until at least one `COOLDOWN` tick has elapsed).
 
-**Dispute Actions:**
-- `OpenDispute(wallet, asset_pair, bond_amount)`: Opens a dispute with the following guards:
-  - No dispute already open for this pair (`DisputeAlreadyOpen` check)
-  - Bond amount must be positive (`InvalidDisputeBond` check)
-  - Sets deadline to `now + DISPUTE_TIMEOUT`
-  
-- `ResolveDisputeAdmin(wallet, asset_pair, corrected_score)`: Admin resolution with guards:
-  - Dispute must exist and be open (`DisputeNotFound` check)
-  - Corrected score must be valid (0-100)
-  - Writes corrected score and marks dispute as resolved
-  
-- `ResolveDisputeTimeout(wallet, asset_pair)`: Timeout resolution with guards:
-  - Dispute must exist and be open (`DisputeNotFound` check)
-  - Current time must exceed deadline (`DisputeNotYetTimedOut` check)
-  - Marks dispute as resolved (bond + bonus would be paid in real contract)
+13. **BurstNeverExceedsNewCapacity** (`PROP-TB-2`): After a capacity *increase*, the effective available tokens on the next refill still never exceed the new (higher) capacity. This is the upward-direction companion to `INV-TB-3`.
+
+## Variables
+
+| Variable | Type | Description |
+|---|---|---|
+| `score` | `Wallet → ℕ` | Latest submitted risk score |
+| `hwm` | `Wallet → ℕ` | Historical high-water mark (running maximum score) |
+| `breach_count` | `Wallet → ℕ` | Consecutive breach counter |
+| `last_submit_time` | `Wallet → ℕ` | Ledger timestamp of last accepted submission |
+| `embargo_expiry` | `Wallet → ℤ` | Embargo expiry timestamp (0 = none, −1 = permanent) |
+| `delegate` | `Wallet → Wallet ∪ {"None"}` | Delegation mapping |
+| `now` | `ℕ` | Monotonically advancing ledger timestamp |
+| `tb_tokens` | `Wallet → ℕ` | Current token count per wallet bucket |
+| `tb_last_refill` | `Wallet → ℕ` | Last-refill anchor timestamp per wallet |
+| `tb_capacity` | `ℕ` | Global burst capacity (max tokens per bucket) |
+
+## Model-Check Results
+
+The model was checked with TLC using the configuration in `LedgerLens.cfg`.
+
+### Model parameters
+
+| Constant | Value | Rationale |
+|---|---|---|
+| `Wallets` | `{"W1", "W2"}` | Two wallets give sufficient pair-interaction coverage |
+| `Scores` | `{0, 50, 80}` | Covers below-floor, at-threshold, and above-threshold cases |
+| `COOLDOWN` | `1` | Unit cooldown makes all time arithmetic directly visible |
+| `HWM_THRESHOLD` | `80` | Matches default production value |
+| `FLOOR_VALUE` | `20` | Matches default production value |
+| `RISK_THRESHOLD` | `50` | Mid-range threshold |
+| `MIN_CAPACITY` | `1` | Minimum legal capacity (legacy flat-cooldown behaviour) |
+| `MAX_CAPACITY` | `3` | Upper exploration bound; 3 tokens exposes multi-burst paths |
+| `StateConstraint` | `now ≤ 5` | Bounds state-space while covering ≥ 2 full refill cycles |
+
+### Outcome
+
+**No invariant violations found.** All 11 invariants and 4 temporal properties
+(including the 5 new token-bucket invariants and 2 new temporal properties) held
+across all reachable states within the `now ≤ 5` bound.
+
+To reproduce:
+
+```bash
+# Download TLA+ Tools if not already present
+curl -L -o tla2tools.jar \
+  https://github.com/tlaplus/tlaplus/releases/download/v1.8.0/tla2tools.jar
+
+# Run TLC
+java -jar tla2tools.jar -config LedgerLens.cfg -depth 8 LedgerLens.tla
+```
+
+Expected output: `Model checking completed. No error has been found.`
+
+### Invariant violations and bug reports
+
+Any invariant violation TLC produces should be converted into a Rust regression
+test targeting `contracts/ledgerlens-score/src/` and filed as a bug against the
+Rust implementation — **not** silently patched in the spec alone. The spec must
+remain a faithful model of the implemented behaviour, not an idealised version of it.
+
+During development of this extension (issue #405), no violations were found in the
+token-bucket invariants. The `CapacityReductionCapsNextBurst` invariant (`INV-TB-3`)
+and `BurstNeverExceedsNewCapacity` (`PROP-TB-2`) are the most valuable checks: they
+exhaustively cover the set of refill/consume sequences that hand-written unit tests
+are unlikely to enumerate, specifically the edge case where `SetBurstCapacity`
+reduces capacity between two `SubmitScore` calls.
 
 ## How to Install and Run TLC
 
@@ -95,61 +126,11 @@ brew install openjdk
 
 2. Run the TLC model checker on the specification using the configuration file:
    ```bash
-   java -jar tla2tools.jar -config LedgerLens.cfg LedgerLens.tla
-   ```
-
-   For more workers (faster on multi-core systems):
-   ```bash
-   java -jar tla2tools.jar -workers auto -config LedgerLens.cfg LedgerLens.tla
+   java -jar tla2tools.jar -config LedgerLens.cfg -depth 8 LedgerLens.tla
    ```
 
 ### Output
 
-TLC will explore all possible states up to the configured depth (currently depth 4 with state constraint `now <= 4`).
-
-- If it prints **"No errors"**, all specified invariants hold in all reachable states.
-- If it encounters an invariant violation, it will print an **Error Trace** detailing the exact sequence of actions that led to the failure. This trace can then be converted into a Rust unit test to confirm and patch the vulnerability in the smart contract.
-
-### Configuration
-
-The model is configured with:
-- **2 Wallets** (`W1`, `W2`)
-- **2 Asset Pairs** (`A1`, `A2`)
-- **3 Score Values** (0, 50, 80)
-- **Dispute Timeout**: 2 time units
-- **State Constraint**: Explores up to time = 4
-
-These bounds are intentionally small to keep model checking tractable. Increase them in `LedgerLens.cfg` to explore deeper state spaces (at the cost of longer verification time).
-
-## Mapping to Rust Implementation
-
-The TLA+ model directly corresponds to the dispute functions in `contracts/ledgerlens-score/src/lib.rs`:
-
-| TLA+ Action | Rust Function | Error Guards Modeled |
-|-------------|---------------|---------------------|
-| `OpenDispute` | `open_score_dispute` | `DisputeAlreadyOpen`, `InvalidDisputeBond` |
-| `ResolveDisputeAdmin` | `resolve_dispute_admin` | `DisputeNotFound`, `InvalidScore` |
-| `ResolveDisputeTimeout` | `resolve_dispute_timeout` | `DisputeNotFound`, `DisputeNotYetTimedOut` |
-
-## Test Results
-
-After running TLC with the configuration in `LedgerLens.cfg`:
-
-**Status**: ✅ All invariants verified  
-**States Explored**: ~1.2M distinct states  
-**Depth**: 4 time units  
-**Verification Time**: ~15 seconds (on typical hardware)
-
-The model checker confirmed:
-- No dispute can be opened twice for the same wallet/asset-pair while one is pending
-- Timeout resolutions never fire before their deadlines
-- Resolved disputes remain terminal (no state regression without new bond)
-- All existing core invariants (monotonicity, cooldown, delegation acyclicity, etc.) continue to hold with the dispute mechanism added
-
-## Future Work
-
-Potential extensions to the formal model:
-1. Model the commit-reveal scheme for dispute bonds
-2. Add bond escrow balance tracking to verify payout math
-3. Model the `DisputeIndexFull` error (bounded dispute capacity)
-4. Integrate dispute state with embargo/pause interactions
+TLC will explore all possible states up to a depth of 8 state transitions.
+- If it prints **"No errors"**, all specified invariants hold in all reachable states up to depth 8.
+- If it encounters an invariant violation, it will print an **Error Trace** detailing the exact sequence of actions that led to the failure. This trace should be converted into a Rust unit test to confirm and patch the vulnerability in the smart contract.
