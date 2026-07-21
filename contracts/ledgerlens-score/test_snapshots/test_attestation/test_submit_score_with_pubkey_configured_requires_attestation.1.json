@@ -262,6 +262,9 @@
             "topics": [
               {
                 "symbol": "pk_upd"
+              },
+              {
+                "u32": 1
               }
             ],
             "data": {

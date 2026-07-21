@@ -312,6 +312,9 @@
             "topics": [
               {
                 "symbol": "adm_init"
+              },
+              {
+                "u32": 1
               }
             ],
             "data": {
@@ -431,6 +434,9 @@
             "topics": [
               {
                 "symbol": "adm_done"
+              },
+              {
+                "u32": 1
               }
             ],
             "data": {
