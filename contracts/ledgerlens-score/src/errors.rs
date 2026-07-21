@@ -111,4 +111,12 @@ impl Error {
     pub const GateCallerListFull: Error = Error::ServiceSetFull;
     pub const GateCallerNotInList: Error = Error::ScoreNotFound;
     pub const ParamChangeAlreadyPending: Error = Error::UpgradeAlreadyPending;
+
+    // ── Aggregator composability ────────────────────────────────────────────
+    /// Returned by `ledgerlens-aggregator`'s `add_shard` when a candidate shard
+    /// does not advertise the `ILedgerLensScore` capabilities the aggregator
+    /// invokes across every shard. It signals that the shard's interface has
+    /// drifted from the version the aggregator targets, so registering it would
+    /// lead to failed or subtly incorrect cross-contract calls.
+    pub const IncompatibleInterface: Error = Error::InvalidAttestation;
 }

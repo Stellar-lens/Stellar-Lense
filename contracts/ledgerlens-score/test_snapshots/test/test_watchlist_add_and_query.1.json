@@ -363,6 +363,9 @@
             "topics": [
               {
                 "symbol": "watch"
+              },
+              {
+                "u32": 1
               }
             ],
             "data": {

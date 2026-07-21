@@ -393,6 +393,9 @@
                 "symbol": "pw_upd"
               },
               {
+                "u32": 1
+              },
+              {
                 "symbol": "XLM_USDC"
               }
             ],
@@ -471,6 +474,9 @@
             "topics": [
               {
                 "symbol": "pw_upd"
+              },
+              {
+                "u32": 1
               },
               {
                 "symbol": "XLM_BTC"
