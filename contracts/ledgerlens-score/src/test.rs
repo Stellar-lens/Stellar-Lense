@@ -168,6 +168,7 @@ fn test_get_scores_batch_single_entry() {
 #[test]
 fn test_get_scores_batch_max_batch() {
     let (env, client, admin, service) = setup();
+    env.budget().reset_unlimited();
     client.initialize(&admin, &service);
 
     let asset_pair = symbol_short!("XLM_USDC");
@@ -2214,6 +2215,9 @@ fn test_score_count_is_per_pair() {
     client.submit_score(&Vec::new(&env), &wallet, &pair1, &30, &false, &false, &1, &60, &1, &None);
     env.ledger().with_mut(|l| l.timestamp += 3_601);
     client.submit_score(&Vec::new(&env), &wallet, &pair1, &40, &false, &false, &2, &70, &1, &None);
+
+    env.ledger().with_mut(|l| l.timestamp += 3_601);
+
     client.submit_score(&Vec::new(&env), &wallet, &pair2, &90, &true, &true, &3, &95, &1, &None);
 
     assert_eq!(client.get_score_count(&wallet, &pair1), 2);

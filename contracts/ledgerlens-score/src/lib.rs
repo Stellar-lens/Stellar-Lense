@@ -1120,12 +1120,7 @@ impl LedgerLensScoreContract {
                             commitment: None,
                         };
                         storage::set_score(&env, &sub.wallet, &sub.asset_pair, &risk_score);
-                        storage::push_score_history(
-                            &env,
-                            &sub.wallet,
-                            &sub.asset_pair,
-                            &risk_score,
-                        );
+                        storage::push_score_history(&env, &sub.wallet, &sub.asset_pair, &risk_score);
                         storage::register_pair_for_wallet(&env, &sub.wallet, &sub.asset_pair);
                         storage::increment_score_count(&env, &sub.wallet, &sub.asset_pair);
                         // Increment per-pair submission counter (Issue 1).
@@ -1143,12 +1138,7 @@ impl LedgerLensScoreContract {
                         );
                         storage::update_histogram_on_write(&env, previous_score, sub.score);
                         Self::refresh_aggregate_cache(&env, &sub.wallet);
-                        Self::update_verkle_commitment(
-                            &env,
-                            &sub.wallet,
-                            &sub.asset_pair,
-                            &risk_score,
-                        );
+                        Self::update_verkle_commitment(&env, &sub.wallet, &sub.asset_pair, &risk_score);
 
                         if sub.score >= threshold {
                             events::threshold_breached(

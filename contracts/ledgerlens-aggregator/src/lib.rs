@@ -13,6 +13,30 @@ use soroban_sdk::{
 
 pub const MAX_SHARDS: usize = 10;
 
+/// Capabilities of the `ILedgerLensScore` interface (interface version 2, see
+/// `docs/interface-spec.md`) that this aggregator invokes on every registered
+/// shard: `query_risk_gate` (`gate`), `get_score` (`score`), and
+/// `get_aggregate_score` (`aggr`). `add_shard` requires a candidate shard to
+/// advertise all of them via `supports_interface`, so a shard whose interface
+/// has drifted is rejected at registration time instead of failing silently
+/// during a later cross-contract call.
+const REQUIRED_SHARD_CAPABILITIES: [&str; 3] = ["score", "gate", "aggr"];
+
+/// Returns `true` only when `shard` reports support for every capability in
+/// [`REQUIRED_SHARD_CAPABILITIES`]. A shard that omits one, reports `false`, or
+/// does not expose `supports_interface` at all (an older or drifted build) is
+/// treated as incompatible.
+fn shard_supports_required_interface(env: &Env, shard: &Address) -> bool {
+    let client = ledgerlens_score::LedgerLensScoreContractClient::new(env, shard);
+    for capability in REQUIRED_SHARD_CAPABILITIES {
+        match client.try_supports_interface(&Symbol::new(env, capability)) {
+            Ok(Ok(true)) => {}
+            _ => return false,
+        }
+    }
+    true
+}
+
 #[contract]
 pub struct LedgerLensAggregator;
 
@@ -104,6 +128,9 @@ impl LedgerLensAggregator {
         }
         if shards.len() as usize >= MAX_SHARDS {
             return Err(ScoreError::ServiceSetFull); // reuse
+        }
+        if !shard_supports_required_interface(&env, &shard) {
+            return Err(ScoreError::IncompatibleInterface);
         }
         shards.push_back(shard);
         env.storage().instance().set(&DataKey::Shards, &shards);
