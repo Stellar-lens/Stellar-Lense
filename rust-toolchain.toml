@@ -1,0 +1,17 @@
+# Pin the exact Rust toolchain version used to produce the release WASM artifact.
+#
+# Why 1.81.0?
+#   soroban-sdk 21.x targets wasm32-unknown-unknown.  Rust 1.82 changed that
+#   target to enable the `reference-types` and `multi-value` wasm proposals,
+#   which the Soroban host environment does not support.  1.81.0 is therefore
+#   the latest stable release that produces valid, deployable Soroban WASM.
+#
+# Reproducibility contract:
+#   Any contributor or third party who installs this exact toolchain and builds
+#   from the same source commit using `cargo build --target wasm32-unknown-unknown
+#   --release -p ledgerlens-score --locked` MUST obtain a byte-identical WASM
+#   file.  See docs/reproducible-builds.md for the full verification procedure.
+[toolchain]
+channel  = "1.81.0"
+targets  = ["wasm32-unknown-unknown"]
+components = ["rustc", "cargo", "rustfmt", "clippy", "rust-src"]
