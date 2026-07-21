@@ -1091,6 +1091,34 @@ fn hll_rho(hash: &[u8; 32], precision: u32) -> u32 {
     count
 }
 
+fn f64_ln(x: f64) -> f64 {
+    if x <= 0.0 {
+        return 0.0;
+    }
+    let bits = x.to_bits();
+    let exp = ((bits >> 52) & 0x7FF) as i32 - 1023;
+    let mantissa = f64::from_bits((bits & 0x000F_FFFF_FFFF_FFFF) | 0x3FF0_0000_0000_0000);
+    let y = (mantissa - 1.0) / (mantissa + 1.0);
+    let y2 = y * y;
+    let mut y_pow = y;
+    let mut series = y;
+    let mut k = 3.0;
+    while k <= 15.0 {
+        y_pow *= y2;
+        series += y_pow / k;
+        k += 2.0;
+    }
+    2.0 * series + (exp as f64) * 0.6931471805599453
+}
+
+fn f64_pow2_neg(r: u32) -> f64 {
+    let mut p = 1.0f64;
+    for _ in 0..r {
+        p *= 2.0;
+    }
+    1.0 / p
+}
+
 fn hll_alpha(precision: u32) -> f64 {
     let m = 1u64 << precision;
     let m_f = m as f64;

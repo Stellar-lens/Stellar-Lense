@@ -73,6 +73,12 @@ jobs:
           name: ledgerlens-score-wasm
           path: target/wasm32-unknown-unknown/release/ledgerlens_score.wasm
           retention-days: 7
+      - name: Upload WASM size report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ledgerlens-score-wasm-size-report
+          path: target/wasm-size-report.md
+          retention-days: 7
 
   audit:
     name: Security audit
