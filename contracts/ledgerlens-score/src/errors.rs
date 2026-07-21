@@ -82,6 +82,10 @@ impl Error {
     pub const ModelVersionAlreadyDeprecated: Error = Error::AlreadyInitialized;
     pub const ModelVersionAlreadyRegistered: Error = Error::SignerAlreadyInSet;
     pub const ModelVersionRegistryFull: Error = Error::ServiceSetFull;
+    pub const ModelVersionNotReady: Error = Error::UpgradeNotReady;
+    pub const ModelVersionAlreadyProposed: Error = Error::UpgradeAlreadyPending;
+    pub const ModelVersionNotProposed: Error = Error::NoPendingUpgrade;
+    pub const ModelVersionNotActive: Error = Error::Unauthorized;
 
     pub const NotFound: Error = Error::ScoreNotFound;
     pub const FeeRecipientNotSet: Error = Error::FeeTokenNotSet;
