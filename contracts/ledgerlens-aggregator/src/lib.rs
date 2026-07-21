@@ -337,6 +337,10 @@ fn is_shard_healthy(env: &Env, shard: &Address) -> bool {
     env.storage().instance().get(&DataKey::ShardHealth(shard.clone())).unwrap_or(true)
 }
 
+fn is_shard_healthy(env: &Env, shard: &Address) -> bool {
+    env.storage().instance().get(&DataKey::ShardHealth(shard.clone())).unwrap_or(true)
+}
+
 #[contracttype]
 #[derive(Clone)]
 enum DataKey {
