@@ -146,6 +146,40 @@ sequenceDiagram
 
 **Source:** [contracts/ledgerlens-score/src/lib.rs](../../contracts/ledgerlens-score/src/lib.rs)
 
+## Commitment Scoping Trace & Isolation Analysis
+
+### 1. Multi-Model Consensus Commit-Reveal Scoping
+- **Storage Key:** `DataKeyC::ConsensusCommitment(model: Address, wallet: Address, asset_pair: Symbol)`
+- **Storage Type:** Soroban `temporary()` storage bounded by `reveal_window_secs` TTL.
+- **Payload Commitment Hash:** `sha256(score: u32 || nonce: u64)` (12-byte big-endian packed array).
+- **Scoping Dimensions:**
+  - `wallet`: Scoped directly in the storage key `DataKeyC::ConsensusCommitment(model, wallet, asset_pair)`.
+  - `asset_pair`: Scoped directly in the storage key.
+  - `signer / model`: Scoped directly in the storage key (`model`).
+  - `nonce`: Implicitly bound inside the 12-byte byte array verified via `sha256(score || nonce)` during `reveal_consensus`.
+  - `window / epoch identifier`: Scoped via temporary storage TTL window (`reveal_window_secs`, default 3600s). Once revealed, `remove_consensus_commitment` deletes the key, preventing double-reveal. If the reveal window closes without reveal, temporary storage TTL evicts the entry, preventing late reveals.
+
+### 2. Finality-Buffer Commit-Reveal Scoping
+- **Storage Key:** `DataKeyB::PendingScore(wallet: Address, asset_pair: Symbol)`
+- **Storage Type:** Soroban `persistent()` storage with TTL management.
+- **Value Data Structure:** `PendingScoreEntry` struct containing `score`, `benford_flag`, `ml_flag`, `submitted_at`, `confidence`, `model_version`, `timestamp`, `commit_after`, `submitted_by`, and an optional `commitment: Option<Bytes>`.
+- **Scoping Dimensions:**
+  - `wallet`: Scoped directly in the storage key `DataKeyB::PendingScore(wallet, asset_pair)`.
+  - `asset_pair`: Scoped directly in the storage key.
+  - `signer`: Recorded in `submitted_by: Address`. Auth check is performed during `submit_score`.
+  - `nonce`: Single-attestation nonces are checked and incremented on `SignerNonce(service)` during `submit_score`.
+  - `window / epoch identifier`: Time-locked by `commit_after` timestamp (`submitted_at + finality_buffer`). `commit_pending_score` rejects execution before `commit_after` with `Error::FinalityWindowNotElapsed`. When committed, `clear_pending_score` removes the entry, preventing replay.
+
+### 3. Mechanism Storage Isolation & Interference Analysis
+- **Key Namespace Separation:**
+  - Consensus commitment uses `DataKeyC::ConsensusCommitment(Address, Address, Symbol)` in `temporary()` storage.
+  - Finality buffer uses `DataKeyB::PendingScore(Address, Symbol)` in `persistent()` storage.
+  - The enum discriminants `DataKeyC` vs `DataKeyB` ensure strict cryptographic byte-level namespace separation in Soroban storage.
+- **Cross-Mechanism Interference Check:**
+  - `commit_consensus` and `reveal_consensus` read/write exclusively from `DataKeyC::ConsensusCommitment`.
+  - `submit_score`, `commit_pending_score`, and `cancel_pending_score` read/write exclusively from `DataKeyB::PendingScore`.
+  - Storing or committing a pending score cannot alter or overwrite a consensus commitment hash, nor can a consensus reveal consume or clear a pending score entry.
+
 ## Security Notes
 
 ### Finality Buffer
