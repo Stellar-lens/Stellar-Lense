@@ -79,8 +79,8 @@ mod test_cooldown;
 // #[cfg(test)]
 // mod test_consensus;
 
-// #[cfg(test)]
-// mod test_dispute;
+#[cfg(test)]
+mod test_dispute;
 
 // #[cfg(test)]
 // mod test_finality_buffer;
@@ -6571,6 +6571,22 @@ impl LedgerLensScoreContract {
         if storage::get_dispute(&env, &wallet, &asset_pair).is_some() {
             return Err(Error::DisputeAlreadyOpen);
         }
+
+        // Enforce per-actor concurrent open dispute cap to prevent DoS saturation
+        let dispute_index = storage::get_dispute_index(&env);
+        let mut actor_dispute_count: u32 = 0;
+        for i in 0..dispute_index.len() {
+            let (w, p) = dispute_index.get(i).unwrap();
+            if let Some(d) = storage::get_dispute(&env, &w, &p) {
+                if d.challenger == challenger {
+                    actor_dispute_count += 1;
+                }
+            }
+        }
+        if actor_dispute_count >= constants::MAX_DISPUTES_PER_ACTOR {
+            return Err(Error::ActorDisputeLimitExceeded);
+        }
+
         if !storage::add_to_dispute_index(&env, &wallet, &asset_pair) {
             return Err(Error::DisputeAlreadyOpen);
         }
