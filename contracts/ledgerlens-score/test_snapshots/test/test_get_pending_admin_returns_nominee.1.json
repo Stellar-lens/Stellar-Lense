@@ -275,6 +275,9 @@
             "topics": [
               {
                 "symbol": "adm_init"
+              },
+              {
+                "u32": 1
               }
             ],
             "data": {
