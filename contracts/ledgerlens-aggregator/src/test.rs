@@ -60,13 +60,153 @@ fn init_aggregator(env: &Env) -> LedgerLensAggregatorClient<'_> {
 }
 
 #[test]
-fn test_query_risk_gate_no_shards_returns_false() {
+fn test_initialize() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let agg_id = env.register_contract(None, LedgerLensAggregator);
+    let client = LedgerLensAggregatorClient::new(&env, &agg_id);
+    let admin = Address::generate(&env);
+    client.initialize(&admin);
+    assert_eq!(client.get_admin(), admin);
+}
+
+#[test]
+fn test_initialize_twice_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let agg_id = env.register_contract(None, LedgerLensAggregator);
+    let client = LedgerLensAggregatorClient::new(&env, &agg_id);
+    let admin = Address::generate(&env);
+    client.initialize(&admin);
+    let result = client.try_initialize(&admin);
+    assert_eq!(result, Err(Ok(Error::AlreadyInitialized)));
+}
+
+#[test]
+fn test_get_admin_not_initialized() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let agg_id = env.register_contract(None, LedgerLensAggregator);
+    let client = LedgerLensAggregatorClient::new(&env, &agg_id);
+    let result = client.try_get_admin();
+    assert_eq!(result, Err(Ok(Error::NotInitialized)));
+}
+
+#[test]
+fn test_add_remove_shards() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let agg_id = env.register_contract(None, LedgerLensAggregator);
+    let client = LedgerLensAggregatorClient::new(&env, &agg_id);
+    let admin = Address::generate(&env);
+    client.initialize(&admin);
+
+    let shard = Address::generate(&env);
+    client.add_shard(&shard);
+
+    let shards = client.get_shards();
+    assert_eq!(shards.len(), 1);
+    assert_eq!(shards.get(0).unwrap(), shard);
+
+    client.remove_shard(&shard);
+    assert_eq!(client.get_shards().len(), 0);
+}
+
+#[test]
+fn test_add_shard_self_reference_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let agg_id = env.register_contract(None, LedgerLensAggregator);
+    let client = LedgerLensAggregatorClient::new(&env, &agg_id);
+    let admin = Address::generate(&env);
+    client.initialize(&admin);
+
+    let result = client.try_add_shard(&agg_id);
+    assert_eq!(result, Err(Ok(Error::SelfReference)));
+}
+
+#[test]
+fn test_add_shard_duplicate_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let agg_id = env.register_contract(None, LedgerLensAggregator);
+    let client = LedgerLensAggregatorClient::new(&env, &agg_id);
+    let admin = Address::generate(&env);
+    client.initialize(&admin);
+
+    let shard = Address::generate(&env);
+    client.add_shard(&shard);
+    let result = client.try_add_shard(&shard);
+    assert_eq!(result, Err(Ok(Error::ShardAlreadyRegistered)));
+}
+
+#[test]
+fn test_remove_nonexistent_shard_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let agg_id = env.register_contract(None, LedgerLensAggregator);
+    let client = LedgerLensAggregatorClient::new(&env, &agg_id);
+    let admin = Address::generate(&env);
+    client.initialize(&admin);
+
+    let shard = Address::generate(&env);
+    let result = client.try_remove_shard(&shard);
+    assert_eq!(result, Err(Ok(Error::ShardNotRegistered)));
+}
+
+#[test]
+fn test_query_risk_gate_no_shards_returns_no_shards_error() {
     let env = Env::default();
     env.mock_all_auths();
     let agg_id = env.register_contract(None, LedgerLensAggregator);
     let client = LedgerLensAggregatorClient::new(&env, &agg_id);
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
+    let result = client.try_query_risk_gate(&wallet, &pair, &75);
+    assert_eq!(result, Err(Ok(Error::NoShards)));
+}
+
+#[test]
+fn test_query_risk_gate_all_shards_pass() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let agg_id = env.register_contract(None, LedgerLensAggregator);
+    let client = LedgerLensAggregatorClient::new(&env, &agg_id);
+    let admin = Address::generate(&env);
+    client.initialize(&admin);
+
+    let (shard1_id, shard1) = setup_score_shard(&env);
+    let (shard2_id, shard2) = setup_score_shard(&env);
+    client.add_shard(&shard1_id);
+    client.add_shard(&shard2_id);
+
+    let wallet = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+    shard1.submit_score(&Vec::new(&env), &wallet, &pair, &10, &false, &false, &1, &100, &1, &None);
+    shard2.submit_score(&Vec::new(&env), &wallet, &pair, &10, &false, &false, &1, &100, &1, &None);
+
+    assert!(client.query_risk_gate(&wallet, &pair, &75));
+}
+
+#[test]
+fn test_query_risk_gate_one_shard_rejects() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let agg_id = env.register_contract(None, LedgerLensAggregator);
+    let client = LedgerLensAggregatorClient::new(&env, &agg_id);
+    let admin = Address::generate(&env);
+    client.initialize(&admin);
+
+    let (shard1_id, shard1) = setup_score_shard(&env);
+    let (shard2_id, shard2) = setup_score_shard(&env);
+    client.add_shard(&shard1_id);
+    client.add_shard(&shard2_id);
+
+    let wallet = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+    shard1.submit_score(&Vec::new(&env), &wallet, &pair, &10, &false, &false, &1, &100, &1, &None);
+    shard2.submit_score(&Vec::new(&env), &wallet, &pair, &90, &false, &false, &1, &100, &1, &None);
+
     assert!(!client.query_risk_gate(&wallet, &pair, &75));
 }
 
