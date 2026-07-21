@@ -3069,7 +3069,7 @@
                           ]
                         },
                         "val": {
-                          "bytes": "b186482288b87bc23b7688b8f80bce862dad79598d426db5f07be93f29e84133"
+                          "bytes": "f49e54c4464b1f402745bcd18b5579585cf031f15a93333b869c7f08fdd95eb4"
                         }
                       }
                     ]
@@ -3391,6 +3391,9 @@
                 "symbol": "scr_dlt"
               },
               {
+                "u32": 1
+              },
+              {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOLZM"
               },
               {
@@ -3431,6 +3434,9 @@
             "topics": [
               {
                 "symbol": "score"
+              },
+              {
+                "u32": 1
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOLZM"
@@ -3611,6 +3617,9 @@
                 "symbol": "breach"
               },
               {
+                "u32": 1
+              },
+              {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAARQG5"
               }
             ],
@@ -3677,6 +3686,9 @@
                 "symbol": "scr_dlt"
               },
               {
+                "u32": 1
+              },
+              {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAARQG5"
               },
               {
@@ -3717,6 +3729,9 @@
             "topics": [
               {
                 "symbol": "score"
+              },
+              {
+                "u32": 1
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAARQG5"

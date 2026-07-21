@@ -2444,7 +2444,7 @@
                           ]
                         },
                         "val": {
-                          "bytes": "d388d309a9832544ab08638bafb4f5b7dbf658e82d1ed8715cae25b1c714cdd5"
+                          "bytes": "c158f9453043aa6dd0d3217402d710d041ea94bebb46b9f806b23fea53296105"
                         }
                       }
                     ]
@@ -2734,6 +2734,9 @@
                 "symbol": "scr_dlt"
               },
               {
+                "u32": 1
+              },
+              {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
               },
               {
@@ -2774,6 +2777,9 @@
             "topics": [
               {
                 "symbol": "score"
+              },
+              {
+                "u32": 1
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
@@ -2894,6 +2900,9 @@
                 "symbol": "scr_dlt"
               },
               {
+                "u32": 1
+              },
+              {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
               },
               {
@@ -2934,6 +2943,9 @@
             "topics": [
               {
                 "symbol": "score"
+              },
+              {
+                "u32": 1
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
@@ -3054,6 +3066,9 @@
                 "symbol": "scr_dlt"
               },
               {
+                "u32": 1
+              },
+              {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
               },
               {
@@ -3094,6 +3109,9 @@
             "topics": [
               {
                 "symbol": "score"
+              },
+              {
+                "u32": 1
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
@@ -3214,6 +3232,9 @@
                 "symbol": "scr_dlt"
               },
               {
+                "u32": 1
+              },
+              {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
               },
               {
@@ -3254,6 +3275,9 @@
             "topics": [
               {
                 "symbol": "score"
+              },
+              {
+                "u32": 1
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"

@@ -2067,7 +2067,7 @@
                           ]
                         },
                         "val": {
-                          "bytes": "5272ec13cba083dd386cf5f6e3ae5cc129c7fd740b34ce881fa94394260ed6da"
+                          "bytes": "ce7ec608444038a690495c6c2bc1839bf496d05da45c4a3bf670004827ac3f6e"
                         }
                       }
                     ]
@@ -2231,7 +2231,7 @@
               }
             ],
             "data": {
-              "bytes": "4c45444745524c454e535f4b5a475f310000000000000000000000000000000000000000000000000000000000000000"
+              "bytes": "4c45444745524c454e535f4b5a475f31fdfdd5396ba68d416587eb28ee4dbdcb3cb04c34e0c7bb63f393afa769cd74f4"
             }
           }
         }
@@ -2305,6 +2305,9 @@
                 "symbol": "scr_dlt"
               },
               {
+                "u32": 1
+              },
+              {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
               },
               {
@@ -2345,6 +2348,9 @@
             "topics": [
               {
                 "symbol": "score"
+              },
+              {
+                "u32": 1
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"

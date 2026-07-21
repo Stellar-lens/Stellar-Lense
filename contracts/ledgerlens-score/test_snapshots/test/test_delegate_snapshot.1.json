@@ -2260,7 +2260,7 @@
                           ]
                         },
                         "val": {
-                          "bytes": "ea2fd421d994629a5deaf23ee21328785f7126c4d05f712249c687aadcedaae4"
+                          "bytes": "dbee170c61b15fdf0713c519cbee0709ad15af56680454652917081ac6265401"
                         }
                       }
                     ]
@@ -2493,6 +2493,9 @@
             "topics": [
               {
                 "symbol": "dlg_set"
+              },
+              {
+                "u32": 1
               }
             ],
             "data": {
@@ -2598,6 +2601,9 @@
                 "symbol": "scr_dlt"
               },
               {
+                "u32": 1
+              },
+              {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
               },
               {
@@ -2638,6 +2644,9 @@
             "topics": [
               {
                 "symbol": "score"
+              },
+              {
+                "u32": 1
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
@@ -2893,6 +2902,9 @@
                 "symbol": "scr_dlt"
               },
               {
+                "u32": 1
+              },
+              {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
               },
               {
@@ -2933,6 +2945,9 @@
             "topics": [
               {
                 "symbol": "score"
+              },
+              {
+                "u32": 1
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
