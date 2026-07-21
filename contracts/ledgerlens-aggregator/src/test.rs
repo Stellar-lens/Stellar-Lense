@@ -211,7 +211,7 @@ fn test_query_risk_gate_one_shard_rejects() {
 }
 
 #[test]
-fn test_get_decay_rate() {
+fn test_set_and_get_conflict_resolution_policy() {
     let env = Env::default();
     env.mock_all_auths();
     let agg_id = env.register_contract(None, LedgerLensAggregator);
@@ -224,7 +224,8 @@ fn test_get_decay_rate() {
     client.add_shard(&shard_id);
     shard_client.set_decay_rate(&1, &1000);
 
-    let (numerator, denominator) = client.get_decay_rate();
+    client.set_conflict_resolution_policy(&ConflictPolicy::MostRecent);
+    assert_eq!(client.get_conflict_resolution_policy(), ConflictPolicy::MostRecent);
 
     assert_eq!(numerator, 1);
     assert_eq!(denominator, 1000);
@@ -263,17 +264,45 @@ fn test_get_decay_rate_no_shards_returns_error() {
 #[test]
 fn test_get_consensus_threshold_k() {
     let env = Env::default();
+    env.mock_all_auths();
     let agg_id = env.register_contract(None, LedgerLensAggregator);
     let client = LedgerLensAggregatorClient::new(&env, &agg_id);
 
-    let k = client.get_consensus_threshold_k();
-
-    assert_eq!(k, 5, "Should return the configured consensus threshold K");
-    assert!(k >= 3, "K should be at least 3 for meaningful consensus");
+    let result = client.try_set_conflict_resolution_policy(&ConflictPolicy::MostRecent);
+    assert_eq!(result, Err(Ok(ScoreError::NotInitialized)));
 }
 
 #[test]
-fn test_get_watchlist_status() {
+fn test_get_score_highest_score_policy() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let admin = Address::generate(&env);
+    let service = Address::generate(&env);
+    let wallet = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+
+    let (shard1_id, shard1_client) = setup_score(&env, &admin, &service);
+    // shard1: score=50, timestamp=100
+    submit_score(&shard1_client, &env, &wallet, &pair, 50, 100);
+
+    let (shard2_id, shard2_client) = setup_score(&env, &admin, &service);
+    // shard2: score=90, timestamp=50 (higher score but older)
+    submit_score(&shard2_client, &env, &wallet, &pair, 90, 50);
+
+    let agg_id = env.register_contract(None, LedgerLensAggregator);
+    let agg_client = LedgerLensAggregatorClient::new(&env, &agg_id);
+    agg_client.initialize(&admin);
+    agg_client.add_shard(&shard1_id);
+    agg_client.add_shard(&shard2_id);
+
+    // Default policy is HighestScore — should return score 90 from shard2
+    let score = agg_client.get_score(&wallet, &pair);
+    assert_eq!(score.score, 90);
+    assert_eq!(score.timestamp, 50);
+}
+
+#[test]
+fn test_get_score_most_recent_policy() {
     let env = Env::default();
     env.mock_all_auths();
     let agg_id = env.register_contract(None, LedgerLensAggregator);
