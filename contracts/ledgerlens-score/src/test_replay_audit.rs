@@ -76,14 +76,7 @@ fn test_replay_consensus_twice_fails() {
     nonces.push_back(nonce);
 
     // First reveal succeeds
-    client.reveal_consensus(
-        &Vec::new(&env),
-        &wallet,
-        &pair,
-        &submissions,
-        &nonces,
-        &START_TS,
-    );
+    client.reveal_consensus(&Vec::new(&env), &wallet, &pair, &submissions, &nonces, &START_TS);
 
     // Second reveal (replay) fails with RevealWindowExpired because commitment was removed
     let res = client.try_reveal_consensus(
@@ -326,7 +319,10 @@ fn test_replay_consensus_commitment_into_pending_score_fails() {
     let att_input_1 = ScoreAttestationInput {
         attestation: MaybeScoreAttestation::None,
         threshold_attestation: MaybeThresholdAttestation::None,
-        commitment: Some(soroban_sdk::Bytes::from_array(&env, &hash_consensus.to_bytes().to_array())),
+        commitment: Some(soroban_sdk::Bytes::from_array(
+            &env,
+            &hash_consensus.to_bytes().to_array(),
+        )),
     };
 
     client.submit_score(
