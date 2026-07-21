@@ -18,6 +18,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Changed
 - **Lazy score TTL extension**: `set_score` now skips `extend_ttl` when the entry's estimated remaining TTL is still at or above `SCORE_TTL_THRESHOLD`, reducing ledger instruction cost for batch resubmissions to pre-warmed entries.
 
+### Removed
+- **`gdpr_accumulator` scaffold**: Removed the unwired, cryptographically unsound RSA-accumulator-style deletion-proof module (`generate_deletion_witness`, `verify_deletion_proof`, `accumulator_update`). It was never called from `clear_score`/`clear_score_history`, used a trivially factorable `u64` modulus in place of RSA, and XOR-folded bytes in place of a real hash. GDPR erasure is handled by plain storage deletion (`storage::clear_score_history`/`storage::clear_score`) only — there is currently no cryptographic non-membership proof accompanying deletion. A sound accumulator or Merkle-based scheme may be reintroduced later, properly wired and documented. Closes #395.
+
 ---
 
 ## [3.0.0] - 2026-06-22
