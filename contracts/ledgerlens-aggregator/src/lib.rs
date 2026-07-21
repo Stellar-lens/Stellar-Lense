@@ -155,6 +155,7 @@ impl LedgerLensAggregator {
             return Err(Error::ShardNotRegistered);
         }
         env.storage().instance().set(&DataKey::Shards, &out);
+        env.storage().instance().remove(&DataKey::ShardHealth(shard));
         Ok(())
     }
 
@@ -175,6 +176,9 @@ impl LedgerLensAggregator {
         }
         for i in 0..shards.len() {
             let shard = shards.get(i).unwrap();
+            if !is_shard_healthy(&env, &shard) {
+                continue;
+            }
             let client = ledgerlens_score::LedgerLensScoreContractClient::new(&env, &shard);
             match client.try_query_risk_gate(&wallet, &asset_pair, &gate_threshold) {
                 Ok(Ok(true)) => {}
@@ -198,6 +202,9 @@ impl LedgerLensAggregator {
         let mut best: Option<RiskScore> = None;
         for i in 0..shards.len() {
             let shard = shards.get(i).unwrap();
+            if !is_shard_healthy(&env, &shard) {
+                continue;
+            }
             let client = ledgerlens_score::LedgerLensScoreContractClient::new(&env, &shard);
             match client.try_get_score(&wallet, &asset_pair) {
                 Ok(Ok(score)) => {
@@ -230,6 +237,9 @@ impl LedgerLensAggregator {
         let mut best: Option<AggregateRiskScore> = None;
         for i in 0..shards.len() {
             let shard = shards.get(i).unwrap();
+            if !is_shard_healthy(&env, &shard) {
+                continue;
+            }
             let client = ledgerlens_score::LedgerLensScoreContractClient::new(&env, &shard);
             match client.try_get_aggregate_score(&wallet) {
                 Ok(Ok(agg)) => {
@@ -279,6 +289,9 @@ impl LedgerLensAggregator {
         let mut out: Vec<(Address, Option<RiskScore>)> = Vec::new(&env);
         for i in 0..shards.len() {
             let shard = shards.get(i).unwrap();
+            if !is_shard_healthy(&env, &shard) {
+                continue;
+            }
             let client = ledgerlens_score::LedgerLensScoreContractClient::new(&env, &shard);
             match client.try_get_score(&wallet, &asset_pair) {
                 Ok(Ok(score)) => out.push_back((shard.clone(), Some(score))),
@@ -297,6 +310,9 @@ impl LedgerLensAggregator {
         let mut max_depth: u32 = 0;
         for i in 0..shards.len() {
             let shard = shards.get(i).unwrap();
+            if !is_shard_healthy(&env, &shard) {
+                continue;
+            }
             let client = ledgerlens_score::LedgerLensScoreContractClient::new(&env, &shard);
             match client.try_get_contagion_depth(&wallet, &asset_pair) {
                 Ok(Ok(depth)) => {
@@ -315,6 +331,10 @@ impl LedgerLensAggregator {
     pub fn get_last_shard_failure(env: Env) -> Option<(Address, u32)> {
         env.storage().instance().get(&DataKey::LastShardFailure)
     }
+}
+
+fn is_shard_healthy(env: &Env, shard: &Address) -> bool {
+    env.storage().instance().get(&DataKey::ShardHealth(shard.clone())).unwrap_or(true)
 }
 
 #[contracttype]
