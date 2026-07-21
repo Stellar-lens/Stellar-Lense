@@ -264,6 +264,9 @@
             "topics": [
               {
                 "symbol": "paused"
+              },
+              {
+                "u32": 1
               }
             ],
             "data": {

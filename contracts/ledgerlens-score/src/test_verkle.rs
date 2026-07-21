@@ -1,4 +1,4 @@
-﻿#![cfg(test)]
+#![cfg(test)]
 
 //! Tests for the Verkle / KZG polynomial commitment system.
 //!
@@ -11,12 +11,12 @@
 //! * Batch path (`submit_scores_batch`) updates commitment identically.
 
 use soroban_sdk::{
-    symbol_short, testutils::{Address as _, Ledger}, Address, Bytes, BytesN, Env, Vec,
+    symbol_short,
+    testutils::{Address as _, Ledger},
+    Address, Bytes, BytesN, Env, Vec,
 };
 
-use crate::{
-    LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreSubmission,
-};
+use crate::{LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreSubmission};
 
 // ── Test infrastructure ──────────────────────────────────────────────────────
 
@@ -76,26 +76,10 @@ fn commitment_changes_after_score_write() {
     let before = client.get_state_commitment();
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLMUSDC");
-    client
-        .submit_score(
-            &Vec::new(&env),
-            &wallet,
-            &pair,
-            &50,
-            &false,
-            &false,
-            &1,
-            &90,
-            &1,
-            &None,
-        );
+    client.submit_score(&Vec::new(&env), &wallet, &pair, &50, &false, &false, &1, &90, &1, &None);
 
     let after = client.get_state_commitment();
-    assert_ne!(
-        before.to_array(),
-        after.to_array(),
-        "commitment must change after a score write"
-    );
+    assert_ne!(before.to_array(), after.to_array(), "commitment must change after a score write");
 }
 
 #[test]
@@ -105,44 +89,27 @@ fn commitment_changes_on_score_update() {
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLMUSDC");
 
-    client
-        .submit_score(
-            &Vec::new(&env),
-            &wallet,
-            &pair,
-            &30,
-            &false,
-            &false,
-            &1,
-            &80,
-            &1,
-            &None,
-        );
+    client.submit_score(&Vec::new(&env), &wallet, &pair, &30, &false, &false, &1, &80, &1, &None);
     let c1 = client.get_state_commitment();
 
     // Advance past cooldown.
     env.ledger().with_mut(|l| l.timestamp += 3_601);
 
-    client
-        .submit_score(
-            &Vec::new(&env),
-            &wallet,
-            &pair,
-            &70,
-            &false,
-            &false,
-            &3_602,
-            &90,
-            &1,
-            &None,
-        );
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &70,
+        &false,
+        &false,
+        &3_602,
+        &90,
+        &1,
+        &None,
+    );
     let c2 = client.get_state_commitment();
 
-    assert_ne!(
-        c1.to_array(),
-        c2.to_array(),
-        "commitment must change when a score is updated"
-    );
+    assert_ne!(c1.to_array(), c2.to_array(), "commitment must change when a score is updated");
 }
 
 // ── Membership proof tests ───────────────────────────────────────────────────
@@ -153,19 +120,7 @@ fn membership_proof_is_97_bytes() {
 
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLMUSDC");
-    client
-        .submit_score(
-            &Vec::new(&env),
-            &wallet,
-            &pair,
-            &42,
-            &false,
-            &false,
-            &1,
-            &90,
-            &1,
-            &None,
-        );
+    client.submit_score(&Vec::new(&env), &wallet, &pair, &42, &false, &false, &1, &90, &1, &None);
 
     let proof = client.get_membership_proof(&wallet, &pair);
     assert_eq!(proof.len(), 97, "proof must be exactly 97 bytes");
@@ -177,19 +132,7 @@ fn membership_proof_type_byte_is_member() {
 
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLMUSDC");
-    client
-        .submit_score(
-            &Vec::new(&env),
-            &wallet,
-            &pair,
-            &42,
-            &false,
-            &false,
-            &1,
-            &90,
-            &1,
-            &None,
-        );
+    client.submit_score(&Vec::new(&env), &wallet, &pair, &42, &false, &false, &1, &90, &1, &None);
 
     let proof = client.get_membership_proof(&wallet, &pair);
     let arr = proof_to_array(&proof);
@@ -204,19 +147,18 @@ fn verify_membership_returns_true_for_valid_proof() {
     let pair = symbol_short!("XLMUSDC");
     let score: u32 = 42;
 
-    client
-        .submit_score(
-            &Vec::new(&env),
-            &wallet,
-            &pair,
-            &score,
-            &false,
-            &false,
-            &1,
-            &90,
-            &1,
-            &None,
-        );
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &score,
+        &false,
+        &false,
+        &1,
+        &90,
+        &1,
+        &None,
+    );
 
     let commitment = client.get_state_commitment();
     let proof = client.get_membership_proof(&wallet, &pair);
@@ -236,19 +178,7 @@ fn verify_membership_fails_for_wrong_score() {
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLMUSDC");
 
-    client
-        .submit_score(
-            &Vec::new(&env),
-            &wallet,
-            &pair,
-            &42,
-            &false,
-            &false,
-            &1,
-            &90,
-            &1,
-            &None,
-        );
+    client.submit_score(&Vec::new(&env), &wallet, &pair, &42, &false, &false, &1, &90, &1, &None);
 
     let commitment = client.get_state_commitment();
     let proof = client.get_membership_proof(&wallet, &pair);
@@ -277,19 +207,7 @@ fn verify_membership_fails_for_wrong_pair() {
     let pair = symbol_short!("XLMUSDC");
     let other_pair = symbol_short!("BTC_USDC");
 
-    client
-        .submit_score(
-            &Vec::new(&env),
-            &wallet,
-            &pair,
-            &42,
-            &false,
-            &false,
-            &1,
-            &90,
-            &1,
-            &None,
-        );
+    client.submit_score(&Vec::new(&env), &wallet, &pair, &42, &false, &false, &1, &90, &1, &None);
 
     let commitment = client.get_state_commitment();
     let proof = client.get_membership_proof(&wallet, &pair);
@@ -308,19 +226,7 @@ fn verify_membership_fails_for_tampered_proof() {
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLMUSDC");
 
-    client
-        .submit_score(
-            &Vec::new(&env),
-            &wallet,
-            &pair,
-            &42,
-            &false,
-            &false,
-            &1,
-            &90,
-            &1,
-            &None,
-        );
+    client.submit_score(&Vec::new(&env), &wallet, &pair, &42, &false, &false, &1, &90, &1, &None);
 
     let commitment = client.get_state_commitment();
     let proof = client.get_membership_proof(&wallet, &pair);
@@ -344,19 +250,7 @@ fn verify_membership_fails_for_stale_commitment() {
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLMUSDC");
 
-    client
-        .submit_score(
-            &Vec::new(&env),
-            &wallet,
-            &pair,
-            &42,
-            &false,
-            &false,
-            &1,
-            &90,
-            &1,
-            &None,
-        );
+    client.submit_score(&Vec::new(&env), &wallet, &pair, &42, &false, &false, &1, &90, &1, &None);
 
     // Snapshot commitment and proof BEFORE the update.
     let old_commitment = client.get_state_commitment();
@@ -365,25 +259,31 @@ fn verify_membership_fails_for_stale_commitment() {
 
     // Update the score (past cooldown).
     env.ledger().with_mut(|l| l.timestamp += 3_601);
-    client
-        .submit_score(
-            &Vec::new(&env),
-            &wallet,
-            &pair,
-            &75,
-            &false,
-            &false,
-            &3_602,
-            &90,
-            &1,
-            &None,
-        );
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &75,
+        &false,
+        &false,
+        &3_602,
+        &90,
+        &1,
+        &None,
+    );
 
     // A new proof against the new commitment should work.
     let new_commitment = client.get_state_commitment();
     let new_proof = client.get_membership_proof(&wallet, &pair);
     let new_timestamp = client.get_score(&wallet, &pair).timestamp;
-    assert!(client.verify_membership(&new_commitment, &wallet, &pair, &75, &new_timestamp, &new_proof));
+    assert!(client.verify_membership(
+        &new_commitment,
+        &wallet,
+        &pair,
+        &75,
+        &new_timestamp,
+        &new_proof
+    ));
 
     // Old proof against new commitment must fail (commitment changed).
     assert!(
@@ -424,11 +324,7 @@ fn nonmember_proof_v_is_all_zeros() {
     let proof = client.get_membership_proof(&wallet, &pair);
     let arr = proof_to_array(&proof);
     // v occupies bytes [33..65] — must be all-zeros sentinel.
-    assert_eq!(
-        &arr[33..65],
-        &[0u8; 32],
-        "non-member proof v must be the all-zeros sentinel"
-    );
+    assert_eq!(&arr[33..65], &[0u8; 32], "non-member proof v must be the all-zeros sentinel");
 }
 
 #[test]
@@ -494,34 +390,10 @@ fn commitment_reflects_multiple_independent_entries() {
     let wallet_a = Address::generate(&env);
     let wallet_b = Address::generate(&env);
 
-    client
-        .submit_score(
-            &Vec::new(&env),
-            &wallet_a,
-            &pair,
-            &20,
-            &false,
-            &false,
-            &1,
-            &80,
-            &1,
-            &None,
-        );
+    client.submit_score(&Vec::new(&env), &wallet_a, &pair, &20, &false, &false, &1, &80, &1, &None);
     let c1 = client.get_state_commitment();
 
-    client
-        .submit_score(
-            &Vec::new(&env),
-            &wallet_b,
-            &pair,
-            &80,
-            &true,
-            &false,
-            &2,
-            &90,
-            &1,
-            &None,
-        );
+    client.submit_score(&Vec::new(&env), &wallet_b, &pair, &80, &true, &false, &2, &90, &1, &None);
     let c2 = client.get_state_commitment();
 
     // Commitment must have changed again.
@@ -551,19 +423,7 @@ fn nonmember_proof_for_unknown_pair_works_alongside_known_entries() {
     let absent_pair = symbol_short!("ETH_USDC");
     let wallet = Address::generate(&env);
 
-    client
-        .submit_score(
-            &Vec::new(&env),
-            &wallet,
-            &pair,
-            &55,
-            &false,
-            &false,
-            &1,
-            &85,
-            &1,
-            &None,
-        );
+    client.submit_score(&Vec::new(&env), &wallet, &pair, &55, &false, &false, &1, &85, &1, &None);
 
     let commitment = client.get_state_commitment();
 
@@ -581,7 +441,14 @@ fn nonmember_proof_for_unknown_pair_works_alongside_known_entries() {
     let member_proof = client.get_membership_proof(&wallet, &pair);
     let member_timestamp = client.get_score(&wallet, &pair).timestamp;
     assert!(
-        client.verify_membership(&commitment, &wallet, &pair, &55, &member_timestamp, &member_proof),
+        client.verify_membership(
+            &commitment,
+            &wallet,
+            &pair,
+            &55,
+            &member_timestamp,
+            &member_proof
+        ),
         "member proof must still verify alongside non-member proof"
     );
 }
@@ -645,19 +512,7 @@ fn verify_membership_returns_false_for_empty_proof() {
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLMUSDC");
 
-    client
-        .submit_score(
-            &Vec::new(&env),
-            &wallet,
-            &pair,
-            &42,
-            &false,
-            &false,
-            &1,
-            &90,
-            &1,
-            &None,
-        );
+    client.submit_score(&Vec::new(&env), &wallet, &pair, &42, &false, &false, &1, &90, &1, &None);
 
     let commitment = client.get_state_commitment();
     let timestamp = client.get_score(&wallet, &pair).timestamp;
@@ -676,19 +531,7 @@ fn verify_membership_returns_false_for_wrong_commitment_prefix() {
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLMUSDC");
 
-    client
-        .submit_score(
-            &Vec::new(&env),
-            &wallet,
-            &pair,
-            &42,
-            &false,
-            &false,
-            &1,
-            &90,
-            &1,
-            &None,
-        );
+    client.submit_score(&Vec::new(&env), &wallet, &pair, &42, &false, &false, &1, &90, &1, &None);
 
     let proof = client.get_membership_proof(&wallet, &pair);
     let commitment = client.get_state_commitment();
@@ -716,27 +559,11 @@ fn range_proof_all_scores_below_80() {
     let (env, client, admin, service) = initialized();
 
     let pair = symbol_short!("XLMUSDC");
-    let wallets = [
-        Address::generate(&env),
-        Address::generate(&env),
-        Address::generate(&env),
-    ];
+    let wallets = [Address::generate(&env), Address::generate(&env), Address::generate(&env)];
     let scores = [10u32, 45u32, 79u32];
 
     for (w, s) in wallets.iter().zip(scores.iter()) {
-        client
-            .submit_score(
-                &Vec::new(&env),
-                w,
-                &pair,
-                s,
-                &false,
-                &false,
-                &1,
-                &80,
-                &1,
-                &None,
-            );
+        client.submit_score(&Vec::new(&env), w, &pair, s, &false, &false, &1, &80, &1, &None);
         // Advance past cooldown so each submission is accepted.
         env.ledger().with_mut(|l| l.timestamp += 3_601);
     }
@@ -753,10 +580,7 @@ fn range_proof_all_scores_below_80() {
         // True range check: verify with each score value — all must pass
         // for each wallet, and each known score must be < 80.
         let actual_score_entry = client.get_score(w, &pair);
-        assert!(
-            actual_score_entry.score < 80,
-            "all scores in the range proof must be below 80"
-        );
+        assert!(actual_score_entry.score < 80, "all scores in the range proof must be below 80");
         // Membership proof is valid.
         assert!(
             client.verify_membership(
@@ -776,4 +600,191 @@ fn range_proof_all_scores_below_80() {
     }
 
     assert!(all_below_80, "range claim 'all < 80' must hold");
+}
+
+// ── Differential commitment recomputation tests ─────────────────────────────
+//
+// The reference recomputation scans all live leaves and computes the
+// commitment as H(DOMAIN_COMMIT || xor_of_all_leaves) — a single hash pass
+// that is independent of the incremental update code path.  If the
+// incrementally-maintained commitment ever drifts from this reference, the
+// test catches it.
+
+fn compute_leaf(env: &Env, wallet: &Address, pair: &Symbol, score: u32, timestamp: u64) -> [u8; 32] {
+    let mut wallet_buf = [0u8; 56];
+    wallet.to_string().copy_into_slice(&mut wallet_buf);
+
+    let pair_str = SymbolStr::try_from_val(env, &pair.to_symbol_val()).unwrap();
+    let pair_bytes_ref: &[u8] = pair_str.as_ref();
+    let mut pair_buf = [0u8; 9];
+    let len = pair_bytes_ref.len().min(9);
+    pair_buf[..len].copy_from_slice(&pair_bytes_ref[..len]);
+
+    let z = verkle::derive_evaluation_point(env, &wallet_buf, &pair_buf);
+    let v = verkle::derive_value_element(env, score, timestamp, &z);
+    verkle::hash_leaf(env, &z, &v)
+}
+
+fn reference_commitment(env: &Env, leaves: &[[u8; 32]]) -> [u8; 32] {
+    let mut acc = [0u8; 32];
+    for leaf in leaves {
+        for i in 0..32 {
+            acc[i] ^= leaf[i];
+        }
+    }
+    let mut buf = [0u8; 33];
+    buf[0] = 0x06;
+    buf[1..33].copy_from_slice(&acc);
+    env.crypto().sha256(&Bytes::from_array(env, &buf)).to_bytes().to_array()
+}
+
+fn raw_commitment(env: &Env, client: &LedgerLensScoreContractClient) -> [u8; 32] {
+    let b48 = client.get_state_commitment();
+    let arr = b48.to_array();
+    let mut raw = [0u8; 32];
+    raw.copy_from_slice(&arr[16..48]);
+    raw
+}
+
+#[test]
+fn differential_single_entry() {
+    let (env, client, admin, service) = initialized();
+    let wallet = Address::generate(&env);
+    let pair = symbol_short!("XLMUSDC");
+
+    client.submit_score(
+        &Vec::new(&env), &wallet, &pair, &50, &false, &false, &1, &90, &1, &None,
+    );
+
+    let leaf = compute_leaf(&env, &wallet, &pair, 50, 1);
+    let expected = reference_commitment(&env, &[leaf]);
+    let actual = raw_commitment(&env, &client);
+    assert_eq!(expected, actual, "single-entry commitment must match reference recomputation");
+}
+
+#[test]
+fn differential_multiple_entries() {
+    let (env, client, admin, service) = initialized();
+    let pair = symbol_short!("XLMUSDC");
+    let wallet_a = Address::generate(&env);
+    let wallet_b = Address::generate(&env);
+
+    client.submit_score(
+        &Vec::new(&env), &wallet_a, &pair, &20, &false, &false, &1, &80, &1, &None,
+    );
+    let leaf_a = compute_leaf(&env, &wallet_a, &pair, 20, 1);
+
+    client.submit_score(
+        &Vec::new(&env), &wallet_b, &pair, &80, &true, &false, &2, &90, &1, &None,
+    );
+    let leaf_b = compute_leaf(&env, &wallet_b, &pair, 80, 2);
+
+    let expected = reference_commitment(&env, &[leaf_a, leaf_b]);
+    let actual = raw_commitment(&env, &client);
+    assert_eq!(expected, actual, "two-entry commitment must match reference recomputation");
+}
+
+#[test]
+fn differential_after_update() {
+    let (env, client, admin, service) = initialized();
+    let wallet = Address::generate(&env);
+    let pair = symbol_short!("XLMUSDC");
+
+    client.submit_score(
+        &Vec::new(&env), &wallet, &pair, &30, &false, &false, &1, &80, &1, &None,
+    );
+    let leaf_old = compute_leaf(&env, &wallet, &pair, 30, 1);
+
+    assert_eq!(
+        reference_commitment(&env, &[leaf_old]),
+        raw_commitment(&env, &client),
+        "commitment must match after first write"
+    );
+
+    // Advance past cooldown and update.
+    env.ledger().with_mut(|l| l.timestamp += 3_601);
+    client.submit_score(
+        &Vec::new(&env), &wallet, &pair, &70, &false, &false, &3_602, &90, &1, &None,
+    );
+    let leaf_new = compute_leaf(&env, &wallet, &pair, 70, 3_602);
+
+    // After update the old leaf is gone, only the new leaf remains.
+    assert_eq!(
+        reference_commitment(&env, &[leaf_new]),
+        raw_commitment(&env, &client),
+        "commitment must match after score update (old leaf removed, new leaf added)"
+    );
+}
+
+#[test]
+fn differential_multiple_pairs() {
+    let (env, client, admin, service) = initialized();
+    let wallet = Address::generate(&env);
+    let pair_a = symbol_short!("XLMUSDC");
+    let pair_b = symbol_short!("ETHUSDC");
+
+    client.submit_score(
+        &Vec::new(&env), &wallet, &pair_a, &50, &false, &false, &10, &90, &1, &None,
+    );
+    let leaf_a = compute_leaf(&env, &wallet, &pair_a, 50, 10);
+
+    client.submit_score(
+        &Vec::new(&env), &wallet, &pair_b, &30, &false, &false, &20, &85, &1, &None,
+    );
+    let leaf_b = compute_leaf(&env, &wallet, &pair_b, 30, 20);
+
+    let expected = reference_commitment(&env, &[leaf_a, leaf_b]);
+    let actual = raw_commitment(&env, &client);
+    assert_eq!(expected, actual, "multi-pair commitment must match reference recomputation");
+}
+
+#[test]
+fn differential_sequence_mixed_operations() {
+    let (env, client, admin, service) = initialized();
+    let wallets = [
+        Address::generate(&env),
+        Address::generate(&env),
+        Address::generate(&env),
+        Address::generate(&env),
+        Address::generate(&env),
+    ];
+    let pair = symbol_short!("XLMUSDC");
+    let mut leaves = std::vec::Vec::new();
+
+    // Submit 5 scores, check after each.
+    for (i, w) in wallets.iter().enumerate() {
+        let ts = (i + 1) as u64;
+        let score = (20 + i * 10) as u32;
+        client.submit_score(
+            &Vec::new(&env), w, &pair, &score, &false, &false, &ts, &85, &1, &None,
+        );
+        let leaf = compute_leaf(&env, w, &pair, score, ts);
+        leaves.push(leaf);
+
+        assert_eq!(
+            reference_commitment(&env, &leaves),
+            raw_commitment(&env, &client),
+            "commitment must match after {}-th submission",
+            i + 1
+        );
+
+        // Advance past cooldown so next submission is accepted.
+        env.ledger().with_mut(|l| l.timestamp += 3_601);
+    }
+
+    // Update wallet[2]'s score (remove old leaf, add new).
+    env.ledger().with_mut(|l| l.timestamp += 3_601);
+    let ts_update = 100u64;
+    let score_update = 99u32;
+    client.submit_score(
+        &Vec::new(&env), &wallets[2], &pair, &score_update, &true, &true, &ts_update, &95, &2, &None,
+    );
+    let new_leaf = compute_leaf(&env, &wallets[2], &pair, score_update, ts_update);
+    leaves[2] = new_leaf;
+
+    assert_eq!(
+        reference_commitment(&env, &leaves),
+        raw_commitment(&env, &client),
+        "commitment must match after score replacement in sequence"
+    );
 }
