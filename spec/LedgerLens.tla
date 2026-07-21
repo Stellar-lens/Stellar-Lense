@@ -4,6 +4,7 @@ EXTENDS Integers, Sequences, FiniteSets, TLC
 CONSTANTS 
     Wallets,
     Scores,
+    Assets,
     COOLDOWN,
     HWM_THRESHOLD,
     FLOOR_VALUE,
@@ -153,7 +154,10 @@ Next ==
     \/ \E w \in Wallets : LiftEmbargo(w)
     \/ \E sub \in Wallets, cust \in Wallets : SetDelegate(sub, cust)
     \/ \E sub \in Wallets : RemoveDelegate(sub)
-    \/ \E w \in Wallets : ResetBreachCount(w)
+    \/ \E w \in Wallets, a \in Assets : ResetBreachCount(w, a)
+    \/ \E w \in Wallets, a \in Assets, bond_amt \in {1, 5, 10} : OpenDispute(w, a, bond_amt)
+    \/ \E w \in Wallets, a \in Assets, corrected_score \in Scores : ResolveDisputeAdmin(w, a, corrected_score)
+    \/ \E w \in Wallets, a \in Assets : ResolveDisputeTimeout(w, a)
 
 \* ════════════════════════════════════════════════════════════════════════════
 \* INVARIANTS
@@ -172,7 +176,21 @@ IsCyclic == \E w \in Wallets :
     \/ (delegate[w] /= "None" /\ delegate[delegate[w]] /= "None" /\ delegate[delegate[delegate[w]]] = w)
 DelegationAcyclicity == ~IsCyclic
 
-FloorNeverBypassed == \A w \in Wallets : hwm[w] >= HWM_THRESHOLD => (score[w] >= FLOOR_VALUE \/ score[w] = 0)
+FloorNeverBypassed == \A w \in Wallets, a \in Assets : hwm[w, a] >= HWM_THRESHOLD => (score[w, a] >= FLOOR_VALUE \/ score[w, a] = 0)
+
+\* Dispute Invariants
+ExactlyOneDisputePerPair == \A w \in Wallets, a \in Assets : 
+    dispute_status[w, a] \in {"none", "open", "resolved"}
+
+NoDoubleOpen == \A w \in Wallets, a \in Assets : 
+    dispute_status[w, a] = "open" => dispute_bond[w, a] > 0
+
+TimeoutNeverEarly == \A w \in Wallets, a \in Assets :
+    dispute_status[w, a] = "open" => dispute_deadline[w, a] > dispute_open_time[w, a]
+
+ResolvedIsTerminal == [][\A w \in Wallets, a \in Assets : 
+    (dispute_status[w, a] = "resolved" /\ dispute_status'[w, a] = "open") => 
+    dispute_open_time'[w, a] > dispute_open_time[w, a]]_vars
 
 \* ── Token-bucket invariants (new) ────────────────────────────────────────────
 
@@ -218,7 +236,11 @@ CapacityWithinBounds ==
 \* Existing temporal properties (unchanged).
 BreachCounterStateMachine == [][ \A w \in Wallets : (breach_count[w] > 0 /\ breach_count'[w] = 0) => (score'[w] < RISK_THRESHOLD \/ (score'[w] = score[w] /\ hwm'[w] = hwm[w])) ]_vars
 
-CooldownEnforcement == [][ \A w \in Wallets : (last_submit_time'[w] /= last_submit_time[w] /\ last_submit_time[w] /= 0) => now >= last_submit_time[w] + COOLDOWN ]_vars
+DisputeTimeoutNotPremature == [][\A w \in Wallets, a \in Assets :
+    (dispute_status[w, a] = "open" /\ dispute_status'[w, a] = "resolved" /\ 
+     \E v1, v2, v3, v4, v5, v6, v7, v8, v9 : 
+        <<v1, v2, v3, v4, v5, v6, v7, v8, v9>>' /= <<score, hwm, breach_count, last_submit_time, embargo_expiry, delegate, dispute_bond, dispute_deadline, dispute_open_time>>)
+    => (now > dispute_deadline[w, a] \/ score'[w, a] /= score[w, a])]_vars
 
 \* ── Token-bucket temporal properties (new) ────────────────────────────────────
 

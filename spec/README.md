@@ -106,10 +106,21 @@ TLC is the official model checker for TLA+ specifications. You can run TLC from 
 
 You must have Java installed (JRE 11+ recommended).
 
+**On Ubuntu/Debian:**
+```bash
+sudo apt install default-jre
+```
+
+**On macOS:**
+```bash
+brew install openjdk
+```
+
 ### Running TLC
 
 1. Download the TLA+ Tools (`tla2tools.jar`) if it isn't already present:
    ```bash
+   cd spec
    curl -L -o tla2tools.jar https://github.com/tlaplus/tlaplus/releases/download/v1.8.0/tla2tools.jar
    ```
 
