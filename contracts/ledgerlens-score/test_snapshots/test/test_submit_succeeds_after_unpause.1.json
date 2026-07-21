@@ -2342,6 +2342,9 @@
             "topics": [
               {
                 "symbol": "paused"
+              },
+              {
+                "u32": 1
               }
             ],
             "data": {
@@ -2409,6 +2412,9 @@
             "topics": [
               {
                 "symbol": "unpaused"
+              },
+              {
+                "u32": 1
               }
             ],
             "data": {
@@ -2507,6 +2513,9 @@
                 "symbol": "scr_dlt"
               },
               {
+                "u32": 1
+              },
+              {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
               },
               {
@@ -2547,6 +2556,9 @@
             "topics": [
               {
                 "symbol": "score"
+              },
+              {
+                "u32": 1
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
