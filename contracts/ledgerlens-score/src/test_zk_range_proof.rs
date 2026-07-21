@@ -1,7 +1,7 @@
 extern crate std;
 
 use crate::{
-    zk_range_proof::{Sc, SeededPrng, get_generators, compress_pt, prove_range_proof},
+    zk_range_proof::{Fe, Pt, Sc, SeededPrng, Bulletproof, get_generators, compress_pt, decompress_pt_32, is_on_curve, prove_range_proof},
     LedgerLensScoreContract, LedgerLensScoreContractClient,
 };
 use soroban_sdk::{testutils::Address as _, Address, Bytes, BytesN, Env, Symbol, Vec};
