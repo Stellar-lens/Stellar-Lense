@@ -27,6 +27,11 @@ name = "batch_submit"
 harness = false
 path = "benches/batch_submit.rs"
 
+[[bench]]
+name = "rent_sweep"
+harness = false
+path = "benches/rent_sweep.rs"
+
 [features]
 testutils = ["soroban-sdk/testutils"]
 

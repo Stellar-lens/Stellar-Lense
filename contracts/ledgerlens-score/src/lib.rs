@@ -32,6 +32,9 @@ mod test_parameter_governance;
 mod test_batch_ttl_optimization;
 
 #[cfg(test)]
+mod test_ttl_rent_manager;
+
+#[cfg(test)]
 mod test_interface;
 
 // #[cfg(test)]
