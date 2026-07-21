@@ -438,7 +438,7 @@ fn test_submit_score_with_correct_contract_id_and_version_succeeds() {
         &1,
         &90,
         &1,
-        &Some(ScoreAttestationInput::Single(attestation)),
+        &Some(ScoreAttestationInput { attestation: MaybeScoreAttestation::Some(attestation), threshold_attestation: MaybeThresholdAttestation::None, commitment: None }),
     );
     assert!(result.is_ok());
 }
@@ -469,7 +469,7 @@ fn test_submit_score_with_wrong_contract_id_rejected() {
         &1,
         &90,
         &1,
-        &Some(ScoreAttestationInput::Single(attestation)),
+        &Some(ScoreAttestationInput { attestation: MaybeScoreAttestation::Some(attestation), threshold_attestation: MaybeThresholdAttestation::None, commitment: None }),
     );
     assert_eq!(result, Err(Ok(Error::InvalidAttestation)));
 }
@@ -498,7 +498,83 @@ fn test_submit_score_with_zero_contract_id_rejected() {
         &1,
         &90,
         &1,
-        &Some(ScoreAttestationInput::Single(attestation)),
+        &Some(ScoreAttestationInput { attestation: MaybeScoreAttestation::Some(attestation), threshold_attestation: MaybeThresholdAttestation::None, commitment: None }),
     );
     assert_eq!(result, Err(Ok(Error::InvalidAttestation)));
+}
+
+// ── Cross-instance replay (issue #401) ─────────────────────────────────────
+//
+// `compute_commitment` binds `env.current_contract_address()` directly into
+// the hashed preimage (see `docs/attestation-spec.md` §3) — independent of
+// the caller-supplied `contract_id` field on `ScoreAttestation`. This test
+// deploys two real, separate contract instances that trust the same service
+// pubkey (the multi-shard scenario the issue describes) and confirms an
+// attestation signed for one instance's real address is rejected outright
+// when replayed against the other, rather than relying solely on the
+// `contract_id` field self-reporting correctly.
+
+#[test]
+fn test_attestation_signed_for_one_instance_rejected_on_another_instance() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let admin = Address::generate(&env);
+    let service = Address::generate(&env);
+    let key = signing_key(1);
+    let pubkey = pubkey_bytes(&env, &key, true);
+
+    let contract_a = env.register_contract(None, LedgerLensScoreContract);
+    let client_a = LedgerLensScoreContractClient::new(&env, &contract_a);
+    client_a.initialize(&admin, &service);
+    client_a.set_service_pubkey(&Vec::new(&env), &pubkey);
+
+    let contract_b = env.register_contract(None, LedgerLensScoreContract);
+    let client_b = LedgerLensScoreContractClient::new(&env, &contract_b);
+    client_b.initialize(&admin, &service);
+    // Same service pubkey registered on both instances — the realistic
+    // failure mode where multiple `ledgerlens-score` shards trust one key.
+    client_b.set_service_pubkey(&Vec::new(&env), &pubkey);
+
+    let wallet = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+    let contract_a_id_bytes = get_contract_id_bytes(&env, &contract_a);
+
+    // Attestation signed for contract A's real digest (its own address is
+    // baked into the preimage via `env.current_contract_address()`).
+    let digest_a = commitment(&env, &contract_a, &wallet, &pair, 42, false, false, 1, 90, 1, &contract_a_id_bytes, 3);
+    let attestation = attest(&env, &key, digest_a, contract_a_id_bytes, 3);
+
+    // Sanity check: it is accepted on the instance it was actually signed for.
+    let accepted_on_a = client_a.try_submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &42,
+        &false,
+        &false,
+        &1,
+        &90,
+        &1,
+        &Some(ScoreAttestationInput { attestation: MaybeScoreAttestation::Some(attestation.clone()), threshold_attestation: MaybeThresholdAttestation::None, commitment: None }),
+    );
+    assert!(accepted_on_a.is_ok());
+
+    // Replaying the *same* attestation against contract B must fail: B's
+    // `compute_commitment` recomputes the digest using its own address, not
+    // A's, so the commitment comparison mismatches before signature
+    // verification is even reached.
+    let replayed_on_b = client_b.try_submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &42,
+        &false,
+        &false,
+        &1,
+        &90,
+        &1,
+        &Some(ScoreAttestationInput { attestation: MaybeScoreAttestation::Some(attestation), threshold_attestation: MaybeThresholdAttestation::None, commitment: None }),
+    );
+    assert_eq!(replayed_on_b, Err(Ok(Error::InvalidAttestation)));
 }

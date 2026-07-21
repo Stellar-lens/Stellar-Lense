@@ -1,6 +1,6 @@
 {
   "generators": {
-    "address": 1,
+    "address": 2,
     "nonce": 0
   },
   "auth": [
@@ -87,10 +87,19 @@
                 "bytes": "0000000000000000000000000000000000000000000000000000000000000001"
               },
               {
-                "symbol": "get_consensus_threshold_k"
+                "symbol": "contagion_depth_across_shards"
               }
             ],
-            "data": "void"
+            "data": {
+              "vec": [
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                },
+                {
+                  "symbol": "XLM_USDC"
+                }
+              ]
+            }
           }
         }
       },
@@ -108,11 +117,11 @@
                 "symbol": "fn_return"
               },
               {
-                "symbol": "get_consensus_threshold_k"
+                "symbol": "contagion_depth_across_shards"
               }
             ],
             "data": {
-              "u32": 5
+              "u32": 0
             }
           }
         }

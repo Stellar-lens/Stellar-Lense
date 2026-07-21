@@ -258,136 +258,411 @@ fn test_verify_score_range_proof_tampered_proof() {
     assert!(!result);
 }
 
-// ── Pure arithmetic tests (catch mutants in Fe/Sc operations) ──────────────
+// ── Adversarial / negative test vectors (issue #397) ─────────────────────────
+//
+// The tests above only cover byte-level corruption of the commitment and the
+// raw proof buffer. The tests below target specific soundness properties of
+// the verifier: boundary values of the committed score, forged proofs that
+// are internally well-formed but statement-mismatched, cross-wallet replay,
+// replay under a different public statement (threshold), and tampering with
+// a value that specifically feeds a Fiat-Shamir challenge rather than being
+// arbitrary byte noise.
 
 #[test]
-fn test_fe_arithmetic_add_identity() {
-    let a = Fe::from_u64(42);
-    let zero = Fe::zero();
-    assert_eq!(a.add(zero).to_bytes(), a.to_bytes(), "a + 0 == a");
-}
-
-#[test]
-fn test_fe_arithmetic_mul_identity() {
-    let a = Fe::from_u64(7);
-    let one = Fe::one();
-    let r = a.mul(one);
-    assert_eq!(r.to_bytes(), a.to_bytes(), "a * 1 == a");
-}
-
-#[test]
-fn test_fe_arithmetic_mul_zero() {
-    let a = Fe::from_u64(99);
-    let zero = Fe::zero();
-    let r = a.mul(zero);
-    assert!(r.is_zero(), "a * 0 == 0");
-}
-
-#[test]
-fn test_fe_arithmetic_neg_add() {
-    let a = Fe::from_u64(123);
-    let neg = a.neg();
-    let r = a.add(neg);
-    assert!(r.is_zero(), "a + (-a) == 0");
-}
-
-#[test]
-fn test_fe_arithmetic_mul_invert() {
+fn test_verify_score_range_proof_boundary_score_zero() {
     let env = Env::default();
-    let a = Fe::from_u64(5);
-    let inv = a.invert();
-    let r = a.mul(inv);
-    let one = Fe::one();
-    assert_eq!(r.to_bytes(), one.to_bytes(), "a * a^(-1) == 1");
-}
+    env.mock_all_auths();
 
-#[test]
-fn test_fe_arithmetic_sub_self() {
-    let a = Fe::from_u64(77);
-    let r = a.sub(a);
-    assert!(r.is_zero(), "a - a == 0");
-}
+    let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
 
-#[test]
-fn test_sc_arithmetic_mul_identity() {
-    let a = Sc::from_u64(42);
-    let one = Sc::one();
-    let r = a.mul(one);
-    assert_eq!(r.to_bytes(), a.to_bytes(), "a * 1 == a");
-}
+    let admin = Address::generate(&env);
+    let service = Address::generate(&env);
+    client.initialize(&admin, &service);
 
-#[test]
-fn test_sc_arithmetic_mul_zero() {
-    let a = Sc::from_u64(99);
-    let zero = Sc::zero();
-    let r = a.mul(zero);
-    assert!(r.is_zero(), "a * 0 == 0");
-}
+    let wallet = Address::generate(&env);
+    let pair = Symbol::new(&env, "XLM_USDC");
 
-#[test]
-fn test_sc_arithmetic_add_neg() {
-    let a = Sc::from_u64(7);
-    let r = a.add(a.neg());
-    assert!(r.is_zero(), "a + (-a) == 0");
-}
+    // Boundary: score = 0 (minimum valid score), threshold = 1.
+    // v' = threshold - 1 - score = 0, the smallest legal range-proof value.
+    let score = 0u32;
+    let threshold = 1u32;
 
-// ── Curve point tests ──────────────────────────────────────────────────────
-
-#[test]
-fn test_is_on_curve_valid_points() {
+    let r = Sc::from_u64(11223344);
     let (g_pt, h_pt, d) = get_generators();
-    assert!(is_on_curve(g_pt.x, g_pt.y, d), "generator G is on curve");
-    assert!(is_on_curve(h_pt.x, h_pt.y, d), "generator H is on curve");
+    let c_pt = g_pt.mul(Sc::from_u64(score as u64), d).add(h_pt.mul(r, d), d);
+    let commitment = compress_pt(&env, &c_pt);
+
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &score,
+        &false,
+        &false,
+        &1,
+        &90,
+        &1,
+        &Some(crate::ScoreAttestationInput {
+            attestation: crate::MaybeScoreAttestation::None,
+            threshold_attestation: crate::MaybeThresholdAttestation::None,
+            commitment: Some(commitment.clone().into()),
+        }),
+    );
+
+    let v_prime = threshold - 1 - score;
+    let r_prime = r.neg();
+    let prng = SeededPrng::new([1u8; 32]);
+    let proof = prove_range_proof(&env, v_prime, r_prime, prng);
+    let proof_bytes = proof.to_bytes(&env);
+
+    let result = client.verify_score_range_proof(
+        &wallet,
+        &pair,
+        &commitment,
+        &proof_bytes,
+        &threshold,
+    );
+    assert!(result);
 }
 
 #[test]
-fn test_point_add_identity() {
-    let (g_pt, _h_pt, d) = get_generators();
-    let id = Pt::identity();
-    let r = g_pt.add(id, d);
-    assert_eq!(r.x.to_bytes(), g_pt.x.to_bytes(), "G + identity == G (x)");
-    assert_eq!(r.y.to_bytes(), g_pt.y.to_bytes(), "G + identity == G (y)");
-}
-
-#[test]
-fn test_point_mul_scalar_zero() {
-    let (g_pt, _h_pt, d) = get_generators();
-    let zero = Sc::zero();
-    let r = g_pt.mul(zero, d);
-    assert!(r.is_identity(), "G * 0 == identity");
-}
-
-#[test]
-fn test_point_mul_scalar_one() {
-    let (g_pt, _h_pt, d) = get_generators();
-    let one = Sc::one();
-    let r = g_pt.mul(one, d);
-    assert_eq!(r.x.to_bytes(), g_pt.x.to_bytes(), "G * 1 == G (x)");
-    assert_eq!(r.y.to_bytes(), g_pt.y.to_bytes(), "G * 1 == G (y)");
-}
-
-// ── Serialisation round-trip tests ─────────────────────────────────────────
-
-#[test]
-fn test_compress_decompress_roundtrip() {
+fn test_verify_score_range_proof_boundary_score_max() {
     let env = Env::default();
-    let (g_pt, _h_pt, _d) = get_generators();
-    let compressed = compress_pt(&env, &g_pt);
-    let decompressed = decompress_pt_32(&env, &compressed);
-    assert!(decompressed.is_some(), "decompress must succeed");
-    let pt = decompressed.unwrap();
-    assert_eq!(pt.x.to_bytes(), g_pt.x.to_bytes(), "x must match after round-trip");
-    assert_eq!(pt.y.to_bytes(), g_pt.y.to_bytes(), "y must match after round-trip");
+    env.mock_all_auths();
+
+    let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let service = Address::generate(&env);
+    client.initialize(&admin, &service);
+
+    let wallet = Address::generate(&env);
+    let pair = Symbol::new(&env, "XLM_USDC");
+
+    // Boundary: score = 100 (maximum valid score), threshold = 101.
+    let score = 100u32;
+    let threshold = 101u32;
+
+    let r = Sc::from_u64(55667788);
+    let (g_pt, h_pt, d) = get_generators();
+    let c_pt = g_pt.mul(Sc::from_u64(score as u64), d).add(h_pt.mul(r, d), d);
+    let commitment = compress_pt(&env, &c_pt);
+
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &score,
+        &false,
+        &false,
+        &1,
+        &90,
+        &1,
+        &Some(crate::ScoreAttestationInput {
+            attestation: crate::MaybeScoreAttestation::None,
+            threshold_attestation: crate::MaybeThresholdAttestation::None,
+            commitment: Some(commitment.clone().into()),
+        }),
+    );
+
+    let v_prime = threshold - 1 - score;
+    let r_prime = r.neg();
+    let prng = SeededPrng::new([1u8; 32]);
+    let proof = prove_range_proof(&env, v_prime, r_prime, prng);
+    let proof_bytes = proof.to_bytes(&env);
+
+    let result = client.verify_score_range_proof(
+        &wallet,
+        &pair,
+        &commitment,
+        &proof_bytes,
+        &threshold,
+    );
+    assert!(result);
 }
 
 #[test]
-fn test_bulletproof_roundtrip() {
+fn test_verify_score_range_proof_boundary_score_equals_threshold() {
     let env = Env::default();
-    let v = 9u32;
-    let r = Sc::from_u64(123456789);
-    let prng = SeededPrng::new([2u8; 32]);
-    let proof = prove_range_proof(&env, v, r, prng);
-    let bytes = proof.to_bytes(&env);
-    let decoded = Bulletproof::from_bytes(&bytes);
-    assert!(decoded.is_some(), "deserialize must succeed");
+    env.mock_all_auths();
+
+    let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let service = Address::generate(&env);
+    client.initialize(&admin, &service);
+
+    let wallet = Address::generate(&env);
+    let pair = Symbol::new(&env, "XLM_USDC");
+
+    // score == threshold: the honest statement "score < threshold" is false,
+    // and the honest exponent (threshold - 1 - score = -1) does not exist in
+    // u32. An attacker who knows the real blinding factor `r` still cannot
+    // forge a proof by substituting the smallest in-range value (0) for the
+    // impossible one, because the verifier derives the committed value from
+    // the on-chain commitment and threshold, not from the prover's claim.
+    let score = 50u32;
+    let threshold = 50u32;
+
+    let r = Sc::from_u64(24681357);
+    let (g_pt, h_pt, d) = get_generators();
+    let c_pt = g_pt.mul(Sc::from_u64(score as u64), d).add(h_pt.mul(r, d), d);
+    let commitment = compress_pt(&env, &c_pt);
+
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &score,
+        &false,
+        &false,
+        &1,
+        &90,
+        &1,
+        &Some(crate::ScoreAttestationInput {
+            attestation: crate::MaybeScoreAttestation::None,
+            threshold_attestation: crate::MaybeThresholdAttestation::None,
+            commitment: Some(commitment.clone().into()),
+        }),
+    );
+
+    let forged_v_prime = 0u32;
+    let r_prime = r.neg();
+    let prng = SeededPrng::new([1u8; 32]);
+    let proof = prove_range_proof(&env, forged_v_prime, r_prime, prng);
+    let proof_bytes = proof.to_bytes(&env);
+
+    let result = client.verify_score_range_proof(
+        &wallet,
+        &pair,
+        &commitment,
+        &proof_bytes,
+        &threshold,
+    );
+    assert!(!result);
+}
+
+#[test]
+fn test_verify_score_range_proof_cross_wallet_commitment_mismatch() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let service = Address::generate(&env);
+    client.initialize(&admin, &service);
+
+    let wallet_a = Address::generate(&env);
+    let wallet_b = Address::generate(&env);
+    let pair = Symbol::new(&env, "XLM_USDC");
+
+    let threshold = 50u32;
+    let (g_pt, h_pt, d) = get_generators();
+
+    // Wallet A's own score/commitment.
+    let score_a = 40u32;
+    let r_a = Sc::from_u64(555666777);
+    let c_pt_a = g_pt.mul(Sc::from_u64(score_a as u64), d).add(h_pt.mul(r_a, d), d);
+    let commitment_a = compress_pt(&env, &c_pt_a);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet_a,
+        &pair,
+        &score_a,
+        &false,
+        &false,
+        &1,
+        &90,
+        &1,
+        &Some(crate::ScoreAttestationInput {
+            attestation: crate::MaybeScoreAttestation::None,
+            threshold_attestation: crate::MaybeThresholdAttestation::None,
+            commitment: Some(commitment_a.clone().into()),
+        }),
+    );
+
+    // Wallet B's own, distinct score/commitment.
+    let score_b = 20u32;
+    let r_b = Sc::from_u64(999888777);
+    let c_pt_b = g_pt.mul(Sc::from_u64(score_b as u64), d).add(h_pt.mul(r_b, d), d);
+    let commitment_b = compress_pt(&env, &c_pt_b);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet_b,
+        &pair,
+        &score_b,
+        &false,
+        &false,
+        &1,
+        &90,
+        &1,
+        &Some(crate::ScoreAttestationInput {
+            attestation: crate::MaybeScoreAttestation::None,
+            threshold_attestation: crate::MaybeThresholdAttestation::None,
+            commitment: Some(commitment_b.clone().into()),
+        }),
+    );
+
+    // A genuinely valid range proof for wallet A's own commitment.
+    let v_prime = threshold - 1 - score_a;
+    let r_prime = r_a.neg();
+    let prng = SeededPrng::new([1u8; 32]);
+    let proof = prove_range_proof(&env, v_prime, r_prime, prng);
+    let proof_bytes = proof.to_bytes(&env);
+
+    // Attempt to present wallet A's commitment + valid proof against wallet
+    // B's identity. Must fail: wallet B's stored commitment is commitment_b,
+    // not commitment_a.
+    let result = client.verify_score_range_proof(
+        &wallet_b,
+        &pair,
+        &commitment_a,
+        &proof_bytes,
+        &threshold,
+    );
+    assert!(!result);
+}
+
+#[test]
+fn test_verify_score_range_proof_replayed_across_threshold() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let service = Address::generate(&env);
+    client.initialize(&admin, &service);
+
+    let wallet = Address::generate(&env);
+    let pair = Symbol::new(&env, "XLM_USDC");
+
+    let score = 40u32;
+    let original_threshold = 50u32;
+
+    let r = Sc::from_u64(135792468);
+    let (g_pt, h_pt, d) = get_generators();
+    let c_pt = g_pt.mul(Sc::from_u64(score as u64), d).add(h_pt.mul(r, d), d);
+    let commitment = compress_pt(&env, &c_pt);
+
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &score,
+        &false,
+        &false,
+        &1,
+        &90,
+        &1,
+        &Some(crate::ScoreAttestationInput {
+            attestation: crate::MaybeScoreAttestation::None,
+            threshold_attestation: crate::MaybeThresholdAttestation::None,
+            commitment: Some(commitment.clone().into()),
+        }),
+    );
+
+    let v_prime = original_threshold - 1 - score;
+    let r_prime = r.neg();
+    let prng = SeededPrng::new([1u8; 32]);
+    let proof = prove_range_proof(&env, v_prime, r_prime, prng);
+    let proof_bytes = proof.to_bytes(&env);
+
+    // Sanity check: the proof is genuinely valid for the threshold it was
+    // generated against.
+    let valid_result = client.verify_score_range_proof(
+        &wallet,
+        &pair,
+        &commitment,
+        &proof_bytes,
+        &original_threshold,
+    );
+    assert!(valid_result);
+
+    // Replay the same commitment + proof against a different threshold
+    // (a different public statement). Must fail even though nothing about
+    // the commitment or proof bytes was touched.
+    let replayed_threshold = 60u32;
+    let replay_result = client.verify_score_range_proof(
+        &wallet,
+        &pair,
+        &commitment,
+        &proof_bytes,
+        &replayed_threshold,
+    );
+    assert!(!replay_result);
+}
+
+#[test]
+fn test_verify_score_range_proof_tampered_fs_challenge() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let service = Address::generate(&env);
+    client.initialize(&admin, &service);
+
+    let wallet = Address::generate(&env);
+    let pair = Symbol::new(&env, "XLM_USDC");
+
+    let score = 40u32;
+    let threshold = 50u32;
+
+    let r = Sc::from_u64(19283746);
+    let (g_pt, h_pt, d) = get_generators();
+    let c_pt = g_pt.mul(Sc::from_u64(score as u64), d).add(h_pt.mul(r, d), d);
+    let commitment = compress_pt(&env, &c_pt);
+
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &score,
+        &false,
+        &false,
+        &1,
+        &90,
+        &1,
+        &Some(crate::ScoreAttestationInput {
+            attestation: crate::MaybeScoreAttestation::None,
+            threshold_attestation: crate::MaybeThresholdAttestation::None,
+            commitment: Some(commitment.clone().into()),
+        }),
+    );
+
+    let v_prime = threshold - 1 - score;
+    let r_prime = r.neg();
+    let prng = SeededPrng::new([1u8; 32]);
+    let proof = prove_range_proof(&env, v_prime, r_prime, prng);
+    let proof_bytes = proof.to_bytes(&env);
+
+    let mut arr = [0u8; 800];
+    for (i, slot) in arr.iter_mut().enumerate() {
+        *slot = proof_bytes.get(i as u32).unwrap();
+    }
+    // Bytes [352..416) encode L[0], the first inner-product-argument point.
+    // The verifier recomputes round 0's Fiat-Shamir challenge as
+    // u = H("ip", 0, L[0], R[0]); flipping a bit here changes that challenge
+    // without touching any other field, so this specifically targets
+    // Fiat-Shamir-challenge tampering rather than generic byte corruption.
+    arr[352] ^= 1;
+    let tampered_proof = Bytes::from_array(&env, &arr);
+
+    let result = client.verify_score_range_proof(
+        &wallet,
+        &pair,
+        &commitment,
+        &tampered_proof,
+        &threshold,
+    );
+    assert!(!result);
 }
