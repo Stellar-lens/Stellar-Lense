@@ -16,6 +16,11 @@ the recommended ways to wire LedgerLens into your protocol.
 > If you are integrating LedgerLens, **program against this document, not
 > against the source.** Anything not listed here as stable may change between
 > releases.
+>
+> The interface versioning and migration policy (notice periods, what counts as
+> breaking vs. non-breaking, how to detect changes programmatically) is
+> specified separately in
+> [`docs/interface-versioning-policy.md`](interface-versioning-policy.md).
 
 ---
 
@@ -212,6 +217,11 @@ upgrade. Reserve `get_version()` for diagnostics, telemetry, and logging.
 A capability symbol, once published, will not be removed or repurposed within
 the same interface major version. Removing one is a breaking change and forces
 an interface-version bump.
+
+The full versioning and migration policy — including the definition of breaking
+vs. non-breaking changes, the 30-day notice period for breaking changes, and
+the migration timeline — is specified in
+[`docs/interface-versioning-policy.md`](interface-versioning-policy.md).
 
 ---
 

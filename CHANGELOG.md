@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [Unreleased]
 
 ### Added
+- **Interface versioning & migration policy**: [`docs/interface-versioning-policy.md`](docs/interface-versioning-policy.md) defines breaking vs. non-breaking changes, a 30-day notice period for breaking releases, and programmatic detection via `supports_interface`. Cross-referenced from `docs/interface-spec.md`, `CHANGELOG.md`, and `CONTRIBUTING.md`. Closes #418.
 - **`get_admin_set`**: Read-only query returning the current M-of-N admin co-signer set, mirroring `get_admin_signers`. Closes #239.
 - **Rustdoc examples**: Added runnable usage examples for `get_hysteresis_margin` (closes #229) and `get_staleness_window` (closes #227).
 - **Parameter Change Governance**: Added `propose_parameter_change`, `execute_parameter_change`, and `veto_parameter_change` for time-locked admin parameter changes with service-signer veto during the first half of the delay window. Supports cooldown, history depth, decay rate, velocity cap, and upgrade delay parameters. See [`docs/governance.md`](docs/governance.md).
