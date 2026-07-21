@@ -1579,7 +1579,8 @@ impl LedgerLensScoreContract {
     /// ```
     pub fn get_state_commitment(env: Env) -> BytesN<48> {
         let raw = storage::get_verkle_commitment_raw(&env);
-        verkle::commitment_to_bytes48(&env, &raw)
+        let hashed = verkle::finalize_commitment(&env, &raw);
+        verkle::commitment_to_bytes48(&env, &hashed)
     }
 
     /// Returns a KZG-style opening proof for `(wallet, asset_pair)`.
@@ -1638,8 +1639,9 @@ impl LedgerLensScoreContract {
 
         let z = verkle::derive_evaluation_point(&env, &wallet_buf, &pair_buf);
 
-        // Load the current commitment root.
-        let commit = storage::get_verkle_commitment_raw(&env);
+        // Load the current XOR accumulator and finalize it into a commitment.
+        let raw = storage::get_verkle_commitment_raw(&env);
+        let commit = verkle::finalize_commitment(&env, &raw);
 
         // Check whether this key has a live score.
         match storage::peek_score(&env, &wallet, &asset_pair) {
@@ -10328,7 +10330,7 @@ impl LedgerLensScoreContract {
         let v_new = verkle::derive_value_element(env, risk_score.score, risk_score.timestamp, &z);
         let leaf_new = verkle::hash_leaf(env, &z, &v_new);
 
-        let mut commit: [u8; 32] = storage::get_verkle_commitment_raw(env);
+        let mut accum: [u8; 32] = storage::get_verkle_commitment_raw(env);
 
         // Remove old leaf contribution (XOR is its own inverse).
         if let Some(old_leaf) = storage::get_verkle_leaf(env, wallet, asset_pair) {
@@ -10344,9 +10346,9 @@ impl LedgerLensScoreContract {
         }
 
         // Add new leaf contribution.
-        commit = verkle::update_commitment(env, &commit, &z, &v_new);
+        accum = verkle::update_accumulator(env, &accum, &z, &v_new);
 
-        storage::set_verkle_commitment_raw(env, &commit);
+        storage::set_verkle_commitment_raw(env, &accum);
         storage::set_verkle_leaf(env, wallet, asset_pair, &leaf_new);
     }
 

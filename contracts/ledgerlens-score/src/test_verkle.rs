@@ -601,3 +601,190 @@ fn range_proof_all_scores_below_80() {
 
     assert!(all_below_80, "range claim 'all < 80' must hold");
 }
+
+// ── Differential commitment recomputation tests ─────────────────────────────
+//
+// The reference recomputation scans all live leaves and computes the
+// commitment as H(DOMAIN_COMMIT || xor_of_all_leaves) — a single hash pass
+// that is independent of the incremental update code path.  If the
+// incrementally-maintained commitment ever drifts from this reference, the
+// test catches it.
+
+fn compute_leaf(env: &Env, wallet: &Address, pair: &Symbol, score: u32, timestamp: u64) -> [u8; 32] {
+    let mut wallet_buf = [0u8; 56];
+    wallet.to_string().copy_into_slice(&mut wallet_buf);
+
+    let pair_str = SymbolStr::try_from_val(env, &pair.to_symbol_val()).unwrap();
+    let pair_bytes_ref: &[u8] = pair_str.as_ref();
+    let mut pair_buf = [0u8; 9];
+    let len = pair_bytes_ref.len().min(9);
+    pair_buf[..len].copy_from_slice(&pair_bytes_ref[..len]);
+
+    let z = verkle::derive_evaluation_point(env, &wallet_buf, &pair_buf);
+    let v = verkle::derive_value_element(env, score, timestamp, &z);
+    verkle::hash_leaf(env, &z, &v)
+}
+
+fn reference_commitment(env: &Env, leaves: &[[u8; 32]]) -> [u8; 32] {
+    let mut acc = [0u8; 32];
+    for leaf in leaves {
+        for i in 0..32 {
+            acc[i] ^= leaf[i];
+        }
+    }
+    let mut buf = [0u8; 33];
+    buf[0] = 0x06;
+    buf[1..33].copy_from_slice(&acc);
+    env.crypto().sha256(&Bytes::from_array(env, &buf)).to_bytes().to_array()
+}
+
+fn raw_commitment(env: &Env, client: &LedgerLensScoreContractClient) -> [u8; 32] {
+    let b48 = client.get_state_commitment();
+    let arr = b48.to_array();
+    let mut raw = [0u8; 32];
+    raw.copy_from_slice(&arr[16..48]);
+    raw
+}
+
+#[test]
+fn differential_single_entry() {
+    let (env, client, admin, service) = initialized();
+    let wallet = Address::generate(&env);
+    let pair = symbol_short!("XLMUSDC");
+
+    client.submit_score(
+        &Vec::new(&env), &wallet, &pair, &50, &false, &false, &1, &90, &1, &None,
+    );
+
+    let leaf = compute_leaf(&env, &wallet, &pair, 50, 1);
+    let expected = reference_commitment(&env, &[leaf]);
+    let actual = raw_commitment(&env, &client);
+    assert_eq!(expected, actual, "single-entry commitment must match reference recomputation");
+}
+
+#[test]
+fn differential_multiple_entries() {
+    let (env, client, admin, service) = initialized();
+    let pair = symbol_short!("XLMUSDC");
+    let wallet_a = Address::generate(&env);
+    let wallet_b = Address::generate(&env);
+
+    client.submit_score(
+        &Vec::new(&env), &wallet_a, &pair, &20, &false, &false, &1, &80, &1, &None,
+    );
+    let leaf_a = compute_leaf(&env, &wallet_a, &pair, 20, 1);
+
+    client.submit_score(
+        &Vec::new(&env), &wallet_b, &pair, &80, &true, &false, &2, &90, &1, &None,
+    );
+    let leaf_b = compute_leaf(&env, &wallet_b, &pair, 80, 2);
+
+    let expected = reference_commitment(&env, &[leaf_a, leaf_b]);
+    let actual = raw_commitment(&env, &client);
+    assert_eq!(expected, actual, "two-entry commitment must match reference recomputation");
+}
+
+#[test]
+fn differential_after_update() {
+    let (env, client, admin, service) = initialized();
+    let wallet = Address::generate(&env);
+    let pair = symbol_short!("XLMUSDC");
+
+    client.submit_score(
+        &Vec::new(&env), &wallet, &pair, &30, &false, &false, &1, &80, &1, &None,
+    );
+    let leaf_old = compute_leaf(&env, &wallet, &pair, 30, 1);
+
+    assert_eq!(
+        reference_commitment(&env, &[leaf_old]),
+        raw_commitment(&env, &client),
+        "commitment must match after first write"
+    );
+
+    // Advance past cooldown and update.
+    env.ledger().with_mut(|l| l.timestamp += 3_601);
+    client.submit_score(
+        &Vec::new(&env), &wallet, &pair, &70, &false, &false, &3_602, &90, &1, &None,
+    );
+    let leaf_new = compute_leaf(&env, &wallet, &pair, 70, 3_602);
+
+    // After update the old leaf is gone, only the new leaf remains.
+    assert_eq!(
+        reference_commitment(&env, &[leaf_new]),
+        raw_commitment(&env, &client),
+        "commitment must match after score update (old leaf removed, new leaf added)"
+    );
+}
+
+#[test]
+fn differential_multiple_pairs() {
+    let (env, client, admin, service) = initialized();
+    let wallet = Address::generate(&env);
+    let pair_a = symbol_short!("XLMUSDC");
+    let pair_b = symbol_short!("ETHUSDC");
+
+    client.submit_score(
+        &Vec::new(&env), &wallet, &pair_a, &50, &false, &false, &10, &90, &1, &None,
+    );
+    let leaf_a = compute_leaf(&env, &wallet, &pair_a, 50, 10);
+
+    client.submit_score(
+        &Vec::new(&env), &wallet, &pair_b, &30, &false, &false, &20, &85, &1, &None,
+    );
+    let leaf_b = compute_leaf(&env, &wallet, &pair_b, 30, 20);
+
+    let expected = reference_commitment(&env, &[leaf_a, leaf_b]);
+    let actual = raw_commitment(&env, &client);
+    assert_eq!(expected, actual, "multi-pair commitment must match reference recomputation");
+}
+
+#[test]
+fn differential_sequence_mixed_operations() {
+    let (env, client, admin, service) = initialized();
+    let wallets = [
+        Address::generate(&env),
+        Address::generate(&env),
+        Address::generate(&env),
+        Address::generate(&env),
+        Address::generate(&env),
+    ];
+    let pair = symbol_short!("XLMUSDC");
+    let mut leaves = std::vec::Vec::new();
+
+    // Submit 5 scores, check after each.
+    for (i, w) in wallets.iter().enumerate() {
+        let ts = (i + 1) as u64;
+        let score = (20 + i * 10) as u32;
+        client.submit_score(
+            &Vec::new(&env), w, &pair, &score, &false, &false, &ts, &85, &1, &None,
+        );
+        let leaf = compute_leaf(&env, w, &pair, score, ts);
+        leaves.push(leaf);
+
+        assert_eq!(
+            reference_commitment(&env, &leaves),
+            raw_commitment(&env, &client),
+            "commitment must match after {}-th submission",
+            i + 1
+        );
+
+        // Advance past cooldown so next submission is accepted.
+        env.ledger().with_mut(|l| l.timestamp += 3_601);
+    }
+
+    // Update wallet[2]'s score (remove old leaf, add new).
+    env.ledger().with_mut(|l| l.timestamp += 3_601);
+    let ts_update = 100u64;
+    let score_update = 99u32;
+    client.submit_score(
+        &Vec::new(&env), &wallets[2], &pair, &score_update, &true, &true, &ts_update, &95, &2, &None,
+    );
+    let new_leaf = compute_leaf(&env, &wallets[2], &pair, score_update, ts_update);
+    leaves[2] = new_leaf;
+
+    assert_eq!(
+        reference_commitment(&env, &leaves),
+        raw_commitment(&env, &client),
+        "commitment must match after score replacement in sequence"
+    );
+}
