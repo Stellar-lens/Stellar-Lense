@@ -59,7 +59,9 @@ impl MaybeRiskScore {
             MaybeRiskScore::None => panic!("called unwrap on None"),
         }
     }
-    pub fn is_none(&self) -> bool { matches!(self, MaybeRiskScore::None) }
+    pub fn is_none(&self) -> bool {
+        matches!(self, MaybeRiskScore::None)
+    }
 }
 
 /// Per-entry result returned by `get_scores_batch`.
@@ -173,6 +175,15 @@ pub struct ModelVersionStats {
     pub score_sum: u64,
     pub total_submissions: u64,
     pub average_score: u32,
+}
+
+/// Governance status for an off-chain ML model version.
+#[contracttype]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum ModelVersionStatus {
+    Proposed = 0,
+    Active = 1,
+    Deprecated = 2,
 }
 
 /// Pending, time-locked risk score submission.
@@ -639,12 +650,9 @@ pub enum DataKeyD {
     RateLimitOverrideLog,
     IqrRejectionMultiplier,
     PendingParamChange(Symbol),
+    ModelVersionExecutableAfter(u32),
+    ModelVersionDescription(u32),
 }
-
-
-
-
-
 
 #[contracttype]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]

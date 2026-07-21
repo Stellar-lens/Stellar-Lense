@@ -1,4 +1,4 @@
-﻿#![cfg(test)]
+#![cfg(test)]
 
 //! Tests for the stake-backed score dispute mechanism:
 //! `open_score_dispute`, `resolve_dispute_admin`, `resolve_dispute_timeout`,
@@ -12,7 +12,7 @@ use soroban_sdk::{
     symbol_short,
     testutils::{Address as _, Events as _, Ledger as _},
     token::{StellarAssetClient, TokenClient},
-    Address, Env, Symbol, Vec,
+    Address, Bytes, Env, Symbol, Vec,
 };
 
 use crate::{Error, LedgerLensScoreContract, LedgerLensScoreContractClient};
@@ -71,6 +71,32 @@ fn setup<'a>(contract_reserve: i128, challenger_funds: i128) -> Fixture<'a> {
     }
 }
 
+/// Helper to execute commit-reveal and open a dispute for a challenger & wallet & pair.
+fn open_dispute(f: &Fixture, challenger: &Address, wallet: &Address, pair: &Symbol, bond: i128) {
+    let salt = Bytes::from_array(&f.env, &[1u8; 16]);
+    let mut commit_bytes = Bytes::new(&f.env);
+    commit_bytes.extend_from_slice(&bond.to_le_bytes());
+    commit_bytes.extend_from_slice(&[1u8; 16]);
+    f.client.commit_dispute_bond(challenger, wallet, pair, &commit_bytes);
+    f.client.open_score_dispute(challenger, wallet, pair, &bond, &salt);
+}
+
+/// Helper to try to commit-reveal and open a dispute, returning the Result.
+fn try_open_dispute(
+    f: &Fixture,
+    challenger: &Address,
+    wallet: &Address,
+    pair: &Symbol,
+    bond: i128,
+) -> Result<Result<(), soroban_sdk::ConversionError>, Result<Error, soroban_sdk::InvokeError>> {
+    let salt = Bytes::from_array(&f.env, &[1u8; 16]);
+    let mut commit_bytes = Bytes::new(&f.env);
+    commit_bytes.extend_from_slice(&bond.to_le_bytes());
+    commit_bytes.extend_from_slice(&[1u8; 16]);
+    let _ = f.client.try_commit_dispute_bond(challenger, wallet, pair, &commit_bytes);
+    f.client.try_open_score_dispute(challenger, wallet, pair, &bond, &salt)
+}
+
 /// Seeds a score for `(challenger, pair)` so there is something to dispute.
 fn seed_score(f: &Fixture, score: u32) {
     f.client
@@ -97,7 +123,7 @@ fn test_open_dispute_escrows_bond_and_lists_it() {
     let token = TokenClient::new(&f.env, &f.token);
     let bond: i128 = 10_000;
 
-    f.client.open_score_dispute(&f.challenger, &f.pair, &bond);
+    open_dispute(&f, &f.challenger, &f.challenger, &f.pair, bond);
 
     // Bond moved from challenger into the contract escrow.
     assert_eq!(token.balance(&f.challenger), 1_000_000 - bond);
@@ -115,22 +141,22 @@ fn test_open_dispute_escrows_bond_and_lists_it() {
 #[test]
 fn test_open_dispute_zero_bond_rejected() {
     let f = setup(1_000_000, 1_000_000);
-    let res = f.client.try_open_score_dispute(&f.challenger, &f.pair, &0);
+    let res = try_open_dispute(&f, &f.challenger, &f.challenger, &f.pair, 0);
     assert_eq!(res, Err(Ok(Error::InvalidDisputeBond)));
 }
 
 #[test]
 fn test_open_dispute_negative_bond_rejected() {
     let f = setup(1_000_000, 1_000_000);
-    let res = f.client.try_open_score_dispute(&f.challenger, &f.pair, &-5);
+    let res = try_open_dispute(&f, &f.challenger, &f.challenger, &f.pair, -5);
     assert_eq!(res, Err(Ok(Error::InvalidDisputeBond)));
 }
 
 #[test]
 fn test_open_dispute_duplicate_rejected() {
     let f = setup(1_000_000, 1_000_000);
-    f.client.open_score_dispute(&f.challenger, &f.pair, &10_000);
-    let res = f.client.try_open_score_dispute(&f.challenger, &f.pair, &10_000);
+    open_dispute(&f, &f.challenger, &f.challenger, &f.pair, 10_000);
+    let res = try_open_dispute(&f, &f.challenger, &f.challenger, &f.pair, 10_000);
     assert_eq!(res, Err(Ok(Error::DisputeAlreadyOpen)));
 }
 
@@ -145,8 +171,52 @@ fn test_open_dispute_fee_token_not_set() {
     client.initialize(&admin, &service);
     let wallet = Address::generate(&env);
 
-    let res = client.try_open_score_dispute(&wallet, &symbol_short!("XLM_USDC"), &10_000);
+    let salt = Bytes::from_array(&env, &[1u8; 16]);
+    let mut commit_bytes = Bytes::new(&env);
+    commit_bytes.extend_from_slice(&10_000i128.to_le_bytes());
+    commit_bytes.extend_from_slice(&[1u8; 16]);
+    let _ = client.try_commit_dispute_bond(&wallet, &wallet, &symbol_short!("XLM_USDC"), &commit_bytes);
+    let res = client.try_open_score_dispute(&wallet, &wallet, &symbol_short!("XLM_USDC"), &10_000, &salt);
     assert_eq!(res, Err(Ok(Error::FeeTokenNotSet)));
+}
+
+#[test]
+fn test_open_dispute_per_actor_cap_exceeded_rejected() {
+    let f = setup(10_000_000, 10_000_000);
+
+    let pairs = [
+        symbol_short!("PAIR1"),
+        symbol_short!("PAIR2"),
+        symbol_short!("PAIR3"),
+        symbol_short!("PAIR4"),
+        symbol_short!("PAIR5"),
+        symbol_short!("PAIR6"),
+        symbol_short!("PAIR7"),
+    ];
+
+    // Challenger 1 opens 5 (MAX_DISPUTES_PER_ACTOR) disputes across different pairs.
+    for i in 0..5 {
+        open_dispute(&f, &f.challenger, &f.challenger, &pairs[i], 1_000);
+    }
+    assert_eq!(f.client.get_open_disputes().len(), 5);
+
+    // 6th dispute from Challenger 1 is rejected with ActorDisputeLimitExceeded (RateLimitExceeded).
+    let res = try_open_dispute(&f, &f.challenger, &f.challenger, &pairs[5], 1_000);
+    assert_eq!(res, Err(Ok(Error::RateLimitExceeded)));
+
+    // Challenger 2 (distinct actor) can still open a dispute on PAIR6.
+    let challenger2 = Address::generate(&f.env);
+    StellarAssetClient::new(&f.env, &f.token).mint(&challenger2, &1_000_000);
+    open_dispute(&f, &challenger2, &challenger2, &pairs[5], 1_000);
+    assert_eq!(f.client.get_open_disputes().len(), 6);
+
+    // Resolving 1 of Challenger 1's disputes liberates a slot for Challenger 1.
+    f.client.resolve_dispute_admin(&Vec::new(&f.env), &f.challenger, &pairs[0], &25);
+    assert_eq!(f.client.get_open_disputes().len(), 5);
+
+    // Challenger 1 can now open a 5th dispute on PAIR7.
+    open_dispute(&f, &f.challenger, &f.challenger, &pairs[6], 1_000);
+    assert_eq!(f.client.get_open_disputes().len(), 6);
 }
 
 // ── resolve_dispute_admin ─────────────────────────────────────────────────────
@@ -158,7 +228,7 @@ fn test_resolve_admin_returns_bond_and_corrects_score() {
     let token = TokenClient::new(&f.env, &f.token);
     let bond: i128 = 10_000;
 
-    f.client.open_score_dispute(&f.challenger, &f.pair, &bond);
+    open_dispute(&f, &f.challenger, &f.challenger, &f.pair, bond);
     f.client.resolve_dispute_admin(&Vec::new(&f.env), &f.challenger, &f.pair, &25);
 
     // Bond fully returned, no bonus.
@@ -180,7 +250,7 @@ fn test_resolve_admin_nonexistent_dispute_rejected() {
 #[test]
 fn test_resolve_admin_invalid_score_rejected() {
     let f = setup(1_000_000, 1_000_000);
-    f.client.open_score_dispute(&f.challenger, &f.pair, &10_000);
+    open_dispute(&f, &f.challenger, &f.challenger, &f.pair, 10_000);
     let res = f.client.try_resolve_dispute_admin(&Vec::new(&f.env), &f.challenger, &f.pair, &101);
     assert_eq!(res, Err(Ok(Error::InvalidScore)));
 }
@@ -196,7 +266,7 @@ fn test_resolve_admin_requires_m_of_n_auth() {
     f.client.add_admin_signer(&Vec::new(&f.env), &signer_b);
     f.client.set_admin_threshold(&Vec::new(&f.env), &2);
 
-    f.client.open_score_dispute(&f.challenger, &f.pair, &10_000);
+    open_dispute(&f, &f.challenger, &f.challenger, &f.pair, 10_000);
 
     // Too few signers → rejected even with mock_all_auths (count is checked
     // before any require_auth).
@@ -223,7 +293,7 @@ fn test_resolve_timeout_returns_bond_with_bonus() {
     let bond: i128 = 10_000;
     let bonus = bond * BONUS_PCT / 100;
 
-    f.client.open_score_dispute(&f.challenger, &f.pair, &bond);
+    open_dispute(&f, &f.challenger, &f.challenger, &f.pair, bond);
 
     // Advance past the deadline.
     f.env.ledger().with_mut(|l| l.timestamp += CHALLENGE_PERIOD_SECS + 1);
@@ -240,7 +310,7 @@ fn test_resolve_timeout_returns_bond_with_bonus() {
 #[test]
 fn test_resolve_timeout_before_deadline_rejected() {
     let f = setup(1_000_000, 1_000_000);
-    f.client.open_score_dispute(&f.challenger, &f.pair, &10_000);
+    open_dispute(&f, &f.challenger, &f.challenger, &f.pair, 10_000);
 
     let res = f.client.try_resolve_dispute_timeout(&f.challenger, &f.pair);
     assert_eq!(res, Err(Ok(Error::DisputeNotYetTimedOut)));
@@ -266,8 +336,8 @@ fn test_get_open_disputes_tracks_multiple_pairs() {
     let f = setup(1_000_000, 1_000_000);
     let other = symbol_short!("BTC_USDC");
 
-    f.client.open_score_dispute(&f.challenger, &f.pair, &10_000);
-    f.client.open_score_dispute(&f.challenger, &other, &5_000);
+    open_dispute(&f, &f.challenger, &f.challenger, &f.pair, 10_000);
+    open_dispute(&f, &f.challenger, &f.challenger, &other, 5_000);
     assert_eq!(f.client.get_open_disputes().len(), 2);
 
     // Resolving one removes only that entry.
@@ -280,7 +350,7 @@ fn test_get_open_disputes_tracks_multiple_pairs() {
 #[test]
 fn test_dispute_emits_events() {
     let f = setup(1_000_000, 1_000_000);
-    f.client.open_score_dispute(&f.challenger, &f.pair, &10_000);
+    open_dispute(&f, &f.challenger, &f.challenger, &f.pair, 10_000);
     // An event was published for the open.
     assert!(!f.env.events().all().is_empty());
 

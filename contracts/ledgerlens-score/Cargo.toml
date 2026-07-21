@@ -13,6 +13,7 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 soroban-sdk = "21.0.0"
 subtle = { version = "2.6", default-features = false }
+libm = "0.2"
 
 [dev-dependencies]
 soroban-sdk = { version = "21.0.0", features = ["testutils"] }
@@ -25,6 +26,11 @@ criterion = { version = "0.5", features = ["html_reports"] }
 name = "batch_submit"
 harness = false
 path = "benches/batch_submit.rs"
+
+[[bench]]
+name = "rent_sweep"
+harness = false
+path = "benches/rent_sweep.rs"
 
 [features]
 testutils = ["soroban-sdk/testutils"]

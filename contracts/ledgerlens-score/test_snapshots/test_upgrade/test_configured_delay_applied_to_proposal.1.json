@@ -503,6 +503,9 @@
             "topics": [
               {
                 "symbol": "upg_prop"
+              },
+              {
+                "u32": 1
               }
             ],
             "data": {
