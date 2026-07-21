@@ -15,8 +15,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: "1.81.0"
           components: rustfmt
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --all -- --check
@@ -26,8 +27,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: "1.81.0"
           components: clippy
       - uses: Swatinem/rust-cache@v2
       - run: cargo clippy --all-targets -- -D warnings
@@ -37,7 +39,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.81.0"
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --workspace
 
@@ -48,11 +52,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: "1.81.0"
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
-      - run: cargo build --target wasm32-unknown-unknown --release -p ledgerlens-score
+      - run: cargo build --target wasm32-unknown-unknown --release -p ledgerlens-score --locked
       - name: Upload wasm artifact
         uses: actions/upload-artifact@v4
         with:
@@ -65,12 +70,105 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.81.0"
       - uses: Swatinem/rust-cache@v2
       - name: Install cargo-audit
         run: cargo install cargo-audit --locked
       - name: Run security audit
         run: cargo audit
 
+  # ── Reproducible-build verification ─────────────────────────────────────────
+  #
+  # Builds the release WASM twice in two completely independent containers and
+  # asserts the resulting files are byte-identical by comparing their SHA-256
+  # digests.  A mismatch means something in the toolchain or build inputs is
+  # non-deterministic — the job fails and surfaces the differing hashes.
+  #
+  # Both jobs must complete before the comparison step, so they run in parallel
+  # first and the compare step depends on both via `needs`.
+  #
+  # See docs/reproducible-builds.md for the local verification procedure.
+  # ─────────────────────────────────────────────────────────────────────────────
 
+  repro-build-1:
+    name: Reproducible build (run 1)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.81.0"
+          targets: wasm32-unknown-unknown
+      # Deliberately no Swatinem/rust-cache — each run must be a cold,
+      # independent build to prove there is no cache-based non-determinism.
+      - name: Build WASM (run 1)
+        run: cargo build --target wasm32-unknown-unknown --release -p ledgerlens-score --locked
+      - name: Compute SHA-256 (run 1)
+        id: hash1
+        run: |
+          SHA=$(sha256sum target/wasm32-unknown-unknown/release/ledgerlens_score.wasm | awk '{print $1}')
+          echo "sha256=$SHA" >> "$GITHUB_OUTPUT"
+          echo "Run 1 SHA-256: $SHA"
+      - name: Upload WASM artifact (run 1)
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-run-1
+          path: target/wasm32-unknown-unknown/release/ledgerlens_score.wasm
+          retention-days: 1
 
+  repro-build-2:
+    name: Reproducible build (run 2)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.81.0"
+          targets: wasm32-unknown-unknown
+      # No cache — independent cold build, same as run 1.
+      - name: Build WASM (run 2)
+        run: cargo build --target wasm32-unknown-unknown --release -p ledgerlens-score --locked
+      - name: Compute SHA-256 (run 2)
+        id: hash2
+        run: |
+          SHA=$(sha256sum target/wasm32-unknown-unknown/release/ledgerlens_score.wasm | awk '{print $1}')
+          echo "sha256=$SHA" >> "$GITHUB_OUTPUT"
+          echo "Run 2 SHA-256: $SHA"
+      - name: Upload WASM artifact (run 2)
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-run-2
+          path: target/wasm32-unknown-unknown/release/ledgerlens_score.wasm
+          retention-days: 1
+
+  repro-verify:
+    name: Verify WASM reproducibility
+    needs: [repro-build-1, repro-build-2]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download WASM artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: wasm-artifacts
+      - name: Compare SHA-256 digests
+        run: |
+          SHA1=$(sha256sum wasm-artifacts/wasm-run-1/ledgerlens_score.wasm | awk '{print $1}')
+          SHA2=$(sha256sum wasm-artifacts/wasm-run-2/ledgerlens_score.wasm | awk '{print $1}')
+          echo "Run 1 SHA-256: $SHA1"
+          echo "Run 2 SHA-256: $SHA2"
+          if [ "$SHA1" != "$SHA2" ]; then
+            echo ""
+            echo "ERROR: WASM output is NOT reproducible."
+            echo "  Run 1: $SHA1"
+            echo "  Run 2: $SHA2"
+            echo ""
+            echo "The two independent builds produced different bytecode."
+            echo "Check for non-deterministic build inputs (timestamps, paths,"
+            echo "env vars, or codegen flags).  See docs/reproducible-builds.md."
+            exit 1
+          fi
+          echo ""
+          echo "SUCCESS: Both builds produced identical WASM output."
+          echo "  SHA-256: $SHA1"
