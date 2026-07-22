@@ -481,6 +481,20 @@ pub fn record_jump_stats(
 
 // ── Score history ring buffer ────────────────────────────────────────────────
 
+/// Pushes `score` onto the ring and evicts from the front until the ring is
+/// back at `HistoryMaxDepth`.
+///
+/// When depth was just lowered a lot via `set_history_max_depth` (up to
+/// 50 -> 1 in one time-locked change), this single call pays for evicting
+/// all of the excess in one pass rather than spreading it across several
+/// submissions. That single-pass cost is intentionally kept as-is rather
+/// than spread out: it is already bounded by `MAX_HISTORY_DEPTH` (50) — at
+/// most 49 `Vec::remove(0)` shifts on a 50-entry `Vec`, independent of how
+/// many scores have ever been submitted — and spreading it out would break
+/// the documented, tested guarantee that the ring is fully trimmed on the
+/// very next write (see `test_set_history_max_depth_decreases_ring_on_next_write`
+/// in `test.rs`). Measured worst-case vs. steady-state cost:
+/// `benches/history_eviction.rs` (issue #424).
 pub fn push_score_history(env: &Env, wallet: &Address, asset_pair: &Symbol, score: &RiskScore) {
     let key = DataKey::ScoreHistory(wallet.clone(), asset_pair.clone());
     let mut history: Vec<RiskScore> =

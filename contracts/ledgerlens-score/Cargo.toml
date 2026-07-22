@@ -32,6 +32,11 @@ name = "rent_sweep"
 harness = false
 path = "benches/rent_sweep.rs"
 
+[[bench]]
+name = "history_eviction"
+harness = false
+path = "benches/history_eviction.rs"
+
 [features]
 testutils = ["soroban-sdk/testutils"]
 
