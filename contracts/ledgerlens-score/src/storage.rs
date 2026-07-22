@@ -2563,6 +2563,46 @@ pub fn remove_registered_oracle(env: &Env, asset_pair: &Symbol) {
     env.storage().instance().remove(&DataKeyD::RegisteredOracle(asset_pair.clone()));
 }
 
+/// Returns the ledger timestamp of the last oracle price consultation for
+/// `asset_pair`, or `None` if the oracle has never been consulted.
+pub fn get_oracle_last_updated(env: &Env, asset_pair: &Symbol) -> Option<u64> {
+    env.storage()
+        .instance()
+        .get(&DataKeyD::OracleLastUpdated(asset_pair.clone()))
+}
+
+/// Persists the ledger timestamp of the most recent oracle price consultation.
+/// Called by `get_effective_score` each time it successfully invokes the oracle.
+pub fn set_oracle_last_updated(env: &Env, asset_pair: &Symbol, ts: u64) {
+    env.storage()
+        .instance()
+        .set(&DataKeyD::OracleLastUpdated(asset_pair.clone()), &ts);
+}
+
+/// Removes the last-updated timestamp for `asset_pair` (called by `remove_oracle`
+/// so stale metadata does not linger after de-registration).
+pub fn remove_oracle_last_updated(env: &Env, asset_pair: &Symbol) {
+    env.storage()
+        .instance()
+        .remove(&DataKeyD::OracleLastUpdated(asset_pair.clone()));
+}
+
+/// Returns the admin-configured oracle staleness threshold in seconds.
+/// Defaults to `DEFAULT_ORACLE_STALENESS_THRESHOLD_SECS` (1 hour).
+pub fn get_oracle_staleness_threshold(env: &Env) -> u64 {
+    env.storage()
+        .instance()
+        .get(&DataKeyD::OracleStalenessThreshold)
+        .unwrap_or(crate::constants::DEFAULT_ORACLE_STALENESS_THRESHOLD_SECS)
+}
+
+/// Persists the oracle staleness threshold. Must be > 0.
+pub fn set_oracle_staleness_threshold(env: &Env, threshold_secs: u64) {
+    env.storage()
+        .instance()
+        .set(&DataKeyD::OracleStalenessThreshold, &threshold_secs);
+}
+
 // ── Epoch sealing (issue #301) ────────────────────────────────────────────────
 
 pub fn is_epoch_open(env: &Env) -> bool {

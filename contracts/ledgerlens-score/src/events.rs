@@ -650,6 +650,25 @@ pub fn oracle_removed(env: &Env, asset_pair: &Symbol) {
     env.events().publish((symbol_short!("orc_rem"),), asset_pair.clone());
 }
 
+/// Emitted by `get_effective_score` when it detects that the registered oracle
+/// for `asset_pair` has not updated within the staleness threshold and falls
+/// back to unadjusted confidence.
+/// Topic: ("orc_stale", asset_pair)  Data: (last_updated_ts, threshold_secs)
+pub fn oracle_stale_fallback(env: &Env, asset_pair: &Symbol, last_updated: u64, threshold: u64) {
+    env.events().publish(
+        (symbol_short!("orc_stale"), asset_pair.clone()),
+        (last_updated, threshold),
+    );
+}
+
+/// Emitted when the admin updates the oracle staleness threshold via
+/// `set_oracle_staleness_threshold`.
+/// Topic: ("orc_sthr",)  Data: threshold_secs
+pub fn oracle_staleness_threshold_updated(env: &Env, threshold_secs: u64) {
+    env.events()
+        .publish((symbol_short!("orc_sthr"),), threshold_secs);
+}
+
 pub fn param_change_proposed(env: &Env, key: &Symbol, apply_after: u64) {
     env.events().publish((symbol_short!("pc_prop"),), (key.clone(), apply_after));
 }

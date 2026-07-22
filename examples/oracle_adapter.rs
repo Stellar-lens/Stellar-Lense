@@ -7,6 +7,13 @@
 //! 3. Calling `get_effective_score` and observing that the returned
 //!    `confidence_floor` is elevated when the oracle reports a high price,
 //!    signalling increased market uncertainty to the caller.
+//! 4. **Staleness handling (issue #429)**: if the oracle's last price update is
+//!    older than the admin-configured staleness threshold
+//!    (`set_oracle_staleness_threshold` / `get_oracle_staleness_threshold`,
+//!    default: 3 600 s), `get_effective_score` automatically falls back to an
+//!    unadjusted confidence floor of `0` and emits an `orc_stale` event.
+//!    Consumers can poll `is_oracle_stale(asset_pair)` to detect this condition
+//!    without having to call `get_effective_score`.
 //!
 //! Build it as part of the workspace:
 //!
