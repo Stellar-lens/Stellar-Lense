@@ -17,3 +17,13 @@ soroban-sdk = { version = "21.0.0", features = ["testutils"] }
 
 [features]
 testutils = ["soroban-sdk/testutils"]
+
+# Reference integration showing the recommended fallback pattern when
+# ledgerlens-aggregator can't meaningfully answer a gate query (no shards
+# registered, or a shard failure) as opposed to a genuine risk-based
+# rejection. Built as a library via:
+# cargo build --example aggregator_gate_example -p ledgerlens-aggregator
+[[example]]
+name = "aggregator_gate_example"
+path = "../../examples/aggregator_gate_example.rs"
+crate-type = ["lib"]
