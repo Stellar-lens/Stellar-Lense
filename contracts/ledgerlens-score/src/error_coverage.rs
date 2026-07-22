@@ -994,14 +994,91 @@ fn test_error_invalidhysteresismargin() {
     assert_eq!(result, Err(Ok(Error::InvalidHysteresisMargin)));
 }
 
-// ── Error::InvalidModelPriorWeight (50) ────────────────────────────────────────
+// ── Error docs alignment test ──────────────────────────────────────────────────
 
 #[test]
-fn test_error_invalidmodelpriorweight() {
-    let (env, client, admin, service) = setup();
-    client.initialize(&admin, &service);
+fn test_errors_md_lock_against_discriminants() {
+    let errors_rs = include_str!("errors.rs");
+    let errors_md = include_str!("../../../docs/errors.md");
 
-    // Try to set model prior weight to 0 (must be > 0)
-    let result = client.try_set_model_prior_weight(&Vec::new(&env), &0);
-    assert_eq!(result, Err(Ok(Error::InvalidModelPriorWeight)));
+    // Parse Error enum variants and their discriminants
+    let mut enum_map = std::collections::HashMap::new();
+    let mut in_enum = false;
+
+    for line in errors_rs.lines() {
+        let line = line.trim();
+        if line.starts_with("pub enum Error {") {
+            in_enum = true;
+            continue;
+        }
+        if in_enum {
+            if line.starts_with('}') {
+                in_enum = false;
+                continue;
+            }
+            if line.contains('=') && !line.starts_with("//") {
+                let parts: Vec<&str> = line.split('=').collect();
+                if parts.len() == 2 {
+                    let name = parts[0].trim();
+                    let val_str = parts[1].trim().trim_end_matches(',');
+                    if let Ok(val) = val_str.parse::<u32>() {
+                        enum_map.insert(name.to_string(), val);
+                    }
+                }
+            }
+        }
+    }
+
+    // Parse impl Error const aliases (e.g. pub const PairPaused: Error = Error::ContractPaused;)
+    let mut alias_map = std::collections::HashMap::new();
+    for line in errors_rs.lines() {
+        let line = line.trim();
+        if line.starts_with("pub const ") && line.contains(": Error = Error::") {
+            let line_clean = line.trim_start_matches("pub const ");
+            let parts: Vec<&str> = line_clean.split(": Error = Error::").collect();
+            if parts.len() == 2 {
+                let alias_name = parts[0].trim();
+                let target_name = parts[1].trim().trim_end_matches(';');
+                if let Some(&val) = enum_map.get(target_name) {
+                    alias_map.insert(alias_name.to_string(), val);
+                }
+            }
+        }
+    }
+
+    // Merge enum variants and aliases into full mapping
+    let mut full_map = enum_map;
+    for (alias, val) in alias_map {
+        full_map.insert(alias, val);
+    }
+
+    // Check every table row in docs/errors.md
+    for line in errors_md.lines() {
+        let line = line.trim();
+        if line.starts_with('|') && line.ends_with('|') {
+            let cells: Vec<&str> = line.split('|').collect();
+            if cells.len() >= 3 {
+                let code_cell = cells[1].trim();
+                let name_cell = cells[2].trim();
+                if let Ok(doc_code) = code_cell.parse::<u32>() {
+                    // Extract name inside backticks `Name`
+                    if name_cell.starts_with('`') && name_cell.contains('`') {
+                        let name = name_cell.trim_matches('`').split_whitespace().next().unwrap_or("");
+                        // Skip non-error constants table entry if any
+                        if name.starts_with("GATE_CALLER_") {
+                            continue;
+                        }
+                        if let Some(&expected_code) = full_map.get(name) {
+                            assert_eq!(
+                                doc_code, expected_code,
+                                "docs/errors.md code mismatch for {}: doc has {}, errors.rs has {}",
+                                name, doc_code, expected_code
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
+

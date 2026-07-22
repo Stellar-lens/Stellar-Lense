@@ -34,8 +34,8 @@ Soroban contract errors are returned as `u32` discriminant values. When a transa
 | Code | Name | Description | When returned | Client action |
 |-----:|------|-------------|---------------|---------------|
 | 7 | `ContractPaused` | The global circuit breaker is active | Any state-mutating call (`submit_score`, `submit_scores_batch`, `submit_scores_batch_attested`, `withdraw_fees`, `set_decay_rate`) while the admin has paused the contract | Wait for the admin to call `unpause`. Monitor the `contract_unpaused` event. |
-| 33 | `PairPaused` | A specific asset pair has been individually frozen | `submit_score` or `submit_scores_batch` (per-entry rejection) targeting a pair paused via `set_pair_paused` | Check `is_pair_paused` before submitting for this pair. Wait for the admin to unfreeze it. |
-| 34 | `PausedPairIndexFull` | The paused-pair index is at capacity (50 pairs) | `set_pair_paused(pair, true)` when `MAX_PAUSED_PAIRS` (50) pairs are already paused | Unpause an existing pair before pausing a new one. |
+| 7 | `PairPaused` | Alias for `ContractPaused`. A specific asset pair has been individually frozen | `submit_score` or `submit_scores_batch` (per-entry rejection) targeting a pair paused via `set_pair_paused` | Check `is_pair_paused` before submitting for this pair. Wait for the admin to unfreeze it. |
+| 17 | `PausedPairIndexFull` | Alias for `ServiceSetFull`. The paused-pair index is at capacity (50 pairs) | `set_pair_paused(pair, true)` when `MAX_PAUSED_PAIRS` (50) pairs are already paused | Unpause an existing pair before pausing a new one. |
 
 ### Admin transfer
 
@@ -97,46 +97,35 @@ Soroban contract errors are returned as `u32` discriminant values. When a transa
 | 27 | `InvalidAttestation` | Attestation verification failed | `submit_score` when the commitment mismatch, invalid recovery id, or recovered pubkey doesn't match; `submit_scores_batch_attested` (per-entry rejection) on Merkle proof mismatch | Regenerate the attestation. Verify the commitment is computed over the exact same payload fields. See `docs/attestation-spec.md`. |
 | 28 | `InvalidPubkeyLength` | Public key is not 33 or 65 bytes | `set_service_pubkey` with a key that is not SEC-1 compressed (33 bytes) or uncompressed (65 bytes) | Supply a valid secp256k1 public key in SEC-1 encoding. |
 
-### Signer tiers
-
-| Code | Name | Description | When returned | Client action |
-|-----:|------|-------------|---------------|---------------|
-| 26 | `SignerTierViolation` | Signer does not meet the required tier level | A signer's tier is insufficient for the operation | Ensure the signer has the required tier assignment. |
-| 27 | `InvalidSignerTier` | The specified signer tier is not valid | An invalid tier value was provided | Use a valid tier value. |
-
-> **Note on codes 26–27:** The `SignerTierViolation` / `InvalidSignerTier` and `ServicePubkeyNotSet` / `InvalidAttestation` pairs share discriminants 26 and 27 respectively due to an in-progress feature branch merge. Integrators should use the variant name (not just the numeric code) to disambiguate and should consult the latest release for the resolved mapping.
-
 ### History & confidence
 
 | Code | Name | Description | When returned | Client action |
 |-----:|------|-------------|---------------|---------------|
 | 29 | `InvalidHistoryDepth` | History depth is 0 or exceeds the maximum (50) | `set_history_max_depth` with `depth == 0` or `depth > 50` | Use a value in `[1, 50]`. Default is 10. |
-| 30 | `InvalidMinConfidence` | Minimum confidence value exceeds 100 | `set_global_min_confidence` with `min_confidence > 100` | Use a value in `[0, 100]`. |
+| 5 | `InvalidMinConfidence` | Alias for `InvalidConfidence`. Minimum confidence value exceeds 100 | `set_global_min_confidence` with `min_confidence > 100` | Use a value in `[0, 100]`. |
 
 ### Fee withdrawal
 
 | Code | Name | Description | When returned | Client action |
 |-----:|------|-------------|---------------|---------------|
-| 30 | `FeeTokenNotSet` | No SEP-41 fee token has been configured | `get_fee_token` or `withdraw_fees` before `set_fee_token` is called | Admin must call `set_fee_token` with the token contract address. |
-| 31 | `InvalidWithdrawalAmount` | Withdrawal amount is zero | `withdraw_fees` with `amount == 0` | Supply a positive withdrawal amount. |
-| 32 | `WithdrawalInProgress` | Another withdrawal is already in-flight | `withdraw_fees` while the concurrency lock is held | Wait for the current withdrawal to complete, then retry. |
-
-> **Note on code 30:** `InvalidMinConfidence` and `FeeTokenNotSet` share discriminant 30 due to an in-progress feature branch merge. Integrators should use the variant name to disambiguate and consult the latest release for the resolved mapping.
+| 38 | `FeeTokenNotSet` | No SEP-41 fee token has been configured | `get_fee_token` or `withdraw_fees` before `set_fee_token` is called | Admin must call `set_fee_token` with the token contract address. |
+| 16 | `InvalidWithdrawalAmount` | Alias for `InvalidThreshold`. Withdrawal amount is zero | `withdraw_fees` with `amount == 0` | Supply a positive withdrawal amount. |
+| 3 | `WithdrawalInProgress` | Alias for `Unauthorized`. Another withdrawal is already in-flight | `withdraw_fees` while the concurrency lock is held | Wait for the current withdrawal to complete, then retry. |
 
 ### Admin multi-sig
 
 | Code | Name | Description | When returned | Client action |
 |-----:|------|-------------|---------------|---------------|
-| 35 | `AdminSetFull` | Admin signer set is at capacity (5 members) | `add_admin_signer` when the set already has `MAX_ADMIN_SIGNERS` (5) members | Remove an existing admin signer before adding a new one. |
-| 36 | `AdminSignerNotInSet` | Address is not in the admin signer set | `remove_admin_signer` with an address not in the set, or `require_admin_auth` with a non-member signer | Verify the address. Check `get_admin_signers()`. |
-| 37 | `InsufficientAdminSigners` | Fewer than M admin signers were supplied | Any admin-gated function when `admin_signers.len() < admin_threshold` | Include at least `threshold` valid admin signers. Check `get_admin_threshold()`. |
+| 33 | `AdminSetFull` | Admin signer set is at capacity (5 members) | `add_admin_signer` when the set already has `MAX_ADMIN_SIGNERS` (5) members | Remove an existing admin signer before adding a new one. |
+| 34 | `AdminSignerNotInSet` | Address is not in the admin signer set | `remove_admin_signer` with an address not in the set, or `require_admin_auth` with a non-member signer | Verify the address. Check `get_admin_signers()`. |
+| 35 | `InsufficientAdminSigners` | Fewer than M admin signers were supplied | Any admin-gated function when `admin_signers.len() < admin_threshold` | Include at least `threshold` valid admin signers. Check `get_admin_threshold()`. |
 
 ### Wallet-score delegation
 
 | Code | Name | Description | When returned | Client action |
 |-----:|------|-------------|---------------|---------------|
-| 38 | `CyclicDelegation` | Delegation would create a cycle | `set_score_delegate` when `sub_wallet == custodian`, or when the custodian already delegates back to `sub_wallet` | Choose a different custodian that does not create a delegation cycle. |
-| 39 | `DelegateNotFound` | No delegate is registered for this wallet | `remove_score_delegate` when the wallet has no active delegation | No action needed — there is nothing to remove. |
+| 36 | `CyclicDelegation` | Delegation would create a cycle | `set_score_delegate` when `sub_wallet == custodian`, or when the custodian already delegates back to `sub_wallet` | Choose a different custodian that does not create a delegation cycle. |
+| 6 | `DelegateNotFound` | Alias for `ScoreNotFound`. No delegate is registered for this wallet | `remove_score_delegate` when the wallet has no active delegation | No action needed — there is nothing to remove. |
 
 ### Cross-contract risk gate
 
@@ -148,42 +137,42 @@ Soroban contract errors are returned as `u32` discriminant values. When a transa
 
 | Code | Name | Description | When returned | Client action |
 |-----:|------|-------------|---------------|---------------|
-| 41 | `InvalidDecayRate` | Decay rate parameters are invalid | `set_decay_rate` with `denominator == 0`, or when the `numerator/denominator` ratio exceeds `MAX_DECAY_LAMBDA` (1/1) | Use a denominator > 0 and ensure the ratio does not exceed 1. |
+| 16 | `InvalidDecayRate` | Alias for `InvalidThreshold`. Decay rate parameters are invalid | `set_decay_rate` with `denominator == 0`, or when the `numerator/denominator` ratio exceeds `MAX_DECAY_LAMBDA` (1/1) | Use a denominator > 0 and ensure the ratio does not exceed 1. |
 
 ### Score embargo
 
 | Code | Name | Description | When returned | Client action |
 |-----:|------|-------------|---------------|---------------|
-| 42 | `ScoreEmbargoed` | Wallet is under an active regulatory embargo | `get_score`, `get_effective_score`, `get_aggregate_score` for an embargoed wallet. `query_risk_gate` returns `false` (no error) for embargoed wallets. | The wallet's scores are temporarily sealed. Contact the contract admin or wait for a timed embargo to expire. Check `is_embargoed`. |
+| 37 | `ScoreEmbargoed` | Wallet is under an active regulatory embargo | `get_score`, `get_effective_score`, `get_aggregate_score` for an embargoed wallet. `query_risk_gate` returns `false` (no error) for embargoed wallets. | The wallet's scores are temporarily sealed. Contact the contract admin or wait for a timed embargo to expire. Check `is_embargoed`. |
 
 ### Wallet relationship graph
 
 | Code | Name | Description | When returned | Client action |
 |-----:|------|-------------|---------------|---------------|
-| 43 | `CounterpartyLinkFull` | Wallet has reached the maximum number of counterparty links (50) | `add_counterparty_link` when the wallet already has `MAX_COUNTERPARTY_LINKS_PER_WALLET` links | Remove an existing link before adding a new one. |
-| 44 | `CounterpartyNotFound` | The specified counterparty link does not exist | `remove_counterparty_link` for a non-existent link | Verify the counterparty address. |
-| 45 | `SelfLink` | Cannot link a wallet to itself | `add_counterparty_link` with the same wallet address for both sides | Use two distinct wallet addresses. |
+| 17 | `CounterpartyLinkFull` | Alias for `ServiceSetFull`. Wallet has reached the maximum number of counterparty links (50) | `add_counterparty_link` when the wallet already has `MAX_COUNTERPARTY_LINKS_PER_WALLET` links | Remove an existing link before adding a new one. |
+| 6 | `CounterpartyNotFound` | Alias for `ScoreNotFound`. The specified counterparty link does not exist | `remove_counterparty_link` for a non-existent link | Verify the counterparty address. |
+| 4 | `SelfLink` | Alias for `InvalidScore`. Cannot link a wallet to itself | `add_counterparty_link` with the same wallet address for both sides | Use two distinct wallet addresses. |
 
 ### Score submission floor
 
 | Code | Name | Description | When returned | Client action |
 |-----:|------|-------------|---------------|---------------|
-| 46 | `BelowScoreFloor` | Score is below the configured floor for a high-risk wallet | `submit_score` (hard fail) or `submit_scores_batch` (per-entry rejection) when the wallet's historical peak is at/above the high-water mark and the new score is below the floor value | The submission was blocked to prevent score-zeroing of a known high-risk wallet. If this is a legitimate re-scoring, the admin can call `override_score_floor` for a one-shot exception. |
-| 47 | `InvalidScoreFloorPolicy` | Floor policy parameters are invalid | `set_score_floor_policy` when `high_water_mark` is outside `[50, 100]`, or `floor_value >= high_water_mark` | Use `high_water_mark` in `[50, 100]` and `floor_value` strictly below it. |
+| 4 | `BelowScoreFloor` | Alias for `InvalidScore`. Score is below the configured floor for a high-risk wallet | `submit_score` (hard fail) or `submit_scores_batch` (per-entry rejection) when the wallet's historical peak is at/above the high-water mark and the new score is below the floor value | The submission was blocked to prevent score-zeroing of a known high-risk wallet. If this is a legitimate re-scoring, the admin can call `override_score_floor` for a one-shot exception. |
+| 16 | `InvalidScoreFloorPolicy` | Alias for `InvalidThreshold`. Floor policy parameters are invalid | `set_score_floor_policy` when `high_water_mark` is outside `[50, 100]`, or `floor_value >= high_water_mark` | Use `high_water_mark` in `[50, 100]` and `floor_value` strictly below it. |
 
 ### Hysteresis layer
 
 | Code | Name | Description | When returned | Client action |
 |-----:|------|-------------|---------------|---------------|
-| 48 | `InvalidHysteresisMargin` | Margin exceeds the maximum (50) | `set_hysteresis_margin` with `margin > MAX_HYSTERESIS_MARGIN` (50) | Use a value in `[0, 50]`. `0` disables hysteresis. |
+| 49 | `InvalidHysteresisMargin` | Margin exceeds the maximum (50) | `set_hysteresis_margin` with `margin > MAX_HYSTERESIS_MARGIN` (50) | Use a value in `[0, 50]`. `0` disables hysteresis. |
 
 ### Multi-model consensus scoring
 
 | Code | Name | Description | When returned | Client action |
 |-----:|------|-------------|---------------|---------------|
-| 49 | `InsufficientConsensus` | Not enough models agreed within the epsilon window | `submit_consensus_score` when fewer than `k` models produced scores within `±epsilon` of the provisional median | Submit more model outputs, widen `epsilon`, or lower `k` via `set_consensus_config`. Investigate model divergence. |
-| 50 | `ConsensusInputEmpty` | Consensus submission has zero model entries | `submit_consensus_score` with an empty `submissions` vec | Supply at least one `ModelSubmission`. |
-| 51 | `InvalidConsensusConfig` | Consensus configuration parameters are invalid | `set_consensus_config` with `k == 0` or `epsilon > 100` | Use `k >= 1` and `epsilon` in `[0, 100]`. Defaults: `k = 2`, `epsilon = 5`. |
+| 30 | `InsufficientConsensus` | Not enough models agreed within the epsilon window | `submit_consensus_score` when fewer than `k` models produced scores within `±epsilon` of the provisional median | Submit more model outputs, widen `epsilon`, or lower `k` via `set_consensus_config`. Investigate model divergence. |
+| 31 | `ConsensusInputEmpty` | Consensus submission has zero model entries | `submit_consensus_score` with an empty `submissions` vec | Supply at least one `ModelSubmission`. |
+| 32 | `InvalidConsensusConfig` | Consensus configuration parameters are invalid | `set_consensus_config` with `k == 0` or `epsilon > 100` | Use `k >= 1` and `epsilon` in `[0, 100]`. Defaults: `k = 2`, `epsilon = 5`. |
 
 ---
 
@@ -210,5 +199,5 @@ In `submit_scores_batch` and `submit_scores_batch_attested`, individual entries 
 | 23 | `RateLimitExceeded` — cooldown not elapsed |
 | 25 | `InvalidTimestamp` — timestamp is 0 |
 | 27 | `InvalidAttestation` — Merkle proof mismatch (attested batch only) |
-| 33 | `PairPaused` — target pair is frozen |
-| 46 | `BelowScoreFloor` — score below floor for high-risk wallet |
+| 7 | `PairPaused` — target pair is frozen |
+| 4 | `BelowScoreFloor` — score below floor for high-risk wallet |
