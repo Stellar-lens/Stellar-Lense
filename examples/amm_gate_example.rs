@@ -68,46 +68,103 @@ impl SimpleAMM {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use soroban_sdk::testutils::{Address as _, Env as _};
+    use ledgerlens_score::LedgerLensScoreContract;
+    use soroban_sdk::testutils::{Address as _, Ledger as _};
+    use soroban_sdk::{symbol_short, Vec};
 
-    #[test]
-    fn test_swap_with_passing_gate() {
-        // This is a stub test showing the happy path structure.
-        // In a real test, you would:
-        // 1. Initialize the LedgerLens contract with test data.
-        // 2. Submit a low-risk score for the user.
-        // 3. Call swap() and verify it succeeds.
+    const GATE_THRESHOLD: u32 = 75;
 
+    struct Fixture<'a> {
+        env: Env,
+        ledgerlens: LedgerLensScoreContractClient<'a>,
+        ledgerlens_id: Address,
+        amm: SimpleAMMClient<'a>,
+    }
+
+    /// Deploys a real `LedgerLensScoreContract` plus a real `SimpleAMM` in the
+    /// same `Env`, so `swap` exercises the actual cross-contract call to
+    /// `query_risk_gate` rather than a mocked gate check.
+    fn setup<'a>() -> Fixture<'a> {
         let env = Env::default();
         env.mock_all_auths();
 
-        // Pseudo-code (not actual test):
-        // let user = Address::generate(&env);
-        // let llens_id = Address::generate(&env);
-        // let amm_contract = env.register_contract(None, SimpleAMM);
-        // let client = SimpleAMMClient::new(&env, &amm_contract);
-        //
-        // let result = client.swap(
-        //     &user,
-        //     &symbol_short!("XLM_USDC"),
-        //     &1_000_000,
-        //     &llens_id,
-        //     &75,
-        // );
-        // assert!(result.is_ok());
+        let ledgerlens_id = env.register_contract(None, LedgerLensScoreContract);
+        let ledgerlens = LedgerLensScoreContractClient::new(&env, &ledgerlens_id);
+        let admin = Address::generate(&env);
+        let service = Address::generate(&env);
+        ledgerlens.initialize(&admin, &service);
+
+        let amm_id = env.register_contract(None, SimpleAMM);
+        let amm = SimpleAMMClient::new(&env, &amm_id);
+
+        Fixture { env, ledgerlens, ledgerlens_id, amm }
+    }
+
+    /// Submits a score for `wallet`, advancing the ledger past the 1-hour
+    /// cooldown first so repeated submissions in the same test never collide.
+    fn submit_score(fixture: &Fixture, wallet: &Address, score: u32) {
+        fixture.env.ledger().with_mut(|l| l.timestamp += 3_601);
+        fixture.ledgerlens.submit_score(
+            &Vec::new(&fixture.env),
+            wallet,
+            &symbol_short!("XLM_USDC"),
+            &score,
+            &false,
+            &false,
+            &fixture.env.ledger().timestamp(),
+            &95,
+            &1,
+            &None,
+        );
+    }
+
+    #[test]
+    fn test_swap_with_passing_gate() {
+        let fixture = setup();
+        let user = Address::generate(&fixture.env);
+        submit_score(&fixture, &user, 10); // 10 < GATE_THRESHOLD(75)
+
+        let result = fixture.amm.try_swap(
+            &user,
+            &symbol_short!("XLM_USDC"),
+            &1_000_000,
+            &fixture.ledgerlens_id,
+            &GATE_THRESHOLD,
+        );
+
+        assert_eq!(result, Ok(Ok(997_000)));
     }
 
     #[test]
     fn test_swap_with_failing_gate() {
-        // Stub: verify that swap rejects high-risk wallets.
-        //
-        // let result = client.swap(
-        //     &high_risk_user,
-        //     &symbol_short!("XLM_USDC"),
-        //     &1_000_000,
-        //     &llens_id,
-        //     &75,
-        // );
-        // assert_eq!(result, Err(AmmError::UserHighRisk));
+        let fixture = setup();
+        let user = Address::generate(&fixture.env);
+        submit_score(&fixture, &user, 90); // 90 >= GATE_THRESHOLD(75)
+
+        let result = fixture.amm.try_swap(
+            &user,
+            &symbol_short!("XLM_USDC"),
+            &1_000_000,
+            &fixture.ledgerlens_id,
+            &GATE_THRESHOLD,
+        );
+
+        assert_eq!(result, Err(Ok(AmmError::UserHighRisk)));
+    }
+
+    #[test]
+    fn test_swap_with_unknown_wallet() {
+        let fixture = setup();
+        let user = Address::generate(&fixture.env); // never scored
+
+        let result = fixture.amm.try_swap(
+            &user,
+            &symbol_short!("XLM_USDC"),
+            &1_000_000,
+            &fixture.ledgerlens_id,
+            &GATE_THRESHOLD,
+        );
+
+        assert_eq!(result, Err(Ok(AmmError::UserHighRisk)));
     }
 }

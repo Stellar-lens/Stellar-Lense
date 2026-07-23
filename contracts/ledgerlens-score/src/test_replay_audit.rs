@@ -76,16 +76,9 @@ fn test_replay_consensus_twice_fails() {
     nonces.push_back(nonce);
 
     // First reveal succeeds
-    client.reveal_consensus(
-        &Vec::new(&env),
-        &wallet,
-        &pair,
-        &submissions,
-        &nonces,
-        &START_TS,
-    );
+    client.reveal_consensus(&Vec::new(&env), &wallet, &pair, &submissions, &nonces, &START_TS);
 
-    // Second reveal (replay) fails with RevealWindowExpired
+    // Second reveal (replay) fails with RevealWindowExpired because commitment was removed
     let res = client.try_reveal_consensus(
         &Vec::new(&env),
         &wallet,
@@ -135,6 +128,45 @@ fn test_replay_consensus_old_commitment_in_new_window_fails() {
         &START_TS,
     );
     assert_eq!(res, Err(Ok(Error::CommitmentMismatch)));
+}
+
+#[test]
+fn test_replay_consensus_after_reveal_window_closed_fails() {
+    let (env, client) = setup();
+
+    let wallet = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+    let model = Address::generate(&env);
+
+    let sub = dummy_submission(&env, &model, 70);
+    let nonce = 12345u64;
+    let mut buf = [0u8; 12];
+    buf[0..4].copy_from_slice(&sub.score.to_be_bytes());
+    buf[4..12].copy_from_slice(&nonce.to_be_bytes());
+    let hash = env.crypto().sha256(&soroban_sdk::Bytes::from_array(&env, &buf));
+
+    client.commit_consensus(&model, &wallet, &pair, &hash.to_bytes());
+
+    // Fast forward ledger sequence / time past reveal window (default 3600 seconds, 720 ledgers)
+    env.ledger().with_mut(|l| {
+        l.timestamp += 3601;
+        l.sequence += 1000;
+    });
+
+    let mut submissions = Vec::new(&env);
+    submissions.push_back(sub);
+    let mut nonces = Vec::new(&env);
+    nonces.push_back(nonce);
+
+    let res = client.try_reveal_consensus(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &submissions,
+        &nonces,
+        &START_TS,
+    );
+    assert_eq!(res, Err(Ok(Error::RevealWindowExpired)));
 }
 
 #[test]
@@ -287,7 +319,10 @@ fn test_replay_consensus_commitment_into_pending_score_fails() {
     let att_input_1 = ScoreAttestationInput {
         attestation: MaybeScoreAttestation::None,
         threshold_attestation: MaybeThresholdAttestation::None,
-        commitment: Some(soroban_sdk::Bytes::from_array(&env, &hash_consensus.to_bytes().to_array())),
+        commitment: Some(soroban_sdk::Bytes::from_array(
+            &env,
+            &hash_consensus.to_bytes().to_array(),
+        )),
     };
 
     client.submit_score(
@@ -376,4 +411,3 @@ fn test_replay_pending_score_into_consensus_reveal_fails() {
     );
     assert_eq!(res, Err(Ok(Error::CommitmentMismatch)));
 }
-

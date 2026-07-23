@@ -39,19 +39,56 @@ pub fn get_last_shard_failure(env: Env) -> Option<(Address, u32)>
 
 ### Example integrator workflow
 
+`query_risk_gate` itself is **infallible** — `Result<bool, Error>` above is
+aspirational/stale; the deployed signature is `fn query_risk_gate(..) -> bool`.
+Every failure case (no shards registered, a shard call trapping, a shard
+being paused) collapses to the same `false` a genuinely high-risk wallet
+would produce (see `tests/composability/tests/aggregator_shard_pause.rs`,
+issue #411). `get_last_shard_failure` is still how you find out whether a
+`false` was actually caused by a shard problem rather than a real verdict —
+you just check it directly instead of matching on an `Err` arm:
+
 ```rust
-match aggregator.query_risk_gate(&wallet, &pair, &threshold) {
-    Ok(true) => { /* wallet passed all shards */ }
-    Ok(false) => { /* wallet rejected by at least one shard */ }
-    Err(Error::ShardFailure) => {
-        if let Some((shard, code)) = aggregator.get_last_shard_failure() {
+if aggregator.get_shards().is_empty() {
+    // Nothing registered to consult at all.
+    return fallback_policy();
+}
+
+let failure_before = aggregator.get_last_shard_failure();
+let passes = aggregator.query_risk_gate(&wallet, &pair, &threshold);
+
+if !passes {
+    let failure_after = aggregator.get_last_shard_failure();
+    if failure_after != failure_before {
+        // This exact call caused a *new* shard failure — the `false`
+        // reflects an unhealthy/unreachable shard, not the wallet's risk.
+        if let Some((shard, code)) = failure_after {
             // shard is the failing contract address
-            // code is the score-contract error (e.g. 2 = NotInitialized)
+            // code is the score-contract error, or 0 for a host-level failure
         }
+        return fallback_policy();
     }
-    Err(_) => { /* other aggregator error */ }
+    // Otherwise it's a genuine, risk-based rejection.
 }
 ```
+
+## Fallback Policy for Aggregator Unavailability (issue #434)
+
+"Unavailable" (no shards registered, or a shard's own cross-contract call
+failing) and "genuinely rejected" both surface as `query_risk_gate() ==
+false`. Integrators that care about the difference — e.g. to alert an
+operator, retry later, or apply a different policy than a real risk
+rejection — must apply the pattern above and choose a `fallback_policy()`.
+
+**Recommendation: fail closed.** Refuse the action (swap, loan, etc.) when
+the aggregator is unavailable rather than proceeding on missing information.
+This is the policy `examples/aggregator_gate_example.rs`
+(`AggregatorGatedAmm::swap`) implements, and the one exercised end-to-end in
+`tests/composability/tests/aggregator_fallback_gate.rs`. A protocol that
+would rather fail open (accept the risk of a temporarily-unavailable oracle
+over blocking legitimate users) can substitute its own policy at the same
+decision point — the point of documenting this is making the choice
+deliberate rather than an accident of "well, `false` came back."
 
 ## Score Contract Error Codes (for reference)
 
@@ -123,8 +160,8 @@ the call panicked).
 | `get_admin` | `Result<Address, Error>` | `NotInitialized` if uninitialized |
 | `add_shard` | `Result<(), Error>` | `SelfReference`, `ShardAlreadyRegistered`, `ShardLimitReached` |
 | `remove_shard` | `Result<(), Error>` | `ShardNotRegistered` |
-| `query_risk_gate` | `Result<bool, Error>` | `NoShards` if no shards; `ShardFailure` if a shard errors (recorded via `get_last_shard_failure`) |
-| `get_score` | `Result<RiskScore, Error>` | `ScoreNotFound` if no shard has data; per-shard errors stored via `get_last_shard_failure` |
-| `get_aggregate_score` | `Result<AggregateRiskScore, Error>` | `ScoreNotFound` if no shard has data; per-shard errors stored via `get_last_shard_failure` |
+| `query_risk_gate` | `bool` (infallible) | `false` if no shards, if any healthy shard rejects, or if a shard's call itself fails (recorded via `get_last_shard_failure`) — see the fallback-policy section above to tell these apart |
+| `get_score` | `Result<RiskScore, ledgerlens_score::Error>` | `ScoreNotFound` if no shard has data; per-shard errors stored via `get_last_shard_failure` |
+| `get_aggregate_score` | `Result<AggregateRiskScore, ledgerlens_score::Error>` | `ScoreNotFound` if no shard has data; per-shard errors stored via `get_last_shard_failure` |
 | `get_score_across_shards` | `Vec<(Address, Option<RiskScore>)>` | Individual shard errors appear as `None` in the result vector |
 | `contagion_depth_across_shards` | `u32` | Silently skips erring shards; per-shard errors stored via `get_last_shard_failure` |
