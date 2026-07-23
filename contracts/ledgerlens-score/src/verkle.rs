@@ -223,12 +223,7 @@ pub fn finalize_commitment(env: &Env, accumulator: &[u8; 32]) -> [u8; 32] {
 /// **Removal** uses the same function: XOR is its own inverse, so to remove an
 /// entry, call `update_accumulator(env, &old_accum, z, old_v)` — the old leaf
 /// XORs out.
-pub fn update_accumulator(
-    env: &Env,
-    accum: &[u8; 32],
-    z: &[u8; 32],
-    v: &[u8; 32],
-) -> [u8; 32] {
+pub fn update_accumulator(env: &Env, accum: &[u8; 32], z: &[u8; 32], v: &[u8; 32]) -> [u8; 32] {
     let leaf = hash_leaf(env, z, v);
     xor32(accum, &leaf)
 }

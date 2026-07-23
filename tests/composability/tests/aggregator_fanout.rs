@@ -5,11 +5,9 @@
 //! links, and delegation setups, then exercises every aggregator read
 //! function against the heterogeneous multi-shard environment.
 
-use ledgerlens_aggregator::{
-    LedgerLensAggregator, LedgerLensAggregatorClient,
-};
+use ledgerlens_aggregator::{LedgerLensAggregator, LedgerLensAggregatorClient};
 use ledgerlens_score::{
-    LedgerLensScoreContract, LedgerLensScoreContractClient, Error as ScoreError,
+    Error as ScoreError, LedgerLensScoreContract, LedgerLensScoreContractClient,
 };
 use soroban_sdk::{
     symbol_short,
@@ -227,10 +225,7 @@ fn test_contagion_depth_returns_max_across_shards() {
 
     // Empty wallet returns 0.
     let isolated = Address::generate(&fix.env);
-    assert_eq!(
-        fix.aggregator.contagion_depth_across_shards(&isolated, &pair),
-        0,
-    );
+    assert_eq!(fix.aggregator.contagion_depth_across_shards(&isolated, &pair), 0,);
 }
 
 // ── Test: cross-shard cyclic delegation safety ──────────────────────────
@@ -276,10 +271,7 @@ fn test_get_aggregate_score_returns_max_across_shards() {
     fix.env.ledger().with_mut(|l| l.timestamp = ts + 100);
 
     let agg = fix.aggregator.get_aggregate_score(&wallet);
-    assert!(
-        agg.aggregate_score > 0,
-        "aggregate_score should be non-zero across shards with data",
-    );
+    assert!(agg.aggregate_score > 0, "aggregate_score should be non-zero across shards with data",);
 }
 
 #[test]

@@ -266,7 +266,10 @@ pub fn get_expiring_entries(env: &Env, max_entries: u32) -> Vec<(Address, Symbol
 /// due. This is what `get_expiring_entries` did before the index was
 /// restructured into an expiry-ordered queue.
 #[cfg(test)]
-pub fn get_expiring_entries_full_scan_baseline(env: &Env, max_entries: u32) -> Vec<(Address, Symbol)> {
+pub fn get_expiring_entries_full_scan_baseline(
+    env: &Env,
+    max_entries: u32,
+) -> Vec<(Address, Symbol)> {
     let index = get_score_entry_index(env);
     let capped = max_entries.min(crate::constants::MAX_EXPIRING_ENTRIES_PER_CALL);
 

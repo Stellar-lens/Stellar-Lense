@@ -6,8 +6,8 @@
 
 use soroban_sdk::{
     symbol_short,
-    testutils::{Address as _, Ledger as _, Events as _},
-    Address, Env, Vec, Symbol, TryFromVal,
+    testutils::{Address as _, Events as _, Ledger as _},
+    Address, Env, Symbol, TryFromVal, Vec,
 };
 
 use crate::{
@@ -119,7 +119,9 @@ fn test_gate_falls_back_to_secondary_when_paused() {
             if topics.len() >= 2 {
                 if let Ok(topic_sym) = Symbol::try_from_val(&env, &topics.get(0).unwrap()) {
                     if topic_sym == symbol_short!("failover") {
-                        if let Ok(topic_wallet) = Address::try_from_val(&env, &topics.get(1).unwrap()) {
+                        if let Ok(topic_wallet) =
+                            Address::try_from_val(&env, &topics.get(1).unwrap())
+                        {
                             if topic_wallet == wallet {
                                 if let Ok(data_pair) = Symbol::try_from_val(&env, &e.2) {
                                     if data_pair == pair {

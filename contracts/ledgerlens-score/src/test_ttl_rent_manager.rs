@@ -5,7 +5,9 @@ use soroban_sdk::{
 };
 
 use crate::constants::SCORE_TTL_THRESHOLD;
-use crate::{storage, types::RiskScore, Error, LedgerLensScoreContract, LedgerLensScoreContractClient};
+use crate::{
+    storage, types::RiskScore, Error, LedgerLensScoreContract, LedgerLensScoreContractClient,
+};
 
 fn dormant_score() -> RiskScore {
     RiskScore {
@@ -256,7 +258,10 @@ fn test_index_moves_entry_to_back_on_retouch() {
         let index = storage::get_score_entry_index(&env);
         assert_eq!(
             index,
-            Vec::from_array(&env, [(a.clone(), pair.clone()), (b.clone(), pair.clone()), (c.clone(), pair.clone())])
+            Vec::from_array(
+                &env,
+                [(a.clone(), pair.clone()), (b.clone(), pair.clone()), (c.clone(), pair.clone())]
+            )
         );
     });
 
@@ -268,7 +273,10 @@ fn test_index_moves_entry_to_back_on_retouch() {
         let index = storage::get_score_entry_index(&env);
         assert_eq!(
             index,
-            Vec::from_array(&env, [(b.clone(), pair.clone()), (c.clone(), pair.clone()), (a.clone(), pair.clone())])
+            Vec::from_array(
+                &env,
+                [(b.clone(), pair.clone()), (c.clone(), pair.clone()), (a.clone(), pair.clone())]
+            )
         );
     });
 }
@@ -334,7 +342,10 @@ fn test_get_expiring_entries_short_circuits_full_index_scan() {
 
         assert_eq!(optimized.len(), 1);
         assert_eq!(optimized.get(0).unwrap(), (old_wallet.clone(), pair.clone()));
-        assert_eq!(optimized, baseline, "early-exit scan must return the same result as the full scan");
+        assert_eq!(
+            optimized, baseline,
+            "early-exit scan must return the same result as the full scan"
+        );
 
         let reduction_pct =
             (baseline_cost.saturating_sub(optimized_cost) as f64 / baseline_cost as f64) * 100.0;

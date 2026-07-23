@@ -610,7 +610,13 @@ fn range_proof_all_scores_below_80() {
 // incrementally-maintained commitment ever drifts from this reference, the
 // test catches it.
 
-fn compute_leaf(env: &Env, wallet: &Address, pair: &Symbol, score: u32, timestamp: u64) -> [u8; 32] {
+fn compute_leaf(
+    env: &Env,
+    wallet: &Address,
+    pair: &Symbol,
+    score: u32,
+    timestamp: u64,
+) -> [u8; 32] {
     let mut wallet_buf = [0u8; 56];
     wallet.to_string().copy_into_slice(&mut wallet_buf);
 
@@ -652,9 +658,7 @@ fn differential_single_entry() {
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLMUSDC");
 
-    client.submit_score(
-        &Vec::new(&env), &wallet, &pair, &50, &false, &false, &1, &90, &1, &None,
-    );
+    client.submit_score(&Vec::new(&env), &wallet, &pair, &50, &false, &false, &1, &90, &1, &None);
 
     let leaf = compute_leaf(&env, &wallet, &pair, 50, 1);
     let expected = reference_commitment(&env, &[leaf]);
@@ -669,14 +673,10 @@ fn differential_multiple_entries() {
     let wallet_a = Address::generate(&env);
     let wallet_b = Address::generate(&env);
 
-    client.submit_score(
-        &Vec::new(&env), &wallet_a, &pair, &20, &false, &false, &1, &80, &1, &None,
-    );
+    client.submit_score(&Vec::new(&env), &wallet_a, &pair, &20, &false, &false, &1, &80, &1, &None);
     let leaf_a = compute_leaf(&env, &wallet_a, &pair, 20, 1);
 
-    client.submit_score(
-        &Vec::new(&env), &wallet_b, &pair, &80, &true, &false, &2, &90, &1, &None,
-    );
+    client.submit_score(&Vec::new(&env), &wallet_b, &pair, &80, &true, &false, &2, &90, &1, &None);
     let leaf_b = compute_leaf(&env, &wallet_b, &pair, 80, 2);
 
     let expected = reference_commitment(&env, &[leaf_a, leaf_b]);
@@ -690,9 +690,7 @@ fn differential_after_update() {
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLMUSDC");
 
-    client.submit_score(
-        &Vec::new(&env), &wallet, &pair, &30, &false, &false, &1, &80, &1, &None,
-    );
+    client.submit_score(&Vec::new(&env), &wallet, &pair, &30, &false, &false, &1, &80, &1, &None);
     let leaf_old = compute_leaf(&env, &wallet, &pair, 30, 1);
 
     assert_eq!(
@@ -704,7 +702,16 @@ fn differential_after_update() {
     // Advance past cooldown and update.
     env.ledger().with_mut(|l| l.timestamp += 3_601);
     client.submit_score(
-        &Vec::new(&env), &wallet, &pair, &70, &false, &false, &3_602, &90, &1, &None,
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &70,
+        &false,
+        &false,
+        &3_602,
+        &90,
+        &1,
+        &None,
     );
     let leaf_new = compute_leaf(&env, &wallet, &pair, 70, 3_602);
 
@@ -724,12 +731,30 @@ fn differential_multiple_pairs() {
     let pair_b = symbol_short!("ETHUSDC");
 
     client.submit_score(
-        &Vec::new(&env), &wallet, &pair_a, &50, &false, &false, &10, &90, &1, &None,
+        &Vec::new(&env),
+        &wallet,
+        &pair_a,
+        &50,
+        &false,
+        &false,
+        &10,
+        &90,
+        &1,
+        &None,
     );
     let leaf_a = compute_leaf(&env, &wallet, &pair_a, 50, 10);
 
     client.submit_score(
-        &Vec::new(&env), &wallet, &pair_b, &30, &false, &false, &20, &85, &1, &None,
+        &Vec::new(&env),
+        &wallet,
+        &pair_b,
+        &30,
+        &false,
+        &false,
+        &20,
+        &85,
+        &1,
+        &None,
     );
     let leaf_b = compute_leaf(&env, &wallet, &pair_b, 30, 20);
 
@@ -755,9 +780,7 @@ fn differential_sequence_mixed_operations() {
     for (i, w) in wallets.iter().enumerate() {
         let ts = (i + 1) as u64;
         let score = (20 + i * 10) as u32;
-        client.submit_score(
-            &Vec::new(&env), w, &pair, &score, &false, &false, &ts, &85, &1, &None,
-        );
+        client.submit_score(&Vec::new(&env), w, &pair, &score, &false, &false, &ts, &85, &1, &None);
         let leaf = compute_leaf(&env, w, &pair, score, ts);
         leaves.push(leaf);
 
@@ -777,7 +800,16 @@ fn differential_sequence_mixed_operations() {
     let ts_update = 100u64;
     let score_update = 99u32;
     client.submit_score(
-        &Vec::new(&env), &wallets[2], &pair, &score_update, &true, &true, &ts_update, &95, &2, &None,
+        &Vec::new(&env),
+        &wallets[2],
+        &pair,
+        &score_update,
+        &true,
+        &true,
+        &ts_update,
+        &95,
+        &2,
+        &None,
     );
     let new_leaf = compute_leaf(&env, &wallets[2], &pair, score_update, ts_update);
     leaves[2] = new_leaf;
