@@ -55,6 +55,12 @@ pub const MAX_SERVICE_SIGNERS: u32 = 10;
 pub const MAX_ADMIN_SIGNERS: u32 = 5;
 pub const DEFAULT_STALENESS_WINDOW_SECS: u64 = 604_800;
 
+/// Default maximum age (seconds) of an oracle's last price update before the
+/// oracle is considered stale and `get_effective_score` falls back to
+/// unadjusted confidence.  Default: 1 hour, matching `FAILOVER_STALENESS_WINDOW`.
+/// Configurable via `set_oracle_staleness_threshold` / `get_oracle_staleness_threshold`.
+pub const DEFAULT_ORACLE_STALENESS_THRESHOLD_SECS: u64 = 3_600;
+
 /// Maximum age (seconds) of a secondary score for it to be accepted during
 /// failover. Secondary scores older than this window cause the gate to
 /// return `false` (fail-closed). Default: 1 hour.

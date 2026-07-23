@@ -631,6 +631,14 @@ pub enum DataKeyC {
 #[derive(Clone)]
 pub enum DataKeyD {
     RegisteredOracle(Symbol),
+    /// Timestamp (ledger seconds) of the last time the oracle for this asset
+    /// pair was consulted and its price was written back by `get_effective_score`.
+    /// Used by `is_oracle_stale` to detect feeds that have stopped updating.
+    OracleLastUpdated(Symbol),
+    /// Admin-configurable maximum age (seconds) for oracle price data before
+    /// `get_effective_score` treats the oracle as stale and falls back to
+    /// unadjusted confidence.  Defaults to `DEFAULT_ORACLE_STALENESS_THRESHOLD_SECS`.
+    OracleStalenessThreshold,
     EpochOpen,
     CurrentEpoch,
     SignerAccuracy(Address),

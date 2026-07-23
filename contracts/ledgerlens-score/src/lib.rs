@@ -74,6 +74,9 @@ mod test_interface;
 mod test_staleness;
 
 #[cfg(test)]
+mod test_oracle_staleness;
+
+#[cfg(test)]
 mod test_cooldown;
 
 // #[cfg(test)]
@@ -2036,27 +2039,47 @@ impl LedgerLensScoreContract {
             confirmed_score.score
         };
 
-        // ── Oracle confidence adjustment ───────────────────────────────────
-        // If an oracle is registered for this asset pair, retrieve the current
-        // price and reduce confidence proportionally when the price is
-        // extremely high (indicating elevated volatility risk). The adjustment
-        // is: confidence_floor = min(50, oracle_floor) where oracle_floor = 0
-        // for prices ≤ 0 (unavailable / invalid) and scales linearly from 0 to
-        // 50 as the price grows beyond a reference level of 1_000_000 units.
-        // This is intentionally conservative: scores survive intact; only the
-        // caller's confidence floor perception changes.
+        // ── Oracle confidence adjustment (issue #429 — staleness guard) ─────
+        // If an oracle is registered for this asset pair, first check whether
+        // its price data is fresh enough to trust.  A price older than the
+        // admin-configured oracle staleness threshold is treated as stale:
+        // `confidence_floor` is set to 0 (unadjusted) and an `orc_stale`
+        // event is emitted so callers can observe the fallback.
+        //
+        // When the oracle is fresh, `oracle_last_updated` is written to
+        // persistent instance storage so `is_oracle_stale` can be queried
+        // independently without needing to call the oracle again.
         let oracle_confidence_floor: u32 =
             if let Some(oracle_addr) = storage::get_registered_oracle(&env, &asset_pair) {
-                let price: i128 = env.invoke_contract(
-                    &oracle_addr,
-                    &soroban_sdk::symbol_short!("get_price"),
-                    soroban_sdk::Vec::from_array(&env, [asset_pair.to_val()]),
-                );
-                if price <= 0 {
+                let threshold = storage::get_oracle_staleness_threshold(&env);
+                let ledger_now = env.ledger().timestamp();
+                let last_updated = storage::get_oracle_last_updated(&env, &asset_pair)
+                    .unwrap_or(0u64);
+                // Stale check: if we have never recorded an update OR the last
+                // recorded update is older than the threshold, treat as stale.
+                // Note: on the very first call `last_updated` is 0 which always
+                // trips the stale guard.  The oracle's first successful read
+                // below will populate the timestamp for all subsequent calls.
+                let age = ledger_now.saturating_sub(last_updated);
+                if last_updated > 0 && age > threshold {
+                    // Oracle is stale — emit event and fall back.
+                    events::oracle_stale_fallback(&env, &asset_pair, last_updated, threshold);
                     0
                 } else {
-                    // floor rises 1 point per 20_000 units above zero, capped at 50.
-                    ((price / 20_000).min(50)) as u32
+                    let price: i128 = env.invoke_contract(
+                        &oracle_addr,
+                        &soroban_sdk::symbol_short!("get_price"),
+                        soroban_sdk::Vec::from_array(&env, [asset_pair.to_val()]),
+                    );
+                    // Record that the oracle was successfully consulted at
+                    // this ledger timestamp so is_oracle_stale stays current.
+                    storage::set_oracle_last_updated(&env, &asset_pair, ledger_now);
+                    if price <= 0 {
+                        0
+                    } else {
+                        // floor rises 1 point per 20_000 units above zero, capped at 50.
+                        ((price / 20_000).min(50)) as u32
+                    }
                 }
             } else {
                 0
@@ -10428,6 +10451,7 @@ impl LedgerLensScoreContract {
     }
 
     /// Admin-only. Removes the oracle registration for `asset_pair`.
+    /// Also clears the last-updated timestamp so stale metadata does not linger.
     pub fn remove_oracle(
         env: Env,
         admin_signers: Vec<Address>,
@@ -10438,6 +10462,7 @@ impl LedgerLensScoreContract {
         }
         Self::require_admin_auth(&env, &admin_signers)?;
         storage::remove_registered_oracle(&env, &asset_pair);
+        storage::remove_oracle_last_updated(&env, &asset_pair);
         events::oracle_removed(&env, &asset_pair);
         Ok(())
     }
@@ -10446,6 +10471,60 @@ impl LedgerLensScoreContract {
     /// `None` if none has been registered.
     pub fn get_registered_oracle(env: Env, asset_pair: Symbol) -> Option<Address> {
         storage::get_registered_oracle(&env, &asset_pair)
+    }
+
+    // ── Oracle staleness threshold (issue #429) ────────────────────────────────
+
+    /// Admin-only. Sets the maximum age (in seconds) of oracle price data before
+    /// `get_effective_score` falls back to unadjusted confidence.
+    ///
+    /// Must be > 0.  Defaults to `DEFAULT_ORACLE_STALENESS_THRESHOLD_SECS` (3 600 s).
+    /// Takes effect on the next `get_effective_score` call — no time-lock is
+    /// required because a too-short threshold only makes the contract more
+    /// conservative (it falls back rather than using stale data).
+    pub fn set_oracle_staleness_threshold(
+        env: Env,
+        admin_signers: Vec<Address>,
+        threshold_secs: u64,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        if threshold_secs == 0 {
+            return Err(Error::InvalidStalenessWindow);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+        storage::set_oracle_staleness_threshold(&env, threshold_secs);
+        events::oracle_staleness_threshold_updated(&env, threshold_secs);
+        Ok(())
+    }
+
+    /// Returns the current oracle staleness threshold in seconds.
+    /// Defaults to `DEFAULT_ORACLE_STALENESS_THRESHOLD_SECS` (3 600 s).
+    pub fn get_oracle_staleness_threshold(env: Env) -> u64 {
+        storage::get_oracle_staleness_threshold(&env)
+    }
+
+    /// Returns `true` if the oracle registered for `asset_pair` is considered
+    /// stale — i.e. the last recorded price consultation is older than the
+    /// current staleness threshold — or if no oracle consultation has ever been
+    /// recorded for this pair.
+    ///
+    /// Returns `false` when no oracle is registered for the pair (there is
+    /// nothing to be stale) or when the oracle is fresh.
+    pub fn is_oracle_stale(env: Env, asset_pair: Symbol) -> bool {
+        if storage::get_registered_oracle(&env, &asset_pair).is_none() {
+            return false;
+        }
+        let threshold = storage::get_oracle_staleness_threshold(&env);
+        let ledger_now = env.ledger().timestamp();
+        let last_updated = storage::get_oracle_last_updated(&env, &asset_pair)
+            .unwrap_or(0u64);
+        // Never-consulted (last_updated == 0) counts as stale.
+        if last_updated == 0 {
+            return true;
+        }
+        ledger_now.saturating_sub(last_updated) > threshold
     }
 }
 
