@@ -8,10 +8,33 @@ mod test;
 
 use ledgerlens_score::{AggregateRiskScore, Error as ScoreError, RiskScore};
 use soroban_sdk::{
-    contract, contractimpl, contracttype, symbol_short, vec, Address, Env, Symbol, Vec,
+    contract, contracterror, contractimpl, contracttype, symbol_short, vec, Address, Env, Symbol,
+    Vec,
 };
 
 pub const MAX_SHARDS: usize = 10;
+
+/// Errors surfaced directly by `LedgerLensAggregator`'s own bookkeeping
+/// (shard registry, admin gating). `query_risk_gate` itself is infallible —
+/// see its doc comment — and reports every failure case by returning `false`
+/// rather than one of these variants. Errors that originate from a specific
+/// shard's `ledgerlens-score` deployment (e.g. an incompatible interface) are
+/// reported as their own `ledgerlens_score::Error` (`ScoreError`) value
+/// instead of being wrapped here.
+#[contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[repr(u32)]
+pub enum Error {
+    AlreadyInitialized = 1,
+    NotInitialized = 2,
+    SelfReference = 3,
+    ShardAlreadyRegistered = 4,
+    ShardLimitReached = 5,
+    ShardNotRegistered = 6,
+    /// A candidate shard does not advertise every capability
+    /// `REQUIRED_SHARD_CAPABILITIES` requires.
+    IncompatibleInterface = 7,
+}
 
 /// Capabilities of the `ILedgerLensScore` interface (interface version 2, see
 /// `docs/interface-spec.md`) that this aggregator invokes on every registered
@@ -109,9 +132,9 @@ impl LedgerLensAggregator {
         false
     }
 
-    pub fn add_shard(env: Env, shard: Address) -> Result<(), ScoreError> {
+    pub fn add_shard(env: Env, shard: Address) -> Result<(), Error> {
         let admin: Address =
-            env.storage().instance().get(&DataKey::Admin).ok_or(ScoreError::NotInitialized)?;
+            env.storage().instance().get(&DataKey::Admin).ok_or(Error::NotInitialized)?;
         admin.require_auth();
         if env.current_contract_address() == shard {
             return Err(Error::SelfReference);
@@ -128,16 +151,16 @@ impl LedgerLensAggregator {
             return Err(Error::ShardLimitReached);
         }
         if !shard_supports_required_interface(&env, &shard) {
-            return Err(ScoreError::IncompatibleInterface);
+            return Err(Error::IncompatibleInterface);
         }
         shards.push_back(shard);
         env.storage().instance().set(&DataKey::Shards, &shards);
         Ok(())
     }
 
-    pub fn remove_shard(env: Env, shard: Address) -> Result<(), ScoreError> {
+    pub fn remove_shard(env: Env, shard: Address) -> Result<(), Error> {
         let admin: Address =
-            env.storage().instance().get(&DataKey::Admin).ok_or(ScoreError::NotInitialized)?;
+            env.storage().instance().get(&DataKey::Admin).ok_or(Error::NotInitialized)?;
         admin.require_auth();
         let shards: Vec<Address> =
             env.storage().instance().get(&DataKey::Shards).unwrap_or_else(|| Vec::new(&env));
@@ -163,6 +186,13 @@ impl LedgerLensAggregator {
         env.storage().instance().get(&DataKey::Shards).unwrap_or_else(|| Vec::new(&env))
     }
 
+    /// Infallible, side-effect-free (beyond recording `LastShardFailure`) gate
+    /// check, mirroring `ledgerlens-score`'s own `query_risk_gate`: every
+    /// registered, healthy shard must agree the wallet clears `gate_threshold`
+    /// (an AND across shards), and any shard that is unhealthy is skipped, but
+    /// a shard whose cross-contract call itself fails (unreachable contract,
+    /// trap, etc.) fails the *whole* query closed — see
+    /// `tests/composability/tests/aggregator_shard_pause.rs` (issue #411).
     pub fn query_risk_gate(
         env: Env,
         wallet: Address,
@@ -172,7 +202,7 @@ impl LedgerLensAggregator {
         let shards: Vec<Address> =
             env.storage().instance().get(&DataKey::Shards).unwrap_or_else(|| Vec::new(&env));
         if shards.is_empty() {
-            return Err(Error::NoShards);
+            return false;
         }
         for i in 0..shards.len() {
             let shard = shards.get(i).unwrap();
@@ -182,7 +212,7 @@ impl LedgerLensAggregator {
             let client = ledgerlens_score::LedgerLensScoreContractClient::new(&env, &shard);
             match client.try_query_risk_gate(&wallet, &asset_pair, &gate_threshold) {
                 Ok(Ok(true)) => {}
-                Ok(Ok(false)) => return Ok(false),
+                Ok(Ok(false)) => return false,
                 _ => {
                     env.storage()
                         .instance()
@@ -191,7 +221,7 @@ impl LedgerLensAggregator {
                 }
             }
         }
-        Ok(true)
+        true
     }
 
     pub fn get_score(
@@ -229,7 +259,7 @@ impl LedgerLensAggregator {
                 }
             }
         }
-        best.ok_or(Error::ScoreNotFound)
+        best.ok_or(ScoreError::ScoreNotFound)
     }
 
     pub fn get_aggregate_score(
@@ -266,7 +296,7 @@ impl LedgerLensAggregator {
                 }
             }
         }
-        best.ok_or(Error::ScoreNotFound)
+        best.ok_or(ScoreError::ScoreNotFound)
     }
 
     pub fn supports_interface(env: Env, capability: Symbol) -> bool {
@@ -345,14 +375,11 @@ fn is_shard_healthy(env: &Env, shard: &Address) -> bool {
     env.storage().instance().get(&DataKey::ShardHealth(shard.clone())).unwrap_or(true)
 }
 
-fn is_shard_healthy(env: &Env, shard: &Address) -> bool {
-    env.storage().instance().get(&DataKey::ShardHealth(shard.clone())).unwrap_or(true)
-}
-
 #[contracttype]
 #[derive(Clone)]
 enum DataKey {
     Admin,
     Shards,
     LastShardFailure,
+    ShardHealth(Address),
 }
