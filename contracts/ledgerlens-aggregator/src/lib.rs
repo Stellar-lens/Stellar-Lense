@@ -214,8 +214,10 @@ impl LedgerLensAggregator {
                 Ok(Ok(true)) => {}
                 Ok(Ok(false)) => return false,
                 _ => {
-                    env.storage().instance().set(&DataKey::LastShardFailure, &(shard.clone(), 0u32));
-                    return false;
+                    env.storage()
+                        .instance()
+                        .set(&DataKey::LastShardFailure, &(shard.clone(), 0u32));
+                    return Err(Error::ShardFailure);
                 }
             }
         }
@@ -237,21 +239,23 @@ impl LedgerLensAggregator {
             }
             let client = ledgerlens_score::LedgerLensScoreContractClient::new(&env, &shard);
             match client.try_get_score(&wallet, &asset_pair) {
-                Ok(Ok(score)) => {
-                    match &best {
-                        None => best = Some(score),
-                        Some(b) => {
-                            if score.score > b.score {
-                                best = Some(score);
-                            }
+                Ok(Ok(score)) => match &best {
+                    None => best = Some(score),
+                    Some(b) => {
+                        if score.score > b.score {
+                            best = Some(score);
                         }
                     }
-                }
+                },
                 Ok(Err(_conv_err)) => {
-                    env.storage().instance().set(&DataKey::LastShardFailure, &(shard.clone(), 1u32));
+                    env.storage()
+                        .instance()
+                        .set(&DataKey::LastShardFailure, &(shard.clone(), 1u32));
                 }
                 Err(_) => {
-                    env.storage().instance().set(&DataKey::LastShardFailure, &(shard.clone(), 0u32));
+                    env.storage()
+                        .instance()
+                        .set(&DataKey::LastShardFailure, &(shard.clone(), 0u32));
                 }
             }
         }
@@ -272,21 +276,23 @@ impl LedgerLensAggregator {
             }
             let client = ledgerlens_score::LedgerLensScoreContractClient::new(&env, &shard);
             match client.try_get_aggregate_score(&wallet) {
-                Ok(Ok(agg)) => {
-                    match &best {
-                        None => best = Some(agg),
-                        Some(b) => {
-                            if agg.aggregate_score > b.aggregate_score {
-                                best = Some(agg);
-                            }
+                Ok(Ok(agg)) => match &best {
+                    None => best = Some(agg),
+                    Some(b) => {
+                        if agg.aggregate_score > b.aggregate_score {
+                            best = Some(agg);
                         }
                     }
-                }
+                },
                 Ok(Err(_conv_err)) => {
-                    env.storage().instance().set(&DataKey::LastShardFailure, &(shard.clone(), 1u32));
+                    env.storage()
+                        .instance()
+                        .set(&DataKey::LastShardFailure, &(shard.clone(), 1u32));
                 }
                 Err(_) => {
-                    env.storage().instance().set(&DataKey::LastShardFailure, &(shard.clone(), 0u32));
+                    env.storage()
+                        .instance()
+                        .set(&DataKey::LastShardFailure, &(shard.clone(), 0u32));
                 }
             }
         }
@@ -351,7 +357,9 @@ impl LedgerLensAggregator {
                     }
                 }
                 _ => {
-                    env.storage().instance().set(&DataKey::LastShardFailure, &(shard.clone(), 0u32));
+                    env.storage()
+                        .instance()
+                        .set(&DataKey::LastShardFailure, &(shard.clone(), 0u32));
                 }
             }
         }

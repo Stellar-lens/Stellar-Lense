@@ -64,11 +64,11 @@ fn setup<'a>() -> Fixture<'a> {
             &Vec::new(&env),
             &wallet,
             &pair,
-            &10u32,  // well under GATE_THRESHOLD
+            &10u32, // well under GATE_THRESHOLD
             &false,
             &false,
             &env.ledger().timestamp(),
-            &90u32,  // comfortably above any confidence floor
+            &90u32, // comfortably above any confidence floor
             &1u32,
             &None,
         );

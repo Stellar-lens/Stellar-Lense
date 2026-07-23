@@ -34,7 +34,12 @@ fn setup(env: &Env) -> (LedgerLensScoreContractClient<'_>, Symbol) {
 
 /// Populates `size` tracked entries, then measures the CPU/memory cost of a
 /// single `get_expiring_entries` sweep over that index.
-fn sweep_cost(env: &Env, client: &LedgerLensScoreContractClient, asset_pair: &Symbol, size: u32) -> (u64, u64) {
+fn sweep_cost(
+    env: &Env,
+    client: &LedgerLensScoreContractClient,
+    asset_pair: &Symbol,
+    size: u32,
+) -> (u64, u64) {
     for i in 0..size {
         let wallet = Address::generate(env);
         client.submit_score(

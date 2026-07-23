@@ -1134,7 +1134,12 @@ impl LedgerLensScoreContract {
                             commitment: None,
                         };
                         storage::set_score(&env, &sub.wallet, &sub.asset_pair, &risk_score);
-                        storage::push_score_history(&env, &sub.wallet, &sub.asset_pair, &risk_score);
+                        storage::push_score_history(
+                            &env,
+                            &sub.wallet,
+                            &sub.asset_pair,
+                            &risk_score,
+                        );
                         storage::register_pair_for_wallet(&env, &sub.wallet, &sub.asset_pair);
                         storage::increment_score_count(&env, &sub.wallet, &sub.asset_pair);
                         // Increment per-pair submission counter (Issue 1).
@@ -1152,7 +1157,12 @@ impl LedgerLensScoreContract {
                         );
                         storage::update_histogram_on_write(&env, previous_score, sub.score);
                         Self::refresh_aggregate_cache(&env, &sub.wallet);
-                        Self::update_verkle_commitment(&env, &sub.wallet, &sub.asset_pair, &risk_score);
+                        Self::update_verkle_commitment(
+                            &env,
+                            &sub.wallet,
+                            &sub.asset_pair,
+                            &risk_score,
+                        );
 
                         if sub.score >= threshold {
                             events::threshold_breached(
@@ -8491,8 +8501,8 @@ impl LedgerLensScoreContract {
         }
         Self::require_admin_auth(&env, &admin_signers)?;
 
-        let status = storage::get_model_version_status(&env, version)
-            .ok_or(Error::ScoreNotFound)?;
+        let status =
+            storage::get_model_version_status(&env, version).ok_or(Error::ScoreNotFound)?;
 
         match status {
             ModelVersionStatus::Proposed => {
@@ -8559,8 +8569,8 @@ impl LedgerLensScoreContract {
             return Err(Error::NotInitialized);
         }
         Self::require_admin_auth(&env, &admin_signers)?;
-        let status = storage::get_model_version_status(&env, version)
-            .ok_or(Error::ScoreNotFound)?;
+        let status =
+            storage::get_model_version_status(&env, version).ok_or(Error::ScoreNotFound)?;
 
         if status == ModelVersionStatus::Deprecated {
             return Err(Error::AlreadyInitialized);
