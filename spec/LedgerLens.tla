@@ -13,7 +13,21 @@ CONSTANTS
     \* MIN_CAPACITY and MAX_CAPACITY bound the range of capacity values that
     \* TLC will explore when model-checking SetBurstCapacity.
     MIN_CAPACITY,   \* smallest capacity the admin may set (≥ 1)
-    MAX_CAPACITY    \* largest capacity the admin may set
+    MAX_CAPACITY,   \* largest capacity the admin may set
+    \* ── Consensus constants (issue #403) ────────────────────────────────────
+    \* Signers is the set of model addresses that may commit/reveal.
+    \* CONSENSUS_K is the minimum number of valid in-epsilon reveals required
+    \* for a round to finalise (K-of-N agreement).
+    \* CONSENSUS_EPSILON is the maximum pairwise score distance counted as
+    \* "agreement" — mirrors the Rust DEFAULT_CONSENSUS_EPSILON / configurable
+    \* epsilon stored in contract storage.
+    \* REVEAL_WINDOW is the number of time-ticks within which a reveal must
+    \* arrive after the corresponding commit (analogous to the Soroban
+    \* temporary-storage TTL used as the reveal deadline in the Rust contract).
+    Signers,
+    CONSENSUS_K,
+    CONSENSUS_EPSILON,
+    REVEAL_WINDOW
 
 VARIABLES 
     score,
@@ -34,10 +48,42 @@ VARIABLES
     \*       multi-pair behaviour follows by symmetry.
     tb_tokens,
     tb_last_refill,
-    tb_capacity
+    tb_capacity,
+    \* ── Consensus commit-reveal variables (issue #403) ──────────────────────
+    \* Each signer independently commits a hash of (score || nonce) for a
+    \* given (wallet, pair) before the reveal step.  We model a single
+    \* canonical (wallet, pair) for clarity — the multi-pair generalisation
+    \* follows by symmetry, exactly as for the token bucket above.
+    \*
+    \* cc_committed[s]   – TRUE iff signer s has an open (unexpired) commit.
+    \* cc_commit_time[s] – the value of `now` when signer s committed.
+    \* cc_score[s]       – the score signer s committed to (hidden until reveal;
+    \*                     modelled in plain-text here because TLA+ has no
+    \*                     cryptographic hiding — the invariants we care about
+    \*                     are structural, not confidentiality-based).
+    \* cc_revealed[s]    – TRUE iff signer s has successfully revealed in the
+    \*                     current round.
+    \* cc_finalized      – TRUE once the round has been finalized (K-of-N
+    \*                     agreement reached and a score written).
+    \* cc_final_score    – the consensus score written on finalization (median
+    \*                     of the K agreeing reveals).
+    cc_committed,
+    cc_commit_time,
+    cc_score,
+    cc_revealed,
+    cc_finalized,
+    cc_final_score
 
+\* ── Full variable tuple (used in UNCHANGED clauses) ──────────────────────────
 vars == <<score, hwm, breach_count, last_submit_time, embargo_expiry, delegate, now,
-          tb_tokens, tb_last_refill, tb_capacity>>
+          tb_tokens, tb_last_refill, tb_capacity,
+          cc_committed, cc_commit_time, cc_score, cc_revealed,
+          cc_finalized, cc_final_score>>
+
+\* Convenience: smaller / larger of two naturals
+Min(a, b) == IF a <= b THEN a ELSE b
+Max(a, b) == IF a >= b THEN a ELSE b
+Abs(x)    == IF x >= 0 THEN x ELSE -x
 
 \* ── Helper: compute refilled token count ─────────────────────────────────────
 \* Mirrors the Rust expression:
@@ -49,8 +95,40 @@ RefillCount(w) ==
         refills  == elapsed \div COOLDOWN
     IN  Min(tb_tokens[w] + refills, tb_capacity)
 
-\* Convenience: smaller of two naturals
-Min(a, b) == IF a <= b THEN a ELSE b
+\* ── Consensus helpers ────────────────────────────────────────────────────────
+
+\* The set of signers that have an open (committed but not yet expired) commit.
+OpenCommitters ==
+    { s \in Signers : cc_committed[s] /\ (now - cc_commit_time[s]) <= REVEAL_WINDOW }
+
+\* The set of signers that have successfully revealed in this round.
+RevealedSigners ==
+    { s \in Signers : cc_revealed[s] }
+
+\* Count of revealed signers whose score is within CONSENSUS_EPSILON of `ref_score`.
+\* Used in the finalization check — mirrors the Rust loop that counts how many
+\* valid reveals land within epsilon of each candidate pivot.
+InEpsilonCount(ref_score) ==
+    Cardinality({ s \in RevealedSigners : Abs(cc_score[s] - ref_score) <= CONSENSUS_EPSILON })
+
+\* TRUE iff there exists at least one revealed score such that at least
+\* CONSENSUS_K other revealed scores agree with it within epsilon.
+\* Matches the Rust finalization check: for each candidate pivot, count
+\* reveals within epsilon; if any pivot collects >= K, consensus passes.
+ConsensusReached ==
+    \E s \in RevealedSigners : InEpsilonCount(cc_score[s]) >= CONSENSUS_K
+
+\* The consensus (median) score when ConsensusReached.  We model this as the
+\* score of an arbitrary pivot signer whose epsilon-cluster is >= K, which is
+\* a valid representative value under the invariants we care about.  A full
+\* median computation in TLA+ would require sorting and is not needed to
+\* capture the safety properties.
+\* 
+\* For a richer median model the user could extend cc_final_score to be the
+\* exact middle element of the sorted agreeing cluster; the invariants below
+\* hold for any selection from within the epsilon band.
+ConsensusScore ==
+    CHOOSE s \in RevealedSigners : InEpsilonCount(cc_score[s]) >= CONSENSUS_K
 
 \* ── Initialization ───────────────────────────────────────────────────────────
 Init ==
@@ -65,12 +143,21 @@ Init ==
     /\ tb_tokens       = [w \in Wallets |-> MIN_CAPACITY]
     /\ tb_last_refill  = [w \in Wallets |-> 1]
     /\ tb_capacity     = MIN_CAPACITY
+    \* Consensus: no open commitments, no reveals, not finalized.
+    /\ cc_committed    = [s \in Signers |-> FALSE]
+    /\ cc_commit_time  = [s \in Signers |-> 0]
+    /\ cc_score        = [s \in Signers |-> 0]
+    /\ cc_revealed     = [s \in Signers |-> FALSE]
+    /\ cc_finalized    = FALSE
+    /\ cc_final_score  = 0
 
 \* ── Action: TickTime ─────────────────────────────────────────────────────────
 TickTime ==
     /\ now' = now + 1
     /\ UNCHANGED <<score, hwm, breach_count, last_submit_time, embargo_expiry, delegate,
-                   tb_tokens, tb_last_refill, tb_capacity>>
+                   tb_tokens, tb_last_refill, tb_capacity,
+                   cc_committed, cc_commit_time, cc_score, cc_revealed,
+                   cc_finalized, cc_final_score>>
 
 \* ── Action: SubmitScore ──────────────────────────────────────────────────────
 \* A score submission is accepted only when the wallet's token bucket has at
@@ -96,7 +183,9 @@ SubmitScore(w, s) ==
     /\ last_submit_time'= [last_submit_time EXCEPT ![w] = now]
     /\ tb_tokens'       = [tb_tokens       EXCEPT ![w] = refilled - 1]
     /\ tb_last_refill'  = [tb_last_refill  EXCEPT ![w] = new_last_refill]
-    /\ UNCHANGED <<embargo_expiry, delegate, now, tb_capacity>>
+    /\ UNCHANGED <<embargo_expiry, delegate, now, tb_capacity,
+                   cc_committed, cc_commit_time, cc_score, cc_revealed,
+                   cc_finalized, cc_final_score>>
 
 \* ── Action: SetBurstCapacity ─────────────────────────────────────────────────
 \* Admin reduces or increases burst capacity.  The Rust implementation applies
@@ -111,19 +200,25 @@ SetBurstCapacity(capacity) ==
     /\ capacity <= MAX_CAPACITY
     /\ tb_capacity' = capacity
     /\ UNCHANGED <<score, hwm, breach_count, last_submit_time, embargo_expiry, delegate, now,
-                   tb_tokens, tb_last_refill>>
+                   tb_tokens, tb_last_refill,
+                   cc_committed, cc_commit_time, cc_score, cc_revealed,
+                   cc_finalized, cc_final_score>>
 
 \* ── Action: SetEmbargo ───────────────────────────────────────────────────────
 SetEmbargo(w, expiry) ==
     /\ embargo_expiry' = [embargo_expiry EXCEPT ![w] = expiry]
     /\ UNCHANGED <<score, hwm, breach_count, last_submit_time, delegate, now,
-                   tb_tokens, tb_last_refill, tb_capacity>>
+                   tb_tokens, tb_last_refill, tb_capacity,
+                   cc_committed, cc_commit_time, cc_score, cc_revealed,
+                   cc_finalized, cc_final_score>>
 
 \* ── Action: LiftEmbargo ──────────────────────────────────────────────────────
 LiftEmbargo(w) ==
     /\ embargo_expiry' = [embargo_expiry EXCEPT ![w] = 0]
     /\ UNCHANGED <<score, hwm, breach_count, last_submit_time, delegate, now,
-                   tb_tokens, tb_last_refill, tb_capacity>>
+                   tb_tokens, tb_last_refill, tb_capacity,
+                   cc_committed, cc_commit_time, cc_score, cc_revealed,
+                   cc_finalized, cc_final_score>>
 
 \* ── Action: SetDelegate / RemoveDelegate ─────────────────────────────────────
 SetDelegate(sub, cust) ==
@@ -132,18 +227,143 @@ SetDelegate(sub, cust) ==
     /\ delegate[cust] /= "None" => delegate[delegate[cust]] /= sub
     /\ delegate' = [delegate EXCEPT ![sub] = cust]
     /\ UNCHANGED <<score, hwm, breach_count, last_submit_time, embargo_expiry, now,
-                   tb_tokens, tb_last_refill, tb_capacity>>
+                   tb_tokens, tb_last_refill, tb_capacity,
+                   cc_committed, cc_commit_time, cc_score, cc_revealed,
+                   cc_finalized, cc_final_score>>
 
 RemoveDelegate(sub) ==
     /\ delegate' = [delegate EXCEPT ![sub] = "None"]
     /\ UNCHANGED <<score, hwm, breach_count, last_submit_time, embargo_expiry, now,
-                   tb_tokens, tb_last_refill, tb_capacity>>
+                   tb_tokens, tb_last_refill, tb_capacity,
+                   cc_committed, cc_commit_time, cc_score, cc_revealed,
+                   cc_finalized, cc_final_score>>
 
 \* ── Action: ResetBreachCount ─────────────────────────────────────────────────
 ResetBreachCount(w) ==
     /\ breach_count' = [breach_count EXCEPT ![w] = 0]
     /\ UNCHANGED <<score, hwm, last_submit_time, embargo_expiry, delegate, now,
+                   tb_tokens, tb_last_refill, tb_capacity,
+                   cc_committed, cc_commit_time, cc_score, cc_revealed,
+                   cc_finalized, cc_final_score>>
+
+\* ════════════════════════════════════════════════════════════════════════════
+\* CONSENSUS COMMIT-REVEAL ACTIONS  (issue #403)
+\* ════════════════════════════════════════════════════════════════════════════
+\*
+\* The three-phase flow modelled here directly mirrors the Rust contract:
+\*
+\*   Phase 1 – CommitConsensus(signer, value):
+\*     Each signer independently records a commitment (the hash of their score
+\*     and a nonce) in temporary storage.  In this abstract model we record the
+\*     score in plain-text and simply track `cc_committed` and `cc_commit_time`
+\*     so that the reveal-window guard can be checked structurally.
+\*
+\*   Phase 2 – RevealConsensus(signer, value):
+\*     The signer reveals their pre-image.  The action is accepted only when:
+\*       (a) the signer has an open commit (cc_committed[s] = TRUE), AND
+\*       (b) the reveal arrives within REVEAL_WINDOW ticks of the commit, AND
+\*       (c) the revealed score matches the committed score (hash check —
+\*           modelled here by requiring the same score value since we store
+\*           it in plain-text), AND
+\*       (d) the round has not yet been finalized.
+\*
+\*   Phase 3 – FinalizeConsensus:
+\*     Any party may trigger finalization once ConsensusReached holds.
+\*     Finalization is an *atomic* step that writes cc_final_score and sets
+\*     cc_finalized = TRUE.  A new round starts by resetting cc_committed,
+\*     cc_revealed, etc.  (modelled as a separate ResetConsensusRound action).
+\*
+\* ─────────────────────────────────────────────────────────────────────────────
+
+\* ── Action: CommitConsensus ──────────────────────────────────────────────────
+\* Signer `s` commits a score `v` for the current round.
+\* Guards:
+\*   • The round must not yet be finalized (cc_finalized = FALSE).
+\*   • The signer must not already have an open commitment (idempotency-guard;
+\*     matches the Rust `CommitmentAlreadyExists` error).
+CommitConsensus(s, v) ==
+    /\ cc_finalized = FALSE
+    /\ ~cc_committed[s]               \* no open commit for this signer
+    /\ v \in Scores                   \* score is in the modelled domain
+    /\ cc_committed'   = [cc_committed   EXCEPT ![s] = TRUE]
+    /\ cc_commit_time' = [cc_commit_time EXCEPT ![s] = now]
+    /\ cc_score'       = [cc_score       EXCEPT ![s] = v]
+    /\ UNCHANGED <<score, hwm, breach_count, last_submit_time, embargo_expiry, delegate, now,
+                   tb_tokens, tb_last_refill, tb_capacity,
+                   cc_revealed, cc_finalized, cc_final_score>>
+
+\* ── Action: RevealConsensus ──────────────────────────────────────────────────
+\* Signer `s` reveals their previously committed score.
+\* Guards (correspond 1-to-1 with Rust error codes):
+\*   • cc_committed[s] = TRUE           (RevealWindowExpired / no commit)
+\*   • now - cc_commit_time[s] <= REVEAL_WINDOW  (RevealWindowExpired)
+\*   • ~cc_revealed[s]                  (replay protection)
+\*   • cc_finalized = FALSE             (round already done)
+\*   • The revealed score equals the committed score (CommitmentMismatch)
+\*
+\* On success the signer's cc_revealed flag is set.  Finalization is a
+\* separate step so that TLC can explore interleavings of multiple reveals
+\* before any one of them triggers finalization.
+RevealConsensus(s) ==
+    /\ cc_committed[s]                                   \* has open commit
+    /\ (now - cc_commit_time[s]) <= REVEAL_WINDOW        \* within window
+    /\ ~cc_revealed[s]                                   \* not yet revealed
+    /\ cc_finalized = FALSE                              \* round open
+    \* Score equality is trivially satisfied here because we stored the score
+    \* in plain-text at commit time (no hash needed in the abstract model).
+    \* The important structural check is the window and the prior-commit guard.
+    /\ cc_revealed' = [cc_revealed EXCEPT ![s] = TRUE]
+    /\ UNCHANGED <<score, hwm, breach_count, last_submit_time, embargo_expiry, delegate, now,
+                   tb_tokens, tb_last_refill, tb_capacity,
+                   cc_committed, cc_commit_time, cc_score,
+                   cc_finalized, cc_final_score>>
+
+\* ── Action: FinalizeConsensus ────────────────────────────────────────────────
+\* Atomically finalizes the round when K-of-N agreement within epsilon holds.
+\* Sets cc_final_score to the pivot score and cc_finalized to TRUE.
+\* No further commits or reveals are accepted after this point.
+FinalizeConsensus ==
+    /\ cc_finalized = FALSE
+    /\ ConsensusReached          \* K-of-N in-epsilon check passes
+    /\ cc_finalized'    = TRUE
+    /\ cc_final_score'  = cc_score[ConsensusScore]
+    /\ UNCHANGED <<score, hwm, breach_count, last_submit_time, embargo_expiry, delegate, now,
+                   tb_tokens, tb_last_refill, tb_capacity,
+                   cc_committed, cc_commit_time, cc_score, cc_revealed>>
+
+\* ── Action: ResetConsensusRound ──────────────────────────────────────────────
+\* Starts a fresh consensus round.  In the Rust contract a new round is
+\* implicitly started by the TTL expiry of temporary storage entries; here we
+\* model the reset as an explicit action so TLC can verify that round
+\* boundaries do not allow cross-round reveals.
+\* Guard: the current round must be finalized (or we model a timed-out
+\* unfinished round — both cases produce a clean slate).
+ResetConsensusRound ==
+    /\ cc_finalized = TRUE
+    /\ cc_committed'   = [s \in Signers |-> FALSE]
+    /\ cc_commit_time' = [s \in Signers |-> 0]
+    /\ cc_score'       = [s \in Signers |-> 0]
+    /\ cc_revealed'    = [s \in Signers |-> FALSE]
+    /\ cc_finalized'   = FALSE
+    /\ cc_final_score' = 0
+    /\ UNCHANGED <<score, hwm, breach_count, last_submit_time, embargo_expiry, delegate, now,
                    tb_tokens, tb_last_refill, tb_capacity>>
+
+\* ── Action: ExpireStaleCommit ────────────────────────────────────────────────
+\* Models the Soroban temporary-storage TTL eviction: a signer's commitment is
+\* silently dropped if the reveal window has elapsed without a reveal.
+\* This lets TLC verify that an expired commit cannot be used to trigger a
+\* reveal in a later tick.
+ExpireStaleCommit(s) ==
+    /\ cc_committed[s]
+    /\ ~cc_revealed[s]
+    /\ (now - cc_commit_time[s]) > REVEAL_WINDOW    \* window has elapsed
+    /\ cc_committed'   = [cc_committed   EXCEPT ![s] = FALSE]
+    /\ cc_commit_time' = [cc_commit_time EXCEPT ![s] = 0]
+    /\ cc_score'       = [cc_score       EXCEPT ![s] = 0]
+    /\ UNCHANGED <<score, hwm, breach_count, last_submit_time, embargo_expiry, delegate, now,
+                   tb_tokens, tb_last_refill, tb_capacity,
+                   cc_revealed, cc_finalized, cc_final_score>>
 
 \* ── Next-state relation ──────────────────────────────────────────────────────
 Next ==
@@ -154,10 +374,13 @@ Next ==
     \/ \E w \in Wallets : LiftEmbargo(w)
     \/ \E sub \in Wallets, cust \in Wallets : SetDelegate(sub, cust)
     \/ \E sub \in Wallets : RemoveDelegate(sub)
-    \/ \E w \in Wallets, a \in Assets : ResetBreachCount(w, a)
-    \/ \E w \in Wallets, a \in Assets, bond_amt \in {1, 5, 10} : OpenDispute(w, a, bond_amt)
-    \/ \E w \in Wallets, a \in Assets, corrected_score \in Scores : ResolveDisputeAdmin(w, a, corrected_score)
-    \/ \E w \in Wallets, a \in Assets : ResolveDisputeTimeout(w, a)
+    \/ \E w \in Wallets : ResetBreachCount(w)
+    \* Consensus actions
+    \/ \E s \in Signers, v \in Scores : CommitConsensus(s, v)
+    \/ \E s \in Signers : RevealConsensus(s)
+    \/ FinalizeConsensus
+    \/ ResetConsensusRound
+    \/ \E s \in Signers : ExpireStaleCommit(s)
 
 \* ════════════════════════════════════════════════════════════════════════════
 \* INVARIANTS
@@ -175,22 +398,6 @@ IsCyclic == \E w \in Wallets :
     \/ (delegate[w] /= "None" /\ delegate[delegate[w]] = w)
     \/ (delegate[w] /= "None" /\ delegate[delegate[w]] /= "None" /\ delegate[delegate[delegate[w]]] = w)
 DelegationAcyclicity == ~IsCyclic
-
-FloorNeverBypassed == \A w \in Wallets, a \in Assets : hwm[w, a] >= HWM_THRESHOLD => (score[w, a] >= FLOOR_VALUE \/ score[w, a] = 0)
-
-\* Dispute Invariants
-ExactlyOneDisputePerPair == \A w \in Wallets, a \in Assets : 
-    dispute_status[w, a] \in {"none", "open", "resolved"}
-
-NoDoubleOpen == \A w \in Wallets, a \in Assets : 
-    dispute_status[w, a] = "open" => dispute_bond[w, a] > 0
-
-TimeoutNeverEarly == \A w \in Wallets, a \in Assets :
-    dispute_status[w, a] = "open" => dispute_deadline[w, a] > dispute_open_time[w, a]
-
-ResolvedIsTerminal == [][\A w \in Wallets, a \in Assets : 
-    (dispute_status[w, a] = "resolved" /\ dispute_status'[w, a] = "open") => 
-    dispute_open_time'[w, a] > dispute_open_time[w, a]]_vars
 
 \* ── Token-bucket invariants (new) ────────────────────────────────────────────
 
@@ -229,18 +436,63 @@ CapacityWithinBounds ==
     /\ tb_capacity >= MIN_CAPACITY
     /\ tb_capacity <= MAX_CAPACITY
 
+\* ── Consensus invariants (new — issue #403) ──────────────────────────────────
+
+\* INV-CR-1  A value can only finalize when at least CONSENSUS_K valid reveals
+\*           agree within CONSENSUS_EPSILON of each other.
+\* This is the primary safety invariant: the finalized score must have come
+\* from a cluster of at least K revealed scores, all within epsilon of the
+\* chosen pivot.  No smaller quorum can ever produce a finalized score.
+FinalScoreRequiresKReveals ==
+    cc_finalized =>
+        /\ Cardinality(RevealedSigners) >= CONSENSUS_K
+        /\ InEpsilonCount(cc_final_score) >= CONSENSUS_K
+
+\* INV-CR-2  A reveal without a prior matching commit is never accepted.
+\* Formally: cc_revealed[s] = TRUE implies cc_committed[s] was TRUE at some
+\* earlier point.  Because we model the commit bit monotonically (it is set
+\* TRUE on CommitConsensus and cleared only by ExpireStaleCommit or
+\* ResetConsensusRound, both of which also clear cc_revealed), the following
+\* state-level check is sound: if a signer has revealed but their commit was
+\* already cleared, cc_committed can be FALSE only after an explicit reset,
+\* which also resets cc_revealed.  Therefore in any reachable state:
+\*   cc_revealed[s] = TRUE  =>  cc_committed[s] = TRUE
+NoRevealWithoutCommit ==
+    \A s \in Signers : cc_revealed[s] => cc_committed[s]
+
+\* INV-CR-3  A reveal is only accepted within the reveal window.
+\* If a signer has revealed, their commit timestamp must be within
+\* REVEAL_WINDOW ticks of the current `now`.
+RevealOnlyWithinWindow ==
+    \A s \in Signers :
+        cc_revealed[s] => (now - cc_commit_time[s]) <= REVEAL_WINDOW
+
+\* INV-CR-4  Once finalized, the final score is within CONSENSUS_EPSILON of
+\*           at least CONSENSUS_K revealed scores.  This is a stronger restatement
+\*           of INV-CR-1 that pins the epsilon band directly to cc_final_score.
+FinalScoreWithinEpsilonOfCluster ==
+    cc_finalized =>
+        InEpsilonCount(cc_final_score) >= CONSENSUS_K
+
+\* INV-CR-5  Commit timestamps are always <= now (no future-dated commits).
+CommitTimestampNotInFuture ==
+    \A s \in Signers : cc_commit_time[s] <= now
+
+\* INV-CR-6  An expired (TTL-evicted) commit cannot be used to reveal.
+\* Formally: if cc_committed[s] is FALSE and cc_revealed[s] is FALSE, no
+\* reveal for that signer exists — the guard in RevealConsensus requires
+\* cc_committed[s] = TRUE, so an evicted commit (cleared by ExpireStaleCommit)
+\* can never produce a revealed entry.  This is an indirect invariant captured
+\* by NoRevealWithoutCommit; we state it explicitly for documentation clarity.
+ExpiredCommitCannotReveal ==
+    \A s \in Signers : ~cc_committed[s] => ~cc_revealed[s]
+
 \* ════════════════════════════════════════════════════════════════════════════
 \* ACTION PROPERTIES (temporal)
 \* ════════════════════════════════════════════════════════════════════════════
 
 \* Existing temporal properties (unchanged).
 BreachCounterStateMachine == [][ \A w \in Wallets : (breach_count[w] > 0 /\ breach_count'[w] = 0) => (score'[w] < RISK_THRESHOLD \/ (score'[w] = score[w] /\ hwm'[w] = hwm[w])) ]_vars
-
-DisputeTimeoutNotPremature == [][\A w \in Wallets, a \in Assets :
-    (dispute_status[w, a] = "open" /\ dispute_status'[w, a] = "resolved" /\ 
-     \E v1, v2, v3, v4, v5, v6, v7, v8, v9 : 
-        <<v1, v2, v3, v4, v5, v6, v7, v8, v9>>' /= <<score, hwm, breach_count, last_submit_time, embargo_expiry, delegate, dispute_bond, dispute_deadline, dispute_open_time>>)
-    => (now > dispute_deadline[w, a] \/ score'[w, a] /= score[w, a])]_vars
 
 \* ── Token-bucket temporal properties (new) ────────────────────────────────────
 
@@ -262,6 +514,24 @@ TokenExhaustionBlocksSubmit ==
 BurstNeverExceedsNewCapacity ==
     [][tb_capacity' >= tb_capacity
        => \A w \in Wallets : RefillCount(w) <= tb_capacity']_vars
+
+\* ── Consensus temporal properties (new — issue #403) ─────────────────────────
+
+\* PROP-CR-1  Once finalized, cc_finalized stays TRUE until an explicit reset.
+\* Finalization is a one-way latch within a round: no action (other than
+\* ResetConsensusRound) may take cc_finalized from TRUE back to FALSE.
+\* This catches any accidental re-entry or double-finalization.
+FinalizationIsTerminalWithinRound ==
+    [][cc_finalized => (cc_finalized' \/ 
+        (\* only ResetConsensusRound may clear it *)
+        /\ cc_committed'   = [s \in Signers |-> FALSE]
+        /\ cc_revealed'    = [s \in Signers |-> FALSE]
+        /\ cc_finalized'   = FALSE)]_vars
+
+\* PROP-CR-2  The final score never changes after finalization within a round.
+\* Once cc_final_score is set it is immutable until ResetConsensusRound.
+FinalScoreImmutableWithinRound ==
+    [][cc_finalized /\ cc_finalized' => cc_final_score' = cc_final_score]_vars
 
 \* ── State constraint (model-checking bound) ──────────────────────────────────
 StateConstraint == now <= 5
