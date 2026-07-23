@@ -99,19 +99,18 @@ fn try_open_dispute(
 
 /// Seeds a score for `(challenger, pair)` so there is something to dispute.
 fn seed_score(f: &Fixture, score: u32) {
-    f.client
-        .submit_score(
-            &Vec::new(&f.env),
-            &f.challenger,
-            &f.pair,
-            &score,
-            &false,
-            &false,
-            &1,
-            &90,
-            &1,
-            &None,
-        );
+    f.client.submit_score(
+        &Vec::new(&f.env),
+        &f.challenger,
+        &f.pair,
+        &score,
+        &false,
+        &false,
+        &1,
+        &90,
+        &1,
+        &None,
+    );
 }
 
 // ── open_score_dispute ──────────────────────────────────────────────────────
@@ -175,8 +174,10 @@ fn test_open_dispute_fee_token_not_set() {
     let mut commit_bytes = Bytes::new(&env);
     commit_bytes.extend_from_slice(&10_000i128.to_le_bytes());
     commit_bytes.extend_from_slice(&[1u8; 16]);
-    let _ = client.try_commit_dispute_bond(&wallet, &wallet, &symbol_short!("XLM_USDC"), &commit_bytes);
-    let res = client.try_open_score_dispute(&wallet, &wallet, &symbol_short!("XLM_USDC"), &10_000, &salt);
+    let _ =
+        client.try_commit_dispute_bond(&wallet, &wallet, &symbol_short!("XLM_USDC"), &commit_bytes);
+    let res =
+        client.try_open_score_dispute(&wallet, &wallet, &symbol_short!("XLM_USDC"), &10_000, &salt);
     assert_eq!(res, Err(Ok(Error::FeeTokenNotSet)));
 }
 
