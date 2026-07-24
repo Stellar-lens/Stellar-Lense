@@ -93,7 +93,7 @@ jobs:
           toolchain: "1.88.0"
       - uses: Swatinem/rust-cache@v2
       - name: Install cargo-audit
-        run: cargo install cargo-audit --version 0.22.2 --locked
+        run: cargo +1.88.0 install cargo-audit --version 0.22.2 --locked
       - name: Run security audit
         # RUSTSEC-2026-0009 affects time's RFC parsing. time is only pulled in
         # through serde_with -> stellar-xdr; the contract does not invoke that
@@ -101,7 +101,7 @@ jobs:
         # be parsed by the Rust 1.81 toolchain required for deployable Soroban
         # WASM. Keep this exception narrow and remove it when Soroban permits a
         # newer release toolchain.
-        run: cargo audit --ignore RUSTSEC-2026-0009
+        run: cargo +1.88.0 audit --ignore RUSTSEC-2026-0009
 
   # ── Reproducible-build verification ─────────────────────────────────────────
   #
