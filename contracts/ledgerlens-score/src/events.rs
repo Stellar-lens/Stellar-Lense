@@ -392,3 +392,36 @@ pub fn embargo_set(env: &Env, wallet: &Address, expiry: Option<u64>) {
 pub fn embargo_lifted(env: &Env, wallet: &Address) {
     env.events().publish((symbol_short!("emb_lift"), wallet.clone()), ());
 }
+
+pub fn escalation_triggered(
+    env: &Env,
+    wallet: &Address,
+    asset_pair: &Symbol,
+    breach_count: u32,
+    score: u32,
+    escalation_threshold: u32,
+) {
+    env.events().publish(
+        (symbol_short!("esc_trig"), wallet.clone(), asset_pair.clone()),
+        (breach_count, score, escalation_threshold),
+    );
+}
+
+pub fn escalation_resolved(
+    env: &Env,
+    wallet: &Address,
+    asset_pair: &Symbol,
+    breach_count: u32,
+    score: u32,
+) {
+    env.events().publish(
+        (symbol_short!("esc_res"), wallet.clone(), asset_pair.clone()),
+        (breach_count, score),
+    );
+}
+
+
+
+pub fn escalation_threshold_updated(env: &Env, old_threshold: u32, new_threshold: u32) {
+    env.events().publish((symbol_short!("esc_thr"),), (old_threshold, new_threshold));
+}

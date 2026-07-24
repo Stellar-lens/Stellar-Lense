@@ -420,6 +420,12 @@ pub enum DataKey {
     /// Maximum allowed score deviation from the provisional median when
     /// building the consensus set.
     ConsensusEpsilon,
+    /// Admin-configured number of consecutive high-risk submissions before
+    /// the auto-escalation event fires. Defaults to DEFAULT_ESCALATION_THRESHOLD.
+    EscalationThreshold,
+    /// Per-(wallet, asset_pair) count of consecutive submissions that met or
+    /// exceeded the risk threshold. Reset to 0 on the first non-breaching submission.
+    BreachCount(Address, Symbol),
 }
 
 #[contracttype]
@@ -427,3 +433,4 @@ pub enum DataKey {
 pub struct TierBounds {
     pub min_score: u32,
     pub max_score: u32,
+}

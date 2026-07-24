@@ -195,3 +195,5 @@ pub const DEFAULT_CONSENSUS_THRESHOLD_K: u32 = 2;
 
 /// Default maximum allowed absolute deviation from the provisional median.
 pub const DEFAULT_CONSENSUS_EPSILON: u32 = 5;
+
+pub const DEFAULT_ESCALATION_THRESHOLD: u32 = 5;
