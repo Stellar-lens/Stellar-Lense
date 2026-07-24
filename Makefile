@@ -1,5 +1,5 @@
-.PHONY: install lint format test run scale-workers mutation-test
-.PHONY: install lint format test run typecheck mutation-test
+.PHONY: install lint format test run scale-workers mutation-test threshold-sweep
+.PHONY: install lint format test run typecheck mutation-test threshold-sweep
 
 VENV_BIN := $(abspath .venv/bin)
 ifeq ($(wildcard $(VENV_BIN)/python),)
@@ -81,3 +81,20 @@ mutation-test:
 	@echo "==> Mutation results:"
 	mutmut results || true
 	$(PYTHON) scripts/check_mutation_score.py --threshold $(MUTATION_THRESHOLD)
+
+# ---------------------------------------------------------------------------
+# Threshold sweep — run threshold diagnostics on a backtest dataset
+#
+# Usage:
+#   make threshold-sweep DATASET=data/backtest.parquet
+#   make threshold-sweep DATASET=data/backtest.parquet OUTPUT=reports/
+# ---------------------------------------------------------------------------
+DATASET ?= data/backtest.parquet
+SWEEP_OUTPUT ?= reports/
+
+threshold-sweep:
+	@echo "==> Running threshold sweep diagnostics..."
+	@echo "    Dataset: $(DATASET)"
+	@echo "    Output:  $(SWEEP_OUTPUT)"
+	$(PYTHON) -m evaluation.backtest $(DATASET) $(SWEEP_OUTPUT) --sweep
+	@echo "==> Threshold sweep complete. Report in $(SWEEP_OUTPUT)/backtest_report.json"
