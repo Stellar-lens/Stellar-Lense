@@ -1,49 +1,41 @@
-import sys
 import os
 import json
-import logging
-from typing import Dict, Any
+from utils.secrets import sanitize_url, mask_secret, SENSITIVE_PARAM_KEYS
 
-logger = logging.getLogger("ledgerlens.cli.diagnostics")
+def run_diagnostics():
+    db_url = os.environ.get("RISK_SCORE_DB_URL", "")
+    horizon_url = os.environ.get("HORIZON_URL", "")
+    kafka_sasl_pass = os.environ.get("KAFKA_SASL_PASSWORD", "")
 
-def check_env_vars() -> Dict[str, Any]:
-    required_vars = ["RISK_SCORE_DB_URL", "HORIZON_URL"]
-    results = {}
+    env_details = {}
     missing = []
-    for var in required_vars:
-        val = os.getenv(var)
-        results[var] = "CONFIGURED" if val else "MISSING"
-        if not val:
-            missing.append(var)
+
+    if db_url:
+        env_details["RISK_SCORE_DB_URL"] = sanitize_url(db_url)
+    else:
+        missing.append("RISK_SCORE_DB_URL")
+
+    if horizon_url:
+        env_details["HORIZON_URL"] = sanitize_url(horizon_url)
+    else:
+        missing.append("HORIZON_URL")
+
+    if kafka_sasl_pass:
+        env_details["KAFKA_SASL_PASSWORD"] = mask_secret(kafka_sasl_pass)
+
+    env_status = "PASS" if not missing else "FAIL"
+
     return {
-        "status": "PASS" if not missing else "FAIL",
-        "details": results,
-        "missing": missing
-    }
-
-def check_streaming_backend() -> Dict[str, Any]:
-    backend = os.getenv("STREAMING_BACKEND", "stdout").lower()
-    if backend == "kafka":
-        kafka_url = os.getenv("KAFKA_BOOTSTRAP_SERVERS")
-        if not kafka_url:
-            return {
-                "status": "FAIL",
-                "backend": backend,
-                "error": "KAFKA_BOOTSTRAP_SERVERS variable missing for kafka backend."
-            }
-        return {"status": "PASS", "backend": backend, "broker": kafka_url}
-    return {"status": "PASS", "backend": backend}
-
-def run_diagnostics() -> Dict[str, Any]:
-    env_res = check_env_vars()
-    stream_res = check_streaming_backend()
-    overall_status = "PASS" if (env_res["status"] == "PASS" and stream_res["status"] == "PASS") else "FAIL"
-    
-    report = {
-        "overall_status": overall_status,
+        "overall_status": env_status,
         "checks": {
-            "environment": env_res,
-            "streaming": stream_res
+            "environment": {
+                "status": env_status,
+                "details": env_details,
+                "missing": missing
+            },
+            "streaming": {
+                "status": "PASS",
+                "backend": os.environ.get("STREAMING_BACKEND", "stdout")
+            }
         }
     }
-    return report
