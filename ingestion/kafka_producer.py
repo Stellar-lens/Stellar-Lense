@@ -50,6 +50,23 @@ from utils.retry import retry_with_backoff
 
 logger = get_logger(__name__)
 
+try:
+    from prometheus_client import Counter
+
+    ledgerlens_ingestion_trades_produced_total = Counter(
+        "ledgerlens_ingestion_trades_produced_total",
+        "Number of trades successfully produced to Kafka",
+        ["topic"],
+    )
+    ledgerlens_ingestion_trades_failed_total = Counter(
+        "ledgerlens_ingestion_trades_failed_total",
+        "Number of trades failed during ingestion",
+        ["reason"],
+    )
+except ImportError:
+    ledgerlens_ingestion_trades_produced_total = None
+    ledgerlens_ingestion_trades_failed_total = None
+
 _SANITISE_RE = re.compile(r"[^a-zA-Z0-9._-]+")
 
 _ASSET_CODE_RE = re.compile(r"^[A-Z0-9]{1,12}$")
@@ -163,6 +180,8 @@ class HorizonKafkaProducer:
                 record.get("trade_id"),
                 exc,
             )
+            if ledgerlens_ingestion_trades_failed_total:
+                ledgerlens_ingestion_trades_failed_total.labels(reason="serialisation_error").inc()
             self._produce_to_dlq(record, reason=str(exc))
             return
 
@@ -253,6 +272,8 @@ class HorizonKafkaProducer:
             )
             self._producer.poll(0)
         except (KafkaException, BufferError) as exc:
+            if ledgerlens_ingestion_trades_failed_total:
+                ledgerlens_ingestion_trades_failed_total.labels(reason="dlq_produce_error").inc()
             logger.critical("Failed to write to DLQ topic %s: %s", self._dlq_topic, exc)
 
 
@@ -267,6 +288,11 @@ def _safe_raw(record: dict) -> dict:
 def _on_delivery(err, msg) -> None:
     if err is not None:
         logger.warning("Delivery failed for topic %s: %s", msg.topic() if msg else "?", err)
+        if ledgerlens_ingestion_trades_failed_total:
+            ledgerlens_ingestion_trades_failed_total.labels(reason="kafka_delivery_error").inc()
+    else:
+        if ledgerlens_ingestion_trades_produced_total and msg and msg.topic():
+            ledgerlens_ingestion_trades_produced_total.labels(topic=msg.topic()).inc()
 
 
 def _build_producer_conf(bootstrap_servers: str) -> dict:
