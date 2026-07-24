@@ -87,12 +87,21 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: "1.81.0"
+          # cargo-audit 0.22 requires Rust 1.88+ and understands the CVSS 4.0
+          # records now present in the live RustSec advisory database. This job
+          # only inspects Cargo.lock; contract builds remain pinned to Rust 1.81.
+          toolchain: "1.88.0"
       - uses: Swatinem/rust-cache@v2
       - name: Install cargo-audit
-        run: cargo install cargo-audit --locked
+        run: cargo install cargo-audit --version 0.22.2 --locked
       - name: Run security audit
-        run: cargo audit
+        # RUSTSEC-2026-0009 affects time's RFC parsing. time is only pulled in
+        # through serde_with -> stellar-xdr; the contract does not invoke that
+        # parsing path. The fixed time release requires Edition 2024 and cannot
+        # be parsed by the Rust 1.81 toolchain required for deployable Soroban
+        # WASM. Keep this exception narrow and remove it when Soroban permits a
+        # newer release toolchain.
+        run: cargo audit --ignore RUSTSEC-2026-0009
 
   # ── Reproducible-build verification ─────────────────────────────────────────
   #
