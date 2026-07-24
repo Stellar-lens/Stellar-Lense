@@ -298,8 +298,13 @@ class KafkaWorker:
 
         self._running = True
         logger.info("KafkaWorker started — consuming trade topics")
+        
+        import threading
+        from streaming.health_check import heartbeat
+
         try:
             while self._running:
+                heartbeat(threading.current_thread().name)
                 msg = self._consumer.poll(1.0)
                 if msg is None:
                     continue
