@@ -128,7 +128,11 @@ fn build_merkle_root(env: &Env, leaves: &[[u8; 32]]) -> [u8; 32] {
     current_level[0]
 }
 
-fn build_merkle_proof(env: &Env, leaves: &[[u8; 32]], index: u32) -> (std::vec::Vec<[u8; 32]>, u32) {
+fn build_merkle_proof(
+    env: &Env,
+    leaves: &[[u8; 32]],
+    index: u32,
+) -> (std::vec::Vec<[u8; 32]>, u32) {
     let mut current_level: std::vec::Vec<[u8; 32]> = leaves.to_vec();
     let mut proof: std::vec::Vec<[u8; 32]> = std::vec::Vec::new();
     let mut flags: u32 = 0;
@@ -240,7 +244,11 @@ fn build_chunk(
         for p in proof_bytes {
             proof.push_back(BytesN::from_array(env, &p));
         }
-        submissions.push_back(ScoreSubmissionWithProof { submission: sub, proof, proof_flags: flags });
+        submissions.push_back(ScoreSubmissionWithProof {
+            submission: sub,
+            proof,
+            proof_flags: flags,
+        });
     }
 
     (submissions, attestation)
@@ -267,7 +275,9 @@ fn submit_n_entries(
         batch_index += 1;
     }
 
-    env.budget().reset_default();
+    // The benchmark aggregates multiple contract calls; keep the cost
+    // tracker active without imposing a single-call host budget ceiling.
+    env.budget().reset_unlimited();
     env.budget().reset_tracker();
 
     for (submissions, attestation) in chunks {

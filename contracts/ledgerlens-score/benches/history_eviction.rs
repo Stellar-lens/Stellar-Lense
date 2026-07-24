@@ -80,9 +80,9 @@ fn submit_one(
     wallet: &Address,
     asset_pair: &Symbol,
 ) -> (u64, u64) {
-    env.budget().reset_default();
+    env.budget().reset_unlimited();
     env.budget().reset_tracker();
-    black_box(client.submit_score(
+    client.submit_score(
         &Vec::new(env),
         wallet,
         asset_pair,
@@ -93,7 +93,8 @@ fn submit_one(
         &90,
         &1,
         &None,
-    ));
+    );
+    black_box(());
     (env.budget().cpu_instruction_cost(), env.budget().memory_bytes_cost())
 }
 

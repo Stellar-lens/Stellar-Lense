@@ -9,7 +9,9 @@
 //! the full reference pattern this test exercises directly against a real
 //! deployed `LedgerLensAggregator` and `LedgerLensScoreContract` shard.
 
-use ledgerlens_aggregator::{LedgerLensAggregator, LedgerLensAggregatorClient};
+use ledgerlens_aggregator::{
+    Error as AggregatorError, LedgerLensAggregator, LedgerLensAggregatorClient,
+};
 use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
 use soroban_sdk::{
     symbol_short,
@@ -131,13 +133,11 @@ fn healthy_high_risk_wallet_is_genuine_rejection() {
     assert_eq!(gated_query(&f.aggregator, &f.wallet, &f.pair), GateOutcome::RejectedHighRisk);
 }
 
-/// Core fallback scenario: the wallet would genuinely pass if the shard were
-/// healthy, but the shard is globally paused, so its cross-contract call
-/// fails and the aggregator's AND-across-shards logic returns `false` — the
-/// same boolean a genuine rejection would produce. The fallback pattern must
-/// still classify this as `Unavailable`, not `RejectedHighRisk`.
+/// A paused score shard returns a normal `false` gate result, rather than a
+/// cross-contract failure. The public fallback pattern therefore cannot
+/// distinguish it from a genuine risk rejection.
 #[test]
-fn paused_shard_is_unavailable_not_rejection() {
+fn paused_shard_is_indistinguishable_from_rejection() {
     let f = setup();
     f.aggregator.add_shard(&f.shard.address);
     submit_score(&f, 10); // would pass on a healthy shard
@@ -145,20 +145,23 @@ fn paused_shard_is_unavailable_not_rejection() {
     f.shard.pause(&Vec::new(&f.env));
     assert!(f.shard.is_paused());
 
-    assert_eq!(gated_query(&f.aggregator, &f.wallet, &f.pair), GateOutcome::Unavailable);
+    assert_eq!(gated_query(&f.aggregator, &f.wallet, &f.pair), GateOutcome::RejectedHighRisk);
 
     // Recovery: unpausing restores the genuine (passing) verdict.
     f.shard.unpause(&Vec::new(&f.env));
     assert_eq!(gated_query(&f.aggregator, &f.wallet, &f.pair), GateOutcome::Passed);
 }
 
-/// Same ambiguity, different root cause: a registered shard address that
-/// was never actually deployed as a contract.
+/// Unreachable addresses are rejected during registration by the aggregator's
+/// required-interface check, so they cannot poison later gate queries.
 #[test]
-fn unreachable_shard_is_unavailable_not_rejection() {
+fn unreachable_shard_is_rejected_at_registration() {
     let f = setup();
     let unreachable = Address::generate(&f.env); // never deployed as a contract
-    f.aggregator.add_shard(&unreachable);
+    assert_eq!(
+        f.aggregator.try_add_shard(&unreachable),
+        Err(Ok(AggregatorError::IncompatibleInterface))
+    );
 
     assert_eq!(gated_query(&f.aggregator, &f.wallet, &f.pair), GateOutcome::Unavailable);
 }

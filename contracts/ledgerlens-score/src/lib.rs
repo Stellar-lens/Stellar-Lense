@@ -151,12 +151,12 @@ pub use types::{
     AdaptiveRateLimit, AdaptiveThresholdConfig, AggregateRiskScore, BatchAttestation,
     BatchEntryResult, BatchResult, BatchScoreResult, DecayCurve, EffectiveRiskScore, EmbargoExpiry,
     FlashProtectionMode, HllSketch, InterpolationMethod, MaybeRiskScore, MaybeScoreAttestation,
-    MaybeThresholdAttestation, ModelSubmission, ModelVersionStats, ParamChangeProposal, ParamValue,
-    ParameterProposal, ParameterProposalRecord, ParameterProposalStatus, PendingScoreEntry,
-    RiskScore, ScoreAttestation, ScoreAttestationInput, ScoreDispute, ScoreFloorPolicy,
-    ScoreHistogram, ScoreQuery, ScoreSubmission, ScoreSubmissionWithProof, ScoreTrend,
-    ScoreVelocityCap, SignerAccuracyRecord, ThresholdAttestation, TierBounds, TokenBucket,
-    UpgradeProposal, WelfordCorrState,
+    MaybeThresholdAttestation, ModelSubmission, ModelVersionStats, ModelVersionStatus,
+    ParamChangeProposal, ParamValue, ParameterProposal, ParameterProposalRecord,
+    ParameterProposalStatus, PendingScoreEntry, RiskScore, ScoreAttestation, ScoreAttestationInput,
+    ScoreDispute, ScoreFloorPolicy, ScoreHistogram, ScoreQuery, ScoreSubmission,
+    ScoreSubmissionWithProof, ScoreTrend, ScoreVelocityCap, SignerAccuracyRecord,
+    ThresholdAttestation, TierBounds, TokenBucket, UpgradeProposal, WelfordCorrState,
 };
 /// The 32-byte all-zeros field element used as the value in non-membership proofs.
 pub use verkle::NON_MEMBER_SENTINEL;
@@ -2049,41 +2049,41 @@ impl LedgerLensScoreContract {
         // When the oracle is fresh, `oracle_last_updated` is written to
         // persistent instance storage so `is_oracle_stale` can be queried
         // independently without needing to call the oracle again.
-        let oracle_confidence_floor: u32 =
-            if let Some(oracle_addr) = storage::get_registered_oracle(&env, &asset_pair) {
-                let threshold = storage::get_oracle_staleness_threshold(&env);
-                let ledger_now = env.ledger().timestamp();
-                let last_updated = storage::get_oracle_last_updated(&env, &asset_pair)
-                    .unwrap_or(0u64);
-                // Stale check: if we have never recorded an update OR the last
-                // recorded update is older than the threshold, treat as stale.
-                // Note: on the very first call `last_updated` is 0 which always
-                // trips the stale guard.  The oracle's first successful read
-                // below will populate the timestamp for all subsequent calls.
-                let age = ledger_now.saturating_sub(last_updated);
-                if last_updated > 0 && age > threshold {
-                    // Oracle is stale — emit event and fall back.
-                    events::oracle_stale_fallback(&env, &asset_pair, last_updated, threshold);
+        let oracle_confidence_floor: u32 = if let Some(oracle_addr) =
+            storage::get_registered_oracle(&env, &asset_pair)
+        {
+            let threshold = storage::get_oracle_staleness_threshold(&env);
+            let ledger_now = env.ledger().timestamp();
+            let last_updated = storage::get_oracle_last_updated(&env, &asset_pair).unwrap_or(0u64);
+            // Stale check: if we have never recorded an update OR the last
+            // recorded update is older than the threshold, treat as stale.
+            // Note: on the very first call `last_updated` is 0 which always
+            // trips the stale guard.  The oracle's first successful read
+            // below will populate the timestamp for all subsequent calls.
+            let age = ledger_now.saturating_sub(last_updated);
+            if last_updated > 0 && age > threshold {
+                // Oracle is stale — emit event and fall back.
+                events::oracle_stale_fallback(&env, &asset_pair, last_updated, threshold);
+                0
+            } else {
+                let price: i128 = env.invoke_contract(
+                    &oracle_addr,
+                    &soroban_sdk::symbol_short!("get_price"),
+                    soroban_sdk::Vec::from_array(&env, [asset_pair.to_val()]),
+                );
+                // Record that the oracle was successfully consulted at
+                // this ledger timestamp so is_oracle_stale stays current.
+                storage::set_oracle_last_updated(&env, &asset_pair, ledger_now);
+                if price <= 0 {
                     0
                 } else {
-                    let price: i128 = env.invoke_contract(
-                        &oracle_addr,
-                        &soroban_sdk::symbol_short!("get_price"),
-                        soroban_sdk::Vec::from_array(&env, [asset_pair.to_val()]),
-                    );
-                    // Record that the oracle was successfully consulted at
-                    // this ledger timestamp so is_oracle_stale stays current.
-                    storage::set_oracle_last_updated(&env, &asset_pair, ledger_now);
-                    if price <= 0 {
-                        0
-                    } else {
-                        // floor rises 1 point per 20_000 units above zero, capped at 50.
-                        ((price / 20_000).min(50)) as u32
-                    }
+                    // floor rises 1 point per 20_000 units above zero, capped at 50.
+                    ((price / 20_000).min(50)) as u32
                 }
-            } else {
-                0
-            };
+            }
+        } else {
+            0
+        };
 
         Ok(EffectiveRiskScore {
             original_score: score.score,
@@ -9980,7 +9980,7 @@ impl LedgerLensScoreContract {
             33 => {
                 let recovered_arr = recovered.to_array();
                 let mut compressed = [0u8; 33];
-                compressed[0] = if recovered_arr[64].is_multiple_of(2) { 0x02 } else { 0x03 };
+                compressed[0] = if recovered_arr[64] % 2 == 0 { 0x02 } else { 0x03 };
                 compressed[1..33].copy_from_slice(&recovered_arr[1..33]);
                 let mut stored = [0u8; 33];
                 pubkey.copy_into_slice(&mut stored);
@@ -10078,7 +10078,7 @@ impl LedgerLensScoreContract {
             33 => {
                 let recovered_arr = recovered.to_array();
                 let mut compressed = [0u8; 33];
-                compressed[0] = if recovered_arr[64].is_multiple_of(2) { 0x02 } else { 0x03 };
+                compressed[0] = if recovered_arr[64] % 2 == 0 { 0x02 } else { 0x03 };
                 compressed[1..33].copy_from_slice(&recovered_arr[1..33]);
                 let mut stored = [0u8; 33];
                 pubkey.copy_into_slice(&mut stored);
@@ -10389,15 +10389,7 @@ impl LedgerLensScoreContract {
 
         // Remove old leaf contribution (XOR is its own inverse).
         if let Some(old_leaf) = storage::get_verkle_leaf(env, wallet, asset_pair) {
-            // XOR old leaf into running accumulator to remove it.
-            commit = verkle::xor32(&commit, &old_leaf);
-            // Re-apply the outer hash with domain separator to maintain the
-            // hash-chain structure after the removal step.
-            let mut buf = [0u8; 33];
-            buf[0] = 0x06; // DOMAIN_COMMIT — same as in update_commitment
-            buf[1..33].copy_from_slice(&commit);
-            commit = soroban_sdk::BytesN::from(env.crypto().sha256(&Bytes::from_array(env, &buf)))
-                .to_array();
+            accum = verkle::xor32(&accum, &old_leaf);
         }
 
         // Add new leaf contribution.
@@ -10518,8 +10510,7 @@ impl LedgerLensScoreContract {
         }
         let threshold = storage::get_oracle_staleness_threshold(&env);
         let ledger_now = env.ledger().timestamp();
-        let last_updated = storage::get_oracle_last_updated(&env, &asset_pair)
-            .unwrap_or(0u64);
+        let last_updated = storage::get_oracle_last_updated(&env, &asset_pair).unwrap_or(0u64);
         // Never-consulted (last_updated == 0) counts as stale.
         if last_updated == 0 {
             return true;

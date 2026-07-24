@@ -1,5 +1,3 @@
-#![cfg(test)]
-
 //! Tests for the Verkle / KZG polynomial commitment system.
 //!
 //! Covers:
@@ -13,10 +11,10 @@
 use soroban_sdk::{
     symbol_short,
     testutils::{Address as _, Ledger},
-    Address, Bytes, BytesN, Env, Vec,
+    Address, Bytes, BytesN, Env, Symbol, SymbolStr, TryFromVal, Vec,
 };
 
-use crate::{LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreSubmission};
+use crate::{verkle, LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreSubmission};
 
 // ── Test infrastructure ──────────────────────────────────────────────────────
 

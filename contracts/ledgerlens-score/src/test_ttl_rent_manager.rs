@@ -312,6 +312,10 @@ fn test_index_moves_entry_to_back_on_admin_renewal() {
 #[test]
 fn test_get_expiring_entries_short_circuits_full_index_scan() {
     let (env, client, _, _) = setup();
+    // Populating the maximum-size synthetic index is test setup, not part of
+    // either measured scan. Keep setup from consuming the default host budget;
+    // each measured implementation resets to the default budget below.
+    env.budget().reset_unlimited();
     let pair = symbol_short!("XLM_USDC");
     let contract_id = client.address.clone();
     let old_wallet = Address::generate(&env);

@@ -1,8 +1,6 @@
-#![cfg(test)]
-
-use crate::{LedgerLensAggregator, LedgerLensAggregatorClient};
-use ledgerlens_score::{Error as ScoreError, LedgerLensScoreContract};
-use soroban_sdk::{symbol_short, testutils::Address as _, Address, Env};
+use crate::{Error, LedgerLensAggregator, LedgerLensAggregatorClient};
+use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+use soroban_sdk::{symbol_short, testutils::Address as _, Address, Env, Vec};
 
 /// A shard whose interface has fully drifted: it advertises no capability the
 /// aggregator depends on.
@@ -101,7 +99,7 @@ fn test_add_remove_shards() {
     let admin = Address::generate(&env);
     client.initialize(&admin);
 
-    let shard = Address::generate(&env);
+    let (shard, _) = setup_score_shard(&env);
     client.add_shard(&shard);
 
     let shards = client.get_shards();
@@ -134,7 +132,7 @@ fn test_add_shard_duplicate_fails() {
     let admin = Address::generate(&env);
     client.initialize(&admin);
 
-    let shard = Address::generate(&env);
+    let (shard, _) = setup_score_shard(&env);
     client.add_shard(&shard);
     let result = client.try_add_shard(&shard);
     assert_eq!(result, Err(Ok(Error::ShardAlreadyRegistered)));
@@ -155,15 +153,14 @@ fn test_remove_nonexistent_shard_fails() {
 }
 
 #[test]
-fn test_query_risk_gate_no_shards_returns_no_shards_error() {
+fn test_query_risk_gate_no_shards_fails_closed() {
     let env = Env::default();
     env.mock_all_auths();
     let agg_id = env.register_contract(None, LedgerLensAggregator);
     let client = LedgerLensAggregatorClient::new(&env, &agg_id);
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
-    let result = client.try_query_risk_gate(&wallet, &pair, &75);
-    assert_eq!(result, Err(Ok(Error::NoShards)));
+    assert!(!client.query_risk_gate(&wallet, &pair, &75));
 }
 
 #[test]
@@ -211,37 +208,14 @@ fn test_query_risk_gate_one_shard_rejects() {
 }
 
 #[test]
-fn test_set_and_get_conflict_resolution_policy() {
-    let env = Env::default();
-    env.mock_all_auths();
-    let agg_id = env.register_contract(None, LedgerLensAggregator);
-    let client = LedgerLensAggregatorClient::new(&env, &agg_id);
-    let admin = Address::generate(&env);
-    let service = Address::generate(&env);
-    let (shard_id, shard_client) = register_score_shard(&env, &admin, &service);
-
-    client.initialize(&admin);
-    client.add_shard(&shard_id);
-    shard_client.set_decay_rate(&1, &1000);
-
-    client.set_conflict_resolution_policy(&ConflictPolicy::MostRecent);
-    assert_eq!(client.get_conflict_resolution_policy(), ConflictPolicy::MostRecent);
-
-    assert_eq!(numerator, 1);
-    assert_eq!(denominator, 1000);
-    assert!(numerator < denominator, "Decay rate should be < 1.0");
-}
-
-#[test]
 fn test_get_decay_rate_returns_primary_shard_when_shards_diverge() {
     let env = Env::default();
     env.mock_all_auths();
     let agg_id = env.register_contract(None, LedgerLensAggregator);
     let client = LedgerLensAggregatorClient::new(&env, &agg_id);
     let admin = Address::generate(&env);
-    let service = Address::generate(&env);
-    let (primary_id, primary_client) = register_score_shard(&env, &admin, &service);
-    let (secondary_id, secondary_client) = register_score_shard(&env, &admin, &service);
+    let (primary_id, primary_client) = setup_score_shard(&env);
+    let (secondary_id, secondary_client) = setup_score_shard(&env);
 
     client.initialize(&admin);
     client.add_shard(&primary_id);
@@ -258,7 +232,7 @@ fn test_get_decay_rate_no_shards_returns_error() {
     let agg_id = env.register_contract(None, LedgerLensAggregator);
     let client = LedgerLensAggregatorClient::new(&env, &agg_id);
 
-    assert_eq!(client.try_get_decay_rate(), Err(Ok(Error::ScoreNotFound)));
+    assert_eq!(client.try_get_decay_rate(), Err(Ok(ledgerlens_score::Error::ScoreNotFound)));
 }
 
 #[test]
@@ -268,8 +242,7 @@ fn test_get_consensus_threshold_k() {
     let agg_id = env.register_contract(None, LedgerLensAggregator);
     let client = LedgerLensAggregatorClient::new(&env, &agg_id);
 
-    let result = client.try_set_conflict_resolution_policy(&ConflictPolicy::MostRecent);
-    assert_eq!(result, Err(Ok(ScoreError::NotInitialized)));
+    assert_eq!(client.get_consensus_threshold_k(), 5);
 }
 
 #[test]
@@ -277,17 +250,38 @@ fn test_get_score_highest_score_policy() {
     let env = Env::default();
     env.mock_all_auths();
     let admin = Address::generate(&env);
-    let service = Address::generate(&env);
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
 
-    let (shard1_id, shard1_client) = setup_score(&env, &admin, &service);
+    let (shard1_id, shard1_client) = setup_score_shard(&env);
     // shard1: score=50, timestamp=100
-    submit_score(&shard1_client, &env, &wallet, &pair, 50, 100);
+    shard1_client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &50,
+        &false,
+        &false,
+        &100,
+        &90,
+        &1,
+        &None,
+    );
 
-    let (shard2_id, shard2_client) = setup_score(&env, &admin, &service);
+    let (shard2_id, shard2_client) = setup_score_shard(&env);
     // shard2: score=90, timestamp=50 (higher score but older)
-    submit_score(&shard2_client, &env, &wallet, &pair, 90, 50);
+    shard2_client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &90,
+        &false,
+        &false,
+        &50,
+        &90,
+        &1,
+        &None,
+    );
 
     let agg_id = env.register_contract(None, LedgerLensAggregator);
     let agg_client = LedgerLensAggregatorClient::new(&env, &agg_id);
@@ -302,14 +296,13 @@ fn test_get_score_highest_score_policy() {
 }
 
 #[test]
-fn test_get_score_most_recent_policy() {
+fn test_get_watchlist_status_returns_true_for_watchlisted_wallet() {
     let env = Env::default();
     env.mock_all_auths();
     let agg_id = env.register_contract(None, LedgerLensAggregator);
     let client = LedgerLensAggregatorClient::new(&env, &agg_id);
     let admin = Address::generate(&env);
-    let service = Address::generate(&env);
-    let (shard_id, shard_client) = register_score_shard(&env, &admin, &service);
+    let (shard_id, shard_client) = setup_score_shard(&env);
 
     client.initialize(&admin);
     client.add_shard(&shard_id);
@@ -327,9 +320,8 @@ fn test_get_watchlist_status_returns_false_when_watchlisted_nowhere() {
     let agg_id = env.register_contract(None, LedgerLensAggregator);
     let client = LedgerLensAggregatorClient::new(&env, &agg_id);
     let admin = Address::generate(&env);
-    let service = Address::generate(&env);
-    let (shard_a_id, _) = register_score_shard(&env, &admin, &service);
-    let (shard_b_id, _) = register_score_shard(&env, &admin, &service);
+    let (shard_a_id, _) = setup_score_shard(&env);
+    let (shard_b_id, _) = setup_score_shard(&env);
 
     client.initialize(&admin);
     client.add_shard(&shard_a_id);
@@ -347,9 +339,8 @@ fn test_get_watchlist_status_returns_true_when_any_shard_watchlists_wallet() {
     let agg_id = env.register_contract(None, LedgerLensAggregator);
     let client = LedgerLensAggregatorClient::new(&env, &agg_id);
     let admin = Address::generate(&env);
-    let service = Address::generate(&env);
-    let (shard_a_id, _) = register_score_shard(&env, &admin, &service);
-    let (shard_b_id, shard_b_client) = register_score_shard(&env, &admin, &service);
+    let (shard_a_id, _) = setup_score_shard(&env);
+    let (shard_b_id, shard_b_client) = setup_score_shard(&env);
 
     client.initialize(&admin);
     client.add_shard(&shard_a_id);
@@ -368,9 +359,8 @@ fn test_get_watchlist_status_returns_true_when_all_shards_watchlist_wallet() {
     let agg_id = env.register_contract(None, LedgerLensAggregator);
     let client = LedgerLensAggregatorClient::new(&env, &agg_id);
     let admin = Address::generate(&env);
-    let service = Address::generate(&env);
-    let (shard_a_id, shard_a_client) = register_score_shard(&env, &admin, &service);
-    let (shard_b_id, shard_b_client) = register_score_shard(&env, &admin, &service);
+    let (shard_a_id, shard_a_client) = setup_score_shard(&env);
+    let (shard_b_id, shard_b_client) = setup_score_shard(&env);
 
     client.initialize(&admin);
     client.add_shard(&shard_a_id);
@@ -406,7 +396,7 @@ fn test_add_shard_rejects_incompatible_shard() {
     let shard = env.register_contract(None, incompatible_shard::IncompatibleShard);
     let result = client.try_add_shard(&shard);
 
-    assert_eq!(result, Err(Ok(ScoreError::IncompatibleInterface)));
+    assert_eq!(result, Err(Ok(Error::IncompatibleInterface)));
     assert_eq!(client.get_shards().len(), 0);
 }
 
@@ -419,7 +409,7 @@ fn test_add_shard_rejects_shard_missing_capability() {
     let shard = env.register_contract(None, partial_shard::PartialShard);
     let result = client.try_add_shard(&shard);
 
-    assert_eq!(result, Err(Ok(ScoreError::IncompatibleInterface)));
+    assert_eq!(result, Err(Ok(Error::IncompatibleInterface)));
     assert_eq!(client.get_shards().len(), 0);
 }
 
@@ -432,7 +422,7 @@ fn test_add_shard_rejects_legacy_shard_without_supports_interface() {
     let shard = env.register_contract(None, legacy_shard::LegacyShard);
     let result = client.try_add_shard(&shard);
 
-    assert_eq!(result, Err(Ok(ScoreError::IncompatibleInterface)));
+    assert_eq!(result, Err(Ok(Error::IncompatibleInterface)));
     assert_eq!(client.get_shards().len(), 0);
 }
 

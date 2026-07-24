@@ -58,8 +58,6 @@
 //!   does not reuse that pattern. A witness here only verifies if its
 //!   sibling hashes are correct outputs of the real leaf list.
 
-#![cfg(test)]
-
 extern crate std;
 
 use soroban_sdk::{Address, Bytes, Env, Symbol};
@@ -183,7 +181,11 @@ fn internal_hash(env: &Env, left: &[u8; 32], right: &[u8; 32]) -> [u8; 32] {
 }
 
 fn status_byte(deleted: bool) -> u8 {
-    if deleted { STATUS_DELETED } else { STATUS_PRESENT }
+    if deleted {
+        STATUS_DELETED
+    } else {
+        STATUS_PRESENT
+    }
 }
 
 /// Pads a leaf list to the next power of two by tail-duplication (same
@@ -416,6 +418,7 @@ const CASE_COUNT: u32 = 300; // 300 cases * 20 ops = 6,000 generated operations,
 #[test]
 fn test_deletion_witness_soundness_fuzz() {
     let env = Env::default();
+    env.budget().reset_unlimited();
 
     for case in 0..CASE_COUNT {
         let mut rng = Xorshift64(0x9E3779B97F4A7C15u64 ^ ((case as u64 + 1) << 32));

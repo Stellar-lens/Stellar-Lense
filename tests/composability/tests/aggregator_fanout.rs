@@ -295,11 +295,12 @@ fn test_supports_interface_recognises_capabilities() {
     assert!(!fix.aggregator.supports_interface(&symbol_short!("unknown")));
 }
 
-// ── Test: get_decay_rate returns constants ──────────────────────────────
+// ── Test: get_decay_rate delegates to the primary shard ─────────────────
 
 #[test]
-fn test_get_decay_rate_returns_expected_constants() {
+fn test_get_decay_rate_returns_primary_shard_configuration() {
     let fix = setup();
+    fix.shard1.set_decay_rate(&999, &1000);
     let (num, den) = fix.aggregator.get_decay_rate();
     assert_eq!(num, 999);
     assert_eq!(den, 1000);

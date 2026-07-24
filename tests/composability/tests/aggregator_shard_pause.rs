@@ -13,7 +13,9 @@
 //! the real cross-contract call path (`aggregator.query_risk_gate(...)`
 //! invoking each shard), rather than asserting on the AND logic in isolation.
 
-use ledgerlens_aggregator::{LedgerLensAggregator, LedgerLensAggregatorClient};
+use ledgerlens_aggregator::{
+    Error as AggregatorError, LedgerLensAggregator, LedgerLensAggregatorClient,
+};
 use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
 use soroban_sdk::{
     symbol_short,
@@ -110,24 +112,18 @@ fn query_risk_gate_fails_closed_when_one_shard_globally_paused() {
     assert!(f.aggregator.query_risk_gate(&f.wallet, &f.pair, &GATE_THRESHOLD));
 }
 
-/// An unreachable shard (a registered address that isn't a deployed
-/// contract at all — e.g. a stale/misconfigured entry) behaves the same way
-/// as a paused one from the aggregator's point of view: the cross-contract
-/// call fails, `try_query_risk_gate` returns an outer `Err`, and the
-/// aggregator's `_ => return false` arm trips, failing the whole query
-/// closed even though shard_a and shard_b are both healthy.
+/// An unreachable shard is rejected at registration because it cannot
+/// advertise the required aggregator interface.
 #[test]
-fn query_risk_gate_fails_closed_when_a_shard_is_unreachable() {
+fn unreachable_shard_is_rejected_before_gate_queries() {
     let f = setup();
     assert!(f.aggregator.query_risk_gate(&f.wallet, &f.pair, &GATE_THRESHOLD));
 
     let unreachable_shard = Address::generate(&f.env); // never deployed as a contract
-    f.aggregator.add_shard(&unreachable_shard);
-
-    assert!(!f.aggregator.query_risk_gate(&f.wallet, &f.pair, &GATE_THRESHOLD));
-
-    // Recovery: removing the bad entry restores the aggregated result.
-    f.aggregator.remove_shard(&unreachable_shard);
+    assert_eq!(
+        f.aggregator.try_add_shard(&unreachable_shard),
+        Err(Ok(AggregatorError::IncompatibleInterface))
+    );
     assert!(f.aggregator.query_risk_gate(&f.wallet, &f.pair, &GATE_THRESHOLD));
 }
 

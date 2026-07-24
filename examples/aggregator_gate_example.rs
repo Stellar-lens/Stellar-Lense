@@ -147,7 +147,7 @@ mod tests {
         Fixture { env, aggregator_id, amm }
     }
 
-    fn add_shard(fixture: &Fixture) -> LedgerLensScoreContractClient<'_> {
+    fn add_shard<'a>(fixture: &'a Fixture<'_>) -> LedgerLensScoreContractClient<'a> {
         let aggregator = LedgerLensAggregatorClient::new(&fixture.env, &fixture.aggregator_id);
         let shard_id = fixture.env.register_contract(None, LedgerLensScoreContract);
         let shard = LedgerLensScoreContractClient::new(&fixture.env, &shard_id);

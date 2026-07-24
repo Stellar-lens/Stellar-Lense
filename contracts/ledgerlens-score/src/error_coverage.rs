@@ -1082,3 +1082,14 @@ fn test_errors_md_lock_against_discriminants() {
     }
 }
 
+// ── Error::InvalidModelPriorWeight (50) ────────────────────────────────────────
+
+#[test]
+fn test_error_invalidmodelpriorweight() {
+    let (env, client, admin, service) = setup();
+    client.initialize(&admin, &service);
+
+    // Try to set model prior weight to 0 (must be > 0)
+    let result = client.try_set_model_prior_weight(&Vec::new(&env), &0);
+    assert_eq!(result, Err(Ok(Error::InvalidModelPriorWeight)));
+}

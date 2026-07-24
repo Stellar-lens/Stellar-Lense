@@ -56,7 +56,7 @@ fn sweep_cost(
         );
     }
 
-    env.budget().reset_default();
+    env.budget().reset_unlimited();
     env.budget().reset_tracker();
     black_box(client.get_expiring_entries(&50));
 

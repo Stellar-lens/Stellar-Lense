@@ -150,7 +150,7 @@ fn test_replay_consensus_after_reveal_window_closed_fails() {
     // Fast forward ledger sequence / time past reveal window (default 3600 seconds, 720 ledgers)
     env.ledger().with_mut(|l| {
         l.timestamp += 3601;
-        l.sequence += 1000;
+        l.sequence_number += 1000;
     });
 
     let mut submissions = Vec::new(&env);

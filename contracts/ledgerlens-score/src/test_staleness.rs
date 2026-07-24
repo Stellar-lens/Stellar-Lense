@@ -1,4 +1,3 @@
-#![cfg(test)]
 //! Dedicated tests for `is_score_stale(wallet, asset_pair) -> bool`.
 //!
 //! Exercises the three acceptance-criteria cases: missing score, fresh score,

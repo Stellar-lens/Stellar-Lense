@@ -58,7 +58,9 @@ fn submit_n_entries(
     asset_pair: &Symbol,
     total: u32,
 ) -> (u64, u64) {
-    env.budget().reset_default();
+    // Benchmark large, multi-call batches without treating the host's
+    // single-transaction default ceiling as a harness-wide limit.
+    env.budget().reset_unlimited();
     env.budget().reset_tracker();
 
     let mut remaining = total;

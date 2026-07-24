@@ -1,5 +1,3 @@
-#![cfg(test)]
-
 //! Tests for the stake-backed score dispute mechanism:
 //! `open_score_dispute`, `resolve_dispute_admin`, `resolve_dispute_timeout`,
 //! and `get_open_disputes`.
@@ -196,8 +194,8 @@ fn test_open_dispute_per_actor_cap_exceeded_rejected() {
     ];
 
     // Challenger 1 opens 5 (MAX_DISPUTES_PER_ACTOR) disputes across different pairs.
-    for i in 0..5 {
-        open_dispute(&f, &f.challenger, &f.challenger, &pairs[i], 1_000);
+    for pair in pairs.iter().take(5) {
+        open_dispute(&f, &f.challenger, &f.challenger, pair, 1_000);
     }
     assert_eq!(f.client.get_open_disputes().len(), 5);
 

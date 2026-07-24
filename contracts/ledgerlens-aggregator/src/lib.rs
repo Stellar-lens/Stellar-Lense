@@ -217,7 +217,7 @@ impl LedgerLensAggregator {
                     env.storage()
                         .instance()
                         .set(&DataKey::LastShardFailure, &(shard.clone(), 0u32));
-                    return Err(Error::ShardFailure);
+                    return false;
                 }
             }
         }

@@ -1,5 +1,3 @@
-#![cfg(test)]
-
 //! Tests for oracle price-feed staleness handling (issue #429).
 //!
 //! Covers:
@@ -12,13 +10,12 @@
 //! * remove_oracle clears last-updated metadata.
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype,
-    symbol_short,
+    contract, contractimpl, contracttype, symbol_short,
     testutils::{Address as _, Events as _, Ledger as _},
-    Address, Env, Symbol, Vec,
+    Address, Env, IntoVal, Symbol, Vec,
 };
 
-use crate::{LedgerLensScoreContract, LedgerLensScoreContractClient, Error};
+use crate::{Error, LedgerLensScoreContract, LedgerLensScoreContractClient};
 
 const START_TS: u64 = 1_700_000_000;
 
@@ -35,15 +32,10 @@ pub struct StaleTestOracle;
 #[contractimpl]
 impl StaleTestOracle {
     pub fn set_price(env: Env, asset_pair: Symbol, price: i128) {
-        env.storage()
-            .instance()
-            .set(&StaleOracleKey::Price(asset_pair), &price);
+        env.storage().instance().set(&StaleOracleKey::Price(asset_pair), &price);
     }
     pub fn get_price(env: Env, asset_pair: Symbol) -> i128 {
-        env.storage()
-            .instance()
-            .get(&StaleOracleKey::Price(asset_pair))
-            .unwrap_or(0i128)
+        env.storage().instance().get(&StaleOracleKey::Price(asset_pair)).unwrap_or(0i128)
     }
 }
 
@@ -112,11 +104,20 @@ fn test_fresh_oracle_applies_confidence_floor() {
 
     let wallet = Address::generate(&env);
     client.submit_score(
-        &Vec::new(&env), &wallet, &pair, &60, &false, &false, &START_TS, &85, &1, &None,
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &60,
+        &false,
+        &false,
+        &START_TS,
+        &85,
+        &1,
+        &None,
     );
 
     // First call: last_updated is 0 → not stale, oracle consulted, floor applied.
-    let eff = client.get_effective_score(&wallet, &pair).unwrap();
+    let eff = client.get_effective_score(&wallet, &pair);
     assert_eq!(eff.confidence_floor, 20);
     assert_eq!(eff.original_score, 60);
 
@@ -137,21 +138,30 @@ fn test_stale_oracle_falls_back_to_zero_floor() {
 
     let wallet = Address::generate(&env);
     client.submit_score(
-        &Vec::new(&env), &wallet, &pair, &55, &false, &false, &START_TS, &80, &1, &None,
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &55,
+        &false,
+        &false,
+        &START_TS,
+        &80,
+        &1,
+        &None,
     );
 
     // Use a tight threshold (60 s) so it's easy to exceed.
     client.set_oracle_staleness_threshold(&Vec::new(&env), &60u64);
 
     // First call at START_TS populates last_updated.
-    let eff1 = client.get_effective_score(&wallet, &pair).unwrap();
+    let eff1 = client.get_effective_score(&wallet, &pair);
     assert_eq!(eff1.confidence_floor, 30); // 600_000 / 20_000 = 30
 
     // Advance time past the threshold.
     env.ledger().with_mut(|l| l.timestamp = START_TS + 61);
 
     // Second call: age = 61 s > 60 s threshold → stale fallback.
-    let eff2 = client.get_effective_score(&wallet, &pair).unwrap();
+    let eff2 = client.get_effective_score(&wallet, &pair);
     assert_eq!(eff2.confidence_floor, 0, "stale oracle must produce zero floor");
     assert_eq!(eff2.original_score, 55, "stored score must be unchanged");
 }
@@ -167,26 +177,33 @@ fn test_stale_oracle_emits_orc_stale_event() {
 
     let wallet = Address::generate(&env);
     client.submit_score(
-        &Vec::new(&env), &wallet, &pair, &50, &false, &false, &START_TS, &80, &1, &None,
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &50,
+        &false,
+        &false,
+        &START_TS,
+        &80,
+        &1,
+        &None,
     );
 
     client.set_oracle_staleness_threshold(&Vec::new(&env), &30u64);
 
     // First call — fresh, populate timestamp.
-    let _ = client.get_effective_score(&wallet, &pair).unwrap();
+    let _ = client.get_effective_score(&wallet, &pair);
 
     // Advance past threshold.
     env.ledger().with_mut(|l| l.timestamp = START_TS + 31);
 
     // Second call — stale, should emit orc_stale event.
-    let _ = client.get_effective_score(&wallet, &pair).unwrap();
+    let _ = client.get_effective_score(&wallet, &pair);
 
     let events = env.events().all();
-    let found = events.iter().any(|(topics, _data)| {
-        topics
-            .iter()
-            .any(|t| t == soroban_sdk::Symbol::new(&env, "orc_stale").to_val())
-    });
+    let topic = (symbol_short!("orc_stale"), pair);
+    let found =
+        events.iter().any(|(_address, topics, _data)| topics == topic.clone().into_val(&env));
     assert!(found, "orc_stale event must be emitted on stale fallback");
 }
 
@@ -223,10 +240,19 @@ fn test_is_oracle_stale_within_threshold_returns_false() {
 
     let wallet = Address::generate(&env);
     client.submit_score(
-        &Vec::new(&env), &wallet, &pair, &40, &false, &false, &START_TS, &70, &1, &None,
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &40,
+        &false,
+        &false,
+        &START_TS,
+        &70,
+        &1,
+        &None,
     );
     // Populate last_updated.
-    let _ = client.get_effective_score(&wallet, &pair).unwrap();
+    let _ = client.get_effective_score(&wallet, &pair);
 
     // Advance within threshold.
     env.ledger().with_mut(|l| l.timestamp = START_TS + 3_600);
@@ -245,10 +271,19 @@ fn test_is_oracle_stale_past_threshold_returns_true() {
 
     let wallet = Address::generate(&env);
     client.submit_score(
-        &Vec::new(&env), &wallet, &pair, &40, &false, &false, &START_TS, &70, &1, &None,
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &40,
+        &false,
+        &false,
+        &START_TS,
+        &70,
+        &1,
+        &None,
     );
     // Populate last_updated.
-    let _ = client.get_effective_score(&wallet, &pair).unwrap();
+    let _ = client.get_effective_score(&wallet, &pair);
 
     // Advance past threshold.
     env.ledger().with_mut(|l| l.timestamp = START_TS + 121);
@@ -268,10 +303,19 @@ fn test_remove_oracle_clears_last_updated() {
 
     let wallet = Address::generate(&env);
     client.submit_score(
-        &Vec::new(&env), &wallet, &pair, &50, &false, &false, &START_TS, &80, &1, &None,
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &50,
+        &false,
+        &false,
+        &START_TS,
+        &80,
+        &1,
+        &None,
     );
     // Populate last_updated.
-    let _ = client.get_effective_score(&wallet, &pair).unwrap();
+    let _ = client.get_effective_score(&wallet, &pair);
 
     // Remove oracle — should also clear last_updated.
     client.remove_oracle(&Vec::new(&env), &pair);
@@ -279,7 +323,7 @@ fn test_remove_oracle_clears_last_updated() {
     // After removal, no oracle is registered → is_oracle_stale returns false.
     assert!(!client.is_oracle_stale(&pair));
     // And get_effective_score reverts to zero confidence floor.
-    let eff = client.get_effective_score(&wallet, &pair).unwrap();
+    let eff = client.get_effective_score(&wallet, &pair);
     assert_eq!(eff.confidence_floor, 0);
 }
 
@@ -291,10 +335,7 @@ fn test_set_oracle_staleness_threshold_emits_event() {
     client.set_oracle_staleness_threshold(&Vec::new(&env), &1_800u64);
 
     let events = env.events().all();
-    let found = events.iter().any(|(topics, _data)| {
-        topics
-            .iter()
-            .any(|t| t == soroban_sdk::Symbol::new(&env, "orc_sthr").to_val())
-    });
+    let topic = (symbol_short!("orc_sthr"),);
+    let found = events.iter().any(|(_address, topics, _data)| topics == topic.into_val(&env));
     assert!(found, "orc_sthr event must be emitted on threshold update");
 }

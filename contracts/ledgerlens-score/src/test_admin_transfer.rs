@@ -1,8 +1,6 @@
 //! Tests for the two-step admin transfer mechanism:
 //! `transfer_admin` / `accept_admin` / `cancel_admin_transfer`.
 
-#![cfg(test)]
-
 use soroban_sdk::{testutils::Address as _, Address, Env, Vec};
 
 use crate::{Error, LedgerLensScoreContract, LedgerLensScoreContractClient};

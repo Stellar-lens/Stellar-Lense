@@ -46,10 +46,10 @@ impl Fe {
 
     pub fn ge(&self, other: &Self) -> bool {
         for i in (0..4).rev() {
-            if self.0[i] > other.0[i] {
-                return true;
-            } else if self.0[i] < other.0[i] {
-                return false;
+            match self.0[i].cmp(&other.0[i]) {
+                core::cmp::Ordering::Greater => return true,
+                core::cmp::Ordering::Less => return false,
+                core::cmp::Ordering::Equal => {}
             }
         }
         true
@@ -224,10 +224,10 @@ impl Sc {
 
     pub fn ge(&self, other: &Self) -> bool {
         for i in (0..4).rev() {
-            if self.0[i] > other.0[i] {
-                return true;
-            } else if self.0[i] < other.0[i] {
-                return false;
+            match self.0[i].cmp(&other.0[i]) {
+                core::cmp::Ordering::Greater => return true,
+                core::cmp::Ordering::Less => return false,
+                core::cmp::Ordering::Equal => {}
             }
         }
         true

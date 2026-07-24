@@ -1764,9 +1764,9 @@ fn test_set_pair_weight_batch_too_large_returns_error() {
 // ── M-of-N multi-signature service authorization ──────────────────────────────
 
 /// Helper: add N signers and set threshold M on an already-initialized client.
-fn setup_multisig<'a>(
+fn setup_multisig(
     env: &Env,
-    client: &LedgerLensScoreContractClient<'a>,
+    client: &LedgerLensScoreContractClient<'_>,
     n: u32,
     m: u32,
 ) -> Vec<Address> {

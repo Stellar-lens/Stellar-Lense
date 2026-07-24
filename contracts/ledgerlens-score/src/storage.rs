@@ -8,10 +8,10 @@ use crate::errors::Error;
 use crate::types::{
     AdaptiveRateLimit, AggregateRiskScore, DataKey, DataKeyB, DataKeyC, DataKeyD, DecayCurve,
     EmbargoExpiry, FlashProtectionMode, GateDataKey, HllSketch, InterpolationMethod, JumpStats,
-    ModelVersionStats, PairVolatilityState, ParamChangeProposal, ParameterProposalRecord,
-    ParameterProposalStatus, PendingScoreEntry, RateLimitOverrideEntry, RiskScore, ScoreDispute,
-    ScoreFloorPolicy, ScoreHistogram, ScoreTrend, ScoreVelocityCap, SignerAccuracyRecord,
-    SubscorePayload, TokenBucket, UpgradeProposal, WelfordCorrState,
+    ModelVersionStats, ModelVersionStatus, PairVolatilityState, ParamChangeProposal,
+    ParameterProposalRecord, ParameterProposalStatus, PendingScoreEntry, RateLimitOverrideEntry,
+    RiskScore, ScoreDispute, ScoreFloorPolicy, ScoreHistogram, ScoreTrend, ScoreVelocityCap,
+    SignerAccuracyRecord, SubscorePayload, TokenBucket, UpgradeProposal, WelfordCorrState,
 };
 use soroban_sdk::{Address, Bytes, BytesN, Env, Symbol, Vec};
 
@@ -1125,7 +1125,7 @@ fn f64_ln(x: f64) -> f64 {
         series += y_pow / k;
         k += 2.0;
     }
-    2.0 * series + (exp as f64) * 0.6931471805599453
+    2.0 * series + (exp as f64) * core::f64::consts::LN_2
 }
 
 fn f64_pow2_neg(r: u32) -> f64 {
@@ -2583,25 +2583,19 @@ pub fn remove_registered_oracle(env: &Env, asset_pair: &Symbol) {
 /// Returns the ledger timestamp of the last oracle price consultation for
 /// `asset_pair`, or `None` if the oracle has never been consulted.
 pub fn get_oracle_last_updated(env: &Env, asset_pair: &Symbol) -> Option<u64> {
-    env.storage()
-        .instance()
-        .get(&DataKeyD::OracleLastUpdated(asset_pair.clone()))
+    env.storage().instance().get(&DataKeyD::OracleLastUpdated(asset_pair.clone()))
 }
 
 /// Persists the ledger timestamp of the most recent oracle price consultation.
 /// Called by `get_effective_score` each time it successfully invokes the oracle.
 pub fn set_oracle_last_updated(env: &Env, asset_pair: &Symbol, ts: u64) {
-    env.storage()
-        .instance()
-        .set(&DataKeyD::OracleLastUpdated(asset_pair.clone()), &ts);
+    env.storage().instance().set(&DataKeyD::OracleLastUpdated(asset_pair.clone()), &ts);
 }
 
 /// Removes the last-updated timestamp for `asset_pair` (called by `remove_oracle`
 /// so stale metadata does not linger after de-registration).
 pub fn remove_oracle_last_updated(env: &Env, asset_pair: &Symbol) {
-    env.storage()
-        .instance()
-        .remove(&DataKeyD::OracleLastUpdated(asset_pair.clone()));
+    env.storage().instance().remove(&DataKeyD::OracleLastUpdated(asset_pair.clone()));
 }
 
 /// Returns the admin-configured oracle staleness threshold in seconds.
@@ -2615,9 +2609,7 @@ pub fn get_oracle_staleness_threshold(env: &Env) -> u64 {
 
 /// Persists the oracle staleness threshold. Must be > 0.
 pub fn set_oracle_staleness_threshold(env: &Env, threshold_secs: u64) {
-    env.storage()
-        .instance()
-        .set(&DataKeyD::OracleStalenessThreshold, &threshold_secs);
+    env.storage().instance().set(&DataKeyD::OracleStalenessThreshold, &threshold_secs);
 }
 
 // ── Epoch sealing (issue #301) ────────────────────────────────────────────────
@@ -2819,7 +2811,7 @@ pub fn pubkeys_match(recovered: &BytesN<65>, stored: &Bytes) -> bool {
         33 => {
             let recovered_arr = recovered.to_array();
             let mut compressed = [0u8; 33];
-            compressed[0] = if recovered_arr[64].is_multiple_of(2) { 0x02 } else { 0x03 };
+            compressed[0] = if recovered_arr[64] % 2 == 0 { 0x02 } else { 0x03 };
             compressed[1..33].copy_from_slice(&recovered_arr[1..33]);
             let mut stored_arr = [0u8; 33];
             stored.copy_into_slice(&mut stored_arr);

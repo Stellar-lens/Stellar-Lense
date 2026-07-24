@@ -1,7 +1,5 @@
 //! Tests for `bulk_reset_pair_weight`.
 
-#![cfg(test)]
-
 use soroban_sdk::{symbol_short, testutils::Address as _, Address, Env, Vec};
 
 use crate::{Error, LedgerLensScoreContract, LedgerLensScoreContractClient};

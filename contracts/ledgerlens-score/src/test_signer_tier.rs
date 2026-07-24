@@ -1,5 +1,3 @@
-#![cfg(test)]
-
 //! Unit tests for `get_signer_tier` / `set_signer_tier`.
 //!
 //! Verifies:
