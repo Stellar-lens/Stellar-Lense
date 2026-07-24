@@ -1,5 +1,5 @@
-.PHONY: install lint format test run scale-workers mutation-test threshold-sweep
-.PHONY: install lint format test run typecheck mutation-test threshold-sweep
+.PHONY: install lint format test run scale-workers mutation-test threshold-sweep anonymization-check
+.PHONY: install lint format test run typecheck mutation-test threshold-sweep anonymization-check
 
 VENV_BIN := $(abspath .venv/bin)
 ifeq ($(wildcard $(VENV_BIN)/python),)
@@ -98,3 +98,14 @@ threshold-sweep:
 	@echo "    Output:  $(SWEEP_OUTPUT)"
 	$(PYTHON) -m evaluation.backtest $(DATASET) $(SWEEP_OUTPUT) --sweep
 	@echo "==> Threshold sweep complete. Report in $(SWEEP_OUTPUT)/backtest_report.json"
+
+# ---------------------------------------------------------------------------
+# Anonymization check — ensure shared example data is free of PII
+#
+# Usage:
+#   make anonymization-check
+# ---------------------------------------------------------------------------
+anonymization-check:
+	@echo "==> Running anonymization checks..."
+	$(PYTHON) scripts/check_anonymization.py --target data tests/fixtures tests/fuzz/corpus
+	@echo "==> Anonymization check complete."
