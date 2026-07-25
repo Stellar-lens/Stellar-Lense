@@ -1,5 +1,6 @@
 .PHONY: install lint format test run scale-workers mutation-test
 .PHONY: install lint format test run typecheck mutation-test
+.PHONY: static-analysis benchmark verify-lockfile regenerate-lockfile
 
 VENV_BIN := $(abspath .venv/bin)
 ifeq ($(wildcard $(VENV_BIN)/python),)
@@ -81,3 +82,33 @@ mutation-test:
 	@echo "==> Mutation results:"
 	mutmut results || true
 	$(PYTHON) scripts/check_mutation_score.py --threshold $(MUTATION_THRESHOLD)
+
+# ---------------------------------------------------------------------------
+# Static analysis gate — mypy + bandit + radon (issue #545)
+# ---------------------------------------------------------------------------
+static-analysis:
+	@echo "==> Running repository-wide static analysis gate..."
+	$(PYTHON) scripts/static_analysis_gate.py
+
+# Run only mypy (fast, no subprocess)
+typecheck:
+	$(PYTHON) -m mypy detection ingestion streaming ci_metrics benchmarks utils config.py
+
+# ---------------------------------------------------------------------------
+# Benchmark datasets — run detector benchmarks (issue #537)
+# ---------------------------------------------------------------------------
+benchmark:
+	@echo "==> Running detector benchmark suite..."
+	$(PYTHON) -m benchmarks.datasets
+	@echo "To run benchmarks against a detector, see benchmarks/runner.py"
+
+# ---------------------------------------------------------------------------
+# Lockfile verification (issue #541)
+# ---------------------------------------------------------------------------
+verify-lockfile:
+	@echo "==> Verifying installed environment matches requirements.lock..."
+	$(PYTHON) scripts/verify_lockfile.py
+
+regenerate-lockfile:
+	@echo "==> Regenerating requirements.lock from current environment..."
+	$(PYTHON) scripts/verify_lockfile.py --generate

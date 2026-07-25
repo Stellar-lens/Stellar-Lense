@@ -100,6 +100,134 @@ jobs:
       - name: Test
         run: pytest -q
 
+      # -----------------------------------------------------------------------
+      # Issue #545 — Static analysis gates (mypy + bandit + radon)
+      # -----------------------------------------------------------------------
+      - name: Install static analysis tools (issue #545)
+        run: pip install bandit>=1.7.9 radon>=6.0.1
+
+      - name: Static analysis gate — mypy type checking
+        run: |
+          python -m mypy \
+            --config-file pyproject.toml \
+            --no-error-summary \
+            detection ingestion streaming ci_metrics benchmarks utils config.py \
+            || true
+          # Non-blocking on first introduction — existing code is not mypy-strict.
+          # Tracked as follow-up: tighten to exit 1 once all modules are annotated.
+
+      - name: Static analysis gate — bandit security linting
+        run: |
+          python -m bandit \
+            -r detection ingestion streaming ci_metrics benchmarks \
+            --severity-level high \
+            --confidence-level medium \
+            --quiet \
+            || true
+          # Non-blocking on first introduction.
+
+      - name: Static analysis gate — radon cyclomatic complexity
+        run: |
+          python scripts/static_analysis_gate.py \
+            --skip-mypy \
+            --skip-bandit \
+            --complexity-max 10 \
+            --targets detection ingestion streaming ci_metrics benchmarks
+
+      # -----------------------------------------------------------------------
+      # Issue #541 — Dependency lockfile verification
+      # -----------------------------------------------------------------------
+      - name: Verify dependency lockfile (issue #541)
+        run: |
+          python scripts/verify_lockfile.py --check-unpinned
+
+      # -----------------------------------------------------------------------
+      # Issue #537 — Benchmark dataset integrity check
+      # -----------------------------------------------------------------------
+      - name: Validate benchmark datasets (issue #537)
+        run: |
+          python - <<'EOF'
+          import json, sys
+          from benchmarks.datasets import BenchmarkRegistry
+
+          registry = BenchmarkRegistry()
+          manifest = registry.manifest()
+          errors = []
+
+          for entry in manifest:
+              name = entry["name"]
+              ds = registry.get(name)
+              if not len(ds.trades) > 0:
+                  errors.append(f"{name}: zero trades")
+              if ds.labels.dtype != bool:
+                  errors.append(f"{name}: labels dtype is {ds.labels.dtype}")
+              # Verify checksum is stable
+              c1 = registry.checksum(name)
+              c2 = registry.checksum(name)
+              if c1 != c2:
+                  errors.append(f"{name}: checksum not deterministic")
+
+          if errors:
+              print("Benchmark dataset validation failures:")
+              for e in errors:
+                  print(" ", e)
+              sys.exit(1)
+
+          print(json.dumps(manifest, indent=2, default=str))
+          print(f"\n{len(manifest)} benchmark datasets validated.", file=sys.stderr)
+          EOF
+
+      # -----------------------------------------------------------------------
+      # Issue #538 — CI metrics regression monitoring self-test
+      # -----------------------------------------------------------------------
+      - name: CI metrics regression monitoring self-test (issue #538)
+        run: |
+          python - <<'EOF'
+          from ci_metrics import CIRunRecord, MetricSnapshot, record_run
+          from ci_metrics.store import MetricsStore
+          from pathlib import Path
+          import tempfile, os
+
+          with tempfile.TemporaryDirectory() as tmp:
+              store_path = Path(tmp) / "test_history.jsonl"
+
+              # Simulate 5 runs with stable metrics
+              for i in range(5):
+                  record = CIRunRecord(
+                      run_id=f"ci-selftest-{i}",
+                      commit_sha="abc123",
+                      branch="ci-selftest",
+                      timestamp_utc="2024-01-01T00:00:00Z",
+                      metrics=[
+                          MetricSnapshot(name="test_pass_rate", value=1.0),
+                          MetricSnapshot(name="runtime_s", value=10.0, higher_is_better=False),
+                      ],
+                  )
+                  record_run(record, store_path=store_path)
+
+              store = MetricsStore(store_path)
+              assert len(store) == 5, f"Expected 5 records, got {len(store)}"
+
+              # Verify no regression on stable series
+              from ci_metrics.regression import RegressionDetector
+              detector = RegressionDetector(store)
+              latest = CIRunRecord(
+                  run_id="ci-selftest-latest",
+                  commit_sha="def456",
+                  branch="ci-selftest",
+                  timestamp_utc="2024-01-02T00:00:00Z",
+                  metrics=[
+                      MetricSnapshot(name="test_pass_rate", value=1.0),
+                  ],
+              )
+              store.append(latest)
+              alerts = detector.check(latest)
+              assert not any(a.severity == "critical" for a in alerts), \
+                  f"Unexpected critical alert on stable metrics: {alerts}"
+
+          print("CI metrics self-test passed.")
+          EOF
+
   mutation-test:
     name: Mutation Testing (≥80% score)
     runs-on: ubuntu-latest

@@ -1,22 +1,139 @@
+# ============================================================
+# LedgerLens-data .gitignore
+# ============================================================
+
+# Python bytecode / caches
 __pycache__/
 *.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Test caches and artefacts
 .pytest_cache/
+.hypothesis/
+*.snap               # test snapshots (e.g. syrupy)
+tests/__snapshots__/
+*/__snapshots__/
+
+# Virtual environments
 .venv/
 venv/
+env/
+ENV/
 
+# Environment / secrets
 .env
-*.db
+.env.*
+!.env.example
 
+# Databases (SQLite, DuckDB, etc.)
+*.db
+*.sqlite3
+*.duckdb
+
+# Model artefacts — binaries and training outputs (keep README and schema files)
 models/*.pkl
 models/*.joblib
+models/*.pt
+models/*.onnx
 models/archive/
 models/optuna_studies.db
 models/best_params_*.json
+models/pareto_front.json
+
+# Benchmark output reports (generated; not source)
 reports/
-# Keep sample/committed reports but ignore generated load test output
-reports/load_test_results.json
+# Keep committed sample/reference reports
+!reports/adversarial_benchmark.json
+!reports/load_test_sample.json
+
+# Benchmark runner outputs (issue #537)
+benchmarks/outputs/
+benchmarks/*.benchmark.json
+benchmarks/*.report.json
+
+# CI metrics history — the JSONL store is ephemeral in CI; commit only if
+# you want to track history in the repo (not recommended for large stores)
+ci_metrics/history.jsonl
+
+# Static analysis gate outputs (issue #545)
+.mypy_cache/
+.bandit/
+.radon_cache/
+bandit_report.json
+mypy_report.xml
 
 # mutmut mutation testing cache
 .mutmut-cache
+html/
+mutmut-results.xml
 
+# Jupyter notebook execution artefacts
+notebooks/.ipynb_checkpoints/
+notebooks/**/.ipynb_checkpoints/
+*.nbconvert.ipynb
+
+# Coverage reports
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+coverage.json
+
+# Distribution / build artefacts
+dist/
+build/
+*.egg-info/
+*.egg
+MANIFEST
+
+# Byte-compiled Cython
+*.c
+*.so
+
+# Editor / OS artefacts
 .DS_Store
+.DS_Storename
+Thumbs.db
+*.swp
+*.swo
+*~
+.idea/
+.vscode/settings.json
+
+# Profiling
+*.prof
+*.lprof
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+*.orig
+
+# Docker build context leftover
+.dockerignore.bak
+
+# Optuna hyperparameter search DB (generated at runtime)
+optuna_*.db
+
+# Adversarial eval outputs
+reports/forensic/
+reports/poisoning_alert_*.json
+reports/backtest_*.json
+reports/retrain_report_*.json
+
+# Data pipeline generated files (not source data)
+data/*.parquet
+data/*.csv
+data/annotation_queue.json
+data/annotation_queue.json.bak
+
+# Redis dump files (if running local Redis)
+dump.rdb
+
+# Node.js (markdown-link-check installed via npm)
+node_modules/
+package-lock.json
