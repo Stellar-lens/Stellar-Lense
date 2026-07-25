@@ -300,6 +300,9 @@
             "topics": [
               {
                 "symbol": "emb_set"
+              },
+              {
+                "u32": 1
               }
             ],
             "data": {
@@ -470,6 +473,9 @@
             "topics": [
               {
                 "symbol": "emb_lift"
+              },
+              {
+                "u32": 1
               }
             ],
             "data": {

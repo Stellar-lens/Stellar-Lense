@@ -47,7 +47,7 @@ LedgerLens detects wash trading and artificial volume on the Stellar Decentralis
 
 ### Core Components
 
-- **lib.rs**: Main contract implementation — `submit_score` and `get_score`
+- **lib.rs**: Main contract implementation — entry points including `submit_score`, `submit_scores_batch`, and query functions
 - **types.rs**: `RiskScore` data structure (score, flags, confidence, timestamp)
 - **storage.rs**: Persistent storage for per-wallet/asset-pair risk scores
 - **errors.rs**: Custom error types for contract operations
@@ -58,8 +58,8 @@ LedgerLens detects wash trading and artificial volume on the Stellar Decentralis
 ### `initialize(admin: Address, service: Address)`
 One-time setup. Sets the admin (who can rotate the service address) and the LedgerLens off-chain service account authorised to submit scores.
 
-### `submit_score(signers: Vec<Address>, wallet: Address, asset_pair: Symbol, score: u32, benford_flag: bool, ml_flag: bool, timestamp: u64, confidence: u32, model_version: u32, attestation: Option<ScoreAttestation>)`
-Called by the authorised LedgerLens off-chain service to register a computed risk score on-chain. Requires authorization from the configured LedgerLens service account (or, under the M-of-N multisig model, from `threshold` of the listed `signers`). `score` and `confidence` must be in the range 0-100. `attestation` is required once `set_service_pubkey` has been configured — see [Score Attestation](#score-attestation).
+### `submit_score(signers: Vec<Address>, wallet: Address, asset_pair: Symbol, score: u32, benford_flag: bool, ml_flag: bool, timestamp: u64, confidence: u32, model_version: u32, attestation_input: Option<ScoreAttestationInput>)`
+Called by the authorised LedgerLens off-chain service to register a computed risk score on-chain. Requires authorization from the configured LedgerLens service account (or, under the M-of-N multisig model, from `threshold` of the listed `signers`). `score` and `confidence` must be in the range 0-100. `attestation_input` wraps both the per-score secp256k1 attestation and the optional threshold attestation — see [Score Attestation](#score-attestation) and [Threshold Attestation]().
 
 ### `get_score(wallet: Address, asset_pair: Symbol) -> RiskScore`
 Read-only function callable by any Soroban contract. Returns the most recent LedgerLens risk score and metadata for a given wallet and asset pair.
@@ -111,7 +111,7 @@ Confidence-gated extension of `query_risk_gate`. Returns `true` only when a scor
 Admin sets a system-wide minimum confidence floor (0–100). When configured, `query_risk_gate_with_confidence` uses `max(caller_param, global_floor)` as the effective floor, letting the contract operator enforce a baseline confidence requirement without requiring every integrating protocol to specify one. Defaults to `0` (no global floor). Returns `InvalidMinConfidence` for values above 100.
 
 ### `supports_interface(capability: Symbol) -> bool`
-Runtime capability detection for the composability interface. Returns `true` for the registered capabilities `score`, `history`, `batch`, `gate`, `aggr`, `count`, and `cgate`, letting integrators feature-detect instead of hardcoding contract version numbers.
+Runtime capability detection for the composability interface. Returns `true` for the registered capabilities `score`, `history`, `batch`, `gate`, `aggr`, `count`, `cgate`, and `pr_rd`, letting integrators feature-detect instead of hardcoding contract version numbers.
 
 ### `propose_upgrade(new_wasm_hash: BytesN<32>)`
 Admin only. Starts a time-locked contract upgrade by committing to `new_wasm_hash`. Stores an `UpgradeProposal` with `executable_after = now + get_upgrade_delay()` and emits `upgrade_proposed`. Does not change the code. Rejected with `UpgradeAlreadyPending` if a proposal is already in flight. See [Upgrade Governance](#upgrade-governance).
@@ -166,16 +166,29 @@ Read-only. Returns `true` only while `asset_pair` is individually paused. `false
 ### `get_paused_pairs() -> Vec<Symbol>`
 Read-only. Returns every asset pair currently paused, in no particular order. O(1) — backed by the incrementally-maintained `PausedPairIndex`, not a scan.
 
+### `get_expiring_entries(max_entries: u32) -> Vec<(Address, Symbol)>`
+Read-only, callable by anyone. Returns up to `max_entries` (capped at `MAX_EXPIRING_ENTRIES_PER_CALL`, 100) tracked `(wallet, asset_pair)` score entries whose estimated remaining TTL has dropped to or below `SCORE_TTL_THRESHOLD`, most overdue first. Feed the result into `extend_entry_ttls`. See [Storage Rent Management](#storage-rent-management).
+
+### `get_entry_ttl(wallet: Address, asset_pair: Symbol) -> u32`
+Read-only. Returns the estimated number of ledgers remaining before the entry should be proactively renewed. Returns `ScoreNotFound` if the wallet/pair has never been scored.
+
+### `extend_entry_ttls(admin_signers: Vec<Address>, entries: Vec<(Address, Symbol)>) -> u32`
+Admin only. Bulk-renews the TTL of every entry in `entries` that still has a live score, skipping any that don't (already archived, or never existed) rather than failing the whole call. Returns the number actually renewed. Rejects with `BatchTooLarge` if `entries` exceeds `MAX_EXPIRING_ENTRIES_PER_CALL`. Emits `ttl_ext` with the renewed and requested counts.
+
 ### `RiskScore` Structure
 
 ```rust
 pub struct RiskScore {
-    pub score: u32,          // 0-100; higher = more suspicious
-    pub benford_flag: bool,  // True if Benford anomaly detected
-    pub ml_flag: bool,       // True if ML classifier flagged
-    pub timestamp: u64,      // Ledger timestamp of last update
-    pub confidence: u32,     // Model confidence 0-100
-    pub model_version: u32,  // Detection-pipeline model version
+    pub score: u32,            // 0-100; higher = more suspicious
+    pub benford_flag: bool,    // True if Benford anomaly detected
+    pub ml_flag: bool,         // True if ML classifier flagged
+    pub timestamp: u64,        // Ledger timestamp of last update
+    pub confidence: u32,       // Model confidence 0-100
+    pub model_version: u32,    // Detection-pipeline model version
+    pub benford_score: u32,    // Raw Benford's Law digit-discrepancy score (0-100)
+    pub ml_score: u32,         // Raw ML ensemble score (0-100)
+    pub network_score: u32,    // Network-level anomaly score (0-100)
+    pub commitment: Option<Bytes>,  // Optional KZG/range-proof commitment
 }
 ```
 
@@ -185,13 +198,14 @@ A wallet that is moderately suspicious across several asset pairs poses a higher
 
 ```rust
 pub struct AggregateRiskScore {
-    pub aggregate_score: u32,     // 0-100, weighted average across all pairs
-    pub pair_count: u32,          // number of distinct pairs the wallet has a score for
-    pub max_pair_score: u32,      // highest individual pair score
-    pub max_pair: Symbol,         // the pair with the highest score
-    pub benford_flag_count: u32,  // number of pairs with benford_flag = true
-    pub ml_flag_count: u32,       // number of pairs with ml_flag = true
-    pub last_updated: u64,        // timestamp of the most recently updated pair score
+    pub aggregate_score: u32,       // 0-100, weighted average across all pairs
+    pub pair_count: u32,            // number of distinct pairs the wallet has a score for
+    pub max_pair_score: u32,        // highest individual pair score
+    pub max_pair: Symbol,           // the pair with the highest score
+    pub benford_flag_count: u32,    // number of pairs with benford_flag = true
+    pub ml_flag_count: u32,         // number of pairs with ml_flag = true
+    pub last_updated: u64,          // timestamp of the most recently updated pair score
+    pub decay_lambda_applied: bool, // true if the decay lambda was applied
 }
 ```
 
@@ -268,7 +282,7 @@ A wallet scoring 60-70 on three pairs individually might not breach the per-pair
 | 7 | `ContractPaused` | Submission attempted while admin circuit-breaker is active |
 | 8 | `NoPendingAdminTransfer` | `accept_admin` / `cancel_admin_transfer` with no transfer in flight |
 | 9 | `EmptyBatch` | `submit_scores_batch` called with zero entries |
-| 10 | `BatchTooLarge` | Batch exceeds `MAX_BATCH_SIZE` (20) |
+| 10 | `BatchTooLarge` | `submit_scores_batch` exceeds `MAX_BATCH_SIZE` (20), or `extend_entry_ttls` exceeds `MAX_EXPIRING_ENTRIES_PER_CALL` (100) |
 | 11 | `ArithmeticOverflow` | Weighted aggregate computation overflows |
 | 12 | `UpgradeAlreadyPending` | `propose_upgrade` while a proposal is already pending |
 | 13 | `NoPendingUpgrade` | `execute_upgrade` / `veto_upgrade` / `get_pending_upgrade` with no proposal |
@@ -284,9 +298,6 @@ A wallet scoring 60-70 on three pairs individually might not breach the per-pair
 | 23 | `RateLimitExceeded` | Submission before the per-pair cooldown has elapsed |
 | 24 | `InvalidCooldown` | `set_cooldown` value outside `[MIN_COOLDOWN_SECS, MAX_COOLDOWN_SECS]` |
 | 25 | `InvalidTimestamp` | `submit_score` called with `timestamp = 0` |
- feat/confidence-gated-risk-gate
-| 30 | `InvalidMinConfidence` | `set_global_min_confidence` called with a value above 100 |
-=======
 | 30 | `PairPaused` | Submission attempted while this `asset_pair` is individually paused — see [Pause Circuit Breaker](#pause-circuit-breaker) |
 | 31 | `PausedPairIndexFull` | `set_pair_paused` would pause a new pair beyond `MAX_PAUSED_PAIRS` (50) |
 | 43 | `BelowScoreFloor` | Submission below the configured floor for a high-risk wallet — see [Score Submission Floor](#score-submission-floor) |
@@ -399,14 +410,43 @@ pub struct ScoreFloorPolicy {
 }
 ```
 
+## Storage Rent Management
+
+Soroban silently **archives** a persistent ledger entry once its TTL reaches zero. Every `submit_score` write extends the written entry's TTL, so high-traffic wallet/pair pairs stay alive automatically — but a wallet that was scored once and then goes quiet has no further writes to trigger that extension, and its score entry counts down to expiry unnoticed. The next read returns `ScoreNotFound` for a wallet that was clearly scored before, with no warning beforehand. `get_expiring_entries` / `extend_entry_ttls` let an admin sweep and proactively renew entries before that happens.
+
+**The flow:**
+
+1. Every accepted `submit_score` / `submit_scores_batch` write registers the `(wallet, asset_pair)` in an incrementally-maintained index (capped at `MAX_TRACKED_SCORE_ENTRIES`, 500) and stamps the ledger sequence it was last touched at.
+2. Periodically (see cadence below), an off-chain job calls `get_expiring_entries(max_entries)` — a free, read-only call — to get back the entries that have gone dormant long enough to be at risk, most urgent first.
+3. The job feeds that list straight into `extend_entry_ttls(admin_signers, entries)`. The admin call renews each entry's on-chain TTL and resets its dormancy clock; entries that turn out to have already been archived (or never existed) are skipped rather than failing the whole batch.
+
+```
+  off-chain cron                 contract
+        │                           │
+        │  get_expiring_entries(N)  │
+        ├──────────────────────────►│  scan ScoreEntryIndex,
+        │◄──────────────────────────┤  return entries due for renewal
+        │  [(wallet, pair), ...]    │
+        │                           │
+        │  extend_entry_ttls(       │
+        │    admin_signers, list)   │
+        ├──────────────────────────►│  extend_ttl() per entry,
+        │◄──────────────────────────┤  refresh dormancy clock
+        │  renewed_count            │
+```
+
+Soroban contracts have no host function to read another entry's *actual* remaining TTL from inside a running contract, so "remaining TTL" here (returned by `get_entry_ttl`, and the ordering used by `get_expiring_entries`) is a conservative estimate based on ledgers elapsed since the entry's last write or renewal, not a literal on-chain read. The estimate can only flag an entry as due *early*, never late — see the rustdoc on `storage::get_expiring_entries` for the full reasoning.
+
+**Recommended operational cadence:** run the sweep (`get_expiring_entries` → `extend_entry_ttls`) on a schedule comfortably shorter than `SCORE_TTL_THRESHOLD` (~30 days at 5s/ledger) — daily is a reasonable default for most deployments, and even weekly leaves a wide safety margin before any entry would actually be at risk of archival.
+
 ## Score Attestation
 
 The service account's `require_auth` proves a transaction was sent by the authorised key, but says nothing about whether the score payload inside that transaction matches what the off-chain detection pipeline actually computed — relevant when the service key is held by infrastructure (a relayer, a batching service, a multisig signer) that's trusted to submit transactions but shouldn't be able to silently alter scores in transit.
 
-`submit_score`'s optional `attestation: Option<ScoreAttestation>` closes that gap with a secp256k1 signature over the exact payload:
+`submit_score`'s optional `attestation_input: Option<ScoreAttestationInput>` closes that gap with a secp256k1 signature over the exact payload. `ScoreAttestationInput` wraps both the per-score attestation (`MaybeScoreAttestation`) and an optional threshold attestation (`MaybeThresholdAttestation`):
 
 1. The admin registers the off-chain pipeline's public key via `set_service_pubkey`. Until this is called, `attestation` is ignored entirely and every existing integration keeps working unchanged.
-2. Once a pubkey is configured, every `submit_score` call must carry a valid `ScoreAttestation` — a missing or invalid one is rejected with `InvalidAttestation`. There is no way to turn this back off short of a contract upgrade.
+2. Once a pubkey is configured, every `submit_score` call must carry a valid attestation — a missing or invalid one is rejected with `InvalidAttestation`. There is no way to turn this back off short of a contract upgrade.
 3. On each call, the contract independently recomputes the SHA-256 commitment over the wallet, asset pair, score fields, this contract's address, and the network id (binding the signature to one deployment on one network), and rejects the call if it disagrees with the attestation's `commitment` field — that field is never trusted as input, only checked.
 4. The signature is then verified via `secp256k1_recover` against the registered pubkey, supporting both compressed and uncompressed key formats.
 
@@ -483,6 +523,29 @@ fn swap(env: Env, user: Address, amount: i128) -> Result<(), AmmError> {
 
 A complete, compiling reference contract lives in [`examples/amm_gate.rs`](examples/amm_gate.rs) (build it with `cargo build --example amm_gate -p ledgerlens-score`). For versioning, error-code stability, threshold selection, and caching guidance, read the full [interface specification](docs/interface-spec.md).
 
+### Gated liquidity provision
+
+For liquidity adds — where a low-confidence score is as dangerous as a high-risk
+score — use `query_risk_gate_with_confidence` and reject before moving funds:
+
+```rust
+let is_safe = client.query_risk_gate_with_confidence(
+    &provider,
+    &symbol_short!("XLM_USDC"),
+    &75,  // gate_threshold
+    &50,  // min_confidence
+);
+if !is_safe {
+    return Err(AmmError::HighRiskWallet);
+}
+// ... proceed with liquidity provision ...
+```
+
+When no score exists, the gate fails closed (`false`) and liquidity is rejected.
+See [`examples/amm_gate_example.rs`](examples/amm_gate_example.rs) and
+[`contracts/mock-amm/`](contracts/mock-amm/) (`provide_liquidity_gated`,
+`set_risk_oracle`).
+
 ## Security Features
 
 1. **Authorization Checks**: Only the authorised LedgerLens service account can submit scores
@@ -535,7 +598,8 @@ soroban contract invoke \
   --benford_flag true \
   --ml_flag true \
   --timestamp 1700000000 \
-  --confidence 92
+  --confidence 92 \
+  --model_version 1
 ```
 
 ### 4. Query a Risk Score
@@ -632,12 +696,16 @@ The single most important cross-repo agreement is the **`RiskScore`** shape, def
 
 ```rust
 pub struct RiskScore {
-    pub score: u32,          // 0-100, higher = more suspicious
-    pub benford_flag: bool,  // Benford's Law anomaly detected
-    pub ml_flag: bool,       // ML ensemble classifier flagged
-    pub timestamp: u64,      // ledger timestamp of computation
-    pub confidence: u32,     // model confidence, 0-100
-    pub model_version: u32,  // detection-pipeline model version
+    pub score: u32,            // 0-100; higher = more suspicious
+    pub benford_flag: bool,    // True if Benford anomaly detected
+    pub ml_flag: bool,         // True if ML classifier flagged
+    pub timestamp: u64,        // Ledger timestamp of last update
+    pub confidence: u32,       // Model confidence 0-100
+    pub model_version: u32,    // Detection-pipeline model version
+    pub benford_score: u32,    // Raw Benford score (0-100)
+    pub ml_score: u32,         // Raw ML score (0-100)
+    pub network_score: u32,    // Network-level anomaly score (0-100)
+    pub commitment: Option<Bytes>,  // Optional cryptographic commitment
 }
 ```
 
@@ -651,11 +719,14 @@ pub struct RiskScore {
 | Function | Caller | Auth required | Used by |
 |---|---|---|---|
 | `initialize(admin, service)` | deployer | admin (one-time) | deployment tooling only |
-| `submit_score(wallet, asset_pair, score, benford_flag, ml_flag, timestamp, confidence)` | LedgerLens service account | `service.require_auth()` | **`api`** — writes scores produced by `core` |
-| `get_score(wallet, asset_pair)` | anyone | none (read-only) | **`api`**, **`dashboard`** (via api), and any third-party Soroban contract that wants to gate on LedgerLens risk |
+| `submit_score(signers, wallet, asset_pair, score, benford_flag, ml_flag, timestamp, confidence, model_version, attestation_input)` | LedgerLens service account or M-of-N signers | `service.require_auth()` or signer threshold | **`api`** — writes scores produced by `core` |
+| `get_score(wallet, asset_pair)` | anyone | none (read-only) | **`api`**, **`dashboard`** (via api), and any third-party Soroban contract |
 | `get_score_count(wallet, asset_pair)` | anyone | none (read-only) | **`api`** — detects newly monitored vs. long-history wallets |
 | `set_service(new_service)` | admin | `admin.require_auth()` | ops/admin tooling for key rotation |
 | `get_admin()` / `get_service()` | anyone | none (read-only) | ops tooling, `api` health checks |
+| `query_risk_gate(wallet, pair, threshold)` | anyone | none (read-only, infallible) | any Soroban contract composing with LedgerLens |
+| `query_risk_gate_with_confidence(wallet, pair, threshold, min_confidence)` | anyone | none (read-only, infallible) | contracts needing confidence-gated checks |
+| `supports_interface(capability)` | anyone | none (read-only) | feature detection for integrators |
 
 `asset_pair` is a `Symbol` (≤ 9 chars in Soroban's short-symbol form, e.g. `XLM_USDC`). If `core`/`api` need pair identifiers longer than 9 characters, they must agree on a canonical short encoding here before the contract is deployed to mainnet.
 
@@ -666,6 +737,17 @@ pub struct RiskScore {
 - `pw_upd` — `(asset_pair) -> weight`, emitted when the admin sets a pair's aggregate-risk weight via `set_pair_weight`
 - `cd_upd` — `() -> cooldown_secs`, emitted when the admin changes the submission cooldown via `set_cooldown`
 - `rl_ovrd` — `(wallet, asset_pair) -> admin`, emitted when the admin clears a pair's cooldown via `override_rate_limit`
+- `cc_upd` — `(k, epsilon)`, emitted when the admin updates consensus config via `set_consensus_config`
+- `sf_upd` — emitted when the admin updates score floor policy via `set_score_floor_policy`
+- `sf_ovrd` — `(wallet, asset_pair)`, emitted when the admin overrides score floor via `override_score_floor`
+- `pr_pause` — `(asset_pair, paused)`, emitted when the admin pauses or unpauses a pair via `set_pair_paused`
+- `clr_scr` — `(wallet, asset_pair)`, emitted when the admin clears a score via `clear_score`
+- `clr_hist` — `(wallet, asset_pair)`, emitted when the admin clears a score history via `clear_score_history`
+- `mg_pub` — emitted when the admin sets the service pubkey via `set_service_pubkey`
+- `ttl_ext` — `(renewed, requested)`, emitted when the admin extends entry TTLs via `extend_entry_ttls`
+- `upgrade_proposed` — `(new_wasm_hash, executable_after)`, emitted on `propose_upgrade`
+- `upgrade_executed` — emitted on `execute_upgrade`
+- `upgrade_vetoed` — emitted on `veto_upgrade`
 
 `api` (or a dedicated indexer in `data`) should subscribe to these for audit trails and to keep an off-chain cache in sync with on-chain state.
 

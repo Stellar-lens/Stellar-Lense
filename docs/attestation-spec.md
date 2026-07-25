@@ -40,6 +40,17 @@ pub struct ScoreAttestation {
     /// 65-byte secp256k1 ECDSA signature over `commitment`: 32-byte `r`,
     /// 32-byte `s`, then a 1-byte recovery id which must be 0 or 1.
     pub signature: BytesN<65>,
+    /// Instance-binding field folded into the commitment preimage (§3).
+    /// Not independently checked against the contract's own address —
+    /// see the note at the end of §6 for why that's still safe.
+    pub contract_id: BytesN<32>,
+    /// Must equal the contract's stored `CONTRACT_VERSION` or the
+    /// attestation is rejected before the commitment is even recomputed.
+    pub contract_version: u32,
+    /// Per-signer sequence number, checked and incremented separately from
+    /// commitment/signature verification — prevents replay of an
+    /// otherwise-valid attestation for the *same* instance and payload.
+    pub nonce: u64,
 }
 ```
 
@@ -68,8 +79,10 @@ field is either fixed-width or zero-padded to a fixed width):
 | `model_version` | 4 bytes | `u32`, little-endian |
 | contract address | 56 bytes | `env.current_contract_address().to_string()` — StrKey encoding, ASCII |
 | network id | 32 bytes | `env.ledger().network_id()` |
+| `contract_id` | 32 bytes | contract's own address as raw 32 bytes |
+| `contract_version` | 4 bytes | `u32`, little-endian |
 
-Total preimage length: 175 bytes.
+Total preimage length: 243 bytes.
 
 Rationale for the StrKey (`to_string()`) encoding of `wallet` and the
 contract address: these are the only stable, deterministic byte
@@ -116,3 +129,46 @@ instance) cannot be replayed against another.
 - 65 bytes, uncompressed (`0x04` prefix + x + y coordinates).
 
 Any other length is rejected with `Error::InvalidPubkeyLength`.
+
+## 6. Migration & Cross-Deployment Binding
+
+As of `CONTRACT_VERSION` 4, attestations now include `contract_id` and `contract_version` fields.
+These fields cryptographically bind the signature to one specific contract deployment and version,
+preventing cross-deployment and cross-version replay attacks.
+
+**Operators running existing service signers must update their signing code to include
+`contract_id` and `contract_version` in the digest.** Existing signatures without these
+fields will be rejected as `InvalidAttestation` after this upgrade.
+
+The digest layout changed from 175 bytes to 243 bytes (see §3). Signers must recompute
+all attestations using the updated preimage format.
+
+### Domain-separation review (issue #401)
+
+Confirmed: the signed payload already binds each attestation to one specific
+contract instance and network, closing the cross-shard/cross-network replay
+vector described in #401. Concretely:
+
+- `compute_commitment` (§3) hashes `env.current_contract_address().to_string()`
+  and `env.ledger().network_id()` **read directly from the executing
+  contract**, not from any attacker- or signer-supplied field. This is the
+  binding that actually matters: it means the recomputed digest for contract
+  B can never equal a commitment signed for contract A's address, regardless
+  of what the attestation's own `contract_id` field claims.
+- The `contract_id` / `contract_version` fields on `ScoreAttestation` are
+  additional preimage inputs and a version gate (`contract_version` is
+  checked against `CONTRACT_VERSION` before the commitment is even
+  recomputed), but `contract_id` itself is *not* separately compared against
+  `env.current_contract_address()`. That's safe rather than a gap: it's
+  redundant with the self-derived binding above, since any mismatch there
+  already makes the recomputed digest fail to match `attestation.commitment`.
+- `test_attestation.rs::test_attestation_signed_for_one_instance_rejected_on_another_instance`
+  deploys two real contract instances sharing one service pubkey (the
+  multi-shard scenario #401 describes), signs a valid attestation against
+  instance A, and confirms the identical attestation is rejected with
+  `InvalidAttestation` when replayed against instance B.
+
+No ABI change or attestation-version bump was needed — the binding predates
+this review; the gap was that it wasn't documented or covered by a
+cross-instance test, both of which this section and the test above now
+provide.

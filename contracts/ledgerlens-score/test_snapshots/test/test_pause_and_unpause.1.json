@@ -50,7 +50,7 @@
   "ledger": {
     "protocol_version": 21,
     "sequence_number": 0,
-    "timestamp": 0,
+    "timestamp": 100000,
     "network_id": "0000000000000000000000000000000000000000000000000000000000000000",
     "base_reserve": 0,
     "min_persistent_entry_ttl": 4096,
@@ -90,6 +90,18 @@
                         },
                         "val": {
                           "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                        }
+                      },
+                      {
+                        "key": {
+                          "vec": [
+                            {
+                              "symbol": "AdminAuditRoot"
+                            }
+                          ]
+                        },
+                        "val": {
+                          "bytes": "359721c98196567ffd9afc64a89bace4688aa1cf2b28d624673c1bbf6fdc9589"
                         }
                       },
                       {
@@ -353,6 +365,9 @@
             "topics": [
               {
                 "symbol": "paused"
+              },
+              {
+                "u32": 1
               }
             ],
             "data": {
@@ -467,6 +482,9 @@
             "topics": [
               {
                 "symbol": "unpaused"
+              },
+              {
+                "u32": 1
               }
             ],
             "data": {

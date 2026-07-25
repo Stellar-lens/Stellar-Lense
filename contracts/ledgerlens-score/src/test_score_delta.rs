@@ -1,4 +1,4 @@
-//! Tests for structured score delta events and get_score_trend (issue #51).
+﻿//! Tests for structured score delta events and get_score_trend (issue #51).
 
 use soroban_sdk::{
     symbol_short,
@@ -54,7 +54,7 @@ fn last_delta_event(
     wallet: &Address,
     pair: &Symbol,
 ) -> (u32, u32, u32, i32, u32) {
-    let topic = (symbol_short!("scr_dlt"), wallet.clone(), pair.clone());
+    let topic = (symbol_short!("scr_dlt"), 1u32, wallet.clone(), pair.clone());
     for (addr, topics, data) in env.events().all().iter().rev() {
         if &addr == contract_id && topics == topic.into_val(env) {
             let (prev, new, abs, trend, consec): (u32, u32, u32, i32, u32) = data.into_val(env);
