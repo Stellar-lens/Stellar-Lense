@@ -12,11 +12,53 @@ models/*.joblib
 models/archive/
 models/optuna_studies.db
 models/best_params_*.json
+models/shap_cache_*.joblib
+
+# Generated reports (keep committed sample/benchmark reports)
 reports/
-# Keep sample/committed reports but ignore generated load test output
-reports/load_test_results.json
+!reports/load_test_sample.json
+!reports/adversarial_benchmark.json
 
 # mutmut mutation testing cache
 .mutmut-cache
 
 .DS_Store
+
+# ---------------------------------------------------------------------------
+# Issue #527 — partitioned dataset output
+# ---------------------------------------------------------------------------
+data/partitioned/
+data/intermediate/
+
+# ---------------------------------------------------------------------------
+# Issue #530 — retention audit logs (generated at runtime)
+# ---------------------------------------------------------------------------
+reports/retention_audit*.ndjson
+
+# ---------------------------------------------------------------------------
+# Issue #533 — dataset reproducibility snapshots
+# ---------------------------------------------------------------------------
+data/snapshots/
+
+# ---------------------------------------------------------------------------
+# Issue #534 — run comparison reports (generated at runtime)
+# ---------------------------------------------------------------------------
+reports/run_comparison*.json
+reports/drift_report_*.json
+
+# ---------------------------------------------------------------------------
+# General intermediates
+# ---------------------------------------------------------------------------
+*.parquet.tmp
+*.tmp
+*.bak
+*.swp
+*~
+
+# Editor / IDE
+.vscode/
+.idea/
+*.code-workspace
+
+# OS artefacts
+Thumbs.db
