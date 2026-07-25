@@ -45,6 +45,7 @@ from confluent_kafka import KafkaException, Producer
 from config import config
 from ingestion.avro_codec import load_schema, serialize, trade_to_record
 from ingestion.data_models import Trade
+from ingestion.exceptions import InvalidInputError
 from utils.logging import get_logger
 from utils.retry import retry_with_backoff
 
@@ -81,13 +82,29 @@ def _to_canonical_pair_id(code_a: str, issuer_a: str, code_b: str, issuer_b: str
     all trades for a pair on the same Kafka partition.
     """
     if not _validate_asset_code(code_a):
-        raise ValueError(f"Invalid asset A code: {code_a!r}")
+        raise InvalidInputError(
+            f"Invalid asset A code: {code_a!r}",
+            source="kafka_producer._to_canonical_pair_id",
+            reason="asset A code failed Stellar format validation",
+        )
     if not _validate_issuer(issuer_a):
-        raise ValueError(f"Invalid asset A issuer: {issuer_a!r}")
+        raise InvalidInputError(
+            f"Invalid asset A issuer: {issuer_a!r}",
+            source="kafka_producer._to_canonical_pair_id",
+            reason="asset A issuer failed Stellar format validation",
+        )
     if not _validate_asset_code(code_b):
-        raise ValueError(f"Invalid asset B code: {code_b!r}")
+        raise InvalidInputError(
+            f"Invalid asset B code: {code_b!r}",
+            source="kafka_producer._to_canonical_pair_id",
+            reason="asset B code failed Stellar format validation",
+        )
     if not _validate_issuer(issuer_b):
-        raise ValueError(f"Invalid asset B issuer: {issuer_b!r}")
+        raise InvalidInputError(
+            f"Invalid asset B issuer: {issuer_b!r}",
+            source="kafka_producer._to_canonical_pair_id",
+            reason="asset B issuer failed Stellar format validation",
+        )
 
     asset_a = f"{code_a}:{issuer_a}"
     asset_b = f"{code_b}:{issuer_b}"
