@@ -123,12 +123,46 @@
                   "u64": 3601
                 },
                 {
-                  "u32": 95
+                  "u32": 90
                 },
                 {
                   "u32": 1
                 },
                 "void"
+              ]
+            }
+          },
+          "sub_invocations": []
+        }
+      ]
+    ],
+    [
+      [
+        "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
+        {
+          "function": {
+            "contract_fn": {
+              "contract_address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4",
+              "function_name": "set_liquidity_gate_config",
+              "args": [
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                },
+                {
+                  "u32": 75
+                },
+                {
+                  "u32": 50
+                },
+                {
+                  "u32": 0
+                },
+                {
+                  "u64": 604800
+                },
+                {
+                  "u32": 0
+                }
               ]
             }
           },
@@ -626,7 +660,7 @@
                         "symbol": "confidence"
                       },
                       "val": {
-                        "u32": 95
+                        "u32": 90
                       }
                     },
                     {
@@ -910,7 +944,7 @@
                             "symbol": "confidence"
                           },
                           "val": {
-                            "u32": 95
+                            "u32": 90
                           }
                         },
                         {
@@ -2277,6 +2311,39 @@
             "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
             "key": {
               "ledger_key_nonce": {
+                "nonce": 2032731177588607455
+              }
+            },
+            "durability": "temporary"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
+                "key": {
+                  "ledger_key_nonce": {
+                    "nonce": 2032731177588607455
+                  }
+                },
+                "durability": "temporary",
+                "val": "void"
+              }
+            },
+            "ext": "v0"
+          },
+          6311999
+        ]
+      ],
+      [
+        {
+          "contract_data": {
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
+            "key": {
+              "ledger_key_nonce": {
                 "nonce": 5541220902715666415
               }
             },
@@ -2874,7 +2941,7 @@
                   "u64": 3601
                 },
                 {
-                  "u32": 95
+                  "u32": 90
                 },
                 {
                   "u32": 1
@@ -2965,7 +3032,7 @@
                   "bool": false
                 },
                 {
-                  "u32": 95
+                  "u32": 90
                 },
                 {
                   "u64": 3601
@@ -2990,6 +3057,72 @@
               },
               {
                 "symbol": "submit_score"
+              }
+            ],
+            "data": "void"
+          }
+        }
+      },
+      "failed_call": false
+    },
+    {
+      "event": {
+        "ext": "v0",
+        "contract_id": null,
+        "type_": "diagnostic",
+        "body": {
+          "v0": {
+            "topics": [
+              {
+                "symbol": "fn_call"
+              },
+              {
+                "bytes": "0000000000000000000000000000000000000000000000000000000000000004"
+              },
+              {
+                "symbol": "set_liquidity_gate_config"
+              }
+            ],
+            "data": {
+              "vec": [
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                },
+                {
+                  "u32": 75
+                },
+                {
+                  "u32": 50
+                },
+                {
+                  "u32": 0
+                },
+                {
+                  "u64": 604800
+                },
+                {
+                  "u32": 0
+                }
+              ]
+            }
+          }
+        }
+      },
+      "failed_call": false
+    },
+    {
+      "event": {
+        "ext": "v0",
+        "contract_id": "0000000000000000000000000000000000000000000000000000000000000004",
+        "type_": "diagnostic",
+        "body": {
+          "v0": {
+            "topics": [
+              {
+                "symbol": "fn_return"
+              },
+              {
+                "symbol": "set_liquidity_gate_config"
               }
             ],
             "data": "void"
@@ -3173,7 +3306,7 @@
                     "symbol": "confidence"
                   },
                   "val": {
-                    "u32": 95
+                    "u32": 90
                   }
                 },
                 {
