@@ -119,6 +119,13 @@ let private_score: u32 = client.get_private_aggregate_score(&wallet, &seed);
    (`get_private_aggregate_score`) has a private variant.  The per-pair
    `get_score` query is exact and not noise-calibrated.
 
+## Deletion-policy note
+
+Privacy-related score deletion is now intentionally separated from routine
+admin rights. `clear_score` and `clear_score_history` can be placed behind an
+explicit deletion-approval policy so normal governance operators cannot perform
+irreversible deletion without the separately configured high-risk approver.
+
 ## Example
 
 ```text

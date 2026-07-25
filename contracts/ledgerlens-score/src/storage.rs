@@ -7,11 +7,12 @@ use crate::constants::{
 use crate::errors::Error;
 use crate::types::{
     AdaptiveRateLimit, AggregateRiskScore, DataKey, DataKeyB, DataKeyC, DataKeyD, DecayCurve,
-    EmbargoExpiry, FlashProtectionMode, GateDataKey, HllSketch, InterpolationMethod, JumpStats,
-    ModelVersionStats, ModelVersionStatus, PairVolatilityState, ParamChangeProposal,
-    ParameterProposalRecord, ParameterProposalStatus, PendingScoreEntry, RateLimitOverrideEntry,
-    RiskScore, ScoreDispute, ScoreFloorPolicy, ScoreHistogram, ScoreTrend, ScoreVelocityCap,
-    SignerAccuracyRecord, SubscorePayload, TokenBucket, UpgradeProposal, WelfordCorrState,
+    DeletionApprovalPolicy, EmbargoExpiry, FlashProtectionMode, GateDataKey, HllSketch,
+    InterpolationMethod, JumpStats, ModelVersionStats, ModelVersionStatus, PairVolatilityState,
+    ParamChangeProposal, ParameterProposalRecord, ParameterProposalStatus, PendingScoreEntry,
+    RateLimitOverrideEntry, RiskScore, ScoreDispute, ScoreFloorPolicy, ScoreHistogram, ScoreTrend,
+    ScoreVelocityCap, SignerAccuracyRecord, SubscorePayload, TokenBucket, UpgradeProposal,
+    WelfordCorrState,
 };
 use soroban_sdk::{Address, Bytes, BytesN, Env, Symbol, Vec};
 
@@ -1023,6 +1024,23 @@ pub fn clear_score_history(env: &Env, wallet: &Address, asset_pair: &Symbol) {
 pub fn clear_score(env: &Env, wallet: &Address, asset_pair: &Symbol) {
     let key = DataKey::Score(wallet.clone(), asset_pair.clone());
     env.storage().persistent().remove(&key);
+}
+
+pub fn get_deletion_approval_policy(env: &Env) -> DeletionApprovalPolicy {
+    let enabled = env.storage().instance().get(&DataKeyD::DeletionPolicyEnabled).unwrap_or(false);
+    let approver = env.storage().instance().get(&DataKeyD::DeletionApprover);
+    DeletionApprovalPolicy { enabled, approver }
+}
+
+pub fn set_deletion_approval_policy(
+    env: &Env,
+    policy: &DeletionApprovalPolicy,
+) {
+    env.storage().instance().set(&DataKeyD::DeletionPolicyEnabled, &policy.enabled);
+    match &policy.approver {
+        Some(approver) => env.storage().instance().set(&DataKeyD::DeletionApprover, approver),
+        None => env.storage().instance().remove(&DataKeyD::DeletionApprover),
+    }
 }
 
 // ── Score count ──────────────────────────────────────────────────────────────

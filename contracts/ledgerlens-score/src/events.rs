@@ -144,6 +144,10 @@ pub fn score_cleared(env: &Env, wallet: &Address, asset_pair: &Symbol) {
         .publish((symbol_short!("clr_scr"), EVENT_VERSION, wallet.clone()), asset_pair.clone());
 }
 
+pub fn deletion_policy_updated(env: &Env, enabled: bool, approver: &Option<Address>) {
+    env.events().publish((symbol_short!("del_pol"), EVENT_VERSION), (enabled, approver.clone()));
+}
+
 pub fn cooldown_updated(env: &Env, cooldown_secs: u64) {
     env.events().publish((symbol_short!("cd_upd"), EVENT_VERSION), cooldown_secs);
 }

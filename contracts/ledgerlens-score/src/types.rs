@@ -384,6 +384,46 @@ pub struct ScoreVelocityCap {
     pub points_per_hour: u32,
 }
 
+/// Separate approval policy for irreversible score deletion operations.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DeletionApprovalPolicy {
+    pub enabled: bool,
+    pub approver: Option<Address>,
+}
+
+/// One canonical key/value entry in the machine-readable configuration export.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ConfigExportEntry {
+    pub key: Symbol,
+    pub value: Bytes,
+}
+
+/// One pending key/value entry in the machine-readable configuration export.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PendingConfigExportEntry {
+    pub key: Symbol,
+    pub value: Bytes,
+    pub proposal_id: u64,
+    pub proposed_at: u64,
+    pub executable_after: u64,
+}
+
+/// Deterministic machine-readable export of governance-controlled configuration.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ConfigExportBundle {
+    pub schema_version: u32,
+    pub active_hash: BytesN<32>,
+    pub pending_hash: BytesN<32>,
+    pub export_hash: BytesN<32>,
+    pub active_values: Vec<ConfigExportEntry>,
+    pub pending_values: Vec<PendingConfigExportEntry>,
+    pub omitted_secret_rationale: Vec<Bytes>,
+}
+
 /// Score histogram returned by `get_score_histogram`.
 #[contracttype]
 #[derive(Clone)]
@@ -660,6 +700,8 @@ pub enum DataKeyD {
     PendingParamChange(Symbol),
     ModelVersionExecutableAfter(u32),
     ModelVersionDescription(u32),
+    DeletionPolicyEnabled,
+    DeletionApprover,
 }
 
 #[contracttype]
