@@ -34,6 +34,18 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo clippy --all-targets -- -D warnings
 
+  contract-build-lints:
+    name: Contract-only dead-code check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.81.0"
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - run: tools/check_contract_build_lints.sh
+
   test:
     name: Unit tests
     runs-on: ubuntu-latest
@@ -79,6 +91,13 @@ jobs:
           name: ledgerlens-score-wasm-size-report
           path: target/wasm-size-report.md
           retention-days: 7
+
+  deploy-script-tests:
+    name: Deploy script failure-mode tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: tests/deploy_script_rpc_failures.sh
 
   audit:
     name: Security audit

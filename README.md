@@ -629,6 +629,8 @@ soroban contract invoke \
 ├── deploy.sh                           ← Build, optimize, deploy, initialize
 ├── docs/
 │   └── interface-spec.md               ← ILedgerLensScore composability spec
+│   └── contract-build-lints.md         ← WASM-only dead-code detection policy
+│   └── ledgerlens-score-module-ownership.md ← Score module ownership map
 ├── examples/
 │   └── amm_gate.rs                     ← Reference AMM integration (query_risk_gate)
 ├── contracts/
@@ -755,8 +757,13 @@ pub struct RiskScore {
 
 - **Networks**: `testnet` for development, `mainnet` for production. Contract IDs per network are recorded in this repo's deployment docs and must be mirrored into `api`'s environment configuration (`CONTRACT_ID`, `RPC_URL`, `NETWORK`).
 - **Secrets**: the "service" keypair that calls `submit_score` lives in `api`'s secret store — never in `core`, `data`, or `dashboard`. This repo only ever stores the **public address** of that account on-chain.
-- **CI**: workflow templates live in `.github`; this repo's contract CI builds with `cargo build --target wasm32-unknown-unknown --release` and runs `cargo test`.
+- **CI**: workflow templates live in `.github`; this repo's contract CI builds with `cargo build --target wasm32-unknown-unknown --release`, runs `cargo test`, checks contract-only wasm lints via `tools/check_contract_build_lints.sh`, and exercises `deploy.sh` RPC failure handling with a shell harness.
 - **Versioning**: tag contract releases as `contract-vX.Y.Z`. `api` should pin against a specific deployed `CONTRACT_ID` + ABI version, not "latest".
+
+### Deployment safety notes
+
+- `deploy.sh` now treats RPC timeouts as unconfirmed state, not success. If deployment or initialization times out, the script exits non-zero and prints the contract id when available so operators can verify chain state manually before retrying.
+- `deploy.sh` now surfaces targeted hints for unavailable RPC endpoints and bad sequence numbers, and it never prints the final "Deployment complete" summary before on-chain verification succeeds.
 
 ### Notes for Other Repos
 
