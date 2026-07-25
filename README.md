@@ -784,7 +784,7 @@ MIT
 
 ## Contributing
 
-Contributions are welcome. LedgerLens is an open-source public good built for the Stellar ecosystem. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, required checks, and PR guidelines.
+Contributions are welcome. LedgerLens is an open-source public good built for the Stellar ecosystem. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, required checks, and PR guidelines. When opening an issue, pick the [task-specific template](.github/ISSUE_TEMPLATE/) — implementation, testing, documentation, security review, or benchmark — so the expected evidence and acceptance checklist match the kind of work involved.
 
 ## References
 

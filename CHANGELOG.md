@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [Unreleased]
 
 ### Added
+- **Issue templates by task type**: Five GitHub issue forms under [`.github/ISSUE_TEMPLATE/`](.github/ISSUE_TEMPLATE/) — implementation, testing, documentation, security review, and benchmark — each with the evidence and acceptance checklist specific to that class of work (e.g. the security-review template mirrors the path-by-path-findings structure already used in `docs/audit-constant-time-2026-07-20.md`; the benchmark template requires measuring at a `MAX_*` cap and capturing Soroban budget cost, not just wall-clock time). Every template requires an explicit compatibility-impact statement. `.github/ISSUE_TEMPLATE/config.yml` disables blank issues and links to `docs/invariants.md`, `CONTRIBUTING.md`, and the interface versioning policy. Cross-referenced from `README.md` and `CONTRIBUTING.md`. Closes #767.
 - **Interface versioning & migration policy**: [`docs/interface-versioning-policy.md`](docs/interface-versioning-policy.md) defines breaking vs. non-breaking changes, a 30-day notice period for breaking releases, and programmatic detection via `supports_interface`. Cross-referenced from `docs/interface-spec.md`, `CHANGELOG.md`, and `CONTRIBUTING.md`. Closes #418.
 - **`get_admin_set`**: Read-only query returning the current M-of-N admin co-signer set, mirroring `get_admin_signers`. Closes #239.
 - **Rustdoc examples**: Added runnable usage examples for `get_hysteresis_margin` (closes #229) and `get_staleness_window` (closes #227).
