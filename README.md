@@ -791,7 +791,7 @@ MIT
 
 ## Contributing
 
-Contributions are welcome. LedgerLens is an open-source public good built for the Stellar ecosystem. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, required checks, and PR guidelines, and [`docs/invariants.md`](docs/invariants.md) for the non-negotiable behaviors (fail-closed gates, no-panic reads, bounded storage, append-only event/error stability) that any change to `lib.rs` must preserve.
+Contributions are welcome. LedgerLens is an open-source public good built for the Stellar ecosystem. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, required checks, and PR guidelines, [`docs/invariants.md`](docs/invariants.md) for the non-negotiable behaviors (fail-closed gates, no-panic reads, bounded storage, append-only event/error stability) that any change to `lib.rs` must preserve, and [`docs/review-checklists.md`](docs/review-checklists.md) for the specific gates governance, cryptography, storage, upgrade, and composability changes are reviewed against.
 
 ## References
 

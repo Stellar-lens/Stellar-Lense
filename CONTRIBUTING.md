@@ -6,6 +6,10 @@ Unfamiliar with a term used in an issue or in this codebase? Check
 [`docs/glossary.md`](docs/glossary.md) before guessing — several terms (**shard**, **finality**,
 **attestation**, **pause**) mean something more specific here than their general blockchain usage.
 
+Touching governance, cryptography, storage, upgrades, or composability? Work through
+[`docs/review-checklists.md`](docs/review-checklists.md) — short, actionable per-category gates
+reviewers will hold your PR to.
+
 ## Getting Started
 
 1. Install the Rust toolchain (stable) and the `wasm32-unknown-unknown` target:
@@ -44,3 +48,7 @@ cargo build --target wasm32-unknown-unknown --release
 - Describe what changed and why.
 - Note any cross-repo coordination needed (e.g. "requires `api` to update its `RiskScore` schema").
 - Ensure all CI checks pass.
+- **If your change touches governance, cryptography, storage, upgrades, or composability**, work
+  through the matching checklist in [`docs/review-checklists.md`](docs/review-checklists.md)
+  before requesting review — reviewers will be checking against it, so a PR description that
+  addresses each item up front gets reviewed faster than one that doesn't.
