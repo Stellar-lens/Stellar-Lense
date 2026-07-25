@@ -16,6 +16,10 @@ pub const MAX_SCORE: u32 = 100;
 pub const MAX_HISTORY_DEPTH: u32 = 50;
 pub const DEFAULT_HISTORY_MAX_DEPTH: u32 = 10;
 pub const MAX_BATCH_SIZE: u32 = 20;
+pub const MAX_ASSET_PAIR_BYTES: u32 = 9;
+pub const MAX_SCORE_COMMITMENT_BYTES: u32 = 32;
+pub const MAX_DISPUTE_BOND_PREIMAGE_BYTES: u32 = 80;
+pub const MAX_DISPUTE_BOND_SALT_BYTES: u32 = 64;
 
 /// Maximum number of entries accepted in a single batch score read call.
 pub const BATCH_READ_MAX: u32 = 50;

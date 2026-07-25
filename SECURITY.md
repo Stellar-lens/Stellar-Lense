@@ -53,6 +53,7 @@ We follow [Responsible Disclosure](https://en.wikipedia.org/wiki/Coordinated_vul
 | Compromised service key              | `pause()` halts submissions; `set_service()` rotates the key      |
 | Accidental admin key loss            | Two-step transfer: new admin must call `accept_admin()`           |
 | Score poisoning via out-of-range data | `score` and `confidence` clamped to 0-100 on-chain               |
+| Resource exhaustion via oversized symbols or cryptographic byte payloads | `asset_pair` symbols are capped at 9 bytes and malformed oversized commitment / dispute replay byte payloads reject before hashing, proof parsing, shard fan-out, or storage writes |
 | DoS via unbounded storage            | History ring buffer capped at `HISTORY_MAX_DEPTH` (10) per pair  |
 | Large batch denial of service        | Batch size capped at `MAX_BATCH_SIZE` (20) per invocation        |
 | Compromised service floods a pair with submissions | Per-`(wallet, asset_pair)` cooldown (`RateLimitExceeded`); admin-bounded `[MIN_COOLDOWN_SECS, MAX_COOLDOWN_SECS]`, with `override_rate_limit` as an audited emergency escape hatch |

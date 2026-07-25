@@ -104,6 +104,100 @@ fn test_submit_and_get_score() {
 }
 
 #[test]
+fn test_submit_score_rejects_oversized_asset_pair_without_mutation() {
+    let (env, client, admin, service) = initialized();
+    let wallet = Address::generate(&env);
+    let oversized_pair = Symbol::new(&env, "PAIR123456");
+
+    let result = client.try_submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &oversized_pair,
+        &42,
+        &false,
+        &false,
+        &1,
+        &90,
+        &1,
+        &None,
+    );
+
+    assert_eq!(result, Err(Ok(Error::InvalidAttestation)));
+    assert_eq!(client.try_get_score(&wallet, &oversized_pair), Err(Ok(Error::InvalidAttestation)));
+    assert_eq!(client.get_wallet_pair_list(&wallet).len(), 0);
+}
+
+#[test]
+fn test_submit_score_rejects_oversized_commitment_bytes_without_mutation() {
+    let (env, client, admin, service) = initialized();
+    let wallet = Address::generate(&env);
+    let pair = Symbol::new(&env, "PAIR12345");
+    let malformed_commitment = soroban_sdk::Bytes::from_array(&env, &[7u8; 31]);
+
+    let result = client.try_submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &42,
+        &false,
+        &false,
+        &1,
+        &90,
+        &1,
+        &Some(crate::ScoreAttestationInput {
+            attestation: crate::MaybeScoreAttestation::None,
+            threshold_attestation: crate::MaybeThresholdAttestation::None,
+            commitment: Some(malformed_commitment),
+        }),
+    );
+
+    assert_eq!(result, Err(Ok(Error::InvalidAttestation)));
+    assert_eq!(client.try_get_score(&wallet, &pair), Err(Ok(Error::ScoreNotFound)));
+    assert_eq!(client.get_wallet_pair_list(&wallet).len(), 0);
+}
+
+#[test]
+fn test_submit_scores_batch_rejects_oversized_pair_per_entry() {
+    let (env, client, admin, service) = initialized();
+    let valid_wallet = Address::generate(&env);
+    let invalid_wallet = Address::generate(&env);
+    let valid_pair = Symbol::new(&env, "PAIR12345");
+    let oversized_pair = Symbol::new(&env, "PAIR123456");
+    let mut batch = Vec::new(&env);
+
+    batch.push_back(ScoreSubmission {
+        wallet: valid_wallet.clone(),
+        asset_pair: valid_pair.clone(),
+        score: 11,
+        benford_flag: false,
+        ml_flag: false,
+        timestamp: 1,
+        confidence: 80,
+        model_version: 1,
+    });
+    batch.push_back(ScoreSubmission {
+        wallet: invalid_wallet.clone(),
+        asset_pair: oversized_pair.clone(),
+        score: 22,
+        benford_flag: false,
+        ml_flag: false,
+        timestamp: 2,
+        confidence: 80,
+        model_version: 1,
+    });
+
+    let result = client.submit_scores_batch(&batch);
+
+    assert_eq!(result.accepted_count, 1);
+    assert_eq!(result.rejected_count, 1);
+    assert!(result.results.get(0).unwrap().accepted);
+    assert_eq!(result.results.get(1).unwrap().rejection_code, Error::InvalidAttestation as u32);
+    assert_eq!(client.get_score(&valid_wallet, &valid_pair).score, 11);
+    assert_eq!(client.try_get_score(&invalid_wallet, &oversized_pair), Err(Ok(Error::InvalidAttestation)));
+    assert_eq!(client.get_wallet_pair_list(&invalid_wallet).len(), 0);
+}
+
+#[test]
 fn test_get_score_exists_returns_true_when_score_present() {
     let (env, client, admin, service) = initialized();
     let wallet = Address::generate(&env);
