@@ -50,6 +50,27 @@ fn test_initialize_twice_fails() {
     assert_eq!(result, Err(Ok(Error::AlreadyInitialized)));
 }
 
+#[test]
+fn test_initialize_requires_nominated_admin_and_rolls_back() {
+    let env = Env::default();
+    let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let admin = Address::generate(&env);
+    let service = Address::generate(&env);
+
+    // No mocked authorization: the host must reject this before either
+    // privileged address becomes persistent state.
+    assert!(client.try_initialize(&admin, &service).is_err());
+    assert_eq!(client.try_get_admin(), Err(Ok(Error::NotInitialized)));
+    assert_eq!(client.try_get_service(), Err(Ok(Error::NotInitialized)));
+
+    // A legitimately authorized retry can still initialize the same instance.
+    env.mock_all_auths();
+    client.initialize(&admin, &service);
+    assert_eq!(client.get_admin(), admin);
+    assert_eq!(client.get_service(), service);
+}
+
 // ── Score submission & retrieval ──────────────────────────────────────────────
 
 #[test]

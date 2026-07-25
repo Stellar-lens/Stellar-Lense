@@ -81,6 +81,23 @@ fn test_initialize_twice_fails() {
 }
 
 #[test]
+fn test_initialize_requires_nominated_admin_and_rolls_back() {
+    let env = Env::default();
+    let agg_id = env.register_contract(None, LedgerLensAggregator);
+    let client = LedgerLensAggregatorClient::new(&env, &agg_id);
+    let admin = Address::generate(&env);
+
+    // An arbitrary invoker cannot install a nominated admin without that
+    // address's authorization, and the failed invocation must not write state.
+    assert!(client.try_initialize(&admin).is_err());
+    assert_eq!(client.try_get_admin(), Err(Ok(Error::NotInitialized)));
+
+    env.mock_all_auths();
+    client.initialize(&admin);
+    assert_eq!(client.get_admin(), admin);
+}
+
+#[test]
 fn test_get_admin_not_initialized() {
     let env = Env::default();
     env.mock_all_auths();

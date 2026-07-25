@@ -69,6 +69,10 @@ impl LedgerLensAggregator {
         if env.storage().instance().has(&DataKey::Admin) {
             return Err(Error::AlreadyInitialized);
         }
+        // Bind first initialization to the nominated administrator. Without
+        // this authorization, any invoker could front-run deployment and take
+        // control of shard registration.
+        admin.require_auth();
         env.storage().instance().set(&DataKey::Admin, &admin);
         Ok(())
     }

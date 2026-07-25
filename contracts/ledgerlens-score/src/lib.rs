@@ -199,6 +199,10 @@ impl LedgerLensScoreContract {
         if storage::has_admin(&env) {
             return Err(Error::AlreadyInitialized);
         }
+        // Initialization is a privileged state transition too. Requiring the
+        // nominated admin prevents a third party from front-running deployment
+        // and permanently installing attacker-controlled admin/service values.
+        admin.require_auth();
         storage::set_admin(&env, &admin);
         storage::set_service(&env, &service);
         env.storage()
