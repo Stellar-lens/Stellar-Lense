@@ -577,11 +577,13 @@ soroban contract optimize --wasm target/wasm32-unknown-unknown/release/ledgerlen
 ### 2. Deploy to Testnet
 
 ```bash
-soroban contract deploy \
-  --wasm target/wasm32-unknown-unknown/release/ledgerlens_score.optimized.wasm \
-  --source deployer \
-  --network testnet
+./deploy.sh --dry-run testnet deployer GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 ```
+
+Reviewed deployment manifests live under `deploy/manifests/`. `deploy.sh`
+validates the selected manifest before use and fails closed if the local Rust
+or Stellar/Soroban CLI version drifts from the pinned project expectations.
+See [`docs/deployment-manifests.md`](docs/deployment-manifests.md).
 
 ### 3. Submit a Risk Score
 
@@ -627,7 +629,9 @@ soroban contract invoke \
 ├── rustfmt.toml
 ├── clippy.toml
 ├── deploy.sh                           ← Build, optimize, deploy, initialize
+├── deploy/manifests/                   ← Reviewed environment deployment manifests
 ├── docs/
+│   ├── deployment-manifests.md         ← Manifest schema and toolchain drift checks
 │   └── interface-spec.md               ← ILedgerLensScore composability spec
 ├── examples/
 │   └── amm_gate.rs                     ← Reference AMM integration (query_risk_gate)

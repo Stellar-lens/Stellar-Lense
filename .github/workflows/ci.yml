@@ -10,6 +10,14 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
+  deploy-script:
+    name: Deployment script checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run deploy.sh manifest and drift tests
+        run: bash tests/deploy/test_deploy.sh
+
   fmt:
     name: Format check
     runs-on: ubuntu-latest

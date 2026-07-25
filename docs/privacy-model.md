@@ -132,3 +132,43 @@ Exact score:  70
 Noised score: 70 + Lap(0, 100) → e.g. 42 or 91
               (always clamped to [0, 100])
 ```
+
+## Recovery limits after on-chain deletion
+
+The differential-privacy query path does not change the deletion semantics of
+the underlying score contract.
+
+Current deletion behavior as of July 25, 2026:
+
+- `clear_score(wallet, asset_pair)` removes the latest live score from contract
+  storage.
+- `clear_score_history(wallet, asset_pair)` removes the history ring buffer for
+  that pair.
+- Both operations are irreversible from current on-chain contract storage
+  alone.
+
+What can still be reconstructed:
+
+- The fact that a deletion happened, from the emitted `clr_scr` or `clr_hist`
+  event.
+- The transaction envelope, auths, and ledger inclusion proof showing who
+  invoked the deletion and when.
+- Prior values only if an off-chain indexer, replay archive, snapshot, or
+  backup captured them before deletion.
+
+What cannot be reconstructed from current chain state alone:
+
+- The deleted score payload after `clear_score` if no external archive kept it.
+- The deleted history entries after `clear_score_history` if no external
+  archive kept them.
+- A full pre-deletion state snapshot solely from the deletion event, because
+  the event records the deletion action, not the erased payload.
+
+Operational guidance:
+
+- Treat `clear_score` and `clear_score_history` as destructive administrative
+  actions.
+- Export or snapshot any data that may be needed for audit, rollback analysis,
+  or downstream replay before invoking either deletion path.
+- Retain off-chain event archives and score snapshots if recovery evidence is a
+  regulatory or incident-response requirement.
