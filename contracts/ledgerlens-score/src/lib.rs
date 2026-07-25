@@ -138,6 +138,8 @@ mod test_replay_audit;
 
 #[cfg(test)]
 mod test_gdpr_accumulator;
+#[cfg(test)]
+mod test_panic_guards;
 
 use soroban_sdk::{
     contract, contractimpl, crypto::Hash, symbol_short, token, Address, Bytes, BytesN, Env,
