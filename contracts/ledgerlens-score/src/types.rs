@@ -660,6 +660,9 @@ pub enum DataKeyD {
     PendingParamChange(Symbol),
     ModelVersionExecutableAfter(u32),
     ModelVersionDescription(u32),
+    /// Latest operator acknowledgement record for a given alert class.
+    /// Keyed by `AlertType` so each class has its own O(1) slot (issue #630).
+    AlertAcknowledgement(AlertType),
 }
 
 #[contracttype]
@@ -811,4 +814,40 @@ pub struct WelfordCorrState {
 pub struct TokenBucket {
     pub tokens: u32,
     pub last_refill: u64,
+}
+
+// ── Operator alert acknowledgement (issue #630) ──────────────────────────────
+
+/// Identifies which class of critical alert an operator is acknowledging.
+///
+/// Variants are stable — never reorder or remove to preserve storage layout.
+/// Extend only by appending new variants.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum AlertType {
+    /// Momentum alert for a specific `(wallet, asset_pair)` crossed the
+    /// configured `MomentumAlertThreshold`.
+    Momentum(Address, Symbol),
+    /// The service heartbeat exceeded `ServiceHeartbeatAlertThreshold`
+    /// and a `ServiceSilenceAlertEvent` was emitted.
+    ServiceSilence,
+}
+
+/// Immutable on-chain record written by an operator when they acknowledge
+/// a critical alert. Stored keyed by `AlertType` so the latest ack for each
+/// alert class is O(1) to read.
+///
+/// `note_hash` is the SHA-256 digest of an off-chain remediation note
+/// (ticket URL, runbook entry, etc.). A zero hash (`[0u8; 32]`) is
+/// explicitly valid when no note is required — the purpose is to force
+/// deliberate operator action, not mandatory documentation.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AlertAckRecord {
+    /// Admin who performed the acknowledgement.
+    pub operator: Address,
+    /// Ledger timestamp at which the acknowledgement was recorded.
+    pub acknowledged_at: u64,
+    /// SHA-256 digest of the off-chain remediation note. Zero is permitted.
+    pub note_hash: BytesN<32>,
 }

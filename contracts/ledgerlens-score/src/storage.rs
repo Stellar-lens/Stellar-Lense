@@ -6,12 +6,13 @@ use crate::constants::{
 };
 use crate::errors::Error;
 use crate::types::{
-    AdaptiveRateLimit, AggregateRiskScore, DataKey, DataKeyB, DataKeyC, DataKeyD, DecayCurve,
-    EmbargoExpiry, FlashProtectionMode, GateDataKey, HllSketch, InterpolationMethod, JumpStats,
-    ModelVersionStats, ModelVersionStatus, PairVolatilityState, ParamChangeProposal,
-    ParameterProposalRecord, ParameterProposalStatus, PendingScoreEntry, RateLimitOverrideEntry,
-    RiskScore, ScoreDispute, ScoreFloorPolicy, ScoreHistogram, ScoreTrend, ScoreVelocityCap,
-    SignerAccuracyRecord, SubscorePayload, TokenBucket, UpgradeProposal, WelfordCorrState,
+    AdaptiveRateLimit, AggregateRiskScore, AlertAckRecord, AlertType, DataKey, DataKeyB, DataKeyC,
+    DataKeyD, DecayCurve, EmbargoExpiry, FlashProtectionMode, GateDataKey, HllSketch,
+    InterpolationMethod, JumpStats, ModelVersionStats, ModelVersionStatus, PairVolatilityState,
+    ParamChangeProposal, ParameterProposalRecord, ParameterProposalStatus, PendingScoreEntry,
+    RateLimitOverrideEntry, RiskScore, ScoreDispute, ScoreFloorPolicy, ScoreHistogram, ScoreTrend,
+    ScoreVelocityCap, SignerAccuracyRecord, SubscorePayload, TokenBucket, UpgradeProposal,
+    WelfordCorrState,
 };
 use soroban_sdk::{Address, Bytes, BytesN, Env, Symbol, Vec};
 
@@ -2897,4 +2898,40 @@ mod test_instrumentation {
     pub enum TestKey {
         ExtendCount,
     }
+}
+
+// ── Operator alert acknowledgement (issue #630) ──────────────────────────
+
+/// Writes or overwrites the acknowledgement record for `alert_type` in
+/// persistent storage. Because each `AlertType` variant is a separate map
+/// key the write is always O(1) and does not scan any collection.
+///
+/// TTL is aligned to the score-entry window so the record survives as long
+/// as the data it refers to.
+pub fn set_alert_acknowledgement(
+    env: &Env,
+    alert_type: &AlertType,
+    record: &AlertAckRecord,
+) {
+    let key = DataKeyD::AlertAcknowledgement(alert_type.clone());
+    env.storage().persistent().set(&key, record);
+    env.storage()
+        .persistent()
+        .extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+}
+
+/// Returns the most recent acknowledgement record for `alert_type`, or
+/// `None` if the alert has never been acknowledged. O(1) persistent read.
+pub fn get_alert_acknowledgement(
+    env: &Env,
+    alert_type: &AlertType,
+) -> Option<AlertAckRecord> {
+    let key = DataKeyD::AlertAcknowledgement(alert_type.clone());
+    let record: Option<AlertAckRecord> = env.storage().persistent().get(&key);
+    if record.is_some() {
+        env.storage()
+            .persistent()
+            .extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    }
+    record
 }

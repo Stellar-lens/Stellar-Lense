@@ -1,6 +1,6 @@
 use soroban_sdk::{contracttype, symbol_short, Address, Bytes, BytesN, Env, Symbol};
 
-use crate::types::RiskScore;
+use crate::types::{AlertAckRecord, AlertType, RiskScore};
 
 /// Event Schema Versioning
 ///
@@ -711,4 +711,19 @@ pub fn suspicious_same_ledger_submission(
 
 pub fn wallet_cluster_assigned(env: &Env, wallet: &Address, cluster: u32) {
     env.events().publish((symbol_short!("wc_asgn"), wallet.clone()), cluster);
+}
+
+// ── Operator alert acknowledgement (issue #630) ──────────────────────────────
+
+/// Emitted by `acknowledge_alert` when an authorized operator records an
+/// acknowledgement for a critical alert.
+///
+/// Topic: `("alrt_ack", EVENT_VERSION, alert_type.clone())`
+/// Data:  `AlertAckRecord { operator, acknowledged_at, note_hash }`
+///
+/// Off-chain monitoring pipelines can subscribe to this topic to close out
+/// open PagerDuty / Opsgenie alerts and feed the ack into audit dashboards.
+pub fn alert_acknowledged(env: &Env, alert_type: &AlertType, record: &AlertAckRecord) {
+    env.events()
+        .publish((symbol_short!("alrt_ack"), EVENT_VERSION, alert_type.clone()), record.clone());
 }
