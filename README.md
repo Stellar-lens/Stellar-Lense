@@ -10,6 +10,11 @@ Soroban smart contract that serves as the on-chain risk-score registry for **Led
 
 LedgerLens detects wash trading and artificial volume on the Stellar Decentralised Exchange (SDEX) by analysing trade data with statistical (Benford's Law) and machine learning techniques. The off-chain detection pipeline computes a **LedgerLens Risk Score (0-100)** for wallets and asset pairs, and this contract acts as the **on-chain truth layer** for those scores — making fraud signals composable with other Soroban protocols (AMMs, lending platforms, DEX aggregators) without relying on an external oracle.
 
+New to the terminology below? [`docs/glossary.md`](docs/glossary.md) defines every term precisely
+against the actual implementation — including a few (**shard**, **finality**, **attestation**,
+**pause**) whose meaning here is narrower or different from what you might assume from general
+blockchain usage.
+
 ## Features
 
 - **On-Chain Risk Score Registry**: Stores the latest LedgerLens risk score, flags, confidence, and timestamp per wallet/asset-pair
