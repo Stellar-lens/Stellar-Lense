@@ -7464,8 +7464,9 @@ impl LedgerLensScoreContract {
     /// Erase the score history ring buffer for `wallet` / `asset_pair`.
     ///
     /// Does nothing (returns `Ok`) if no history exists. After this call,
-    /// `get_score_history` returns an empty Vec. This operation is
-    /// **irreversible on-chain** — keep off-chain backups before erasing.
+    /// `get_score_history` returns an empty Vec while the live score and its
+    /// live indexes remain intact. This operation is **irreversible on-chain**
+    /// — keep off-chain backups before erasing.
     /// Admin only.
     ///
     /// Emits `clr_hist` for the on-chain audit trail.
@@ -7490,8 +7491,10 @@ impl LedgerLensScoreContract {
     /// Erase the latest score entry for `wallet` / `asset_pair`.
     ///
     /// Does nothing (returns `Ok`) if no score exists. After this call,
-    /// `get_score` returns `ScoreNotFound`. This operation is
-    /// **irreversible on-chain** — keep off-chain backups before erasing.
+    /// `get_score` returns `ScoreNotFound`, `get_wallet_pair_list` drops the
+    /// pair, and the proactive rent-management index stops tracking it. The
+    /// history ring is left untouched. This operation is **irreversible
+    /// on-chain** — keep off-chain backups before erasing.
     /// Admin only.
     ///
     /// Emits `clr_scr` for the on-chain audit trail.
@@ -7509,6 +7512,8 @@ impl LedgerLensScoreContract {
             storage::update_histogram_on_clear(&env, risk.score);
         }
         storage::clear_score(&env, &wallet, &asset_pair);
+        storage::remove_score_entry(&env, &wallet, &asset_pair);
+        storage::remove_pair_for_wallet(&env, &wallet, &asset_pair);
         events::score_cleared(&env, &wallet, &asset_pair);
         Ok(())
     }

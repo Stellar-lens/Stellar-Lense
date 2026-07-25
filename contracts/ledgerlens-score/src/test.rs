@@ -8,6 +8,7 @@ use crate::{
     BatchResult, Error, LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreQuery,
     ScoreSubmission,
 };
+use crate::storage;
 
 // ── Test helpers ──────────────────────────────────────────────────────────────
 
@@ -2384,7 +2385,7 @@ fn test_set_staleness_window_updates_stale_check() {
 // ── GDPR / data-erasure ───────────────────────────────────────────────────────
 
 #[test]
-fn test_clear_score_history_removes_all_entries() {
+fn test_clear_score_history_removes_history_only_and_is_idempotent() {
     let (env, client, _admin, _service) = initialized();
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
@@ -2395,7 +2396,19 @@ fn test_clear_score_history_removes_all_entries() {
 
     assert_eq!(client.get_score_history(&wallet, &pair).len(), 2);
     client.clear_score_history(&Vec::new(&env), &wallet, &pair);
+
     assert_eq!(client.get_score_history(&wallet, &pair).len(), 0);
+    assert_eq!(client.get_score(&wallet, &pair).score, 20);
+    assert_eq!(client.get_wallet_pair_list(&wallet).len(), 1);
+    assert_eq!(storage::get_score_entry_index(&env).len(), 1);
+    assert_eq!(client.get_score_count(&wallet, &pair), 2);
+    assert_eq!(client.get_pair_score_count(&pair), 2);
+
+    client.clear_score_history(&Vec::new(&env), &wallet, &pair);
+    assert_eq!(client.get_score_history(&wallet, &pair).len(), 0);
+    assert_eq!(client.get_score(&wallet, &pair).score, 20);
+    assert_eq!(client.get_wallet_pair_list(&wallet).len(), 1);
+    assert_eq!(storage::get_score_entry_index(&env).len(), 1);
 }
 
 #[test]
@@ -2410,16 +2423,36 @@ fn test_clear_score_history_on_empty_is_noop() {
 }
 
 #[test]
-fn test_clear_score_removes_latest_score() {
+fn test_clear_score_removes_latest_and_live_indexes_and_is_idempotent() {
     let (env, client, _admin, _service) = initialized();
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
 
     client.submit_score(&Vec::new(&env), &wallet, &pair, &42, &false, &false, &1, &80, &1, &None);
+    assert_eq!(client.get_score_history(&wallet, &pair).len(), 1);
+    assert_eq!(client.get_wallet_pair_list(&wallet).len(), 1);
+    assert_eq!(storage::get_score_entry_index(&env).len(), 1);
+    assert_eq!(client.get_score_count(&wallet, &pair), 1);
+    assert_eq!(client.get_pair_score_count(&pair), 1);
+    assert_eq!(client.get_total_wallets_scored(), 1);
+
     client.clear_score(&Vec::new(&env), &wallet, &pair);
 
     let result = client.try_get_score(&wallet, &pair);
     assert_eq!(result, Err(Ok(Error::ScoreNotFound)));
+    assert_eq!(client.get_score_history(&wallet, &pair).len(), 1);
+    assert_eq!(client.get_score_history(&wallet, &pair).get(0).unwrap().score, 42);
+    assert_eq!(client.get_wallet_pair_list(&wallet).len(), 0);
+    assert_eq!(storage::get_score_entry_index(&env).len(), 0);
+    assert_eq!(client.get_score_count(&wallet, &pair), 1);
+    assert_eq!(client.get_pair_score_count(&pair), 1);
+    assert_eq!(client.get_total_wallets_scored(), 1);
+
+    client.clear_score(&Vec::new(&env), &wallet, &pair);
+    assert_eq!(client.try_get_score(&wallet, &pair), Err(Ok(Error::ScoreNotFound)));
+    assert_eq!(client.get_score_history(&wallet, &pair).len(), 1);
+    assert_eq!(client.get_wallet_pair_list(&wallet).len(), 0);
+    assert_eq!(storage::get_score_entry_index(&env).len(), 0);
 }
 
 #[test]
@@ -2432,6 +2465,8 @@ fn test_clear_score_on_nonexistent_is_noop() {
     client.clear_score(&Vec::new(&env), &wallet, &pair);
     let result = client.try_get_score(&wallet, &pair);
     assert_eq!(result, Err(Ok(Error::ScoreNotFound)));
+    assert_eq!(client.get_wallet_pair_list(&wallet).len(), 0);
+    assert_eq!(storage::get_score_entry_index(&env).len(), 0);
 }
 
 #[test]

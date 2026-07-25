@@ -8,6 +8,11 @@
 //! transfers. It exists solely to prove that `swap` / `provide_liquidity_gated`
 //! can call LedgerLens gate functions and refuse risky wallets, mirroring the
 //! patterns in `examples/amm_gate.rs` and `examples/amm_gate_example.rs`.
+//!
+//! The mock intentionally focuses on confidence-gated access control. Real
+//! integrations should layer their own max-age and pause-state checks on top
+//! of the LedgerLens gate so a stale-but-safe score cannot bypass a high-value
+//! action during detection lag.
 
 use ledgerlens_score::LedgerLensScoreContractClient;
 use soroban_sdk::{
@@ -85,7 +90,9 @@ impl MockAmm {
     /// Attempt a swap for `user` on `asset_pair`. Rejected with
     /// `HighRiskWallet` whenever LedgerLens's `query_risk_gate` says the
     /// wallet is not safe — note there is no `try_query_risk_gate` and no
-    /// `?`, since the gate is infallible by design.
+    /// `?`, since the gate is infallible by design. Callers that need
+    /// freshness guarantees must add their own max-age bound before invoking
+    /// this method.
     pub fn swap(
         env: Env,
         user: Address,
@@ -109,7 +116,9 @@ impl MockAmm {
 
     /// Provide liquidity for `provider`, gated by LedgerLens risk score and
     /// confidence. The gate check runs **before** any state changes — no funds
-    /// are moved until the provider clears the oracle.
+    /// are moved until the provider clears the oracle. Real deployments should
+    /// also cap score age and respect their own pause state before allowing a
+    /// deposit through.
     ///
     /// When no score exists for the provider, the gate fails closed (same as
     /// `query_risk_gate_with_confidence` returning `false`) and the call is

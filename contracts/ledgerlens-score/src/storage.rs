@@ -122,6 +122,26 @@ pub fn get_score_entry_index(env: &Env) -> Vec<(Address, Symbol)> {
     index
 }
 
+/// Removes `(wallet, asset_pair)` from the proactive rent-management index.
+/// No-op if the pair is not tracked.
+pub fn remove_score_entry(env: &Env, wallet: &Address, asset_pair: &Symbol) {
+    let entry = (wallet.clone(), asset_pair.clone());
+    let mut index = get_score_entry_index(env);
+    if let Some(pos) = index.first_index_of(&entry) {
+        index.remove(pos);
+        if index.is_empty() {
+            env.storage().persistent().remove(&DataKeyB::ScoreEntryIndex);
+        } else {
+            env.storage().persistent().set(&DataKeyB::ScoreEntryIndex, &index);
+            env.storage().persistent().extend_ttl(
+                &DataKeyB::ScoreEntryIndex,
+                SCORE_TTL_THRESHOLD,
+                SCORE_TTL_EXTEND_TO,
+            );
+        }
+    }
+}
+
 /// Registers `(wallet, asset_pair)` in the rent-management index — if it
 /// isn't already present and the index has room — and stamps its
 /// last-touched ledger to now. Called from `set_score` so every write is
@@ -607,6 +627,24 @@ pub fn register_pair_for_wallet(env: &Env, wallet: &Address, asset_pair: &Symbol
         env.storage().persistent().set(&key, &pairs);
     }
     env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+}
+
+/// Removes `asset_pair` from the live pair list for `wallet`.
+///
+/// This keeps live-read aggregates and pair counts aligned with the set of
+/// scores that still exist on chain. No-op if the pair is not present.
+pub fn remove_pair_for_wallet(env: &Env, wallet: &Address, asset_pair: &Symbol) {
+    let key = DataKey::AssetPairs(wallet.clone());
+    let mut pairs: Vec<Symbol> = env.storage().persistent().get(&key).unwrap_or_else(|| Vec::new(env));
+    if let Some(pos) = pairs.first_index_of(asset_pair) {
+        pairs.remove(pos);
+        if pairs.is_empty() {
+            env.storage().persistent().remove(&key);
+        } else {
+            env.storage().persistent().set(&key, &pairs);
+            env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+        }
+    }
 }
 
 pub fn get_wallet_pairs(env: &Env, wallet: &Address) -> Vec<Symbol> {

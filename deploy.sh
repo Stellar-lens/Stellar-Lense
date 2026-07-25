@@ -9,9 +9,12 @@
 #   --help      Show this help message.
 #
 # Arguments:
-#   network           soroban CLI network alias (e.g. testnet, futurenet)
+#   network           soroban CLI network alias (local, testnet, futurenet, mainnet)
 #   admin-identity    soroban CLI identity used to deploy and initialize
 #   service-address   Stellar public key authorised to call submit_score
+#
+# See docs/network-matrix.md for the supported deployment profiles and
+# failure modes.
 
 set -euo pipefail
 
@@ -52,10 +55,11 @@ log() { echo "==> $*"; }
 # ── Validate inputs ───────────────────────────────────────────────────────────
 
 case "$NETWORK" in
-  testnet|futurenet|mainnet) ;;
+  local|standalone|testnet|futurenet|mainnet) ;;
   *)
-    echo "WARNING: '$NETWORK' is not a recognised Stellar network alias." >&2
-    echo "         Proceeding anyway — ensure the alias is configured in soroban config." >&2
+    echo "ERROR: '$NETWORK' is not a supported deployment profile." >&2
+    echo "Supported profiles: local, standalone, testnet, futurenet, mainnet." >&2
+    exit 2
     ;;
 esac
 

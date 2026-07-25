@@ -278,6 +278,12 @@ below are stable** — integrators may match on the numeric code:
   this function rather than `query_risk_gate` for high-value guard clauses.
   The admin-configurable `global_min_confidence` allows a system-wide floor to
   be enforced without requiring every integrating protocol to specify one.
+- **Freshness is separate from confidence.** A high-confidence score can still
+  be stale if the off-chain pipeline has not published a replacement yet.
+  LedgerLens does not currently bake max-age into `query_risk_gate`, so
+  consumers that care about detection lag must enforce their own freshness
+  bound, re-check their own pause state, and fail closed when the score is too
+  old or the oracle is silent.
 - **`query_risk_gate` and `query_risk_gate_with_confidence` cannot be
   weaponised against you.** Both are infallible and side-effect free by design,
   so an attacker cannot craft inputs that make them panic, consume unexpected
@@ -311,8 +317,13 @@ if !client.query_risk_gate(&user, &symbol_short!("XLM_USDC"), &75) {
 Cross-contract calls cost gas. For hot paths, cache the gate result per wallet
 for a short window (e.g. a handful of ledgers) and re-query when the cache
 expires. Keep the TTL short: a wallet's score can change the moment the
-off-chain pipeline submits an update. Caching trades freshness for cost — never
-cache a *safe* verdict longer than you are willing to be wrong about it.
+off-chain pipeline submits an update, and a cached *safe* verdict can age into
+the wrong answer during detection lag. Caching trades freshness for cost —
+never cache a safe verdict longer than you are willing to be wrong about it.
+
+If your protocol already tracks a pause state, check that first and short-circuit
+to the fail-closed branch while paused. Then apply a max-age bound to the score
+itself before you treat the gate result as actionable.
 
 ### 6.3 Fallback behaviour when `ScoreNotFound`
 
@@ -320,7 +331,8 @@ With `query_risk_gate` the not-found case is already folded into `false`
 (fail closed) — no extra handling required. If you call `get_score` directly,
 handle `Err(ScoreNotFound)` explicitly and default to your protocol's
 fail-closed branch unless you have a deliberate reason to allow unknown wallets
-through.
+through. The same rule applies to stale scores: if the age check fails, treat
+the result exactly like `ScoreNotFound`.
 
 ### 6.4 Feature-detect before using newer functions
 
