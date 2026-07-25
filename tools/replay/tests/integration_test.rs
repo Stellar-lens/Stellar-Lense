@@ -3,6 +3,7 @@ mod tests {
     use ledgerlens_score::{
         LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreSubmission,
     };
+    use replay::{compare_config_manifests, parse_manifest_json, recommended_manifest_template};
     use soroban_sdk::testutils::Address as _;
     use soroban_sdk::{Address, Env, Symbol, Vec as SVec};
 
@@ -148,5 +149,74 @@ mod tests {
         assert_eq!(score1.score, 42);
         assert!(score1.benford_flag);
         assert!(!score1.ml_flag);
+    }
+
+    #[test]
+    fn test_config_drift_report_is_deterministic() {
+        let approved = parse_manifest_json(
+            r#"{
+                "contract_version": 4,
+                "paused": false,
+                "risk_threshold": 75,
+                "upgrade_delay": 172800
+            }"#,
+        )
+        .unwrap();
+        let observed = parse_manifest_json(
+            r#"{
+                "contract_version": 4,
+                "paused": true,
+                "risk_threshold": 80,
+                "upgrade_delay": 172800,
+                "mystery_field": 1
+            }"#,
+        )
+        .unwrap();
+
+        let report = compare_config_manifests(&approved, &observed).unwrap();
+        assert_eq!(report.status, "drifted");
+        assert_eq!(report.diffs.len(), 3);
+        assert_eq!(report.diffs[0].field, "mystery_field");
+        assert_eq!(report.diffs[0].status, "unknown_observed_field");
+        assert_eq!(report.diffs[1].field, "paused");
+        assert_eq!(report.diffs[1].status, "drift");
+        assert_eq!(report.diffs[2].field, "risk_threshold");
+        assert_eq!(report.diffs[2].status, "drift");
+    }
+
+    #[test]
+    fn test_config_drift_handles_missing_and_unknown_fields_clearly() {
+        let approved = parse_manifest_json(
+            r#"{
+                "contract_version": 4,
+                "paused": false,
+                "risk_threshold": 75,
+                "unknown_policy": true
+            }"#,
+        )
+        .unwrap();
+        let observed = parse_manifest_json(r#"{"contract_version": 4}"#).unwrap();
+
+        let report = compare_config_manifests(&approved, &observed).unwrap();
+        assert_eq!(report.status, "drifted");
+        assert!(report.diffs.iter().any(|entry| {
+            entry.field == "paused" && entry.status == "missing_observed_field"
+        }));
+        assert!(report.diffs.iter().any(|entry| {
+            entry.field == "risk_threshold" && entry.status == "missing_observed_field"
+        }));
+        assert!(report.diffs.iter().any(|entry| {
+            entry.field == "unknown_policy" && entry.status == "unknown_approved_field"
+        }));
+    }
+
+    #[test]
+    fn test_config_drift_template_tracks_known_fields() {
+        let template = recommended_manifest_template();
+        let template = template.as_object().unwrap();
+        assert!(template.contains_key("contract_version"));
+        assert!(template.contains_key("paused"));
+        assert!(template.contains_key("risk_threshold"));
+        assert!(template.contains_key("oracle_staleness_threshold"));
     }
 }

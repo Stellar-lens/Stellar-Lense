@@ -1,8 +1,10 @@
 use anyhow::{Context, Result};
+use replay::{compare_config_manifests, parse_manifest_json, recommended_manifest_template};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
+use std::{env as std_env, fs};
 
 use soroban_sdk::testutils::Address as _;
 use soroban_sdk::{Address, Env, Symbol, Vec as SVec};
@@ -85,6 +87,25 @@ fn process_snapshot(
 }
 
 fn main() -> Result<()> {
+    let args: Vec<String> = std_env::args().collect();
+    if args.len() > 1 && args[1] == "config-drift" {
+        if args.len() == 3 && args[2] == "--template" {
+            println!("{}", serde_json::to_string_pretty(&recommended_manifest_template())?);
+            return Ok(());
+        }
+        if args.len() != 4 {
+            eprintln!("usage: replay config-drift <approved.json> <observed.json>");
+            eprintln!("   or: replay config-drift --template");
+            return Ok(());
+        }
+
+        let approved = parse_manifest_json(&fs::read_to_string(&args[2]).context("reading approved manifest")?)?;
+        let observed = parse_manifest_json(&fs::read_to_string(&args[3]).context("reading observed manifest")?)?;
+        let report = compare_config_manifests(&approved, &observed)?;
+        println!("{}", serde_json::to_string_pretty(&report)?);
+        return Ok(());
+    }
+
     let path = "testdata/reference.ndjson";
     println!("Replay — reading {}", path);
 
