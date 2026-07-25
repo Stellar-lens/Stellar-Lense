@@ -16,6 +16,11 @@ the recommended ways to wire LedgerLens into your protocol.
 > If you are integrating LedgerLens, **program against this document, not
 > against the source.** Anything not listed here as stable may change between
 > releases.
+>
+> The interface versioning and migration policy (notice periods, what counts as
+> breaking vs. non-breaking, how to detect changes programmatically) is
+> specified separately in
+> [`docs/interface-versioning-policy.md`](interface-versioning-policy.md).
 
 ---
 
@@ -122,6 +127,8 @@ capabilities (all `symbol_short!`):
 | `gate`          | `query_risk_gate`                                                    |
 | `aggr`          | `get_aggregate_score` (cross-asset aggregate risk)                   |
 | `batch_attested`| `submit_scores_batch_attested` (Merkle-root attestation)             |
+| `emb`           | `set_score_embargo` / `lift_score_embargo`                          |
+| `cons`          | `commit_consensus` / `reveal_consensus` / `set_consensus_config`     |
 
 Unrecognised capabilities return `false`.
 
@@ -210,6 +217,11 @@ upgrade. Reserve `get_version()` for diagnostics, telemetry, and logging.
 A capability symbol, once published, will not be removed or repurposed within
 the same interface major version. Removing one is a breaking change and forces
 an interface-version bump.
+
+The full versioning and migration policy — including the definition of breaking
+vs. non-breaking changes, the 30-day notice period for breaking changes, and
+the migration timeline — is specified in
+[`docs/interface-versioning-policy.md`](interface-versioning-policy.md).
 
 ---
 
@@ -318,7 +330,95 @@ an older deployment instead of trapping on a missing function.
 
 ---
 
-## 7. Reference material
+## Composability Examples
+
+### AMM liquidity provision (score + confidence gate)
+
+The mock AMM in `contracts/mock-amm/` demonstrates gating liquidity provision
+with `query_risk_gate_with_confidence` — stricter than the swap path, which uses
+score-only `query_risk_gate`. The gate runs **before** any pool state changes:
+
+```rust
+let client = LedgerLensScoreContractClient::new(&env, &ledgerlens_id);
+let is_safe = client.query_risk_gate_with_confidence(
+    &provider,
+    &symbol_short!("XLM_USDC"),
+    &75,  // gate_threshold
+    &50,  // min_confidence
+);
+if !is_safe {
+    return Err(AmmError::HighRiskWallet);
+}
+// ... proceed with liquidity mint / reserve update ...
+```
+
+**No-score policy:** when LedgerLens has no score for the provider,
+`query_risk_gate_with_confidence` returns `false` (fail closed). Liquidity is
+rejected — the same conservative default as swap gating.
+
+Reference implementations:
+
+- [`examples/amm_gate_example.rs`](../examples/amm_gate_example.rs) — standalone example contract
+- [`contracts/mock-amm/src/lib.rs`](../contracts/mock-amm/src/lib.rs) — `provide_liquidity_gated` + `set_risk_oracle`
+- Cross-contract tests: `contracts/mock-amm/src/test.rs`, `tests/composability/`
+
+---
+
+## 7. Aggregator compatibility contract
+
+`ledgerlens-aggregator` is a federating caller of this interface: it fans a
+single query out across a set of registered `ledgerlens-score` shards and
+combines the results. Because the two contracts are separate deployable units
+that evolve independently, a shard whose interface has drifted from what the
+aggregator expects would otherwise be registrable, producing failed or subtly
+incorrect cross-contract calls at query time rather than a clear error up front.
+
+### 7.1 Targeted interface version
+
+The aggregator targets **interface version 2** (the version at the top of this
+document). Concretely, it invokes the following canonical functions on every
+registered shard, each identified by its `supports_interface` capability:
+
+| Aggregator call | Backing shard function | Required capability |
+|-----------------|------------------------|---------------------|
+| `query_risk_gate`               | `query_risk_gate`     | `gate`  |
+| `get_score` / `get_score_across_shards` | `get_score`   | `score` |
+| `get_aggregate_score`           | `get_aggregate_score` | `aggr`  |
+
+These three capabilities — `score`, `gate`, `aggr` — are the aggregator's
+compatibility contract. A shard must advertise all of them.
+
+### 7.2 Enforcement at registration
+
+`add_shard` verifies compatibility **before** accepting a candidate shard. For
+each required capability it calls the shard's `supports_interface`; the shard is
+rejected unless every call returns `true`. Rejection cases:
+
+- The shard reports `false` for a required capability (interface drift).
+- The shard does not expose `supports_interface` at all — an older build that
+  predates capability detection — so the cross-contract call traps. The
+  aggregator invokes it defensively (`try_supports_interface`) and treats a
+  trap as "incompatible" rather than letting it abort the registration
+  transaction.
+
+A rejected shard is never stored, and `add_shard` returns
+`IncompatibleInterface` (discriminant `27`, shared with `InvalidAttestation`;
+the aggregator's error set is not itself part of this stability contract).
+
+Per [§3](#3-versioning-policy), this uses **capability detection rather than a
+`get_version()` comparison**, so an additive upgrade to a shard that keeps the
+three required capabilities still registers cleanly. Removing or repurposing one
+of those capabilities is a breaking change and, by design, causes `add_shard` to
+reject the shard.
+
+### 7.3 Reference
+
+- Enforcement + tests: `contracts/ledgerlens-aggregator/src/lib.rs`,
+  `contracts/ledgerlens-aggregator/src/test.rs`
+
+---
+
+## 8. Reference material
 
 - Reference integration: [`examples/amm_gate.rs`](../examples/amm_gate.rs)
 - Interface stability tests: `contracts/ledgerlens-score/src/test_interface.rs`

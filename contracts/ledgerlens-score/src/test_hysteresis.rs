@@ -1,4 +1,4 @@
-#![cfg(test)]
+﻿#![cfg(test)]
 
 use soroban_sdk::{
     symbol_short,
@@ -33,20 +33,18 @@ fn submit(
     pair: &soroban_sdk::Symbol,
     score: u32,
 ) {
-    client
-        .submit_score(
-            &Vec::new(env),
-            wallet,
-            pair,
-            &score,
-            &false,
-            &false,
-            &(env.ledger().timestamp().max(1)),
-            &80,
-            &1,
-            &None,
-        )
-        .unwrap();
+    client.submit_score(
+        &Vec::new(env),
+        wallet,
+        pair,
+        &score,
+        &false,
+        &false,
+        &(env.ledger().timestamp().max(1)),
+        &80,
+        &1,
+        &None,
+    );
     env.ledger().with_mut(|l| l.timestamp += 3_601);
 }
 
@@ -61,14 +59,14 @@ fn test_default_hysteresis_margin_is_zero() {
 #[test]
 fn test_set_hysteresis_margin_stores_value() {
     let (_env, client, _admin, _service) = setup();
-    client.set_hysteresis_margin(&20).unwrap();
+    client.set_hysteresis_margin(&20);
     assert_eq!(client.get_hysteresis_margin(), 20);
 }
 
 #[test]
 fn test_set_hysteresis_margin_at_max_accepted() {
     let (_env, client, _admin, _service) = setup();
-    client.set_hysteresis_margin(&50).unwrap();
+    client.set_hysteresis_margin(&50);
     assert_eq!(client.get_hysteresis_margin(), 50);
 }
 
@@ -82,8 +80,8 @@ fn test_set_hysteresis_margin_above_max_rejected() {
 #[test]
 fn test_set_hysteresis_margin_zero_accepted() {
     let (_env, client, _admin, _service) = setup();
-    client.set_hysteresis_margin(&10).unwrap();
-    client.set_hysteresis_margin(&0).unwrap();
+    client.set_hysteresis_margin(&10);
+    client.set_hysteresis_margin(&0);
     assert_eq!(client.get_hysteresis_margin(), 0);
 }
 
@@ -165,7 +163,7 @@ fn test_no_duplicate_band_entered_during_sustained_high_risk() {
 fn test_no_exit_when_score_drops_below_threshold_but_above_exit_boundary() {
     let (env, client, _admin, _service) = setup();
     // threshold = 75, margin = 10 → exit_threshold = 65
-    client.set_hysteresis_margin(&10).unwrap();
+    client.set_hysteresis_margin(&10);
 
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
@@ -185,7 +183,7 @@ fn test_no_exit_when_score_drops_below_threshold_but_above_exit_boundary() {
 fn test_no_exit_when_score_equals_exit_threshold() {
     let (env, client, _admin, _service) = setup();
     // threshold = 75, margin = 10 → exit_threshold = 65
-    client.set_hysteresis_margin(&10).unwrap();
+    client.set_hysteresis_margin(&10);
 
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
@@ -203,7 +201,7 @@ fn test_no_exit_when_score_equals_exit_threshold() {
 fn test_exit_band_when_score_crosses_below_exit_threshold() {
     let (env, client, _admin, _service) = setup();
     // threshold = 75, margin = 10 → exit_threshold = 65
-    client.set_hysteresis_margin(&10).unwrap();
+    client.set_hysteresis_margin(&10);
 
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
@@ -220,7 +218,7 @@ fn test_exit_band_when_score_crosses_below_exit_threshold() {
 fn test_exit_requires_crossing_full_hysteresis_boundary_not_just_threshold() {
     let (env, client, _admin, _service) = setup();
     // threshold = 75, margin = 10 → exit_threshold = 65
-    client.set_hysteresis_margin(&10).unwrap();
+    client.set_hysteresis_margin(&10);
 
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
@@ -247,7 +245,7 @@ fn test_exit_requires_crossing_full_hysteresis_boundary_not_just_threshold() {
 #[test]
 fn test_band_re_entered_after_clearing() {
     let (env, client, _admin, _service) = setup();
-    client.set_hysteresis_margin(&10).unwrap();
+    client.set_hysteresis_margin(&10);
 
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
@@ -346,7 +344,7 @@ fn test_band_state_isolated_per_asset_pair() {
 #[test]
 fn test_band_state_independent_exit_per_pair() {
     let (env, client, _admin, _service) = setup();
-    client.set_hysteresis_margin(&10).unwrap();
+    client.set_hysteresis_margin(&10);
 
     let wallet = Address::generate(&env);
     let pair_a = symbol_short!("XLM_USDC");
@@ -370,7 +368,7 @@ fn test_band_state_independent_exit_per_pair() {
 fn test_query_risk_gate_returns_false_when_in_band_despite_low_score() {
     let (env, client, _admin, _service) = setup();
     // threshold = 75, margin = 10 → exit_threshold = 65
-    client.set_hysteresis_margin(&10).unwrap();
+    client.set_hysteresis_margin(&10);
 
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
@@ -393,7 +391,7 @@ fn test_query_risk_gate_returns_false_when_in_band_despite_low_score() {
 #[test]
 fn test_query_risk_gate_returns_true_after_band_cleared() {
     let (env, client, _admin, _service) = setup();
-    client.set_hysteresis_margin(&10).unwrap();
+    client.set_hysteresis_margin(&10);
 
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
@@ -439,7 +437,7 @@ fn test_batch_submission_enters_band_on_high_score() {
         confidence: 80,
         model_version: 1,
     });
-    client.submit_scores_batch(&batch).unwrap();
+    client.submit_scores_batch(&batch);
     assert!(client.is_in_risk_band(&wallet, &pair));
 }
 
@@ -447,7 +445,7 @@ fn test_batch_submission_enters_band_on_high_score() {
 fn test_batch_submission_hysteresis_holds_in_band() {
     let (env, client, _admin, _service) = setup();
     // threshold = 75, margin = 10 → exit_threshold = 65
-    client.set_hysteresis_margin(&10).unwrap();
+    client.set_hysteresis_margin(&10);
 
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
@@ -464,7 +462,7 @@ fn test_batch_submission_hysteresis_holds_in_band() {
         confidence: 80,
         model_version: 1,
     });
-    client.submit_scores_batch(&batch).unwrap();
+    client.submit_scores_batch(&batch);
     assert!(client.is_in_risk_band(&wallet, &pair));
 
     env.ledger().with_mut(|l| l.timestamp += 3_601);
@@ -482,7 +480,7 @@ fn test_batch_submission_hysteresis_holds_in_band() {
         confidence: 80,
         model_version: 1,
     });
-    client.submit_scores_batch(&batch2).unwrap();
+    client.submit_scores_batch(&batch2);
     assert!(
         client.is_in_risk_band(&wallet, &pair),
         "batch: hysteresis must hold while score >= exit_threshold"
@@ -495,7 +493,7 @@ fn test_batch_submission_hysteresis_holds_in_band() {
 fn test_state_snapshot_consistent_under_repeated_updates() {
     let (env, client, _admin, _service) = setup();
     // threshold = 75, margin = 15 → exit_threshold = 60
-    client.set_hysteresis_margin(&15).unwrap();
+    client.set_hysteresis_margin(&15);
 
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
@@ -530,8 +528,8 @@ fn test_state_snapshot_consistent_under_repeated_updates() {
 fn test_hysteresis_respects_custom_risk_threshold() {
     let (env, client, _admin, _service) = setup();
     // Set custom threshold = 90, margin = 5 → exit_threshold = 85
-    client.set_risk_threshold(&90).unwrap();
-    client.set_hysteresis_margin(&5).unwrap();
+    client.set_risk_threshold(&Vec::new(&env), &90);
+    client.set_hysteresis_margin(&5);
 
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
@@ -551,4 +549,202 @@ fn test_hysteresis_respects_custom_risk_threshold() {
     // Score 84 < 85 (exit_threshold): exits band.
     submit(&env, &client, &wallet, &pair, 84);
     assert!(!client.is_in_risk_band(&wallet, &pair));
+}
+
+// ── get_risk_band_entry_time ──────────────────────────────────────────────────
+
+#[test]
+fn test_entry_time_none_before_band_entered() {
+    let (env, client, _admin, _service) = setup();
+    let wallet = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+
+    // No submission at all: entry time must be absent.
+    assert_eq!(client.get_risk_band_entry_time(&wallet, &pair), None);
+}
+
+#[test]
+fn test_entry_time_none_while_below_threshold() {
+    let (env, client, _admin, _service) = setup();
+    let wallet = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+
+    // Score below threshold never enters band.
+    submit(&env, &client, &wallet, &pair, 74);
+    assert_eq!(client.get_risk_band_entry_time(&wallet, &pair), None);
+}
+
+#[test]
+fn test_entry_time_recorded_on_band_entry() {
+    let (env, client, _admin, _service) = setup();
+    let wallet = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+
+    let entry_ts = env.ledger().timestamp();
+    submit(&env, &client, &wallet, &pair, 80);
+
+    // Timestamp must be present and equal the ledger time at submission.
+    assert_eq!(client.get_risk_band_entry_time(&wallet, &pair), Some(entry_ts));
+}
+
+#[test]
+fn test_entry_time_stable_during_sustained_high_risk() {
+    let (env, client, _admin, _service) = setup();
+    let wallet = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+
+    // First submission enters band at ts=0 (or whatever the initial timestamp is).
+    let entry_ts = env.ledger().timestamp();
+    submit(&env, &client, &wallet, &pair, 80); // advances ledger by 3601
+
+    // Subsequent high-risk submissions must NOT overwrite the entry timestamp.
+    submit(&env, &client, &wallet, &pair, 85);
+    submit(&env, &client, &wallet, &pair, 90);
+
+    assert_eq!(
+        client.get_risk_band_entry_time(&wallet, &pair),
+        Some(entry_ts),
+        "entry timestamp must remain the initial entry time throughout sustained high risk"
+    );
+}
+
+#[test]
+fn test_entry_time_stable_during_hysteresis_hold() {
+    let (env, client, _admin, _service) = setup();
+    // threshold = 75, margin = 10 → exit_threshold = 65
+    client.set_hysteresis_margin(&10);
+
+    let wallet = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+
+    let entry_ts = env.ledger().timestamp();
+    submit(&env, &client, &wallet, &pair, 80);
+
+    // Score drops below threshold but stays above exit_threshold (hysteresis holds).
+    submit(&env, &client, &wallet, &pair, 70);
+    assert!(client.is_in_risk_band(&wallet, &pair));
+
+    assert_eq!(
+        client.get_risk_band_entry_time(&wallet, &pair),
+        Some(entry_ts),
+        "entry timestamp must not change while hysteresis is holding the band"
+    );
+}
+
+#[test]
+fn test_entry_time_cleared_on_band_exit() {
+    let (env, client, _admin, _service) = setup();
+    client.set_hysteresis_margin(&10);
+
+    let wallet = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+
+    submit(&env, &client, &wallet, &pair, 80);
+    assert!(client.get_risk_band_entry_time(&wallet, &pair).is_some());
+
+    // Cross below exit_threshold (65) to exit the band.
+    submit(&env, &client, &wallet, &pair, 64);
+    assert!(!client.is_in_risk_band(&wallet, &pair));
+
+    assert_eq!(
+        client.get_risk_band_entry_time(&wallet, &pair),
+        None,
+        "entry timestamp must be cleared when the wallet exits the band"
+    );
+}
+
+#[test]
+fn test_entry_time_reset_on_reentry() {
+    let (env, client, _admin, _service) = setup();
+    client.set_hysteresis_margin(&10);
+
+    let wallet = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+
+    // First entry.
+    let first_entry_ts = env.ledger().timestamp();
+    submit(&env, &client, &wallet, &pair, 80);
+    assert_eq!(client.get_risk_band_entry_time(&wallet, &pair), Some(first_entry_ts));
+
+    // Exit band.
+    submit(&env, &client, &wallet, &pair, 60); // below exit_threshold 65
+    assert_eq!(client.get_risk_band_entry_time(&wallet, &pair), None);
+
+    // Re-enter band; new entry timestamp must differ from the first.
+    let second_entry_ts = env.ledger().timestamp();
+    submit(&env, &client, &wallet, &pair, 80);
+    let recorded = client.get_risk_band_entry_time(&wallet, &pair);
+    assert_eq!(recorded, Some(second_entry_ts));
+    assert_ne!(
+        recorded,
+        Some(first_entry_ts),
+        "re-entry must record a fresh timestamp, not the original one"
+    );
+}
+
+#[test]
+fn test_entry_time_isolated_per_wallet() {
+    let (env, client, _admin, _service) = setup();
+    let wallet_a = Address::generate(&env);
+    let wallet_b = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+
+    submit(&env, &client, &wallet_a, &pair, 80);
+    assert!(client.get_risk_band_entry_time(&wallet_a, &pair).is_some());
+    assert_eq!(client.get_risk_band_entry_time(&wallet_b, &pair), None);
+}
+
+#[test]
+fn test_entry_time_isolated_per_pair() {
+    let (env, client, _admin, _service) = setup();
+    let wallet = Address::generate(&env);
+    let pair_a = symbol_short!("XLM_USDC");
+    let pair_b = symbol_short!("BTC_USDC");
+
+    submit(&env, &client, &wallet, &pair_a, 80);
+    assert!(client.get_risk_band_entry_time(&wallet, &pair_a).is_some());
+    assert_eq!(client.get_risk_band_entry_time(&wallet, &pair_b), None);
+}
+
+// ── set_hysteresis_margin: margin >= risk_threshold rejected ─────────────────
+
+#[test]
+fn test_set_hysteresis_margin_at_risk_threshold_rejected() {
+    let (_env, client, _admin, _service) = setup();
+    // Default risk_threshold is 75; margin = 75 must be rejected.
+    let result = client.try_set_hysteresis_margin(&75);
+    assert_eq!(result, Err(Ok(Error::InvalidHysteresisMargin)));
+}
+
+#[test]
+fn test_set_hysteresis_margin_above_risk_threshold_rejected() {
+    let (_env, client, _admin, _service) = setup();
+    // margin = 76 > risk_threshold = 75, also rejected.
+    let result = client.try_set_hysteresis_margin(&76);
+    assert_eq!(result, Err(Ok(Error::InvalidHysteresisMargin)));
+}
+
+#[test]
+fn test_set_hysteresis_margin_below_risk_threshold_accepted() {
+    let (_env, client, _admin, _service) = setup();
+    // margin = 74 < risk_threshold = 75, must be accepted.
+    client.set_hysteresis_margin(&20);
+    assert_eq!(client.get_hysteresis_margin(), 20);
+}
+
+// ── set_hysteresis_margin: non-admin rejected ────────────────────────────────
+
+#[test]
+fn test_set_hysteresis_margin_non_admin_rejected() {
+    let env = Env::default();
+    let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    env.mock_all_auths();
+    client.initialize(&Address::generate(&env), &Address::generate(&env));
+
+    // Fresh env without mock_all_auths so admin auth check fires.
+    let env2 = Env::default();
+    let c2 = LedgerLensScoreContractClient::new(&env2, &contract_id);
+    let result = c2.try_set_hysteresis_margin(&10);
+    assert!(result.is_err());
 }

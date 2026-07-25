@@ -1,4 +1,4 @@
-//! Tests for score jump anomaly detection (issue #74).
+﻿//! Tests for score jump anomaly detection (issue #74).
 //!
 //! When the absolute delta between consecutive scores exceeds the configured
 //! `JumpThreshold`, a `ScoreJumpAnomalyEvent` is emitted in addition to the
@@ -289,14 +289,14 @@ fn test_custom_threshold_emits_event() {
 fn test_set_jump_threshold_zero_rejected() {
     let (env, client) = setup();
     let result = client.try_set_jump_threshold(&Vec::new(&env), &0);
-    assert_eq!(result, Err(Ok(Error::InvalidJumpThreshold)));
+    assert_eq!(result, Err(Ok(Error::InvalidThreshold)));
 }
 
 #[test]
 fn test_set_jump_threshold_over_99_rejected() {
     let (env, client) = setup();
     let result = client.try_set_jump_threshold(&Vec::new(&env), &100);
-    assert_eq!(result, Err(Ok(Error::InvalidJumpThreshold)));
+    assert_eq!(result, Err(Ok(Error::InvalidThreshold)));
 }
 
 #[test]

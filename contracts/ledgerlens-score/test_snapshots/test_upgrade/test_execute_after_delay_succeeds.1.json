@@ -96,6 +96,18 @@
                         "key": {
                           "vec": [
                             {
+                              "symbol": "AdminAuditRoot"
+                            }
+                          ]
+                        },
+                        "val": {
+                          "bytes": "f89b60de8b280f407a4d1ba8186850adf625726e60c15a88bb19bcfed82a0d7e"
+                        }
+                      },
+                      {
+                        "key": {
+                          "vec": [
+                            {
                               "symbol": "Service"
                             }
                           ]
@@ -301,6 +313,9 @@
             "topics": [
               {
                 "symbol": "upg_prop"
+              },
+              {
+                "u32": 1
               }
             ],
             "data": {
@@ -415,6 +430,9 @@
             "topics": [
               {
                 "symbol": "upg_exec"
+              },
+              {
+                "u32": 1
               }
             ],
             "data": {
