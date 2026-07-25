@@ -169,6 +169,10 @@ class Config:
     KAFKA_LAG_ALERT_THRESHOLD: int = int(os.getenv("KAFKA_LAG_ALERT_THRESHOLD", "500"))
     KAFKA_METRICS_PORT: int = int(os.getenv("KAFKA_METRICS_PORT", "9100"))
     TRADE_AVRO_SCHEMA_PATH: str = os.getenv("TRADE_AVRO_SCHEMA_PATH", "data/trade_avro_schema.json")
+    
+    # End-to-end latency budget (Issue #124)
+    E2E_LATENCY_BUDGET_MS: int = int(os.getenv("E2E_LATENCY_BUDGET_MS", "2000"))
+    LATENCY_ANOMALY_RATE_THRESHOLD: float = float(os.getenv("LATENCY_ANOMALY_RATE_THRESHOLD", "0.90"))
 
     # Account metadata streaming join (streaming/account_metadata_stream.py,
     # streaming/pipeline.py MetadataJoinState)

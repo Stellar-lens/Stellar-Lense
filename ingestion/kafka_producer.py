@@ -39,6 +39,7 @@ import json
 import os
 import re
 import socket
+import time
 
 from confluent_kafka import KafkaException, Producer
 
@@ -171,7 +172,14 @@ class HorizonKafkaProducer:
         key = record["base_account"].encode("utf-8")
         # Schema version header: hex CRC-32 fingerprint of the encoding schema.
         schema_fp = hex(_avro_crc32_fingerprint(self._schema) & 0xFFFFFFFF).encode("utf-8")
-        self._produce_with_headers(topic, value, key, schema_fp)
+        ingestion_ts = str(int(time.time() * 1000)).encode("utf-8")
+        
+        headers = [
+            ("avro-schema-version", schema_fp),
+            ("ingestion_timestamp_ms", ingestion_ts)
+        ]
+        
+        self._produce_with_headers(topic, value, key, headers)
         self._producer.poll(0)
 
     def begin_transaction(self) -> None:
@@ -224,13 +232,13 @@ class HorizonKafkaProducer:
         exceptions=(KafkaException, BufferError),
     )
     def _produce_with_headers(
-        self, topic: str, value: bytes, key: bytes, schema_fp: bytes
+        self, topic: str, value: bytes, key: bytes, headers: list[tuple[str, bytes]]
     ) -> None:
         self._producer.produce(
             topic=topic,
             value=value,
             key=key,
-            headers=[("avro-schema-version", schema_fp)],
+            headers=headers,
             on_delivery=_on_delivery,
         )
 
