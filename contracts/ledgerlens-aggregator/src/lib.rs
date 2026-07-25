@@ -5,7 +5,7 @@ extern crate std;
 
 #[cfg(test)]
 mod test;
-
+const REQUIRED_SHARD_CAPABILITIES: [&str; 4] = ["score", "gate", "aggr", "arch"];
 use ledgerlens_score::{AggregateRiskScore, Error as ScoreError, RiskScore};
 use soroban_sdk::{
     contract, contracterror, contractimpl, contracttype, symbol_short, vec, Address, Env, Symbol,
@@ -51,12 +51,24 @@ const REQUIRED_SHARD_CAPABILITIES: [&str; 3] = ["score", "gate", "aggr"];
 /// treated as incompatible.
 fn shard_supports_required_interface(env: &Env, shard: &Address) -> bool {
     let client = ledgerlens_score::LedgerLensScoreContractClient::new(env, shard);
+    
+    // 1. Verify standard capability flags
     for capability in REQUIRED_SHARD_CAPABILITIES {
         match client.try_supports_interface(&Symbol::new(env, capability)) {
             Ok(Ok(true)) => {}
             _ => return false,
         }
     }
+
+    // 2. Interface validation: Verify getters exist and are callable
+    if client.try_get_arch_owner().is_err() {
+        return false;
+    }
+
+    if client.try_get_mandatory_reviewers().is_err() {
+        return false;
+    }
+
     true
 }
 

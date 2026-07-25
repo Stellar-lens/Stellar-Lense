@@ -15,6 +15,17 @@ use crate::types::{
 };
 use soroban_sdk::{Address, Bytes, BytesN, Env, Symbol, Vec};
 
+pub const MAX_MANDATORY_REVIEWERS: u32 = 10;
+#[contracttype]
+#[derive(Clone)]
+pub enum DataKey {
+
+    /// Storage key for the designated primary Architecture Owner address
+    ArchOwner,
+    /// Storage key for the list of mandatory off-chain/on-chain reviewer addresses
+    MandatoryReviewers,
+}
+
 // ── Admin / Service ─────────────────────────────────────────────────────────
 
 pub fn has_admin(env: &Env) -> bool {
@@ -2886,6 +2897,25 @@ pub fn set_gate_query_fee(env: &Env, amount: i128) {
 
 pub fn get_accumulated_fees(env: &Env) -> i128 {
     env.storage().instance().get(&GateDataKey::AccumulatedFees).unwrap_or(0)
+}
+
+pub fn set_arch_owner(env: &Env, owner: &Address) {
+    env.storage().instance().set(&DataKey::ArchOwner, owner);
+}
+
+pub fn get_arch_owner(env: &Env) -> Option<Address> {
+    env.storage().instance().get(&DataKey::ArchOwner)
+}
+
+pub fn set_mandatory_reviewers(env: &Env, reviewers: &Vec<Address>) {
+    env.storage().instance().set(&DataKey::MandatoryReviewers, reviewers);
+}
+
+pub fn get_mandatory_reviewers(env: &Env) -> Vec<Address> {
+    env.storage()
+        .instance()
+        .get(&DataKey::MandatoryReviewers)
+        .unwrap_or_else(|| Vec::new(env))
 }
 
 #[cfg(test)]
