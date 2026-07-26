@@ -13,13 +13,13 @@ serde_json = "1"
 tokio = { version = "1", features = ["rt-multi-thread"], optional = true }
 chrono = { version = "0.4", features = ["serde"] }
 thiserror = "1"
-
 # ZK verification (arkworks suite)
 ark-bn254 = { version = "0.4", optional = true }
 ark-ec = { version = "0.4", optional = true }
 ark-serialize = { version = "0.4", optional = true }
 ark-ff = { version = "0.4", optional = true }
 sha2 = { version = "0.10", optional = true }
+num-bigint = { version = "0.4", optional = true }
 
 [dev-dependencies]
 wiremock = "0.6"
@@ -28,7 +28,7 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 [features]
 default = ["async"]
 async = ["tokio"]
-zk-verify = ["ark-bn254", "ark-ec", "ark-serialize", "ark-ff", "sha2"]
+zk-verify = ["ark-bn254", "ark-ec", "ark-serialize", "ark-ff", "sha2", "num-bigint"]
 
 [package.metadata.docs.rs]
 features = ["async", "zk-verify"]

@@ -26,11 +26,11 @@
 //!   `tests/fixtures/zk_proof_vectors.json`.
 
 use crate::error::ZkVerifyError;
-use crate::models::{BitProof, ThresholdProof};
+use crate::models::ThresholdProof;
 
 use ark_bn254::Bn254;
 use ark_ec::{pairing::Pairing, AffineRepr, CurveGroup};
-use ark_ff::{BigInteger, PrimeField, AddAssign};
+use ark_ff::{BigInt, BigInteger, PrimeField};
 use sha2::{Digest, Sha256};
 
 /// The BN254 (alt_bn128) curve order / scalar field modulus.
@@ -45,18 +45,29 @@ const PROOF_WIRE_VERSION: u8 = 1;
 
 /// Parse a decimal string into a scalar field element.
 fn parse_scalar(s: &str) -> Result<<Bn254 as Pairing>::ScalarField, ZkVerifyError> {
-    let bigint = s
-        .parse::<ark_ff::BigInt<4>>()
-        .map_err(|_| ZkVerifyError::InvalidFormat(format!("invalid scalar: {}", s)))?;
-    Ok(<Bn254 as Pairing>::ScalarField::from(bigint))
+    // Parse the string as a big-endian byte representation, then convert to field element.
+    // This matches the `int.from_bytes(x.to_bytes(32, "big"), "big")` convention in the Python prover.
+    let bytes = parse_decimal_string_to_bytes(s)?;
+    Ok(<Bn254 as Pairing>::ScalarField::from_le_bytes_mod_order(&bytes))
 }
 
 /// Parse a decimal string into a base field element (for point coordinates).
 fn parse_base(s: &str) -> Result<<Bn254 as Pairing>::BaseField, ZkVerifyError> {
-    let bigint = s
-        .parse::<ark_ff::BigInt<4>>()
+    let bytes = parse_decimal_string_to_bytes(s)?;
+    Ok(<Bn254 as Pairing>::BaseField::from_le_bytes_mod_order(&bytes))
+}
+
+/// Convert a decimal string to 32 big-endian bytes.
+fn parse_decimal_string_to_bytes(s: &str) -> Result<Vec<u8>, ZkVerifyError> {
+    // Use num-bigint's BigUint to parse the decimal string and convert to bytes.
+    let val: num_bigint::BigUint = s.parse()
         .map_err(|_| ZkVerifyError::InvalidFormat(format!("invalid field element: {}", s)))?;
-    Ok(<Bn254 as Pairing>::BaseField::from(bigint))
+    let bytes = val.to_bytes_be();
+    // Pad to 32 bytes
+    let mut padded = vec![0u8; 32];
+    let start = 32usize.saturating_sub(bytes.len());
+    padded[start..].copy_from_slice(&bytes);
+    Ok(padded)
 }
 
 /// The second generator *H* for Pedersen commitments on BN254.
@@ -86,13 +97,14 @@ fn add_points(
 
 /// Multiply a G1 point by a scalar.
 fn mul_point(p: &ark_bn254::G1Affine, scalar: &<Bn254 as Pairing>::ScalarField) -> ark_bn254::G1Affine {
-    (p * scalar).into_affine()
+    ((*p).into_group() * scalar).into_affine()
 }
 
 /// Serialize a point into 64 bytes (32 for x, 32 for y) big-endian.
 fn point_bytes(p: &ark_bn254::G1Affine) -> Vec<u8> {
-    let x = p.x().unwrap_or(&<Bn254 as Pairing>::BaseField::from(0u64));
-    let y = p.y().unwrap_or(&<Bn254 as Pairing>::BaseField::from(0u64));
+    let zero = <Bn254 as Pairing>::BaseField::from(0u64);
+    let x = p.x().unwrap_or(&zero);
+    let y = p.y().unwrap_or(&zero);
     let x_bytes = x.into_bigint().to_bytes_be();
     let y_bytes = y.into_bigint().to_bytes_be();
     [x_bytes.as_slice(), y_bytes.as_slice()].concat()
@@ -207,8 +219,7 @@ pub fn verify_threshold_proof(
         let expected_c = fiat_shamir(&r0, &r1, &b, &context);
 
         // Check: c0 + c1 == expected_c (mod curve_order)
-        let mut c_sum = c0;
-        c_sum.add_assign(&c1);
+        let c_sum = c0 + c1;
         if c_sum != expected_c {
             return Ok(false);
         }
