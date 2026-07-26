@@ -90,6 +90,36 @@ jobs:
           markdown-link-check docs/security.md
           markdown-link-check CONTRIBUTING.md
 
+      - name: Check import cycles (Issue #546)
+        run: |
+          python scripts/check_import_cycles.py
+        # Exit code 2 = cycles found → fail CI.
+        # Exit code 1 = fatal error (unreadable file, bad args) → also fail.
+
+      - name: Probe optional dependencies (Issue #542)
+        run: |
+          python -m utils.dependency_probe --groups ml_core cryptography prometheus
+        # Probes core required groups; missing optional deps are warnings only.
+        # Add --require <group> here if a group becomes mandatory.
+
+      - name: Validate README bash examples (Issue #548)
+        run: |
+          python scripts/validate_readme_examples.py --docs README.md docs/
+        # Exits 2 if any python -m or python <file> reference is broken.
+        # make <target> mismatches are always warnings (never block CI).
+
+      - name: Validate notebooks — structure (Issue #549)
+        run: |
+          python scripts/validate_notebooks.py
+        # Checks JSON validity, nbformat ≥ 4, kernelspec, empty cells.
+        # Does NOT enforce output clearing here — that's the --check-outputs flag.
+
+      - name: Validate notebooks — outputs cleared (Issue #549)
+        run: |
+          python scripts/validate_notebooks.py --check-outputs
+        # Notebooks must not commit cell outputs (diff bloat / data leakage).
+        # Add metadata.keep_outputs=true in the notebook to opt out.
+
       - name: Execute Benford explainer notebook
         run: |
           cd notebooks

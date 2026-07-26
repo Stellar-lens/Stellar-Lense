@@ -1,22 +1,133 @@
+# ── Python bytecode & caches ─────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
-.pytest_cache/
+*.pyo
+*.pyd
+.Python
+
+# ── Virtual environments ──────────────────────────────────────────────────────
 .venv/
 venv/
+env/
+.env/
+ENV/
 
+# ── Environment / secrets ─────────────────────────────────────────────────────
 .env
-*.db
+.env.local
+.env.*.local
+*.secret
+*.secrets
 
+# ── Databases ─────────────────────────────────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+
+# ── Model artifacts (generated; not committed) ────────────────────────────────
 models/*.pkl
 models/*.joblib
 models/archive/
 models/optuna_studies.db
 models/best_params_*.json
-reports/
-# Keep sample/committed reports but ignore generated load test output
-reports/load_test_results.json
+models/shap_sensitivity.json
+models/pareto_front.json
 
+# ── Generated reports (runtime output) ───────────────────────────────────────
+reports/
+# Keep the committed sample reports
+!reports/load_test_sample.json
+!reports/adversarial_benchmark.json
+
+# ── Test tooling caches & output ──────────────────────────────────────────────
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+# Test snapshots (syrupy, pytest-snapshot, inline-snapshot)
+**/__snapshots__/
+**/snapshots/
+*.ambr
+*.snap
 # mutmut mutation testing cache
 .mutmut-cache
+mutmut-results.json
 
+# ── Jupyter notebook output ───────────────────────────────────────────────────
+# Strip cell output so notebooks don't bloat diffs
+# (the executed copy is validated in CI but never committed back)
+notebooks/.ipynb_checkpoints/
+.ipynb_checkpoints/
+# Notebook validation artefacts
+notebooks/validation_report_*.json
+
+# ── Compiled / build artefacts ────────────────────────────────────────────────
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+*.whl
+MANIFEST
+
+# ── Type-checker caches ───────────────────────────────────────────────────────
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pytype/
+.pyre/
+
+# ── Profiling / benchmarks ────────────────────────────────────────────────────
+*.prof
+*.lprof
+*.pyc.profiler
+
+# ── Data files generated at runtime ──────────────────────────────────────────
+data/annotation_queue.json
+data/unscored_wallets.parquet
+data/annotated.parquet
+# Keep committed static data files
+!data/synthetic_dataset.parquet
+!data/known_manipulation_events.csv
+!data/feature_ranges.json
+!data/trade_avro_schema.json
+!data/allowlist.json
+!data/denylist.json
+!data/bridge_anchors.json
+!data/zero_shot_patterns.json
+!data/causal_priors.yaml
+!data/build_config.json
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── macOS ──────────────────────────────────────────────────────────────────────
 .DS_Store
+.AppleDouble
+.LSOverride
+
+# ── Windows ───────────────────────────────────────────────────────────────────
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ── IDE / editor ──────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.classpath
+
+# ── Optuna / hyperparameter search ────────────────────────────────────────────
+optuna_studies/
+
+# ── Import cycle detection artefacts (generated; not committed) ───────────────
+import_cycle_report_*.json
+
+# ── Dependency probe reports (generated; not committed) ───────────────────────
+dependency_probe_report_*.json
