@@ -670,6 +670,26 @@ pub fn param_change_proposed(env: &Env, key: &Symbol, apply_after: u64) {
     env.events().publish((symbol_short!("pc_prop"),), (key.clone(), apply_after));
 }
 
+/// Emitted when a risk-threshold + cooldown policy bundle is proposed via
+/// `propose_policy_bundle`.
+/// Topic: ("pbdl_prop",)  Data: (risk_threshold, cooldown_secs, apply_after)
+pub fn policy_bundle_proposed(
+    env: &Env,
+    risk_threshold: u32,
+    cooldown_secs: u64,
+    apply_after: u64,
+) {
+    env.events()
+        .publish((symbol_short!("pbdl_prop"),), (risk_threshold, cooldown_secs, apply_after));
+}
+
+/// Emitted when a pending policy bundle is applied via `apply_policy_bundle`,
+/// after both fields have been written atomically.
+/// Topic: ("pbdl_appl",)  Data: (risk_threshold, cooldown_secs)
+pub fn policy_bundle_applied(env: &Env, risk_threshold: u32, cooldown_secs: u64) {
+    env.events().publish((symbol_short!("pbdl_appl"),), (risk_threshold, cooldown_secs));
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn score_jump_anomaly(
     env: &Env,

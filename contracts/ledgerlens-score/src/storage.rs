@@ -9,9 +9,10 @@ use crate::types::{
     AdaptiveRateLimit, AggregateRiskScore, DataKey, DataKeyB, DataKeyC, DataKeyD, DecayCurve,
     EmbargoExpiry, FlashProtectionMode, GateDataKey, HllSketch, InterpolationMethod, JumpStats,
     ModelVersionStats, ModelVersionStatus, PairVolatilityState, ParamChangeProposal,
-    ParameterProposalRecord, ParameterProposalStatus, PendingScoreEntry, RateLimitOverrideEntry,
-    RiskScore, ScoreDispute, ScoreFloorPolicy, ScoreHistogram, ScoreTrend, ScoreVelocityCap,
-    SignerAccuracyRecord, SubscorePayload, TokenBucket, UpgradeProposal, WelfordCorrState,
+    ParameterProposalRecord, ParameterProposalStatus, PendingScoreEntry, PolicyBundleProposal,
+    RateLimitOverrideEntry, RiskScore, ScoreDispute, ScoreFloorPolicy, ScoreHistogram, ScoreTrend,
+    ScoreVelocityCap, SignerAccuracyRecord, SubscorePayload, TokenBucket, UpgradeProposal,
+    WelfordCorrState,
 };
 use soroban_sdk::{Address, Bytes, BytesN, Env, Symbol, Vec};
 
@@ -2858,6 +2859,24 @@ pub fn get_pending_param_change(env: &Env, key: &Symbol) -> Option<ParamChangePr
 
 pub fn clear_pending_param_change(env: &Env, key: &Symbol) {
     env.storage().instance().remove(&DataKeyD::PendingParamChange(key.clone()));
+}
+
+// ── Policy bundles (risk threshold + cooldown, activated atomically) ──────────
+
+pub fn has_pending_policy_bundle(env: &Env) -> bool {
+    env.storage().instance().has(&DataKeyD::PendingPolicyBundle)
+}
+
+pub fn set_pending_policy_bundle(env: &Env, proposal: &PolicyBundleProposal) {
+    env.storage().instance().set(&DataKeyD::PendingPolicyBundle, proposal);
+}
+
+pub fn get_pending_policy_bundle(env: &Env) -> Option<PolicyBundleProposal> {
+    env.storage().instance().get(&DataKeyD::PendingPolicyBundle)
+}
+
+pub fn clear_pending_policy_bundle(env: &Env) {
+    env.storage().instance().remove(&DataKeyD::PendingPolicyBundle);
 }
 
 pub fn get_param_change_delay(env: &Env) -> u64 {
