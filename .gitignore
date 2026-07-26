@@ -3,8 +3,11 @@ __pycache__/
 .pytest_cache/
 .venv/
 venv/
+.ruff_cache/
+.ipynb_checkpoints/
 
 .env
+.env.*
 *.db
 
 models/*.pkl
@@ -18,5 +21,23 @@ reports/load_test_results.json
 
 # mutmut mutation testing cache
 .mutmut-cache
+
+# Coverage / build artifacts
+.coverage
+.coverage.*
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Test snapshot artifacts (syrupy/pytest-snapshot/insta-style) — none are
+# committed today, but any generated locally must never be pushed.
+**/__snapshots__/
+*.snap
+*.ambr
+
+# IDE
+.vscode/
+.idea/
 
 .DS_Store

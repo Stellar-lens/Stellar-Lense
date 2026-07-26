@@ -1,5 +1,6 @@
 .PHONY: install lint format test run scale-workers mutation-test
 .PHONY: install lint format test run typecheck mutation-test
+.PHONY: check-integrity dead-path-report env-docs env-docs-check
 
 VENV_BIN := $(abspath .venv/bin)
 ifeq ($(wildcard $(VENV_BIN)/python),)
@@ -30,6 +31,39 @@ format:
 
 test:
 	$(PYTEST) -q
+
+# ---------------------------------------------------------------------------
+# Source package integrity checks (Issue #540)
+#
+# Filesystem + AST sweep for missing __init__.py, unresolved merge conflict
+# markers, syntax errors, and empty modules. Runs automatically before every
+# `pytest` session (see tests/conftest.py::pytest_sessionstart) — this
+# target is for running it standalone, independent of the test suite.
+# ---------------------------------------------------------------------------
+check-integrity:
+	$(PYTHON) scripts/check_package_integrity.py
+
+# ---------------------------------------------------------------------------
+# Dead-path detection for retired modules (Issue #547)
+#
+# Reports source modules with no inbound Python import and no reference in
+# Makefile/CI/docs — candidates for removal. Read-only, never deletes code.
+# ---------------------------------------------------------------------------
+dead-path-report:
+	$(PYTHON) scripts/detect_dead_paths.py
+
+# ---------------------------------------------------------------------------
+# Environment contract docs generated from config schemas (Issue #544)
+#
+# `env-docs` regenerates docs/environment_contract.md from config.py.
+# `env-docs-check` fails (without writing) if the committed doc has drifted
+# from config.py — wire this into CI to keep the contract doc honest.
+# ---------------------------------------------------------------------------
+env-docs:
+	$(PYTHON) scripts/generate_env_contract_docs.py
+
+env-docs-check:
+	$(PYTHON) scripts/generate_env_contract_docs.py --check
 
 fuzz:
 	@echo "Running fuzz tests for 60 seconds each..."

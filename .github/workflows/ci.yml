@@ -31,6 +31,18 @@ jobs:
           ruff check .
           black --check .
 
+      - name: Source package integrity check (Issue #540)
+        run: python scripts/check_package_integrity.py
+
+      - name: Environment contract docs drift check (Issue #544)
+        run: python scripts/generate_env_contract_docs.py --check
+
+      - name: Dead-path detection report (Issue #547)
+        # Informational — surfaces retirement candidates without failing the
+        # build. Use `make dead-path-report` locally, or pass --strict to
+        # gate CI once the initial candidate backlog above has been triaged.
+        run: python scripts/detect_dead_paths.py
+
       - name: Check verify_chain called after every joblib.load in detection/
         run: |
           python - <<'EOF'
