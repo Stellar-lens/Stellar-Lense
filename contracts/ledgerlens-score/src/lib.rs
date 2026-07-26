@@ -104,6 +104,9 @@ mod test_dispute;
 mod test_failover;
 
 #[cfg(test)]
+mod test_incident_event_topics;
+
+#[cfg(test)]
 mod test_breach_counter_reset;
 
 #[cfg(test)]
