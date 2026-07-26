@@ -104,6 +104,9 @@ mod test_dispute;
 mod test_failover;
 
 #[cfg(test)]
+mod test_signer_compromise_containment;
+
+#[cfg(test)]
 mod test_breach_counter_reset;
 
 #[cfg(test)]
