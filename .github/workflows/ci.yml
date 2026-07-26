@@ -45,6 +45,26 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --workspace
 
+  production-acceptance:
+    name: Production acceptance report
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.81.0"
+          components: rustfmt, clippy
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - name: Run production acceptance suite
+        run: scripts/production-acceptance.sh --output target/production-readiness-report.md
+      - name: Upload production readiness report
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-readiness-report
+          path: target/production-readiness-report.md
+          retention-days: 14
+
   error-discriminants:
     name: Error discriminant stability
     runs-on: ubuntu-latest
@@ -67,6 +87,16 @@ jobs:
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
       - run: cargo build --target wasm32-unknown-unknown --release -p ledgerlens-score --locked
+      - name: Record WASM byte-size evidence
+        run: |
+          mkdir -p target
+          {
+            echo "# WASM Size Evidence"
+            echo ""
+            echo "Path: target/wasm32-unknown-unknown/release/ledgerlens_score.wasm"
+            echo "Bytes: $(wc -c < target/wasm32-unknown-unknown/release/ledgerlens_score.wasm | tr -d ' ')"
+            echo "SHA-256: $(sha256sum target/wasm32-unknown-unknown/release/ledgerlens_score.wasm | awk '{print $1}')"
+          } > target/wasm-size-report.md
       - name: Upload wasm artifact
         uses: actions/upload-artifact@v4
         with:
