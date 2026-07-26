@@ -1,22 +1,130 @@
+# Python
 __pycache__/
 *.py[cod]
-.pytest_cache/
+*.pyo
+*.pyd
+*.pyc
+
+# Virtual environments
 .venv/
 venv/
+env/
+.env/
 
+# Environment / secrets
 .env
-*.db
+.env.*
+!.env.example
 
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Test / coverage artefacts
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+junit*.xml
+test-results/
+test_output/
+
+# Test snapshots (pytest-snapshot, syrupy, snapshottest)
+__snapshots__/
+*.snap
+
+# Hypothesis property-based testing database
+.hypothesis/
+
+# Mutation testing
+.mutmut-cache
+mutmut-results/
+
+# Fuzz corpus (generated at runtime — keep only hand-crafted seeds in VCS)
+tests/fuzz/corpus/generated/
+
+# Profiling output
+*.prof
+*.lprof
+profiling/
+
+# Trained model artefacts (binary, large)
 models/*.pkl
 models/*.joblib
+models/*.pt
+models/*.onnx
 models/archive/
 models/optuna_studies.db
 models/best_params_*.json
-reports/
-# Keep sample/committed reports but ignore generated load test output
+models/conformal_calibration.joblib
+
+# Generated / runtime reports (keep committed sample reports)
 reports/load_test_results.json
+reports/forensic/
+reports/backtest_*.json
+reports/poisoning_alert_*.json
 
-# mutmut mutation testing cache
-.mutmut-cache
+# Watermark store (runtime state, not source)
+data/watermarks.json
 
+# Generated dataset outputs (large binary, reproducible)
+data/*.parquet
+data/*.csv
+# Keep committed reference files
+!data/synthetic_dataset.parquet
+!data/known_manipulation_events.csv
+!data/feature_ranges.json
+!data/build_config.json
+
+# Annotation queue (runtime state)
+data/annotation_queue.json
+
+# Jupyter notebook checkpoints
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# MyPy cache
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Ruff / linting cache
+.ruff_cache/
+
+# Build / packaging
+dist/
+build/
+*.egg-info/
+*.egg
+
+# macOS
 .DS_Store
+.AppleDouble
+.LSOverride
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Secrets / keys (belt-and-suspenders — should never be committed)
+*.pem
+*.key
+*.p12
+*.pfx
+jwt_public_key.pem
+jwt_private_key.pem
+models/metrics.json.sig
+
+# Dead-letter queue files (runtime output)
+alerts_dlq.ndjson
+
+# Docker build context leftovers
+*.tar.gz
+
+# Grafana provisioning secrets
+monitoring/grafana/provisioning/datasources/*.yaml
