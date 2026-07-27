@@ -55,7 +55,8 @@ impl MockLending {
     /// `RiskGateRejected` whenever LedgerLens's
     /// `query_risk_gate_with_confidence` says the wallet's score is too
     /// risky, missing, or not backed by enough confidence — even if the raw
-    /// risk score itself would otherwise pass.
+    /// risk score itself would otherwise pass. This mirrors the documented
+    /// fail-closed semantics of the confidence-gated interface.
     pub fn borrow(
         env: Env,
         user: Address,

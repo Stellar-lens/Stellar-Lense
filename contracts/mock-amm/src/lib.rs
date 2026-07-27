@@ -85,7 +85,9 @@ impl MockAmm {
     /// Attempt a swap for `user` on `asset_pair`. Rejected with
     /// `HighRiskWallet` whenever LedgerLens's `query_risk_gate` says the
     /// wallet is not safe — note there is no `try_query_risk_gate` and no
-    /// `?`, since the gate is infallible by design.
+    /// `?`, since the gate is infallible by design. The mock follows the
+    /// documented fail-closed semantics: missing scores and risky scores both
+    /// reject the call.
     pub fn swap(
         env: Env,
         user: Address,
