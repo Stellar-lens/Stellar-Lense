@@ -138,6 +138,10 @@ mod test_replay_audit;
 
 #[cfg(test)]
 mod test_gdpr_accumulator;
+mod test_monotonicity_reweight;
+mod test_confidence_floor_truth_tables;
+mod test_model_version_policy_compat;
+mod test_bounded_drift;
 
 use soroban_sdk::{
     contract, contractimpl, crypto::Hash, symbol_short, token, Address, Bytes, BytesN, Env,
