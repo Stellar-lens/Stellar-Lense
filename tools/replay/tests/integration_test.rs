@@ -299,4 +299,93 @@ mod tests {
             assert!(!comparison.is_deterministic);
         }
     }
+
+    #[cfg(test)]
+    mod wasm_analysis_tests {
+        use replay::wasm_analysis::{self, SizeCategory, RegressionSeverity, WasmBinaryAnalysis};
+
+        #[test]
+        fn test_create_wasm_analysis() {
+            let analysis = WasmBinaryAnalysis::new(1000000);
+            assert_eq!(analysis.total_size, 1000000);
+            assert!(analysis.modules.is_empty());
+        }
+
+        #[test]
+        fn test_add_module_to_analysis() {
+            let mut analysis = WasmBinaryAnalysis::new(1000000);
+            analysis.add_module("score", 500000, SizeCategory::Core);
+            assert_eq!(analysis.modules.len(), 1);
+            assert_eq!(analysis.modules[0].bytes, 500000);
+            assert_eq!(analysis.modules[0].percentage, 50.0);
+        }
+
+        #[test]
+        fn test_add_feature_to_analysis() {
+            let mut analysis = WasmBinaryAnalysis::new(1000000);
+            analysis.add_feature("validation", 200000, SizeCategory::Feature);
+            assert_eq!(analysis.features.len(), 1);
+            assert_eq!(analysis.features[0].bytes, 200000);
+        }
+
+        #[test]
+        fn test_modules_sorted_by_size() {
+            let mut analysis = WasmBinaryAnalysis::new(1000000);
+            analysis.add_module("small", 100000, SizeCategory::Test);
+            analysis.add_module("large", 500000, SizeCategory::Core);
+            analysis.add_module("medium", 300000, SizeCategory::Feature);
+
+            let sorted = analysis.modules_by_size();
+            assert_eq!(sorted[0].bytes, 500000);
+            assert_eq!(sorted[1].bytes, 300000);
+            assert_eq!(sorted[2].bytes, 100000);
+        }
+
+        #[test]
+        fn test_detect_size_regression() {
+            let mut prev = WasmBinaryAnalysis::new(1000000);
+            prev.add_module("score", 500000, SizeCategory::Core);
+
+            let mut curr = WasmBinaryAnalysis::new(1100000);
+            curr.add_module("score", 550000, SizeCategory::Core); // 10% increase
+
+            let comparison = wasm_analysis::compare_binaries(prev, curr);
+            assert!(!comparison.regressions.is_empty());
+            assert_eq!(comparison.regressions[0].name, "score");
+            assert_eq!(comparison.regressions[0].increase_percent, 10.0);
+        }
+
+        #[test]
+        fn test_regression_severity() {
+            assert_eq!(RegressionSeverity::from_percentage(0.5), RegressionSeverity::Negligible);
+            assert_eq!(RegressionSeverity::from_percentage(3.0), RegressionSeverity::Minor);
+            assert_eq!(RegressionSeverity::from_percentage(7.0), RegressionSeverity::Moderate);
+            assert_eq!(RegressionSeverity::from_percentage(15.0), RegressionSeverity::Severe);
+        }
+
+        #[test]
+        fn test_requires_review_flag() {
+            let mut prev = WasmBinaryAnalysis::new(1000000);
+            prev.add_module("score", 500000, SizeCategory::Core);
+
+            let mut curr = WasmBinaryAnalysis::new(1500000);
+            curr.add_module("score", 750000, SizeCategory::Core); // 50% increase
+
+            let comparison = wasm_analysis::compare_binaries(prev, curr);
+            assert!(comparison.requires_review);
+            assert_eq!(comparison.regressions[0].severity, RegressionSeverity::Severe);
+        }
+
+        #[test]
+        fn test_improvement_not_regression() {
+            let mut prev = WasmBinaryAnalysis::new(1000000);
+            prev.add_module("score", 500000, SizeCategory::Core);
+
+            let mut curr = WasmBinaryAnalysis::new(900000);
+            curr.add_module("score", 450000, SizeCategory::Core); // 10% decrease
+
+            let comparison = wasm_analysis::compare_binaries(prev, curr);
+            assert!(comparison.regressions.is_empty()); // Improvement, not regression
+        }
+    }
 }
