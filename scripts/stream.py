@@ -22,6 +22,7 @@ import os
 import sys
 
 from config import config
+from config.contracts import validate_mode
 from streaming.alert_dispatcher import AlertDispatcher
 from streaming.feature_buffer import FeatureBuffer
 from streaming.pipeline import StreamingPipeline
@@ -92,9 +93,11 @@ def main() -> None:
     config.STREAMING_BACKEND = args.backend
 
     # --- Config validation ---
-    # A producer needs pairs to stream; a worker discovers topics dynamically.
-    if args.role != "worker" and not config.WATCHED_ASSET_PAIRS:
-        logger.error("WATCHED_ASSET_PAIRS is not configured — set it in .env before streaming")
+    mode = "streaming_kafka" if args.backend == "kafka" else "streaming_sse"
+    try:
+        validate_mode(mode, alert_channel=args.alert_channel, role=args.role, backend=args.backend)
+    except OSError as exc:
+        logger.error(str(exc))
         sys.exit(1)
 
     # --- Load ensemble models (not needed for a pure Kafka producer) ---
@@ -122,7 +125,11 @@ def main() -> None:
 
         host = os.getenv("WS_BIND_HOST", "127.0.0.1")
         port = int(os.getenv("WS_PORT", "8765"))
-        start_ws_server_thread(host, port)
+        try:
+            start_ws_server_thread(host, port)
+        except OSError as exc:
+            logger.error(str(exc))
+            sys.exit(1)
         ws_client = _WsClientAdapter()
         ws_addr = f"ws://{host}:{port}"
 
