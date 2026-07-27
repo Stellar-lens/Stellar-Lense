@@ -26,8 +26,8 @@ _SAMPLE_RECORD = {
     "id": "trade-001",
     "paging_token": "12345-0",
     "ledger_close_time": "2024-01-10T12:00:00Z",
-    "base_account": "GBASE123",
-    "counter_account": "GCOUNTER456",
+    "base_account": "GCGPQMCLRXCUPCL3AVMYUUQML2WVC7A5M6HO5RKYSU4CIA7O7SI4VKWE",
+    "counter_account": "GB2HHLFDCBSBDAMU2QRDU4AJV63WQE2DWT7MBZWZRQDFYUXJXIPPUG7M",
     "base_asset_type": "credit_alphanum4",
     "base_asset_code": "USDC",
     "base_asset_issuer": "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
@@ -102,8 +102,8 @@ def test_load_amm_pool_trades_returns_correct_schema(monkeypatch):
         set(df.columns)
     ), f"Missing columns: {expected_cols - set(df.columns)}"
     assert len(df) == 1
-    assert df.iloc[0]["base_account"] == "GBASE123"
-    assert df.iloc[0]["counter_account"] == "GCOUNTER456"
+    assert df.iloc[0]["base_account"] == "GCGPQMCLRXCUPCL3AVMYUUQML2WVC7A5M6HO5RKYSU4CIA7O7SI4VKWE"
+    assert df.iloc[0]["counter_account"] == "GB2HHLFDCBSBDAMU2QRDU4AJV63WQE2DWT7MBZWZRQDFYUXJXIPPUG7M"
     assert (
         df.iloc[0]["base_asset"] == "USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN"
     )

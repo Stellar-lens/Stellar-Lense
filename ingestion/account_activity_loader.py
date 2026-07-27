@@ -13,6 +13,7 @@ from stellar_sdk import Server
 
 from config import config
 from ingestion.data_models import AccountActivity
+from ingestion.untrusted_input import validate_account_activity
 from utils.logging import get_logger
 from utils.retry import retry_with_backoff
 
@@ -40,11 +41,12 @@ def load_account_activity(account_id: str) -> AccountActivity | None:
 
     for record in records:
         if record.get("type") == "account_created":
-            return AccountActivity(
+            activity = AccountActivity(
                 account_id=record["account"],
                 account_created_at=record["created_at"],
                 funding_account=record.get("funder"),
             )
+            return validate_account_activity(activity, source="account_activity_loader")
 
     return None
 

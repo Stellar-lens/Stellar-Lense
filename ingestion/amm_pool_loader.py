@@ -11,10 +11,12 @@ from typing import Any, cast
 
 import pandas as pd
 import requests
+from pydantic import ValidationError
 from stellar_sdk import Server
 
 from config import config
 from ingestion.data_models import Asset, Trade
+from ingestion.untrusted_input import UntrustedInputError, safe_ratio, validate_trade
 from utils.logging import get_logger
 from utils.retry import retry_with_backoff
 
@@ -35,11 +37,8 @@ def _validate_pool_id(pool_id: str) -> None:
 
 
 def _amm_record_to_trade(record: dict) -> Trade:
-    price_raw = record.get("price", {})
-    try:
-        price = float(price_raw["n"]) / float(price_raw["d"])
-    except (KeyError, TypeError, ZeroDivisionError, ValueError):
-        price = 0.0
+    price_raw = record.get("price") or {}
+    price = safe_ratio(price_raw.get("n"), price_raw.get("d"))
 
     return Trade(
         trade_id=record.get("id", record["paging_token"]),
@@ -113,6 +112,17 @@ def load_amm_pool_trades(
             seen_paging_tokens.add(paging_token)
 
             trade = _amm_record_to_trade(record)
+            try:
+                validate_trade(trade, source="amm_pool_loader")
+            except (UntrustedInputError, ValidationError) as exc:
+                logger.warning(
+                    "Rejected malformed AMM trade record from Horizon (pool=%s, paging_token=%s): %s",
+                    pool_id,
+                    paging_token,
+                    exc,
+                )
+                cursor = paging_token
+                continue
 
             ledger_time = pd.to_datetime(trade.ledger_close_time, utc=True)
             since_ts = (
@@ -185,7 +195,18 @@ def stream_amm_pool_trades(pool_id: str) -> Generator[Trade, None, None]:
         try:
             call_builder = server.trades().for_liquidity_pool(pool_id).cursor(cursor)
             for record in call_builder.stream():
-                trade = _amm_record_to_trade(record)
+                try:
+                    trade = _amm_record_to_trade(record)
+                    validate_trade(trade, source="amm_pool_loader_stream")
+                except (UntrustedInputError, ValidationError, KeyError, ValueError) as exc:
+                    logger.warning(
+                        "Rejected malformed AMM trade record for pool %s (paging_token=%s): %s",
+                        pool_id,
+                        record.get("paging_token", "?"),
+                        exc,
+                    )
+                    cursor = record.get("paging_token", cursor)
+                    continue
                 cursor = record["paging_token"]
                 yield trade
         except Exception as exc:

@@ -22,11 +22,13 @@ import urllib.request
 from collections import deque
 from collections.abc import Iterator
 
+from pydantic import ValidationError
 from stellar_sdk import Asset as SdkAsset
 from stellar_sdk import Server
 
 from config import config
 from ingestion.data_models import Asset, Trade
+from ingestion.untrusted_input import UntrustedInputError, safe_ratio, validate_trade
 from utils.logging import get_logger
 from utils.tracing import get_tracer, hash_span_id
 
@@ -211,7 +213,7 @@ def _to_trade(record: dict) -> Trade:
         ),
         base_amount=float(record["base_amount"]),
         counter_amount=float(record["counter_amount"]),
-        price=float(record["price"]["n"]) / float(record["price"]["d"]),
+        price=safe_ratio(record["price"]["n"], record["price"]["d"]),
     )
 
 
@@ -242,7 +244,19 @@ def stream_trades(
         call_builder = server.trades().for_asset_pair(base_asset, counter_asset).cursor(cursor)
         try:
             for response in call_builder.stream():
-                trade = _to_trade(response)
+                try:
+                    trade = _to_trade(response)
+                    validate_trade(trade, source="horizon_streamer")
+                except (UntrustedInputError, ValidationError, KeyError, ValueError) as exc:
+                    logger.warning(
+                        "Rejected malformed trade record from %s (paging_token=%s): %s",
+                        horizon_url,
+                        response.get("paging_token", "?"),
+                        exc,
+                    )
+                    cursor = response.get("paging_token", cursor)
+                    attempts = 0
+                    continue
                 with _tracer.start_as_current_span("trade_event.received") as span:
                     span.set_attribute("trade.id", hash_span_id(trade.trade_id))
                     span.set_attribute("trade.base_asset", trade.base_asset.code)

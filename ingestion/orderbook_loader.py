@@ -17,11 +17,16 @@ compute `order_cancellation_rate`.
 from collections.abc import Iterable, Iterator
 
 import pandas as pd
+from pydantic import ValidationError
 from stellar_sdk import Server
 
 from config import config
 from ingestion.data_models import Asset, OrderBookEvent
+from ingestion.untrusted_input import UntrustedInputError, safe_ratio, validate_orderbook_event
+from utils.logging import get_logger
 from utils.retry import retry_with_backoff
+
+logger = get_logger(__name__)
 
 _MANAGE_OFFER_OPERATION_TYPES = {
     "manage_buy_offer",
@@ -65,10 +70,13 @@ def _to_orderbook_event(record: dict) -> OrderBookEvent | None:
 
     price = record.get("price")
     if price is None:
-        n, d = record.get("price_r", {"n": 0, "d": 1}).values()
-        price = float(n) / float(d) if d else 0.0
+        price_r = record.get("price_r") or {}
+        price = safe_ratio(price_r.get("n", 0), price_r.get("d", 1))
     else:
-        price = float(price)
+        try:
+            price = float(price)
+        except (TypeError, ValueError):
+            price = 0.0
 
     return OrderBookEvent(
         event_id=record["id"],
@@ -99,7 +107,17 @@ def load_orderbook_events(account_id: str, limit_per_page: int = 200) -> Iterato
         for record in records:
             if record.get("type") not in _MANAGE_OFFER_OPERATION_TYPES:
                 continue
-            event = _to_orderbook_event(record)
+            try:
+                event = _to_orderbook_event(record)
+                if event is not None:
+                    validate_orderbook_event(event, source="orderbook_loader")
+            except (UntrustedInputError, ValidationError, KeyError, ValueError) as exc:
+                logger.warning(
+                    "Rejected malformed orderbook record from Horizon (id=%s): %s",
+                    record.get("id", "?"),
+                    exc,
+                )
+                continue
             if event is not None:
                 yield event
 
