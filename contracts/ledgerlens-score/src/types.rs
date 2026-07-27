@@ -660,6 +660,12 @@ pub enum DataKeyD {
     PendingParamChange(Symbol),
     ModelVersionExecutableAfter(u32),
     ModelVersionDescription(u32),
+    /// Asset-class label (e.g. `stable`, `volatile`, `thin`, `hivalue`) assigned
+    /// to an asset pair for policy-profile lookup. Unset pairs have no class.
+    PairAssetClass(Symbol),
+    /// Risk threshold override for an asset class, set via
+    /// `set_asset_class_policy`. Absent when the class has no override.
+    AssetClassRiskThreshold(Symbol),
 }
 
 #[contracttype]

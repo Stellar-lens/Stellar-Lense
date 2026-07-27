@@ -646,6 +646,53 @@ pub fn remove_pair_weight(env: &Env, asset_pair: &Symbol) {
     env.storage().persistent().remove(&key);
 }
 
+// ── Asset-class policy profiles ──────────────────────────────────────────────
+
+/// Returns the asset class assigned to `asset_pair`, if any.
+pub fn get_pair_asset_class(env: &Env, asset_pair: &Symbol) -> Option<Symbol> {
+    let key = DataKeyD::PairAssetClass(asset_pair.clone());
+    let class: Option<Symbol> = env.storage().persistent().get(&key);
+    if class.is_some() {
+        env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    }
+    class
+}
+
+pub fn set_pair_asset_class(env: &Env, asset_pair: &Symbol, class: &Symbol) {
+    let key = DataKeyD::PairAssetClass(asset_pair.clone());
+    env.storage().persistent().set(&key, class);
+    env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+}
+
+/// Returns the risk-threshold override configured for `class`, if any.
+pub fn get_asset_class_risk_threshold(env: &Env, class: &Symbol) -> Option<u32> {
+    let key = DataKeyD::AssetClassRiskThreshold(class.clone());
+    let threshold: Option<u32> = env.storage().persistent().get(&key);
+    if threshold.is_some() {
+        env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    }
+    threshold
+}
+
+pub fn set_asset_class_risk_threshold(env: &Env, class: &Symbol, threshold: u32) {
+    let key = DataKeyD::AssetClassRiskThreshold(class.clone());
+    env.storage().persistent().set(&key, &threshold);
+    env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+}
+
+/// Resolves the effective risk threshold for `asset_pair`: the asset class's
+/// override when both the pair is classified and the class has one
+/// configured, otherwise the global `risk_threshold` default. Deterministic
+/// and safe when no policy profile exists for the pair.
+pub fn get_effective_risk_threshold(env: &Env, asset_pair: &Symbol) -> u32 {
+    if let Some(class) = get_pair_asset_class(env, asset_pair) {
+        if let Some(threshold) = get_asset_class_risk_threshold(env, &class) {
+            return threshold;
+        }
+    }
+    get_risk_threshold(env)
+}
+
 pub fn set_aggregate_score(env: &Env, wallet: &Address, aggregate: &AggregateRiskScore) {
     let key = DataKey::AggregateScore(wallet.clone());
     env.storage().persistent().set(&key, aggregate);
