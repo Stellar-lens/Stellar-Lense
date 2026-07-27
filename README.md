@@ -826,6 +826,7 @@ We're actively looking for collaborators with experience in:
 | [`detection/benford_engine.py`](detection/benford_engine.py) | Production Benford metrics engine (`chi_square_statistic`, `z_scores`, `mad_score`) |
 | [`docs/drift_detection.md`](docs/drift_detection.md) | PSI-based feature drift detection methodology |
 | [`docs/backtesting.md`](docs/backtesting.md) | Historical backtesting framework |
+| [`docs/checkpointing.md`](docs/checkpointing.md) | Checkpoint/resume contract for long-running batch pipelines |
 
 ## License
 

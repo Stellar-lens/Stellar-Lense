@@ -19,4 +19,8 @@ reports/load_test_results.json
 # mutmut mutation testing cache
 .mutmut-cache
 
+# Pipeline checkpoint/resume state (utils/checkpoint.py) — run-local progress
+# files and cached per-unit artifacts, never committed.
+.checkpoints/
+
 .DS_Store
