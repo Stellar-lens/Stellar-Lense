@@ -6,6 +6,61 @@ mod tests {
     use soroban_sdk::testutils::Address as _;
     use soroban_sdk::{Address, Env, Symbol, Vec as SVec};
 
+    #[cfg(test)]
+    mod schema_tests {
+        use replay::schema::{self, ReplayEntryV1, ReplayFileHeader, ReplayMetadata};
+
+        #[test]
+        fn test_schema_version_validation() {
+            assert!(schema::validate_schema_version(1).is_ok());
+            assert!(schema::validate_schema_version(999).is_err());
+        }
+
+        #[test]
+        fn test_current_schema_version() {
+            assert_eq!(schema::current_version(), 1);
+        }
+
+        #[test]
+        fn test_supported_versions() {
+            let supported = schema::supported_versions();
+            assert!(supported.contains(&1));
+        }
+
+        #[test]
+        fn test_replay_file_header_with_metadata() {
+            let header = ReplayFileHeader {
+                schema_version: 1,
+                metadata: Some(ReplayMetadata {
+                    description: Some("Test data".to_string()),
+                    created_at: Some(1700000000),
+                    host_version: Some("21.0.0".to_string()),
+                    custom: None,
+                }),
+            };
+            let json = serde_json::to_string(&header).unwrap();
+            let parsed: ReplayFileHeader = serde_json::from_str(&json).unwrap();
+            assert_eq!(parsed.schema_version, 1);
+            assert_eq!(parsed.metadata.unwrap().description.unwrap(), "Test data");
+        }
+
+        #[test]
+        fn test_replay_entry_roundtrip() {
+            let entry = ReplayEntryV1 {
+                wallet: "test_wallet".to_string(),
+                asset_pair: "XLM_USDC".to_string(),
+                trades: Some(vec![
+                    replay::schema::TradeRecord { price: 1.5, quantity: None, timestamp: None },
+                    replay::schema::TradeRecord { price: 1.6, quantity: None, timestamp: None },
+                ]),
+            };
+            let json = serde_json::to_string(&entry).unwrap();
+            let parsed: ReplayEntryV1 = serde_json::from_str(&json).unwrap();
+            assert_eq!(parsed.wallet, "test_wallet");
+            assert_eq!(parsed.trades.unwrap().len(), 2);
+        }
+    }
+
     fn init_contract(env: &Env) -> (LedgerLensScoreContractClient<'_>, Address, Address) {
         env.mock_all_auths();
         let contract_id = env.register_contract(None, LedgerLensScoreContract);
