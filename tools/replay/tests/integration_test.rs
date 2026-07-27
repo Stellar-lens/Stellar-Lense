@@ -6,61 +6,6 @@ mod tests {
     use soroban_sdk::testutils::Address as _;
     use soroban_sdk::{Address, Env, Symbol, Vec as SVec};
 
-    #[cfg(test)]
-    mod schema_tests {
-        use replay::schema::{self, ReplayEntryV1, ReplayFileHeader, ReplayMetadata};
-
-        #[test]
-        fn test_schema_version_validation() {
-            assert!(schema::validate_schema_version(1).is_ok());
-            assert!(schema::validate_schema_version(999).is_err());
-        }
-
-        #[test]
-        fn test_current_schema_version() {
-            assert_eq!(schema::current_version(), 1);
-        }
-
-        #[test]
-        fn test_supported_versions() {
-            let supported = schema::supported_versions();
-            assert!(supported.contains(&1));
-        }
-
-        #[test]
-        fn test_replay_file_header_with_metadata() {
-            let header = ReplayFileHeader {
-                schema_version: 1,
-                metadata: Some(ReplayMetadata {
-                    description: Some("Test data".to_string()),
-                    created_at: Some(1700000000),
-                    host_version: Some("21.0.0".to_string()),
-                    custom: None,
-                }),
-            };
-            let json = serde_json::to_string(&header).unwrap();
-            let parsed: ReplayFileHeader = serde_json::from_str(&json).unwrap();
-            assert_eq!(parsed.schema_version, 1);
-            assert_eq!(parsed.metadata.unwrap().description.unwrap(), "Test data");
-        }
-
-        #[test]
-        fn test_replay_entry_roundtrip() {
-            let entry = ReplayEntryV1 {
-                wallet: "test_wallet".to_string(),
-                asset_pair: "XLM_USDC".to_string(),
-                trades: Some(vec![
-                    replay::schema::TradeRecord { price: 1.5, quantity: None, timestamp: None },
-                    replay::schema::TradeRecord { price: 1.6, quantity: None, timestamp: None },
-                ]),
-            };
-            let json = serde_json::to_string(&entry).unwrap();
-            let parsed: ReplayEntryV1 = serde_json::from_str(&json).unwrap();
-            assert_eq!(parsed.wallet, "test_wallet");
-            assert_eq!(parsed.trades.unwrap().len(), 2);
-        }
-    }
-
     fn init_contract(env: &Env) -> (LedgerLensScoreContractClient<'_>, Address, Address) {
         env.mock_all_auths();
         let contract_id = env.register_contract(None, LedgerLensScoreContract);
@@ -203,5 +148,155 @@ mod tests {
         assert_eq!(score1.score, 42);
         assert!(score1.benford_flag);
         assert!(!score1.ml_flag);
+    }
+
+    #[cfg(test)]
+    mod schema_tests {
+        use replay::schema::{self, ReplayEntryV1, ReplayFileHeader, ReplayMetadata};
+
+        #[test]
+        fn test_schema_version_validation() {
+            assert!(schema::validate_schema_version(1).is_ok());
+            assert!(schema::validate_schema_version(999).is_err());
+        }
+
+        #[test]
+        fn test_current_schema_version() {
+            assert_eq!(schema::current_version(), 1);
+        }
+
+        #[test]
+        fn test_supported_versions() {
+            let supported = schema::supported_versions();
+            assert!(supported.contains(&1));
+        }
+
+        #[test]
+        fn test_replay_file_header_with_metadata() {
+            let header = ReplayFileHeader {
+                schema_version: 1,
+                metadata: Some(ReplayMetadata {
+                    description: Some("Test data".to_string()),
+                    created_at: Some(1700000000),
+                    host_version: Some("21.0.0".to_string()),
+                    custom: None,
+                }),
+            };
+            let json = serde_json::to_string(&header).unwrap();
+            let parsed: ReplayFileHeader = serde_json::from_str(&json).unwrap();
+            assert_eq!(parsed.schema_version, 1);
+            assert_eq!(parsed.metadata.unwrap().description.unwrap(), "Test data");
+        }
+
+        #[test]
+        fn test_replay_entry_roundtrip() {
+            let entry = ReplayEntryV1 {
+                wallet: "test_wallet".to_string(),
+                asset_pair: "XLM_USDC".to_string(),
+                trades: Some(vec![
+                    replay::schema::TradeRecord { price: 1.5, quantity: None, timestamp: None },
+                    replay::schema::TradeRecord { price: 1.6, quantity: None, timestamp: None },
+                ]),
+            };
+            let json = serde_json::to_string(&entry).unwrap();
+            let parsed: ReplayEntryV1 = serde_json::from_str(&json).unwrap();
+            assert_eq!(parsed.wallet, "test_wallet");
+            assert_eq!(parsed.trades.unwrap().len(), 2);
+        }
+    }
+
+    #[cfg(test)]
+    mod determinism_tests {
+        use replay::determinism::{self, HostVersionResult, ExecutionMetadata};
+        use std::collections::HashMap;
+
+        fn create_test_result(
+            host_version: &str,
+            accepted: u32,
+            rejected: u32,
+            state: HashMap<String, String>,
+        ) -> HostVersionResult {
+            HostVersionResult {
+                host_version: host_version.to_string(),
+                accepted_count: accepted,
+                rejected_count: rejected,
+                state_snapshot: state,
+                events: vec![],
+                error_code: None,
+                metadata: ExecutionMetadata {
+                    gas_consumed: Some(1000),
+                    execution_time_ms: Some(100),
+                    peak_memory_bytes: Some(1024),
+                    custom: HashMap::new(),
+                },
+            }
+        }
+
+        #[test]
+        fn test_identical_results_deterministic() {
+            let mut state = HashMap::new();
+            state.insert("score_wallet_1_XLM_USDC".to_string(), "50".to_string());
+
+            let result_a = create_test_result("21.0.0", 5, 0, state.clone());
+            let result_b = create_test_result("21.0.0", 5, 0, state);
+
+            let comparison = determinism::compare_results(&result_a, &result_b);
+            assert!(comparison.is_deterministic);
+            assert!(comparison.divergences.is_empty());
+        }
+
+        #[test]
+        fn test_acceptance_count_divergence() {
+            let state = HashMap::new();
+            let result_a = create_test_result("21.0.0", 5, 0, state.clone());
+            let result_b = create_test_result("21.1.0", 4, 1, state);
+
+            let comparison = determinism::compare_results(&result_a, &result_b);
+            assert!(!comparison.is_deterministic);
+            assert!(!comparison.divergences.is_empty());
+        }
+
+        #[test]
+        fn test_state_value_divergence() {
+            let mut state_a = HashMap::new();
+            state_a.insert("key1".to_string(), "value_a".to_string());
+
+            let mut state_b = HashMap::new();
+            state_b.insert("key1".to_string(), "value_b".to_string());
+
+            let result_a = create_test_result("21.0.0", 5, 0, state_a);
+            let result_b = create_test_result("21.1.0", 5, 0, state_b);
+
+            let comparison = determinism::compare_results(&result_a, &result_b);
+            assert!(!comparison.is_deterministic);
+            assert!(!comparison.state_differences.is_empty());
+        }
+
+        #[test]
+        fn test_event_divergence() {
+            let state = HashMap::new();
+            let mut result_a = create_test_result("21.0.0", 5, 0, state.clone());
+            result_a.events = vec!["ScoreUpdated".to_string()];
+
+            let mut result_b = create_test_result("21.1.0", 5, 0, state);
+            result_b.events = vec!["ScoreUpdatedV2".to_string()];
+
+            let comparison = determinism::compare_results(&result_a, &result_b);
+            assert!(!comparison.is_deterministic);
+            assert!(!comparison.event_differences.is_empty());
+        }
+
+        #[test]
+        fn test_error_code_divergence() {
+            let state = HashMap::new();
+            let mut result_a = create_test_result("21.0.0", 5, 0, state.clone());
+            result_a.error_code = Some(1);
+
+            let mut result_b = create_test_result("21.1.0", 5, 0, state);
+            result_b.error_code = Some(2);
+
+            let comparison = determinism::compare_results(&result_a, &result_b);
+            assert!(!comparison.is_deterministic);
+        }
     }
 }
