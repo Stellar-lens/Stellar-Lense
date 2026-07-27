@@ -8,6 +8,7 @@ mod constants;
 extern crate std;
 mod errors;
 mod events;
+mod governance_helpers;
 #[cfg(any(test, feature = "testutils"))]
 mod invariants;
 mod parameter_governance;
