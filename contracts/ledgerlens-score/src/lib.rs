@@ -142,6 +142,9 @@ mod test_gdpr_accumulator;
 #[cfg(test)]
 mod test_storage_key_collisions;
 
+#[cfg(test)]
+mod test_rent_renewal_fairness;
+
 use soroban_sdk::{
     contract, contractimpl, crypto::Hash, symbol_short, token, Address, Bytes, BytesN, Env,
     IntoVal, Symbol, SymbolStr, TryFromVal, Vec,
