@@ -6,6 +6,8 @@ extern crate std;
 #[cfg(test)]
 mod test;
 
+pub mod optimization;
+
 use ledgerlens_score::{AggregateRiskScore, Error as ScoreError, RiskScore};
 use soroban_sdk::{
     contract, contracterror, contractimpl, contracttype, symbol_short, vec, Address, Env, Symbol,
