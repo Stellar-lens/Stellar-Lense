@@ -37,6 +37,9 @@ mod test_ttl_rent_manager;
 #[cfg(test)]
 mod test_interface;
 
+#[cfg(test)]
+mod test_dos_read_patterns;
+
 // #[cfg(test)]
 // mod test_rate_limit;
 
