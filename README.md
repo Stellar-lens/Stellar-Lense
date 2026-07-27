@@ -1,4 +1,4 @@
-# LedgerLens Data 🔍
+# LedgerLens Data 🔍 ...
 
 [![CI](https://github.com/Ledger-Lenz/Ledgerlens-data/actions/workflows/ci.yml/badge.svg)](https://github.com/Ledger-Lenz/Ledgerlens-data/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)

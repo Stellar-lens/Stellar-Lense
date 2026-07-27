@@ -1,5 +1,5 @@
 .PHONY: install lint format test run scale-workers mutation-test
-.PHONY: install lint format test run typecheck mutation-test
+.PHONY: install lint format test run typecheck mutation-test list-connectors
 
 VENV_BIN := $(abspath .venv/bin)
 ifeq ($(wildcard $(VENV_BIN)/python),)
@@ -43,6 +43,11 @@ test-e2e:
 
 run:
 	python run_pipeline.py
+
+# List registered data connectors (built-in + installed plugins) and
+# whether each currently passes its config validation. See docs/connectors.md.
+list-connectors:
+	$(PYTHON) -m scripts.list_connectors
 
 scale-workers:
 	@if [ -z "$(N)" ]; then \

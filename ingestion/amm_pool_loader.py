@@ -69,18 +69,18 @@ def _fetch_page(session: requests.Session, url: str, params: dict) -> dict:
     return cast(dict[Any, Any], resp.json())
 
 
-def load_amm_pool_trades(
+def iter_amm_pool_trades(
     pool_id: str,
     since: datetime,
     until: datetime,
     limit_per_page: int = 200,
-) -> pd.DataFrame:
-    """Bulk-load historical trades for a liquidity pool from Horizon.
+) -> Generator[Trade, None, None]:
+    """Page through historical trades for a liquidity pool, yielding `Trade` objects.
 
-    Returns a DataFrame with the same column schema as
-    ``historical_loader.trades_to_dataframe``:
-    trade_id, ledger_close_time, base_account, counter_account,
-    base_asset, counter_asset, amount, price.
+    Shared pagination core for `load_amm_pool_trades` (DataFrame) and
+    `ingestion.connectors.builtin.AmmPoolTradeConnector` (typed records).
+    Trades outside `[since, until]` are skipped; iteration stops as soon as
+    a trade past `until` is seen (Horizon returns pages in ascending order).
 
     Raises:
         ValueError: If pool_id is not a valid 64-character hex string.
@@ -92,8 +92,10 @@ def load_amm_pool_trades(
     session = requests.Session()
 
     seen_paging_tokens: set[str] = set()
-    rows: list[dict] = []
     cursor = None
+
+    since_ts = pd.Timestamp(since, tz="UTC") if since.tzinfo is None else pd.Timestamp(since)
+    until_ts = pd.Timestamp(until, tz="UTC") if until.tzinfo is None else pd.Timestamp(until)
 
     while True:
         params: dict = {"limit": limit_per_page, "order": "asc"}
@@ -113,39 +115,52 @@ def load_amm_pool_trades(
             seen_paging_tokens.add(paging_token)
 
             trade = _amm_record_to_trade(record)
-
             ledger_time = pd.to_datetime(trade.ledger_close_time, utc=True)
-            since_ts = (
-                pd.Timestamp(since, tz="UTC") if since.tzinfo is None else pd.Timestamp(since)
-            )
-            until_ts = (
-                pd.Timestamp(until, tz="UTC") if until.tzinfo is None else pd.Timestamp(until)
-            )
 
             if ledger_time < since_ts:
                 cursor = paging_token
                 continue
             if ledger_time > until_ts:
-                return _records_to_dataframe(rows)
+                return
 
-            rows.append(
-                {
-                    "trade_id": trade.trade_id,
-                    "ledger_close_time": trade.ledger_close_time,
-                    "base_account": trade.base_account,
-                    "counter_account": trade.counter_account,
-                    "base_asset": f"{trade.base_asset.code}:{trade.base_asset.issuer or 'native'}",
-                    "counter_asset": f"{trade.counter_asset.code}:{trade.counter_asset.issuer or 'native'}",
-                    "amount": trade.base_amount,
-                    "price": trade.price,
-                }
-            )
+            yield trade
             cursor = paging_token
 
         next_href = page.get("_links", {}).get("next", {}).get("href", "")
         if not next_href:
             break
 
+
+def load_amm_pool_trades(
+    pool_id: str,
+    since: datetime,
+    until: datetime,
+    limit_per_page: int = 200,
+) -> pd.DataFrame:
+    """Bulk-load historical trades for a liquidity pool from Horizon.
+
+    Returns a DataFrame with the same column schema as
+    ``historical_loader.trades_to_dataframe``:
+    trade_id, ledger_close_time, base_account, counter_account,
+    base_asset, counter_asset, amount, price.
+
+    Raises:
+        ValueError: If pool_id is not a valid 64-character hex string.
+        PoolNotFoundError: If the pool does not exist on Horizon (HTTP 404).
+    """
+    rows: list[dict] = [
+        {
+            "trade_id": trade.trade_id,
+            "ledger_close_time": trade.ledger_close_time,
+            "base_account": trade.base_account,
+            "counter_account": trade.counter_account,
+            "base_asset": f"{trade.base_asset.code}:{trade.base_asset.issuer or 'native'}",
+            "counter_asset": f"{trade.counter_asset.code}:{trade.counter_asset.issuer or 'native'}",
+            "amount": trade.base_amount,
+            "price": trade.price,
+        }
+        for trade in iter_amm_pool_trades(pool_id, since, until, limit_per_page)
+    ]
     return _records_to_dataframe(rows)
 
 
