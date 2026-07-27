@@ -12,11 +12,53 @@ models/*.joblib
 models/archive/
 models/optuna_studies.db
 models/best_params_*.json
+
+# Generated reports — keep committed sample/benchmark reports,
+# exclude runtime-generated outputs
 reports/
-# Keep sample/committed reports but ignore generated load test output
-reports/load_test_results.json
+!reports/load_test_sample.json
+!reports/adversarial_benchmark.json
+
+# Validation and maturity reports (generated at runtime)
+reports/validation_report*.json
+reports/maturity_report*.json
+reports/drift_report_*.json
+
+# Test snapshots and fixtures generated during test runs
+tests/__snapshots__/
+tests/**/__snapshots__/
+*.snap
 
 # mutmut mutation testing cache
 .mutmut-cache
 
+# macOS metadata
 .DS_Store
+
+# Jupyter notebook checkpoints
+.ipynb_checkpoints/
+notebooks/.ipynb_checkpoints/
+
+# Coverage artifacts
+.coverage
+htmlcov/
+coverage.xml
+
+# Build / packaging
+dist/
+*.egg-info/
+build/
+
+# Editor directories
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Profiling output
+*.prof
+*.lprof
+
+# Temporary files
+*.tmp
+*.bak

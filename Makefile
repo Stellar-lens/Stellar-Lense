@@ -1,4 +1,4 @@
-.PHONY: install lint format test run scale-workers mutation-test
+.PHONY: install lint format test run scale-workers mutation-test validate maturity
 .PHONY: install lint format test run typecheck mutation-test
 
 VENV_BIN := $(abspath .venv/bin)
@@ -81,3 +81,39 @@ mutation-test:
 	@echo "==> Mutation results:"
 	mutmut results || true
 	$(PYTHON) scripts/check_mutation_score.py --threshold $(MUTATION_THRESHOLD)
+
+# ---------------------------------------------------------------------------
+# Contributor validation suite — Issue #558
+#
+# Usage:
+#   make validate              # run all suites
+#   make validate SUITE=parsing
+#   make validate SUITE=reconciliation REPORT=reports/validation.json
+# ---------------------------------------------------------------------------
+SUITE ?= all
+VALIDATION_REPORT ?=
+
+validate:
+	@echo "==> Running LedgerLens contributor validation suite (suite: $(SUITE))..."
+	$(PYTHON) -m scripts.validate \
+		--suite $(SUITE) \
+		$(if $(VALIDATION_REPORT),--report $(VALIDATION_REPORT),) \
+		--verbose
+
+# ---------------------------------------------------------------------------
+# Repository maturity tracking — Issue #560
+#
+# Usage:
+#   make maturity
+#   make maturity MATURITY_REPORT=reports/maturity.json
+#   make maturity MATURITY_THRESHOLD=70
+# ---------------------------------------------------------------------------
+MATURITY_REPORT ?=
+MATURITY_THRESHOLD ?= 60
+
+maturity:
+	@echo "==> Running LedgerLens repository maturity check (threshold: $(MATURITY_THRESHOLD))..."
+	$(PYTHON) -m scripts.repo_maturity \
+		--threshold $(MATURITY_THRESHOLD) \
+		$(if $(MATURITY_REPORT),--report $(MATURITY_REPORT),) \
+		--verbose || true
