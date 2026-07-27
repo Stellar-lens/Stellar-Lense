@@ -627,6 +627,31 @@ pub enum DataKeyC {
     AdaptiveThresholdEnabled,
 }
 
+/// Signer lifecycle state for explicit state machine governance.
+#[contracttype]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[repr(u32)]
+pub enum SignerState {
+    /// Signer added but awaiting grace period before becoming active.
+    Pending = 0,
+    /// Signer is authorized to participate in threshold signatures.
+    Active = 1,
+    /// Signer was active but is now superseded (removed and replaced).
+    Superseded = 2,
+    /// Signer explicitly revoked and no longer participates.
+    Revoked = 3,
+}
+
+/// Record tracking signer lifecycle state and timing for audit compliance.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SignerStateRecord {
+    pub signer: Address,
+    pub state: SignerState,
+    pub state_changed_at: u64,
+    pub state_changed_by: Address,
+}
+
 #[contracttype]
 #[derive(Clone)]
 pub enum DataKeyD {
@@ -660,6 +685,12 @@ pub enum DataKeyD {
     PendingParamChange(Symbol),
     ModelVersionExecutableAfter(u32),
     ModelVersionDescription(u32),
+    /// Explicit state record for a service signer (issue #691).
+    SignerStateRecord(Address),
+    /// Grace period in seconds before a pending signer becomes active (issue #691).
+    SignerGracePeriodSecs,
+    /// Index of all active service signers for efficient iteration.
+    ActiveSignerIndex,
 }
 
 #[contracttype]

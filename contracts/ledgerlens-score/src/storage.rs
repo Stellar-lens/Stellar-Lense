@@ -11,7 +11,7 @@ use crate::types::{
     ModelVersionStats, ModelVersionStatus, PairVolatilityState, ParamChangeProposal,
     ParameterProposalRecord, ParameterProposalStatus, PendingScoreEntry, RateLimitOverrideEntry,
     RiskScore, ScoreDispute, ScoreFloorPolicy, ScoreHistogram, ScoreTrend, ScoreVelocityCap,
-    SignerAccuracyRecord, SubscorePayload, TokenBucket, UpgradeProposal, WelfordCorrState,
+    SignerAccuracyRecord, SignerState, SignerStateRecord, SubscorePayload, TokenBucket, UpgradeProposal, WelfordCorrState,
 };
 use soroban_sdk::{Address, Bytes, BytesN, Env, Symbol, Vec};
 
@@ -2886,6 +2886,47 @@ pub fn set_gate_query_fee(env: &Env, amount: i128) {
 
 pub fn get_accumulated_fees(env: &Env) -> i128 {
     env.storage().instance().get(&GateDataKey::AccumulatedFees).unwrap_or(0)
+}
+
+// ── Explicit signer state machine (issue #691) ──────────────────────────────
+
+pub fn get_signer_state_record(
+    env: &Env,
+    signer: &Address,
+) -> Option<crate::types::SignerStateRecord> {
+    env.storage()
+        .instance()
+        .get(&DataKeyD::SignerStateRecord(signer.clone()))
+}
+
+pub fn set_signer_state_record(env: &Env, record: &crate::types::SignerStateRecord) {
+    env.storage()
+        .instance()
+        .set(&DataKeyD::SignerStateRecord(record.signer.clone()), record);
+}
+
+pub fn get_signer_grace_period_secs(env: &Env) -> u64 {
+    env.storage()
+        .instance()
+        .get(&DataKeyD::SignerGracePeriodSecs)
+        .unwrap_or(crate::constants::DEFAULT_SIGNER_GRACE_PERIOD_SECS)
+}
+
+pub fn set_signer_grace_period_secs(env: &Env, secs: u64) {
+    env.storage()
+        .instance()
+        .set(&DataKeyD::SignerGracePeriodSecs, &secs);
+}
+
+pub fn get_active_signer_index(env: &Env) -> Vec<Address> {
+    env.storage()
+        .instance()
+        .get(&DataKeyD::ActiveSignerIndex)
+        .unwrap_or_else(|| Vec::new(env))
+}
+
+pub fn set_active_signer_index(env: &Env, signers: &Vec<Address>) {
+    env.storage().instance().set(&DataKeyD::ActiveSignerIndex, signers);
 }
 
 #[cfg(test)]
