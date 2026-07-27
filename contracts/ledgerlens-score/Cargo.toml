@@ -52,3 +52,8 @@ crate-type = ["lib"]
 name = "amm_gate_example"
 path = "../../examples/amm_gate_example.rs"
 crate-type = ["lib"]
+
+[[example]]
+name = "typed_client_examples"
+path = "../../examples/typed_client_examples.rs"
+crate-type = ["lib"]
