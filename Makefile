@@ -1,4 +1,4 @@
-.PHONY: install lint format test run scale-workers mutation-test
+.PHONY: install lint format test test-normalization run scale-workers mutation-test
 .PHONY: install lint format test run typecheck mutation-test
 
 VENV_BIN := $(abspath .venv/bin)
@@ -30,6 +30,9 @@ format:
 
 test:
 	$(PYTEST) -q
+
+test-normalization:
+	$(PYTEST) -q tests/test_transaction_normalization_properties.py
 
 fuzz:
 	@echo "Running fuzz tests for 60 seconds each..."
