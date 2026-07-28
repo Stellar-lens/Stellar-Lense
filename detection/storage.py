@@ -14,6 +14,8 @@ integration point is wired up (see README's "Open Integration Points"),
    `schema_migrations` log table.
 """
 
+from __future__ import annotations
+
 import json
 import logging
 import sqlite3
