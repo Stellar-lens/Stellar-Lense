@@ -8,6 +8,8 @@ mod constants;
 extern crate std;
 mod errors;
 mod events;
+mod event_causality;
+mod event_stability;
 #[cfg(any(test, feature = "testutils"))]
 mod invariants;
 mod parameter_governance;
@@ -139,6 +141,9 @@ mod test_replay_audit;
 #[cfg(test)]
 mod test_gdpr_accumulator;
 
+#[cfg(test)]
+mod test_audit_replay;
+
 use soroban_sdk::{
     contract, contractimpl, crypto::Hash, symbol_short, token, Address, Bytes, BytesN, Env,
     IntoVal, Symbol, SymbolStr, TryFromVal, Vec,
@@ -146,6 +151,8 @@ use soroban_sdk::{
 use subtle::ConstantTimeEq;
 
 pub use errors::Error;
+pub use event_causality::{EventCausality, WorkflowTracker};
+pub use event_stability::{EventStability, EventStabilityRegistry};
 pub use events::{ServiceResumedEvent, ServiceSilenceAlertEvent};
 pub use types::{
     AdaptiveRateLimit, AdaptiveThresholdConfig, AggregateRiskScore, BatchAttestation,
