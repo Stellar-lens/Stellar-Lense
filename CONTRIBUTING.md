@@ -2,6 +2,23 @@
 
 Thanks for your interest in improving the LedgerLens on-chain risk score registry.
 
+## Opening an Issue
+
+Pick the template that matches what you're actually doing — each one asks for the specific
+evidence that class of task needs, not a generic description box:
+
+| Task class | Template | What it's for |
+|---|---|---|
+| Implementation | [`🔧 Implementation task`](.github/ISSUE_TEMPLATE/implementation-task.yml) | Adding or changing contract behavior. |
+| Testing | [`🧪 Testing task`](.github/ISSUE_TEMPLATE/testing-task.yml) | Closing a coverage gap without changing behavior. |
+| Documentation | [`📚 Documentation task`](.github/ISSUE_TEMPLATE/documentation-task.yml) | README/CONTRIBUTING/docs additions or corrections. |
+| Security review | [`🔒 Security review task`](.github/ISSUE_TEMPLATE/security-review-task.yml) | Auditing a specific property across a defined set of code paths. |
+| Benchmark | [`📊 Benchmark task`](.github/ISSUE_TEMPLATE/benchmark-task.yml) | Measuring and recording resource cost, especially at a worst-case bound. |
+
+Every template requires an explicit **Compatibility impact** statement (even "None") and links
+back to [`docs/invariants.md`](docs/invariants.md) — read that first regardless of which template
+you use.
+
 ## Getting Started
 
 1. Install the Rust toolchain (stable) and the `wasm32-unknown-unknown` target:
