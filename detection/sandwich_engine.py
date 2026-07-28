@@ -22,45 +22,21 @@ import pandas as pd
 MIN_VICTIM_AMOUNT_XLM: float = 500.0
 MIN_PRICE_IMPACT: float = 0.003  # 0.3%
 MIN_SANDWICH_CONFIDENCE: float = 0.7
-_PERMUTATION_N: int = 1000
-"""AMM sandwich-attack / price-manipulation detection.
-
-`detection.amm_engine` computes *volume* manipulation features (round-trip
-ratio, share concentration). It cannot see the temporal pattern that defines a
-sandwich attack: an attacker submits a large buy, lets a victim's trade execute
-at the inflated price, then immediately sells back into the pool for a profit.
-
-On Stellar, ledger ordering is deterministic within a ledger close, so a
-sandwich reduces to finding ordered triples ``[buy_a -> trade_v -> sell_a]``
-over ``(ledger_sequence, operation_order)`` keys against the same pool.
-
-This module operates on a `Trade`-shaped DataFrame (see
-`ingestion.data_models.Trade`) restricted to pool trades. The two ordering
-columns the algorithm needs — ``ledger_sequence`` and ``operation_order`` — are
-optional: when absent they are derived deterministically from
-``ledger_close_time`` so the detector works against the existing trade schema
-without requiring a migration of `Trade`.
-"""
-
-
 
 from ingestion.data_models import TradeType
 
 
 @dataclass
 class SandwichCandidate:
-    attacker_wallet: str
-    victim_wallet: str
-    asset_pair: str
-    front_run_time: datetime
-    victim_time: datetime
-    back_run_time: datetime
-    front_run_price: float
-    victim_amount: float
-    back_run_price: float
-    pre_trade_price: float
-    post_trade_price: float
-    confidence: float = 0.0
+    attacker: str
+    victim: str
+    pool_id: str
+    buy_op_idx: int
+    victim_op_idx: int
+    sell_op_idx: int
+    profit_xlm: float
+    ledger_sequence: int
+    slippage_inflicted: float = 0.0
 
 
 @dataclass
@@ -226,15 +202,6 @@ class SandwichEngine:
                             )
 
         return events
-    attacker: str
-    victim: str
-    pool_id: str
-    buy_op_idx: int
-    victim_op_idx: int
-    sell_op_idx: int
-    profit_xlm: float
-    ledger_sequence: int
-    slippage_inflicted: float = 0.0
 
 
 def _with_ordering(trades: pd.DataFrame) -> pd.DataFrame:
