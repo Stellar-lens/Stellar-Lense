@@ -127,4 +127,14 @@ impl Error {
     /// drifted from the version the aggregator targets, so registering it would
     /// lead to failed or subtly incorrect cross-contract calls.
     pub const IncompatibleInterface: Error = Error::InvalidAttestation;
+
+// ── Architecture Governance & Reviewer Routing ─────────────────────────
+    /// Returned when an architecture owner or reviewer address is invalid.
+    pub const InvalidArchOwner: Error = Error::Unauthorized;
+    /// Returned when trying to set more mandatory reviewers than MAX_MANDATORY_REVIEWERS (10).
+    pub const MaxReviewersExceeded: Error = Error::ServiceSetFull;
+    /// Returned when trying to add a duplicate mandatory reviewer address.
+    pub const ReviewerAlreadyExists: Error = Error::SignerAlreadyInSet;
+    /// Returned when a reviewer to be removed is not in the set.
+    pub const ReviewerNotFound: Error = Error::SignerNotInSet;
 }

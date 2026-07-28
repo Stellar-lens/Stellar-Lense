@@ -10520,6 +10520,70 @@ impl LedgerLensScoreContract {
         storage::get_oracle_staleness_threshold(&env)
     }
 
+// ── Architecture Ownership & Reviewer Routing ─────────────────────────────
+
+pub fn set_arch_owner(env: Env, new_owner: Address) -> Result<(), Error> {
+    // Requires authorization from current admin or existing arch owner
+    if let Some(current_owner) = storage::get_arch_owner(&env) {
+        current_owner.require_auth();
+    } else {
+        storage::get_admin(&env).require_auth();
+    }
+
+    storage::set_arch_owner(&env, &new_owner);
+
+    // Emit event for architecture ownership change
+    env.events().publish(
+        (Symbol::new(&env, "arch_owner_updated"),),
+        new_owner,
+    );
+
+    Ok(())
+}
+
+pub fn get_arch_owner(env: Env) -> Option<Address> {
+    storage::get_arch_owner(&env)
+}
+
+pub fn set_mandatory_reviewers(env: Env, reviewers: Vec<Address>) -> Result<(), Error> {
+    // Ensure caller is authorized (arch owner or contract admin)
+    if let Some(owner) = storage::get_arch_owner(&env) {
+        owner.require_auth();
+    } else {
+        storage::get_admin(&env).require_auth();
+    }
+
+    // Bound check against MAX_MANDATORY_REVIEWERS
+    if reviewers.len() > storage::MAX_MANDATORY_REVIEWERS {
+        return Err(Error::MaxReviewersExceeded);
+    }
+
+    // Check for duplicate reviewers in vector
+    for i in 0..reviewers.len() {
+        let rev_i = reviewers.get(i).unwrap();
+        for j in (i + 1)..reviewers.len() {
+            let rev_j = reviewers.get(j).unwrap();
+            if rev_i == rev_j {
+                return Err(Error::ReviewerAlreadyExists);
+            }
+        }
+    }
+
+    storage::set_mandatory_reviewers(&env, &reviewers);
+
+    // Emit event for reviewer set update
+    env.events().publish(
+        (Symbol::new(&env, "mandatory_reviewers_updated"),),
+        reviewers.len(),
+    );
+
+    Ok(())
+}
+
+pub fn get_mandatory_reviewers(env: Env) -> Vec<Address> {
+    storage::get_mandatory_reviewers(&env)
+}
+
     /// Returns `true` if the oracle registered for `asset_pair` is considered
     /// stale — i.e. the last recorded price consultation is older than the
     /// current staleness threshold — or if no oracle consultation has ever been
