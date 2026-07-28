@@ -45,6 +45,17 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --workspace
 
+  historical-wasm-compat:
+    name: Historical WASM compatibility
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.81.0"
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --locked -p composability-tests --test historical_wasm_compat
+
   error-discriminants:
     name: Error discriminant stability
     runs-on: ubuntu-latest
