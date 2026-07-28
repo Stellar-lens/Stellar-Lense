@@ -661,6 +661,9 @@ pub enum DataKeyD {
     PendingParamChange(Symbol),
     ModelVersionExecutableAfter(u32),
     ModelVersionDescription(u32),
+    /// Latest operator acknowledgement record for a given alert class.
+    /// Keyed by `AlertType` so each class has its own O(1) slot (issue #630).
+    AlertAcknowledgement(AlertType),
 }
 
 #[contracttype]

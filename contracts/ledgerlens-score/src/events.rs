@@ -1,6 +1,6 @@
 use soroban_sdk::{contracttype, symbol_short, Address, Bytes, BytesN, Env, Symbol};
 
-use crate::types::RiskScore;
+use crate::types::{AlertAckRecord, AlertType, RiskScore};
 
 /// Event Schema Versioning
 ///
