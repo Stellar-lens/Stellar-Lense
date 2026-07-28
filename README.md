@@ -557,6 +557,8 @@ See [`examples/amm_gate_example.rs`](examples/amm_gate_example.rs) and
 7. **Score Attestation**: An opt-in secp256k1 signature over the score payload lets the off-chain pipeline vouch for its contents independent of `require_auth` — see [Score Attestation](#score-attestation)
 8. **Score Submission Floor**: An opt-in per-wallet floor that blocks downward score-revision attacks on wallets whose historical peak crossed a danger level — see [Score Submission Floor](#score-submission-floor)
 
+These are backed by a set of non-negotiable implementation invariants — fail-closed gates, no-panic reads, bounded storage, and append-only event/error stability — documented with their concrete enforcement (code + tests + CI) in [`docs/invariants.md`](docs/invariants.md).
+
 ## Testing
 
 Run the test suite with:
@@ -784,7 +786,7 @@ MIT
 
 ## Contributing
 
-Contributions are welcome. LedgerLens is an open-source public good built for the Stellar ecosystem. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, required checks, and PR guidelines. When opening an issue, pick the [task-specific template](.github/ISSUE_TEMPLATE/) — implementation, testing, documentation, security review, or benchmark — so the expected evidence and acceptance checklist match the kind of work involved.
+Contributions are welcome. LedgerLens is an open-source public good built for the Stellar ecosystem. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, required checks, and PR guidelines, and [`docs/invariants.md`](docs/invariants.md) for the non-negotiable behaviors (fail-closed gates, no-panic reads, bounded storage, append-only event/error stability) that any change to `lib.rs` must preserve.
 
 ## References
 

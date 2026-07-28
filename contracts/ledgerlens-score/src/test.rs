@@ -3334,3 +3334,61 @@ fn test_private_aggregate_score_not_initialized_fails() {
     let wallet = Address::generate(&env);
     assert_eq!(client.get_private_aggregate_score(&wallet, &0), 0);
 }
+#[test]
+fn test_arch_owner_management() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let arch_owner_1 = Address::generate(&env);
+    let arch_owner_2 = Address::generate(&env);
+
+    client.initialize(&admin, &service_address);
+
+    // Initial getter returns None
+    assert_eq!(client.get_arch_owner(), None);
+
+    // Admin sets initial arch owner
+    client.set_arch_owner(&arch_owner_1);
+    assert_eq!(client.get_arch_owner(), Some(arch_owner_1.clone()));
+
+    // Arch owner transfers to new arch owner
+    client.set_arch_owner(&arch_owner_2);
+    assert_eq!(client.get_arch_owner(), Some(arch_owner_2));
+}
+
+#[test]
+fn test_mandatory_reviewers_validation() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    client.initialize(&admin, &service_address);
+
+    let r1 = Address::generate(&env);
+    let r2 = Address::generate(&env);
+
+    // Set valid reviewers
+    let reviewers = vec![&env, r1.clone(), r2.clone()];
+    client.set_mandatory_reviewers(&reviewers);
+    assert_eq!(client.get_mandatory_reviewers().len(), 2);
+
+    // Duplicate reviewer triggers ReviewerAlreadyExists (mapped to SignerAlreadyInSet)
+    let duplicate_reviewers = vec![&env, r1.clone(), r1.clone()];
+    let res = client.try_set_mandatory_reviewers(&duplicate_reviewers);
+    assert_eq!(res, Err(Ok(Error::ReviewerAlreadyExists)));
+
+    // Exceeding MAX_MANDATORY_REVIEWERS (10) triggers MaxReviewersExceeded (mapped to ServiceSetFull)
+    let mut too_many = vec![&env];
+    for _ in 0..11 {
+        too_many.push_back(Address::generate(&env));
+    }
+    let res = client.try_set_mandatory_reviewers(&too_many);
+    assert_eq!(res, Err(Ok(Error::MaxReviewersExceeded)));
+}
