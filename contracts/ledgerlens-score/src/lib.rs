@@ -122,6 +122,9 @@ mod test_privacy_exports;
 mod test_minimal_disclosure;
 
 #[cfg(test)]
+mod test_privacy_regression_history;
+
+#[cfg(test)]
 mod test_pair_score_count;
 
 #[cfg(test)]
