@@ -21,14 +21,11 @@ import re
 import sqlite3
 import time
 from collections import defaultdict
-from concurrent.futures import ThreadPoolExecutor
-from typing import Optional
-from concurrent.futures import TimeoutError as FutureTimeoutError
-from contextlib import asynccontextmanager
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.routing import APIRouter
@@ -38,22 +35,15 @@ from api.auth import require_admin_key, require_compliance_key
 from api.api_key_router import router as api_key_router, require_scope
 from api.admin_router import router as admin_router
 from api.analyst import router as analyst_router
-from api.api_key_router import require_scope, router as api_key_router
 from api.api_keys_router import router as api_keys_router
 from api.export_router import router as export_router
 from api.batch_router import router as batch_router
 from api.cross_chain_router import router as cross_chain_router
-from api.api_key_router import router as api_key_router
-from api.api_keys_router import router as api_keys_router, require_scope
 from api.namespace import list_namespaces
-from api.api_key_router import router as api_key_router, require_scope
-from api.api_keys_router import router as api_keys_router
 from api.gateway import GatewayMiddleware
 from config.settings import get_runtime_risk_score_threshold, settings
 from detection.tracing import (
     configure_tracing,
-    extract_context_from_headers,
-    get_tracer,
     start_span,
 )
 from detection.amm_engine import pool_risk_from_trade_rows
@@ -63,7 +53,6 @@ from detection.counterfactual_engine import generate_counterfactuals
 from detection.counterfactual_translator import translate_counterfactual
 from detection.storage import (
     get_alerts,
-    get_bridge_transfer_history,
     get_bridge_transfers,
     get_circular_routes,
     get_drift_reports,
@@ -73,7 +62,6 @@ from detection.storage import (
     get_pair_correlations,
     get_retrain_runs,
     get_rings,
-    get_shap_values,
 )
 from detection.dispute_store import submit_dispute, get_dispute, cast_vote
 from detection.feedback_store import AnalystFeedbackStore
@@ -92,57 +80,70 @@ logger = logging.getLogger("ledgerlens.api")
 _STELLAR_ADDRESS_PATTERN = re.compile(r"^G[A-Z2-7]{55}$")
 
 # ---------------------------------------------------------------------------
-# Simple in-process IP rate limiter for the causal-explanation endpoint.
-# Limit: 10 requests per minute per IP (token-bucket style).
+# Shared in-process sliding-window rate limiter helper
 # ---------------------------------------------------------------------------
-_CAUSAL_RATE_LIMIT = 10         # max requests per window
-_CAUSAL_RATE_WINDOW = 60.0      # window size in seconds
+
+_RATE_WINDOW = 60.0
+
+
+def _check_sliding_window_rate_limit(
+    buckets: dict[str, list[float]],
+    client_ip: str,
+    max_requests: int,
+    window: float = _RATE_WINDOW,
+    detail: str = "Rate limit exceeded",
+) -> None:
+    """Raise HTTP 429 if ``client_ip`` has exceeded the sliding-window rate limit.
+
+    Uses a sliding window: only timestamps within the last ``window`` seconds
+    are counted. Mutates ``buckets`` in-place to evict stale entries.
+    """
+    now = time.monotonic()
+    bucket = buckets[client_ip]
+    buckets[client_ip] = [t for t in bucket if now - t < window]
+    if len(buckets[client_ip]) >= max_requests:
+        raise HTTPException(
+            status_code=429,
+            detail=detail,
+        )
+    buckets[client_ip].append(now)
+
+
+# ---------------------------------------------------------------------------
+# Causal-explanation rate limiter (10 req/min per IP)
+# ---------------------------------------------------------------------------
+_CAUSAL_RATE_LIMIT = 10
 _causal_rate_buckets: dict[str, list[float]] = defaultdict(list)
 
 
 def _check_causal_rate_limit(client_ip: str) -> None:
-    """Raise HTTP 429 if ``client_ip`` has exceeded the causal-explanation rate limit.
-
-    Uses a sliding window: only timestamps within the last 60 seconds are counted.
-    """
-    now = time.monotonic()
-    bucket = _causal_rate_buckets[client_ip]
-    # Evict timestamps outside the window
-    _causal_rate_buckets[client_ip] = [t for t in bucket if now - t < _CAUSAL_RATE_WINDOW]
-    if len(_causal_rate_buckets[client_ip]) >= _CAUSAL_RATE_LIMIT:
-        raise HTTPException(
-            status_code=429,
-            detail=(
-                f"Rate limit exceeded: causal-explanation endpoint allows "
-                f"{_CAUSAL_RATE_LIMIT} requests per minute per IP."
-            ),
-        )
-    _causal_rate_buckets[client_ip].append(now)
+    _check_sliding_window_rate_limit(
+        _causal_rate_buckets,
+        client_ip,
+        _CAUSAL_RATE_LIMIT,
+        detail=(
+            f"Rate limit exceeded: causal-explanation endpoint allows "
+            f"{_CAUSAL_RATE_LIMIT} requests per minute per IP."
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------
-# Simple in-process IP rate limiter for the similar-wallets endpoint.
+# GNN similarity rate limiter (configurable rate/min per IP)
 # ---------------------------------------------------------------------------
-_GNN_SIMILARITY_RATE_WINDOW = 60.0  # window size in seconds
 _gnn_similarity_rate_buckets: dict[str, list[float]] = defaultdict(list)
 
 
 def _check_gnn_similarity_rate_limit(client_ip: str) -> None:
-    """Raise HTTP 429 if ``client_ip`` has exceeded the similar-wallets rate limit."""
-    from config.settings import settings
-    now = time.monotonic()
-    bucket = _gnn_similarity_rate_buckets[client_ip]
-    # Evict timestamps outside the window
-    _gnn_similarity_rate_buckets[client_ip] = [t for t in bucket if now - t < _GNN_SIMILARITY_RATE_WINDOW]
-    if len(_gnn_similarity_rate_buckets[client_ip]) >= settings.gnn_similarity_rate_limit_per_minute:
-        raise HTTPException(
-            status_code=429,
-            detail=(
-                f"Rate limit exceeded: similar-wallets endpoint allows "
-                f"{settings.gnn_similarity_rate_limit_per_minute} requests per minute per IP."
-            ),
-        )
-    _gnn_similarity_rate_buckets[client_ip].append(now)
+    _check_sliding_window_rate_limit(
+        _gnn_similarity_rate_buckets,
+        client_ip,
+        settings.gnn_similarity_rate_limit_per_minute,
+        detail=(
+            f"Rate limit exceeded: similar-wallets endpoint allows "
+            f"{settings.gnn_similarity_rate_limit_per_minute} requests per minute per IP."
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -298,20 +299,6 @@ async def _lifespan(application: FastAPI):
 
     logger.info("[shutdown] Shutdown sequence complete")
 
-
-_OPENAPI_TAGS = [
-    {"name": "Scores", "description": "Wallet risk score retrieval and explanation endpoints."},
-    {"name": "Alerts", "description": "Manipulation alert listing and deduplication state."},
-    {"name": "Webhooks", "description": "Webhook subscriber management."},
-    {"name": "Feedback", "description": "Ground-truth feedback ingestion for model improvement."},
-    {"name": "AMM", "description": "Automated Market Maker pool risk metrics."},
-    {"name": "Disputes", "description": "Score dispute submission and committee voting."},
-    {"name": "Governance", "description": "On-chain parameter governance proposals."},
-    {"name": "Admin", "description": "Admin-only model lifecycle, config, and observability endpoints."},
-    {"name": "Allowlist / Denylist", "description": "Wallet allowlist and denylist management with audit trail."},
-    {"name": "export", "description": "CSV / Parquet bulk export of risk score data."},
-    {"name": "batch", "description": "Async batch wallet scoring jobs."},
-]
 
 app = FastAPI(
     title="LedgerLens API",
@@ -653,16 +640,15 @@ class PaginatedFeedback(BaseModel):
 
 _feedback_rate_buckets: dict[str, list[float]] = defaultdict(list)
 _FEEDBACK_RATE_LIMIT = 100
-_FEEDBACK_RATE_WINDOW = 3600.0
 
 
 def _check_feedback_rate_limit(client_ip: str) -> None:
-    now = time.monotonic()
-    bucket = _feedback_rate_buckets[client_ip]
-    _feedback_rate_buckets[client_ip] = [t for t in bucket if now - t < _FEEDBACK_RATE_WINDOW]
-    if len(_feedback_rate_buckets[client_ip]) >= _FEEDBACK_RATE_LIMIT:
-        raise HTTPException(status_code=429, detail="Rate limit exceeded: 100 corrections per hour.")
-    _feedback_rate_buckets[client_ip].append(now)
+    _check_sliding_window_rate_limit(
+        _feedback_rate_buckets,
+        client_ip,
+        _FEEDBACK_RATE_LIMIT,
+        detail=f"Rate limit exceeded: {_FEEDBACK_RATE_LIMIT} corrections per hour.",
+    )
 
 
 @v1_router.post("/feedback", status_code=201, response_model=FeedbackRecordOut,
@@ -1003,8 +989,7 @@ async def prometheus_metrics(
     from fastapi.responses import Response as _Response  # noqa: PLC0415
 
     try:
-        from config.settings import settings as _s  # noqa: PLC0415
-        if not getattr(_s, "metrics_enabled", True):
+        if not getattr(settings, "metrics_enabled", True):
             return _Response(
                 content="# Metrics collection is disabled (METRICS_ENABLED=False)\n",
                 status_code=503,
@@ -1462,10 +1447,10 @@ class FeedbackRequest(BaseModel):
 
 
 @v1_router.post(
-    "/feedback",
+    "/feedback/ground-truth",
     dependencies=[Depends(require_admin_key)],
     tags=["Admin"],
-    summary="Submit scoring feedback",
+    summary="Submit ground-truth scoring feedback",
     description="Record ground-truth feedback (confirmed wash / confirmed clean) for a previously scored wallet.",
 )
 def submit_feedback(body: FeedbackRequest) -> dict:
@@ -1532,7 +1517,8 @@ def get_slo_status_from_registry() -> dict:
     try:
         from prometheus_client import REGISTRY
     except ImportError:
-        return {}
+        logger.warning("prometheus_client not installed — SLO status unavailable")
+        return {"error": "prometheus_client not installed"}
 
     # Initialise counters
     # 1. Score Availability
