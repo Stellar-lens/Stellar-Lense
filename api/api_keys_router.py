@@ -36,8 +36,8 @@ VALID_SCOPES = {"read:scores", "write:suppressions", "admin"}
 _rate_windows: dict[str, list[float]] = {}
 
 
-def _add_deprecation_headers(response: dict | None = None) -> dict:
-    """Add RFC 8594 Deprecation headers to the response."""
+def _add_deprecation_headers() -> dict:
+    """Build RFC 8594 Deprecation headers for a response."""
     headers = dict(_DEPRECATION_HEADER)
     headers["Link"] = f'<{_MIGRATION_GUIDE}>; rel="deprecation"'
     return headers
@@ -211,19 +211,22 @@ def create_api_key(body: CreateKeyRequest) -> CreateKeyResponse:
 )
 def revoke_api_key(key_id: int) -> dict:
     with sqlite3.connect(settings.db_path) as conn:
+        conn.row_factory = sqlite3.Row
         _ensure_table(conn)
-        cur = conn.execute(
-            "UPDATE api_keys SET revoked = 1 WHERE id = ? AND revoked = 0",
+        row = conn.execute(
+            "SELECT key_hash FROM api_keys WHERE id = ? AND revoked = 0",
             (key_id,),
-        )
-        if cur.rowcount == 0:
+        ).fetchone()
+        if row is None:
             raise HTTPException(
                 status_code=404,
                 detail=f"API key {key_id} not found or already revoked",
                 headers=_add_deprecation_headers(),
             )
+        conn.execute("UPDATE api_keys SET revoked = 1 WHERE id = ?", (key_id,))
 
-    _rate_windows.pop(str(key_id), None)
+    # Rate-limit windows are keyed by key_hash (not key_id) — clear the
+    # matching entry so a revoked key doesn't keep a stale window alive.
+    _rate_windows.pop(row["key_hash"], None)
 
-    response = {"revoked": True, "id": key_id}
-    return response
+    return {"revoked": True, "id": key_id}
