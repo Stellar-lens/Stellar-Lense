@@ -29,6 +29,9 @@ mod test_upgrade;
 mod test_upgrade_rollback;
 
 #[cfg(test)]
+mod test_batch_error_events;
+
+#[cfg(test)]
 mod test_parameter_governance;
 
 #[cfg(test)]
