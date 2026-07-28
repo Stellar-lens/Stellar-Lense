@@ -483,6 +483,7 @@ pub enum DataKeyB {
     ScoreEmbargo(Address),
     ConsensusThresholdK,
     ConsensusEpsilon,
+
     /// Adaptive epsilon enabled flag (issue #204).
     AdaptiveEpsilonEnabled,
     /// Minimum epsilon bound for adaptive mode (issue #204).
@@ -669,6 +670,7 @@ pub struct TierBounds {
     pub max_score: u32,
 }
 
+
 /// Histogram of all score submissions across 101 buckets (0–100).
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -812,3 +814,4 @@ pub struct TokenBucket {
     pub tokens: u32,
     pub last_refill: u64,
 }
+
