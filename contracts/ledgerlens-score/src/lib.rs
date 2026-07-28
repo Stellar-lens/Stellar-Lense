@@ -140,7 +140,7 @@ mod test_replay_audit;
 mod test_gdpr_accumulator;
 
 #[cfg(test)]
-mod test_alerts;
+mod test_memory_exhaustion;
 
 use soroban_sdk::{
     contract, contractimpl, crypto::Hash, symbol_short, token, Address, Bytes, BytesN, Env,
@@ -1362,6 +1362,14 @@ impl LedgerLensScoreContract {
         if !service_set.is_empty() && threshold > 0 {
             if signers.len() < threshold {
                 return Err(Error::InsufficientSigners);
+            }
+            // Bound the M-of-N loop before it does any storage read or
+            // `require_auth` host call: a caller cannot legitimately need
+            // more signers than currently exist in the service set, so a
+            // larger `signers` Vec is padding aimed at burning CPU/memory
+            // on `check_signer_expired` storage reads (#612).
+            if signers.len() > service_set.len() {
+                return Err(Error::TooManySigners);
             }
             for i in 0..signers.len() {
                 let signer = signers.get(i).unwrap();
@@ -9860,6 +9868,13 @@ impl LedgerLensScoreContract {
             if admin_signers.len() < threshold {
                 return Err(Error::InsufficientAdminSigners);
             }
+            // Same bound as the service-signer paths (#612): an
+            // `admin_signers` Vec longer than the admin set itself carries
+            // no legitimate signature it couldn't already carry at set
+            // size, so reject before the per-signer `require_auth` loop.
+            if admin_signers.len() > admin_set.len() {
+                return Err(Error::TooManySigners);
+            }
             for i in 0..admin_signers.len() {
                 let signer = admin_signers.get(i).unwrap();
                 if !admin_set.contains(&signer) {
@@ -9882,6 +9897,11 @@ impl LedgerLensScoreContract {
         if !service_set.is_empty() && threshold > 0 {
             if service_signers.len() < threshold {
                 return Err(Error::InsufficientSigners);
+            }
+            // Same bound as `submit_scores_batch_attested` (#612): reject
+            // before the loop touches storage or `require_auth`.
+            if service_signers.len() > service_set.len() {
+                return Err(Error::TooManySigners);
             }
             for i in 0..service_signers.len() {
                 let signer = service_signers.get(i).unwrap();
@@ -10500,6 +10520,70 @@ impl LedgerLensScoreContract {
     pub fn get_oracle_staleness_threshold(env: Env) -> u64 {
         storage::get_oracle_staleness_threshold(&env)
     }
+
+// ── Architecture Ownership & Reviewer Routing ─────────────────────────────
+
+pub fn set_arch_owner(env: Env, new_owner: Address) -> Result<(), Error> {
+    // Requires authorization from current admin or existing arch owner
+    if let Some(current_owner) = storage::get_arch_owner(&env) {
+        current_owner.require_auth();
+    } else {
+        storage::get_admin(&env).require_auth();
+    }
+
+    storage::set_arch_owner(&env, &new_owner);
+
+    // Emit event for architecture ownership change
+    env.events().publish(
+        (Symbol::new(&env, "arch_owner_updated"),),
+        new_owner,
+    );
+
+    Ok(())
+}
+
+pub fn get_arch_owner(env: Env) -> Option<Address> {
+    storage::get_arch_owner(&env)
+}
+
+pub fn set_mandatory_reviewers(env: Env, reviewers: Vec<Address>) -> Result<(), Error> {
+    // Ensure caller is authorized (arch owner or contract admin)
+    if let Some(owner) = storage::get_arch_owner(&env) {
+        owner.require_auth();
+    } else {
+        storage::get_admin(&env).require_auth();
+    }
+
+    // Bound check against MAX_MANDATORY_REVIEWERS
+    if reviewers.len() > storage::MAX_MANDATORY_REVIEWERS {
+        return Err(Error::MaxReviewersExceeded);
+    }
+
+    // Check for duplicate reviewers in vector
+    for i in 0..reviewers.len() {
+        let rev_i = reviewers.get(i).unwrap();
+        for j in (i + 1)..reviewers.len() {
+            let rev_j = reviewers.get(j).unwrap();
+            if rev_i == rev_j {
+                return Err(Error::ReviewerAlreadyExists);
+            }
+        }
+    }
+
+    storage::set_mandatory_reviewers(&env, &reviewers);
+
+    // Emit event for reviewer set update
+    env.events().publish(
+        (Symbol::new(&env, "mandatory_reviewers_updated"),),
+        reviewers.len(),
+    );
+
+    Ok(())
+}
+
+pub fn get_mandatory_reviewers(env: Env) -> Vec<Address> {
+    storage::get_mandatory_reviewers(&env)
+}
 
     /// Returns `true` if the oracle registered for `asset_pair` is considered
     /// stale — i.e. the last recorded price consultation is older than the

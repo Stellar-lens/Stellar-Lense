@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [Unreleased]
 
 ### Added
+- **Memory-exhaustion tests for maximum-sized nested inputs**: `contracts/ledgerlens-score/src/test_memory_exhaustion.rs` exercises `submit_scores_batch_attested` at its maximum nested shape (`MAX_BATCH_SIZE` entries × `MAX_MERKLE_PROOF_DEPTH`-deep proofs each), asserting no panic and measuring worst-case CPU/memory cost, plus regression coverage for the new `signers`/`admin_signers` bound below and a bounded-read test for `get_expiring_entries`. Closes #612.
 - **Interface versioning & migration policy**: [`docs/interface-versioning-policy.md`](docs/interface-versioning-policy.md) defines breaking vs. non-breaking changes, a 30-day notice period for breaking releases, and programmatic detection via `supports_interface`. Cross-referenced from `docs/interface-spec.md`, `CHANGELOG.md`, and `CONTRIBUTING.md`. Closes #418.
 - **`get_admin_set`**: Read-only query returning the current M-of-N admin co-signer set, mirroring `get_admin_signers`. Closes #239.
 - **Rustdoc examples**: Added runnable usage examples for `get_hysteresis_margin` (closes #229) and `get_staleness_window` (closes #227).
@@ -22,6 +23,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Changed
 - **Lazy score TTL extension**: `set_score` now skips `extend_ttl` when the entry's estimated remaining TTL is still at or above `SCORE_TTL_THRESHOLD`, reducing ledger instruction cost for batch resubmissions to pre-warmed entries. Applies equally to `submit_score`, `submit_scores_batch`, and `submit_scores_batch_attested`, all of which route through the same `storage::set_score`.
 - **Expiry-ordered rent-management index**: The tracked-entry index backing `get_expiring_entries`/`extend_entry_ttls` is now maintained as a queue ordered from least- to most-recently-touched (an entry moves to the back on every write or admin renewal), instead of insertion order. `get_expiring_entries` now stops scanning as soon as it reaches the first not-yet-due entry rather than always walking all `MAX_TRACKED_SCORE_ENTRIES` entries, and no longer needs its O(n²) selection sort since the queue is already in urgency order. Closes #422.
+
+### Fixed
+- **Unbounded M-of-N signer lists**: `submit_scores_batch_attested`, `veto_parameter_change` (via `require_service_signers_auth`), and every admin-gated entry point (via `require_admin_auth`) now reject a `signers`/`admin_signers` `Vec<Address>` longer than the current signer-set size with `TooManySigners`, before doing any per-signer storage read or `require_auth` call. Previously an oversized list would loop through the full attacker-supplied length before failing. `TooManySigners` reuses the existing `ServiceSetFull` discriminant — no ABI change. Closes #612.
 
 ### Removed
 - **`gdpr_accumulator` scaffold**: Removed the unwired, cryptographically unsound RSA-accumulator-style deletion-proof module (`generate_deletion_witness`, `verify_deletion_proof`, `accumulator_update`). It was never called from `clear_score`/`clear_score_history`, used a trivially factorable `u64` modulus in place of RSA, and XOR-folded bytes in place of a real hash. GDPR erasure is handled by plain storage deletion (`storage::clear_score_history`/`storage::clear_score`) only — there is currently no cryptographic non-membership proof accompanying deletion. A sound accumulator or Merkle-based scheme may be reintroduced later, properly wired and documented. Closes #395.

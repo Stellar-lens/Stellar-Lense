@@ -16,6 +16,17 @@ use crate::types::{
 };
 use soroban_sdk::{Address, Bytes, BytesN, Env, Symbol, Vec};
 
+pub const MAX_MANDATORY_REVIEWERS: u32 = 10;
+#[contracttype]
+#[derive(Clone)]
+pub enum DataKey {
+
+    /// Storage key for the designated primary Architecture Owner address
+    ArchOwner,
+    /// Storage key for the list of mandatory off-chain/on-chain reviewer addresses
+    MandatoryReviewers,
+}
+
 // ── Admin / Service ─────────────────────────────────────────────────────────
 
 pub fn has_admin(env: &Env) -> bool {
@@ -2889,6 +2900,25 @@ pub fn get_accumulated_fees(env: &Env) -> i128 {
     env.storage().instance().get(&GateDataKey::AccumulatedFees).unwrap_or(0)
 }
 
+pub fn set_arch_owner(env: &Env, owner: &Address) {
+    env.storage().instance().set(&DataKey::ArchOwner, owner);
+}
+
+pub fn get_arch_owner(env: &Env) -> Option<Address> {
+    env.storage().instance().get(&DataKey::ArchOwner)
+}
+
+pub fn set_mandatory_reviewers(env: &Env, reviewers: &Vec<Address>) {
+    env.storage().instance().set(&DataKey::MandatoryReviewers, reviewers);
+}
+
+pub fn get_mandatory_reviewers(env: &Env) -> Vec<Address> {
+    env.storage()
+        .instance()
+        .get(&DataKey::MandatoryReviewers)
+        .unwrap_or_else(|| Vec::new(env))
+}
+
 #[cfg(test)]
 mod test_instrumentation {
     use soroban_sdk::contracttype;
@@ -2900,38 +2930,35 @@ mod test_instrumentation {
     }
 }
 
-// ── Operator alert acknowledgement (issue #630) ──────────────────────────
-
-/// Writes or overwrites the acknowledgement record for `alert_type` in
-/// persistent storage. Because each `AlertType` variant is a separate map
-/// key the write is always O(1) and does not scan any collection.
-///
-/// TTL is aligned to the score-entry window so the record survives as long
-/// as the data it refers to.
-pub fn set_alert_acknowledgement(
-    env: &Env,
-    alert_type: &AlertType,
-    record: &AlertAckRecord,
-) {
-    let key = DataKeyD::AlertAcknowledgement(alert_type.clone());
-    env.storage().persistent().set(&key, record);
-    env.storage()
-        .persistent()
-        .extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+pub fn get_escalation_threshold(env: &Env) -> u32 {
+    let result: Option<u32> = env.storage().instance().get(&DataKey::EscalationThreshold);
+    result.unwrap_or(crate::constants::DEFAULT_ESCALATION_THRESHOLD)
 }
 
-/// Returns the most recent acknowledgement record for `alert_type`, or
-/// `None` if the alert has never been acknowledged. O(1) persistent read.
-pub fn get_alert_acknowledgement(
-    env: &Env,
-    alert_type: &AlertType,
-) -> Option<AlertAckRecord> {
-    let key = DataKeyD::AlertAcknowledgement(alert_type.clone());
-    let record: Option<AlertAckRecord> = env.storage().persistent().get(&key);
-    if record.is_some() {
-        env.storage()
-            .persistent()
-            .extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+pub fn set_escalation_threshold(env: &Env, threshold: u32) {
+    env.storage().instance().set(&DataKey::EscalationThreshold, &threshold);
+}
+
+pub fn get_breach_count(env: &Env, wallet: &Address, asset_pair: &Symbol) -> u32 {
+    let key = DataKey::BreachCount(wallet.clone(), asset_pair.clone());
+    let result: Option<u32> = env.storage().persistent().get(&key);
+    if result.is_some() {
+        env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
     }
-    record
+    result.unwrap_or(0)
+}
+
+pub fn set_breach_count(env: &Env, wallet: &Address, asset_pair: &Symbol, count: u32) {
+    let key = DataKey::BreachCount(wallet.clone(), asset_pair.clone());
+    if count == 0 {
+        env.storage().persistent().remove(&key);
+    } else {
+        env.storage().persistent().set(&key, &count);
+        env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    }
+}
+
+pub fn clear_breach_count(env: &Env, wallet: &Address, asset_pair: &Symbol) {
+    let key = DataKey::BreachCount(wallet.clone(), asset_pair.clone());
+    env.storage().persistent().remove(&key);
 }
