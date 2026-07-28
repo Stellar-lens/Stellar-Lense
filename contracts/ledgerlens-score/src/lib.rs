@@ -116,6 +116,9 @@ mod test_bulk_reset_pair_weight;
 mod test_query_helpers;
 
 #[cfg(test)]
+mod test_privacy_exports;
+
+#[cfg(test)]
 mod test_pair_score_count;
 
 #[cfg(test)]
@@ -148,15 +151,17 @@ use subtle::ConstantTimeEq;
 pub use errors::Error;
 pub use events::{ServiceResumedEvent, ServiceSilenceAlertEvent};
 pub use types::{
-    AdaptiveRateLimit, AdaptiveThresholdConfig, AggregateRiskScore, BatchAttestation,
-    BatchEntryResult, BatchResult, BatchScoreResult, DecayCurve, EffectiveRiskScore, EmbargoExpiry,
-    FlashProtectionMode, HllSketch, InterpolationMethod, MaybeRiskScore, MaybeScoreAttestation,
-    MaybeThresholdAttestation, ModelSubmission, ModelVersionStats, ModelVersionStatus,
+    AdaptiveRateLimit, AdaptiveThresholdConfig, AggregateRiskScore, AuditorScoreExport,
+    BatchAttestation, BatchEntryResult, BatchResult, BatchScoreResult, DecayCurve,
+    EffectiveRiskScore, EmbargoExpiry, ExportViewMode, FlashProtectionMode, HllSketch,
+    InterpolationMethod, MaybeRiskScore, MaybeScoreAttestation, MaybeThresholdAttestation,
+    ModelSubmission, ModelVersionStats, ModelVersionStatus, OperatorScoreExport,
     ParamChangeProposal, ParamValue, ParameterProposal, ParameterProposalRecord,
-    ParameterProposalStatus, PendingScoreEntry, RiskScore, ScoreAttestation, ScoreAttestationInput,
-    ScoreDispute, ScoreFloorPolicy, ScoreHistogram, ScoreQuery, ScoreSubmission,
-    ScoreSubmissionWithProof, ScoreTrend, ScoreVelocityCap, SignerAccuracyRecord,
-    ThresholdAttestation, TierBounds, TokenBucket, UpgradeProposal, WelfordCorrState,
+    ParameterProposalStatus, PendingScoreEntry, PublicScoreExport, RiskScore, ScoreAttestation,
+    ScoreAttestationInput, ScoreDispute, ScoreFloorPolicy, ScoreHistogram, ScoreQuery,
+    ScoreSubmission, ScoreSubmissionWithProof, ScoreTrend, ScoreVelocityCap,
+    SignerAccuracyRecord, ThresholdAttestation, TierBounds, TokenBucket, UpgradeProposal,
+    WelfordCorrState,
 };
 /// The 32-byte all-zeros field element used as the value in non-membership proofs.
 pub use verkle::NON_MEMBER_SENTINEL;
@@ -1858,6 +1863,115 @@ impl LedgerLensScoreContract {
     /// ```
     pub fn get_score_exists(env: Env, wallet: Address, asset_pair: Symbol) -> bool {
         storage::peek_score(&env, &wallet, &asset_pair).is_some()
+    }
+
+    /// Returns a public-view export of a score: risk-gate decision only,
+    /// without exposing full score details. Minimal disclosure for general consumers.
+    ///
+    /// # Returns
+    /// - `PublicScoreExport` with only `risk_gate_decision` (0=pass, >0=breached).
+    /// - `ScoreNotFound` if the score does not exist.
+    /// - Respects embargo: embargoed wallets return `ScoreNotFound`.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let export = client.get_score_export_public(&wallet, &asset_pair)?;
+    /// // Only exposes: risk_gate_decision, last_updated
+    /// ```
+    pub fn get_score_export_public(
+        env: Env,
+        wallet: Address,
+        asset_pair: Symbol,
+    ) -> Result<PublicScoreExport, Error> {
+        Self::check_service_silence(&env);
+        let score = Self::lookup_score(&env, &wallet, &asset_pair)?.ok_or(Error::ScoreNotFound)?;
+        let risk_threshold = storage::get_risk_threshold(&env);
+
+        Ok(PublicScoreExport {
+            wallet,
+            asset_pair,
+            risk_gate_decision: if score.score >= risk_threshold { score.score } else { 0 },
+            last_updated: env.ledger().timestamp(),
+        })
+    }
+
+    /// Returns an operator-view export: includes operational details needed
+    /// for system operations and monitoring, without internal breakdown scores.
+    ///
+    /// # Returns
+    /// - `OperatorScoreExport` with: score, confidence, timestamp, model_version.
+    /// - `ScoreNotFound` if the score does not exist.
+    /// - Respects embargo: embargoed wallets return `ScoreNotFound`.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let export = client.get_score_export_operator(&wallet, &asset_pair)?;
+    /// // Includes: score, confidence, timestamp, model_version, is_embargoed
+    /// ```
+    pub fn get_score_export_operator(
+        env: Env,
+        wallet: Address,
+        asset_pair: Symbol,
+    ) -> Result<OperatorScoreExport, Error> {
+        Self::check_service_silence(&env);
+        let score = Self::lookup_score(&env, &wallet, &asset_pair)?.ok_or(Error::ScoreNotFound)?;
+        let is_embargoed = storage::get_score_embargo(&env, &wallet).is_some();
+
+        Ok(OperatorScoreExport {
+            wallet,
+            asset_pair,
+            score: score.score,
+            confidence: score.confidence,
+            timestamp: score.timestamp,
+            model_version: score.model_version,
+            last_updated: env.ledger().timestamp(),
+            is_embargoed,
+        })
+    }
+
+    /// Returns an auditor-view export: complete disclosure for compliance
+    /// and incident response, including internal breakdown scores and flags.
+    ///
+    /// # Returns
+    /// - `AuditorScoreExport` with all fields from `RiskScore` plus embargo status.
+    /// - `ScoreNotFound` if the score does not exist.
+    /// - Does NOT respect embargo: auditors can always view embargoed wallets.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let export = client.get_score_export_auditor(&wallet, &asset_pair)?;
+    /// // Full disclosure: all scores, flags, breakdown, confidence
+    /// ```
+    pub fn get_score_export_auditor(
+        env: Env,
+        wallet: Address,
+        asset_pair: Symbol,
+    ) -> Result<AuditorScoreExport, Error> {
+        Self::check_service_silence(&env);
+        // Auditors bypass embargo checks for full disclosure
+        let score = storage::peek_score(&env, &wallet, &asset_pair)
+            .flatten()
+            .ok_or(Error::ScoreNotFound)?;
+        let is_embargoed = storage::get_score_embargo(&env, &wallet).is_some();
+
+        Ok(AuditorScoreExport {
+            wallet,
+            asset_pair,
+            score: score.score,
+            benford_flag: score.benford_flag,
+            ml_flag: score.ml_flag,
+            timestamp: score.timestamp,
+            confidence: score.confidence,
+            model_version: score.model_version,
+            benford_score: score.benford_score,
+            ml_score: score.ml_score,
+            network_score: score.network_score,
+            last_updated: env.ledger().timestamp(),
+            is_embargoed,
+        })
     }
 
     /// Reads the latest score for each requested wallet / asset-pair pair.
