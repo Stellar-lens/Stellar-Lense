@@ -86,3 +86,78 @@ def test_cors_default_is_empty_tuple(monkeypatch):
     settings = settings_module.Settings()
 
     assert settings.cors_allowed_origins == ()
+
+
+# ── Cost & Capacity settings validation ─────────────────────────────────
+
+
+def test_default_cost_coefficients_are_reasonable():
+    """Verify default cost coefficient values are non-negative and within sane bounds."""
+    settings = settings_module.Settings()
+    assert settings.cost_per_vcpu_hour_usd >= 0
+    assert settings.cost_per_vcpu_hour_usd < 1.0
+    assert settings.cost_per_gb_memory_hour_usd >= 0
+    assert settings.cost_per_gb_memory_hour_usd < 1.0
+    assert settings.cost_per_gb_storage_month_usd >= 0
+    assert settings.cost_per_gb_storage_month_usd < 10.0
+
+
+def test_default_capacity_projection_days_are_reasonable():
+    """Verify default capacity projection settings are >= 1."""
+    settings = settings_module.Settings()
+    assert settings.capacity_projection_window_days >= 1
+    assert settings.capacity_projection_lead_time_days >= 1
+
+
+def test_negative_cost_coefficient_rejected(monkeypatch):
+    """Verify that pydantic rejects negative cost coefficients at Settings load time."""
+    import os
+    from pydantic import ValidationError
+
+    original_value = os.environ.get("COST_PER_VCPU_HOUR_USD")
+    os.environ["COST_PER_VCPU_HOUR_USD"] = "-0.01"
+
+    try:
+        with pytest.raises(ValidationError, match="Cost coefficients must be non-negative"):
+            settings_module.Settings()
+    finally:
+        if original_value is not None:
+            os.environ["COST_PER_VCPU_HOUR_USD"] = original_value
+        else:
+            os.environ.pop("COST_PER_VCPU_HOUR_USD", None)
+
+
+def test_capacity_projection_window_validation(monkeypatch):
+    """Verify capacity projection window must be >= 1 day."""
+    import os
+    from pydantic import ValidationError
+
+    original_value = os.environ.get("CAPACITY_PROJECTION_WINDOW_DAYS")
+    os.environ["CAPACITY_PROJECTION_WINDOW_DAYS"] = "0"
+
+    try:
+        with pytest.raises(ValidationError, match="Capacity projection days must be >= 1"):
+            settings_module.Settings()
+    finally:
+        if original_value is not None:
+            os.environ["CAPACITY_PROJECTION_WINDOW_DAYS"] = original_value
+        else:
+            os.environ.pop("CAPACITY_PROJECTION_WINDOW_DAYS", None)
+
+
+def test_capacity_projection_lead_time_validation(monkeypatch):
+    """Verify capacity projection lead time must be >= 1 day."""
+    import os
+    from pydantic import ValidationError
+
+    original_value = os.environ.get("CAPACITY_PROJECTION_LEAD_TIME_DAYS")
+    os.environ["CAPACITY_PROJECTION_LEAD_TIME_DAYS"] = "-5"
+
+    try:
+        with pytest.raises(ValidationError, match="Capacity projection days must be >= 1"):
+            settings_module.Settings()
+    finally:
+        if original_value is not None:
+            os.environ["CAPACITY_PROJECTION_LEAD_TIME_DAYS"] = original_value
+        else:
+            os.environ.pop("CAPACITY_PROJECTION_LEAD_TIME_DAYS", None)

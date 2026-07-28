@@ -439,6 +439,18 @@ class Settings(BaseSettings):
     zk_snark_verification_key_path: str = "circuits/keys/verification_key.json"
     zk_snark_prover_timeout_seconds: float = 10.0
 
+    # ── Cost & Capacity ─────────────────────────────────────
+    cost_per_vcpu_hour_usd: float = 0.0416
+    """Cost per vCPU-hour in USD (operator-configurable coefficient)."""
+    cost_per_gb_memory_hour_usd: float = 0.0056
+    """Cost per GB memory-hour in USD (operator-configurable coefficient)."""
+    cost_per_gb_storage_month_usd: float = 0.10
+    """Cost per GB storage per month in USD (operator-configurable coefficient)."""
+    capacity_projection_window_days: int = 7
+    """Number of days to look back for capacity trend projection (must be >= 1)."""
+    capacity_projection_lead_time_days: int = 14
+    """Number of days ahead to alert for capacity shortfall (must be >= 1)."""
+
     # ── Validators ────────────────────────────────────────────────────────────
 
     @field_validator("poll_interval_seconds", "trade_history_lookback_days",
@@ -713,7 +725,7 @@ class Settings(BaseSettings):
         return val
 
     @field_validator("cost_per_vcpu_hour_usd", "cost_per_gb_memory_hour_usd",
-                     "cost_per_gb_storage_month_usd", mode="before", check_fields=False)
+                     "cost_per_gb_storage_month_usd", mode="before")
     @classmethod
     def non_negative_cost(cls, v: object) -> object:
         val = float(v)
@@ -722,7 +734,7 @@ class Settings(BaseSettings):
         return val
 
     @field_validator("capacity_projection_window_days",
-                     "capacity_projection_lead_time_days", mode="before", check_fields=False)
+                     "capacity_projection_lead_time_days", mode="before")
     @classmethod
     def positive_capacity_days(cls, v: object) -> object:
         val = int(v)
