@@ -20,6 +20,7 @@ GET    /analyst/feedback                  Export feedback since ISO timestamp
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from datetime import datetime, timedelta, timezone
 
@@ -42,12 +43,20 @@ from detection.storage import get_latest_scores, get_shap_values, get_rings, ini
 
 router = APIRouter(prefix="/analyst", tags=["analyst"])
 
-_WALLET_PATTERN = __import__("re").compile(r"^G[A-Z2-7]{55}$")
+_WALLET_PATTERN = re.compile(r"^G[A-Z2-7]{55}$")
 
 
 def _validate_wallet(wallet: str) -> None:
     if not _WALLET_PATTERN.match(wallet):
         raise HTTPException(status_code=400, detail="Invalid Stellar wallet address format.")
+
+
+def _default_asset_pair(wallet: str) -> str:
+    """Return the wallet's highest-scored asset pair, or 404 if it has no scores."""
+    scores = get_latest_scores(wallet=wallet)
+    if not scores:
+        raise HTTPException(status_code=404, detail=f"No scores found for wallet {wallet}")
+    return max(scores, key=lambda s: s.score).asset_pair
 
 
 # ---------------------------------------------------------------------------
@@ -227,10 +236,7 @@ def claim_analyst_wallet(
     init_db()
 
     if asset_pair is None:
-        scores = get_latest_scores(wallet=wallet)
-        if not scores:
-            raise HTTPException(status_code=404, detail=f"No scores found for wallet {wallet}")
-        asset_pair = max(scores, key=lambda s: s.score).asset_pair
+        asset_pair = _default_asset_pair(wallet)
 
     try:
         result = claim_wallet(
@@ -278,10 +284,7 @@ def release_analyst_wallet(
     init_db()
 
     if asset_pair is None:
-        scores = get_latest_scores(wallet=wallet)
-        if not scores:
-            raise HTTPException(status_code=404, detail=f"No scores found for wallet {wallet}")
-        asset_pair = max(scores, key=lambda s: s.score).asset_pair
+        asset_pair = _default_asset_pair(wallet)
 
     released = release_wallet(wallet, asset_pair, body.analyst_key_hash)
     if not released:
@@ -318,6 +321,7 @@ def submit_feedback(wallet: str, body: AnalystFeedbackRequest) -> dict:
     Accepted verdicts: ``confirmed_wash``, ``false_positive``, ``needs_review``.
     """
     _validate_wallet(wallet)
+    init_db()
 
     review_started_at: datetime | None = None
     if body.review_started_at:
@@ -326,7 +330,9 @@ def submit_feedback(wallet: str, body: AnalystFeedbackRequest) -> dict:
             if review_started_at.tzinfo is None:
                 review_started_at = review_started_at.replace(tzinfo=timezone.utc)
         except ValueError as exc:
-            raise HTTPException(status_code=422, detail=f"Invalid review_started_at: {exc}")
+            raise HTTPException(
+                status_code=422, detail=f"Invalid review_started_at: {exc}"
+            ) from exc
 
     # Default asset_pair from the wallet's highest-scored pair
     scores = get_latest_scores(wallet=wallet)
@@ -343,10 +349,8 @@ def submit_feedback(wallet: str, body: AnalystFeedbackRequest) -> dict:
             require_claim=True,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
-    except PermissionError as exc:
-        raise HTTPException(status_code=403, detail=str(exc)) from exc
-    except RuntimeError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except (PermissionError, RuntimeError) as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
 
     return record
@@ -438,7 +442,7 @@ def analyst_feedback_export(
         if since_dt.tzinfo is None:
             since_dt = since_dt.replace(tzinfo=timezone.utc)
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=f"Invalid since timestamp: {exc}")
+        raise HTTPException(status_code=422, detail=f"Invalid since timestamp: {exc}") from exc
 
     init_db()
     return get_analyst_feedback_since(since=since_dt)
