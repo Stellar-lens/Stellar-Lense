@@ -113,6 +113,13 @@ impl Error {
     pub const GateCallerNotInList: Error = Error::ScoreNotFound;
     pub const ParamChangeAlreadyPending: Error = Error::UpgradeAlreadyPending;
 
+    // ── Memory-exhaustion guards (#612) ─────────────────────────────────────
+    /// Returned by `submit_scores_batch_attested` when `signers.len()`
+    /// exceeds the current service set size, i.e. more entries than could
+    /// ever be legitimately required. Reused discriminant: the enum is
+    /// already at the 50-variant XDR limit.
+    pub const TooManySigners: Error = Error::ServiceSetFull;
+
     // ── Aggregator composability ────────────────────────────────────────────
     /// Returned by `ledgerlens-aggregator`'s `add_shard` when a candidate shard
     /// does not advertise the `ILedgerLensScore` capabilities the aggregator
