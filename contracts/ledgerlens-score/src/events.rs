@@ -134,6 +134,10 @@ pub fn parameter_change_vetoed(env: &Env, proposal_id: u64, by: &Address) {
     env.events().publish((symbol_short!("prm_veto"),), (proposal_id, by.clone()));
 }
 
+pub fn parameter_change_cleanup(env: &Env, count: u32, oldest_kept_ts: u64) {
+    env.events().publish((symbol_short!("prm_clean"),), (count, oldest_kept_ts));
+}
+
 pub fn score_history_cleared(env: &Env, wallet: &Address, asset_pair: &Symbol) {
     env.events()
         .publish((symbol_short!("clr_hist"), EVENT_VERSION, wallet.clone()), asset_pair.clone());

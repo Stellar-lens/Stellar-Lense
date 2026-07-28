@@ -296,6 +296,27 @@ pub struct ParameterProposalRecord {
     pub status: ParameterProposalStatus,
 }
 
+/// Simulated impact of a parameter change without applying it.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParameterSimulation {
+    pub param_key: Symbol,
+    pub current_value: Bytes,
+    pub new_value: Bytes,
+    pub affected_capabilities: Vec<Symbol>,
+    pub execution_window_start: u64,
+    pub execution_window_end: u64,
+}
+
+/// Output of a parameter change simulation for audit and preview.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProposalSimulationOutput {
+    pub proposal_id: u64,
+    pub simulation: ParameterSimulation,
+    pub simulated_at: u64,
+}
+
 /// Typed value for a simple, single-parameter time-locked change (see
 /// `set_pending_param_change`). Distinct from the richer `ParameterProposal`
 /// governance flow above.
@@ -660,6 +681,8 @@ pub enum DataKeyD {
     PendingParamChange(Symbol),
     ModelVersionExecutableAfter(u32),
     ModelVersionDescription(u32),
+    /// Whether destructive operations require multi-admin approval.
+    RequireMultisigForDestructive,
 }
 
 #[contracttype]

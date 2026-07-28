@@ -767,6 +767,41 @@ pub fn prune_expired_parameter_proposals(env: &Env) {
     }
 }
 
+/// Deletes all expired proposals from storage that have been expired for at least 48 hours.
+/// Returns (count_deleted, oldest_proposal_kept_timestamp).
+pub fn cleanup_expired_parameter_proposals(env: &Env) -> (u32, u64) {
+    use soroban_sdk::Env;
+
+    let now = env.ledger().timestamp();
+    let ttl_buffer_secs = 48 * 3600;
+    let mut count = 0;
+    let mut oldest_kept = u64::MAX;
+
+    let next_id = env.storage()
+        .instance()
+        .get::<DataKeyB, u64>(&DataKeyB::ParameterProposalNextId)
+        .unwrap_or(1);
+
+    for id in 1..next_id {
+        if let Some(record) = get_parameter_proposal_record(env, id) {
+            if record.status == ParameterProposalStatus::Expired {
+                let expiry = record.proposal.proposed_at
+                    .saturating_add(record.proposal.time_lock_secs.saturating_mul(2));
+                if now > expiry.saturating_add(ttl_buffer_secs) {
+                    env.storage().persistent().remove(&DataKeyB::ParameterProposal(id));
+                    count += 1;
+                    continue;
+                }
+            }
+            if record.proposal.proposed_at < oldest_kept {
+                oldest_kept = record.proposal.proposed_at;
+            }
+        }
+    }
+
+    (count, if oldest_kept == u64::MAX { now } else { oldest_kept })
+}
+
 /// Seeds `count` pending proposals directly in storage for cap tests without
 /// replaying the full propose flow (keeps Soroban test snapshots small).
 #[cfg(test)]
@@ -2886,6 +2921,16 @@ pub fn set_gate_query_fee(env: &Env, amount: i128) {
 
 pub fn get_accumulated_fees(env: &Env) -> i128 {
     env.storage().instance().get(&GateDataKey::AccumulatedFees).unwrap_or(0)
+}
+
+// ── Multi-admin requirement for destructive operations ──────────────────────
+
+pub fn set_require_multisig_for_destructive(env: &Env, required: bool) {
+    env.storage().instance().set(&DataKeyD::RequireMultisigForDestructive, &required);
+}
+
+pub fn get_require_multisig_for_destructive(env: &Env) -> bool {
+    env.storage().instance().get(&DataKeyD::RequireMultisigForDestructive).unwrap_or(false)
 }
 
 #[cfg(test)]
