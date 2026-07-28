@@ -176,6 +176,18 @@ class Settings(BaseSettings):
     openlineage_namespace: str = "ledgerlens-core"
     lineage_queue_maxsize: int = 1000
 
+    # ── Cost coefficients (used by Prometheus cost gauges) ────────────────────
+    # Operator-configurable cost coefficients for capacity planning.
+    # All values must be non-negative; validated by `non_negative_cost`.
+    cost_per_vcpu_hour_usd: float = 0.048
+    cost_per_gb_memory_hour_usd: float = 0.006
+    cost_per_gb_storage_month_usd: float = 0.023
+
+    # ── Capacity projection (used by capacity planning CLI) ───────────────────
+    # Both values must be >= 1 day; validated by `positive_capacity_days`.
+    capacity_projection_window_days: int = 30
+    capacity_projection_lead_time_days: int = 7
+
     # ── Event Bus (RiskScore Handoff) ─────────────────────────────────────────
     event_bus_backend: str = "none"  # none | kafka | nats
     event_bus_kafka_bootstrap_servers: str = "localhost:9092"
@@ -713,7 +725,7 @@ class Settings(BaseSettings):
         return val
 
     @field_validator("cost_per_vcpu_hour_usd", "cost_per_gb_memory_hour_usd",
-                     "cost_per_gb_storage_month_usd", mode="before", check_fields=False)
+                     "cost_per_gb_storage_month_usd", mode="before")
     @classmethod
     def non_negative_cost(cls, v: object) -> object:
         val = float(v)
@@ -722,7 +734,7 @@ class Settings(BaseSettings):
         return val
 
     @field_validator("capacity_projection_window_days",
-                     "capacity_projection_lead_time_days", mode="before", check_fields=False)
+                     "capacity_projection_lead_time_days", mode="before")
     @classmethod
     def positive_capacity_days(cls, v: object) -> object:
         val = int(v)
