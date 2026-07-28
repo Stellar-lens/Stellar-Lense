@@ -54,8 +54,10 @@ class Subscriber:
     def masked_secret(self) -> str:
         s = self.secret
         if len(s) <= 8:
-            return s[:2] + "****"
-        return s[:4] + "****"
+            visible = min(2, len(s))
+        else:
+            visible = 4
+        return s[:visible] + "****"
 
 
 # ---------------------------------------------------------------------------
@@ -159,6 +161,10 @@ def init_db(db_path: str | None = None):
         conn.commit()
 
 
+# Initialize database at module import time (idempotent)
+init_db()
+
+
 def _row_to_subscriber(row) -> Subscriber:
     return Subscriber(
         subscriber_id=row[0],
@@ -184,7 +190,6 @@ def register_subscriber(
     asset_pair_filter: str | None = None,
     db_path: str | None = None,
 ) -> str:
-    init_db(db_path)
     validate_webhook_url(url)
     subscriber_id = str(uuid.uuid4())
     secret_encrypted = _encrypt_secret(secret)
@@ -199,7 +204,6 @@ def register_subscriber(
 
 
 def get_subscriber(subscriber_id: str, db_path: str | None = None) -> Subscriber | None:
-    init_db(db_path)
     with _connect(db_path) as conn:
         row = conn.execute(
             "SELECT subscriber_id, url, secret_encrypted, min_score, wallet_filter, asset_pair_filter, active, created_at FROM webhook_subscribers WHERE subscriber_id = ?",
@@ -209,7 +213,6 @@ def get_subscriber(subscriber_id: str, db_path: str | None = None) -> Subscriber
 
 
 def list_subscribers(active_only: bool = True, db_path: str | None = None) -> list[Subscriber]:
-    init_db(db_path)
     with _connect(db_path) as conn:
         if active_only:
             rows = conn.execute(
@@ -223,7 +226,6 @@ def list_subscribers(active_only: bool = True, db_path: str | None = None) -> li
 
 
 def deactivate_subscriber(subscriber_id: str, db_path: str | None = None) -> bool:
-    init_db(db_path)
     with _connect(db_path) as conn:
         cur = conn.execute(
             "UPDATE webhook_subscribers SET active = 0 WHERE subscriber_id = ? AND active = 1",

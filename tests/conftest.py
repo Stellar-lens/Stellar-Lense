@@ -20,7 +20,7 @@ os.environ.setdefault("MLFLOW_ALLOW_FILE_STORE", "true")
 TEST_SIGNING_KEY = "test-signing-key-for-unit-tests-only"
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(autouse=True, scope="function")
 def patch_signing_key(monkeypatch):
     """Inject a test signing key into settings for every test.
 
@@ -31,9 +31,17 @@ def patch_signing_key(monkeypatch):
     """
     import config.settings as settings_module
 
+    previous_signing_key = settings_module.settings.ledgerlens_model_signing_key
     monkeypatch.setenv("LEDGERLENS_MODEL_SIGNING_KEY", TEST_SIGNING_KEY)
     object.__setattr__(settings_module.settings, "ledgerlens_model_signing_key", TEST_SIGNING_KEY)
-    yield  # test runs here; monkeypatch teardown restores originals afterwards
+    try:
+        yield
+    finally:
+        object.__setattr__(
+            settings_module.settings,
+            "ledgerlens_model_signing_key",
+            previous_signing_key,
+        )
 
 
 # Files that need the real stellar_sdk during test execution.
