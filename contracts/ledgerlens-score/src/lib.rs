@@ -8,6 +8,7 @@ mod constants;
 extern crate std;
 mod errors;
 mod events;
+mod governance_actions;
 #[cfg(any(test, feature = "testutils"))]
 mod invariants;
 mod parameter_governance;
@@ -138,6 +139,9 @@ mod test_replay_audit;
 
 #[cfg(test)]
 mod test_gdpr_accumulator;
+
+#[cfg(test)]
+mod test_governance_action_registry;
 
 use soroban_sdk::{
     contract, contractimpl, crypto::Hash, symbol_short, token, Address, Bytes, BytesN, Env,
@@ -4197,10 +4201,10 @@ impl LedgerLensScoreContract {
         storage::set_service_set(&env, &set);
         storage::set_signer_added_at(&env, &signer, env.ledger().timestamp());
         events::signer_added(&env, &signer);
-        // #299: governance audit chain
+        // #299: governance audit chain — stable discriminant from governance_actions registry
         let mut data = [0u8; 32];
-        data[0] = 0x02; // action: add_service_signer
-        Self::append_governance_action_raw(&env, &data);
+        data[0] = governance_actions::GOV_ACTION_ADD_SERVICE_SIGNER;
+        Self::append_governance_action(&env, governance_actions::GOV_ACTION_ADD_SERVICE_SIGNER, &data);
         Ok(())
     }
 
@@ -4462,10 +4466,10 @@ impl LedgerLensScoreContract {
         storage::get_admin(&env).require_auth();
         storage::set_service(&env, &new_service);
         events::service_updated(&env, &new_service);
-        // #299: append to governance audit chain (action discriminant 0x01)
+        // #299: append to governance audit chain — stable discriminant from governance_actions registry
         let mut data = [0u8; 32];
-        data[0] = 0x01; // action: set_service
-        Self::append_governance_action_raw(&env, &data);
+        data[0] = governance_actions::GOV_ACTION_SET_SERVICE;
+        Self::append_governance_action(&env, governance_actions::GOV_ACTION_SET_SERVICE, &data);
         Ok(())
     }
 
@@ -5069,7 +5073,12 @@ impl LedgerLensScoreContract {
         storage::set_paused(&env, true);
         events::contract_paused(&env, &admin);
         let action_bytes = Bytes::new(&env);
-        Self::update_audit_root(&env, symbol_short!("pause"), admin.clone(), action_bytes);
+        Self::update_audit_root(
+            &env,
+            Symbol::new(&env, governance_actions::GOV_ACTION_NAME_PAUSE),
+            admin.clone(),
+            action_bytes,
+        );
         Ok(())
     }
 
@@ -5102,7 +5111,12 @@ impl LedgerLensScoreContract {
         storage::set_paused(&env, false);
         events::contract_unpaused(&env, &admin);
         let action_bytes = Bytes::new(&env);
-        Self::update_audit_root(&env, symbol_short!("unpause"), admin.clone(), action_bytes);
+        Self::update_audit_root(
+            &env,
+            Symbol::new(&env, governance_actions::GOV_ACTION_NAME_UNPAUSE),
+            admin.clone(),
+            action_bytes,
+        );
         Ok(())
     }
 
@@ -5396,12 +5410,24 @@ impl LedgerLensScoreContract {
             proposed_by: admin.clone(),
         };
         storage::set_pending_upgrade(&env, &proposal);
-        Self::append_governance_action_raw(&env, &new_wasm_hash.to_array());
+        // The propose_upgrade audit payload is the new WASM hash (32 bytes) rather
+        // than a discriminant byte so the committed hash is unconditionally captured.
+        // append_governance_action emits the typed gov_action event alongside it.
+        Self::append_governance_action(
+            &env,
+            governance_actions::GOV_ACTION_PROPOSE_UPGRADE,
+            &new_wasm_hash.to_array(),
+        );
 
         events::upgrade_proposed(&env, &new_wasm_hash, executable_after);
         let mut params_bytes = Bytes::new(&env);
         params_bytes.extend_from_array(&new_wasm_hash.to_array());
-        Self::update_audit_root(&env, symbol_short!("upg_prop"), admin.clone(), params_bytes);
+        Self::update_audit_root(
+            &env,
+            Symbol::new(&env, governance_actions::GOV_ACTION_NAME_PROPOSE_UPGRADE),
+            admin.clone(),
+            params_bytes,
+        );
         Ok(())
     }
 
@@ -8331,11 +8357,11 @@ impl LedgerLensScoreContract {
             return Err(Error::InvalidThreshold);
         }
         storage::set_admin_threshold(&env, threshold);
-        // #299: governance audit chain
+        // #299: governance audit chain — stable discriminant from governance_actions registry
         let mut data = [0u8; 32];
-        data[0] = 0x03; // action: set_admin_threshold
+        data[0] = governance_actions::GOV_ACTION_SET_ADMIN_THRESHOLD;
         data[28..32].copy_from_slice(&threshold.to_be_bytes());
-        Self::append_governance_action_raw(&env, &data);
+        Self::append_governance_action(&env, governance_actions::GOV_ACTION_SET_ADMIN_THRESHOLD, &data);
         Ok(())
     }
 
@@ -9836,7 +9862,28 @@ impl LedgerLensScoreContract {
         );
     }
 
-    /// Returns the current Merkle audit root over all admin governance actions since initialization.
+    /// Hash-chains `data` into the audit root **and** emits a `gov_action`
+    /// event carrying the stable [`governance_actions`] `action_id` discriminant
+    /// and its human-readable name.
+    ///
+    /// All new governance audit chain writes should call this wrapper instead
+    /// of [`append_governance_action_raw`] directly so that off-chain indexers
+    /// receive a queryable, typed event for every chain entry.
+    fn append_governance_action(env: &Env, action_id: u8, data: &[u8; 32]) {
+        Self::append_governance_action_raw(env, data);
+        let new_head = env
+            .storage()
+            .instance()
+            .get::<_, BytesN<32>>(&types::DataKeyC::AdminAuditRoot)
+            .unwrap_or_else(|| BytesN::from_array(env, &[0u8; 32]));
+        events::gov_action(
+            env,
+            action_id,
+            governance_actions::action_name(action_id),
+            &new_head,
+        );
+    }
+
     pub fn get_admin_audit_root(env: Env) -> BytesN<32> {
         env.storage()
             .instance()

@@ -8,9 +8,79 @@ pattern:
 propose → time-lock → execute (or veto)
 ```
 
-This document covers **parameter change governance**. For WASM upgrade
-governance, see the [Upgrade Governance](../README.md#upgrade-governance)
-section in the README.
+This document covers **parameter change governance** and the **governance action
+registry**.  For WASM upgrade governance, see the
+[Upgrade Governance](../README.md#upgrade-governance) section in the README.
+
+## Governance Action Registry
+
+Every privileged admin action is assigned a **stable `u8` discriminant** in
+`contracts/ledgerlens-score/src/governance_actions.rs`.  This registry is the
+single source of truth for action identifiers — no other file may introduce a
+new raw byte literal for a governance action.
+
+### Why a registry?
+
+Before the registry, each audit-chain entry was stamped with an ad-hoc magic
+byte (e.g. `0x01`, `0x02`) defined inline with only a terse comment.  There
+was no central lookup, no uniqueness guarantee, and no stable name exposed to
+events or documentation.  The registry fixes all three:
+
+| Problem | Solution |
+|---------|----------|
+| Magic bytes scattered in `lib.rs` | All discriminants live in one module with doc-comments |
+| No compile-time uniqueness check | Each constant has a distinct value; `is_known_action()` can detect gaps |
+| Events carried no action type | `gov_action` event embeds `action_id` and `action_name` |
+| Off-chain tools had to decode raw bytes | `all_actions()` provides a stable reverse-lookup slice |
+
+### Stability rules
+
+1. **Discriminants are frozen once assigned.**  Off-chain audit-chain replay
+   tools reconstruct the Merkle root by replaying stored discriminants.  A
+   reassignment silently corrupts every root that followed the change.
+2. **New actions claim the next sequential value.**  Predictable ordering makes
+   manual inspection and test fixtures easier.
+3. **`0x00` is reserved** (uninitialized / zeroed payload sentinel).
+4. **Name strings must be ≤ 9 ASCII characters** so they fit in a Soroban
+   `symbol_short!()`.
+
+### Registry table
+
+| Discriminant | Constant | Name (`action_name()`) | Contract function |
+|:------------:|----------|------------------------|-------------------|
+| `0x00` | `GOV_ACTION_RESERVED` | *(reserved)* | — |
+| `0x01` | `GOV_ACTION_SET_SERVICE` | `set_svc` | `set_service` |
+| `0x02` | `GOV_ACTION_ADD_SERVICE_SIGNER` | `add_sig` | `add_service_signer` |
+| `0x03` | `GOV_ACTION_SET_ADMIN_THRESHOLD` | `set_athr` | `set_admin_threshold` |
+| `0x04` | `GOV_ACTION_PAUSE` | `pause` | `pause` |
+| `0x05` | `GOV_ACTION_UNPAUSE` | `unpause` | `unpause` |
+| `0x06` | `GOV_ACTION_PROPOSE_UPGRADE` | `upg_prop` | `propose_upgrade` |
+
+### `gov_action` event
+
+Every time a governance action is appended to the Merkle audit chain the
+contract emits a `gov_action` event:
+
+```
+Topic:  ("gov_action", EVENT_VERSION)
+Data:   (action_id: u32, action_name: Symbol, new_head: BytesN<32>)
+```
+
+`action_id` is the discriminant from the table above.  `action_name` is its
+human-readable name string.  `new_head` is the updated Merkle root after the
+action was folded in.  Off-chain indexers can filter by `action_id` to build a
+typed timeline of all admin activity without decoding raw chain bytes.
+
+### Adding a new action
+
+1. Append a new `GOV_ACTION_*` constant in `governance_actions.rs` using the
+   next available discriminant.
+2. Add a matching `GOV_ACTION_NAME_*` string constant (≤ 9 chars).
+3. Add an arm to `action_name()` and an entry to `all_actions()`.
+4. Update this table.
+5. Call `Self::append_governance_action(&env, GOV_ACTION_YOUR_ACTION, &data)`
+   at the relevant call site in `lib.rs` — **never** call
+   `append_governance_action_raw` directly for new actions.
 
 ## Motivation
 
