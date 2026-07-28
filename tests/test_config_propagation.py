@@ -34,11 +34,6 @@ import pytest
 import config.settings as settings_module
 from detection.governance import GovernanceEngine, SettingsReloader
 
-try:
-    import fakeredis
-except ImportError:  # pragma: no cover
-    fakeredis = None
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -130,8 +125,7 @@ class TestCrossProcessPropagation:
         """With Redis reachable: a second process's cache bypasses its local
         TTL and observes a governance-executed change on its very next read
         -- no restart, no waiting out the 60s TTL."""
-        if fakeredis is None:
-            pytest.skip("fakeredis not installed")
+        fakeredis = pytest.importorskip("fakeredis", reason="fakeredis not installed")
 
         db_path = str(tmp_path / "ledgerlens.db")
         _make_governance_db(db_path)
@@ -371,8 +365,7 @@ class TestHealthReportsConfigVersion:
 
 class TestAdminConfigPatchPropagates:
     def test_patch_admin_config_propagates_to_a_second_process(self, tmp_path):
-        if fakeredis is None:
-            pytest.skip("fakeredis not installed")
+        fakeredis = pytest.importorskip("fakeredis", reason="fakeredis not installed")
 
         from fastapi.testclient import TestClient
 
