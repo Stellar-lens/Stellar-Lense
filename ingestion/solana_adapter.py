@@ -23,16 +23,15 @@ import logging
 import os
 import struct
 from datetime import datetime, timezone
-from typing import Any, TYPE_CHECKING
+from typing import Any
 
 import httpx
 
 from ingestion.data_models import Asset, Trade, TradeType
 
-if TYPE_CHECKING:
-    from ingestion.dedup import IdempotencyKeyStore
-
 logger = logging.getLogger("ledgerlens.solana_adapter")
+
+__all__ = ["SolanaAdapter"]
 
 _DEFAULT_RPC = "https://api.mainnet-beta.solana.com"
 
@@ -101,10 +100,6 @@ def _extract_spl_token_changes(
     """Return (owner_pubkey, mint, amount_change) for each SPL token balance change."""
     pre: list[dict] = tx.get("meta", {}).get("preTokenBalances", []) or []
     post: list[dict] = tx.get("meta", {}).get("postTokenBalances", []) or []
-
-    (
-        tx.get("transaction", {}).get("message", {}).get("accountKeys", [])
-    )
 
     pre_map: dict[tuple[int, str], float] = {}
     for b in pre:
@@ -185,8 +180,10 @@ class SolanaAdapter:
         if rpc_url:
             os.environ.setdefault("SOLANA_RPC_URL", rpc_url)
         from config.settings import settings
+        # Imported at runtime inside __init__ to avoid a circular import at
+        # module load time between ingestion.solana_adapter and ingestion.dedup.
         from ingestion.dedup import IdempotencyKeyStore
-        
+
         self.dedup_store = dedup_store or (
             IdempotencyKeyStore(
                 db_path=settings.db_path,
@@ -332,9 +329,12 @@ def _extract_stellar_address_from_vaa(tx: dict) -> str | None:
         # Locate the guardian signatures block to find the VAA body.
         # VAA header: version(1) guardian_set_index(4) num_signatures(1) signatures(66*n)
         offset = 1  # skip instruction discriminator
-        if len(raw) < offset + 5:
+        if len(raw) < offset + 6:
             continue
-        raw[offset]
+        vaa_version = raw[offset]
+        if vaa_version != 1:
+            # Only VAA version 1 is currently defined by Wormhole; skip unknown formats.
+            continue
         num_sigs = raw[offset + 5]
         body_start = offset + 6 + 66 * num_sigs
 

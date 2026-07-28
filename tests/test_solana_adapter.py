@@ -227,3 +227,84 @@ def test_solana_adapter_rpc_url_from_env(monkeypatch):
     monkeypatch.setenv("SOLANA_RPC_URL", "https://api.devnet.solana.com")
     from ingestion.solana_adapter import _rpc_url
     assert _rpc_url() == "https://api.devnet.solana.com"
+
+
+# ---------------------------------------------------------------------------
+# __all__ exports
+# ---------------------------------------------------------------------------
+
+
+def test_module_all_defined():
+    import ingestion.solana_adapter as m
+
+    assert hasattr(m, "__all__")
+    for name in m.__all__:
+        assert hasattr(m, name), f"__all__ lists {name!r} but not defined"
+
+
+# ---------------------------------------------------------------------------
+# _extract_spl_token_changes — no dead account_keys variable
+# ---------------------------------------------------------------------------
+
+
+def test_extract_spl_token_changes_no_dead_variable():
+    """Ensure _extract_spl_token_changes does not reference an unused accountKeys
+    variable; previously the expression was evaluated and discarded, which
+    cluttered the code. This test verifies the function works correctly without
+    account_keys being present in the message at all."""
+    tx = {
+        "meta": {
+            "preTokenBalances": [
+                {"accountIndex": 0, "mint": _TOKEN_A, "owner": _MOCK_ADDRESS,
+                 "uiTokenAmount": {"uiAmount": 5.0}},
+            ],
+            "postTokenBalances": [
+                {"accountIndex": 0, "mint": _TOKEN_A, "owner": _MOCK_ADDRESS,
+                 "uiTokenAmount": {"uiAmount": 3.0}},
+            ],
+        },
+        # Deliberately omit "transaction.message.accountKeys"
+        "transaction": {"message": {}},
+    }
+    changes = _extract_spl_token_changes(tx)
+    # Should still extract the -2.0 balance change for TOKEN_A.
+    assert len(changes) == 1
+    owner, mint, delta = changes[0]
+    assert owner == _MOCK_ADDRESS
+    assert mint == _TOKEN_A
+    assert abs(delta - (-2.0)) < 1e-9
+
+
+# ---------------------------------------------------------------------------
+# VAA version check (previously the version byte was a dead expression)
+# ---------------------------------------------------------------------------
+
+
+def test_extract_stellar_address_from_vaa_unknown_version():
+    """VAA data whose version byte != 1 must be silently skipped."""
+    import base64
+    import struct
+
+    # Build a minimal fake VAA with version byte = 2 (unknown).
+    WORMHOLE_CORE_PROG = "worm2ZoG2kUd4vFXhvjh93UUH596ayRfgQ2MgjNMTth"
+
+    # instruction discriminator (1 byte) + version (1) + guardian_set_index (4) +
+    # num_sigs (1) + body placeholder
+    num_sigs = 0
+    version = 2  # unknown — should be rejected
+    raw = bytes([0x00, version, 0, 0, 0, 0, num_sigs]) + bytes(200)
+    data_b64 = base64.b64encode(raw).decode()
+
+    tx = {
+        "transaction": {
+            "message": {
+                "accountKeys": [WORMHOLE_CORE_PROG],
+                "instructions": [
+                    {"programIdIndex": 0, "data": data_b64},
+                ],
+            }
+        },
+        "meta": {},
+    }
+    # Should return None because version != 1.
+    assert _extract_stellar_address_from_vaa(tx) is None
