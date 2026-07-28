@@ -18,7 +18,7 @@ import json
 import logging
 import sqlite3
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import TYPE_CHECKING
 
@@ -26,12 +26,18 @@ import pandas as pd
 
 if TYPE_CHECKING:
     from detection.feature_store import WalletFeatureState
+    from detection.sandwich_engine import SandwichCandidate
 
 from config.settings import settings
 from detection.risk_score import RiskScore
 from ingestion.data_models import BridgeTransfer, PathPayment, Trade
 
 logger = logging.getLogger("ledgerlens.storage")
+
+# Database configuration constants
+_DB_TIMEOUT_SECONDS = 30.0
+_DB_BUSY_TIMEOUT_MS = 30000
+_PRUNE_TARGET_RATIO = 0.9  # Keep 90% of max rows when pruning
 
 
 class AlertType(str, Enum):
@@ -700,9 +706,9 @@ class RiskScoreStore:
     def __init__(self, db_path: str | None = None) -> None:
         self.db_path = db_path or settings.db_path
         init_db(self.db_path)
-        with sqlite3.connect(self.db_path, timeout=30.0) as conn:
+        with sqlite3.connect(self.db_path, timeout=_DB_TIMEOUT_SECONDS) as conn:
             conn.execute("PRAGMA journal_mode = WAL")
-            conn.execute("PRAGMA busy_timeout = 30000")
+            conn.execute(f"PRAGMA busy_timeout = {_DB_BUSY_TIMEOUT_MS}")
 
     def upsert_trades(self, trades: list[Trade]) -> int:
         """Insert validated trades, ignoring existing paging tokens."""
@@ -818,7 +824,7 @@ def prune_filtered_trades(
     """
     if max_rows is None:
         max_rows = settings.filter_rejected_trades_max_rows
-    target_rows = int(max_rows * 0.9)
+    target_rows = int(max_rows * _PRUNE_TARGET_RATIO)
     with _connect(db_path) as conn:
         (count,) = conn.execute(
             "SELECT COUNT(*) FROM filtered_trades"
@@ -1707,13 +1713,13 @@ def promote_cold_to_hot(feature_store, batch_size: int = 100, db_path: str | Non
 
     count = 0
     from detection.feature_store import WalletFeatureState
-    for row in rows:
+    for i, row in enumerate(rows):
         try:
             state = WalletFeatureState.model_validate_json(row[0])
             feature_store.set_state(state)
             count += 1
         except Exception as e:
-            logger.error(f"Error promoting feature state: {e}")
+            logger.warning("Failed to promote feature state at row %d: %s", i, e)
 
     return count
 
@@ -1791,8 +1797,6 @@ def get_bridge_transfers(
 ) -> list[BridgeTransfer]:
     """Return bridge transfers filtered by wallet and recency."""
     init_db(db_path)
-    from datetime import timedelta
-
     cutoff = (datetime.now(timezone.utc) - timedelta(days=since_days)).isoformat()
     conditions = ["timestamp >= ?"]
     params: list = [cutoff]
@@ -1870,7 +1874,7 @@ def get_bridge_transfer_history(
     ]
 
 
-def sandwich_candidates_to_alerts(candidates, asset_pair: str) -> list[dict]:
+def sandwich_candidates_to_alerts(candidates: list[SandwichCandidate], asset_pair: str) -> list[dict]:
     """Convert `SandwichCandidate` objects into storable alert dicts.
 
     Each alert is attributed to the attacker account (`wallet`) and carries the
@@ -2091,11 +2095,10 @@ def get_scores_since(since: str, db_path: str | None = None) -> list[RiskScore]:
 
 
 def save_hop_payment_cycles(
-    cycles: list,
+    cycles: list[PathPaymentCycle],
     db_path: str | None = None,
 ) -> None:
     """Persist PathPaymentCycle records to the hop_payment_cycles table."""
-    import dataclasses
     init_db(db_path)
     if not cycles:
         return

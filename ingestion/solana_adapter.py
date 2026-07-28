@@ -25,16 +25,15 @@ import math
 import os
 import struct
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import httpx
 
 from ingestion.data_models import Asset, Trade, TradeType
 
-if TYPE_CHECKING:
-    from ingestion.dedup import IdempotencyKeyStore
-
 logger = logging.getLogger("ledgerlens.solana_adapter")
+
+__all__ = ["SolanaAdapter"]
 
 _DEFAULT_RPC = "https://api.mainnet-beta.solana.com"
 
@@ -115,31 +114,12 @@ def _extract_spl_token_changes(
 ) -> list[tuple[str, str, float]]:
     """Return ``(owner_pubkey, mint, amount_change)`` for each SPL balance change.
 
-    The result is keyed on ``(accountIndex, mint)`` so that a token account that
-    exists only in ``preTokenBalances`` (i.e. it was fully drained and closed by
-    the swap) still yields a negative delta.  Entries are returned in a stable,
-    deterministic order (sorted by account index then mint) so callers never
-    depend on RPC response ordering.
-    """
-    meta = tx.get("meta") or {}
-    pre: list[dict] = meta.get("preTokenBalances") or []
-    post: list[dict] = meta.get("postTokenBalances") or []
-
-    def _amount(entry: dict) -> float:
-        ui = entry.get("uiTokenAmount") or {}
-        try:
-            value = float(ui.get("uiAmount") or 0.0)
-        except (TypeError, ValueError):
-            return 0.0
-        # NaN/Inf from a malformed RPC payload would otherwise propagate into
-        # Trade construction and raise a ValidationError out of the mapper.
-        return value if math.isfinite(value) else 0.0
-
-    def _key(entry: dict) -> tuple[int, str]:
-        return (entry.get("accountIndex", -1), entry.get("mint", ""))
-
-    pre_map = {_key(b): b for b in pre}
-    post_map = {_key(b): b for b in post}
+    pre_map: dict[tuple[int, str], float] = {}
+    for b in pre:
+        idx = b.get("accountIndex", -1)
+        mint = b.get("mint", "")
+        amt = float(b.get("uiTokenAmount", {}).get("uiAmount") or 0)
+        pre_map[(idx, mint)] = amt
 
     changes: list[tuple[str, str, float]] = []
     for key in sorted(pre_map.keys() | post_map.keys()):
@@ -246,13 +226,9 @@ class SolanaAdapter:
         dedup_store: IdempotencyKeyStore | None = None,
     ) -> None:
         from config.settings import settings
+        # Imported at runtime inside __init__ to avoid a circular import at
+        # module load time between ingestion.solana_adapter and ingestion.dedup.
         from ingestion.dedup import IdempotencyKeyStore
-
-        # Held per instance rather than pushed into os.environ: the previous
-        # ``os.environ.setdefault`` both leaked into every other adapter in the
-        # process and silently ignored the argument when the variable already
-        # existed.
-        self.rpc_url: str | None = rpc_url or None
 
         self.dedup_store = dedup_store or (
             IdempotencyKeyStore(
@@ -420,8 +396,10 @@ def _extract_stellar_address_from_vaa(tx: dict) -> str | None:
         offset = 1  # skip instruction discriminator
         if len(raw) < offset + 6:
             continue
-        # bytes [offset:offset+1] = VAA version, [offset+1:offset+5] = guardian
-        # set index; neither is needed to locate the body.
+        vaa_version = raw[offset]
+        if vaa_version != 1:
+            # Only VAA version 1 is currently defined by Wormhole; skip unknown formats.
+            continue
         num_sigs = raw[offset + 5]
         body_start = offset + 6 + 66 * num_sigs
 
