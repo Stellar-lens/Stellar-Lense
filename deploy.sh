@@ -15,12 +15,18 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=deploy/validate_manifest.sh
+source "$SCRIPT_DIR/deploy/validate_manifest.sh"
+
 DRY_RUN=false
+MANIFEST_PATH="$SCRIPT_DIR/deploy/manifest.json"
 POSITIONAL=()
 
 for arg in "$@"; do
   case "$arg" in
     --dry-run) DRY_RUN=true ;;
+    --manifest=*) MANIFEST_PATH="${arg#--manifest=}" ;;
     --help)
       sed -n '3,20p' "$0"
       exit 0
@@ -33,6 +39,15 @@ set -- "${POSITIONAL[@]+"${POSITIONAL[@]}"}"
 NETWORK="${1:-testnet}"
 ADMIN_IDENTITY="${2:-deployer}"
 SERVICE_ADDRESS="${3:?ERROR: service-address argument is required}"
+
+# ── Validate deploy manifest ──────────────────────────────────────────────────
+# Runs before any build/deploy command and submits no transactions.
+
+if ! validate_manifest "$NETWORK" "$MANIFEST_PATH" "$ADMIN_IDENTITY" "$SERVICE_ADDRESS"; then
+  echo "" >&2
+  echo "Deployment aborted: manifest validation failed for network '$NETWORK'." >&2
+  exit 1
+fi
 
 WASM_PATH="target/wasm32-unknown-unknown/release/ledgerlens_score.wasm"
 OPTIMIZED_WASM_PATH="target/wasm32-unknown-unknown/release/ledgerlens_score.optimized.wasm"
