@@ -337,6 +337,14 @@ class Settings(BaseSettings):
     gateway_quota_store: str = "redis"
     gateway_log_body: bool = False
 
+    # ── Cost & capacity monitoring ────────────────────────────────────────────
+    # See COST_CAPACITY_IMPLEMENTATION.md and config/cost_exporter.py for usage.
+    cost_per_vcpu_hour_usd: float = 0.0416
+    cost_per_gb_memory_hour_usd: float = 0.0056
+    cost_per_gb_storage_month_usd: float = 0.10
+    capacity_projection_window_days: int = 7
+    capacity_projection_lead_time_days: int = 14
+
     # ── Performance monitoring ────────────────────────────────────────────────
     performance_min_feedback_samples: int = 20
     performance_monitoring_window_days: int = 30
@@ -585,9 +593,9 @@ class Settings(BaseSettings):
 
     @field_validator("cursor_flush_seconds", "historical_chunk_hours", mode="before")
     @classmethod
-    def positive_cursor_flush_seconds(cls, v: object) -> object:
+    def positive_float_gt_zero(cls, v: object) -> object:
         if float(v) <= 0:
-            raise ValueError("CURSOR_FLUSH_SECONDS must be positive")
+            raise ValueError("must be positive")
         return v
 
     @field_validator("streamer_overflow_strategy", mode="before")
