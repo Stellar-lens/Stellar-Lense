@@ -26,6 +26,9 @@ mod event_emission;
 mod test_upgrade;
 
 #[cfg(test)]
+mod test_upgrade_rollback;
+
+#[cfg(test)]
 mod test_parameter_governance;
 
 #[cfg(test)]
