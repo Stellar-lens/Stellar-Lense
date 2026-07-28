@@ -483,6 +483,7 @@ pub enum DataKeyB {
     ScoreEmbargo(Address),
     ConsensusThresholdK,
     ConsensusEpsilon,
+
     /// Adaptive epsilon enabled flag (issue #204).
     AdaptiveEpsilonEnabled,
     /// Minimum epsilon bound for adaptive mode (issue #204).
@@ -660,6 +661,9 @@ pub enum DataKeyD {
     PendingParamChange(Symbol),
     ModelVersionExecutableAfter(u32),
     ModelVersionDescription(u32),
+    /// Latest operator acknowledgement record for a given alert class.
+    /// Keyed by `AlertType` so each class has its own O(1) slot (issue #630).
+    AlertAcknowledgement(AlertType),
 }
 
 #[contracttype]
@@ -668,6 +672,7 @@ pub struct TierBounds {
     pub min_score: u32,
     pub max_score: u32,
 }
+
 
 /// Histogram of all score submissions across 101 buckets (0–100).
 #[contracttype]
@@ -812,3 +817,4 @@ pub struct TokenBucket {
     pub tokens: u32,
     pub last_refill: u64,
 }
+
