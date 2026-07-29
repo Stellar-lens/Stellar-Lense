@@ -1,0 +1,10 @@
+# requirements/chain.in
+# ─────────────────────────────────────────────────────────────────────────────
+# EVM cross-chain detection + Soroban submission lease co-ordination surface.
+# Required when SOROBAN_SUBMISSION_LEASE_ENABLED=true or when using the EVM
+# bridge-loader and Uniswap/Curve adapters.
+# Regenerate with: make lock
+# ─────────────────────────────────────────────────────────────────────────────
+
+-r base.in
+-e ".[chain]"

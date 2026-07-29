@@ -1,0 +1,13 @@
+# requirements/docs.txt
+# ─────────────────────────────────────────────────────────────────────────────
+# AUTO-GENERATED – do not edit manually.
+# Regenerate with: make lock   (or: bash requirements/compile.sh docs)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# [docs] extra
+griffe>=0.45.0,<1.0
+mkdocs-material>=9.5.0,<10.0
+mkdocstrings[python]>=0.25.0,<1.0
+
+# Project must be installed so mkdocstrings can resolve module docstrings.
+# Install with: pip install -r requirements/docs.txt -e . --no-deps

@@ -1,13 +1,76 @@
-.PHONY: install test lint mutation-test generate-data train serve fuzz-quick
+.PHONY: install install-dev install-test install-docs install-fuzz install-chain install-ml \
+        lock lint test test-e2e test-chaos mutation-test \
+        generate-data train serve \
+        fuzz-quick docs docs-serve \
+        benchmark-check \
+        license audit audit-py audit-rust audit-go audit-ts
 
+# ── Installation ─────────────────────────────────────────────────────────────
+
+# Base runtime deps (matches the container image)
 install:
-	pip install -r requirements.txt
+	pip install --upgrade pip==24.0
+	pip install -r requirements/base.txt
+	pip install -e . --no-deps
 
-test:
-	pytest
+# Test surface (used in CI)
+install-test:
+	pip install --upgrade pip==24.0
+	pip install -r requirements/test.txt
+	pip install -e . --no-deps
 
+# Full local dev: test + lint + fuzz + chain + ML + GraphQL + causal
+install-dev:
+	pip install --upgrade pip==24.0
+	pip install -r requirements/dev.txt
+	pip install -e . --no-deps
+
+install-docs:
+	pip install --upgrade pip==24.0
+	pip install -r requirements/docs.txt
+	pip install -e . --no-deps
+
+install-fuzz:
+	pip install --upgrade pip==24.0
+	pip install -r requirements/fuzz.txt
+	pip install -e . --no-deps
+
+install-chain:
+	pip install --upgrade pip==24.0
+	pip install -r requirements/chain.txt
+	pip install -e . --no-deps
+
+install-ml:
+	pip install --upgrade pip==24.0
+	pip install -r requirements/ml.txt
+	pip install -e . --no-deps
+
+# ── Lock-file management ─────────────────────────────────────────────────────
+# Regenerates all requirements/*.txt from their *.in sources.
+# Run this whenever you change pyproject.toml version constraints or *.in files,
+# then commit the updated *.txt files.
+#
+# Requires: pip install pip-tools
+lock:
+	bash requirements/compile.sh
+
+# Dry-run check — same check that CI's lock-check job runs.
+lock-check:
+	@pip-compile --dry-run --check --output-file requirements/base.txt  requirements/base.in
+	@pip-compile --dry-run --check --output-file requirements/test.txt  requirements/test.in
+	@pip-compile --dry-run --check --output-file requirements/dev.txt   requirements/dev.in
+	@pip-compile --dry-run --check --output-file requirements/docs.txt  requirements/docs.in
+	@pip-compile --dry-run --check --output-file requirements/fuzz.txt  requirements/fuzz.in
+	@pip-compile --dry-run --check --output-file requirements/chain.txt requirements/chain.in
+	@echo "All lockfiles are up to date."
+
+# ── Linting ──────────────────────────────────────────────────────────────────
 lint:
 	ruff check .
+
+# ── Tests ────────────────────────────────────────────────────────────────────
+test:
+	pytest
 
 mutation-test:
 	mutmut run --paths-to-mutate detection/benford_engine.py,detection/graph_engine.py,detection/model_inference.py
@@ -23,36 +86,30 @@ train:
 serve:
 	python3 cli.py serve --reload
 
-# ── End-to-end tests ────────────────────────────────────────────────────────
-# Runs the E2E test suite (SQLite + trained models, no external containers needed
-# for the base suite). Must complete in < 5 minutes.
+# ── End-to-end tests ─────────────────────────────────────────────────────────
 test-e2e:
 	pytest tests/e2e/ -m e2e -v --tb=short --timeout=300
 
-# ── Chaos engineering ────────────────────────────────────────────────────────
-# Requires Docker + Docker Compose. Starts Toxiproxy + Redis, runs chaos suite,
-# then tears down. Set LEDGERLENS_ADMIN_API_KEY before running.
+# ── Chaos engineering ─────────────────────────────────────────────────────────
 test-chaos:
 	docker compose --profile chaos up -d --wait
 	pytest tests/chaos/ -m chaos -v --tb=short --timeout=120 || (docker compose --profile chaos down && exit 1)
 	docker compose --profile chaos down
 
-# ── Documentation ────────────────────────────────────────────────────────────
+# ── Documentation ─────────────────────────────────────────────────────────────
 docs:
 	mkdocs build
 
 docs-serve:
 	mkdocs serve
 
-.PHONY: benchmark-check
-
+# ── Benchmark ─────────────────────────────────────────────────────────────────
 benchmark-check:
 	pytest -m benchmark -q --no-header 2>&1 || true
 
-# ── Fuzz testing ─────────────────────────────────────────────────────────────
+# ── Fuzz testing ──────────────────────────────────────────────────────────────
 # Runs each Atheris harness for 30 seconds — a quick pre-merge smoke check.
-# Requires: pip install atheris
-# Exits non-zero if any harness reports a crash.
+# Requires: pip install atheris  (or: make install-fuzz)
 fuzz-quick:
 	@echo "Running fuzz harnesses for 30s each..."
 	@failed=0; \
@@ -71,3 +128,39 @@ fuzz-quick:
 	  exit 1; \
 	fi
 	@echo "fuzz-quick: all harnesses completed without crashes."
+
+# ── License inventory ─────────────────────────────────────────────────────────
+# Generates reports/licenses-python.csv and prints a summary table.
+# Requires: make install (pip-licenses is bundled in the dev extra)
+license:
+	@mkdir -p reports
+	pip-licenses \
+	  --format=csv \
+	  --output-file=reports/licenses-python.csv \
+	  --ignore-packages ledgerlens-core
+	pip-licenses \
+	  --format=plain-vertical \
+	  --ignore-packages ledgerlens-core
+	@echo ""
+	@echo "Full inventory written to reports/licenses-python.csv"
+
+# ── Vulnerability audits ──────────────────────────────────────────────────────
+# Python (osv-scanner must be installed separately: https://github.com/google/osv-scanner)
+audit-py:
+	@mkdir -p reports
+	osv-scanner --lockfile requirements/base.txt --format table
+
+# Rust
+audit-rust:
+	cargo audit
+
+# Go
+audit-go:
+	cd go && govulncheck ./...
+
+# TypeScript SDK
+audit-ts:
+	cd sdk && npm audit --audit-level=high
+
+# Run all audits
+audit: audit-py audit-rust audit-go audit-ts

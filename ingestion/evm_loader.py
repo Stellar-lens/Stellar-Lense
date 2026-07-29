@@ -29,7 +29,25 @@ from typing import Any
 import aiohttp
 import requests
 from pydantic import BaseModel
-from web3 import Web3
+
+# ---------------------------------------------------------------------------
+# Optional dependency: web3  (pip install 'ledgerlens-core[chain]')
+# ---------------------------------------------------------------------------
+try:
+    from web3 import Web3
+    _HAS_WEB3 = True
+except ImportError:  # pragma: no cover
+    Web3 = None  # type: ignore[assignment,misc]
+    _HAS_WEB3 = False
+
+
+def _require_web3(location: str = "ingestion/evm_loader.py") -> None:
+    if not _HAS_WEB3:
+        raise ImportError(
+            f"'web3' is required by {location} but is not installed.\n"
+            "  Install the 'chain' extra:  pip install 'ledgerlens-core[chain]'\n"
+            "  Or install directly:        pip install web3"
+        )
 
 from config.settings import settings
 
@@ -674,15 +692,21 @@ _NETWORK_RATE_LIMITS: dict[str, float] = {
 # Uniswap V3: Swap(address indexed sender, address indexed recipient,
 #                  int256 amount0, int256 amount1, uint160 sqrtPriceX96,
 #                  uint128 liquidity, int24 tick)
-UNISWAP_V3_SWAP_TOPIC = "0x" + Web3.keccak(
-    text="Swap(address,address,int256,int256,uint160,uint128,int24)"
-).hex()
-
-# Uniswap V2: Swap(address indexed sender, uint256 amount0In, uint256 amount1In,
-#                  uint256 amount0Out, uint256 amount1Out, address indexed to)
-UNISWAP_V2_SWAP_TOPIC = "0x" + Web3.keccak(
-    text="Swap(address,uint256,uint256,uint256,uint256,address)"
-).hex()
+# Computed lazily when web3 is available; falls back to a known constant so the
+# module can be imported without web3 for surfaces that don't use EVM features.
+if _HAS_WEB3:
+    UNISWAP_V3_SWAP_TOPIC = "0x" + Web3.keccak(
+        text="Swap(address,address,int256,int256,uint160,uint128,int24)"
+    ).hex()
+    # Uniswap V2: Swap(address indexed sender, ...)
+    UNISWAP_V2_SWAP_TOPIC = "0x" + Web3.keccak(
+        text="Swap(address,uint256,uint256,uint256,uint256,address)"
+    ).hex()
+else:
+    # Known ABI keccak-256 topic hashes — kept in sync with the web3 computation
+    # above so the module can be imported and type-checked without web3 installed.
+    UNISWAP_V3_SWAP_TOPIC = "0xc42079f94a6350d7e6235f29174924f928cc2ac818eb64fed8004e115fbcca67"
+    UNISWAP_V2_SWAP_TOPIC = "0xd78ad95fa46c994b6551d0da85fc275fe613ce37657fb8d5e3d130840159d822"
 
 
 class CrossChainTrade(BaseModel):

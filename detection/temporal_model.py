@@ -20,12 +20,37 @@ import os
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
-import torch
-import torch.nn as nn
-import torch.optim as optim
-from torch import Tensor
-from torch.nn.utils.rnn import pack_padded_sequence
-from torch.utils.data import DataLoader, TensorDataset
+
+# ---------------------------------------------------------------------------
+# Optional heavy dependency: torch  (pip install 'ledgerlens-core[ml]')
+# ---------------------------------------------------------------------------
+try:
+    import torch
+    import torch.nn as nn
+    import torch.optim as optim
+    from torch import Tensor
+    from torch.nn.utils.rnn import pack_padded_sequence
+    from torch.utils.data import DataLoader, TensorDataset
+    _HAS_TORCH = True
+except ImportError:  # pragma: no cover
+    torch = None  # type: ignore[assignment]
+    nn = None  # type: ignore[assignment]
+    optim = None  # type: ignore[assignment]
+    Tensor = None  # type: ignore[assignment]
+    pack_padded_sequence = None  # type: ignore[assignment]
+    DataLoader = None  # type: ignore[assignment]
+    TensorDataset = None  # type: ignore[assignment]
+    _HAS_TORCH = False
+
+
+def _require_torch(location: str = "detection/temporal_model.py") -> None:
+    """Raise a helpful ImportError when torch is not installed."""
+    if not _HAS_TORCH:
+        raise ImportError(
+            f"'torch' is required by {location} but is not installed.\n"
+            "  Install the 'ml' extra:  pip install 'ledgerlens-core[ml]'\n"
+            "  Or install directly:     pip install torch"
+        )
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +59,11 @@ TRADE_FEATURE_DIM = 5  # [log_amount, direction, log_interarrival, asset_id, hou
 # ---------------------------------------------------------------------------
 # Legacy model (preserved for backward compatibility)
 # ---------------------------------------------------------------------------
+# All classes below require torch.  The guard at module level ensures that
+# importing this module without torch installed raises a clear error before
+# any attribute access would produce a confusing AttributeError.
+# ---------------------------------------------------------------------------
+_require_torch()
 
 
 class TemporalAnomalyLSTM(nn.Module):

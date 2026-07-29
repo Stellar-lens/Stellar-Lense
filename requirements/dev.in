@@ -1,0 +1,9 @@
+# requirements/dev.in
+# ─────────────────────────────────────────────────────────────────────────────
+# Full local-development surface: test + fuzz + ml + chain + graphql + causal
+# + federated + lint tools.  Not installed in CI or the container.
+# Regenerate with: make lock
+# ─────────────────────────────────────────────────────────────────────────────
+
+-r test.in
+-e ".[dev]"

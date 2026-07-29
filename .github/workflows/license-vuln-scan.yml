@@ -1,0 +1,198 @@
+name: License & Vulnerability Scan
+
+# Runs on every push to main and on PRs that touch dependency files.
+# Also available as a manual trigger.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "requirements/**"
+      - "pyproject.toml"
+      - "go/go.mod"
+      - "go/go.sum"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "sdk/package.json"
+  pull_request:
+    paths:
+      - "requirements/**"
+      - "pyproject.toml"
+      - "go/go.mod"
+      - "go/go.sum"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "sdk/package.json"
+  schedule:
+    # Full nightly scan catches new CVEs against unchanged deps.
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+
+jobs:
+  # ── Python license inventory ───────────────────────────────────────────────
+  python-licenses:
+    name: Python license inventory
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements/base.txt
+
+      - name: Install from base lockfile + pip-licenses
+        run: |
+          pip install --upgrade pip==24.0
+          pip install -r requirements/base.txt
+          pip install -e . --no-deps
+          pip install pip-licenses==4.4.0
+
+      - name: Generate license inventory (CSV)
+        run: |
+          pip-licenses \
+            --format=csv \
+            --output-file=reports/licenses-python.csv \
+            --ignore-packages ledgerlens-core
+
+      - name: Generate license inventory (plain text for PR review)
+        run: |
+          pip-licenses \
+            --format=plain-vertical \
+            --ignore-packages ledgerlens-core
+
+      - name: Fail on disallowed licenses
+        # Block GPL, AGPL, LGPL, and CC-BY-SA in shipped artifacts.
+        # Update the deny list in docs/dependency_policy.md if an exception is needed.
+        run: |
+          pip-licenses \
+            --format=json \
+            --ignore-packages ledgerlens-core \
+            --output-file /tmp/licenses.json
+          python - <<'EOF'
+          import json, sys
+          DENY = {"GPL", "AGPL", "LGPL", "CC-BY-SA"}
+          with open("/tmp/licenses.json") as f:
+              pkgs = json.load(f)
+          violations = [
+              f"{p['Name']} ({p['License']})"
+              for p in pkgs
+              if any(d in p.get("License", "") for d in DENY)
+          ]
+          if violations:
+              print("BLOCKED — disallowed license(s) detected:")
+              for v in violations:
+                  print(f"  {v}")
+              print("Add an exception in docs/dependency_policy.md and update this gate.")
+              sys.exit(1)
+          print(f"OK — {len(pkgs)} packages, no disallowed licenses.")
+          EOF
+
+      - name: Upload license inventory
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-license-inventory
+          path: reports/licenses-python.csv
+          retention-days: 90
+
+  # ── Python vulnerability scan (OSV) ───────────────────────────────────────
+  python-vuln:
+    name: Python vulnerability scan (OSV)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install osv-scanner
+        run: |
+          curl -sSfL \
+            https://github.com/google/osv-scanner/releases/latest/download/osv-scanner_linux_amd64 \
+            -o /usr/local/bin/osv-scanner
+          chmod +x /usr/local/bin/osv-scanner
+
+      - name: Scan Python dependencies (requirements/base.txt)
+        run: |
+          osv-scanner --lockfile requirements/base.txt \
+            --format table \
+            --output reports/osv-python-base.txt || EXIT_CODE=$?
+          cat reports/osv-python-base.txt || true
+          exit ${EXIT_CODE:-0}
+
+      - name: Scan all Python lockfiles
+        run: |
+          for f in requirements/*.txt; do
+            echo "=== $f ==="
+            osv-scanner --lockfile "$f" --format table || true
+          done
+
+      - name: Upload OSV report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: osv-python-reports
+          path: reports/osv-*.txt
+          if-no-files-found: ignore
+          retention-days: 30
+
+  # ── Rust vulnerability scan (cargo audit) ─────────────────────────────────
+  rust-audit:
+    name: Rust vulnerability scan (cargo audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: Run cargo audit
+        run: cargo audit
+
+  # ── Go vulnerability scan (govulncheck) ───────────────────────────────────
+  go-vuln:
+    name: Go vulnerability scan (govulncheck)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache-dependency-path: go/go.sum
+
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+
+      - name: Run govulncheck
+        working-directory: go
+        run: govulncheck ./...
+
+  # ── TypeScript audit (npm audit) ──────────────────────────────────────────
+  ts-audit:
+    name: TypeScript vulnerability scan (npm audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: sdk/package-lock.json
+
+      - name: npm install (sdk)
+        working-directory: sdk
+        run: npm ci
+
+      - name: npm audit (sdk)
+        working-directory: sdk
+        # --audit-level=high only fails on high/critical CVEs; moderate alerts
+        # are visible in the log but do not block merges.
+        run: npm audit --audit-level=high

@@ -14,14 +14,28 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 
 import requests
-from web3 import Web3
+
+# ---------------------------------------------------------------------------
+# Optional dependency: web3  (pip install 'ledgerlens-core[chain]')
+# ---------------------------------------------------------------------------
+try:
+    from web3 import Web3
+    _HAS_WEB3 = True
+except ImportError:  # pragma: no cover
+    Web3 = None  # type: ignore[assignment,misc]
+    _HAS_WEB3 = False
 
 
 logger = logging.getLogger("ledgerlens.curve_adapter")
 
-CURVE_TOKEN_EXCHANGE_TOPIC = "0x" + Web3.keccak(
-    text="TokenExchange(address,int128,uint256,int128,uint256)"
-).hex()
+if _HAS_WEB3:
+    CURVE_TOKEN_EXCHANGE_TOPIC = "0x" + Web3.keccak(
+        text="TokenExchange(address,int128,uint256,int128,uint256)"
+    ).hex()
+else:
+    # Known keccak-256 topic hash — fallback so the module can be imported
+    # without web3 installed.
+    CURVE_TOKEN_EXCHANGE_TOPIC = "0x8b3e96f2b889fa771c53c981b40daf005f63f637f1869f707052d15a3dd97140"
 
 
 def _is_enabled() -> bool:

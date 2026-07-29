@@ -21,7 +21,16 @@ import logging
 import time
 from typing import TYPE_CHECKING
 
-import mlflow
+# ---------------------------------------------------------------------------
+# Optional dependency: mlflow  (pip install 'ledgerlens-core[ml]')
+# ---------------------------------------------------------------------------
+try:
+    import mlflow
+    _HAS_MLFLOW = True
+except ImportError:  # pragma: no cover
+    mlflow = None  # type: ignore[assignment]
+    _HAS_MLFLOW = False
+
 import pandas as pd
 
 from config.settings import settings
@@ -86,6 +95,12 @@ def mlflow_run(
     str
         The MLflow ``run_id`` of the started (or resumed) run.
     """
+    if not _HAS_MLFLOW:
+        raise ImportError(
+            "'mlflow' is required by detection/mlflow_tracker.py but is not installed.\n"
+            "  Install the 'ml' extra:  pip install 'ledgerlens-core[ml]'\n"
+            "  Or install directly:     pip install mlflow"
+        )
     uri = _resolve_tracking_uri(tracking_uri)
     exp_name = experiment_name or settings.mlflow_experiment_name or "ledgerlens-training"
 
