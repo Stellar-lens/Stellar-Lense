@@ -551,6 +551,11 @@ See [`examples/amm_gate_example.rs`](examples/amm_gate_example.rs) and
 [`contracts/mock-amm/`](contracts/mock-amm/) (`provide_liquidity_gated`,
 `set_risk_oracle`).
 
+One important caveat: a safe score can still be stale. If your protocol is
+sensitive to detection lag, layer a max-age check on top of the gate, require
+confidence for high-value actions, and fail closed when the oracle is silent or
+your own pause flag is active.
+
 ## Security Features
 
 1. **Authorization Checks**: Only the authorised LedgerLens service account can submit scores
@@ -807,3 +812,5 @@ Contributions are welcome. LedgerLens is an open-source public good built for th
 - Harea, R. and Mihailă, S. (2025) 'Benford's law: Applicability in accounting and financial anomaly detection', *Challenges of Accounting for Young Researchers*, 3(1).
 - Stellar Development Foundation (2024) *Horizon API Documentation*. Available at: https://developers.stellar.org/api/horizon
 - Stellar Development Foundation (2024) *Soroban Smart Contract Documentation*. Available at: https://soroban.stellar.org/docs
+- [`docs/host-version-support-policy.md`](docs/host-version-support-policy.md) — supported Rust/Soroban build boundary and CI coverage
+- [`docs/network-matrix.md`](docs/network-matrix.md) — supported deployment profiles and failure modes

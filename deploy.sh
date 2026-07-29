@@ -14,6 +14,9 @@
 #   network           reviewed deployment manifest selector (e.g. testnet, futurenet, mainnet)
 #   admin-identity    stellar/soroban CLI identity used to deploy and initialize
 #   service-address   Stellar public key authorised to call submit_score
+#
+# See docs/network-matrix.md for the supported deployment profiles and
+# failure modes.
 
 set -euo pipefail
 

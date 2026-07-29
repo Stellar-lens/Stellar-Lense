@@ -9,6 +9,10 @@
 //! call `query_risk_gate_with_confidence` with its own `min_confidence`
 //! floor and refuse the borrow when the wallet is too risky or the score
 //! isn't backed by enough confidence.
+//!
+//! Production integrations should add a freshness bound and fail closed when
+//! the score is stale, the oracle is silent, or the protocol's own pause state
+//! is active.
 
 use ledgerlens_score::LedgerLensScoreContractClient;
 use soroban_sdk::{contract, contracterror, contractimpl, contracttype, Address, Env, Symbol};
@@ -115,7 +119,8 @@ impl MockLending {
     /// `RiskGateRejected` whenever LedgerLens's
     /// `query_risk_gate_with_confidence` says the wallet's score is too
     /// risky, missing, or not backed by enough confidence — even if the raw
-    /// risk score itself would otherwise pass.
+    /// risk score itself would otherwise pass. Callers that care about
+    /// detection lag should apply a max-age check before calling this.
     pub fn borrow(
         env: Env,
         user: Address,
