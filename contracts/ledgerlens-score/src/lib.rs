@@ -112,6 +112,9 @@ mod test_dispute;
 mod test_failover;
 
 #[cfg(test)]
+mod test_slo_defaults;
+
+#[cfg(test)]
 mod test_breach_counter_reset;
 
 #[cfg(test)]
