@@ -17,7 +17,7 @@ import sys
 import threading
 import time
 
-from config import config
+from config.contracts import validate_mode
 from detection.model_inference import RiskScorer
 from streaming.alert_dispatcher import AlertDispatcher
 from streaming.feature_buffer import FeatureBuffer
@@ -218,9 +218,13 @@ def main() -> None:
         bootstrap_servers,
     )
 
-    # Validate config
-    if not config.WATCHED_ASSET_PAIRS:
-        logger.warning("WATCHED_ASSET_PAIRS is not configured")
+    # Validate config — this pool always runs the Kafka worker/scorer role
+    # (topics are discovered dynamically, so WATCHED_ASSET_PAIRS isn't needed).
+    try:
+        validate_mode("streaming_kafka", role="worker", backend="kafka")
+    except OSError as exc:
+        logger.error(str(exc))
+        sys.exit(1)
 
     # Try to load models
     try:

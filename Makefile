@@ -1,4 +1,4 @@
-.PHONY: install lint format test run scale-workers mutation-test
+.PHONY: install lint format test run scale-workers mutation-test check-env
 .PHONY: install lint format test run typecheck mutation-test
 .PHONY: check-schema-compatibility check-review-gates
 
@@ -82,6 +82,13 @@ test-e2e:
 
 run:
 	python run_pipeline.py
+
+# Validate environment configuration contracts (config/contracts.py) without
+# starting the service. Usage:
+#   make check-env MODE=api        # validate one runtime mode
+#   make check-env                 # validate every known runtime mode
+check-env:
+	$(PYTHON) -m scripts.check_env $(if $(MODE),--mode $(MODE),--all)
 
 scale-workers:
 	@if [ -z "$(N)" ]; then \

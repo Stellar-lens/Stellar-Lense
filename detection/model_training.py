@@ -39,6 +39,7 @@ from sklearn.model_selection import train_test_split
 from xgboost import XGBClassifier
 
 from config import config
+from config.contracts import validate_mode
 from detection.conformal import ConformalCalibrator
 from utils.logging import get_logger
 
@@ -1025,6 +1026,12 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     model_dir = args.model_dir or config.MODEL_DIR
+
+    try:
+        validate_mode("training", model_dir=model_dir)
+    except OSError as exc:
+        logger.error(str(exc))
+        sys.exit(1)
 
     logger.info("Loading training data from %s", args.data_path)
     df = load_training_data(args.data_path)

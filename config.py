@@ -466,7 +466,13 @@ class Config:
     )
 
     @classmethod
-    def validate(cls, require_onchain: bool = False):
+    def _core_errors(cls, require_onchain: bool = False) -> list[str]:
+        """Collect (not raise) the baseline config errors shared by every entry point.
+
+        Split out from `validate()` so `config/contracts.py` can compose these
+        checks with mode-specific ones (API, streaming, training, ...) instead of
+        re-implementing the same field-by-field logic per runtime mode.
+        """
         errors = []
 
         if not cls.WATCHED_ASSET_PAIRS:
@@ -490,6 +496,12 @@ class Config:
 
             if not cls.LEDGERLENS_SUBMITTER_SECRET.strip():
                 errors.append("LEDGERLENS_SUBMITTER_SECRET is not set.")
+
+        return errors
+
+    @classmethod
+    def validate(cls, require_onchain: bool = False):
+        errors = cls._core_errors(require_onchain)
 
         if errors:
             raise OSError("LedgerLens configuration errors:\n- " + "\n- ".join(errors))

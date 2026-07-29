@@ -90,6 +90,24 @@ jobs:
           markdown-link-check docs/security.md
           markdown-link-check CONTRIBUTING.md
 
+      - name: Validate environment configuration contracts (config/contracts.py)
+        # Exercises every runtime mode's contract (config/contracts.py) end-to-end
+        # against a fully-populated environment, the same way `make check-env`
+        # does for a developer. Catches contract/entry-point drift — e.g. a
+        # renamed Config attribute a check still references — that unit tests
+        # mocking individual attributes could miss.
+        run: |
+          openssl genpkey -algorithm ed25519 -out /tmp/ci_signing_key.pem
+          openssl pkey -in /tmp/ci_signing_key.pem -pubout -out /tmp/ci_jwt_public_key.pem
+          MODEL_DIR=./models \
+          RISK_SCORE_DB_URL=sqlite:///:memory: \
+          WATCHED_ASSET_PAIRS=USDC:GA5ZSEJYBY3RJRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN \
+          API_KEYS=ci-placeholder-hash \
+          LEDGERLENS_CONTRACT_ID=ci-placeholder-contract \
+          LEDGERLENS_SUBMITTER_SECRET=ci-placeholder-secret \
+          JWT_PUBLIC_KEY_PATH=/tmp/ci_jwt_public_key.pem \
+          python -m scripts.check_env --all
+
       - name: Execute Benford explainer notebook
         run: |
           cd notebooks

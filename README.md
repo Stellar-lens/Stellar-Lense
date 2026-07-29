@@ -270,6 +270,31 @@ python run_pipeline.py
 python -m scripts.score_wallet --wallet <G...> --pair "USDC:<G...>/XLM:native"
 ```
 
+### Environment configuration contracts
+
+`config.py` centralizes every environment variable this repo reads, but
+different entry points depend on different subsets of it — the REST API
+needs `API_KEYS`; the Kafka streaming worker needs `TRADE_AVRO_SCHEMA_PATH`;
+`--submit-onchain` needs `LEDGERLENS_CONTRACT_ID`. `config/contracts.py`
+defines one **runtime-mode contract** per entry point (`pipeline`,
+`pipeline_onchain`, `api`, `streaming_sse`, `streaming_kafka`, `ws_server`,
+`training`) and every entry point validates its contract at startup, so a
+missing var fails immediately with an actionable message instead of
+surfacing as a `KeyError` deep inside a request handler or worker thread.
+
+Check whether your current `.env` satisfies a mode's contract without
+starting the service:
+
+```bash
+make check-env MODE=api      # validate one runtime mode
+make check-env                # validate every registered mode
+python -m scripts.check_env --mode streaming_kafka --json
+```
+
+See the module docstring in [`config/contracts.py`](config/contracts.py) for
+the full rationale and [`tests/test_config_contracts.py`](tests/test_config_contracts.py)
+for the contract-by-contract test coverage.
+
 ### Real-time streaming (`scripts/stream.py`)
 
 After training models, `scripts/stream.py` scores wallets in real time as
