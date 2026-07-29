@@ -73,10 +73,10 @@
                   "bool": false
                 },
                 {
-                  "u64": 1
+                  "u64": 700000
                 },
                 {
-                  "u32": 100
+                  "u32": 90
                 },
                 {
                   "u32": 1
@@ -108,7 +108,7 @@
                   "symbol": "XLM_USDC"
                 },
                 {
-                  "u32": 90
+                  "u32": 10
                 },
                 {
                   "bool": false
@@ -120,7 +120,7 @@
                   "u64": 1
                 },
                 {
-                  "u32": 100
+                  "u32": 90
                 },
                 {
                   "u32": 1
@@ -138,7 +138,7 @@
   "ledger": {
     "protocol_version": 21,
     "sequence_number": 0,
-    "timestamp": 0,
+    "timestamp": 700000,
     "network_id": "0000000000000000000000000000000000000000000000000000000000000000",
     "base_reserve": 0,
     "min_persistent_entry_ttl": 4096,
@@ -341,7 +341,7 @@
                         "symbol": "last_updated"
                       },
                       "val": {
-                        "u64": 1
+                        "u64": 700000
                       }
                     },
                     {
@@ -483,57 +483,6 @@
             "ext": "v0"
           },
           15
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
-            "key": {
-              "vec": [
-                {
-                  "symbol": "GateReadLedger"
-                },
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
-                },
-                {
-                  "symbol": "XLM_USDC"
-                }
-              ]
-            },
-            "durability": "temporary"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
-                "key": {
-                  "vec": [
-                    {
-                      "symbol": "GateReadLedger"
-                    },
-                    {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
-                    },
-                    {
-                      "symbol": "XLM_USDC"
-                    }
-                  ]
-                },
-                "durability": "temporary",
-                "val": {
-                  "u32": 0
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          777600
         ]
       ],
       [
@@ -753,7 +702,7 @@
                         "symbol": "confidence"
                       },
                       "val": {
-                        "u32": 100
+                        "u32": 90
                       }
                     },
                     {
@@ -801,7 +750,7 @@
                         "symbol": "timestamp"
                       },
                       "val": {
-                        "u64": 1
+                        "u64": 700000
                       }
                     }
                   ]
@@ -1037,7 +986,7 @@
                             "symbol": "confidence"
                           },
                           "val": {
-                            "u32": 100
+                            "u32": 90
                           }
                         },
                         {
@@ -1085,7 +1034,7 @@
                             "symbol": "timestamp"
                           },
                           "val": {
-                            "u64": 1
+                            "u64": 700000
                           }
                         }
                       ]
@@ -2091,7 +2040,7 @@
                 },
                 "durability": "persistent",
                 "val": {
-                  "bytes": "5b319192d345e91f2d97d1c6c4a185faaf20e0992d4c8c2923692520662e3746"
+                  "bytes": "ec1797b989161e16041d9c630233b4bea6c47c731600519e0879d0ea0b6099e7"
                 }
               }
             },
@@ -2319,7 +2268,7 @@
                           ]
                         },
                         "val": {
-                          "bytes": "5b319192d345e91f2d97d1c6c4a185faaf20e0992d4c8c2923692520662e3746"
+                          "bytes": "ec1797b989161e16041d9c630233b4bea6c47c731600519e0879d0ea0b6099e7"
                         }
                       }
                     ]
@@ -2407,7 +2356,7 @@
                         "symbol": "aggregate_score"
                       },
                       "val": {
-                        "u32": 90
+                        "u32": 10
                       }
                     },
                     {
@@ -2447,7 +2396,7 @@
                         "symbol": "max_pair_score"
                       },
                       "val": {
-                        "u32": 90
+                        "u32": 10
                       }
                     },
                     {
@@ -2531,57 +2480,6 @@
             "key": {
               "vec": [
                 {
-                  "symbol": "BandEntryTime"
-                },
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
-                },
-                {
-                  "symbol": "XLM_USDC"
-                }
-              ]
-            },
-            "durability": "temporary"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4",
-                "key": {
-                  "vec": [
-                    {
-                      "symbol": "BandEntryTime"
-                    },
-                    {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
-                    },
-                    {
-                      "symbol": "XLM_USDC"
-                    }
-                  ]
-                },
-                "durability": "temporary",
-                "val": {
-                  "u64": 0
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          777600
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4",
-            "key": {
-              "vec": [
-                {
                   "symbol": "BreachCount"
                 },
                 {
@@ -2617,64 +2515,13 @@
                 },
                 "durability": "temporary",
                 "val": {
-                  "u32": 1
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          15
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4",
-            "key": {
-              "vec": [
-                {
-                  "symbol": "GateReadLedger"
-                },
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
-                },
-                {
-                  "symbol": "XLM_USDC"
-                }
-              ]
-            },
-            "durability": "temporary"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4",
-                "key": {
-                  "vec": [
-                    {
-                      "symbol": "GateReadLedger"
-                    },
-                    {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
-                    },
-                    {
-                      "symbol": "XLM_USDC"
-                    }
-                  ]
-                },
-                "durability": "temporary",
-                "val": {
                   "u32": 0
                 }
               }
             },
             "ext": "v0"
           },
-          777600
+          15
         ]
       ],
       [
@@ -2719,7 +2566,7 @@
                 },
                 "durability": "persistent",
                 "val": {
-                  "u32": 90
+                  "u32": 10
                 }
               }
             },
@@ -2831,57 +2678,6 @@
             "key": {
               "vec": [
                 {
-                  "symbol": "RiskBandState"
-                },
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
-                },
-                {
-                  "symbol": "XLM_USDC"
-                }
-              ]
-            },
-            "durability": "temporary"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4",
-                "key": {
-                  "vec": [
-                    {
-                      "symbol": "RiskBandState"
-                    },
-                    {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
-                    },
-                    {
-                      "symbol": "XLM_USDC"
-                    }
-                  ]
-                },
-                "durability": "temporary",
-                "val": {
-                  "bool": true
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          777600
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4",
-            "key": {
-              "vec": [
-                {
                   "symbol": "Score"
                 },
                 {
@@ -2945,7 +2741,7 @@
                         "symbol": "confidence"
                       },
                       "val": {
-                        "u32": 100
+                        "u32": 90
                       }
                     },
                     {
@@ -2985,7 +2781,7 @@
                         "symbol": "score"
                       },
                       "val": {
-                        "u32": 90
+                        "u32": 10
                       }
                     },
                     {
@@ -3229,7 +3025,7 @@
                             "symbol": "confidence"
                           },
                           "val": {
-                            "u32": 100
+                            "u32": 90
                           }
                         },
                         {
@@ -3269,7 +3065,7 @@
                             "symbol": "score"
                           },
                           "val": {
-                            "u32": 90
+                            "u32": 10
                           }
                         },
                         {
@@ -4283,7 +4079,7 @@
                 },
                 "durability": "persistent",
                 "val": {
-                  "bytes": "5e36296c9528d81f3749a5132afa9151bdfe3281ddc0e0e56c9401e5fdd35c07"
+                  "bytes": "5b319192d345e91f2d97d1c6c4a185faaf20e0992d4c8c2923692520662e3746"
                 }
               }
             },
@@ -4397,7 +4193,7 @@
                                 "symbol": "score_sum"
                               },
                               "val": {
-                                "u64": 90
+                                "u64": 10
                               }
                             },
                             {
@@ -4449,31 +4245,31 @@
                               "u64": 0
                             },
                             {
-                              "u64": 0
-                            },
-                            {
-                              "u64": 0
-                            },
-                            {
-                              "u64": 0
-                            },
-                            {
-                              "u64": 0
-                            },
-                            {
-                              "u64": 0
-                            },
-                            {
-                              "u64": 0
-                            },
-                            {
-                              "u64": 0
-                            },
-                            {
-                              "u64": 0
-                            },
-                            {
                               "u64": 1
+                            },
+                            {
+                              "u64": 0
+                            },
+                            {
+                              "u64": 0
+                            },
+                            {
+                              "u64": 0
+                            },
+                            {
+                              "u64": 0
+                            },
+                            {
+                              "u64": 0
+                            },
+                            {
+                              "u64": 0
+                            },
+                            {
+                              "u64": 0
+                            },
+                            {
+                              "u64": 0
                             }
                           ]
                         }
@@ -4511,7 +4307,7 @@
                           ]
                         },
                         "val": {
-                          "bytes": "5e36296c9528d81f3749a5132afa9151bdfe3281ddc0e0e56c9401e5fdd35c07"
+                          "bytes": "5b319192d345e91f2d97d1c6c4a185faaf20e0992d4c8c2923692520662e3746"
                         }
                       }
                     ]
@@ -5163,10 +4959,10 @@
                   "bool": false
                 },
                 {
-                  "u64": 1
+                  "u64": 700000
                 },
                 {
-                  "u32": 100
+                  "u32": 90
                 },
                 {
                   "u32": 1
@@ -5257,10 +5053,10 @@
                   "bool": false
                 },
                 {
-                  "u32": 100
+                  "u32": 90
                 },
                 {
-                  "u64": 1
+                  "u64": 700000
                 }
               ]
             }
@@ -5320,7 +5116,7 @@
                   "symbol": "XLM_USDC"
                 },
                 {
-                  "u32": 90
+                  "u32": 10
                 },
                 {
                   "bool": false
@@ -5332,81 +5128,12 @@
                   "u64": 1
                 },
                 {
-                  "u32": 100
+                  "u32": 90
                 },
                 {
                   "u32": 1
                 },
                 "void"
-              ]
-            }
-          }
-        }
-      },
-      "failed_call": false
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": "0000000000000000000000000000000000000000000000000000000000000006",
-        "type_": "contract",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "breach"
-              },
-              {
-                "u32": 1
-              },
-              {
-                "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
-              }
-            ],
-            "data": {
-              "vec": [
-                {
-                  "symbol": "XLM_USDC"
-                },
-                {
-                  "u32": 90
-                },
-                {
-                  "u32": 75
-                }
-              ]
-            }
-          }
-        }
-      },
-      "failed_call": false
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": "0000000000000000000000000000000000000000000000000000000000000006",
-        "type_": "contract",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "band_in"
-              },
-              {
-                "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
-              }
-            ],
-            "data": {
-              "vec": [
-                {
-                  "symbol": "XLM_USDC"
-                },
-                {
-                  "u32": 90
-                },
-                {
-                  "u32": 75
-                }
               ]
             }
           }
@@ -5441,7 +5168,7 @@
                   "u32": 0
                 },
                 {
-                  "u32": 90
+                  "u32": 10
                 },
                 {
                   "u32": 0
@@ -5483,16 +5210,16 @@
             "data": {
               "vec": [
                 {
+                  "u32": 10
+                },
+                {
+                  "bool": false
+                },
+                {
+                  "bool": false
+                },
+                {
                   "u32": 90
-                },
-                {
-                  "bool": false
-                },
-                {
-                  "bool": false
-                },
-                {
-                  "u32": 100
                 },
                 {
                   "u64": 1
@@ -5540,7 +5267,7 @@
                 "bytes": "0000000000000000000000000000000000000000000000000000000000000001"
               },
               {
-                "symbol": "query_risk_gate"
+                "symbol": "detect_split_brain"
               }
             ],
             "data": {
@@ -5550,9 +5277,6 @@
                 },
                 {
                   "symbol": "XLM_USDC"
-                },
-                {
-                  "u32": 75
                 }
               ]
             }
@@ -5576,7 +5300,7 @@
                 "bytes": "0000000000000000000000000000000000000000000000000000000000000003"
               },
               {
-                "symbol": "query_risk_gate"
+                "symbol": "get_score"
               }
             ],
             "data": {
@@ -5586,9 +5310,6 @@
                 },
                 {
                   "symbol": "XLM_USDC"
-                },
-                {
-                  "u32": 75
                 }
               ]
             }
@@ -5609,11 +5330,348 @@
                 "symbol": "fn_return"
               },
               {
-                "symbol": "query_risk_gate"
+                "symbol": "get_score"
               }
             ],
             "data": {
-              "bool": true
+              "map": [
+                {
+                  "key": {
+                    "symbol": "benford_flag"
+                  },
+                  "val": {
+                    "bool": false
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "benford_score"
+                  },
+                  "val": {
+                    "u32": 0
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "commitment"
+                  },
+                  "val": "void"
+                },
+                {
+                  "key": {
+                    "symbol": "confidence"
+                  },
+                  "val": {
+                    "u32": 90
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "ml_flag"
+                  },
+                  "val": {
+                    "bool": false
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "ml_score"
+                  },
+                  "val": {
+                    "u32": 0
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "model_version"
+                  },
+                  "val": {
+                    "u32": 1
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "network_score"
+                  },
+                  "val": {
+                    "u32": 0
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "score"
+                  },
+                  "val": {
+                    "u32": 10
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "timestamp"
+                  },
+                  "val": {
+                    "u64": 700000
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "failed_call": false
+    },
+    {
+      "event": {
+        "ext": "v0",
+        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
+        "type_": "diagnostic",
+        "body": {
+          "v0": {
+            "topics": [
+              {
+                "symbol": "fn_call"
+              },
+              {
+                "bytes": "0000000000000000000000000000000000000000000000000000000000000003"
+              },
+              {
+                "symbol": "is_score_stale"
+              }
+            ],
+            "data": {
+              "vec": [
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
+                },
+                {
+                  "symbol": "XLM_USDC"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "failed_call": false
+    },
+    {
+      "event": {
+        "ext": "v0",
+        "contract_id": "0000000000000000000000000000000000000000000000000000000000000003",
+        "type_": "diagnostic",
+        "body": {
+          "v0": {
+            "topics": [
+              {
+                "symbol": "fn_return"
+              },
+              {
+                "symbol": "is_score_stale"
+              }
+            ],
+            "data": {
+              "bool": false
+            }
+          }
+        }
+      },
+      "failed_call": false
+    },
+    {
+      "event": {
+        "ext": "v0",
+        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
+        "type_": "diagnostic",
+        "body": {
+          "v0": {
+            "topics": [
+              {
+                "symbol": "fn_call"
+              },
+              {
+                "bytes": "0000000000000000000000000000000000000000000000000000000000000003"
+              },
+              {
+                "symbol": "get_decay_rate"
+              }
+            ],
+            "data": "void"
+          }
+        }
+      },
+      "failed_call": false
+    },
+    {
+      "event": {
+        "ext": "v0",
+        "contract_id": "0000000000000000000000000000000000000000000000000000000000000003",
+        "type_": "diagnostic",
+        "body": {
+          "v0": {
+            "topics": [
+              {
+                "symbol": "fn_return"
+              },
+              {
+                "symbol": "get_decay_rate"
+              }
+            ],
+            "data": {
+              "vec": [
+                {
+                  "u64": 0
+                },
+                {
+                  "u64": 1
+                }
+              ]
+            }
+          }
+        }
+      },
+      "failed_call": false
+    },
+    {
+      "event": {
+        "ext": "v0",
+        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
+        "type_": "diagnostic",
+        "body": {
+          "v0": {
+            "topics": [
+              {
+                "symbol": "fn_call"
+              },
+              {
+                "bytes": "0000000000000000000000000000000000000000000000000000000000000003"
+              },
+              {
+                "symbol": "get_staleness_window"
+              }
+            ],
+            "data": "void"
+          }
+        }
+      },
+      "failed_call": false
+    },
+    {
+      "event": {
+        "ext": "v0",
+        "contract_id": "0000000000000000000000000000000000000000000000000000000000000003",
+        "type_": "diagnostic",
+        "body": {
+          "v0": {
+            "topics": [
+              {
+                "symbol": "fn_return"
+              },
+              {
+                "symbol": "get_staleness_window"
+              }
+            ],
+            "data": {
+              "u64": 604800
+            }
+          }
+        }
+      },
+      "failed_call": false
+    },
+    {
+      "event": {
+        "ext": "v0",
+        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
+        "type_": "diagnostic",
+        "body": {
+          "v0": {
+            "topics": [
+              {
+                "symbol": "fn_call"
+              },
+              {
+                "bytes": "0000000000000000000000000000000000000000000000000000000000000003"
+              },
+              {
+                "symbol": "get_global_min_confidence"
+              }
+            ],
+            "data": "void"
+          }
+        }
+      },
+      "failed_call": false
+    },
+    {
+      "event": {
+        "ext": "v0",
+        "contract_id": "0000000000000000000000000000000000000000000000000000000000000003",
+        "type_": "diagnostic",
+        "body": {
+          "v0": {
+            "topics": [
+              {
+                "symbol": "fn_return"
+              },
+              {
+                "symbol": "get_global_min_confidence"
+              }
+            ],
+            "data": {
+              "u32": 0
+            }
+          }
+        }
+      },
+      "failed_call": false
+    },
+    {
+      "event": {
+        "ext": "v0",
+        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
+        "type_": "diagnostic",
+        "body": {
+          "v0": {
+            "topics": [
+              {
+                "symbol": "fn_call"
+              },
+              {
+                "bytes": "0000000000000000000000000000000000000000000000000000000000000003"
+              },
+              {
+                "symbol": "get_consensus_config"
+              }
+            ],
+            "data": "void"
+          }
+        }
+      },
+      "failed_call": false
+    },
+    {
+      "event": {
+        "ext": "v0",
+        "contract_id": "0000000000000000000000000000000000000000000000000000000000000003",
+        "type_": "diagnostic",
+        "body": {
+          "v0": {
+            "topics": [
+              {
+                "symbol": "fn_return"
+              },
+              {
+                "symbol": "get_consensus_config"
+              }
+            ],
+            "data": {
+              "vec": [
+                {
+                  "u32": 2
+                },
+                {
+                  "u32": 5
+                }
+              ]
             }
           }
         }
@@ -5635,7 +5693,7 @@
                 "bytes": "0000000000000000000000000000000000000000000000000000000000000006"
               },
               {
-                "symbol": "query_risk_gate"
+                "symbol": "get_score"
               }
             ],
             "data": {
@@ -5645,9 +5703,6 @@
                 },
                 {
                   "symbol": "XLM_USDC"
-                },
-                {
-                  "u32": 75
                 }
               ]
             }
@@ -5668,11 +5723,146 @@
                 "symbol": "fn_return"
               },
               {
-                "symbol": "query_risk_gate"
+                "symbol": "get_score"
               }
             ],
             "data": {
-              "bool": false
+              "map": [
+                {
+                  "key": {
+                    "symbol": "benford_flag"
+                  },
+                  "val": {
+                    "bool": false
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "benford_score"
+                  },
+                  "val": {
+                    "u32": 0
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "commitment"
+                  },
+                  "val": "void"
+                },
+                {
+                  "key": {
+                    "symbol": "confidence"
+                  },
+                  "val": {
+                    "u32": 90
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "ml_flag"
+                  },
+                  "val": {
+                    "bool": false
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "ml_score"
+                  },
+                  "val": {
+                    "u32": 0
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "model_version"
+                  },
+                  "val": {
+                    "u32": 1
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "network_score"
+                  },
+                  "val": {
+                    "u32": 0
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "score"
+                  },
+                  "val": {
+                    "u32": 10
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "timestamp"
+                  },
+                  "val": {
+                    "u64": 1
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "failed_call": false
+    },
+    {
+      "event": {
+        "ext": "v0",
+        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
+        "type_": "diagnostic",
+        "body": {
+          "v0": {
+            "topics": [
+              {
+                "symbol": "fn_call"
+              },
+              {
+                "bytes": "0000000000000000000000000000000000000000000000000000000000000006"
+              },
+              {
+                "symbol": "is_score_stale"
+              }
+            ],
+            "data": {
+              "vec": [
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
+                },
+                {
+                  "symbol": "XLM_USDC"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "failed_call": false
+    },
+    {
+      "event": {
+        "ext": "v0",
+        "contract_id": "0000000000000000000000000000000000000000000000000000000000000006",
+        "type_": "diagnostic",
+        "body": {
+          "v0": {
+            "topics": [
+              {
+                "symbol": "fn_return"
+              },
+              {
+                "symbol": "is_score_stale"
+              }
+            ],
+            "data": {
+              "bool": true
             }
           }
         }
@@ -5691,11 +5881,285 @@
                 "symbol": "fn_return"
               },
               {
-                "symbol": "query_risk_gate"
+                "symbol": "detect_split_brain"
               }
             ],
             "data": {
-              "bool": false
+              "map": [
+                {
+                  "key": {
+                    "symbol": "available_count"
+                  },
+                  "val": {
+                    "u32": 1
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "canonical"
+                  },
+                  "val": {
+                    "vec": [
+                      {
+                        "symbol": "Some"
+                      },
+                      {
+                        "map": [
+                          {
+                            "key": {
+                              "symbol": "consensus_epsilon"
+                            },
+                            "val": {
+                              "u32": 5
+                            }
+                          },
+                          {
+                            "key": {
+                              "symbol": "consensus_k"
+                            },
+                            "val": {
+                              "u32": 2
+                            }
+                          },
+                          {
+                            "key": {
+                              "symbol": "decay_den"
+                            },
+                            "val": {
+                              "u64": 1
+                            }
+                          },
+                          {
+                            "key": {
+                              "symbol": "decay_num"
+                            },
+                            "val": {
+                              "u64": 0
+                            }
+                          },
+                          {
+                            "key": {
+                              "symbol": "global_min_confidence"
+                            },
+                            "val": {
+                              "u32": 0
+                            }
+                          },
+                          {
+                            "key": {
+                              "symbol": "staleness_window"
+                            },
+                            "val": {
+                              "u64": 604800
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "diagnostics"
+                  },
+                  "val": {
+                    "vec": [
+                      {
+                        "map": [
+                          {
+                            "key": {
+                              "symbol": "fingerprint"
+                            },
+                            "val": {
+                              "vec": [
+                                {
+                                  "symbol": "Some"
+                                },
+                                {
+                                  "map": [
+                                    {
+                                      "key": {
+                                        "symbol": "consensus_epsilon"
+                                      },
+                                      "val": {
+                                        "u32": 5
+                                      }
+                                    },
+                                    {
+                                      "key": {
+                                        "symbol": "consensus_k"
+                                      },
+                                      "val": {
+                                        "u32": 2
+                                      }
+                                    },
+                                    {
+                                      "key": {
+                                        "symbol": "decay_den"
+                                      },
+                                      "val": {
+                                        "u64": 1
+                                      }
+                                    },
+                                    {
+                                      "key": {
+                                        "symbol": "decay_num"
+                                      },
+                                      "val": {
+                                        "u64": 0
+                                      }
+                                    },
+                                    {
+                                      "key": {
+                                        "symbol": "global_min_confidence"
+                                      },
+                                      "val": {
+                                        "u32": 0
+                                      }
+                                    },
+                                    {
+                                      "key": {
+                                        "symbol": "staleness_window"
+                                      },
+                                      "val": {
+                                        "u64": 604800
+                                      }
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          },
+                          {
+                            "key": {
+                              "symbol": "shard"
+                            },
+                            "val": {
+                              "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
+                            }
+                          },
+                          {
+                            "key": {
+                              "symbol": "status"
+                            },
+                            "val": {
+                              "vec": [
+                                {
+                                  "symbol": "Aligned"
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "map": [
+                          {
+                            "key": {
+                              "symbol": "fingerprint"
+                            },
+                            "val": {
+                              "vec": [
+                                {
+                                  "symbol": "None"
+                                }
+                              ]
+                            }
+                          },
+                          {
+                            "key": {
+                              "symbol": "shard"
+                            },
+                            "val": {
+                              "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4"
+                            }
+                          },
+                          {
+                            "key": {
+                              "symbol": "status"
+                            },
+                            "val": {
+                              "vec": [
+                                {
+                                  "symbol": "Stale"
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "healthy_count"
+                  },
+                  "val": {
+                    "u32": 2
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "mismatch_count"
+                  },
+                  "val": {
+                    "u32": 0
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "quorum_count"
+                  },
+                  "val": {
+                    "u32": 1
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "required_quorum"
+                  },
+                  "val": {
+                    "u32": 2
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "shard_count"
+                  },
+                  "val": {
+                    "u32": 2
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "stale_count"
+                  },
+                  "val": {
+                    "u32": 1
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "status"
+                  },
+                  "val": {
+                    "vec": [
+                      {
+                        "symbol": "QuorumLost"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "unavailable_count"
+                  },
+                  "val": {
+                    "u32": 0
+                  }
+                }
+              ]
             }
           }
         }

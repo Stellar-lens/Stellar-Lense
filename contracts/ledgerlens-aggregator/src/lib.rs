@@ -13,6 +13,8 @@ use soroban_sdk::{
 };
 
 pub const MAX_SHARDS: usize = 10;
+const FAILURE_TRANSPORT: u32 = 0;
+const FAILURE_CONTRACT_ERROR: u32 = 1;
 
 /// Errors surfaced directly by `LedgerLensAggregator`'s own bookkeeping
 /// (shard registry, admin gating). `query_risk_gate` itself is infallible —
@@ -34,6 +36,67 @@ pub enum Error {
     /// A candidate shard does not advertise every capability
     /// `REQUIRED_SHARD_CAPABILITIES` requires.
     IncompatibleInterface = 7,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum SplitBrainStatus {
+    NoShards,
+    Aligned,
+    SplitBrain,
+    QuorumLost,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ShardProbeStatus {
+    Aligned,
+    ConfigMismatch,
+    Unavailable,
+    Stale,
+    Unhealthy,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AggregatorConfigFingerprint {
+    pub decay_num: u64,
+    pub decay_den: u64,
+    pub staleness_window: u64,
+    pub global_min_confidence: u32,
+    pub consensus_k: u32,
+    pub consensus_epsilon: u32,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum MaybeAggregatorConfigFingerprint {
+    None,
+    Some(AggregatorConfigFingerprint),
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ShardConfigDiagnostic {
+    pub shard: Address,
+    pub status: ShardProbeStatus,
+    pub fingerprint: MaybeAggregatorConfigFingerprint,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SplitBrainReport {
+    pub status: SplitBrainStatus,
+    pub canonical: MaybeAggregatorConfigFingerprint,
+    pub shard_count: u32,
+    pub healthy_count: u32,
+    pub available_count: u32,
+    pub stale_count: u32,
+    pub unavailable_count: u32,
+    pub mismatch_count: u32,
+    pub quorum_count: u32,
+    pub required_quorum: u32,
+    pub diagnostics: Vec<ShardConfigDiagnostic>,
 }
 
 /// Capabilities of the `ILedgerLensScore` interface (interface version 2, see
@@ -244,7 +307,7 @@ impl LedgerLensAggregator {
                 _ => {
                     env.storage()
                         .instance()
-                        .set(&DataKey::LastShardFailure, &(shard.clone(), 0u32));
+                        .set(&DataKey::LastShardFailure, &(shard.clone(), FAILURE_TRANSPORT));
                     return false;
                 }
             }
@@ -281,12 +344,12 @@ impl LedgerLensAggregator {
                 Ok(Err(_conv_err)) => {
                     env.storage()
                         .instance()
-                        .set(&DataKey::LastShardFailure, &(shard.clone(), 1u32));
+                        .set(&DataKey::LastShardFailure, &(shard.clone(), FAILURE_CONTRACT_ERROR));
                 }
                 Err(_) => {
                     env.storage()
                         .instance()
-                        .set(&DataKey::LastShardFailure, &(shard.clone(), 0u32));
+                        .set(&DataKey::LastShardFailure, &(shard.clone(), FAILURE_TRANSPORT));
                 }
             }
         }
@@ -318,12 +381,12 @@ impl LedgerLensAggregator {
                 Ok(Err(_conv_err)) => {
                     env.storage()
                         .instance()
-                        .set(&DataKey::LastShardFailure, &(shard.clone(), 1u32));
+                        .set(&DataKey::LastShardFailure, &(shard.clone(), FAILURE_CONTRACT_ERROR));
                 }
                 Err(_) => {
                     env.storage()
                         .instance()
-                        .set(&DataKey::LastShardFailure, &(shard.clone(), 0u32));
+                        .set(&DataKey::LastShardFailure, &(shard.clone(), FAILURE_TRANSPORT));
                 }
             }
         }
@@ -337,6 +400,8 @@ impl LedgerLensAggregator {
             symbol_short!("gate"),
             symbol_short!("aggr"),
             symbol_short!("federated"),
+            symbol_short!("sbrain"),
+            symbol_short!("health"),
         ];
         for i in 0..caps.len() {
             if caps.get(i).unwrap() == capability {
@@ -396,7 +461,7 @@ impl LedgerLensAggregator {
                 _ => {
                     env.storage()
                         .instance()
-                        .set(&DataKey::LastShardFailure, &(shard.clone(), 0u32));
+                        .set(&DataKey::LastShardFailure, &(shard.clone(), FAILURE_TRANSPORT));
                 }
             }
         }
@@ -406,10 +471,254 @@ impl LedgerLensAggregator {
     pub fn get_last_shard_failure(env: Env) -> Option<(Address, u32)> {
         env.storage().instance().get(&DataKey::LastShardFailure)
     }
+
+    pub fn set_shard_health(env: Env, shard: Address, healthy: bool) -> Result<(), Error> {
+        let admin: Address =
+            env.storage().instance().get(&DataKey::Admin).ok_or(Error::NotInitialized)?;
+        admin.require_auth();
+        if !is_shard_registered(&env, &shard) {
+            return Err(Error::ShardNotRegistered);
+        }
+        env.storage().instance().set(&DataKey::ShardHealth(shard.clone()), &healthy);
+        env.events().publish((symbol_short!("sh_health"), shard), healthy);
+        Ok(())
+    }
+
+    pub fn get_shard_health(env: Env, shard: Address) -> Result<bool, Error> {
+        if !env.storage().instance().has(&DataKey::Admin) {
+            return Err(Error::NotInitialized);
+        }
+        if !is_shard_registered(&env, &shard) {
+            return Err(Error::ShardNotRegistered);
+        }
+        Ok(is_shard_healthy(&env, &shard))
+    }
+
+    pub fn detect_split_brain(env: Env, wallet: Address, asset_pair: Symbol) -> SplitBrainReport {
+        let shards: Vec<Address> =
+            env.storage().instance().get(&DataKey::Shards).unwrap_or_else(|| Vec::new(&env));
+        let shard_count = shards.len();
+        let mut diagnostics: Vec<ShardConfigDiagnostic> = Vec::new(&env);
+        let mut available: Vec<(Address, AggregatorConfigFingerprint)> = Vec::new(&env);
+        let mut healthy_count = 0u32;
+        let mut stale_count = 0u32;
+        let mut unavailable_count = 0u32;
+
+        for i in 0..shards.len() {
+            let shard = shards.get(i).unwrap();
+            if !is_shard_healthy(&env, &shard) {
+                diagnostics.push_back(ShardConfigDiagnostic {
+                    shard,
+                    status: ShardProbeStatus::Unhealthy,
+                    fingerprint: MaybeAggregatorConfigFingerprint::None,
+                });
+                continue;
+            }
+            healthy_count += 1;
+            let client = ledgerlens_score::LedgerLensScoreContractClient::new(&env, &shard);
+            match client.try_get_score(&wallet, &asset_pair) {
+                Ok(Ok(_)) => match client.try_is_score_stale(&wallet, &asset_pair) {
+                    Ok(Ok(true)) => {
+                        stale_count += 1;
+                        diagnostics.push_back(ShardConfigDiagnostic {
+                            shard,
+                            status: ShardProbeStatus::Stale,
+                            fingerprint: MaybeAggregatorConfigFingerprint::None,
+                        });
+                        continue;
+                    }
+                    Ok(Ok(false)) => {}
+                    _ => {
+                        unavailable_count += 1;
+                        diagnostics.push_back(ShardConfigDiagnostic {
+                            shard,
+                            status: ShardProbeStatus::Unavailable,
+                            fingerprint: MaybeAggregatorConfigFingerprint::None,
+                        });
+                        continue;
+                    }
+                },
+                Err(Ok(ScoreError::ScoreNotFound)) => {}
+                Ok(Err(_)) => {
+                    unavailable_count += 1;
+                    diagnostics.push_back(ShardConfigDiagnostic {
+                        shard,
+                        status: ShardProbeStatus::Unavailable,
+                        fingerprint: MaybeAggregatorConfigFingerprint::None,
+                    });
+                    continue;
+                }
+                Err(_) => {
+                    unavailable_count += 1;
+                    diagnostics.push_back(ShardConfigDiagnostic {
+                        shard,
+                        status: ShardProbeStatus::Unavailable,
+                        fingerprint: MaybeAggregatorConfigFingerprint::None,
+                    });
+                    continue;
+                }
+            }
+
+            match read_config_fingerprint(&env, &shard) {
+                Some(fingerprint) => {
+                    available.push_back((shard.clone(), fingerprint.clone()));
+                    diagnostics.push_back(ShardConfigDiagnostic {
+                        shard,
+                        status: ShardProbeStatus::Aligned,
+                        fingerprint: MaybeAggregatorConfigFingerprint::Some(fingerprint),
+                    });
+                }
+                None => {
+                    unavailable_count += 1;
+                    diagnostics.push_back(ShardConfigDiagnostic {
+                        shard,
+                        status: ShardProbeStatus::Unavailable,
+                        fingerprint: MaybeAggregatorConfigFingerprint::None,
+                    });
+                }
+            }
+        }
+
+        let required_quorum = (healthy_count / 2) + 1;
+        let (canonical, quorum_count) = select_canonical_fingerprint(&available);
+        let mut mismatch_count = 0u32;
+        let mut final_diagnostics: Vec<ShardConfigDiagnostic> = Vec::new(&env);
+
+        for i in 0..diagnostics.len() {
+            let mut diagnostic = diagnostics.get(i).unwrap();
+            if let (Some(canon), MaybeAggregatorConfigFingerprint::Some(fingerprint)) =
+                (&canonical, &diagnostic.fingerprint)
+            {
+                if fingerprint != canon {
+                    diagnostic.status = ShardProbeStatus::ConfigMismatch;
+                    mismatch_count += 1;
+                }
+            }
+            final_diagnostics.push_back(diagnostic);
+        }
+
+        let status = if shard_count == 0 {
+            SplitBrainStatus::NoShards
+        } else if quorum_count < required_quorum {
+            SplitBrainStatus::QuorumLost
+        } else if mismatch_count > 0 {
+            SplitBrainStatus::SplitBrain
+        } else {
+            SplitBrainStatus::Aligned
+        };
+
+        SplitBrainReport {
+            status,
+            canonical: match canonical {
+                Some(fingerprint) => MaybeAggregatorConfigFingerprint::Some(fingerprint),
+                None => MaybeAggregatorConfigFingerprint::None,
+            },
+            shard_count,
+            healthy_count,
+            available_count: available.len(),
+            stale_count,
+            unavailable_count,
+            mismatch_count,
+            quorum_count,
+            required_quorum,
+            diagnostics: final_diagnostics,
+        }
+    }
 }
 
 fn is_shard_healthy(env: &Env, shard: &Address) -> bool {
     env.storage().instance().get(&DataKey::ShardHealth(shard.clone())).unwrap_or(true)
+}
+
+fn is_shard_registered(env: &Env, shard: &Address) -> bool {
+    let shards: Vec<Address> =
+        env.storage().instance().get(&DataKey::Shards).unwrap_or_else(|| Vec::new(env));
+    for i in 0..shards.len() {
+        if shards.get(i).unwrap() == *shard {
+            return true;
+        }
+    }
+    false
+}
+
+fn read_config_fingerprint(env: &Env, shard: &Address) -> Option<AggregatorConfigFingerprint> {
+    let client = ledgerlens_score::LedgerLensScoreContractClient::new(env, shard);
+    let decay = match client.try_get_decay_rate() {
+        Ok(Ok(rate)) => rate,
+        _ => return None,
+    };
+    let staleness_window = match client.try_get_staleness_window() {
+        Ok(Ok(window)) => window,
+        _ => return None,
+    };
+    let global_min_confidence = match client.try_get_global_min_confidence() {
+        Ok(Ok(confidence)) => confidence,
+        _ => return None,
+    };
+    let consensus = match client.try_get_consensus_config() {
+        Ok(Ok(config)) => config,
+        _ => return None,
+    };
+    Some(AggregatorConfigFingerprint {
+        decay_num: decay.0,
+        decay_den: decay.1,
+        staleness_window,
+        global_min_confidence,
+        consensus_k: consensus.0,
+        consensus_epsilon: consensus.1,
+    })
+}
+
+fn fingerprint_less(a: &AggregatorConfigFingerprint, b: &AggregatorConfigFingerprint) -> bool {
+    if a.decay_num != b.decay_num {
+        return a.decay_num < b.decay_num;
+    }
+    if a.decay_den != b.decay_den {
+        return a.decay_den < b.decay_den;
+    }
+    if a.staleness_window != b.staleness_window {
+        return a.staleness_window < b.staleness_window;
+    }
+    if a.global_min_confidence != b.global_min_confidence {
+        return a.global_min_confidence < b.global_min_confidence;
+    }
+    if a.consensus_k != b.consensus_k {
+        return a.consensus_k < b.consensus_k;
+    }
+    a.consensus_epsilon < b.consensus_epsilon
+}
+
+fn select_canonical_fingerprint(
+    available: &Vec<(Address, AggregatorConfigFingerprint)>,
+) -> (Option<AggregatorConfigFingerprint>, u32) {
+    let mut best: Option<AggregatorConfigFingerprint> = None;
+    let mut best_count = 0u32;
+
+    for i in 0..available.len() {
+        let candidate = available.get(i).unwrap().1;
+        let mut count = 0u32;
+        for j in 0..available.len() {
+            if available.get(j).unwrap().1 == candidate {
+                count += 1;
+            }
+        }
+        match &best {
+            None => {
+                best = Some(candidate);
+                best_count = count;
+            }
+            Some(current) => {
+                if count > best_count
+                    || (count == best_count && fingerprint_less(&candidate, current))
+                {
+                    best = Some(candidate);
+                    best_count = count;
+                }
+            }
+        }
+    }
+
+    (best, best_count)
 }
 
 #[contracttype]
