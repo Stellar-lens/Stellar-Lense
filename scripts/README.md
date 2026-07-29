@@ -1,5 +1,22 @@
 # scripts/
 
+## `sandbox.py` — Sandboxed execution checks
+
+`sandboxed_execution()` wraps a maintenance script's entrypoint with CPU/memory
+resource limits and optional network blocking, raising `SandboxViolation` with
+an actionable message instead of letting the process die opaquely.
+`dry_run_guard()` centralizes `--dry-run` logging for destructive actions
+(see `migrate_add_ring_id.py` for a reference integration).
+
+```python
+from scripts.sandbox import sandboxed_execution, dry_run_guard
+
+with sandboxed_execution(allow_network=False):
+    dry_run_guard(args.dry_run, "ALTER TABLE ...", lambda: migrate(engine))
+```
+
+---
+
 ## `stream.py` — Real-time streaming pipeline
 
 Streams trades from the Stellar Horizon SSE API, maintains a rolling feature
