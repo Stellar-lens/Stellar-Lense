@@ -57,7 +57,9 @@ class DLQEntry:
 
 @contextmanager
 def _connect(db_path: str | None = None):
-    conn = sqlite3.connect(db_path or settings.db_path)
+    # Use check_same_thread=False so the async retry tasks can open connections
+    # safely if the environment uses threads. Keep a reasonable timeout.
+    conn = sqlite3.connect(db_path or settings.db_path, check_same_thread=False, timeout=30)
     conn.row_factory = sqlite3.Row
     try:
         yield conn
@@ -67,6 +69,12 @@ def _connect(db_path: str | None = None):
 
 def init_dlq(db_path: str | None = None) -> None:
     with _connect(db_path) as conn:
+        # Enable WAL for better concurrency between async tasks and other processes.
+        try:
+            conn.execute("PRAGMA journal_mode=WAL;")
+        except Exception:
+            # Best-effort, don't fail if the environment doesn't support WAL.
+            pass
         conn.executescript(_DLQ_SCHEMA)
         conn.commit()
 
