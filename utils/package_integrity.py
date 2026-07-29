@@ -118,7 +118,15 @@ def _check_file(path: Path) -> list[IntegrityIssue]:
 
     for marker in _CONFLICT_MARKERS:
         for lineno, line in enumerate(text.splitlines(), start=1):
-            if line.startswith(marker):
+            stripped = line.rstrip()
+            # Exact match only: a real conflict marker is either the bare
+            # "=======" separator or "<<<<<<<"/">>>>>>>" followed by a ref
+            # name. Prefix-only matching false-positives on text dividers
+            # like a long "====...====" docstring underline.
+            is_marker = stripped == marker or (
+                marker != "=======" and stripped.startswith(marker + " ")
+            )
+            if is_marker:
                 issues.append(
                     IntegrityIssue(
                         path,
