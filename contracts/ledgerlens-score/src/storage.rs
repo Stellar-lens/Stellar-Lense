@@ -29,22 +29,36 @@ pub enum DataKey {
 
 // ── Admin / Service ─────────────────────────────────────────────────────────
 
+/// Precondition: none. Postcondition: does not mutate storage.
 pub fn has_admin(env: &Env) -> bool {
     env.storage().instance().has(&DataKey::Admin)
 }
 
+/// Precondition: none — safe to call before or after `initialize`.
+/// Postcondition: overwrites any previously stored admin unconditionally;
+/// callers are responsible for authorization (this function performs none).
 pub fn set_admin(env: &Env, admin: &Address) {
     env.storage().instance().set(&DataKey::Admin, admin);
 }
 
+/// Precondition: `set_admin` must have been called at least once (normally
+/// via `initialize`) — callers must check [`has_admin`] first if the admin
+/// may not yet be set. Panics (unwraps `None`) if no admin has been stored.
+/// Postcondition: does not mutate storage.
 pub fn get_admin(env: &Env) -> Address {
     env.storage().instance().get(&DataKey::Admin).unwrap()
 }
 
+/// Precondition: none — safe to call before or after `initialize`.
+/// Postcondition: overwrites any previously stored service address
+/// unconditionally; callers are responsible for authorization.
 pub fn set_service(env: &Env, service: &Address) {
     env.storage().instance().set(&DataKey::Service, service);
 }
 
+/// Precondition: `set_service` must have been called at least once (normally
+/// via `initialize`). Panics (unwraps `None`) if no service has been stored.
+/// Postcondition: does not mutate storage.
 pub fn get_service(env: &Env) -> Address {
     env.storage().instance().get(&DataKey::Service).unwrap()
 }
