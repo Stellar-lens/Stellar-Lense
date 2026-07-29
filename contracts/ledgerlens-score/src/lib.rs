@@ -1,6 +1,6 @@
 #![no_std]
 #![allow(deprecated)] // Required: contractimpl macro calls spec_xdr_* for all fns including deprecated ones
-#![allow(dead_code)]
+#![cfg_attr(all(target_family = "wasm", not(test)), deny(dead_code))]
 #![allow(unused_variables)]
 
 mod constants;

@@ -1,4 +1,5 @@
 use crate::{Error, LedgerLensAggregator, LedgerLensAggregatorClient};
+use ledgerlens_test_support::{generate_score_roles, test_env};
 use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
 use soroban_sdk::{symbol_short, testutils::Address as _, Address, Env, Symbol, Vec};
 
@@ -59,8 +60,7 @@ fn init_aggregator(env: &Env) -> LedgerLensAggregatorClient<'_> {
 
 #[test]
 fn test_initialize() {
-    let env = Env::default();
-    env.mock_all_auths();
+    let env = test_env();
     let agg_id = env.register_contract(None, LedgerLensAggregator);
     let client = LedgerLensAggregatorClient::new(&env, &agg_id);
     let admin = Address::generate(&env);
@@ -70,8 +70,7 @@ fn test_initialize() {
 
 #[test]
 fn test_initialize_twice_fails() {
-    let env = Env::default();
-    env.mock_all_auths();
+    let env = test_env();
     let agg_id = env.register_contract(None, LedgerLensAggregator);
     let client = LedgerLensAggregatorClient::new(&env, &agg_id);
     let admin = Address::generate(&env);
@@ -99,8 +98,7 @@ fn test_initialize_requires_nominated_admin_and_rolls_back() {
 
 #[test]
 fn test_get_admin_not_initialized() {
-    let env = Env::default();
-    env.mock_all_auths();
+    let env = test_env();
     let agg_id = env.register_contract(None, LedgerLensAggregator);
     let client = LedgerLensAggregatorClient::new(&env, &agg_id);
     let result = client.try_get_admin();
@@ -109,8 +107,7 @@ fn test_get_admin_not_initialized() {
 
 #[test]
 fn test_add_remove_shards() {
-    let env = Env::default();
-    env.mock_all_auths();
+    let env = test_env();
     let agg_id = env.register_contract(None, LedgerLensAggregator);
     let client = LedgerLensAggregatorClient::new(&env, &agg_id);
     let admin = Address::generate(&env);
@@ -129,8 +126,7 @@ fn test_add_remove_shards() {
 
 #[test]
 fn test_add_shard_self_reference_fails() {
-    let env = Env::default();
-    env.mock_all_auths();
+    let env = test_env();
     let agg_id = env.register_contract(None, LedgerLensAggregator);
     let client = LedgerLensAggregatorClient::new(&env, &agg_id);
     let admin = Address::generate(&env);
@@ -142,8 +138,7 @@ fn test_add_shard_self_reference_fails() {
 
 #[test]
 fn test_add_shard_duplicate_fails() {
-    let env = Env::default();
-    env.mock_all_auths();
+    let env = test_env();
     let agg_id = env.register_contract(None, LedgerLensAggregator);
     let client = LedgerLensAggregatorClient::new(&env, &agg_id);
     let admin = Address::generate(&env);
@@ -157,8 +152,7 @@ fn test_add_shard_duplicate_fails() {
 
 #[test]
 fn test_remove_nonexistent_shard_fails() {
-    let env = Env::default();
-    env.mock_all_auths();
+    let env = test_env();
     let agg_id = env.register_contract(None, LedgerLensAggregator);
     let client = LedgerLensAggregatorClient::new(&env, &agg_id);
     let admin = Address::generate(&env);
@@ -171,8 +165,7 @@ fn test_remove_nonexistent_shard_fails() {
 
 #[test]
 fn test_query_risk_gate_no_shards_fails_closed() {
-    let env = Env::default();
-    env.mock_all_auths();
+    let env = test_env();
     let agg_id = env.register_contract(None, LedgerLensAggregator);
     let client = LedgerLensAggregatorClient::new(&env, &agg_id);
     let wallet = Address::generate(&env);
@@ -182,8 +175,7 @@ fn test_query_risk_gate_no_shards_fails_closed() {
 
 #[test]
 fn test_query_risk_gate_all_shards_pass() {
-    let env = Env::default();
-    env.mock_all_auths();
+    let env = test_env();
     let agg_id = env.register_contract(None, LedgerLensAggregator);
     let client = LedgerLensAggregatorClient::new(&env, &agg_id);
     let admin = Address::generate(&env);
@@ -204,8 +196,7 @@ fn test_query_risk_gate_all_shards_pass() {
 
 #[test]
 fn test_query_risk_gate_one_shard_rejects() {
-    let env = Env::default();
-    env.mock_all_auths();
+    let env = test_env();
     let agg_id = env.register_contract(None, LedgerLensAggregator);
     let client = LedgerLensAggregatorClient::new(&env, &agg_id);
     let admin = Address::generate(&env);
@@ -250,8 +241,7 @@ fn test_oversized_asset_pair_fails_closed_before_shard_fanout() {
 
 #[test]
 fn test_get_decay_rate_returns_primary_shard_when_shards_diverge() {
-    let env = Env::default();
-    env.mock_all_auths();
+    let env = test_env();
     let agg_id = env.register_contract(None, LedgerLensAggregator);
     let client = LedgerLensAggregatorClient::new(&env, &agg_id);
     let admin = Address::generate(&env);
@@ -470,8 +460,7 @@ fn test_add_shard_rejects_legacy_shard_without_supports_interface() {
 fn setup_score_shard(env: &Env) -> (Address, LedgerLensScoreContractClient<'_>) {
     let id = env.register_contract(None, LedgerLensScoreContract);
     let client = LedgerLensScoreContractClient::new(env, &id);
-    let admin = Address::generate(env);
-    let service = Address::generate(env);
+    let (admin, service) = generate_score_roles(env);
     client.initialize(&admin, &service);
     (id, client)
 }

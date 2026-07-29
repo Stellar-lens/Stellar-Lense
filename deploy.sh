@@ -244,7 +244,7 @@ fi
 # ── Build ─────────────────────────────────────────────────────────────────────
 
 log "Building contract (wasm32-unknown-unknown, release)"
-run cargo build --target wasm32-unknown-unknown --release -p ledgerlens-score
+run "$CARGO_BIN" build --target wasm32-unknown-unknown --release -p ledgerlens-score
 
 log "Optimizing wasm"
 run "$CLI_BIN" contract optimize --wasm "$WASM_PATH"
@@ -263,7 +263,8 @@ else
     --network-passphrase "$NETWORK_PASSPHRASE")
 fi
 
-log "Deployed contract: $CONTRACT_ID"
+[ -n "$CONTRACT_ID" ] || die "Deployment returned an empty contract id."
+log "Deployment transaction returned contract id: $CONTRACT_ID"
 
 # ── Initialize ────────────────────────────────────────────────────────────────
 
@@ -282,7 +283,10 @@ run "$CLI_BIN" contract invoke \
   -- \
   initialize \
   --admin "$ADMIN_ADDRESS" \
-  --service "$SERVICE_ADDRESS"
+  --service "$SERVICE_ADDRESS" >/dev/null; then
+  echo "Contract id: $CONTRACT_ID" >&2
+  die "Initialization failed; do not treat this deployment as successful."
+fi
 
 # ── Verify ────────────────────────────────────────────────────────────────────
 
@@ -294,12 +298,10 @@ if [ "$DRY_RUN" = false ]; then
     --rpc-url "$RPC_URL" \
     --network-passphrase "$NETWORK_PASSPHRASE" \
     -- \
-    get_admin 2>/dev/null || echo "VERIFICATION_FAILED")
-
-  if [ "$STORED_ADMIN" = "VERIFICATION_FAILED" ]; then
-    echo "ERROR: post-deployment verification failed — get_admin returned an error." >&2
-    exit 1
-  fi
+    get_admin) || {
+      echo "Contract id: $CONTRACT_ID" >&2
+      die "Post-deployment verification failed."
+    }
 
   log "Admin verified on-chain: $STORED_ADMIN"
 
@@ -309,7 +311,10 @@ if [ "$DRY_RUN" = false ]; then
     --rpc-url "$RPC_URL" \
     --network-passphrase "$NETWORK_PASSPHRASE" \
     -- \
-    get_version 2>/dev/null || echo "0")
+    get_version) || {
+      echo "Contract id: $CONTRACT_ID" >&2
+      die "Deployment verification could not read the contract version."
+    }
 
   log "Contract version: $CONTRACT_VERSION"
 fi

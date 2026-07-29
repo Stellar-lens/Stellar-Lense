@@ -4,6 +4,7 @@ use soroban_sdk::{
     Address, Bytes, BytesN, Env, IntoVal, Symbol, Vec,
 };
 
+use ledgerlens_test_support::{generate_score_roles, set_ledger_timestamp, test_env_with_unlimited_budget};
 use crate::{
     BatchResult, DeletionAuditWarning, Error, LedgerLensScoreContract,
     LedgerLensScoreContractClient, ScoreQuery, ScoreSubmission,
@@ -13,22 +14,16 @@ use crate::storage;
 // ── Test helpers ──────────────────────────────────────────────────────────────
 
 pub fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
-    let env = Env::default();
-    env.mock_all_auths();
-    env.budget().reset_unlimited();
-
+    let env = test_env_with_unlimited_budget();
     let contract_id = env.register_contract(None, LedgerLensScoreContract);
     let client = LedgerLensScoreContractClient::new(&env, &contract_id);
-
-    let admin = Address::generate(&env);
-    let service = Address::generate(&env);
-
+    let (admin, service) = generate_score_roles(&env);
     (env, client, admin, service)
 }
 
 pub fn initialized<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
     let (env, client, admin, service) = setup();
-    env.ledger().with_mut(|l| l.timestamp = 100_000);
+    set_ledger_timestamp(&env, 100_000);
     client.initialize(&admin, &service);
     (env, client, admin, service)
 }
