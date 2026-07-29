@@ -20,6 +20,9 @@ mod zk_range_proof;
 mod test;
 
 #[cfg(test)]
+mod test_builders;
+
+#[cfg(test)]
 mod event_emission;
 
 #[cfg(test)]
@@ -148,6 +151,7 @@ use soroban_sdk::{
 };
 use subtle::ConstantTimeEq;
 
+pub use constants::CONFIG_DRIFT_MANIFEST_FIELDS;
 pub use errors::Error;
 pub use events::{ServiceResumedEvent, ServiceSilenceAlertEvent};
 pub use types::{
@@ -760,7 +764,7 @@ impl LedgerLensScoreContract {
         Self::authorize_submission(&env, &signers)?;
 
         if submissions.is_empty() {
-            return Err(Error::InvalidConsensusConfig);
+            return Err(Error::ConsensusInputEmpty);
         }
         if submissions.len() != nonces.len() {
             return Err(Error::CommitmentMismatch); // Or some other length mismatch
@@ -909,7 +913,7 @@ impl LedgerLensScoreContract {
         Self::ensure_active(&env)?;
         Self::authorize_submission(&env, &signers)?;
         if submissions.is_empty() {
-            return Err(Error::InvalidConsensusConfig);
+            return Err(Error::ConsensusInputEmpty);
         }
         if timestamp == 0 {
             return Err(Error::InvalidTimestamp);

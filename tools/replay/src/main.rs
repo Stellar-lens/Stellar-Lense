@@ -1,9 +1,11 @@
 use anyhow::{Context, Result};
+use replay::{compare_config_manifests, parse_manifest_json, recommended_manifest_template};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::env;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
+use std::{env as std_env, fs};
 
 use soroban_sdk::testutils::Address as _;
 use soroban_sdk::testutils::Ledger as _;

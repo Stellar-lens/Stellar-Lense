@@ -170,3 +170,23 @@ pub const DEFAULT_PARAM_CHANGE_DELAY_SECS: u64 = 86_400;
 
 /// Maximum number of entries retained in the rate-limit override audit log.
 pub const MAX_RATE_LIMIT_OVERRIDE_LOG: u32 = 100;
+
+/// Operator-facing manifest fields that the drift checker treats as the
+/// stable configuration surface for deployed instances.
+pub const CONFIG_DRIFT_MANIFEST_FIELDS: &[&str] = &[
+    "contract_version",
+    "paused",
+    "risk_threshold",
+    "jump_threshold",
+    "staleness_window",
+    "upgrade_delay",
+    "cooldown",
+    "service_threshold",
+    "admin_threshold",
+    "consensus_threshold_k",
+    "consensus_epsilon",
+    "reveal_window",
+    "finality_buffer",
+    "heartbeat_alert_threshold",
+    "oracle_staleness_threshold",
+];
