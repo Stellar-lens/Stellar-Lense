@@ -9,7 +9,7 @@ const REQUIRED_SHARD_CAPABILITIES: [&str; 4] = ["score", "gate", "aggr", "arch"]
 use ledgerlens_score::{AggregateRiskScore, Error as ScoreError, RiskScore};
 use soroban_sdk::{
     contract, contracterror, contractimpl, contracttype, symbol_short, vec, Address, Env, Symbol,
-    Vec,
+    TryFromVal, Vec,
 };
 
 pub const MAX_SHARDS: usize = 10;
@@ -44,6 +44,7 @@ pub enum Error {
 /// has drifted is rejected at registration time instead of failing silently
 /// during a later cross-contract call.
 const REQUIRED_SHARD_CAPABILITIES: [&str; 3] = ["score", "gate", "aggr"];
+const MAX_ASSET_PAIR_BYTES: u32 = 9;
 
 /// Returns `true` only when `shard` reports support for every capability in
 /// [`REQUIRED_SHARD_CAPABILITIES`]. A shard that omits one, reports `false`, or
@@ -72,6 +73,14 @@ fn shard_supports_required_interface(env: &Env, shard: &Address) -> bool {
     true
 }
 
+fn asset_pair_is_bounded(env: &Env, asset_pair: &Symbol) -> bool {
+    let pair = soroban_sdk::SymbolStr::try_from_val(env, &asset_pair.to_symbol_val());
+    match pair {
+        Ok(pair) => pair.as_ref().len() as u32 <= MAX_ASSET_PAIR_BYTES,
+        Err(_) => false,
+    }
+}
+
 #[contract]
 pub struct LedgerLensAggregator;
 
@@ -81,6 +90,10 @@ impl LedgerLensAggregator {
         if env.storage().instance().has(&DataKey::Admin) {
             return Err(Error::AlreadyInitialized);
         }
+        // Bind first initialization to the nominated administrator. Without
+        // this authorization, any invoker could front-run deployment and take
+        // control of shard registration.
+        admin.require_auth();
         env.storage().instance().set(&DataKey::Admin, &admin);
         Ok(())
     }
@@ -211,6 +224,9 @@ impl LedgerLensAggregator {
         asset_pair: Symbol,
         gate_threshold: u32,
     ) -> bool {
+        if !asset_pair_is_bounded(&env, &asset_pair) {
+            return false;
+        }
         let shards: Vec<Address> =
             env.storage().instance().get(&DataKey::Shards).unwrap_or_else(|| Vec::new(&env));
         if shards.is_empty() {
@@ -241,6 +257,9 @@ impl LedgerLensAggregator {
         wallet: Address,
         asset_pair: Symbol,
     ) -> Result<RiskScore, ScoreError> {
+        if !asset_pair_is_bounded(&env, &asset_pair) {
+            return Err(ScoreError::InvalidAttestation);
+        }
         let shards: Vec<Address> =
             env.storage().instance().get(&DataKey::Shards).unwrap_or_else(|| Vec::new(&env));
         let mut best: Option<RiskScore> = None;
@@ -332,6 +351,9 @@ impl LedgerLensAggregator {
         wallet: Address,
         asset_pair: Symbol,
     ) -> Vec<(Address, Option<RiskScore>)> {
+        if !asset_pair_is_bounded(&env, &asset_pair) {
+            return Vec::new(&env);
+        }
         let shards: Vec<Address> =
             env.storage().instance().get(&DataKey::Shards).unwrap_or_else(|| Vec::new(&env));
         let mut out: Vec<(Address, Option<RiskScore>)> = Vec::new(&env);
@@ -353,6 +375,9 @@ impl LedgerLensAggregator {
     ///
     /// Returns the highest counterparty count for the wallet/pair across all registered shards.
     pub fn contagion_depth_across_shards(env: Env, wallet: Address, asset_pair: Symbol) -> u32 {
+        if !asset_pair_is_bounded(&env, &asset_pair) {
+            return 0;
+        }
         let shards: Vec<Address> =
             env.storage().instance().get(&DataKey::Shards).unwrap_or_else(|| Vec::new(&env));
         let mut max_depth: u32 = 0;

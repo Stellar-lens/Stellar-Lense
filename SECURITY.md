@@ -48,16 +48,23 @@ We follow [Responsible Disclosure](https://en.wikipedia.org/wiki/Coordinated_vul
 
 | Attack vector                        | Mitigation                                                        |
 |--------------------------------------|-------------------------------------------------------------------|
+| Deployment initialization front-running | Both contract initializers require authorization from the nominated admin before writing any privileged state |
 | Unauthorized score write             | `submit_score` requires `service.require_auth()`                  |
 | Compromised service key              | `pause()` halts submissions; `set_service()` rotates the key      |
 | Accidental admin key loss            | Two-step transfer: new admin must call `accept_admin()`           |
 | Score poisoning via out-of-range data | `score` and `confidence` clamped to 0-100 on-chain               |
+| Resource exhaustion via oversized symbols or cryptographic byte payloads | `asset_pair` symbols are capped at 9 bytes and malformed oversized commitment / dispute replay byte payloads reject before hashing, proof parsing, shard fan-out, or storage writes |
 | DoS via unbounded storage            | History ring buffer capped at `HISTORY_MAX_DEPTH` (10) per pair  |
 | Large batch denial of service        | Batch size capped at `MAX_BATCH_SIZE` (20) per invocation        |
 | M-of-N `signers`/`admin_signers` Vec padding | Signer lists bounded by the current signer-set size before any per-signer storage read or `require_auth` call (`TooManySigners`) — see "Memory-Exhaustion & Nested Input Bounds" below |
 | Compromised service floods a pair with submissions | Per-`(wallet, asset_pair)` cooldown (`RateLimitExceeded`); admin-bounded `[MIN_COOLDOWN_SECS, MAX_COOLDOWN_SECS]`, with `override_rate_limit` as an audited emergency escape hatch |
 | Silent malicious contract upgrade    | Time-locked upgrade governance (see below): mandatory delay + on-chain proposal anyone can inspect, plus admin veto |
 | Data-residency / GDPR erasure request | `clear_score_history` and `clear_score` (admin-only) permanently remove scoring data from persistent storage; `clr_hist` / `clr_scr` events provide an on-chain audit trail of every erasure |
+
+The complete caller, signer, and contract-as-caller review is recorded in
+[`docs/cross-contract-authorization-audit.md`](docs/cross-contract-authorization-audit.md).
+The corresponding lifecycle and adversarial coverage index is
+[`docs/critical-state-transition-matrix.md`](docs/critical-state-transition-matrix.md).
 
 ## Upgrade Governance & Threat Model
 

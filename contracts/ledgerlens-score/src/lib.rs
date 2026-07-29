@@ -176,6 +176,34 @@ pub struct LedgerLensScoreContract;
 
 #[contractimpl]
 impl LedgerLensScoreContract {
+    fn asset_pair_len(env: &Env, asset_pair: &Symbol) -> Option<u32> {
+        let pair_str = SymbolStr::try_from_val(env, &asset_pair.to_symbol_val()).ok()?;
+        Some(pair_str.as_ref().len() as u32)
+    }
+
+    fn asset_pair_is_bounded(env: &Env, asset_pair: &Symbol) -> bool {
+        Self::asset_pair_len(env, asset_pair)
+            .map(|len| len <= constants::MAX_ASSET_PAIR_BYTES)
+            .unwrap_or(false)
+    }
+
+    fn ensure_asset_pair_bounded(env: &Env, asset_pair: &Symbol) -> Result<(), Error> {
+        if Self::asset_pair_is_bounded(env, asset_pair) {
+            Ok(())
+        } else {
+            Err(Error::InvalidAttestation)
+        }
+    }
+
+    fn ensure_score_commitment_bounded(commitment: &Option<Bytes>) -> Result<(), Error> {
+        match commitment {
+            Some(bytes) if bytes.len() != constants::MAX_SCORE_COMMITMENT_BYTES => {
+                Err(Error::InvalidAttestation)
+            }
+            _ => Ok(()),
+        }
+    }
+
     // ── Lifecycle ────────────────────────────────────────────────────────────
 
     /// One-time setup.  `admin` can rotate the scoring service address
@@ -203,6 +231,10 @@ impl LedgerLensScoreContract {
         if storage::has_admin(&env) {
             return Err(Error::AlreadyInitialized);
         }
+        // Initialization is a privileged state transition too. Requiring the
+        // nominated admin prevents a third party from front-running deployment
+        // and permanently installing attacker-controlled admin/service values.
+        admin.require_auth();
         storage::set_admin(&env, &admin);
         storage::set_service(&env, &service);
         env.storage()
@@ -303,6 +335,7 @@ impl LedgerLensScoreContract {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
+        Self::ensure_asset_pair_bounded(&env, &asset_pair)?;
         if storage::is_paused(&env) {
             return Err(Error::ContractPaused);
         }
@@ -328,6 +361,8 @@ impl LedgerLensScoreContract {
             }
             None => (None, None, None),
         };
+
+        Self::ensure_score_commitment_bounded(&commitment)?;
 
         if let Some(ref ta) = threshold_attestation {
             // ── Threshold-sig path ───────────────────────────────────────
@@ -1062,7 +1097,9 @@ impl LedgerLensScoreContract {
             let mut accepted = false;
             let mut rejection_code: u32 = 0;
 
-            if storage::is_pair_paused(&env, &sub.asset_pair) {
+            if !Self::asset_pair_is_bounded(&env, &sub.asset_pair) {
+                rejection_code = Error::InvalidAttestation as u32;
+            } else if storage::is_pair_paused(&env, &sub.asset_pair) {
                 rejection_code = Error::ContractPaused as u32;
             } else if sub.score > 100 {
                 rejection_code = Error::InvalidScore as u32;
@@ -1424,6 +1461,15 @@ impl LedgerLensScoreContract {
             let mut accepted = false;
             let mut rejection_code: u32 = 0;
 
+            if !Self::asset_pair_is_bounded(&env, &entry.submission.asset_pair) {
+                results.push_back(BatchEntryResult {
+                    index: i,
+                    accepted: false,
+                    rejection_code: Error::InvalidAttestation as u32,
+                });
+                continue;
+            }
+
             // Per-entry Merkle proof check. A failure here rejects only
             // this entry with `InvalidAttestation` — siblings in the same
             // batch can still process if their proofs hold.
@@ -1652,6 +1698,9 @@ impl LedgerLensScoreContract {
     /// assert_eq!(proof.len(), 97);
     /// ```
     pub fn get_membership_proof(env: Env, wallet: Address, asset_pair: Symbol) -> Bytes {
+        if !Self::asset_pair_is_bounded(&env, &asset_pair) {
+            return Bytes::new(&env);
+        }
         // Derive the evaluation point z for this key.
         let mut wallet_buf = [0u8; 56];
         wallet.to_string().copy_into_slice(&mut wallet_buf);
@@ -1757,6 +1806,9 @@ impl LedgerLensScoreContract {
         timestamp: u64,
         proof: Bytes,
     ) -> bool {
+        if !Self::asset_pair_is_bounded(&env, &asset_pair) {
+            return false;
+        }
         // Decode the 48-byte commitment to its inner 32-byte hash.
         let commit_inner = match verkle::bytes48_to_commitment(&commitment) {
             Some(c) => c,
@@ -1838,6 +1890,7 @@ impl LedgerLensScoreContract {
     /// assert_eq!(score.score, 10);
     /// ```
     pub fn get_score(env: Env, wallet: Address, asset_pair: Symbol) -> Result<RiskScore, Error> {
+        Self::ensure_asset_pair_bounded(&env, &asset_pair)?;
         Self::check_service_silence(&env);
         Self::lookup_score(&env, &wallet, &asset_pair)?.ok_or(Error::ScoreNotFound)
     }
@@ -1869,6 +1922,9 @@ impl LedgerLensScoreContract {
     /// assert!(client.get_score_exists(&wallet, &asset_pair));
     /// ```
     pub fn get_score_exists(env: Env, wallet: Address, asset_pair: Symbol) -> bool {
+        if !Self::asset_pair_is_bounded(&env, &asset_pair) {
+            return false;
+        }
         storage::peek_score(&env, &wallet, &asset_pair).is_some()
     }
 
@@ -3721,6 +3777,9 @@ impl LedgerLensScoreContract {
         proof: Bytes,
         threshold: u32,
     ) -> bool {
+        if !Self::asset_pair_is_bounded(&env, &asset_pair) {
+            return false;
+        }
         let stored_score = match storage::get_score(&env, &wallet, &asset_pair) {
             Some(s) => s,
             None => return false,
@@ -3781,6 +3840,9 @@ impl LedgerLensScoreContract {
         asset_pair: Symbol,
         gate_threshold: u32,
     ) -> bool {
+        if !Self::asset_pair_is_bounded(&env, &asset_pair) {
+            return false;
+        }
         // Flash-loan protection: record this gate read in temporary storage (#300).
         storage::set_gate_read_ledger(&env, &wallet, &asset_pair);
         Self::query_risk_gate_with_confidence(env, wallet, asset_pair, gate_threshold, 0)
@@ -3898,6 +3960,9 @@ impl LedgerLensScoreContract {
     /// `None` rather than an `Error` so it can be invoked cross-contract via
     /// `env.invoke_contract` without needing to decode a `Result`.
     pub fn get_score_opt(env: Env, wallet: Address, asset_pair: Symbol) -> Option<RiskScore> {
+        if !Self::asset_pair_is_bounded(&env, &asset_pair) {
+            return None;
+        }
         storage::get_score(&env, &wallet, &asset_pair)
     }
 
@@ -3927,6 +3992,9 @@ impl LedgerLensScoreContract {
         gate_threshold: u32,
         min_confidence: u32,
     ) -> bool {
+        if !Self::asset_pair_is_bounded(&env, &asset_pair) {
+            return false;
+        }
         Self::check_service_silence(&env);
         // #302: strict gate enforcement — reject callers not in the allowlist.
         if storage::get_gate_enforcement_mode(&env) {
@@ -4127,6 +4195,7 @@ impl LedgerLensScoreContract {
         if top_percentile == 0 || top_percentile > 100 {
             return Err(Error::InvalidThreshold);
         }
+        Self::ensure_asset_pair_bounded(&env, &asset_pair)?;
         let percentile = Self::get_score_percentile(env, wallet, asset_pair)?;
         Ok(percentile >= 100u32.saturating_sub(top_percentile))
     }
@@ -6565,6 +6634,10 @@ impl LedgerLensScoreContract {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
+        Self::ensure_asset_pair_bounded(&env, &asset_pair)?;
+        if bond_amount_salt.len() > constants::MAX_DISPUTE_BOND_PREIMAGE_BYTES {
+            return Err(Error::InvalidAttestation);
+        }
 
         // Require caller to be the challenger
         challenger.require_auth();
@@ -6586,6 +6659,10 @@ impl LedgerLensScoreContract {
         bond_salt: Bytes,
     ) -> Result<(), Error> {
         Self::ensure_active(&env)?;
+        Self::ensure_asset_pair_bounded(&env, &asset_pair)?;
+        if bond_salt.len() > constants::MAX_DISPUTE_BOND_SALT_BYTES {
+            return Err(Error::InvalidAttestation);
+        }
 
         if bond <= 0 {
             return Err(Error::InvalidDisputeBond);
