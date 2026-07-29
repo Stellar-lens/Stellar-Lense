@@ -7620,6 +7620,9 @@ impl LedgerLensScoreContract {
     /// Does nothing (returns `Ok`) if no history exists. After this call,
     /// `get_score_history` returns an empty Vec. This operation is
     /// **irreversible on-chain** — keep off-chain backups before erasing.
+    /// The `clr_hist` event proves the deletion happened, but it does not
+    /// preserve the deleted history payload. Recovery therefore depends on
+    /// off-chain backups, archived indexers, or prior replay artifacts.
     /// Admin only.
     ///
     /// Emits `clr_hist` for the on-chain audit trail.
@@ -7677,6 +7680,9 @@ impl LedgerLensScoreContract {
     /// Does nothing (returns `Ok`) if no score exists. After this call,
     /// `get_score` returns `ScoreNotFound`. This operation is
     /// **irreversible on-chain** — keep off-chain backups before erasing.
+    /// The `clr_scr` event proves the deletion happened, but it does not
+    /// preserve the deleted score payload. Recovery therefore depends on
+    /// off-chain backups, archived indexers, or prior replay artifacts.
     /// Admin only.
     ///
     /// Emits `clr_scr` for the on-chain audit trail.
