@@ -90,6 +90,15 @@ jobs:
           markdown-link-check docs/security.md
           markdown-link-check CONTRIBUTING.md
 
+      - name: Validate model artifact backward compatibility (Issue #510)
+        run: make validate-artifacts
+
+      - name: Check deprecation policy for public modules (Issue #511)
+        run: make check-deprecations
+
+      - name: Validate documentation for advanced contributor paths (Issue #512)
+        run: make validate-docs
+
       - name: Execute Benford explainer notebook
         run: |
           cd notebooks

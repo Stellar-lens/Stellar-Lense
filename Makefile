@@ -1,5 +1,6 @@
 .PHONY: install lint format test run scale-workers mutation-test
 .PHONY: install lint format test run typecheck mutation-test
+.PHONY: validate-artifacts check-deprecations validate-docs
 
 VENV_BIN := $(abspath .venv/bin)
 ifeq ($(wildcard $(VENV_BIN)/python),)
@@ -81,3 +82,31 @@ mutation-test:
 	@echo "==> Mutation results:"
 	mutmut results || true
 	$(PYTHON) scripts/check_mutation_score.py --threshold $(MUTATION_THRESHOLD)
+
+# ---------------------------------------------------------------------------
+# Backward compatibility validation for stored model artifacts (Issue #510)
+#
+# Compares the current models/ directory against the most recently archived
+# version under models/archive/. No-ops (exit 0) if nothing has been
+# archived yet.
+# ---------------------------------------------------------------------------
+validate-artifacts:
+	@baseline="$$(ls -1d models/archive/*/ 2>/dev/null | sort -r | head -n1)"; \
+	if [ -z "$$baseline" ]; then \
+		echo "No archived model versions found under models/archive/ — nothing to validate."; \
+	else \
+		$(PYTHON) -m scripts.check_artifact_compatibility \
+			--baseline-dir "$$baseline" --candidate-dir models; \
+	fi
+
+# ---------------------------------------------------------------------------
+# Structured deprecation policy checks for public modules (Issue #511)
+# ---------------------------------------------------------------------------
+check-deprecations:
+	$(PYTHON) -m scripts.check_deprecation_policy
+
+# ---------------------------------------------------------------------------
+# Documentation validation for advanced contributor paths (Issue #512)
+# ---------------------------------------------------------------------------
+validate-docs:
+	$(PYTHON) -m scripts.validate_docs
