@@ -10,6 +10,11 @@ Soroban smart contract that serves as the on-chain risk-score registry for **Led
 
 LedgerLens detects wash trading and artificial volume on the Stellar Decentralised Exchange (SDEX) by analysing trade data with statistical (Benford's Law) and machine learning techniques. The off-chain detection pipeline computes a **LedgerLens Risk Score (0-100)** for wallets and asset pairs, and this contract acts as the **on-chain truth layer** for those scores — making fraud signals composable with other Soroban protocols (AMMs, lending platforms, DEX aggregators) without relying on an external oracle.
 
+New to the terminology below? [`docs/glossary.md`](docs/glossary.md) defines every term precisely
+against the actual implementation — including a few (**shard**, **finality**, **attestation**,
+**pause**) whose meaning here is narrower or different from what you might assume from general
+blockchain usage.
+
 ## Features
 
 - **On-Chain Risk Score Registry**: Stores the latest LedgerLens risk score, flags, confidence, and timestamp per wallet/asset-pair
@@ -546,6 +551,11 @@ See [`examples/amm_gate_example.rs`](examples/amm_gate_example.rs) and
 [`contracts/mock-amm/`](contracts/mock-amm/) (`provide_liquidity_gated`,
 `set_risk_oracle`).
 
+One important caveat: a safe score can still be stale. If your protocol is
+sensitive to detection lag, layer a max-age check on top of the gate, require
+confidence for high-value actions, and fail closed when the oracle is silent or
+your own pause flag is active.
+
 ## Security Features
 
 1. **Authorization Checks**: Only the authorised LedgerLens service account can submit scores
@@ -556,6 +566,8 @@ See [`examples/amm_gate_example.rs`](examples/amm_gate_example.rs) and
 6. **Submission Rate Limiting**: A configurable per-`(wallet, asset_pair)` cooldown (default 1 h) bounds how often the service account can overwrite a score — see [Rate Limiting](#rate-limiting)
 7. **Score Attestation**: An opt-in secp256k1 signature over the score payload lets the off-chain pipeline vouch for its contents independent of `require_auth` — see [Score Attestation](#score-attestation)
 8. **Score Submission Floor**: An opt-in per-wallet floor that blocks downward score-revision attacks on wallets whose historical peak crossed a danger level — see [Score Submission Floor](#score-submission-floor)
+
+These are backed by a set of non-negotiable implementation invariants — fail-closed gates, no-panic reads, bounded storage, and append-only event/error stability — documented with their concrete enforcement (code + tests + CI) in [`docs/invariants.md`](docs/invariants.md).
 
 ## Testing
 
@@ -577,11 +589,13 @@ soroban contract optimize --wasm target/wasm32-unknown-unknown/release/ledgerlen
 ### 2. Deploy to Testnet
 
 ```bash
-soroban contract deploy \
-  --wasm target/wasm32-unknown-unknown/release/ledgerlens_score.optimized.wasm \
-  --source deployer \
-  --network testnet
+./deploy.sh --dry-run testnet deployer GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 ```
+
+Reviewed deployment manifests live under `deploy/manifests/`. `deploy.sh`
+validates the selected manifest before use and fails closed if the local Rust
+or Stellar/Soroban CLI version drifts from the pinned project expectations.
+See [`docs/deployment-manifests.md`](docs/deployment-manifests.md).
 
 ### 3. Submit a Risk Score
 
@@ -627,7 +641,9 @@ soroban contract invoke \
 ├── rustfmt.toml
 ├── clippy.toml
 ├── deploy.sh                           ← Build, optimize, deploy, initialize
+├── deploy/manifests/                   ← Reviewed environment deployment manifests
 ├── docs/
+│   ├── deployment-manifests.md         ← Manifest schema and toolchain drift checks
 │   └── interface-spec.md               ← ILedgerLensScore composability spec
 │   └── contract-build-lints.md         ← WASM-only dead-code detection policy
 │   └── ledgerlens-score-module-ownership.md ← Score module ownership map
@@ -791,7 +807,7 @@ MIT
 
 ## Contributing
 
-Contributions are welcome. LedgerLens is an open-source public good built for the Stellar ecosystem. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, required checks, and PR guidelines.
+Contributions are welcome. LedgerLens is an open-source public good built for the Stellar ecosystem. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, required checks, and PR guidelines, [`docs/invariants.md`](docs/invariants.md) for the non-negotiable behaviors (fail-closed gates, no-panic reads, bounded storage, append-only event/error stability) that any change to `lib.rs` must preserve, and [`docs/review-checklists.md`](docs/review-checklists.md) for the specific gates governance, cryptography, storage, upgrade, and composability changes are reviewed against.
 
 ## References
 
@@ -803,3 +819,5 @@ Contributions are welcome. LedgerLens is an open-source public good built for th
 - Harea, R. and Mihailă, S. (2025) 'Benford's law: Applicability in accounting and financial anomaly detection', *Challenges of Accounting for Young Researchers*, 3(1).
 - Stellar Development Foundation (2024) *Horizon API Documentation*. Available at: https://developers.stellar.org/api/horizon
 - Stellar Development Foundation (2024) *Soroban Smart Contract Documentation*. Available at: https://soroban.stellar.org/docs
+- [`docs/host-version-support-policy.md`](docs/host-version-support-policy.md) — supported Rust/Soroban build boundary and CI coverage
+- [`docs/network-matrix.md`](docs/network-matrix.md) — supported deployment profiles and failure modes
