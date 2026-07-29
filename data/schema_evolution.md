@@ -66,27 +66,50 @@ Edit `data/trade_avro_schema.json`.  For every added field, include a `"default"
 }
 ```
 
-### Step 2: Run the compatibility check (CI)
+### Step 2: Run the compatibility check
 
-The CI step `make check-schema-compatibility` runs:
-
-```python
-from ingestion.avro_codec import (
-    SchemaRegistry, check_backward_compatibility, check_forward_compatibility
-)
-import json
-
-old_schema = json.load(open("data/trade_avro_schema.json.prev"))
-new_schema = json.load(open("data/trade_avro_schema.json"))
-
-back_ok, back_errs = check_backward_compatibility(old_schema, new_schema)
-fwd_ok,  fwd_errs  = check_forward_compatibility(old_schema, new_schema)
-
-if not back_ok or not fwd_ok:
-    raise SystemExit(f"Schema incompatible:\n{back_errs + fwd_errs}")
+```bash
+make check-schema-compatibility
 ```
 
-Any change to `data/trade_avro_schema.json` must pass both checks before merge.
+This runs `scripts/check_schema_compatibility.py`, which compares the schema in
+your working tree against the same file **as it exists on the branch you are
+merging into**, and applies both `check_backward_compatibility` and
+`check_forward_compatibility` from `ingestion/avro_codec.py`.
+
+The baseline comes from git rather than from a committed copy of the previous
+schema. A baseline file that the change under test can edit enforces nothing,
+because the author would update both in the same commit.
+
+Exit codes:
+
+| Code | Meaning |
+|---|---|
+| 0 | Compatible, unchanged, or a newly added schema with no baseline |
+| 1 | Incompatible — violations are printed |
+| 2 | The baseline ref could not be resolved (misconfiguration, not a schema break) |
+
+Useful options:
+
+```bash
+# Compare against a specific ref instead of the default
+python scripts/check_schema_compatibility.py --baseline-ref origin/release-1.x
+
+# Check one direction only
+python scripts/check_schema_compatibility.py --mode backward
+
+# Report the decision without failing
+python scripts/check_schema_compatibility.py --dry-run
+```
+
+The `schema-compatibility` job in `.github/workflows/ci.yml` runs the same
+command on every pull request, so any change to
+`data/trade_avro_schema.json` must pass before merge.
+
+A schema change also triggers the review gate in
+[`.github/review-checklists.md`](../.github/review-checklists.md), which asks
+for the rollout plan — the compatibility check verifies the mechanical rules,
+not whether the migration window is safe.
 
 ### Step 3: Update the schema fingerprint header
 

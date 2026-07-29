@@ -100,6 +100,36 @@ jobs:
       - name: Test
         run: pytest -q
 
+  schema-compatibility:
+    name: Avro Schema Compatibility
+    runs-on: ubuntu-latest
+    # A separate job rather than a step in `test`: this needs fetch-depth: 0 to
+    # read the baseline from git, and the test matrix runs checkout twice
+    # (3.11 and 3.12). Running it once here avoids doubling the clone cost.
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Fetch the base branch
+        # On a pull_request the baseline is the target branch; on a push to
+        # main it is main's previous state, which the full clone already has.
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref || github.ref_name }}
+        run: git fetch --no-tags origin "$BASE_REF"
+
+      - name: Check Avro schema compatibility
+        run: make check-schema-compatibility
+
   mutation-test:
     name: Mutation Testing (≥80% score)
     runs-on: ubuntu-latest
