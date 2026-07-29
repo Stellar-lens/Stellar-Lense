@@ -156,7 +156,11 @@ class ScorePublisher:
         4. ``EXPIRE ledgerlens:last_event 86400``
         """
         channel = f"{self.CHANNEL_PREFIX}{event.wallet}"
-        payload = json.dumps(dataclasses.asdict(event), default=str)
+        # Ensure published_at is an ISO string so replay storage is consistent
+        data = dataclasses.asdict(event)
+        if isinstance(data.get("published_at"), datetime):
+            data["published_at"] = data["published_at"].isoformat()
+        payload = json.dumps(data)
         try:
             async with self._redis.pipeline(transaction=False) as pipe:
                 await pipe.publish(channel, payload)
