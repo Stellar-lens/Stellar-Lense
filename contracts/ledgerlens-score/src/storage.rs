@@ -6,34 +6,59 @@ use crate::constants::{
 };
 use crate::errors::Error;
 use crate::types::{
-    AdaptiveRateLimit, AggregateRiskScore, DataKey, DataKeyB, DataKeyC, DataKeyD, DecayCurve,
-    EmbargoExpiry, FlashProtectionMode, GateDataKey, HllSketch, InterpolationMethod, JumpStats,
-    ModelVersionStats, ModelVersionStatus, PairVolatilityState, ParamChangeProposal,
-    ParameterProposalRecord, ParameterProposalStatus, PendingScoreEntry, PolicyBundleProposal,
+    AdaptiveRateLimit, AggregateRiskScore, AlertAckRecord, AlertType, DataKey, DataKeyB, DataKeyC,
+    DataKeyD, DecayCurve, EmbargoExpiry, FlashProtectionMode, GateDataKey, HllSketch,
+    InterpolationMethod, JumpStats, ModelVersionStats, ModelVersionStatus, PairVolatilityState,
+    ParamChangeProposal, ParameterProposalRecord, ParameterProposalStatus, PendingScoreEntry,
     RateLimitOverrideEntry, RiskScore, ScoreDispute, ScoreFloorPolicy, ScoreHistogram, ScoreTrend,
     ScoreVelocityCap, SignerAccuracyRecord, SubscorePayload, TokenBucket, UpgradeProposal,
     WelfordCorrState,
 };
 use soroban_sdk::{Address, Bytes, BytesN, Env, Symbol, Vec};
 
+pub const MAX_MANDATORY_REVIEWERS: u32 = 10;
+#[contracttype]
+#[derive(Clone)]
+pub enum DataKey {
+
+    /// Storage key for the designated primary Architecture Owner address
+    ArchOwner,
+    /// Storage key for the list of mandatory off-chain/on-chain reviewer addresses
+    MandatoryReviewers,
+}
+
 // ── Admin / Service ─────────────────────────────────────────────────────────
 
+/// Precondition: none. Postcondition: does not mutate storage.
 pub fn has_admin(env: &Env) -> bool {
     env.storage().instance().has(&DataKey::Admin)
 }
 
+/// Precondition: none — safe to call before or after `initialize`.
+/// Postcondition: overwrites any previously stored admin unconditionally;
+/// callers are responsible for authorization (this function performs none).
 pub fn set_admin(env: &Env, admin: &Address) {
     env.storage().instance().set(&DataKey::Admin, admin);
 }
 
+/// Precondition: `set_admin` must have been called at least once (normally
+/// via `initialize`) — callers must check [`has_admin`] first if the admin
+/// may not yet be set. Panics (unwraps `None`) if no admin has been stored.
+/// Postcondition: does not mutate storage.
 pub fn get_admin(env: &Env) -> Address {
     env.storage().instance().get(&DataKey::Admin).unwrap()
 }
 
+/// Precondition: none — safe to call before or after `initialize`.
+/// Postcondition: overwrites any previously stored service address
+/// unconditionally; callers are responsible for authorization.
 pub fn set_service(env: &Env, service: &Address) {
     env.storage().instance().set(&DataKey::Service, service);
 }
 
+/// Precondition: `set_service` must have been called at least once (normally
+/// via `initialize`). Panics (unwraps `None`) if no service has been stored.
+/// Postcondition: does not mutate storage.
 pub fn get_service(env: &Env) -> Address {
     env.storage().instance().get(&DataKey::Service).unwrap()
 }
@@ -121,6 +146,26 @@ pub fn get_score_entry_index(env: &Env) -> Vec<(Address, Symbol)> {
         );
     }
     index
+}
+
+/// Removes `(wallet, asset_pair)` from the proactive rent-management index.
+/// No-op if the pair is not tracked.
+pub fn remove_score_entry(env: &Env, wallet: &Address, asset_pair: &Symbol) {
+    let entry = (wallet.clone(), asset_pair.clone());
+    let mut index = get_score_entry_index(env);
+    if let Some(pos) = index.first_index_of(&entry) {
+        index.remove(pos);
+        if index.is_empty() {
+            env.storage().persistent().remove(&DataKeyB::ScoreEntryIndex);
+        } else {
+            env.storage().persistent().set(&DataKeyB::ScoreEntryIndex, &index);
+            env.storage().persistent().extend_ttl(
+                &DataKeyB::ScoreEntryIndex,
+                SCORE_TTL_THRESHOLD,
+                SCORE_TTL_EXTEND_TO,
+            );
+        }
+    }
 }
 
 /// Registers `(wallet, asset_pair)` in the rent-management index — if it
@@ -525,6 +570,13 @@ pub fn get_score_history(env: &Env, wallet: &Address, asset_pair: &Symbol) -> Ve
     history
 }
 
+pub fn peek_score_history_len(env: &Env, wallet: &Address, asset_pair: &Symbol) -> u32 {
+    let key = DataKey::ScoreHistory(wallet.clone(), asset_pair.clone());
+    let history: Vec<RiskScore> =
+        env.storage().persistent().get(&key).unwrap_or_else(|| Vec::new(env));
+    history.len()
+}
+
 /// Read-only windowed view into the score-history ring buffer.
 ///
 /// `offset` is 0-indexed from the **most recent** entry (offset `0` == newest);
@@ -608,6 +660,24 @@ pub fn register_pair_for_wallet(env: &Env, wallet: &Address, asset_pair: &Symbol
         env.storage().persistent().set(&key, &pairs);
     }
     env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+}
+
+/// Removes `asset_pair` from the live pair list for `wallet`.
+///
+/// This keeps live-read aggregates and pair counts aligned with the set of
+/// scores that still exist on chain. No-op if the pair is not present.
+pub fn remove_pair_for_wallet(env: &Env, wallet: &Address, asset_pair: &Symbol) {
+    let key = DataKey::AssetPairs(wallet.clone());
+    let mut pairs: Vec<Symbol> = env.storage().persistent().get(&key).unwrap_or_else(|| Vec::new(env));
+    if let Some(pos) = pairs.first_index_of(asset_pair) {
+        pairs.remove(pos);
+        if pairs.is_empty() {
+            env.storage().persistent().remove(&key);
+        } else {
+            env.storage().persistent().set(&key, &pairs);
+            env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+        }
+    }
 }
 
 pub fn get_wallet_pairs(env: &Env, wallet: &Address) -> Vec<Symbol> {
@@ -1024,6 +1094,23 @@ pub fn clear_score_history(env: &Env, wallet: &Address, asset_pair: &Symbol) {
 pub fn clear_score(env: &Env, wallet: &Address, asset_pair: &Symbol) {
     let key = DataKey::Score(wallet.clone(), asset_pair.clone());
     env.storage().persistent().remove(&key);
+}
+
+pub fn get_deletion_approval_policy(env: &Env) -> DeletionApprovalPolicy {
+    let enabled = env.storage().instance().get(&DataKeyD::DeletionPolicyEnabled).unwrap_or(false);
+    let approver = env.storage().instance().get(&DataKeyD::DeletionApprover);
+    DeletionApprovalPolicy { enabled, approver }
+}
+
+pub fn set_deletion_approval_policy(
+    env: &Env,
+    policy: &DeletionApprovalPolicy,
+) {
+    env.storage().instance().set(&DataKeyD::DeletionPolicyEnabled, &policy.enabled);
+    match &policy.approver {
+        Some(approver) => env.storage().instance().set(&DataKeyD::DeletionApprover, approver),
+        None => env.storage().instance().remove(&DataKeyD::DeletionApprover),
+    }
 }
 
 // ── Score count ──────────────────────────────────────────────────────────────
@@ -2907,6 +2994,25 @@ pub fn get_accumulated_fees(env: &Env) -> i128 {
     env.storage().instance().get(&GateDataKey::AccumulatedFees).unwrap_or(0)
 }
 
+pub fn set_arch_owner(env: &Env, owner: &Address) {
+    env.storage().instance().set(&DataKey::ArchOwner, owner);
+}
+
+pub fn get_arch_owner(env: &Env) -> Option<Address> {
+    env.storage().instance().get(&DataKey::ArchOwner)
+}
+
+pub fn set_mandatory_reviewers(env: &Env, reviewers: &Vec<Address>) {
+    env.storage().instance().set(&DataKey::MandatoryReviewers, reviewers);
+}
+
+pub fn get_mandatory_reviewers(env: &Env) -> Vec<Address> {
+    env.storage()
+        .instance()
+        .get(&DataKey::MandatoryReviewers)
+        .unwrap_or_else(|| Vec::new(env))
+}
+
 #[cfg(test)]
 mod test_instrumentation {
     use soroban_sdk::contracttype;
@@ -2916,4 +3022,37 @@ mod test_instrumentation {
     pub enum TestKey {
         ExtendCount,
     }
+}
+
+pub fn get_escalation_threshold(env: &Env) -> u32 {
+    let result: Option<u32> = env.storage().instance().get(&DataKey::EscalationThreshold);
+    result.unwrap_or(crate::constants::DEFAULT_ESCALATION_THRESHOLD)
+}
+
+pub fn set_escalation_threshold(env: &Env, threshold: u32) {
+    env.storage().instance().set(&DataKey::EscalationThreshold, &threshold);
+}
+
+pub fn get_breach_count(env: &Env, wallet: &Address, asset_pair: &Symbol) -> u32 {
+    let key = DataKey::BreachCount(wallet.clone(), asset_pair.clone());
+    let result: Option<u32> = env.storage().persistent().get(&key);
+    if result.is_some() {
+        env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    }
+    result.unwrap_or(0)
+}
+
+pub fn set_breach_count(env: &Env, wallet: &Address, asset_pair: &Symbol, count: u32) {
+    let key = DataKey::BreachCount(wallet.clone(), asset_pair.clone());
+    if count == 0 {
+        env.storage().persistent().remove(&key);
+    } else {
+        env.storage().persistent().set(&key, &count);
+        env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    }
+}
+
+pub fn clear_breach_count(env: &Env, wallet: &Address, asset_pair: &Symbol) {
+    let key = DataKey::BreachCount(wallet.clone(), asset_pair.clone());
+    env.storage().persistent().remove(&key);
 }

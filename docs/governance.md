@@ -82,6 +82,30 @@ If a proposal is neither executed nor vetoed within `time_lock_secs * 2`, it
 expires and can no longer be executed. Attempting execution marks it `Expired`
 and returns `ParameterProposalExpired`.
 
+## Proposal-spam bounds and cleanup behavior
+
+Current contract behavior as of July 25, 2026:
+
+- Pending parameter proposals are capped at `MAX_PENDING_PARAMETER_PROPOSALS = 10`.
+- A proposal leaves the pending index immediately when it is executed or vetoed.
+- Expired proposals are pruned before new proposals are accepted, and also when
+  `get_parameter_proposal` is queried.
+- Proposal IDs remain monotonic after cleanup; pruning frees pending capacity,
+  not IDs.
+
+This means a compromised admin can create at most 10 concurrent pending
+parameter proposals before the contract fails closed with
+`TooManyPendingParameterProposals`. The operational load is therefore bounded
+by the pending index plus the cost of reviewing at most 10 live proposals.
+
+Recommended operator limits:
+
+- Alert when pending proposals reach 8 of 10.
+- Treat any proposal still pending near `time_lock_secs * 2` as cleanup debt
+  and either execute, veto, or let the next governance read/propose prune it.
+- Keep monitoring keyed to `prm_prop`, `prm_exec`, and `prm_veto` so off-chain
+  responders can measure backlog without scanning full storage.
+
 ## Supported Parameters
 
 | `param_key` symbol | Direct setter | `new_value` encoding |
@@ -148,3 +172,5 @@ still pending.
 - WASM upgrade governance: `propose_upgrade` / `execute_upgrade` / `veto_upgrade`
 - Upgrade delay configuration: `set_upgrade_delay` / `get_upgrade_delay`
 - Threat model: [`SECURITY.md`](../SECURITY.md#upgrade-governance--threat-model)
+- Canonical export: [`configuration-export.md`](./configuration-export.md)
+- Safe defaults: [`configuration-safe-defaults.md`](./configuration-safe-defaults.md)
