@@ -1,5 +1,5 @@
 .PHONY: install lint format test run scale-workers mutation-test
-.PHONY: install lint format test run typecheck mutation-test check-boundaries check-deps
+.PHONY: install lint format test run typecheck mutation-test check-boundaries check-deps check-api-compat
 
 VENV_BIN := $(abspath .venv/bin)
 ifeq ($(wildcard $(VENV_BIN)/python),)
@@ -38,6 +38,10 @@ check-boundaries:
 check-deps:
 	@echo "==> Checking module dependency/layering rules (config/module_boundaries.yml)..."
 	$(PYTHON) scripts/check_module_dependencies.py
+
+check-api-compat:
+	@echo "==> Checking public API compatibility against tests/fixtures/api_baseline.json..."
+	$(PYTHON) scripts/check_api_compatibility.py
 
 fuzz:
 	@echo "Running fuzz tests for 60 seconds each..."

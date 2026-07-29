@@ -103,6 +103,9 @@ jobs:
       - name: Check module dependency rules (config/module_boundaries.yml)
         run: python scripts/check_module_dependencies.py
 
+      - name: Check public API compatibility (tests/fixtures/api_baseline.json)
+        run: python scripts/check_api_compatibility.py
+
       - name: Test
         run: pytest -q
 
