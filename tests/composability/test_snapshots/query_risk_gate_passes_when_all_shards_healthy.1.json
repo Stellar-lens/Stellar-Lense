@@ -1,10 +1,9 @@
 {
   "generators": {
-    "address": 12,
+    "address": 9,
     "nonce": 0
   },
   "auth": [
-    [],
     [],
     [],
     [],
@@ -48,25 +47,6 @@
     ],
     [
       [
-        "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
-        {
-          "function": {
-            "contract_fn": {
-              "contract_address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-              "function_name": "add_shard",
-              "args": [
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
-                }
-              ]
-            }
-          },
-          "sub_invocations": []
-        }
-      ]
-    ],
-    [
-      [
         "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM",
         {
           "function": {
@@ -78,13 +58,13 @@
                   "vec": []
                 },
                 {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                 },
                 {
-                  "symbol": "BTC_USDC"
+                  "symbol": "XLM_USDC"
                 },
                 {
-                  "u32": 20
+                  "u32": 10
                 },
                 {
                   "bool": false
@@ -96,7 +76,7 @@
                   "u64": 100000
                 },
                 {
-                  "u32": 100
+                  "u32": 90
                 },
                 {
                   "u32": 1
@@ -122,13 +102,13 @@
                   "vec": []
                 },
                 {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                 },
                 {
-                  "symbol": "BTC_USDC"
+                  "symbol": "XLM_USDC"
                 },
                 {
-                  "u32": 55
+                  "u32": 10
                 },
                 {
                   "bool": false
@@ -138,53 +118,9 @@
                 },
                 {
                   "u64": 100000
-                },
-                {
-                  "u32": 100
-                },
-                {
-                  "u32": 1
-                },
-                "void"
-              ]
-            }
-          },
-          "sub_invocations": []
-        }
-      ]
-    ],
-    [
-      [
-        "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAXI7N",
-        {
-          "function": {
-            "contract_fn": {
-              "contract_address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON",
-              "function_name": "submit_score",
-              "args": [
-                {
-                  "vec": []
-                },
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
-                },
-                {
-                  "symbol": "BTC_USDC"
                 },
                 {
                   "u32": 90
-                },
-                {
-                  "bool": false
-                },
-                {
-                  "bool": false
-                },
-                {
-                  "u64": 100000
-                },
-                {
-                  "u32": 100
                 },
                 {
                   "u32": 1
@@ -202,7 +138,7 @@
   "ledger": {
     "protocol_version": 21,
     "sequence_number": 0,
-    "timestamp": 100100,
+    "timestamp": 100000,
     "network_id": "0000000000000000000000000000000000000000000000000000000000000000",
     "base_reserve": 0,
     "min_persistent_entry_ttl": 4096,
@@ -259,9 +195,6 @@
                             },
                             {
                               "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4"
-                            },
-                            {
-                              "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                             }
                           ]
                         }
@@ -298,39 +231,6 @@
                 "key": {
                   "ledger_key_nonce": {
                     "nonce": 801925984706572462
-                  }
-                },
-                "durability": "temporary",
-                "val": "void"
-              }
-            },
-            "ext": "v0"
-          },
-          6311999
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
-            "key": {
-              "ledger_key_nonce": {
-                "nonce": 1033654523790656264
-              }
-            },
-            "durability": "temporary"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
-                "key": {
-                  "ledger_key_nonce": {
-                    "nonce": 1033654523790656264
                   }
                 },
                 "durability": "temporary",
@@ -385,7 +285,7 @@
                   "symbol": "AggregateScore"
                 },
                 {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                 }
               ]
             },
@@ -405,7 +305,7 @@
                       "symbol": "AggregateScore"
                     },
                     {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                     }
                   ]
                 },
@@ -417,7 +317,7 @@
                         "symbol": "aggregate_score"
                       },
                       "val": {
-                        "u32": 20
+                        "u32": 10
                       }
                     },
                     {
@@ -449,7 +349,7 @@
                         "symbol": "max_pair"
                       },
                       "val": {
-                        "symbol": "BTC_USDC"
+                        "symbol": "XLM_USDC"
                       }
                     },
                     {
@@ -457,7 +357,7 @@
                         "symbol": "max_pair_score"
                       },
                       "val": {
-                        "u32": 20
+                        "u32": 10
                       }
                     },
                     {
@@ -495,7 +395,7 @@
                   "symbol": "AssetPairs"
                 },
                 {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                 }
               ]
             },
@@ -515,7 +415,7 @@
                       "symbol": "AssetPairs"
                     },
                     {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                     }
                   ]
                 },
@@ -523,7 +423,7 @@
                 "val": {
                   "vec": [
                     {
-                      "symbol": "BTC_USDC"
+                      "symbol": "XLM_USDC"
                     }
                   ]
                 }
@@ -544,10 +444,10 @@
                   "symbol": "BreachCount"
                 },
                 {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                 },
                 {
-                  "symbol": "BTC_USDC"
+                  "symbol": "XLM_USDC"
                 }
               ]
             },
@@ -567,10 +467,10 @@
                       "symbol": "BreachCount"
                     },
                     {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                     },
                     {
-                      "symbol": "BTC_USDC"
+                      "symbol": "XLM_USDC"
                     }
                   ]
                 },
@@ -592,13 +492,64 @@
             "key": {
               "vec": [
                 {
+                  "symbol": "GateReadLedger"
+                },
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
+                },
+                {
+                  "symbol": "XLM_USDC"
+                }
+              ]
+            },
+            "durability": "temporary"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
+                "key": {
+                  "vec": [
+                    {
+                      "symbol": "GateReadLedger"
+                    },
+                    {
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
+                    },
+                    {
+                      "symbol": "XLM_USDC"
+                    }
+                  ]
+                },
+                "durability": "temporary",
+                "val": {
+                  "u32": 0
+                }
+              }
+            },
+            "ext": "v0"
+          },
+          777600
+        ]
+      ],
+      [
+        {
+          "contract_data": {
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
+            "key": {
+              "vec": [
+                {
                   "symbol": "HistoricalMaxScore"
                 },
                 {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                 },
                 {
-                  "symbol": "BTC_USDC"
+                  "symbol": "XLM_USDC"
                 }
               ]
             },
@@ -618,16 +569,16 @@
                       "symbol": "HistoricalMaxScore"
                     },
                     {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                     },
                     {
-                      "symbol": "BTC_USDC"
+                      "symbol": "XLM_USDC"
                     }
                   ]
                 },
                 "durability": "persistent",
                 "val": {
-                  "u32": 20
+                  "u32": 10
                 }
               }
             },
@@ -646,10 +597,10 @@
                   "symbol": "LastSubmitTime"
                 },
                 {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                 },
                 {
-                  "symbol": "BTC_USDC"
+                  "symbol": "XLM_USDC"
                 }
               ]
             },
@@ -669,10 +620,10 @@
                       "symbol": "LastSubmitTime"
                     },
                     {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                     },
                     {
-                      "symbol": "BTC_USDC"
+                      "symbol": "XLM_USDC"
                     }
                   ]
                 },
@@ -697,7 +648,7 @@
                   "symbol": "PairScoreCount"
                 },
                 {
-                  "symbol": "BTC_USDC"
+                  "symbol": "XLM_USDC"
                 }
               ]
             },
@@ -717,7 +668,7 @@
                       "symbol": "PairScoreCount"
                     },
                     {
-                      "symbol": "BTC_USDC"
+                      "symbol": "XLM_USDC"
                     }
                   ]
                 },
@@ -742,10 +693,10 @@
                   "symbol": "Score"
                 },
                 {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                 },
                 {
-                  "symbol": "BTC_USDC"
+                  "symbol": "XLM_USDC"
                 }
               ]
             },
@@ -765,10 +716,10 @@
                       "symbol": "Score"
                     },
                     {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                     },
                     {
-                      "symbol": "BTC_USDC"
+                      "symbol": "XLM_USDC"
                     }
                   ]
                 },
@@ -802,7 +753,7 @@
                         "symbol": "confidence"
                       },
                       "val": {
-                        "u32": 100
+                        "u32": 90
                       }
                     },
                     {
@@ -842,7 +793,7 @@
                         "symbol": "score"
                       },
                       "val": {
-                        "u32": 20
+                        "u32": 10
                       }
                     },
                     {
@@ -872,10 +823,10 @@
                   "symbol": "ScoreCount"
                 },
                 {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                 },
                 {
-                  "symbol": "BTC_USDC"
+                  "symbol": "XLM_USDC"
                 }
               ]
             },
@@ -895,10 +846,10 @@
                       "symbol": "ScoreCount"
                     },
                     {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                     },
                     {
-                      "symbol": "BTC_USDC"
+                      "symbol": "XLM_USDC"
                     }
                   ]
                 },
@@ -947,10 +898,10 @@
                     {
                       "vec": [
                         {
-                          "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                          "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                         },
                         {
-                          "symbol": "BTC_USDC"
+                          "symbol": "XLM_USDC"
                         }
                       ]
                     }
@@ -973,10 +924,10 @@
                   "symbol": "ScoreEntryLastTouchedLedger"
                 },
                 {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                 },
                 {
-                  "symbol": "BTC_USDC"
+                  "symbol": "XLM_USDC"
                 }
               ]
             },
@@ -996,10 +947,10 @@
                       "symbol": "ScoreEntryLastTouchedLedger"
                     },
                     {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                     },
                     {
-                      "symbol": "BTC_USDC"
+                      "symbol": "XLM_USDC"
                     }
                   ]
                 },
@@ -1024,10 +975,10 @@
                   "symbol": "ScoreHistory"
                 },
                 {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                 },
                 {
-                  "symbol": "BTC_USDC"
+                  "symbol": "XLM_USDC"
                 }
               ]
             },
@@ -1047,10 +998,10 @@
                       "symbol": "ScoreHistory"
                     },
                     {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                     },
                     {
-                      "symbol": "BTC_USDC"
+                      "symbol": "XLM_USDC"
                     }
                   ]
                 },
@@ -1086,7 +1037,7 @@
                             "symbol": "confidence"
                           },
                           "val": {
-                            "u32": 100
+                            "u32": 90
                           }
                         },
                         {
@@ -1126,7 +1077,7 @@
                             "symbol": "score"
                           },
                           "val": {
-                            "u32": 20
+                            "u32": 10
                           }
                         },
                         {
@@ -1158,10 +1109,10 @@
                   "symbol": "ScoreSubmissionLedger"
                 },
                 {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                 },
                 {
-                  "symbol": "BTC_USDC"
+                  "symbol": "XLM_USDC"
                 }
               ]
             },
@@ -1181,10 +1132,10 @@
                       "symbol": "ScoreSubmissionLedger"
                     },
                     {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                     },
                     {
-                      "symbol": "BTC_USDC"
+                      "symbol": "XLM_USDC"
                     }
                   ]
                 },
@@ -1209,10 +1160,10 @@
                   "symbol": "TrendState"
                 },
                 {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                 },
                 {
-                  "symbol": "BTC_USDC"
+                  "symbol": "XLM_USDC"
                 }
               ]
             },
@@ -1232,10 +1183,10 @@
                       "symbol": "TrendState"
                     },
                     {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                     },
                     {
-                      "symbol": "BTC_USDC"
+                      "symbol": "XLM_USDC"
                     }
                   ]
                 },
@@ -1277,7 +1228,7 @@
                   "symbol": "UniqueWalletsHll"
                 },
                 {
-                  "symbol": "BTC_USDC"
+                  "symbol": "XLM_USDC"
                 }
               ]
             },
@@ -1297,7 +1248,7 @@
                       "symbol": "UniqueWalletsHll"
                     },
                     {
-                      "symbol": "BTC_USDC"
+                      "symbol": "XLM_USDC"
                     }
                   ]
                 },
@@ -1318,6 +1269,168 @@
                       },
                       "val": {
                         "vec": [
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
                           {
                             "u32": 0
                           },
@@ -1923,168 +2036,6 @@
                           },
                           {
                             "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
                           }
                         ]
                       }
@@ -2108,10 +2059,10 @@
                   "symbol": "VerkleLeaf"
                 },
                 {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                 },
                 {
-                  "symbol": "BTC_USDC"
+                  "symbol": "XLM_USDC"
                 }
               ]
             },
@@ -2131,16 +2082,16 @@
                       "symbol": "VerkleLeaf"
                     },
                     {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                     },
                     {
-                      "symbol": "BTC_USDC"
+                      "symbol": "XLM_USDC"
                     }
                   ]
                 },
                 "durability": "persistent",
                 "val": {
-                  "bytes": "7ce6a68bdc202f7ec7687b4cdae5750a39b21788187d2aaa887aed70800093c4"
+                  "bytes": "82aa16909abdf65cba579f4a3108a5439f067a32aa3fdece27e61c0b5c1768a1"
                 }
               }
             },
@@ -2254,7 +2205,7 @@
                                 "symbol": "score_sum"
                               },
                               "val": {
-                                "u64": 20
+                                "u64": 10
                               }
                             },
                             {
@@ -2306,10 +2257,10 @@
                               "u64": 0
                             },
                             {
-                              "u64": 0
+                              "u64": 1
                             },
                             {
-                              "u64": 1
+                              "u64": 0
                             },
                             {
                               "u64": 0
@@ -2368,7 +2319,7 @@
                           ]
                         },
                         "val": {
-                          "bytes": "7ce6a68bdc202f7ec7687b4cdae5750a39b21788187d2aaa887aed70800093c4"
+                          "bytes": "82aa16909abdf65cba579f4a3108a5439f067a32aa3fdece27e61c0b5c1768a1"
                         }
                       }
                     ]
@@ -2387,7 +2338,7 @@
             "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM",
             "key": {
               "ledger_key_nonce": {
-                "nonce": 4837995959683129791
+                "nonce": 1033654523790656264
               }
             },
             "durability": "temporary"
@@ -2402,7 +2353,7 @@
                 "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM",
                 "key": {
                   "ledger_key_nonce": {
-                    "nonce": 4837995959683129791
+                    "nonce": 1033654523790656264
                   }
                 },
                 "durability": "temporary",
@@ -2424,7 +2375,7 @@
                   "symbol": "AggregateScore"
                 },
                 {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                 }
               ]
             },
@@ -2444,7 +2395,7 @@
                       "symbol": "AggregateScore"
                     },
                     {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                     }
                   ]
                 },
@@ -2456,7 +2407,7 @@
                         "symbol": "aggregate_score"
                       },
                       "val": {
-                        "u32": 55
+                        "u32": 10
                       }
                     },
                     {
@@ -2488,7 +2439,7 @@
                         "symbol": "max_pair"
                       },
                       "val": {
-                        "symbol": "BTC_USDC"
+                        "symbol": "XLM_USDC"
                       }
                     },
                     {
@@ -2496,7 +2447,7 @@
                         "symbol": "max_pair_score"
                       },
                       "val": {
-                        "u32": 55
+                        "u32": 10
                       }
                     },
                     {
@@ -2534,7 +2485,7 @@
                   "symbol": "AssetPairs"
                 },
                 {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                 }
               ]
             },
@@ -2554,7 +2505,7 @@
                       "symbol": "AssetPairs"
                     },
                     {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                     }
                   ]
                 },
@@ -2562,7 +2513,7 @@
                 "val": {
                   "vec": [
                     {
-                      "symbol": "BTC_USDC"
+                      "symbol": "XLM_USDC"
                     }
                   ]
                 }
@@ -2583,10 +2534,10 @@
                   "symbol": "BreachCount"
                 },
                 {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                 },
                 {
-                  "symbol": "BTC_USDC"
+                  "symbol": "XLM_USDC"
                 }
               ]
             },
@@ -2606,10 +2557,10 @@
                       "symbol": "BreachCount"
                     },
                     {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                     },
                     {
-                      "symbol": "BTC_USDC"
+                      "symbol": "XLM_USDC"
                     }
                   ]
                 },
@@ -2631,13 +2582,64 @@
             "key": {
               "vec": [
                 {
+                  "symbol": "GateReadLedger"
+                },
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
+                },
+                {
+                  "symbol": "XLM_USDC"
+                }
+              ]
+            },
+            "durability": "temporary"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4",
+                "key": {
+                  "vec": [
+                    {
+                      "symbol": "GateReadLedger"
+                    },
+                    {
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
+                    },
+                    {
+                      "symbol": "XLM_USDC"
+                    }
+                  ]
+                },
+                "durability": "temporary",
+                "val": {
+                  "u32": 0
+                }
+              }
+            },
+            "ext": "v0"
+          },
+          777600
+        ]
+      ],
+      [
+        {
+          "contract_data": {
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4",
+            "key": {
+              "vec": [
+                {
                   "symbol": "HistoricalMaxScore"
                 },
                 {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                 },
                 {
-                  "symbol": "BTC_USDC"
+                  "symbol": "XLM_USDC"
                 }
               ]
             },
@@ -2657,16 +2659,16 @@
                       "symbol": "HistoricalMaxScore"
                     },
                     {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                     },
                     {
-                      "symbol": "BTC_USDC"
+                      "symbol": "XLM_USDC"
                     }
                   ]
                 },
                 "durability": "persistent",
                 "val": {
-                  "u32": 55
+                  "u32": 10
                 }
               }
             },
@@ -2685,10 +2687,10 @@
                   "symbol": "LastSubmitTime"
                 },
                 {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                 },
                 {
-                  "symbol": "BTC_USDC"
+                  "symbol": "XLM_USDC"
                 }
               ]
             },
@@ -2708,10 +2710,10 @@
                       "symbol": "LastSubmitTime"
                     },
                     {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                     },
                     {
-                      "symbol": "BTC_USDC"
+                      "symbol": "XLM_USDC"
                     }
                   ]
                 },
@@ -2736,7 +2738,7 @@
                   "symbol": "PairScoreCount"
                 },
                 {
-                  "symbol": "BTC_USDC"
+                  "symbol": "XLM_USDC"
                 }
               ]
             },
@@ -2756,7 +2758,7 @@
                       "symbol": "PairScoreCount"
                     },
                     {
-                      "symbol": "BTC_USDC"
+                      "symbol": "XLM_USDC"
                     }
                   ]
                 },
@@ -2781,10 +2783,10 @@
                   "symbol": "Score"
                 },
                 {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                 },
                 {
-                  "symbol": "BTC_USDC"
+                  "symbol": "XLM_USDC"
                 }
               ]
             },
@@ -2804,10 +2806,10 @@
                       "symbol": "Score"
                     },
                     {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                     },
                     {
-                      "symbol": "BTC_USDC"
+                      "symbol": "XLM_USDC"
                     }
                   ]
                 },
@@ -2841,7 +2843,7 @@
                         "symbol": "confidence"
                       },
                       "val": {
-                        "u32": 100
+                        "u32": 90
                       }
                     },
                     {
@@ -2881,7 +2883,7 @@
                         "symbol": "score"
                       },
                       "val": {
-                        "u32": 55
+                        "u32": 10
                       }
                     },
                     {
@@ -2911,10 +2913,10 @@
                   "symbol": "ScoreCount"
                 },
                 {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                 },
                 {
-                  "symbol": "BTC_USDC"
+                  "symbol": "XLM_USDC"
                 }
               ]
             },
@@ -2934,10 +2936,10 @@
                       "symbol": "ScoreCount"
                     },
                     {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                     },
                     {
-                      "symbol": "BTC_USDC"
+                      "symbol": "XLM_USDC"
                     }
                   ]
                 },
@@ -2986,10 +2988,10 @@
                     {
                       "vec": [
                         {
-                          "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                          "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                         },
                         {
-                          "symbol": "BTC_USDC"
+                          "symbol": "XLM_USDC"
                         }
                       ]
                     }
@@ -3012,10 +3014,10 @@
                   "symbol": "ScoreEntryLastTouchedLedger"
                 },
                 {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                 },
                 {
-                  "symbol": "BTC_USDC"
+                  "symbol": "XLM_USDC"
                 }
               ]
             },
@@ -3035,10 +3037,10 @@
                       "symbol": "ScoreEntryLastTouchedLedger"
                     },
                     {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                     },
                     {
-                      "symbol": "BTC_USDC"
+                      "symbol": "XLM_USDC"
                     }
                   ]
                 },
@@ -3063,10 +3065,10 @@
                   "symbol": "ScoreHistory"
                 },
                 {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                 },
                 {
-                  "symbol": "BTC_USDC"
+                  "symbol": "XLM_USDC"
                 }
               ]
             },
@@ -3086,10 +3088,10 @@
                       "symbol": "ScoreHistory"
                     },
                     {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                     },
                     {
-                      "symbol": "BTC_USDC"
+                      "symbol": "XLM_USDC"
                     }
                   ]
                 },
@@ -3125,7 +3127,7 @@
                             "symbol": "confidence"
                           },
                           "val": {
-                            "u32": 100
+                            "u32": 90
                           }
                         },
                         {
@@ -3165,7 +3167,7 @@
                             "symbol": "score"
                           },
                           "val": {
-                            "u32": 55
+                            "u32": 10
                           }
                         },
                         {
@@ -3197,10 +3199,10 @@
                   "symbol": "ScoreSubmissionLedger"
                 },
                 {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                 },
                 {
-                  "symbol": "BTC_USDC"
+                  "symbol": "XLM_USDC"
                 }
               ]
             },
@@ -3220,10 +3222,10 @@
                       "symbol": "ScoreSubmissionLedger"
                     },
                     {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                     },
                     {
-                      "symbol": "BTC_USDC"
+                      "symbol": "XLM_USDC"
                     }
                   ]
                 },
@@ -3248,10 +3250,10 @@
                   "symbol": "TrendState"
                 },
                 {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                 },
                 {
-                  "symbol": "BTC_USDC"
+                  "symbol": "XLM_USDC"
                 }
               ]
             },
@@ -3271,10 +3273,10 @@
                       "symbol": "TrendState"
                     },
                     {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                     },
                     {
-                      "symbol": "BTC_USDC"
+                      "symbol": "XLM_USDC"
                     }
                   ]
                 },
@@ -3316,7 +3318,7 @@
                   "symbol": "UniqueWalletsHll"
                 },
                 {
-                  "symbol": "BTC_USDC"
+                  "symbol": "XLM_USDC"
                 }
               ]
             },
@@ -3336,7 +3338,7 @@
                       "symbol": "UniqueWalletsHll"
                     },
                     {
-                      "symbol": "BTC_USDC"
+                      "symbol": "XLM_USDC"
                     }
                   ]
                 },
@@ -3357,6 +3359,168 @@
                       },
                       "val": {
                         "vec": [
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
+                          {
+                            "u32": 0
+                          },
                           {
                             "u32": 0
                           },
@@ -3962,168 +4126,6 @@
                           },
                           {
                             "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
                           }
                         ]
                       }
@@ -4147,10 +4149,10 @@
                   "symbol": "VerkleLeaf"
                 },
                 {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                 },
                 {
-                  "symbol": "BTC_USDC"
+                  "symbol": "XLM_USDC"
                 }
               ]
             },
@@ -4170,16 +4172,16 @@
                       "symbol": "VerkleLeaf"
                     },
                     {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                     },
                     {
-                      "symbol": "BTC_USDC"
+                      "symbol": "XLM_USDC"
                     }
                   ]
                 },
                 "durability": "persistent",
                 "val": {
-                  "bytes": "001e39bcbe3a1645676f721f3e83db91980bf4c18ae634be0b5aa85a8a475426"
+                  "bytes": "82aa16909abdf65cba579f4a3108a5439f067a32aa3fdece27e61c0b5c1768a1"
                 }
               }
             },
@@ -4293,7 +4295,7 @@
                                 "symbol": "score_sum"
                               },
                               "val": {
-                                "u64": 55
+                                "u64": 10
                               }
                             },
                             {
@@ -4345,19 +4347,19 @@
                               "u64": 0
                             },
                             {
-                              "u64": 0
-                            },
-                            {
-                              "u64": 0
-                            },
-                            {
-                              "u64": 0
-                            },
-                            {
-                              "u64": 0
-                            },
-                            {
                               "u64": 1
+                            },
+                            {
+                              "u64": 0
+                            },
+                            {
+                              "u64": 0
+                            },
+                            {
+                              "u64": 0
+                            },
+                            {
+                              "u64": 0
                             },
                             {
                               "u64": 0
@@ -4407,7 +4409,7 @@
                           ]
                         },
                         "val": {
-                          "bytes": "001e39bcbe3a1645676f721f3e83db91980bf4c18ae634be0b5aa85a8a475426"
+                          "bytes": "82aa16909abdf65cba579f4a3108a5439f067a32aa3fdece27e61c0b5c1768a1"
                         }
                       }
                     ]
@@ -4426,7 +4428,7 @@
             "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAARQG5",
             "key": {
               "ledger_key_nonce": {
-                "nonce": 2032731177588607455
+                "nonce": 4837995959683129791
               }
             },
             "durability": "temporary"
@@ -4441,2148 +4443,7 @@
                 "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAARQG5",
                 "key": {
                   "ledger_key_nonce": {
-                    "nonce": 2032731177588607455
-                  }
-                },
-                "durability": "temporary",
-                "val": "void"
-              }
-            },
-            "ext": "v0"
-          },
-          6311999
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON",
-            "key": {
-              "vec": [
-                {
-                  "symbol": "AggregateScore"
-                },
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
-                }
-              ]
-            },
-            "durability": "persistent"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON",
-                "key": {
-                  "vec": [
-                    {
-                      "symbol": "AggregateScore"
-                    },
-                    {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
-                    }
-                  ]
-                },
-                "durability": "persistent",
-                "val": {
-                  "map": [
-                    {
-                      "key": {
-                        "symbol": "aggregate_score"
-                      },
-                      "val": {
-                        "u32": 90
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "benford_flag_count"
-                      },
-                      "val": {
-                        "u32": 0
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "decay_lambda_applied"
-                      },
-                      "val": {
-                        "bool": false
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "last_updated"
-                      },
-                      "val": {
-                        "u64": 100000
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "max_pair"
-                      },
-                      "val": {
-                        "symbol": "BTC_USDC"
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "max_pair_score"
-                      },
-                      "val": {
-                        "u32": 90
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "ml_flag_count"
-                      },
-                      "val": {
-                        "u32": 0
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "pair_count"
-                      },
-                      "val": {
-                        "u32": 1
-                      }
-                    }
-                  ]
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          777600
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON",
-            "key": {
-              "vec": [
-                {
-                  "symbol": "AssetPairs"
-                },
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
-                }
-              ]
-            },
-            "durability": "persistent"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON",
-                "key": {
-                  "vec": [
-                    {
-                      "symbol": "AssetPairs"
-                    },
-                    {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
-                    }
-                  ]
-                },
-                "durability": "persistent",
-                "val": {
-                  "vec": [
-                    {
-                      "symbol": "BTC_USDC"
-                    }
-                  ]
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          777600
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON",
-            "key": {
-              "vec": [
-                {
-                  "symbol": "BandEntryTime"
-                },
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
-                },
-                {
-                  "symbol": "BTC_USDC"
-                }
-              ]
-            },
-            "durability": "temporary"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON",
-                "key": {
-                  "vec": [
-                    {
-                      "symbol": "BandEntryTime"
-                    },
-                    {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
-                    },
-                    {
-                      "symbol": "BTC_USDC"
-                    }
-                  ]
-                },
-                "durability": "temporary",
-                "val": {
-                  "u64": 100000
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          777600
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON",
-            "key": {
-              "vec": [
-                {
-                  "symbol": "BreachCount"
-                },
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
-                },
-                {
-                  "symbol": "BTC_USDC"
-                }
-              ]
-            },
-            "durability": "temporary"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON",
-                "key": {
-                  "vec": [
-                    {
-                      "symbol": "BreachCount"
-                    },
-                    {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
-                    },
-                    {
-                      "symbol": "BTC_USDC"
-                    }
-                  ]
-                },
-                "durability": "temporary",
-                "val": {
-                  "u32": 1
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          15
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON",
-            "key": {
-              "vec": [
-                {
-                  "symbol": "HistoricalMaxScore"
-                },
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
-                },
-                {
-                  "symbol": "BTC_USDC"
-                }
-              ]
-            },
-            "durability": "persistent"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON",
-                "key": {
-                  "vec": [
-                    {
-                      "symbol": "HistoricalMaxScore"
-                    },
-                    {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
-                    },
-                    {
-                      "symbol": "BTC_USDC"
-                    }
-                  ]
-                },
-                "durability": "persistent",
-                "val": {
-                  "u32": 90
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          777600
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON",
-            "key": {
-              "vec": [
-                {
-                  "symbol": "LastSubmitTime"
-                },
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
-                },
-                {
-                  "symbol": "BTC_USDC"
-                }
-              ]
-            },
-            "durability": "persistent"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON",
-                "key": {
-                  "vec": [
-                    {
-                      "symbol": "LastSubmitTime"
-                    },
-                    {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
-                    },
-                    {
-                      "symbol": "BTC_USDC"
-                    }
-                  ]
-                },
-                "durability": "persistent",
-                "val": {
-                  "u64": 100000
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          777600
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON",
-            "key": {
-              "vec": [
-                {
-                  "symbol": "PairScoreCount"
-                },
-                {
-                  "symbol": "BTC_USDC"
-                }
-              ]
-            },
-            "durability": "persistent"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON",
-                "key": {
-                  "vec": [
-                    {
-                      "symbol": "PairScoreCount"
-                    },
-                    {
-                      "symbol": "BTC_USDC"
-                    }
-                  ]
-                },
-                "durability": "persistent",
-                "val": {
-                  "u64": 1
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          777600
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON",
-            "key": {
-              "vec": [
-                {
-                  "symbol": "RiskBandState"
-                },
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
-                },
-                {
-                  "symbol": "BTC_USDC"
-                }
-              ]
-            },
-            "durability": "temporary"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON",
-                "key": {
-                  "vec": [
-                    {
-                      "symbol": "RiskBandState"
-                    },
-                    {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
-                    },
-                    {
-                      "symbol": "BTC_USDC"
-                    }
-                  ]
-                },
-                "durability": "temporary",
-                "val": {
-                  "bool": true
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          777600
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON",
-            "key": {
-              "vec": [
-                {
-                  "symbol": "Score"
-                },
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
-                },
-                {
-                  "symbol": "BTC_USDC"
-                }
-              ]
-            },
-            "durability": "persistent"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON",
-                "key": {
-                  "vec": [
-                    {
-                      "symbol": "Score"
-                    },
-                    {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
-                    },
-                    {
-                      "symbol": "BTC_USDC"
-                    }
-                  ]
-                },
-                "durability": "persistent",
-                "val": {
-                  "map": [
-                    {
-                      "key": {
-                        "symbol": "benford_flag"
-                      },
-                      "val": {
-                        "bool": false
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "benford_score"
-                      },
-                      "val": {
-                        "u32": 0
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "commitment"
-                      },
-                      "val": "void"
-                    },
-                    {
-                      "key": {
-                        "symbol": "confidence"
-                      },
-                      "val": {
-                        "u32": 100
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "ml_flag"
-                      },
-                      "val": {
-                        "bool": false
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "ml_score"
-                      },
-                      "val": {
-                        "u32": 0
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "model_version"
-                      },
-                      "val": {
-                        "u32": 1
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "network_score"
-                      },
-                      "val": {
-                        "u32": 0
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "score"
-                      },
-                      "val": {
-                        "u32": 90
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "timestamp"
-                      },
-                      "val": {
-                        "u64": 100000
-                      }
-                    }
-                  ]
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          777600
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON",
-            "key": {
-              "vec": [
-                {
-                  "symbol": "ScoreCount"
-                },
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
-                },
-                {
-                  "symbol": "BTC_USDC"
-                }
-              ]
-            },
-            "durability": "persistent"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON",
-                "key": {
-                  "vec": [
-                    {
-                      "symbol": "ScoreCount"
-                    },
-                    {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
-                    },
-                    {
-                      "symbol": "BTC_USDC"
-                    }
-                  ]
-                },
-                "durability": "persistent",
-                "val": {
-                  "u32": 1
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          777600
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON",
-            "key": {
-              "vec": [
-                {
-                  "symbol": "ScoreEntryIndex"
-                }
-              ]
-            },
-            "durability": "persistent"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON",
-                "key": {
-                  "vec": [
-                    {
-                      "symbol": "ScoreEntryIndex"
-                    }
-                  ]
-                },
-                "durability": "persistent",
-                "val": {
-                  "vec": [
-                    {
-                      "vec": [
-                        {
-                          "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
-                        },
-                        {
-                          "symbol": "BTC_USDC"
-                        }
-                      ]
-                    }
-                  ]
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          777600
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON",
-            "key": {
-              "vec": [
-                {
-                  "symbol": "ScoreEntryLastTouchedLedger"
-                },
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
-                },
-                {
-                  "symbol": "BTC_USDC"
-                }
-              ]
-            },
-            "durability": "persistent"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON",
-                "key": {
-                  "vec": [
-                    {
-                      "symbol": "ScoreEntryLastTouchedLedger"
-                    },
-                    {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
-                    },
-                    {
-                      "symbol": "BTC_USDC"
-                    }
-                  ]
-                },
-                "durability": "persistent",
-                "val": {
-                  "u32": 0
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          777600
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON",
-            "key": {
-              "vec": [
-                {
-                  "symbol": "ScoreHistory"
-                },
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
-                },
-                {
-                  "symbol": "BTC_USDC"
-                }
-              ]
-            },
-            "durability": "persistent"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON",
-                "key": {
-                  "vec": [
-                    {
-                      "symbol": "ScoreHistory"
-                    },
-                    {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
-                    },
-                    {
-                      "symbol": "BTC_USDC"
-                    }
-                  ]
-                },
-                "durability": "persistent",
-                "val": {
-                  "vec": [
-                    {
-                      "map": [
-                        {
-                          "key": {
-                            "symbol": "benford_flag"
-                          },
-                          "val": {
-                            "bool": false
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "benford_score"
-                          },
-                          "val": {
-                            "u32": 0
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "commitment"
-                          },
-                          "val": "void"
-                        },
-                        {
-                          "key": {
-                            "symbol": "confidence"
-                          },
-                          "val": {
-                            "u32": 100
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "ml_flag"
-                          },
-                          "val": {
-                            "bool": false
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "ml_score"
-                          },
-                          "val": {
-                            "u32": 0
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "model_version"
-                          },
-                          "val": {
-                            "u32": 1
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "network_score"
-                          },
-                          "val": {
-                            "u32": 0
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "score"
-                          },
-                          "val": {
-                            "u32": 90
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "timestamp"
-                          },
-                          "val": {
-                            "u64": 100000
-                          }
-                        }
-                      ]
-                    }
-                  ]
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          777600
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON",
-            "key": {
-              "vec": [
-                {
-                  "symbol": "ScoreSubmissionLedger"
-                },
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
-                },
-                {
-                  "symbol": "BTC_USDC"
-                }
-              ]
-            },
-            "durability": "persistent"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON",
-                "key": {
-                  "vec": [
-                    {
-                      "symbol": "ScoreSubmissionLedger"
-                    },
-                    {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
-                    },
-                    {
-                      "symbol": "BTC_USDC"
-                    }
-                  ]
-                },
-                "durability": "persistent",
-                "val": {
-                  "u32": 0
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          777600
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON",
-            "key": {
-              "vec": [
-                {
-                  "symbol": "TrendState"
-                },
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
-                },
-                {
-                  "symbol": "BTC_USDC"
-                }
-              ]
-            },
-            "durability": "persistent"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON",
-                "key": {
-                  "vec": [
-                    {
-                      "symbol": "TrendState"
-                    },
-                    {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
-                    },
-                    {
-                      "symbol": "BTC_USDC"
-                    }
-                  ]
-                },
-                "durability": "persistent",
-                "val": {
-                  "map": [
-                    {
-                      "key": {
-                        "symbol": "consecutive"
-                      },
-                      "val": {
-                        "u32": 0
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "trend"
-                      },
-                      "val": {
-                        "i32": 0
-                      }
-                    }
-                  ]
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          777600
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON",
-            "key": {
-              "vec": [
-                {
-                  "symbol": "UniqueWalletsHll"
-                },
-                {
-                  "symbol": "BTC_USDC"
-                }
-              ]
-            },
-            "durability": "persistent"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON",
-                "key": {
-                  "vec": [
-                    {
-                      "symbol": "UniqueWalletsHll"
-                    },
-                    {
-                      "symbol": "BTC_USDC"
-                    }
-                  ]
-                },
-                "durability": "persistent",
-                "val": {
-                  "map": [
-                    {
-                      "key": {
-                        "symbol": "precision"
-                      },
-                      "val": {
-                        "u32": 8
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "registers"
-                      },
-                      "val": {
-                        "vec": [
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 3
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          },
-                          {
-                            "u32": 0
-                          }
-                        ]
-                      }
-                    }
-                  ]
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          777600
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON",
-            "key": {
-              "vec": [
-                {
-                  "symbol": "VerkleLeaf"
-                },
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
-                },
-                {
-                  "symbol": "BTC_USDC"
-                }
-              ]
-            },
-            "durability": "persistent"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON",
-                "key": {
-                  "vec": [
-                    {
-                      "symbol": "VerkleLeaf"
-                    },
-                    {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
-                    },
-                    {
-                      "symbol": "BTC_USDC"
-                    }
-                  ]
-                },
-                "durability": "persistent",
-                "val": {
-                  "bytes": "03e154be27287a8ecc5e755bce7ed0f4a4c434255fdf4636e7aa57ea81bcf98a"
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          4095
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON",
-            "key": "ledger_key_contract_instance",
-            "durability": "persistent"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON",
-                "key": "ledger_key_contract_instance",
-                "durability": "persistent",
-                "val": {
-                  "contract_instance": {
-                    "executable": {
-                      "wasm": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-                    },
-                    "storage": [
-                      {
-                        "key": {
-                          "vec": [
-                            {
-                              "symbol": "Admin"
-                            }
-                          ]
-                        },
-                        "val": {
-                          "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAVAX5"
-                        }
-                      },
-                      {
-                        "key": {
-                          "vec": [
-                            {
-                              "symbol": "AdminAuditRoot"
-                            }
-                          ]
-                        },
-                        "val": {
-                          "bytes": "0000000000000000000000000000000000000000000000000000000000000000"
-                        }
-                      },
-                      {
-                        "key": {
-                          "vec": [
-                            {
-                              "symbol": "LastGlobalSubmissionTime"
-                            }
-                          ]
-                        },
-                        "val": {
-                          "u64": 100000
-                        }
-                      },
-                      {
-                        "key": {
-                          "vec": [
-                            {
-                              "symbol": "LastServiceActivityAt"
-                            }
-                          ]
-                        },
-                        "val": {
-                          "u64": 100000
-                        }
-                      },
-                      {
-                        "key": {
-                          "vec": [
-                            {
-                              "symbol": "ModelStats"
-                            },
-                            {
-                              "u32": 1
-                            }
-                          ]
-                        },
-                        "val": {
-                          "map": [
-                            {
-                              "key": {
-                                "symbol": "average_score"
-                              },
-                              "val": {
-                                "u32": 0
-                              }
-                            },
-                            {
-                              "key": {
-                                "symbol": "model_version"
-                              },
-                              "val": {
-                                "u32": 1
-                              }
-                            },
-                            {
-                              "key": {
-                                "symbol": "score_sum"
-                              },
-                              "val": {
-                                "u64": 90
-                              }
-                            },
-                            {
-                              "key": {
-                                "symbol": "submission_count"
-                              },
-                              "val": {
-                                "u32": 1
-                              }
-                            },
-                            {
-                              "key": {
-                                "symbol": "total_submissions"
-                              },
-                              "val": {
-                                "u64": 0
-                              }
-                            }
-                          ]
-                        }
-                      },
-                      {
-                        "key": {
-                          "vec": [
-                            {
-                              "symbol": "ModelVersionIndex"
-                            }
-                          ]
-                        },
-                        "val": {
-                          "vec": [
-                            {
-                              "u32": 1
-                            }
-                          ]
-                        }
-                      },
-                      {
-                        "key": {
-                          "vec": [
-                            {
-                              "symbol": "ScoreHistogram"
-                            }
-                          ]
-                        },
-                        "val": {
-                          "vec": [
-                            {
-                              "u64": 0
-                            },
-                            {
-                              "u64": 0
-                            },
-                            {
-                              "u64": 0
-                            },
-                            {
-                              "u64": 0
-                            },
-                            {
-                              "u64": 0
-                            },
-                            {
-                              "u64": 0
-                            },
-                            {
-                              "u64": 0
-                            },
-                            {
-                              "u64": 0
-                            },
-                            {
-                              "u64": 0
-                            },
-                            {
-                              "u64": 1
-                            }
-                          ]
-                        }
-                      },
-                      {
-                        "key": {
-                          "vec": [
-                            {
-                              "symbol": "Service"
-                            }
-                          ]
-                        },
-                        "val": {
-                          "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAXI7N"
-                        }
-                      },
-                      {
-                        "key": {
-                          "vec": [
-                            {
-                              "symbol": "TotalWalletsScored"
-                            }
-                          ]
-                        },
-                        "val": {
-                          "u64": 1
-                        }
-                      },
-                      {
-                        "key": {
-                          "vec": [
-                            {
-                              "symbol": "VerkleCommitment"
-                            }
-                          ]
-                        },
-                        "val": {
-                          "bytes": "03e154be27287a8ecc5e755bce7ed0f4a4c434255fdf4636e7aa57ea81bcf98a"
-                        }
-                      }
-                    ]
-                  }
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          4095
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAXI7N",
-            "key": {
-              "ledger_key_nonce": {
-                "nonce": 4270020994084947596
-              }
-            },
-            "durability": "temporary"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAXI7N",
-                "key": {
-                  "ledger_key_nonce": {
-                    "nonce": 4270020994084947596
+                    "nonce": 4837995959683129791
                   }
                 },
                 "durability": "temporary",
@@ -6756,60 +4617,6 @@
       "event": {
         "ext": "v0",
         "contract_id": "0000000000000000000000000000000000000000000000000000000000000006",
-        "type_": "diagnostic",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "fn_return"
-              },
-              {
-                "symbol": "initialize"
-              }
-            ],
-            "data": "void"
-          }
-        }
-      },
-      "failed_call": false
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": null,
-        "type_": "diagnostic",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "fn_call"
-              },
-              {
-                "bytes": "0000000000000000000000000000000000000000000000000000000000000009"
-              },
-              {
-                "symbol": "initialize"
-              }
-            ],
-            "data": {
-              "vec": [
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAVAX5"
-                },
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAXI7N"
-                }
-              ]
-            }
-          }
-        }
-      },
-      "failed_call": false
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": "0000000000000000000000000000000000000000000000000000000000000009",
         "type_": "diagnostic",
         "body": {
           "v0": {
@@ -7227,200 +5034,6 @@
                 "symbol": "fn_call"
               },
               {
-                "bytes": "0000000000000000000000000000000000000000000000000000000000000001"
-              },
-              {
-                "symbol": "add_shard"
-              }
-            ],
-            "data": {
-              "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
-            }
-          }
-        }
-      },
-      "failed_call": false
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
-        "type_": "diagnostic",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "fn_call"
-              },
-              {
-                "bytes": "0000000000000000000000000000000000000000000000000000000000000009"
-              },
-              {
-                "symbol": "supports_interface"
-              }
-            ],
-            "data": {
-              "symbol": "score"
-            }
-          }
-        }
-      },
-      "failed_call": false
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": "0000000000000000000000000000000000000000000000000000000000000009",
-        "type_": "diagnostic",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "fn_return"
-              },
-              {
-                "symbol": "supports_interface"
-              }
-            ],
-            "data": {
-              "bool": true
-            }
-          }
-        }
-      },
-      "failed_call": false
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
-        "type_": "diagnostic",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "fn_call"
-              },
-              {
-                "bytes": "0000000000000000000000000000000000000000000000000000000000000009"
-              },
-              {
-                "symbol": "supports_interface"
-              }
-            ],
-            "data": {
-              "symbol": "gate"
-            }
-          }
-        }
-      },
-      "failed_call": false
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": "0000000000000000000000000000000000000000000000000000000000000009",
-        "type_": "diagnostic",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "fn_return"
-              },
-              {
-                "symbol": "supports_interface"
-              }
-            ],
-            "data": {
-              "bool": true
-            }
-          }
-        }
-      },
-      "failed_call": false
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
-        "type_": "diagnostic",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "fn_call"
-              },
-              {
-                "bytes": "0000000000000000000000000000000000000000000000000000000000000009"
-              },
-              {
-                "symbol": "supports_interface"
-              }
-            ],
-            "data": {
-              "symbol": "aggr"
-            }
-          }
-        }
-      },
-      "failed_call": false
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": "0000000000000000000000000000000000000000000000000000000000000009",
-        "type_": "diagnostic",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "fn_return"
-              },
-              {
-                "symbol": "supports_interface"
-              }
-            ],
-            "data": {
-              "bool": true
-            }
-          }
-        }
-      },
-      "failed_call": false
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
-        "type_": "diagnostic",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "fn_return"
-              },
-              {
-                "symbol": "add_shard"
-              }
-            ],
-            "data": "void"
-          }
-        }
-      },
-      "failed_call": false
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": null,
-        "type_": "diagnostic",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "fn_call"
-              },
-              {
                 "bytes": "0000000000000000000000000000000000000000000000000000000000000003"
               },
               {
@@ -7433,13 +5046,13 @@
                   "vec": []
                 },
                 {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                 },
                 {
-                  "symbol": "BTC_USDC"
+                  "symbol": "XLM_USDC"
                 },
                 {
-                  "u32": 20
+                  "u32": 10
                 },
                 {
                   "bool": false
@@ -7451,7 +5064,7 @@
                   "u64": 100000
                 },
                 {
-                  "u32": 100
+                  "u32": 90
                 },
                 {
                   "u32": 1
@@ -7479,10 +5092,10 @@
                 "u32": 1
               },
               {
-                "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
               },
               {
-                "symbol": "BTC_USDC"
+                "symbol": "XLM_USDC"
               }
             ],
             "data": {
@@ -7491,7 +5104,7 @@
                   "u32": 0
                 },
                 {
-                  "u32": 20
+                  "u32": 10
                 },
                 {
                   "u32": 0
@@ -7524,16 +5137,16 @@
                 "u32": 1
               },
               {
-                "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
               },
               {
-                "symbol": "BTC_USDC"
+                "symbol": "XLM_USDC"
               }
             ],
             "data": {
               "vec": [
                 {
-                  "u32": 20
+                  "u32": 10
                 },
                 {
                   "bool": false
@@ -7542,7 +5155,7 @@
                   "bool": false
                 },
                 {
-                  "u32": 100
+                  "u32": 90
                 },
                 {
                   "u64": 100000
@@ -7599,13 +5212,13 @@
                   "vec": []
                 },
                 {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                 },
                 {
-                  "symbol": "BTC_USDC"
+                  "symbol": "XLM_USDC"
                 },
                 {
-                  "u32": 55
+                  "u32": 10
                 },
                 {
                   "bool": false
@@ -7617,7 +5230,7 @@
                   "u64": 100000
                 },
                 {
-                  "u32": 100
+                  "u32": 90
                 },
                 {
                   "u32": 1
@@ -7645,10 +5258,10 @@
                 "u32": 1
               },
               {
-                "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
               },
               {
-                "symbol": "BTC_USDC"
+                "symbol": "XLM_USDC"
               }
             ],
             "data": {
@@ -7657,7 +5270,7 @@
                   "u32": 0
                 },
                 {
-                  "u32": 55
+                  "u32": 10
                 },
                 {
                   "u32": 0
@@ -7690,16 +5303,16 @@
                 "u32": 1
               },
               {
-                "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
               },
               {
-                "symbol": "BTC_USDC"
+                "symbol": "XLM_USDC"
               }
             ],
             "data": {
               "vec": [
                 {
-                  "u32": 55
+                  "u32": 10
                 },
                 {
                   "bool": false
@@ -7708,7 +5321,7 @@
                   "bool": false
                 },
                 {
-                  "u32": 100
+                  "u32": 90
                 },
                 {
                   "u64": 100000
@@ -7724,241 +5337,6 @@
       "event": {
         "ext": "v0",
         "contract_id": "0000000000000000000000000000000000000000000000000000000000000006",
-        "type_": "diagnostic",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "fn_return"
-              },
-              {
-                "symbol": "submit_score"
-              }
-            ],
-            "data": "void"
-          }
-        }
-      },
-      "failed_call": false
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": null,
-        "type_": "diagnostic",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "fn_call"
-              },
-              {
-                "bytes": "0000000000000000000000000000000000000000000000000000000000000009"
-              },
-              {
-                "symbol": "submit_score"
-              }
-            ],
-            "data": {
-              "vec": [
-                {
-                  "vec": []
-                },
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
-                },
-                {
-                  "symbol": "BTC_USDC"
-                },
-                {
-                  "u32": 90
-                },
-                {
-                  "bool": false
-                },
-                {
-                  "bool": false
-                },
-                {
-                  "u64": 100000
-                },
-                {
-                  "u32": 100
-                },
-                {
-                  "u32": 1
-                },
-                "void"
-              ]
-            }
-          }
-        }
-      },
-      "failed_call": false
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": "0000000000000000000000000000000000000000000000000000000000000009",
-        "type_": "contract",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "breach"
-              },
-              {
-                "u32": 1
-              },
-              {
-                "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
-              }
-            ],
-            "data": {
-              "vec": [
-                {
-                  "symbol": "BTC_USDC"
-                },
-                {
-                  "u32": 90
-                },
-                {
-                  "u32": 75
-                }
-              ]
-            }
-          }
-        }
-      },
-      "failed_call": false
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": "0000000000000000000000000000000000000000000000000000000000000009",
-        "type_": "contract",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "band_in"
-              },
-              {
-                "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
-              }
-            ],
-            "data": {
-              "vec": [
-                {
-                  "symbol": "BTC_USDC"
-                },
-                {
-                  "u32": 90
-                },
-                {
-                  "u32": 75
-                }
-              ]
-            }
-          }
-        }
-      },
-      "failed_call": false
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": "0000000000000000000000000000000000000000000000000000000000000009",
-        "type_": "contract",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "scr_dlt"
-              },
-              {
-                "u32": 1
-              },
-              {
-                "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
-              },
-              {
-                "symbol": "BTC_USDC"
-              }
-            ],
-            "data": {
-              "vec": [
-                {
-                  "u32": 0
-                },
-                {
-                  "u32": 90
-                },
-                {
-                  "u32": 0
-                },
-                {
-                  "i32": 0
-                },
-                {
-                  "u32": 0
-                }
-              ]
-            }
-          }
-        }
-      },
-      "failed_call": false
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": "0000000000000000000000000000000000000000000000000000000000000009",
-        "type_": "contract",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "score"
-              },
-              {
-                "u32": 1
-              },
-              {
-                "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
-              },
-              {
-                "symbol": "BTC_USDC"
-              }
-            ],
-            "data": {
-              "vec": [
-                {
-                  "u32": 90
-                },
-                {
-                  "bool": false
-                },
-                {
-                  "bool": false
-                },
-                {
-                  "u32": 100
-                },
-                {
-                  "u64": 100000
-                }
-              ]
-            }
-          }
-        }
-      },
-      "failed_call": false
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": "0000000000000000000000000000000000000000000000000000000000000009",
         "type_": "diagnostic",
         "body": {
           "v0": {
@@ -7991,11 +5369,21 @@
                 "bytes": "0000000000000000000000000000000000000000000000000000000000000001"
               },
               {
-                "symbol": "get_aggregate_score"
+                "symbol": "query_risk_gate"
               }
             ],
             "data": {
-              "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+              "vec": [
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
+                },
+                {
+                  "symbol": "XLM_USDC"
+                },
+                {
+                  "u32": 75
+                }
+              ]
             }
           }
         }
@@ -8017,11 +5405,21 @@
                 "bytes": "0000000000000000000000000000000000000000000000000000000000000003"
               },
               {
-                "symbol": "get_aggregate_score"
+                "symbol": "query_risk_gate"
               }
             ],
             "data": {
-              "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+              "vec": [
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
+                },
+                {
+                  "symbol": "XLM_USDC"
+                },
+                {
+                  "u32": 75
+                }
+              ]
             }
           }
         }
@@ -8040,76 +5438,11 @@
                 "symbol": "fn_return"
               },
               {
-                "symbol": "get_aggregate_score"
+                "symbol": "query_risk_gate"
               }
             ],
             "data": {
-              "map": [
-                {
-                  "key": {
-                    "symbol": "aggregate_score"
-                  },
-                  "val": {
-                    "u32": 20
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "benford_flag_count"
-                  },
-                  "val": {
-                    "u32": 0
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "decay_lambda_applied"
-                  },
-                  "val": {
-                    "bool": false
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "last_updated"
-                  },
-                  "val": {
-                    "u64": 100000
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "max_pair"
-                  },
-                  "val": {
-                    "symbol": "BTC_USDC"
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "max_pair_score"
-                  },
-                  "val": {
-                    "u32": 20
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "ml_flag_count"
-                  },
-                  "val": {
-                    "u32": 0
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "pair_count"
-                  },
-                  "val": {
-                    "u32": 1
-                  }
-                }
-              ]
+              "bool": true
             }
           }
         }
@@ -8131,11 +5464,21 @@
                 "bytes": "0000000000000000000000000000000000000000000000000000000000000006"
               },
               {
-                "symbol": "get_aggregate_score"
+                "symbol": "query_risk_gate"
               }
             ],
             "data": {
-              "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+              "vec": [
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
+                },
+                {
+                  "symbol": "XLM_USDC"
+                },
+                {
+                  "u32": 75
+                }
+              ]
             }
           }
         }
@@ -8154,190 +5497,11 @@
                 "symbol": "fn_return"
               },
               {
-                "symbol": "get_aggregate_score"
+                "symbol": "query_risk_gate"
               }
             ],
             "data": {
-              "map": [
-                {
-                  "key": {
-                    "symbol": "aggregate_score"
-                  },
-                  "val": {
-                    "u32": 55
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "benford_flag_count"
-                  },
-                  "val": {
-                    "u32": 0
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "decay_lambda_applied"
-                  },
-                  "val": {
-                    "bool": false
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "last_updated"
-                  },
-                  "val": {
-                    "u64": 100000
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "max_pair"
-                  },
-                  "val": {
-                    "symbol": "BTC_USDC"
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "max_pair_score"
-                  },
-                  "val": {
-                    "u32": 55
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "ml_flag_count"
-                  },
-                  "val": {
-                    "u32": 0
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "pair_count"
-                  },
-                  "val": {
-                    "u32": 1
-                  }
-                }
-              ]
-            }
-          }
-        }
-      },
-      "failed_call": false
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
-        "type_": "diagnostic",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "fn_call"
-              },
-              {
-                "bytes": "0000000000000000000000000000000000000000000000000000000000000009"
-              },
-              {
-                "symbol": "get_aggregate_score"
-              }
-            ],
-            "data": {
-              "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
-            }
-          }
-        }
-      },
-      "failed_call": false
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": "0000000000000000000000000000000000000000000000000000000000000009",
-        "type_": "diagnostic",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "fn_return"
-              },
-              {
-                "symbol": "get_aggregate_score"
-              }
-            ],
-            "data": {
-              "map": [
-                {
-                  "key": {
-                    "symbol": "aggregate_score"
-                  },
-                  "val": {
-                    "u32": 90
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "benford_flag_count"
-                  },
-                  "val": {
-                    "u32": 0
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "decay_lambda_applied"
-                  },
-                  "val": {
-                    "bool": false
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "last_updated"
-                  },
-                  "val": {
-                    "u64": 100000
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "max_pair"
-                  },
-                  "val": {
-                    "symbol": "BTC_USDC"
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "max_pair_score"
-                  },
-                  "val": {
-                    "u32": 90
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "ml_flag_count"
-                  },
-                  "val": {
-                    "u32": 0
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "pair_count"
-                  },
-                  "val": {
-                    "u32": 1
-                  }
-                }
-              ]
+              "bool": true
             }
           }
         }
@@ -8356,76 +5520,11 @@
                 "symbol": "fn_return"
               },
               {
-                "symbol": "get_aggregate_score"
+                "symbol": "query_risk_gate"
               }
             ],
             "data": {
-              "map": [
-                {
-                  "key": {
-                    "symbol": "aggregate_score"
-                  },
-                  "val": {
-                    "u32": 90
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "benford_flag_count"
-                  },
-                  "val": {
-                    "u32": 0
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "decay_lambda_applied"
-                  },
-                  "val": {
-                    "bool": false
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "last_updated"
-                  },
-                  "val": {
-                    "u64": 100000
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "max_pair"
-                  },
-                  "val": {
-                    "symbol": "BTC_USDC"
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "max_pair_score"
-                  },
-                  "val": {
-                    "u32": 90
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "ml_flag_count"
-                  },
-                  "val": {
-                    "u32": 0
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "pair_count"
-                  },
-                  "val": {
-                    "u32": 1
-                  }
-                }
-              ]
+              "bool": true
             }
           }
         }

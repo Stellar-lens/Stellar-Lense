@@ -10,8 +10,10 @@
 //! turn invoke LedgerLens — rather than calling the gate functions directly.
 
 use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
-use mock_amm::{MockAmm, MockAmmClient, MockAmmError};
-use mock_lending::{MockLending, MockLendingClient, MockLendingError};
+use mock_amm::{FailPolicy as AmmFailPolicy, MockAmm, MockAmmClient, MockAmmError};
+use mock_lending::{
+    FailPolicy as LendingFailPolicy, MockLending, MockLendingClient, MockLendingError,
+};
 use soroban_sdk::{
     symbol_short,
     testutils::{Address as _, Ledger as _},
@@ -23,6 +25,7 @@ const MIN_CONFIDENCE: u32 = 50;
 
 struct Fixture<'a> {
     env: Env,
+    admin: Address,
     ledgerlens: LedgerLensScoreContractClient<'a>,
     amm: MockAmmClient<'a>,
     lending: MockLendingClient<'a>,
@@ -43,14 +46,21 @@ fn setup<'a>() -> Fixture<'a> {
 
     let amm_id = env.register_contract(None, MockAmm);
     let amm = MockAmmClient::new(&env, &amm_id);
-    amm.initialize(&ledgerlens_id, &GATE_THRESHOLD);
-    amm.set_liquidity_gate_config(&GATE_THRESHOLD, &MIN_CONFIDENCE);
+    amm.initialize(&admin, &ledgerlens_id, &GATE_THRESHOLD);
+    amm.set_liquidity_gate_config(
+        &admin,
+        &GATE_THRESHOLD,
+        &MIN_CONFIDENCE,
+        &AmmFailPolicy::FailClosed,
+        &604_800,
+        &0,
+    );
 
     let lending_id = env.register_contract(None, MockLending);
     let lending = MockLendingClient::new(&env, &lending_id);
-    lending.initialize(&ledgerlens_id, &GATE_THRESHOLD, &MIN_CONFIDENCE);
+    lending.initialize(&admin, &ledgerlens_id, &GATE_THRESHOLD, &MIN_CONFIDENCE);
 
-    Fixture { env, ledgerlens, amm, lending }
+    Fixture { env, admin, ledgerlens, amm, lending }
 }
 
 /// Submits a score for `wallet`, advancing the ledger past the 1-hour
@@ -210,8 +220,107 @@ fn amm_provide_liquidity_uses_set_risk_oracle() {
         &None,
     );
 
-    fixture.amm.set_risk_oracle(&alt_oracle_id);
+    fixture.amm.set_risk_oracle(&fixture.admin, &alt_oracle_id);
     assert_eq!(fixture.amm.try_provide_liquidity_gated(&provider, &500), Ok(Ok(())));
+}
+
+#[test]
+fn amm_config_rejects_unauthorized_admin_rotation() {
+    let fixture = setup();
+    let attacker = Address::generate(&fixture.env);
+    let oracle = Address::generate(&fixture.env);
+
+    assert_eq!(
+        fixture.amm.try_set_risk_oracle(&attacker, &oracle),
+        Err(Ok(MockAmmError::Unauthorized))
+    );
+}
+
+#[test]
+fn amm_swap_rejects_stale_score() {
+    let fixture = setup();
+    let wallet = Address::generate(&fixture.env);
+    submit_score(&fixture, &wallet, 10, 90);
+    fixture.amm.set_liquidity_gate_config(
+        &fixture.admin,
+        &GATE_THRESHOLD,
+        &MIN_CONFIDENCE,
+        &AmmFailPolicy::FailClosed,
+        &1,
+        &0,
+    );
+    fixture.env.ledger().with_mut(|l| l.timestamp += 2);
+
+    assert_eq!(
+        fixture.amm.try_swap(&wallet, &symbol_short!("XLM_USDC"), &1_000),
+        Err(Ok(MockAmmError::StaleScore))
+    );
+}
+
+#[test]
+fn amm_swap_reports_unavailable_oracle_fail_closed() {
+    let fixture = setup();
+    let wallet = Address::generate(&fixture.env);
+    fixture.amm.set_risk_oracle(&fixture.admin, &Address::generate(&fixture.env));
+
+    assert_eq!(
+        fixture.amm.try_swap(&wallet, &symbol_short!("XLM_USDC"), &1_000),
+        Err(Ok(MockAmmError::OracleUnavailable))
+    );
+}
+
+#[test]
+fn amm_swap_fail_open_is_explicit_for_unavailable_oracle() {
+    let fixture = setup();
+    let wallet = Address::generate(&fixture.env);
+    fixture.amm.set_risk_oracle(&fixture.admin, &Address::generate(&fixture.env));
+    fixture.amm.set_liquidity_gate_config(
+        &fixture.admin,
+        &GATE_THRESHOLD,
+        &MIN_CONFIDENCE,
+        &AmmFailPolicy::FailOpen,
+        &604_800,
+        &0,
+    );
+
+    assert_eq!(fixture.amm.try_swap(&wallet, &symbol_short!("XLM_USDC"), &1_000), Ok(Ok(())));
+}
+
+#[test]
+fn amm_swap_rejects_unsupported_oracle_version() {
+    let fixture = setup();
+    let wallet = Address::generate(&fixture.env);
+    submit_score(&fixture, &wallet, 10, 90);
+    fixture.amm.set_liquidity_gate_config(
+        &fixture.admin,
+        &GATE_THRESHOLD,
+        &MIN_CONFIDENCE,
+        &AmmFailPolicy::FailClosed,
+        &604_800,
+        &(fixture.ledgerlens.get_contract_version() + 1),
+    );
+
+    assert_eq!(
+        fixture.amm.try_swap(&wallet, &symbol_short!("XLM_USDC"), &1_000),
+        Err(Ok(MockAmmError::UnsupportedVersion))
+    );
+}
+
+#[test]
+fn amm_swap_supports_old_client_version_zero_against_new_contract() {
+    let fixture = setup();
+    let wallet = Address::generate(&fixture.env);
+    submit_score(&fixture, &wallet, 10, 90);
+    fixture.amm.set_liquidity_gate_config(
+        &fixture.admin,
+        &GATE_THRESHOLD,
+        &MIN_CONFIDENCE,
+        &AmmFailPolicy::FailClosed,
+        &604_800,
+        &0,
+    );
+
+    assert_eq!(fixture.amm.try_swap(&wallet, &symbol_short!("XLM_USDC"), &1_000), Ok(Ok(())));
 }
 
 // ── Acceptance criterion: lending gate fails on low confidence ─────────────
