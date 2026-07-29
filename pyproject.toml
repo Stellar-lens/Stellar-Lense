@@ -31,6 +31,7 @@ addopts = "-ra"
 markers = [
     "integration: marks tests as live Testnet integration tests (deselect with '-m not integration')",
     "slow: marks tests that run PPO training (deselect with '-m not slow')",
+    "issue(id): links a test to an advanced work-item ID in tests/issue_traceability.json",
 ]
 
 # ---------------------------------------------------------------------------

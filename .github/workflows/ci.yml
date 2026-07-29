@@ -31,6 +31,9 @@ jobs:
           ruff check .
           black --check .
 
+      - name: Validate advanced work-item test traceability
+        run: python scripts/check_issue_test_traceability.py
+
       - name: Check verify_chain called after every joblib.load in detection/
         run: |
           python - <<'EOF'
