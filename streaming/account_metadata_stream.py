@@ -44,6 +44,8 @@ from datetime import UTC, datetime
 from pydantic import BaseModel, Field, field_validator
 
 from config import config
+from streaming.cursor_store import BaseCursorStore, get_cursor_store
+from streaming.health import WorkerHealthMonitor, get_health_registry
 from utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -211,17 +213,37 @@ class AccountMetadataStream:
         on_update: Callable[[AccountMetadataUpdate], None] | None = None,
         kafka_producer=None,
         produce_to_kafka: bool = False,
+        cursor_store: BaseCursorStore | None = None,
     ) -> None:
         self._on_update = on_update
         self._kafka_producer = kafka_producer
         self._produce_to_kafka = produce_to_kafka and kafka_producer is not None
+        self._cursor_store = cursor_store or get_cursor_store()
         self._stop_event = threading.Event()
         # Registry: wallet_id → Thread (one per wallet).
         self._registry_lock = threading.Lock()
         self._threads: dict[str, threading.Thread] = {}
 
+        self._health_monitor = WorkerHealthMonitor(
+            "account_metadata_stream",
+            health_check_fn=self._get_health_status,
+        )
+        get_health_registry().register(self._health_monitor)
+
         for wallet in wallets or []:
             self.add_wallet(wallet)
+
+    def _get_health_status(self) -> tuple[HealthStatus, str | None]:
+        with self._registry_lock:
+            active_threads = sum(1 for t in self._threads.values() if t.is_alive())
+            total = len(self._threads)
+
+        if total == 0 or active_threads == total:
+            return HealthStatus.HEALTHY, f"{active_threads}/{total} metadata stream threads active"
+        elif active_threads > 0:
+            return HealthStatus.DEGRADED, f"{active_threads}/{total} metadata stream threads active"
+        else:
+            return HealthStatus.UNHEALTHY, "All metadata stream threads died"
 
     # ------------------------------------------------------------------
     # Public API
@@ -245,6 +267,7 @@ class AccountMetadataStream:
     def stop(self) -> None:
         """Signal all subscription threads to exit."""
         self._stop_event.set()
+        self._health_monitor.mark_stopped("AccountMetadataStream stopped")
 
     def is_running(self) -> bool:
         """Return True if any subscription thread is still alive."""
@@ -257,15 +280,20 @@ class AccountMetadataStream:
 
     def _subscribe(self, wallet: str) -> None:
         """Subscription loop for a single wallet — runs in its own thread."""
-        cursor = "now"
+        stream_key = f"metadata:{wallet}"
+        cursor = self._cursor_store.get_cursor(stream_key, default="now")
         consecutive_failures = 0
         max_failures = config.HORIZON_MAX_RETRIES
 
         while not self._stop_event.is_set():
+            self._health_monitor.record_heartbeat(
+                details={"watched_wallets": len(self._threads)}
+            )
             try:
-                self._stream_effects(wallet, cursor)
+                self._stream_effects(wallet, cursor, stream_key)
                 # Generator exhausted without error — reconnect from latest cursor.
                 consecutive_failures = 0
+                cursor = self._cursor_store.get_cursor(stream_key, default="now")
             except Exception as exc:
                 if self._stop_event.is_set():
                     return
@@ -280,6 +308,7 @@ class AccountMetadataStream:
                     exc,
                     backoff,
                 )
+                self._health_monitor.record_heartbeat(error_message=str(exc))
                 if consecutive_failures >= max_failures:
                     logger.error(
                         "Effects stream for %s exceeded %d consecutive failures — "
@@ -290,7 +319,7 @@ class AccountMetadataStream:
                     return
                 time.sleep(backoff)
 
-    def _stream_effects(self, wallet: str, cursor: str) -> None:
+    def _stream_effects(self, wallet: str, cursor: str, stream_key: str) -> None:
         """Open a single SSE connection and iterate until disconnection."""
         from stellar_sdk import Server
 
@@ -305,6 +334,14 @@ class AccountMetadataStream:
         for record in call_builder.stream():
             if self._stop_event.is_set():
                 return
+
+            if "paging_token" in record:
+                token = str(record["paging_token"])
+                self._cursor_store.save_cursor(
+                    stream_key,
+                    token,
+                    metadata={"wallet": wallet, "effect_id": record.get("id", "")},
+                )
 
             # Filter to effect types that affect wallet-graph features.
             if record.get("type") not in _INTERESTING_EFFECT_TYPES:

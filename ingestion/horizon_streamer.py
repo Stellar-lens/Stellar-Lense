@@ -27,6 +27,8 @@ from stellar_sdk import Server
 
 from config import config
 from ingestion.data_models import Asset, Trade
+from streaming.cursor_store import BaseCursorStore, get_cursor_store
+from streaming.health import HealthStatus, WorkerHealthMonitor, get_health_registry
 from utils.logging import get_logger
 from utils.tracing import get_tracer, hash_span_id
 
@@ -89,6 +91,24 @@ class HorizonEndpointPool:
         )
         self._health_thread.start()
 
+        self._health_monitor = WorkerHealthMonitor(
+            "horizon_endpoint_pool",
+            health_check_fn=self._get_health_status,
+        )
+        get_health_registry().register(self._health_monitor)
+
+    def _get_health_status(self) -> tuple[HealthStatus, str | None]:
+        with self._lock:
+            healthy_count = sum(1 for h in self._healthy.values() if h)
+            total = len(self._urls)
+
+        if healthy_count == total:
+            return HealthStatus.HEALTHY, f"All {total} endpoints healthy"
+        elif healthy_count > 0:
+            return HealthStatus.DEGRADED, f"{healthy_count}/{total} endpoints healthy"
+        else:
+            return HealthStatus.UNHEALTHY, "All Horizon endpoints unhealthy"
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
@@ -118,6 +138,7 @@ class HorizonEndpointPool:
 
     def stop(self) -> None:
         self._stop_event.set()
+        self._health_monitor.mark_stopped("HorizonEndpointPool stopped")
 
     # ------------------------------------------------------------------
     # Internal
@@ -220,6 +241,8 @@ def stream_trades(
     counter_asset: SdkAsset,
     cursor: str = "now",
     max_reconnect_attempts: int = 5,
+    cursor_store: BaseCursorStore | None = None,
+    stream_id: str | None = None,
 ) -> Iterator[Trade]:
     """Yield `Trade` objects as they are streamed from Horizon.
 
@@ -230,11 +253,17 @@ def stream_trades(
     ledger cursor is preserved across failover so no events are missed or
     duplicated.
 
-    Without failover URLs this behaves identically to the original single-endpoint
-    implementation.
+    When a ``cursor_store`` is provided (or if default config cursor store is active),
+    the streaming cursor is automatically restored on restart and saved on each event.
     """
     pool = _get_pool()
     attempts = 0
+
+    active_stream_id = stream_id or f"trades:{base_asset.code}:{counter_asset.code}"
+    active_store = cursor_store or get_cursor_store()
+
+    # Restore persisted cursor if available
+    cursor = active_store.get_cursor(active_stream_id, default=cursor)
 
     while True:
         horizon_url = pool.best_url() if pool is not None else config.HORIZON_URL
@@ -249,6 +278,11 @@ def stream_trades(
                     span.set_attribute("trade.counter_asset", trade.counter_asset.code)
                 yield trade
                 cursor = response["paging_token"]
+                active_store.save_cursor(
+                    active_stream_id,
+                    cursor,
+                    metadata={"trade_id": trade.trade_id, "timestamp": time.time()},
+                )
                 attempts = 0
         except (ConnectionError, TimeoutError, OSError) as exc:
             attempts += 1

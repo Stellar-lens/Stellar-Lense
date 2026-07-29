@@ -21,6 +21,7 @@ from config import config
 from detection.persistence import RiskScoreRecord, get_session_factory
 from detection.risk_score_store import RiskScoreStore
 from detection.shap_explainer import ShapExplainer
+from streaming.health import HealthStatus, get_health_registry
 
 # ---------------------------------------------------------------------------
 # Stellar address validation
@@ -100,6 +101,7 @@ class HealthResponse(BaseModel):
     status: str
     db: str
     model: str
+    workers: dict[str, dict] | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -144,8 +146,32 @@ async def health(request: Request):
 
     model_status = "ok" if os.path.isdir(config.MODEL_DIR) else "unavailable"
 
-    overall = "ok" if db_status == "ok" else "degraded"
-    return HealthResponse(status=overall, db=db_status, model=model_status)
+    registry = get_health_registry()
+    worker_status, worker_report = registry.get_overall_status()
+
+    if db_status != "ok" or worker_status in (HealthStatus.UNHEALTHY, HealthStatus.DEGRADED):
+        overall = "degraded" if db_status == "ok" else "unavailable"
+    else:
+        overall = "ok"
+
+    return HealthResponse(
+        status=overall,
+        db=db_status,
+        model=model_status,
+        workers=worker_report.get("components"),
+    )
+
+
+@app.get("/v1/health/workers", tags=["ops"])
+@limiter.limit(f"{config.API_RATE_LIMIT_RPM}/minute")
+async def worker_health(request: Request):
+    """Detailed health probe for all registered background worker processes."""
+    registry = get_health_registry()
+    overall_status, report = registry.get_overall_status()
+    return {
+        "status": overall_status.value,
+        "report": report,
+    }
 
 
 @app.get(

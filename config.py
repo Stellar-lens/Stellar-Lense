@@ -465,6 +465,18 @@ class Config:
         "TRADE_DEDUP_CACHE_KEY_PREFIX", "ledgerlens:trades:"
     )
 
+    # Worker health check configuration (streaming/health.py)
+    WORKER_HEALTH_STALE_THRESHOLD_SECONDS: float = float(
+        os.getenv("WORKER_HEALTH_STALE_THRESHOLD_SECONDS", "30.0")
+    )
+
+    # Resumable streaming cursor store configuration (streaming/cursor_store.py)
+    CURSOR_STORE_TYPE: str = os.getenv("CURSOR_STORE_TYPE", "file").lower()
+    CURSOR_STORE_PATH: str = os.getenv("CURSOR_STORE_PATH", "data/cursors.json")
+    CURSOR_STORE_FLUSH_INTERVAL_EVENTS: int = int(
+        os.getenv("CURSOR_STORE_FLUSH_INTERVAL_EVENTS", "1")
+    )
+
     @classmethod
     def validate(cls, require_onchain: bool = False):
         errors = []
