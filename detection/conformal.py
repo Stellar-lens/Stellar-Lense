@@ -16,7 +16,7 @@ import hashlib
 import json
 import logging
 from datetime import datetime, timezone
-from typing import Any, List
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -28,11 +28,6 @@ logger = logging.getLogger("ledgerlens.conformal")
 # ---------------------------------------------------------------------------
 
 CLASS_LABELS = {0: "clean", 1: "suspicious", 2: "wash"}
-CLASS_BOUNDARIES = {
-    0: (0, 33),    # score 0–33  → clean
-    1: (34, 66),   # score 34–66 → suspicious
-    2: (67, 100),  # score 67–100 → wash
-}
 
 
 def score_to_class(score: int) -> int:
@@ -121,7 +116,7 @@ def predict_set_raps(
     q_hat: float,
     lambda_reg: float = 0.2,
     k_reg: int = 2,
-) -> List[int]:
+) -> list[int]:
     """Return the RAPS prediction set for one softmax probability vector.
 
     Includes class k when raps_score(softmax_probs, k) ≤ q_hat.
@@ -265,7 +260,7 @@ class RAPSConformal:
         self,
         test_softmax_probs: np.ndarray,
         alpha: float | None = None,
-    ) -> List[int]:
+    ) -> list[int]:
         """Return the RAPS prediction set for one softmax probability vector.
 
         Args:
