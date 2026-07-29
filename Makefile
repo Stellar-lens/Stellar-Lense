@@ -81,3 +81,9 @@ mutation-test:
 	@echo "==> Mutation results:"
 	mutmut results || true
 	$(PYTHON) scripts/check_mutation_score.py --threshold $(MUTATION_THRESHOLD)
+
+ops-check:
+	python -m cli.main healthcheck
+
+ops-validate:
+	python -m cli.main validate-artifacts
