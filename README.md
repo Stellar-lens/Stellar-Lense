@@ -373,7 +373,10 @@ Every training run produces a `model_metadata.json` sidecar file. This is used b
   "n_training_rows": 400,
   "n_test_rows": 100,
   "feature_columns": ["benford_chi_square_1h", "benford_mad_1h", "..."],
+  "feature_dtypes": {"benford_chi_square_1h": "float64", "benford_mad_1h": "float64"},
+  "feature_contract_version": 1,
   "feature_schema_hash": "sha256:<hash-of-sorted-feature-column-list>",
+  "feature_contract_hash": "sha256:<hash-of-versioned-ordered-names-and-dtypes>",
   "model_names": ["random_forest", "xgboost", "lightgbm"],
   "python_version": "3.11.9",
   "ledgerlens_version": "0.2.0"
@@ -381,6 +384,22 @@ Every training run produces a `model_metadata.json` sidecar file. This is used b
 ```
 
 If the `feature_schema_hash` computed from the input feature row does not match the hash in the metadata, `RiskScorer.score()` will raise a `RuntimeError` detailing the mismatched columns.
+
+Before promoting or rolling back a model, compare its complete feature contract
+(ordered names and dtypes) with the deployed version:
+
+```bash
+python -m scripts.validate_model_compatibility \
+  --reference models \
+  --candidate models/archive/20260720_120000
+```
+
+The command exits non-zero for removed, reordered, or type-changed features.
+Candidate-only features are rejected by default and can be explicitly permitted
+with `--allow-additive`. Legacy metadata without dtype information remains
+readable, but the report clearly identifies the comparison as `names_only`.
+See [Feature compatibility validation](docs/model_compatibility.md) for the
+contract and rollout policy.
 
 ## Continuous Retraining Pipeline
 
