@@ -169,6 +169,10 @@ class Config:
     KAFKA_LAG_ALERT_THRESHOLD: int = int(os.getenv("KAFKA_LAG_ALERT_THRESHOLD", "500"))
     KAFKA_METRICS_PORT: int = int(os.getenv("KAFKA_METRICS_PORT", "9100"))
     TRADE_AVRO_SCHEMA_PATH: str = os.getenv("TRADE_AVRO_SCHEMA_PATH", "data/trade_avro_schema.json")
+    
+    # End-to-end latency budget (Issue #124)
+    E2E_LATENCY_BUDGET_MS: int = int(os.getenv("E2E_LATENCY_BUDGET_MS", "2000"))
+    LATENCY_ANOMALY_RATE_THRESHOLD: float = float(os.getenv("LATENCY_ANOMALY_RATE_THRESHOLD", "0.90"))
 
     # Account metadata streaming join (streaming/account_metadata_stream.py,
     # streaming/pipeline.py MetadataJoinState)
@@ -466,7 +470,13 @@ class Config:
     )
 
     @classmethod
-    def validate(cls, require_onchain: bool = False):
+    def _core_errors(cls, require_onchain: bool = False) -> list[str]:
+        """Collect (not raise) the baseline config errors shared by every entry point.
+
+        Split out from `validate()` so `config/contracts.py` can compose these
+        checks with mode-specific ones (API, streaming, training, ...) instead of
+        re-implementing the same field-by-field logic per runtime mode.
+        """
         errors = []
 
         if not cls.WATCHED_ASSET_PAIRS:
@@ -490,6 +500,12 @@ class Config:
 
             if not cls.LEDGERLENS_SUBMITTER_SECRET.strip():
                 errors.append("LEDGERLENS_SUBMITTER_SECRET is not set.")
+
+        return errors
+
+    @classmethod
+    def validate(cls, require_onchain: bool = False):
+        errors = cls._core_errors(require_onchain)
 
         if errors:
             raise OSError("LedgerLens configuration errors:\n- " + "\n- ".join(errors))

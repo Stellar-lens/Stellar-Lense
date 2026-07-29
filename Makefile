@@ -1,6 +1,5 @@
-.PHONY: install lint format test run scale-workers mutation-test
-.PHONY: install lint format test run typecheck mutation-test
-.PHONY: check-cycles probe-deps validate-readme validate-notebooks validate-all
+.PHONY: install lint format test run scale-workers typecheck mutation-test threshold-sweep anonymization-check check-env check-schema-compatibility check-review-gates ops-check ops-validate static-analysis benchmark verify-lockfile regenerate-lockfile partition-write partition-read retention-scan snapshot-freeze snapshot-list snapshot-verify run-compare run-compare-all check-cycles probe-deps probe-deps-json validate-readme validate-readme-warn validate-notebooks validate-notebooks-strict validate-notebooks-ci validate-all
+.ONESHELL:
 
 VENV_BIN := $(abspath .venv/bin)
 ifeq ($(wildcard $(VENV_BIN)/python),)
@@ -32,6 +31,44 @@ format:
 test:
 	$(PYTEST) -q
 
+# ---------------------------------------------------------------------------
+# Review gates for high-risk data and model changes
+#
+#   make check-schema-compatibility   # Avro wire-schema compatibility
+#   make check-review-gates           # high-risk path acknowledgement
+#
+# check-schema-compatibility is the exact command CI runs.
+#
+# check-review-gates reports what CI would decide but always exits 0, since
+# locally there is usually no pull-request body yet. Unlike CI — which sees a
+# pushed branch — it also counts uncommitted and untracked files, so it is
+# useful before you commit. Reads the body from PR_BODY_FILE when supplied:
+#
+#   make check-review-gates PR_BODY_FILE=/tmp/body.md
+#
+# To reproduce a CI failure exactly, drop --dry-run:
+#
+#   python scripts/check_review_gates.py \
+#       --changed-paths-from <file> --pr-body-file <file>
+# ---------------------------------------------------------------------------
+BASE ?= main
+PR_BODY_FILE ?=
+
+check-schema-compatibility:
+	$(PYTHON) scripts/check_schema_compatibility.py
+
+check-review-gates:
+	@{ \
+		git diff --name-only $(BASE)...HEAD; \
+		git diff --name-only HEAD; \
+		git ls-files --others --exclude-standard; \
+	} | sort -u > .changed_paths.tmp
+	@$(PYTHON) scripts/check_review_gates.py \
+		--changed-paths-from .changed_paths.tmp \
+		$(if $(PR_BODY_FILE),--pr-body-file $(PR_BODY_FILE),--pr-body "") \
+		--dry-run
+	@rm -f .changed_paths.tmp
+
 fuzz:
 	@echo "Running fuzz tests for 60 seconds each..."
 	timeout 65 python tests/fuzz/fuzz_avro_codec.py tests/fuzz/corpus/ -max_len=10000 -timeout=10 || true
@@ -44,6 +81,13 @@ test-e2e:
 
 run:
 	python run_pipeline.py
+
+# Validate environment configuration contracts (config/contracts.py) without
+# starting the service. Usage:
+#   make check-env MODE=api        # validate one runtime mode
+#   make check-env                 # validate every known runtime mode
+check-env:
+	$(PYTHON) -m scripts.check_env $(if $(MODE),--mode $(MODE),--all)
 
 scale-workers:
 	@if [ -z "$(N)" ]; then \
@@ -174,3 +218,217 @@ validate-notebooks-ci:
 
 validate-all: check-cycles probe-deps validate-readme validate-notebooks
 	@echo "==> All validation checks complete."
+
+# ---------------------------------------------------------------------------
+# Issue #527 — Partitioned dataset helpers
+#
+# Usage:
+#   make partition-write DATA=data/synthetic_dataset.parquet STRATEGY=time PERIOD=month
+#   make partition-read  ROOT=data/partitioned
+# ---------------------------------------------------------------------------
+DATA ?= data/synthetic_dataset.parquet
+STRATEGY ?= time
+PERIOD ?= month
+PARTITION_ROOT ?= data/partitioned
+
+partition-write:
+	@echo "==> Writing partitioned dataset from $(DATA) (strategy=$(STRATEGY), period=$(PERIOD))"
+	$(PYTHON) - <<-'EOF'
+	import pandas as pd
+	from pathlib import Path
+	from data.partitioning import PartitionedDatasetWriter, TimePartitionStrategy, PairPartitionStrategy, WalletPartitionStrategy
+
+	strat_name = "$(STRATEGY)"
+	strategy = TimePartitionStrategy(period="$(PERIOD)") if strat_name == "time" else (PairPartitionStrategy() if strat_name == "pair" else WalletPartitionStrategy())
+	df = pd.read_parquet("$(DATA)")
+	writer = PartitionedDatasetWriter(root=Path("$(PARTITION_ROOT)"), strategy=strategy)
+	result = writer.write(df)
+	print(f"Written {sum(result.values())} rows across {len(result)} partition(s).")
+	for k, n in sorted(result.items()): print(f"  {k}: {n} rows")
+	EOF
+
+partition-read:
+	@echo "==> Listing partitions under $(PARTITION_ROOT)"
+	$(PYTHON) - <<-'EOF'
+	from pathlib import Path
+	from data.partitioning import PartitionedDatasetReader
+	reader = PartitionedDatasetReader(Path("$(PARTITION_ROOT)"))
+	parts = reader.list_partitions()
+	print(f"Found {len(parts)} partition(s):")
+	for p in parts: meta = reader.get_metadata(p); rows = meta.row_count if meta else "?"; print(f"  {p}: {rows} rows")
+	EOF
+
+# ---------------------------------------------------------------------------
+# Issue #530 — Data retention scan / purge
+#
+# Usage:
+#   make retention-scan              # dry-run using default policies
+#   make retention-scan DRY_RUN=0   # live purge
+# ---------------------------------------------------------------------------
+DRY_RUN ?= 1
+
+retention-scan:
+	@echo "==> Running retention scan (dry_run=$(DRY_RUN))"
+	$(PYTHON) - <<-'EOF'
+	from data.retention import FileRetentionManager, DEFAULT_POLICIES
+	from pathlib import Path
+	dry = "$(DRY_RUN)" != "0"
+	manager = FileRetentionManager(
+	    policies=DEFAULT_POLICIES,
+	    base_dir=Path("."),
+	    audit_log_path=Path("reports/retention_audit.ndjson"),
+	)
+	report = manager.run(dry_run=dry)
+	print(report.summary())
+	EOF
+
+# ---------------------------------------------------------------------------
+# Issue #533 — Dataset snapshot helpers
+#
+# Usage:
+#   make snapshot-freeze SOURCE=data/synthetic_dataset.parquet LABEL=pre-training
+#   make snapshot-list
+#   make snapshot-verify SNAPSHOT_ID=snap_20240601T000000_pre-training_abc12345
+# ---------------------------------------------------------------------------
+SOURCE ?= data/synthetic_dataset.parquet
+LABEL ?= manual
+SNAPSHOT_ROOT ?= data/snapshots
+SNAPSHOT_ID ?=
+
+snapshot-freeze:
+	@echo "==> Freezing snapshot of $(SOURCE) (label=$(LABEL))"
+	$(PYTHON) - <<-'EOF'
+	from pathlib import Path
+	from data.reproducibility import DatasetSnapshot
+	snap = DatasetSnapshot(snapshot_root=Path("$(SNAPSHOT_ROOT)"))
+	m = snap.freeze(Path("$(SOURCE)"), label="$(LABEL)")
+	print(f"Snapshot created: {m.snapshot_id}")
+	print(f"  sha256   : {m.sha256}")
+	print(f"  rows     : {m.row_count}")
+	print(f"  columns  : {m.columns}")
+	EOF
+
+snapshot-list:
+	@echo "==> Listing snapshots under $(SNAPSHOT_ROOT)"
+	$(PYTHON) - <<-'EOF'
+	from pathlib import Path
+	from data.reproducibility import SnapshotRegistry
+	reg = SnapshotRegistry(Path("$(SNAPSHOT_ROOT)"))
+	manifests = reg.list_all()
+	print("No snapshots found.") if not manifests else [print(f"  {m.snapshot_id}  label={m.label!r}  rows={m.row_count}  sha256={m.sha256[:12]}...") for m in manifests]
+	EOF
+
+snapshot-verify:
+	@if [ -z "$(SNAPSHOT_ID)" ]; then echo "Error: SNAPSHOT_ID is required.  Usage: make snapshot-verify SNAPSHOT_ID=<id>"; exit 1; fi
+	@echo "==> Verifying snapshot $(SNAPSHOT_ID)"
+	$(PYTHON) - <<-'EOF'
+	from pathlib import Path
+	from data.reproducibility import DatasetSnapshot
+	snap = DatasetSnapshot(snapshot_root=Path("$(SNAPSHOT_ROOT)"))
+	ok = snap.verify("$(SNAPSHOT_ID)")
+	print("Integrity OK" if ok else "Integrity FAILED")
+	EOF
+
+# ---------------------------------------------------------------------------
+# Issue #534 — Model run comparison
+#
+# Usage:
+#   make run-compare BASELINE=run_20240601 CANDIDATE=run_20240701 RUNS_DIR=models
+#   make run-compare-all RUNS_DIR=models
+# ---------------------------------------------------------------------------
+BASELINE ?=
+CANDIDATE ?=
+RUNS_DIR ?= models
+COMPARE_TOLERANCE ?= 0.01
+
+run-compare:
+	@if [ -z "$(BASELINE)" ] || [ -z "$(CANDIDATE)" ]; then \
+		echo "Error: BASELINE and CANDIDATE are required."; \
+		echo "Usage: make run-compare BASELINE=run_A CANDIDATE=run_B RUNS_DIR=models"; \
+		exit 1; \
+	fi
+	@echo "==> Comparing runs $(BASELINE) → $(CANDIDATE) (tolerance=$(COMPARE_TOLERANCE))"
+	$(PYTHON) - <<-'EOF'
+	from pathlib import Path
+	from evaluation.run_comparator import ModelRunComparator
+	comp = ModelRunComparator(runs_dir=Path("$(RUNS_DIR)"), metrics_filename="metrics.json")
+	report = comp.compare("$(BASELINE)", "$(CANDIDATE)", regression_tolerance=float("$(COMPARE_TOLERANCE)"))
+	print(report.summary())
+	out = Path("reports/run_comparison_$(BASELINE)_vs_$(CANDIDATE).json")
+	report.save(out)
+	print(f"Report saved to {out}")
+	EOF
+
+run-compare-all:
+	@echo "==> Comparing all consecutive runs under $(RUNS_DIR)"
+	$(PYTHON) - <<-'EOF'
+	from pathlib import Path
+	from evaluation.run_comparator import ModelRunComparator
+	comp = ModelRunComparator(runs_dir=Path("$(RUNS_DIR)"), metrics_filename="metrics.json")
+	reports = comp.compare_all(regression_tolerance=float("$(COMPARE_TOLERANCE)"))
+	print("No consecutive run pairs found.") if not reports else [print(r.summary()) for r in reports]
+	EOF
+
+# ---------------------------------------------------------------------------
+# Static analysis gate — mypy + bandit + radon (issue #545)
+# ---------------------------------------------------------------------------
+static-analysis:
+	@echo "==> Running repository-wide static analysis gate..."
+	$(PYTHON) scripts/static_analysis_gate.py
+
+# Run only mypy (fast, no subprocess)
+typecheck:
+	$(PYTHON) -m mypy detection ingestion streaming ci_metrics benchmarks utils config.py
+
+# ---------------------------------------------------------------------------
+# Benchmark datasets — run detector benchmarks (issue #537)
+# ---------------------------------------------------------------------------
+benchmark:
+	@echo "==> Running detector benchmark suite..."
+	$(PYTHON) -m benchmarks.datasets
+	@echo "To run benchmarks against a detector, see benchmarks/runner.py"
+
+# ---------------------------------------------------------------------------
+# Lockfile verification (issue #541)
+# ---------------------------------------------------------------------------
+verify-lockfile:
+	@echo "==> Verifying installed environment matches requirements.lock..."
+	$(PYTHON) scripts/verify_lockfile.py
+
+regenerate-lockfile:
+	@echo "==> Regenerating requirements.lock from current environment..."
+	$(PYTHON) scripts/verify_lockfile.py --generate
+
+# ---------------------------------------------------------------------------
+# Threshold sweep — run threshold diagnostics on a backtest dataset
+#
+# Usage:
+#   make threshold-sweep DATASET=data/backtest.parquet
+#   make threshold-sweep DATASET=data/backtest.parquet OUTPUT=reports/
+# ---------------------------------------------------------------------------
+DATASET ?= data/backtest.parquet
+SWEEP_OUTPUT ?= reports/
+
+threshold-sweep:
+	@echo "==> Running threshold sweep diagnostics..."
+	@echo "    Dataset: $(DATASET)"
+	@echo "    Output:  $(SWEEP_OUTPUT)"
+	$(PYTHON) -m evaluation.backtest $(DATASET) $(SWEEP_OUTPUT) --sweep
+	@echo "==> Threshold sweep complete. Report in $(SWEEP_OUTPUT)/backtest_report.json"
+
+# ---------------------------------------------------------------------------
+# Anonymization check — ensure shared example data is free of PII
+#
+# Usage:
+#   make anonymization-check
+# ---------------------------------------------------------------------------
+anonymization-check:
+	@echo "==> Running anonymization checks..."
+	$(PYTHON) scripts/check_anonymization.py --target data tests/fixtures tests/fuzz/corpus
+	@echo "==> Anonymization check complete."
+
+ops-check:
+	python -m cli.main healthcheck
+
+ops-validate:
+	python -m cli.main validate-artifacts

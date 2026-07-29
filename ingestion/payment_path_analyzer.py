@@ -15,6 +15,8 @@ from typing import TypedDict
 
 import pandas as pd
 
+from ingestion.exceptions import InvalidInputError, RecordValidationError
+
 MAX_PATH_LENGTH = 6  # Stellar's maximum path hops
 ROUND_TRIP_WINDOW_HOURS = 24
 
@@ -56,12 +58,18 @@ def reconstruct_path_flow(
         or exceeds Stellar's path length limit.
 
     Raises:
-        ValueError: If the operation type is not a path payment variant.
-        KeyError: If required fields are missing.
+        InvalidInputError: If the operation type is not a path payment variant
+            (also a ``ValueError``).
+        RecordValidationError: If required fields are missing. Note this is
+            **not** a ``KeyError`` — see ``ingestion/exceptions.py``.
     """
     op_type = path_payment_op.get("type")
     if op_type not in ("path_payment_strict_send", "path_payment_strict_receive"):
-        raise ValueError(f"Operation type {op_type} is not a path payment variant")
+        raise InvalidInputError(
+            f"Operation type {op_type} is not a path payment variant",
+            source="payment_path_analyzer.reconstruct_path_flow",
+            reason=f"unsupported operation type {op_type!r}",
+        )
 
     # Extract mandatory fields
     source_wallet = path_payment_op.get("source_account")
@@ -70,7 +78,12 @@ def reconstruct_path_flow(
     created_at = path_payment_op.get("created_at")
 
     if not all([source_wallet, destination_wallet, transaction_id]):
-        raise KeyError("Missing required fields: source_account, destination_account, transaction_id")
+        raise RecordValidationError(
+            "Missing required fields: source_account, destination_account, transaction_id",
+            source="payment_path_analyzer.reconstruct_path_flow",
+            reason="one or more required fields are absent or empty",
+            raw=path_payment_op,
+        )
 
     # Parse the asset path
     asset_path = path_payment_op.get("asset_path", [])
