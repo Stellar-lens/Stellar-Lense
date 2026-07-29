@@ -341,7 +341,42 @@ def main() -> None:
 
     df.to_parquet(args.output)
     print(f"Wrote {len(df)} rows to {args.output}")
-    if not args.quiet:
+
+    try:
+        from data.lineage import LineageNodeType, LineageTracker
+
+        tracker = LineageTracker(graph_name="synthetic_dataset_generation")
+        node = tracker.register_dataset(
+            name="synthetic_dataset",
+            filepath=args.output,
+            node_type=LineageNodeType.GENERATED if hasattr(LineageNodeType, "GENERATED") else LineageNodeType.DERIVED_DATASET,
+            metadata={
+                "profile": args.profile,
+                "n_wallets": args.n_wallets,
+                "seed": args.seed,
+                "wash_offset": args.wash_offset,
+                "wash_noise": args.wash_noise,
+            },
+            row_count=len(df),
+            columns=list(df.columns),
+        )
+        tracker.add_transformation_step(
+            node_id=node.node_id,
+            step_name="generate_synthetic_dataset",
+            transform_type="simulation",
+            parameters={"profile": args.profile, "seed": args.seed},
+        )
+        sidecar = tracker.save_sidecar(args.output)
+        quiet = getattr(args, "quiet", False)
+        if not quiet:
+            print(f"Wrote lineage sidecar to {sidecar}")
+    except Exception as err:
+        quiet = getattr(args, "quiet", False)
+        if not quiet:
+            print(f"Lineage sidecar warning: {err}")
+
+    quiet = getattr(args, "quiet", False)
+    if not quiet:
         print_dataset_summary(df, profile=args.profile)
 
 
