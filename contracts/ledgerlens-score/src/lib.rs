@@ -57,6 +57,9 @@ mod test_deprecation_compat;
 // #[cfg(test)]
 // mod test_batch_attestation;
 
+#[cfg(test)]
+mod test_batch_attestation_replay;
+
 // #[cfg(test)]
 // mod test_score_delta;
 
