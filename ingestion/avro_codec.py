@@ -23,6 +23,7 @@ import fastavro
 
 from config import config
 from ingestion.data_models import Asset, Trade
+from ingestion.exceptions import SchemaDecodeError, SchemaValidationError
 
 
 @lru_cache(maxsize=4)
@@ -93,20 +94,50 @@ def serialize(record: dict, schema: dict) -> bytes:
     Raises if *record* is missing fields or has wrong-typed values — this is the
     first line of defence against poison-pill messages.
     """
-    fastavro.validation.validate(record, schema, raise_errors=True)
-    buffer = io.BytesIO()
-    fastavro.schemaless_writer(buffer, schema, record)
-    return cast(bytes, buffer.getvalue())
+    try:
+        fastavro.validation.validate(record, schema, raise_errors=True)
+        buffer = io.BytesIO()
+        fastavro.schemaless_writer(buffer, schema, record)
+        return cast(bytes, buffer.getvalue())
+    except SchemaValidationError:
+        raise
+    except Exception as exc:
+        raise SchemaValidationError.from_exception(
+            exc,
+            source="kafka",
+            operation="serialize_avro",
+            details={"record_type": schema.get("name", "unknown")},
+        ) from exc
 
 
 def deserialize(value: bytes, schema: dict) -> dict:
     """Decode schemaless Avro binary *value* back into a record dict."""
-    return cast(dict[Any, Any], fastavro.schemaless_reader(io.BytesIO(value), schema))
+    try:
+        return cast(dict[Any, Any], fastavro.schemaless_reader(io.BytesIO(value), schema))
+    except SchemaDecodeError:
+        raise
+    except Exception as exc:
+        raise SchemaDecodeError.from_exception(
+            exc,
+            source="kafka",
+            operation="deserialize_avro",
+            details={"payload_size_bytes": len(value)},
+        ) from exc
 
 
 def validate(record: dict, schema: dict) -> None:
     """Raise ``fastavro`` validation error if *record* does not match *schema*."""
-    fastavro.validation.validate(record, schema, raise_errors=True)
+    try:
+        fastavro.validation.validate(record, schema, raise_errors=True)
+    except SchemaValidationError:
+        raise
+    except Exception as exc:
+        raise SchemaValidationError.from_exception(
+            exc,
+            source="kafka",
+            operation="validate_avro",
+            details={"record_type": schema.get("name", "unknown")},
+        ) from exc
 
 
 # ---------------------------------------------------------------------------

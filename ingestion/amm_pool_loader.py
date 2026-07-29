@@ -15,6 +15,7 @@ from stellar_sdk import Server
 
 from config import config
 from ingestion.data_models import Asset, Trade
+from ingestion.exceptions import IngestionNotFoundError, RecordValidationError
 from utils.logging import get_logger
 from utils.retry import retry_with_backoff
 
@@ -23,14 +24,17 @@ logger = get_logger(__name__)
 _POOL_ID_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
-class PoolNotFoundError(Exception):
+class PoolNotFoundError(IngestionNotFoundError):
     """Raised when a liquidity pool ID is not found on Horizon (HTTP 404)."""
 
 
 def _validate_pool_id(pool_id: str) -> None:
     if not _POOL_ID_RE.match(pool_id):
-        raise ValueError(
-            f"Invalid pool ID {pool_id!r} — must be a 64-character lowercase hex string"
+        raise RecordValidationError(
+            f"Invalid pool ID {pool_id!r} — must be a 64-character lowercase hex string",
+            source="horizon",
+            operation="validate_pool_id",
+            details={"field": "pool_id"},
         )
 
 
@@ -64,7 +68,11 @@ def _amm_record_to_trade(record: dict) -> Trade:
 def _fetch_page(session: requests.Session, url: str, params: dict) -> dict:
     resp = session.get(url, params=params, timeout=30)
     if resp.status_code == 404:
-        raise PoolNotFoundError(f"Liquidity pool not found: {url}")
+        raise PoolNotFoundError(
+            f"Liquidity pool not found: {url}",
+            source="horizon",
+            operation="fetch_amm_pool",
+        )
     resp.raise_for_status()
     return cast(dict[Any, Any], resp.json())
 

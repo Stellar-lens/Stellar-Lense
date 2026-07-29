@@ -14,6 +14,7 @@ from collections.abc import Callable
 from typing import TypeVar
 
 from config import config
+from ingestion.exceptions import IngestionRateLimitError
 from ingestion.rate_limiter import TokenBucketLimiter
 from monitoring.ingestion_metrics import emit_ingestion_failure, emit_ingestion_success
 from utils.logging import get_logger
@@ -35,7 +36,7 @@ def get_limiter() -> TokenBucketLimiter:
     return _limiter
 
 
-class HorizonRateLimitExceeded(RuntimeError):
+class HorizonRateLimitExceeded(IngestionRateLimitError):
     """Raised when HORIZON_MAX_RETRIES consecutive 429s are exhausted."""
 
 
@@ -80,7 +81,10 @@ def fetch(
                 raise
             if attempt == config.HORIZON_MAX_RETRIES:
                 raise HorizonRateLimitExceeded(
-                    f"Horizon returned 429 on all {attempt} attempts"
+                    f"Horizon returned 429 on all {attempt} attempts",
+                    source="horizon",
+                    operation="fetch",
+                    details={"attempts": attempt},
                 ) from exc
 
             delay = min(max_delay, base_delay * (2 ** (attempt - 1)))
