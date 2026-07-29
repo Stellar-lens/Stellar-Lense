@@ -106,6 +106,9 @@ jobs:
       - name: Check public API compatibility (tests/fixtures/api_baseline.json)
         run: python scripts/check_api_compatibility.py
 
+      - name: Check CLI command contracts (scripts/cli_contracts.py)
+        run: python scripts/check_cli_contracts.py
+
       - name: Test
         run: pytest -q
 
