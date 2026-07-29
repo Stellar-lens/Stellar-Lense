@@ -15,6 +15,7 @@ from typing import TypeVar
 
 from config import config
 from ingestion.rate_limiter import TokenBucketLimiter
+from monitoring.ingestion_metrics import emit_ingestion_failure, emit_ingestion_success
 from utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -65,9 +66,16 @@ def fetch(
 
     for attempt in range(1, config.HORIZON_MAX_RETRIES + 1):
         limiter.acquire()
+        started_at = time.perf_counter()
         try:
-            return call()
+            result = call()
         except Exception as exc:
+            emit_ingestion_failure(
+                "horizon",
+                exc,
+                stage="fetch",
+                duration_seconds=time.perf_counter() - started_at,
+            )
             if _status_code(exc) != 429:
                 raise
             if attempt == config.HORIZON_MAX_RETRIES:
@@ -85,5 +93,24 @@ def fetch(
                 delay,
             )
             sleep_fn(delay)
+        else:
+            emit_ingestion_success(
+                "horizon",
+                stage="fetch",
+                record_count=_record_count(result),
+                duration_seconds=time.perf_counter() - started_at,
+            )
+            return result
 
     raise AssertionError("unreachable")  # pragma: no cover
+
+
+def _record_count(result: object) -> int:
+    """Best-effort count for a Horizon page without coupling to its schema."""
+    if not isinstance(result, dict):
+        return 1
+    embedded = result.get("_embedded")
+    if not isinstance(embedded, dict):
+        return 1
+    records = embedded.get("records")
+    return len(records) if isinstance(records, list) else 1

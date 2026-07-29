@@ -39,12 +39,14 @@ import json
 import os
 import re
 import socket
+import time
 
 from confluent_kafka import KafkaException, Producer
 
 from config import config
 from ingestion.avro_codec import load_schema, serialize, trade_to_record
 from ingestion.data_models import Trade
+from monitoring.ingestion_metrics import emit_ingestion_failure, emit_ingestion_success
 from utils.logging import correlation_headers, get_logger, log_context
 from utils.retry import retry_with_backoff
 
@@ -155,10 +157,17 @@ class HorizonKafkaProducer:
         from ingestion.avro_codec import _avro_crc32_fingerprint
 
         with log_context(pipeline_stage="ingestion.kafka_producer", trade_id=trade.trade_id):
+            started_at = time.perf_counter()
             record = trade_to_record(trade)
             try:
                 value = serialize(record, self._schema)
             except Exception as exc:  # serialisation / validation failure → DLQ
+                emit_ingestion_failure(
+                    "kafka",
+                    exc,
+                    stage="validation",
+                    duration_seconds=time.perf_counter() - started_at,
+                )
                 logger.error(
                     "Serialisation failed for trade %s — routing to DLQ: %s",
                     record.get("trade_id"),
@@ -172,7 +181,22 @@ class HorizonKafkaProducer:
             key = record["base_account"].encode("utf-8")
             # Schema version header: hex CRC-32 fingerprint of the encoding schema.
             schema_fp = hex(_avro_crc32_fingerprint(self._schema) & 0xFFFFFFFF).encode("utf-8")
-            self._produce_with_headers(topic, value, key, schema_fp)
+            try:
+                self._produce_with_headers(topic, value, key, schema_fp)
+            except Exception as exc:
+                emit_ingestion_failure(
+                    "kafka",
+                    exc,
+                    stage="publish",
+                    duration_seconds=time.perf_counter() - started_at,
+                )
+                raise
+            emit_ingestion_success(
+                "kafka",
+                stage="publish",
+                record_count=1,
+                duration_seconds=time.perf_counter() - started_at,
+            )
             self._producer.poll(0)
 
     def begin_transaction(self) -> None:
