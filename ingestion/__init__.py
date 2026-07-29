@@ -1,3 +1,15 @@
+from .contracts import (
+    AnomalyDetectionStrategy,
+    BatchSource,
+    DataSource,
+    SourceConfig,
+    SourceRegistry,
+    SourceState,
+    StreamSource,
+    TradeBatchSource,
+    TradeSourceConfig,
+    TradeStreamSource,
+)
 from .data_models import AccountActivity, OrderBookEvent, Trade
 from .data_quality import (
     CompletenessRule,
@@ -10,16 +22,34 @@ from .data_quality import (
 )
 from .sketches import WalletSketchBook
 
+
+def _register_builtin_sources() -> None:
+    """Lazy-register adapter implementations (avoids heavy imports at package level)."""
+    try:
+        from .adapters import HorizonHistoricalSource, HorizonSSESource, KafkaTradeSource
+
+        SourceRegistry.register("horizon_sse", HorizonSSESource)
+        SourceRegistry.register("horizon_historical", HorizonHistoricalSource)
+        SourceRegistry.register("kafka", KafkaTradeSource)
+    except ImportError:
+        pass
+
 __all__ = [
-    "Trade",
-    "OrderBookEvent",
     "AccountActivity",
+    "AnomalyDetectionStrategy",
+    "BatchSource",
+    "DataSource",
+    "HorizonHistoricalSource",
+    "HorizonSSESource",
+    "KafkaTradeSource",
+    "OrderBookEvent",
+    "SourceConfig",
+    "SourceRegistry",
+    "SourceState",
+    "StreamSource",
+    "Trade",
+    "TradeBatchSource",
+    "TradeSourceConfig",
+    "TradeStreamSource",
     "WalletSketchBook",
-    "LedgerQualityScorer",
-    "QualityDimension",
-    "ReadinessStatus",
-    "QualityReport",
-    "QualityRuleResult",
-    "CompletenessRule",
-    "StellarAddressValidityRule",
 ]

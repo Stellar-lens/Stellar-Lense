@@ -27,6 +27,7 @@ import pandas as pd
 from stellar_sdk import Asset as SdkAsset
 
 from config import config
+from config.contracts import validate_mode
 from detection.feature_engineering import build_feature_matrix
 from detection.risk_score_store import RiskScoreStore
 from detection.wallet_graph import build_funding_graph, detect_wash_trading_rings, ring_id_map
@@ -78,8 +79,12 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
-    config.validate()
     args = parse_args()
+    # Validated *after* parsing --submit-onchain: calling this before parsing
+    # args always validated the non-onchain contract, silently skipping the
+    # LEDGERLENS_CONTRACT_ID / LEDGERLENS_SUBMITTER_SECRET checks even when
+    # --submit-onchain was passed.
+    validate_mode("pipeline_onchain" if args.submit_onchain else "pipeline")
 
     if args.dry_run:
         logger.info("[DRY RUN] No data will be written.")

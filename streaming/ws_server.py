@@ -25,6 +25,7 @@ from prometheus_client import Counter, Gauge
 from pydantic import BaseModel, Field, ValidationError
 
 from config import config
+from config.contracts import validate_mode
 from streaming.pubsub_router import PubSubRouter
 from streaming.ws_abuse_detector import AbuseDetector
 from streaming.ws_auth import JWTAuthenticator
@@ -840,10 +841,16 @@ async def run_ws_server(host: str = "127.0.0.1", port: int = 8765) -> None:
 def start_ws_server_thread(host: str = "127.0.0.1", port: int = 8765) -> threading.Thread:
     """Launch the WebSocket server in a daemon thread.
 
+    Validates the "ws_server" config contract first (e.g. JWT_PUBLIC_KEY_PATH
+    must exist) so a misconfigured deployment fails immediately here instead
+    of every client hitting a FileNotFoundError on first connection.
+
     Returns:
         Threading.Thread object (daemon=True)
     """
     global _loop
+
+    validate_mode("ws_server")
 
     ready = threading.Event()
 
