@@ -5,6 +5,8 @@ import os
 import pytest
 from sklearn.ensemble import RandomForestClassifier
 
+import config.settings as settings_module
+
 from detection.model_registry import (
     _compute_version_hash,
     get_current_version,
@@ -301,18 +303,15 @@ class TestSigningIntegration:
         with pytest.raises(ModelIntegrityError):
             load_latest_model("rf", model_dir)
 
-    def test_load_raises_on_missing_signing_key(self, tmp_path, dummy_model):
-        import config.settings as settings_module
+    def test_load_raises_on_missing_signing_key(self, tmp_path, dummy_model, monkeypatch):
+        """load_latest_model should raise when signing key is empty.
 
+        Uses ``monkeypatch.setattr`` on the property so the original value
+        is automatically restored after the test — no more try/finally
+        or ``object.__setattr__`` global-state coupling.
+        """
         model_dir = str(tmp_path)
         save_versioned_model(dummy_model, "rf", "v001", model_dir)
-        object.__setattr__(settings_module.settings, "model_signing_key", "")
-        try:
-            with pytest.raises(ModelIntegrityError, match="LEDGERLENS_MODEL_SIGNING_KEY"):
-                load_latest_model("rf", model_dir)
-        finally:
-            object.__setattr__(
-                settings_module.settings,
-                "model_signing_key",
-                "test-signing-key-for-unit-tests-only",
-            )
+        monkeypatch.setattr(settings_module.settings, "model_signing_key", "")
+        with pytest.raises(ModelIntegrityError, match="LEDGERLENS_MODEL_SIGNING_KEY"):
+            load_latest_model("rf", model_dir)
