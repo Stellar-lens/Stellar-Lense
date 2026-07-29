@@ -44,6 +44,7 @@ from streaming.alert_dispatcher import AlertDispatcher
 from streaming.feature_buffer import FeatureBuffer
 from streaming.streaming_scorer import StreamingScorer
 from utils.circuit_breaker import CircuitBreaker, CircuitOpenError
+from utils.correlation import PipelineStage, correlation_context, generate_correlation_id
 from utils.logging import get_logger
 
 if TYPE_CHECKING:
@@ -601,15 +602,32 @@ class StreamingPipeline:
                 for trade in stream_trades(base_asset, counter_asset):
                     if self._stop_event.is_set():
                         return
-                    self._buffer.update(trade)
+                    trade_id = getattr(trade, "trade_id", None) or generate_correlation_id()
                     pair_id = trade.base_asset.pair_id(trade.counter_asset)
-                    assert self._scorer is not None
-                    for wallet in (trade.base_account, trade.counter_account):
-                        # Enrich with latest metadata before scoring.
-                        self._enrich_from_metadata(wallet)
-                        score = self._scorer.score_wallet(wallet, self._buffer)
-                        if score is not None:
-                            self._dispatch_with_cb(wallet, score, pair_id)
+                    with correlation_context(
+                        trade_id,
+                        stage=PipelineStage.STREAMING,
+                        pair_id=pair_id,
+                    ):
+                        self._buffer.update(trade)
+                        assert self._scorer is not None
+                        for wallet in (trade.base_account, trade.counter_account):
+                            with correlation_context(
+                                trade_id,
+                                stage=PipelineStage.SCORING,
+                                pair_id=pair_id,
+                                wallet=wallet,
+                            ):
+                                self._enrich_from_metadata(wallet)
+                                score = self._scorer.score_wallet(wallet, self._buffer)
+                                if score is not None:
+                                    with correlation_context(
+                                        trade_id,
+                                        stage=PipelineStage.ALERTING,
+                                        pair_id=pair_id,
+                                        wallet=wallet,
+                                    ):
+                                        self._dispatch_with_cb(wallet, score, pair_id)
             except Exception as exc:
                 if self._stop_event.is_set():
                     return
