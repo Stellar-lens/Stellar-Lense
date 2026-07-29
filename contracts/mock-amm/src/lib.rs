@@ -14,6 +14,13 @@ use soroban_sdk::{
     contract, contracterror, contractimpl, contracttype, symbol_short, Address, Env, Symbol,
 };
 
+#[contracttype]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum FailPolicy {
+    FailClosed = 0,
+    FailOpen = 1,
+}
+
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 #[repr(u32)]
@@ -28,16 +35,28 @@ pub enum MockAmmError {
     /// LedgerLens's gate returned `false` because the score's confidence is
     /// below the configured minimum.
     LowConfidence = 4,
+    /// The configured oracle call trapped or could not be decoded.
+    OracleUnavailable = 5,
+    /// The stored score is older than the configured fixture freshness window.
+    StaleScore = 6,
+    /// The configured oracle does not expose the required contract version.
+    UnsupportedVersion = 7,
+    /// Caller is not the configured fixture admin.
+    Unauthorized = 8,
 }
 
 #[contracttype]
 enum DataKey {
+    Admin,
     /// Contract ID of the LedgerLens score registry this AMM trusts.
     LedgerLens,
     /// Risk-gate threshold (0-100) this AMM enforces.
     GateThreshold,
     /// Minimum confidence (0-100) required of the score backing a gate decision.
     MinConfidence,
+    FailPolicy,
+    MaxStalenessSecs,
+    RequiredOracleVersion,
 }
 
 #[contract]
@@ -45,28 +64,58 @@ pub struct MockAmm;
 
 #[contractimpl]
 impl MockAmm {
-    /// One-time wiring: record the LedgerLens deployment and the risk
-    /// threshold this AMM enforces. No admin auth — this is a test fixture,
-    /// not a production contract.
-    pub fn initialize(env: Env, ledgerlens: Address, gate_threshold: u32) {
+    /// One-time wiring: record the LedgerLens deployment, admin, version
+    /// expectation, bounded freshness window, and failure policy enforced by
+    /// this SDK conformance fixture.
+    pub fn initialize(env: Env, admin: Address, ledgerlens: Address, gate_threshold: u32) {
+        admin.require_auth();
+        env.storage().instance().set(&DataKey::Admin, &admin);
         env.storage().instance().set(&DataKey::LedgerLens, &ledgerlens);
         env.storage().instance().set(&DataKey::GateThreshold, &gate_threshold);
         env.storage().instance().set(&DataKey::MinConfidence, &0u32);
+        env.storage().instance().set(&DataKey::FailPolicy, &FailPolicy::FailClosed);
+        env.storage().instance().set(&DataKey::MaxStalenessSecs, &604_800u64);
+        env.storage().instance().set(&DataKey::RequiredOracleVersion, &0u32);
     }
 
     /// Register or rotate the LedgerLens oracle this AMM consults for gate checks.
-    pub fn set_risk_oracle(env: Env, oracle: Address) {
+    pub fn set_risk_oracle(env: Env, admin: Address, oracle: Address) -> Result<(), MockAmmError> {
+        Self::require_admin(&env, &admin)?;
         env.storage().instance().set(&DataKey::LedgerLens, &oracle);
+        Ok(())
     }
 
     /// Configure the score and confidence floors enforced by
     /// `provide_liquidity_gated`.
-    pub fn set_liquidity_gate_config(env: Env, gate_threshold: u32, min_confidence: u32) {
+    pub fn set_liquidity_gate_config(
+        env: Env,
+        admin: Address,
+        gate_threshold: u32,
+        min_confidence: u32,
+        fail_policy: FailPolicy,
+        max_staleness_secs: u64,
+        required_oracle_version: u32,
+    ) -> Result<(), MockAmmError> {
+        Self::require_admin(&env, &admin)?;
         env.storage().instance().set(&DataKey::GateThreshold, &gate_threshold);
         env.storage().instance().set(&DataKey::MinConfidence, &min_confidence);
+        env.storage().instance().set(&DataKey::FailPolicy, &fail_policy);
+        env.storage().instance().set(&DataKey::MaxStalenessSecs, &max_staleness_secs);
+        env.storage().instance().set(&DataKey::RequiredOracleVersion, &required_oracle_version);
+        Ok(())
     }
 
-    fn gate_config(env: &Env) -> Result<(Address, u32, u32), MockAmmError> {
+    fn require_admin(env: &Env, admin: &Address) -> Result<(), MockAmmError> {
+        let configured: Address =
+            env.storage().instance().get(&DataKey::Admin).ok_or(MockAmmError::NotConfigured)?;
+        if &configured != admin {
+            return Err(MockAmmError::Unauthorized);
+        }
+        admin.require_auth();
+        Ok(())
+    }
+
+    fn gate_config(env: &Env) -> Result<(Address, u32, u32, FailPolicy, u64, u32), MockAmmError> {
         let ledgerlens: Address = env
             .storage()
             .instance()
@@ -79,7 +128,27 @@ impl MockAmm {
             .ok_or(MockAmmError::NotConfigured)?;
         let min_confidence: u32 =
             env.storage().instance().get(&DataKey::MinConfidence).unwrap_or(0);
-        Ok((ledgerlens, gate_threshold, min_confidence))
+        let fail_policy: FailPolicy =
+            env.storage().instance().get(&DataKey::FailPolicy).unwrap_or(FailPolicy::FailClosed);
+        let max_staleness_secs: u64 =
+            env.storage().instance().get(&DataKey::MaxStalenessSecs).unwrap_or(604_800);
+        let required_oracle_version: u32 =
+            env.storage().instance().get(&DataKey::RequiredOracleVersion).unwrap_or(0);
+        Ok((
+            ledgerlens,
+            gate_threshold,
+            min_confidence,
+            fail_policy,
+            max_staleness_secs,
+            required_oracle_version,
+        ))
+    }
+
+    fn allow_on_unavailable(policy: FailPolicy) -> Result<(), MockAmmError> {
+        match policy {
+            FailPolicy::FailOpen => Ok(()),
+            FailPolicy::FailClosed => Err(MockAmmError::OracleUnavailable),
+        }
     }
 
     /// Attempt a swap for `user` on `asset_pair`. Rejected with
@@ -96,12 +165,30 @@ impl MockAmm {
             return Err(MockAmmError::InvalidAmount);
         }
 
-        let (ledgerlens, gate_threshold, _) = Self::gate_config(&env)?;
+        let (ledgerlens, gate_threshold, _, fail_policy, max_staleness_secs, required_version) =
+            Self::gate_config(&env)?;
 
         let client = LedgerLensScoreContractClient::new(&env, &ledgerlens);
-        let is_safe = client.query_risk_gate(&user, &asset_pair, &gate_threshold);
+        if required_version > 0 {
+            match client.try_get_contract_version() {
+                Ok(Ok(version)) if version >= required_version => {}
+                Ok(Ok(_)) => return Err(MockAmmError::UnsupportedVersion),
+                _ => return Self::allow_on_unavailable(fail_policy),
+            }
+        }
+        let is_safe = match client.try_query_risk_gate(&user, &asset_pair, &gate_threshold) {
+            Ok(Ok(v)) => v,
+            _ => return Self::allow_on_unavailable(fail_policy),
+        };
         if !is_safe {
             return Err(MockAmmError::HighRiskWallet);
+        }
+        let score = match client.try_get_score(&user, &asset_pair) {
+            Ok(Ok(score)) => score,
+            _ => return Self::allow_on_unavailable(fail_policy),
+        };
+        if env.ledger().timestamp().saturating_sub(score.timestamp) > max_staleness_secs {
+            return Err(MockAmmError::StaleScore);
         }
 
         Ok(())
@@ -123,16 +210,33 @@ impl MockAmm {
             return Err(MockAmmError::InvalidAmount);
         }
 
-        let (ledgerlens, gate_threshold, min_confidence) = Self::gate_config(&env)?;
+        let (
+            ledgerlens,
+            gate_threshold,
+            min_confidence,
+            fail_policy,
+            max_staleness_secs,
+            required_version,
+        ) = Self::gate_config(&env)?;
         let asset_pair = symbol_short!("XLM_USDC");
 
         let client = LedgerLensScoreContractClient::new(&env, &ledgerlens);
-        let is_safe = client.query_risk_gate_with_confidence(
+        if required_version > 0 {
+            match client.try_get_contract_version() {
+                Ok(Ok(version)) if version >= required_version => {}
+                Ok(Ok(_)) => return Err(MockAmmError::UnsupportedVersion),
+                _ => return Self::allow_on_unavailable(fail_policy),
+            }
+        }
+        let is_safe = match client.try_query_risk_gate_with_confidence(
             &provider,
             &asset_pair,
             &gate_threshold,
             &min_confidence,
-        );
+        ) {
+            Ok(Ok(v)) => v,
+            _ => return Self::allow_on_unavailable(fail_policy),
+        };
         if !is_safe {
             match client.try_get_score(&provider, &asset_pair) {
                 Ok(Ok(score)) if score.confidence < min_confidence => {
@@ -140,6 +244,13 @@ impl MockAmm {
                 }
                 _ => return Err(MockAmmError::HighRiskWallet),
             }
+        }
+        let score = match client.try_get_score(&provider, &asset_pair) {
+            Ok(Ok(score)) => score,
+            _ => return Self::allow_on_unavailable(fail_policy),
+        };
+        if env.ledger().timestamp().saturating_sub(score.timestamp) > max_staleness_secs {
+            return Err(MockAmmError::StaleScore);
         }
 
         Ok(())

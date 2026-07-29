@@ -146,3 +146,5 @@ Recommended operator limits:
 - WASM upgrade governance: `propose_upgrade` / `execute_upgrade` / `veto_upgrade`
 - Upgrade delay configuration: `set_upgrade_delay` / `get_upgrade_delay`
 - Threat model: [`SECURITY.md`](../SECURITY.md#upgrade-governance--threat-model)
+- Canonical export: [`configuration-export.md`](./configuration-export.md)
+- Safe defaults: [`configuration-safe-defaults.md`](./configuration-safe-defaults.md)

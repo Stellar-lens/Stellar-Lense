@@ -10,6 +10,11 @@ Soroban smart contract that serves as the on-chain risk-score registry for **Led
 
 LedgerLens detects wash trading and artificial volume on the Stellar Decentralised Exchange (SDEX) by analysing trade data with statistical (Benford's Law) and machine learning techniques. The off-chain detection pipeline computes a **LedgerLens Risk Score (0-100)** for wallets and asset pairs, and this contract acts as the **on-chain truth layer** for those scores — making fraud signals composable with other Soroban protocols (AMMs, lending platforms, DEX aggregators) without relying on an external oracle.
 
+New to the terminology below? [`docs/glossary.md`](docs/glossary.md) defines every term precisely
+against the actual implementation — including a few (**shard**, **finality**, **attestation**,
+**pause**) whose meaning here is narrower or different from what you might assume from general
+blockchain usage.
+
 ## Features
 
 - **On-Chain Risk Score Registry**: Stores the latest LedgerLens risk score, flags, confidence, and timestamp per wallet/asset-pair
@@ -557,6 +562,8 @@ See [`examples/amm_gate_example.rs`](examples/amm_gate_example.rs) and
 7. **Score Attestation**: An opt-in secp256k1 signature over the score payload lets the off-chain pipeline vouch for its contents independent of `require_auth` — see [Score Attestation](#score-attestation)
 8. **Score Submission Floor**: An opt-in per-wallet floor that blocks downward score-revision attacks on wallets whose historical peak crossed a danger level — see [Score Submission Floor](#score-submission-floor)
 
+These are backed by a set of non-negotiable implementation invariants — fail-closed gates, no-panic reads, bounded storage, and append-only event/error stability — documented with their concrete enforcement (code + tests + CI) in [`docs/invariants.md`](docs/invariants.md).
+
 ## Testing
 
 Run the test suite with:
@@ -788,7 +795,7 @@ MIT
 
 ## Contributing
 
-Contributions are welcome. LedgerLens is an open-source public good built for the Stellar ecosystem. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, required checks, and PR guidelines.
+Contributions are welcome. LedgerLens is an open-source public good built for the Stellar ecosystem. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, required checks, and PR guidelines, [`docs/invariants.md`](docs/invariants.md) for the non-negotiable behaviors (fail-closed gates, no-panic reads, bounded storage, append-only event/error stability) that any change to `lib.rs` must preserve, and [`docs/review-checklists.md`](docs/review-checklists.md) for the specific gates governance, cryptography, storage, upgrade, and composability changes are reviewed against.
 
 ## References
 

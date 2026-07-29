@@ -119,6 +119,13 @@ let private_score: u32 = client.get_private_aggregate_score(&wallet, &seed);
    (`get_private_aggregate_score`) has a private variant.  The per-pair
    `get_score` query is exact and not noise-calibrated.
 
+## Deletion-policy note
+
+Privacy-related score deletion is now intentionally separated from routine
+admin rights. `clear_score` and `clear_score_history` can be placed behind an
+explicit deletion-approval policy so normal governance operators cannot perform
+irreversible deletion without the separately configured high-risk approver.
+
 ## Example
 
 ```text
@@ -133,42 +140,77 @@ Noised score: 70 + Lap(0, 100) → e.g. 42 or 91
               (always clamped to [0, 100])
 ```
 
-## Recovery limits after on-chain deletion
+## Irreversible score deletion operations
 
-The differential-privacy query path does not change the deletion semantics of
-the underlying score contract.
+`clear_score` and `clear_score_history` are intentionally destructive operator
+tools. Before the changes for issues #791 and #792, the concrete behavior was:
 
-Current deletion behavior as of July 25, 2026:
+- both calls were admin-only and no-op on missing data;
+- `clear_score` removed only the latest `Score(wallet, pair)` entry;
+- `clear_score_history` removed only the `ScoreHistory(wallet, pair)` ring;
+- each path updated the histogram using only the current latest score when one
+  existed;
+- the emitted events (`clr_scr`, `clr_hist`) contained only the wallet topic
+  and the asset pair payload, so operators had no hashed reason/category or
+  auth-context evidence on chain.
 
-- `clear_score(wallet, asset_pair)` removes the latest live score from contract
-  storage.
-- `clear_score_history(wallet, asset_pair)` removes the history ring buffer for
-  that pair.
-- Both operations are irreversible from current on-chain contract storage
-  alone.
+The current operator workflow is:
 
-What can still be reconstructed:
+1. Call `get_deletion_preflight(wallet, pair)` to inspect the deletion scope.
+2. Execute `clear_score*` or `clear_score_history*`.
+3. Persist the unhashed case notes off chain if a human-readable record is
+   required.
 
-- The fact that a deletion happened, from the emitted `clr_scr` or `clr_hist`
-  event.
-- The transaction envelope, auths, and ledger inclusion proof showing who
-  invoked the deletion and when.
-- Prior values only if an off-chain indexer, replay archive, snapshot, or
-  backup captured them before deletion.
+### Preflight output
 
-What cannot be reconstructed from current chain state alone:
+`get_deletion_preflight` is read-only and returns:
 
-- The deleted score payload after `clear_score` if no external archive kept it.
-- The deleted history entries after `clear_score_history` if no external
-  archive kept them.
-- A full pre-deletion state snapshot solely from the deletion event, because
-  the event records the deletion action, not the erased payload.
+- `wallet`
+- `asset_pair`
+- `latest_score_present`
+- `history_count`
+- `audit_warning = Irreversible`
 
-Operational guidance:
+This preview intentionally avoids touching the history TTL, so operators can
+inspect the target without mutating its retention horizon.
 
-- Treat `clear_score` and `clear_score_history` as destructive administrative
-  actions.
-- Export or snapshot any data that may be needed for audit, rollback analysis,
-  or downstream replay before invoking either deletion path.
-- Retain off-chain event archives and score snapshots if recovery evidence is a
-  regulatory or incident-response requirement.
+### Audit trail shape
+
+`clr_scr` and `clr_hist` keep their existing topic shape
+`(event_name, EVENT_VERSION, wallet)` but now append richer payload data:
+
+- `asset_pair`
+- `by` (the configured admin address)
+- `latest_score_present`
+- `history_count`
+- `reason_hash = sha256(reason_bytes)`
+- `category_hash = sha256(category_bytes)`
+- `multisig_enabled`
+- `signer_count`
+- `threshold`
+
+Raw deleted `RiskScore` values are still excluded from the event payload.
+
+For backwards-compatible callers, `clear_score` and `clear_score_history`
+continue to exist and emit deterministic default hashes for
+`reason = "unspecified"` and categories `"score-clear"` / `"history-clear"`.
+Operators that want case-specific hashes can call
+`clear_score_with_audit(...)` or `clear_score_history_with_audit(...)`.
+
+### Compatibility impact
+
+- Public ABI: additive only. Existing delete entrypoints are preserved; new
+  preflight and `*_with_audit` functions are optional.
+- Event topics: unchanged.
+- Event payloads: append-only expansion of `clr_scr` / `clr_hist`.
+- Errors: unchanged.
+- Storage layout: unchanged. No new persistent deletion log is stored on chain.
+
+### Resource bounds
+
+- `history_count` is derived from the bounded score-history ring, whose maximum
+  depth remains `MAX_HISTORY_DEPTH = 50`.
+- Batch submission boundaries remain capped at `MAX_BATCH_SIZE = 20`.
+- The worst relevant cases are therefore still bounded by existing constants,
+  and the existing batch/history TTL tests and benches remain the governing
+  budget references for these paths.
