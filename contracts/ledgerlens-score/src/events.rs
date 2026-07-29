@@ -1,6 +1,6 @@
 use soroban_sdk::{contracttype, symbol_short, Address, Bytes, BytesN, Env, Symbol};
 
-use crate::types::RiskScore;
+use crate::types::{AlertAckRecord, AlertType, RiskScore};
 
 /// Event Schema Versioning
 ///
@@ -134,14 +134,68 @@ pub fn parameter_change_vetoed(env: &Env, proposal_id: u64, by: &Address) {
     env.events().publish((symbol_short!("prm_veto"),), (proposal_id, by.clone()));
 }
 
-pub fn score_history_cleared(env: &Env, wallet: &Address, asset_pair: &Symbol) {
-    env.events()
-        .publish((symbol_short!("clr_hist"), EVENT_VERSION, wallet.clone()), asset_pair.clone());
+#[allow(clippy::too_many_arguments)]
+pub fn score_history_cleared(
+    env: &Env,
+    wallet: &Address,
+    asset_pair: &Symbol,
+    by: &Address,
+    latest_score_present: bool,
+    history_count: u32,
+    reason_hash: &BytesN<32>,
+    category_hash: &BytesN<32>,
+    multisig_enabled: bool,
+    signer_count: u32,
+    threshold: u32,
+) {
+    env.events().publish(
+        (symbol_short!("clr_hist"), EVENT_VERSION, wallet.clone()),
+        (
+            asset_pair.clone(),
+            by.clone(),
+            latest_score_present,
+            history_count,
+            reason_hash.clone(),
+            category_hash.clone(),
+            multisig_enabled,
+            signer_count,
+            threshold,
+        ),
+    );
 }
 
-pub fn score_cleared(env: &Env, wallet: &Address, asset_pair: &Symbol) {
-    env.events()
-        .publish((symbol_short!("clr_scr"), EVENT_VERSION, wallet.clone()), asset_pair.clone());
+#[allow(clippy::too_many_arguments)]
+pub fn score_cleared(
+    env: &Env,
+    wallet: &Address,
+    asset_pair: &Symbol,
+    by: &Address,
+    latest_score_present: bool,
+    history_count: u32,
+    reason_hash: &BytesN<32>,
+    category_hash: &BytesN<32>,
+    multisig_enabled: bool,
+    signer_count: u32,
+    threshold: u32,
+) {
+    env.events().publish(
+        (symbol_short!("clr_scr"), EVENT_VERSION, wallet.clone()),
+        (
+            asset_pair.clone(),
+            by.clone(),
+            latest_score_present,
+            history_count,
+            reason_hash.clone(),
+            category_hash.clone(),
+            multisig_enabled,
+            signer_count,
+            threshold,
+        ),
+    );
+}
+
+pub fn deletion_policy_updated(env: &Env, enabled: bool, approver: &Option<Address>) {
+    env.events().publish((symbol_short!("del_pol"), EVENT_VERSION), (enabled, approver.clone()));
 }
 
 pub fn cooldown_updated(env: &Env, cooldown_secs: u64) {
@@ -670,6 +724,26 @@ pub fn param_change_proposed(env: &Env, key: &Symbol, apply_after: u64) {
     env.events().publish((symbol_short!("pc_prop"),), (key.clone(), apply_after));
 }
 
+/// Emitted when a risk-threshold + cooldown policy bundle is proposed via
+/// `propose_policy_bundle`.
+/// Topic: ("pbdl_prop",)  Data: (risk_threshold, cooldown_secs, apply_after)
+pub fn policy_bundle_proposed(
+    env: &Env,
+    risk_threshold: u32,
+    cooldown_secs: u64,
+    apply_after: u64,
+) {
+    env.events()
+        .publish((symbol_short!("pbdl_prop"),), (risk_threshold, cooldown_secs, apply_after));
+}
+
+/// Emitted when a pending policy bundle is applied via `apply_policy_bundle`,
+/// after both fields have been written atomically.
+/// Topic: ("pbdl_appl",)  Data: (risk_threshold, cooldown_secs)
+pub fn policy_bundle_applied(env: &Env, risk_threshold: u32, cooldown_secs: u64) {
+    env.events().publish((symbol_short!("pbdl_appl"),), (risk_threshold, cooldown_secs));
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn score_jump_anomaly(
     env: &Env,
@@ -711,4 +785,37 @@ pub fn suspicious_same_ledger_submission(
 
 pub fn wallet_cluster_assigned(env: &Env, wallet: &Address, cluster: u32) {
     env.events().publish((symbol_short!("wc_asgn"), wallet.clone()), cluster);
+}
+
+pub fn escalation_triggered(
+    env: &Env,
+    wallet: &Address,
+    asset_pair: &Symbol,
+    breach_count: u32,
+    score: u32,
+    escalation_threshold: u32,
+) {
+    env.events().publish(
+        (symbol_short!("esc_trig"), wallet.clone(), asset_pair.clone()),
+        (breach_count, score, escalation_threshold),
+    );
+}
+
+pub fn escalation_resolved(
+    env: &Env,
+    wallet: &Address,
+    asset_pair: &Symbol,
+    breach_count: u32,
+    score: u32,
+) {
+    env.events().publish(
+        (symbol_short!("esc_res"), wallet.clone(), asset_pair.clone()),
+        (breach_count, score),
+    );
+}
+
+
+
+pub fn escalation_threshold_updated(env: &Env, old_threshold: u32, new_threshold: u32) {
+    env.events().publish((symbol_short!("esc_thr"),), (old_threshold, new_threshold));
 }

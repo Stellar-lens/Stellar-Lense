@@ -1,6 +1,7 @@
 use crate::{Error, LedgerLensAggregator, LedgerLensAggregatorClient};
+use ledgerlens_test_support::{generate_score_roles, test_env};
 use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
-use soroban_sdk::{symbol_short, testutils::Address as _, Address, Env, Vec};
+use soroban_sdk::{symbol_short, testutils::Address as _, Address, Env, Symbol, Vec};
 
 /// A shard whose interface has fully drifted: it advertises no capability the
 /// aggregator depends on.
@@ -50,6 +51,28 @@ mod legacy_shard {
     }
 }
 
+/// A shard that passes capability registration but does not implement the
+/// configuration getters used by split-brain probing.
+mod deceptive_shard {
+    use soroban_sdk::{contract, contractimpl, Env, Symbol};
+
+    #[contract]
+    pub struct DeceptiveShard;
+
+    #[contractimpl]
+    impl DeceptiveShard {
+        pub fn supports_interface(env: Env, capability: Symbol) -> bool {
+            capability == Symbol::new(&env, "score")
+                || capability == Symbol::new(&env, "gate")
+                || capability == Symbol::new(&env, "aggr")
+        }
+
+        pub fn is_score_stale(_env: Env, _wallet: soroban_sdk::Address, _pair: Symbol) -> bool {
+            false
+        }
+    }
+}
+
 fn init_aggregator(env: &Env) -> LedgerLensAggregatorClient<'_> {
     let agg_id = env.register_contract(None, LedgerLensAggregator);
     let client = LedgerLensAggregatorClient::new(env, &agg_id);
@@ -59,8 +82,7 @@ fn init_aggregator(env: &Env) -> LedgerLensAggregatorClient<'_> {
 
 #[test]
 fn test_initialize() {
-    let env = Env::default();
-    env.mock_all_auths();
+    let env = test_env();
     let agg_id = env.register_contract(None, LedgerLensAggregator);
     let client = LedgerLensAggregatorClient::new(&env, &agg_id);
     let admin = Address::generate(&env);
@@ -70,8 +92,7 @@ fn test_initialize() {
 
 #[test]
 fn test_initialize_twice_fails() {
-    let env = Env::default();
-    env.mock_all_auths();
+    let env = test_env();
     let agg_id = env.register_contract(None, LedgerLensAggregator);
     let client = LedgerLensAggregatorClient::new(&env, &agg_id);
     let admin = Address::generate(&env);
@@ -81,9 +102,25 @@ fn test_initialize_twice_fails() {
 }
 
 #[test]
-fn test_get_admin_not_initialized() {
+fn test_initialize_requires_nominated_admin_and_rolls_back() {
     let env = Env::default();
+    let agg_id = env.register_contract(None, LedgerLensAggregator);
+    let client = LedgerLensAggregatorClient::new(&env, &agg_id);
+    let admin = Address::generate(&env);
+
+    // An arbitrary invoker cannot install a nominated admin without that
+    // address's authorization, and the failed invocation must not write state.
+    assert!(client.try_initialize(&admin).is_err());
+    assert_eq!(client.try_get_admin(), Err(Ok(Error::NotInitialized)));
+
     env.mock_all_auths();
+    client.initialize(&admin);
+    assert_eq!(client.get_admin(), admin);
+}
+
+#[test]
+fn test_get_admin_not_initialized() {
+    let env = test_env();
     let agg_id = env.register_contract(None, LedgerLensAggregator);
     let client = LedgerLensAggregatorClient::new(&env, &agg_id);
     let result = client.try_get_admin();
@@ -92,8 +129,7 @@ fn test_get_admin_not_initialized() {
 
 #[test]
 fn test_add_remove_shards() {
-    let env = Env::default();
-    env.mock_all_auths();
+    let env = test_env();
     let agg_id = env.register_contract(None, LedgerLensAggregator);
     let client = LedgerLensAggregatorClient::new(&env, &agg_id);
     let admin = Address::generate(&env);
@@ -112,8 +148,7 @@ fn test_add_remove_shards() {
 
 #[test]
 fn test_add_shard_self_reference_fails() {
-    let env = Env::default();
-    env.mock_all_auths();
+    let env = test_env();
     let agg_id = env.register_contract(None, LedgerLensAggregator);
     let client = LedgerLensAggregatorClient::new(&env, &agg_id);
     let admin = Address::generate(&env);
@@ -125,8 +160,7 @@ fn test_add_shard_self_reference_fails() {
 
 #[test]
 fn test_add_shard_duplicate_fails() {
-    let env = Env::default();
-    env.mock_all_auths();
+    let env = test_env();
     let agg_id = env.register_contract(None, LedgerLensAggregator);
     let client = LedgerLensAggregatorClient::new(&env, &agg_id);
     let admin = Address::generate(&env);
@@ -140,8 +174,7 @@ fn test_add_shard_duplicate_fails() {
 
 #[test]
 fn test_remove_nonexistent_shard_fails() {
-    let env = Env::default();
-    env.mock_all_auths();
+    let env = test_env();
     let agg_id = env.register_contract(None, LedgerLensAggregator);
     let client = LedgerLensAggregatorClient::new(&env, &agg_id);
     let admin = Address::generate(&env);
@@ -154,8 +187,7 @@ fn test_remove_nonexistent_shard_fails() {
 
 #[test]
 fn test_query_risk_gate_no_shards_fails_closed() {
-    let env = Env::default();
-    env.mock_all_auths();
+    let env = test_env();
     let agg_id = env.register_contract(None, LedgerLensAggregator);
     let client = LedgerLensAggregatorClient::new(&env, &agg_id);
     let wallet = Address::generate(&env);
@@ -165,8 +197,7 @@ fn test_query_risk_gate_no_shards_fails_closed() {
 
 #[test]
 fn test_query_risk_gate_all_shards_pass() {
-    let env = Env::default();
-    env.mock_all_auths();
+    let env = test_env();
     let agg_id = env.register_contract(None, LedgerLensAggregator);
     let client = LedgerLensAggregatorClient::new(&env, &agg_id);
     let admin = Address::generate(&env);
@@ -187,8 +218,7 @@ fn test_query_risk_gate_all_shards_pass() {
 
 #[test]
 fn test_query_risk_gate_one_shard_rejects() {
-    let env = Env::default();
-    env.mock_all_auths();
+    let env = test_env();
     let agg_id = env.register_contract(None, LedgerLensAggregator);
     let client = LedgerLensAggregatorClient::new(&env, &agg_id);
     let admin = Address::generate(&env);
@@ -208,9 +238,32 @@ fn test_query_risk_gate_one_shard_rejects() {
 }
 
 #[test]
-fn test_get_decay_rate_returns_primary_shard_when_shards_diverge() {
+fn test_oversized_asset_pair_fails_closed_before_shard_fanout() {
     let env = Env::default();
     env.mock_all_auths();
+    let agg_id = env.register_contract(None, LedgerLensAggregator);
+    let client = LedgerLensAggregatorClient::new(&env, &agg_id);
+    let admin = Address::generate(&env);
+    client.initialize(&admin);
+
+    let (shard_id, shard) = setup_score_shard(&env);
+    client.add_shard(&shard_id);
+
+    let wallet = Address::generate(&env);
+    let valid_pair = symbol_short!("XLM_USDC");
+    shard.submit_score(&Vec::new(&env), &wallet, &valid_pair, &10, &false, &false, &1, &100, &1, &None);
+
+    let oversized_pair = Symbol::new(&env, "PAIR123456");
+    assert!(!client.query_risk_gate(&wallet, &oversized_pair, &75));
+    assert_eq!(client.try_get_score(&wallet, &oversized_pair), Err(Ok(ledgerlens_score::Error::InvalidAttestation)));
+    assert_eq!(client.get_score_across_shards(&wallet, &oversized_pair).len(), 0);
+    assert_eq!(client.contagion_depth_across_shards(&wallet, &oversized_pair), 0);
+    assert_eq!(client.get_last_shard_failure(), None);
+}
+
+#[test]
+fn test_get_decay_rate_returns_primary_shard_when_shards_diverge() {
+    let env = test_env();
     let agg_id = env.register_contract(None, LedgerLensAggregator);
     let client = LedgerLensAggregatorClient::new(&env, &agg_id);
     let admin = Address::generate(&env);
@@ -429,10 +482,225 @@ fn test_add_shard_rejects_legacy_shard_without_supports_interface() {
 fn setup_score_shard(env: &Env) -> (Address, LedgerLensScoreContractClient<'_>) {
     let id = env.register_contract(None, LedgerLensScoreContract);
     let client = LedgerLensScoreContractClient::new(env, &id);
-    let admin = Address::generate(env);
-    let service = Address::generate(env);
+    let (admin, service) = generate_score_roles(env);
     client.initialize(&admin, &service);
     (id, client)
+}
+
+fn default_fingerprint() -> AggregatorConfigFingerprint {
+    AggregatorConfigFingerprint {
+        decay_num: 0,
+        decay_den: 1,
+        staleness_window: 604_800,
+        global_min_confidence: 0,
+        consensus_k: 2,
+        consensus_epsilon: 5,
+    }
+}
+
+#[test]
+fn test_detect_split_brain_aligned() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let client = init_aggregator(&env);
+    let (shard_a, _) = setup_score_shard(&env);
+    let (shard_b, _) = setup_score_shard(&env);
+    client.add_shard(&shard_a);
+    client.add_shard(&shard_b);
+
+    let wallet = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+    let report = client.detect_split_brain(&wallet, &pair);
+
+    assert_eq!(report.status, SplitBrainStatus::Aligned);
+    assert_eq!(report.shard_count, 2);
+    assert_eq!(report.healthy_count, 2);
+    assert_eq!(report.available_count, 2);
+    assert_eq!(report.quorum_count, 2);
+    assert_eq!(report.required_quorum, 2);
+    assert_eq!(report.mismatch_count, 0);
+    assert_eq!(report.canonical, MaybeAggregatorConfigFingerprint::Some(default_fingerprint()));
+}
+
+#[test]
+fn test_detect_split_brain_permutation_stable_majority() {
+    let env_a = Env::default();
+    env_a.mock_all_auths();
+    let client_a = init_aggregator(&env_a);
+    let wallet_a = Address::generate(&env_a);
+    let pair_a = symbol_short!("XLM_USDC");
+    let (a1, a1_client) = setup_score_shard(&env_a);
+    let (a2, _) = setup_score_shard(&env_a);
+    let (a3, _) = setup_score_shard(&env_a);
+    a1_client.set_decay_rate(&2, &1000);
+    client_a.add_shard(&a1);
+    client_a.add_shard(&a2);
+    client_a.add_shard(&a3);
+
+    let env_b = Env::default();
+    env_b.mock_all_auths();
+    let client_b = init_aggregator(&env_b);
+    let wallet_b = Address::generate(&env_b);
+    let pair_b = symbol_short!("XLM_USDC");
+    let (b1, b1_client) = setup_score_shard(&env_b);
+    let (b2, _) = setup_score_shard(&env_b);
+    let (b3, _) = setup_score_shard(&env_b);
+    b1_client.set_decay_rate(&2, &1000);
+    client_b.add_shard(&b2);
+    client_b.add_shard(&b3);
+    client_b.add_shard(&b1);
+
+    let report_a = client_a.detect_split_brain(&wallet_a, &pair_a);
+    let report_b = client_b.detect_split_brain(&wallet_b, &pair_b);
+
+    assert_eq!(report_a.status, SplitBrainStatus::SplitBrain);
+    assert_eq!(report_b.status, SplitBrainStatus::SplitBrain);
+    assert_eq!(report_a.canonical, report_b.canonical);
+    assert_eq!(report_a.quorum_count, 2);
+    assert_eq!(report_b.quorum_count, 2);
+    assert_eq!(report_a.mismatch_count, 1);
+    assert_eq!(report_b.mismatch_count, 1);
+}
+
+#[test]
+fn test_detect_split_brain_partial_failure_preserves_quorum() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let client = init_aggregator(&env);
+    let (shard_a, _) = setup_score_shard(&env);
+    let (shard_b, _) = setup_score_shard(&env);
+    let bad = env.register_contract(None, deceptive_shard::DeceptiveShard);
+    client.add_shard(&shard_a);
+    client.add_shard(&shard_b);
+    client.add_shard(&bad);
+
+    let wallet = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+    let report = client.detect_split_brain(&wallet, &pair);
+
+    assert_eq!(report.status, SplitBrainStatus::Aligned);
+    assert_eq!(report.healthy_count, 3);
+    assert_eq!(report.available_count, 2);
+    assert_eq!(report.unavailable_count, 1);
+    assert_eq!(report.quorum_count, 2);
+    assert_eq!(report.required_quorum, 2);
+    assert_eq!(report.diagnostics.get(2).unwrap().status, ShardProbeStatus::Unavailable);
+}
+
+#[test]
+fn test_detect_split_brain_byzantine_config_mismatch() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let client = init_aggregator(&env);
+    let (shard_a, shard_a_client) = setup_score_shard(&env);
+    let (shard_b, _) = setup_score_shard(&env);
+    shard_a_client.set_global_min_confidence(&50);
+    client.add_shard(&shard_a);
+    client.add_shard(&shard_b);
+
+    let wallet = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+    let report = client.detect_split_brain(&wallet, &pair);
+
+    assert_eq!(report.status, SplitBrainStatus::QuorumLost);
+    assert_eq!(report.available_count, 2);
+    assert_eq!(report.quorum_count, 1);
+    assert_eq!(report.required_quorum, 2);
+    assert_eq!(report.mismatch_count, 1);
+}
+
+#[test]
+fn test_detect_split_brain_stale_shard_causes_quorum_loss() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let client = init_aggregator(&env);
+    let (fresh_id, fresh_client) = setup_score_shard(&env);
+    let (stale_id, stale_client) = setup_score_shard(&env);
+    client.add_shard(&fresh_id);
+    client.add_shard(&stale_id);
+
+    let wallet = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+    fresh_client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &10,
+        &false,
+        &false,
+        &700_000,
+        &90,
+        &1,
+        &None,
+    );
+    stale_client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &10,
+        &false,
+        &false,
+        &1,
+        &90,
+        &1,
+        &None,
+    );
+
+    env.ledger().with_mut(|ledger| ledger.timestamp = 700_000);
+    let report = client.detect_split_brain(&wallet, &pair);
+
+    assert_eq!(report.status, SplitBrainStatus::QuorumLost);
+    assert_eq!(report.stale_count, 1);
+    assert_eq!(report.available_count, 1);
+    assert_eq!(report.required_quorum, 2);
+}
+
+#[test]
+fn test_set_shard_health_quarantines_and_restores_conflicting_shard() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let client = init_aggregator(&env);
+    let (shard_a, shard_a_client) = setup_score_shard(&env);
+    let (shard_b, _) = setup_score_shard(&env);
+    shard_a_client.set_decay_rate(&2, &1000);
+    client.add_shard(&shard_a);
+    client.add_shard(&shard_b);
+
+    let wallet = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+    assert_eq!(client.detect_split_brain(&wallet, &pair).status, SplitBrainStatus::QuorumLost);
+
+    client.set_shard_health(&shard_a, &false);
+    let quarantined = client.detect_split_brain(&wallet, &pair);
+    assert_eq!(quarantined.status, SplitBrainStatus::Aligned);
+    assert_eq!(quarantined.healthy_count, 1);
+    assert_eq!(quarantined.diagnostics.get(0).unwrap().status, ShardProbeStatus::Unhealthy);
+    assert!(!client.get_shard_health(&shard_a));
+
+    client.set_shard_health(&shard_a, &true);
+    assert!(client.get_shard_health(&shard_a));
+    assert_eq!(client.detect_split_brain(&wallet, &pair).status, SplitBrainStatus::QuorumLost);
+}
+
+#[test]
+fn test_detect_split_brain_max_shards_bounded_diagnostics() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let client = init_aggregator(&env);
+    for _ in 0..crate::MAX_SHARDS {
+        let (shard, _) = setup_score_shard(&env);
+        client.add_shard(&shard);
+    }
+
+    let wallet = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+    let report = client.detect_split_brain(&wallet, &pair);
+
+    assert_eq!(report.status, SplitBrainStatus::Aligned);
+    assert_eq!(report.shard_count, crate::MAX_SHARDS as u32);
+    assert_eq!(report.diagnostics.len(), crate::MAX_SHARDS as u32);
+    assert_eq!(report.quorum_count, crate::MAX_SHARDS as u32);
+    assert_eq!(report.required_quorum, 6);
 }
 
 #[test]
