@@ -24,6 +24,24 @@ strict_optional = true
 warn_return_any = true
 ignore_missing_imports = true
 warn_unused_ignores = true
+# Modules covered by the static analysis gate (issue #545)
+# Run with: python scripts/static_analysis_gate.py
+# or:       mypy detection ingestion streaming ci_metrics benchmarks utils
+
+# ---------------------------------------------------------------------------
+# bandit — security linting (issue #545)
+# ---------------------------------------------------------------------------
+[tool.bandit]
+# Exclude test files and vendored scripts from the security scan
+exclude_dirs = ["tests", "scripts"]
+# Skip B101 (assert statements) — used in test helpers that may be imported
+skips = ["B101"]
+
+# ---------------------------------------------------------------------------
+# radon — complexity analysis (issue #545)
+# ---------------------------------------------------------------------------
+# Run via: python scripts/static_analysis_gate.py --complexity-max 10
+# Or:      radon cc detection/ ingestion/ --min C --show-complexity
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -31,6 +49,7 @@ addopts = "-ra"
 markers = [
     "integration: marks tests as live Testnet integration tests (deselect with '-m not integration')",
     "slow: marks tests that run PPO training (deselect with '-m not slow')",
+    "concurrency: concurrency validation tests for streaming workers (included by default)",
 ]
 
 # ---------------------------------------------------------------------------

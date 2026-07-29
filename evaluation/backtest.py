@@ -127,6 +127,8 @@ def run_backtest(
     model_config: dict[str, Any],
     output_dir: str,
     threshold: float | None = None,
+    sweep: bool = False,
+    sweep_grid: list[float] | None = None,
 ) -> dict[str, Any]:
     """Replay a labelled Parquet dataset through the detection pipeline and
     write a standardized performance report.
@@ -178,6 +180,30 @@ def run_backtest(
         "per_asset_pair": _per_asset_pair_breakdown(df, y_true, y_pred),
     }
 
+    # Optional threshold sweep diagnostics
+    if sweep:
+        from evaluation.threshold_sweep import ThresholdSweep
+
+        sweep_engine = ThresholdSweep(y_true, y_score, grid=sweep_grid)
+        sweep_points = sweep_engine.sweep()
+        optimal_f1 = sweep_engine.find_optimal_threshold(metric="f1")
+        optimal_constrained = sweep_engine.find_optimal_threshold(
+            metric="f1", recall_floor=0.85
+        )
+        report["threshold_sweep"] = {
+            "grid_size": len(sweep_points),
+            "optimal_f1_threshold": optimal_f1.threshold,
+            "optimal_f1": optimal_f1.f1,
+            "optimal_constrained_threshold": optimal_constrained.threshold,
+            "optimal_constrained_f1": optimal_constrained.f1,
+            "optimal_constrained_recall": optimal_constrained.recall,
+        }
+        logger.info(
+            "Sweep complete: optimal F1=%.3f at threshold=%.3f",
+            optimal_f1.f1,
+            optimal_f1.threshold,
+        )
+
     with open(os.path.join(output_dir, "backtest_report.json"), "w") as f:
         json.dump(report, f, indent=2, sort_keys=True)
 
@@ -193,12 +219,20 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--threshold", type=float, default=None, help="Risk-probability cutoff in [0, 1]"
     )
+    parser.add_argument(
+        "--sweep",
+        action="store_true",
+        default=False,
+        help="Run threshold sweep and include optimal threshold in report",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = _parse_args()
-    report = run_backtest(args.dataset_path, {}, args.output_dir, threshold=args.threshold)
+    report = run_backtest(
+        args.dataset_path, {}, args.output_dir, threshold=args.threshold, sweep=args.sweep
+    )
     print(json.dumps(report, indent=2, sort_keys=True))
 
 
