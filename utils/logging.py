@@ -12,6 +12,11 @@ When the ``CorrelationFilter`` is active (installed automatically), every log
 record carries ``correlation_id``, ``stage``, ``pair_id``, and ``wallet``
 attributes.  In JSON mode these are included in the output automatically.
 In text mode they are appended as ``[correlation_id=<id> stage=<stage>]``.
+
+Secret redaction
+-----------------
+All formatters route their final output through ``sanitize_text`` so secrets
+(passwords, API keys, tokens) never reach log sinks.
 """
 
 import logging
@@ -20,12 +25,19 @@ import sys
 from typing import Any
 
 from config import config
+from utils.secrets import sanitize_text
 
 _CONFIGURED = False
 
 # ── Correlation-enriched JSON formatter ──────────────────────────────────────
 
 _CORRELATION_FIELDS = ("correlation_id", "stage", "pair_id", "wallet")
+
+
+class SecretsRedactingFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        original = super().format(record)
+        return sanitize_text(original)
 
 
 class CorrelationJsonFormatter:
@@ -43,7 +55,7 @@ class CorrelationJsonFormatter:
             value = getattr(record, field_name, None)
             if value is not None:
                 setattr(record, field_name, value)
-        return self._base.format(record)
+        return sanitize_text(self._base.format(record))
 
 
 class CorrelationTextFormatter(logging.Formatter):
@@ -76,8 +88,8 @@ class CorrelationTextFormatter(logging.Formatter):
                 # Truncate wallet for readability in text mode
                 short = wallet[:8] + "..." if len(wallet) > 11 else wallet
                 parts.append(f"wallet={short}")
-            return f"{base} [{' '.join(parts)}]"
-        return base
+            base = f"{base} [{' '.join(parts)}]"
+        return sanitize_text(base)
 
 
 def _configure() -> None:
@@ -140,3 +152,15 @@ def set_level(level: str) -> None:
     """Override the root logger's verbosity, e.g. from a CLI --log-level flag."""
     _configure()
     logging.getLogger().setLevel(level.upper())
+
+
+def setup_logger(name: str = "ledgerlens", level: int = logging.INFO) -> logging.Logger:
+    """Standalone logger with secret redaction, independent of the root config."""
+    logger = logging.getLogger(name)
+    logger.setLevel(level)
+    if not logger.handlers:
+        handler = logging.StreamHandler()
+        formatter = SecretsRedactingFormatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+    return logger
