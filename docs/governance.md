@@ -141,6 +141,32 @@ Recommended operator limits:
 | `prm_exec` | Parameter applied `(proposal_id, param_key)` |
 | `prm_veto` | Proposal vetoed `(proposal_id, vetoer)` |
 
+## Policy Bundles
+
+`propose_policy_bundle` / `apply_policy_bundle` group the risk threshold and
+submission cooldown into a single named change so operators review and roll
+out both together, instead of as two independently-timelocked changes that
+could land at different times (e.g. a lowered risk threshold taking effect
+before its paired cooldown increase, temporarily over-tightening the gate).
+
+This uses the same simple time-lock as `set_risk_threshold` /
+`set_history_max_depth` (no veto window, single time-lock, `apply_after` gate
+callable by anyone) rather than the richer `propose_parameter_change` flow
+documented above — it is a separate, lighter-weight mechanism, not an
+extension of the `Supported Parameters` table.
+
+Both fields are validated before anything is stored: an invalid
+`risk_threshold` (>100) or `cooldown_secs` (outside
+`[MIN_COOLDOWN_SECS, MAX_COOLDOWN_SECS]`) rejects the whole proposal, so
+there is no partial proposal. `apply_policy_bundle` writes both fields in the
+same call, so no caller can observe one field updated while the other is
+still pending.
+
+| Topic | When |
+|-------|------|
+| `pbdl_prop` | Bundle proposed `(risk_threshold, cooldown_secs, apply_after)` |
+| `pbdl_appl` | Bundle applied `(risk_threshold, cooldown_secs)` |
+
 ## Related
 
 - WASM upgrade governance: `propose_upgrade` / `execute_upgrade` / `veto_upgrade`

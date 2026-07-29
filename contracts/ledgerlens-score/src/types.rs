@@ -315,6 +315,25 @@ pub struct ParamChangeProposal {
     pub apply_after: u64,
 }
 
+/// A named group of related risk-gate parameters that must be reviewed and
+/// activated together, so the risk threshold and cooldown can never diverge
+/// mid-rollout (one applied, the other still pending).
+#[contracttype]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub struct PolicyBundle {
+    pub risk_threshold: u32,
+    pub cooldown_secs: u64,
+}
+
+/// A pending policy bundle change awaiting its time-lock delay.
+#[contracttype]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub struct PolicyBundleProposal {
+    pub bundle: PolicyBundle,
+    pub proposed_at: u64,
+    pub apply_after: u64,
+}
+
 /// One entry in the `override_rate_limit` admin audit log.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]

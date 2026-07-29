@@ -2903,6 +2903,81 @@ impl LedgerLensScoreContract {
         Ok(())
     }
 
+    /// Proposes a named policy bundle grouping the risk threshold and
+    /// submission cooldown, so operators review and roll out related
+    /// risk-gate settings together instead of as two independent,
+    /// individually-timelocked changes that could land at different times.
+    ///
+    /// Both fields are validated up front; if either is out of bounds the
+    /// whole proposal is rejected and nothing is stored — there is no
+    /// partial proposal. Time-locked identically to the other simple
+    /// parameter changes (see [`Self::apply_param_change`]).
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if the contract has no admin yet.
+    /// - [`Error::InvalidScore`] if `risk_threshold` is above 100.
+    /// - [`Error::InvalidCooldown`] if `cooldown_secs` is outside
+    ///   `[MIN_COOLDOWN_SECS, MAX_COOLDOWN_SECS]`.
+    /// - [`Error::ParamChangeAlreadyPending`] if a bundle proposal is
+    ///   already pending.
+    pub fn propose_policy_bundle(
+        env: Env,
+        admin_signers: Vec<Address>,
+        risk_threshold: u32,
+        cooldown_secs: u64,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        if risk_threshold > 100 {
+            return Err(Error::InvalidScore);
+        }
+        if !(constants::MIN_COOLDOWN_SECS..=constants::MAX_COOLDOWN_SECS).contains(&cooldown_secs) {
+            return Err(Error::InvalidCooldown);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+        if storage::has_pending_policy_bundle(&env) {
+            return Err(Error::ParamChangeAlreadyPending);
+        }
+        let now = env.ledger().timestamp();
+        let apply_after = now.saturating_add(storage::get_param_change_delay(&env));
+        storage::set_pending_policy_bundle(
+            &env,
+            &PolicyBundleProposal {
+                bundle: PolicyBundle { risk_threshold, cooldown_secs },
+                proposed_at: now,
+                apply_after,
+            },
+        );
+        events::policy_bundle_proposed(&env, risk_threshold, cooldown_secs, apply_after);
+        Ok(())
+    }
+
+    /// Applies a pending policy bundle once its time-lock delay has
+    /// elapsed, writing the risk threshold and cooldown together in the
+    /// same call so no caller can ever observe one field updated and the
+    /// other still pending. Callable by anyone — the only gate is
+    /// `apply_after <= now`, matching [`Self::apply_param_change`].
+    ///
+    /// # Errors
+    /// - [`Error::NoPendingUpgrade`] if no bundle is pending.
+    /// - [`Error::UpgradeNotReady`] if `apply_after > now`.
+    pub fn apply_policy_bundle(env: Env) -> Result<(), Error> {
+        let pending = storage::get_pending_policy_bundle(&env).ok_or(Error::NoPendingUpgrade)?;
+        if env.ledger().timestamp() < pending.apply_after {
+            return Err(Error::UpgradeNotReady);
+        }
+        storage::set_risk_threshold(&env, pending.bundle.risk_threshold);
+        storage::set_cooldown_secs(&env, pending.bundle.cooldown_secs);
+        storage::clear_pending_policy_bundle(&env);
+        events::policy_bundle_applied(
+            &env,
+            pending.bundle.risk_threshold,
+            pending.bundle.cooldown_secs,
+        );
+        Ok(())
+    }
+
     /// Returns the current history ring-buffer depth.  Defaults to
     /// `DEFAULT_HISTORY_MAX_DEPTH` (10) until the admin sets one explicitly.
     ///

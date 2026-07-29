@@ -2948,6 +2948,24 @@ pub fn clear_pending_param_change(env: &Env, key: &Symbol) {
     env.storage().instance().remove(&DataKeyD::PendingParamChange(key.clone()));
 }
 
+// ── Policy bundles (risk threshold + cooldown, activated atomically) ──────────
+
+pub fn has_pending_policy_bundle(env: &Env) -> bool {
+    env.storage().instance().has(&DataKeyD::PendingPolicyBundle)
+}
+
+pub fn set_pending_policy_bundle(env: &Env, proposal: &PolicyBundleProposal) {
+    env.storage().instance().set(&DataKeyD::PendingPolicyBundle, proposal);
+}
+
+pub fn get_pending_policy_bundle(env: &Env) -> Option<PolicyBundleProposal> {
+    env.storage().instance().get(&DataKeyD::PendingPolicyBundle)
+}
+
+pub fn clear_pending_policy_bundle(env: &Env) {
+    env.storage().instance().remove(&DataKeyD::PendingPolicyBundle);
+}
+
 pub fn get_param_change_delay(env: &Env) -> u64 {
     crate::constants::DEFAULT_PARAM_CHANGE_DELAY_SECS
 }
