@@ -105,6 +105,11 @@ def run_worker_pool(
     signal.signal(signal.SIGINT, shutdown_handler)
 
     try:
+        # Start health check server
+        from streaming.health_check import start_health_server
+        health_port = int(os.getenv("HEALTH_SERVER_PORT", "8080"))
+        start_health_server(port=health_port)
+
         # Create and start workers
         logger.info("Starting %d workers...", num_workers)
         for worker_id in range(num_workers):
