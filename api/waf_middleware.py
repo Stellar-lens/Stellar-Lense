@@ -17,17 +17,17 @@ logger = logging.getLogger("ledgerlens.waf")
 
 # SQL injection patterns
 _SQLI_PATTERNS = [
-    re.compile(r"(?i)\b(union\s+select)\b", re.IGNORECASE),
-    re.compile(r"(?i)\b(drop\s+table)\b", re.IGNORECASE),
+    re.compile(r"\b(union\s+select)\b", re.IGNORECASE),
+    re.compile(r"\b(drop\s+table)\b", re.IGNORECASE),
     re.compile(r";\s*--", re.IGNORECASE),
-    re.compile(r"(?i)\b(or\s+1\s*=\s*1)\b", re.IGNORECASE),
+    re.compile(r"\b(or\s+1\s*=\s*1)\b", re.IGNORECASE),
 ]
 
 # XSS patterns
 _XSS_PATTERNS = [
-    re.compile(r"(?i)<script[^>]*>", re.IGNORECASE),
-    re.compile(r"(?i)javascript:", re.IGNORECASE),
-    re.compile(r"(?i)onerror\s*=", re.IGNORECASE),
+    re.compile(r"<script[^>]*>", re.IGNORECASE),
+    re.compile(r"javascript:", re.IGNORECASE),
+    re.compile(r"onerror\s*=", re.IGNORECASE),
 ]
 
 # In-memory store for blocked requests (kept for admin inspection)
@@ -77,8 +77,15 @@ class WAFMiddleware(BaseHTTPMiddleware):
                     pass  # Not valid JSON, pass through
 
             # Replace request body so it can be read again by downstream
+            consumed = False
+
             async def mock_receive():
-                return {"type": "http.request", "body": body or b""}
+                nonlocal consumed
+                # Return the body on the first call, then empty chunks afterwards.
+                if not consumed:
+                    consumed = True
+                    return {"type": "http.request", "body": body or b"", "more_body": False}
+                return {"type": "http.request", "body": b"", "more_body": False}
 
             request._receive = mock_receive
             return await call_next(request)
