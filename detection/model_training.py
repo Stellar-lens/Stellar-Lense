@@ -41,6 +41,10 @@ from xgboost import XGBClassifier
 from config import config
 from config.contracts import validate_mode
 from detection.conformal import ConformalCalibrator
+from detection.model_compatibility import (
+    FEATURE_CONTRACT_VERSION,
+    compute_feature_contract_hash,
+)
 from utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -621,6 +625,7 @@ def train_models(
             ...
           },
           "feature_columns": [...],
+          "feature_dtypes": {"feature_name": "float64", ...},
           "feature_distributions": {...},
           "n_train": int,
           "n_test": int,
@@ -768,6 +773,7 @@ def train_models(
     return {
         "results": results,
         "feature_columns": list(X.columns),
+        "feature_dtypes": {column: str(dtype) for column, dtype in X.dtypes.items()},
         "feature_distributions": compute_feature_distributions(X),
         "X_cal": X_cal,
         "y_cal": y_cal,
@@ -919,6 +925,18 @@ def save_training_artifacts(
 
     results = training_output["results"]
     feature_columns = training_output["feature_columns"]
+    feature_dtypes = training_output.get("feature_dtypes")
+    if feature_dtypes is None:
+        test_features = training_output.get("X_test")
+        if isinstance(test_features, pd.DataFrame):
+            feature_dtypes = {
+                column: str(test_features[column].dtype)
+                for column in feature_columns
+            }
+        else:
+            # Backward compatibility for callers constructing the historical
+            # training-output mapping by hand.
+            feature_dtypes = {column: "float64" for column in feature_columns}
     feature_distributions = training_output.get("feature_distributions")
 
     # Save metrics.json
@@ -944,7 +962,13 @@ def save_training_artifacts(
         "n_training_rows": training_output["n_train"],
         "n_test_rows": training_output["n_test"],
         "feature_columns": feature_columns,
+        "feature_dtypes": feature_dtypes,
+        "feature_contract_version": FEATURE_CONTRACT_VERSION,
         "feature_schema_hash": compute_feature_schema_hash(feature_columns),
+        "feature_contract_hash": compute_feature_contract_hash(
+            feature_columns,
+            feature_dtypes,
+        ),
         "model_names": list(results.keys()),
         "python_version": sys.version.split()[0],
         "ledgerlens_version": "0.2.0",
