@@ -1037,6 +1037,23 @@ pub fn clear_score(env: &Env, wallet: &Address, asset_pair: &Symbol) {
     env.storage().persistent().remove(&key);
 }
 
+pub fn get_deletion_approval_policy(env: &Env) -> DeletionApprovalPolicy {
+    let enabled = env.storage().instance().get(&DataKeyD::DeletionPolicyEnabled).unwrap_or(false);
+    let approver = env.storage().instance().get(&DataKeyD::DeletionApprover);
+    DeletionApprovalPolicy { enabled, approver }
+}
+
+pub fn set_deletion_approval_policy(
+    env: &Env,
+    policy: &DeletionApprovalPolicy,
+) {
+    env.storage().instance().set(&DataKeyD::DeletionPolicyEnabled, &policy.enabled);
+    match &policy.approver {
+        Some(approver) => env.storage().instance().set(&DataKeyD::DeletionApprover, approver),
+        None => env.storage().instance().remove(&DataKeyD::DeletionApprover),
+    }
+}
+
 // ── Score count ──────────────────────────────────────────────────────────────
 
 pub fn increment_score_count(env: &Env, wallet: &Address, asset_pair: &Symbol) {

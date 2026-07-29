@@ -7554,6 +7554,47 @@ impl LedgerLensScoreContract {
         Ok(())
     }
 
+    /// Configures the separate approval policy for irreversible deletion.
+    ///
+    /// When `enabled == false`, `clear_score` and `clear_score_history` keep
+    /// using routine admin authorization only. When `enabled == true`, both
+    /// deletion functions additionally require `approver.require_auth()`, and
+    /// the approver must stay disjoint from the routine admin key / admin set.
+    ///
+    /// This is intentionally fail-closed: an enabled policy with a missing or
+    /// overlapping approver blocks deletion until governance repairs the
+    /// configuration.
+    pub fn set_deletion_approval_policy(
+        env: Env,
+        admin_signers: Vec<Address>,
+        enabled: bool,
+        approver: Option<Address>,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+
+        if enabled {
+            let approver_ref = approver.as_ref().ok_or(Error::InvalidThreshold)?;
+            if Self::deletion_approver_conflicts_with_admin(&env, approver_ref) {
+                return Err(Error::InvalidThreshold);
+            }
+        }
+
+        let policy = DeletionApprovalPolicy { enabled, approver };
+        storage::set_deletion_approval_policy(&env, &policy);
+        events::deletion_policy_updated(&env, enabled, &policy.approver);
+        Ok(())
+    }
+
+    /// Returns the current approval policy for irreversible deletion.
+    ///
+    /// Defaults to `enabled = false` and `approver = None`.
+    pub fn get_deletion_approval_policy(env: Env) -> DeletionApprovalPolicy {
+        storage::get_deletion_approval_policy(&env)
+    }
+
     /// Erase the score history ring buffer for `wallet` / `asset_pair`.
     ///
     /// Does nothing (returns `Ok`) if no history exists. After this call,
@@ -7571,7 +7612,7 @@ impl LedgerLensScoreContract {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
-        Self::require_admin_auth(&env, &admin_signers)?;
+        Self::require_deletion_auth(&env, &admin_signers)?;
         if let Some(risk) = storage::peek_score(&env, &wallet, &asset_pair) {
             storage::update_histogram_on_clear(&env, risk.score);
         }
@@ -7597,7 +7638,7 @@ impl LedgerLensScoreContract {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
-        Self::require_admin_auth(&env, &admin_signers)?;
+        Self::require_deletion_auth(&env, &admin_signers)?;
         if let Some(risk) = storage::peek_score(&env, &wallet, &asset_pair) {
             storage::update_histogram_on_clear(&env, risk.score);
         }
@@ -8508,6 +8549,48 @@ impl LedgerLensScoreContract {
     /// ```
     pub fn get_admin_threshold(env: Env) -> u32 {
         storage::get_admin_threshold(&env)
+    }
+
+    /// Returns a deterministic machine-readable export of governance-controlled
+    /// configuration, including active values, pending values, and integrity
+    /// hashes over both sections.
+    ///
+    /// Schema version `1` uses an ordered key/value list whose values are
+    /// canonical binary encodings documented in `docs/configuration-export.md`.
+    pub fn export_configuration(env: Env) -> ConfigExportBundle {
+        let active_values = Self::collect_active_config_entries(&env);
+        let pending_values = Self::collect_pending_config_entries(&env);
+
+        let active_hash = env.crypto().sha256(&Self::encode_active_entries(&env, &active_values));
+        let pending_hash =
+            env.crypto().sha256(&Self::encode_pending_entries(&env, &pending_values));
+
+        let mut rationale = Vec::new(&env);
+        rationale.push_back(Bytes::from_slice(
+            &env,
+            b"off-chain private keys, seed material, and operator playbooks are not stored on-chain; this export covers only public governance state",
+        ));
+        rationale.push_back(Bytes::from_slice(
+            &env,
+            b"rate-limit override justifications are exported as hashes only because the contract persists only justification_hash for bounded public auditability",
+        ));
+
+        let mut export_preimage = Bytes::new(&env);
+        export_preimage.append(&Bytes::from_array(&env, &1u32.to_be_bytes()));
+        export_preimage.append(&Bytes::from_array(&env, &active_hash.to_array()));
+        export_preimage.append(&Bytes::from_array(&env, &pending_hash.to_array()));
+        export_preimage.append(&Self::encode_bytes_vec(&env, &rationale));
+        let export_hash = env.crypto().sha256(&export_preimage);
+
+        ConfigExportBundle {
+            schema_version: 1,
+            active_hash,
+            pending_hash,
+            export_hash,
+            active_values,
+            pending_values,
+            omitted_secret_rationale: rationale,
+        }
     }
 
     /// Returns the age (in seconds) of the last score submission for `(wallet, asset_pair)`.
@@ -9996,6 +10079,487 @@ impl LedgerLensScoreContract {
             storage::get_service(env).require_auth();
         }
         Ok(())
+    }
+
+    fn deletion_approver_conflicts_with_admin(env: &Env, approver: &Address) -> bool {
+        if storage::get_admin(env) == *approver {
+            return true;
+        }
+        storage::get_admin_set(env).contains(approver)
+    }
+
+    fn require_deletion_auth(env: &Env, admin_signers: &Vec<Address>) -> Result<(), Error> {
+        Self::require_admin_auth(env, admin_signers)?;
+        let policy = storage::get_deletion_approval_policy(env);
+        if !policy.enabled {
+            return Ok(());
+        }
+
+        let approver = policy.approver.ok_or(Error::Unauthorized)?;
+        if Self::deletion_approver_conflicts_with_admin(env, &approver) {
+            return Err(Error::Unauthorized);
+        }
+        approver.require_auth();
+        Ok(())
+    }
+
+    fn config_entry(env: &Env, key: Symbol, value: Bytes) -> ConfigExportEntry {
+        ConfigExportEntry { key, value }
+    }
+
+    fn pending_config_entry(
+        env: &Env,
+        key: Symbol,
+        value: Bytes,
+        proposal_id: u64,
+        proposed_at: u64,
+        executable_after: u64,
+    ) -> PendingConfigExportEntry {
+        let _ = env;
+        PendingConfigExportEntry { key, value, proposal_id, proposed_at, executable_after }
+    }
+
+    fn encode_bool(env: &Env, value: bool) -> Bytes {
+        Bytes::from_slice(env, &[if value { 1 } else { 0 }])
+    }
+
+    fn encode_u32(env: &Env, value: u32) -> Bytes {
+        Bytes::from_array(env, &value.to_be_bytes())
+    }
+
+    fn encode_u64(env: &Env, value: u64) -> Bytes {
+        Bytes::from_array(env, &value.to_be_bytes())
+    }
+
+    fn encode_i128(env: &Env, value: i128) -> Bytes {
+        Bytes::from_array(env, &value.to_be_bytes())
+    }
+
+    fn encode_symbol(env: &Env, value: &Symbol) -> Bytes {
+        let text = value.to_string();
+        let len = text.len().min(64) as usize;
+        let mut buf = [0u8; 64];
+        text.copy_into_slice(&mut buf);
+        Bytes::from_slice(env, &buf[..len])
+    }
+
+    fn encode_address(env: &Env, value: &Address) -> Bytes {
+        let text = value.to_string();
+        let len = text.len().min(64) as usize;
+        let mut buf = [0u8; 64];
+        text.copy_into_slice(&mut buf);
+        Bytes::from_slice(env, &buf[..len])
+    }
+
+    fn encode_option_address(env: &Env, value: &Option<Address>) -> Bytes {
+        let mut bytes = Bytes::new(env);
+        match value {
+            Some(address) => {
+                bytes.append(&Self::encode_bool(env, true));
+                bytes.append(&Self::encode_address(env, address));
+            }
+            None => bytes.append(&Self::encode_bool(env, false)),
+        }
+        bytes
+    }
+
+    fn encode_u32_vec(env: &Env, values: &Vec<u32>) -> Bytes {
+        let mut bytes = Bytes::new(env);
+        bytes.append(&Bytes::from_array(env, &values.len().to_be_bytes()));
+        for i in 0..values.len() {
+            bytes.append(&Self::encode_u32(env, values.get(i).unwrap()));
+        }
+        bytes
+    }
+
+    fn encode_address_vec(env: &Env, values: &Vec<Address>) -> Bytes {
+        let mut bytes = Bytes::new(env);
+        bytes.append(&Bytes::from_array(env, &values.len().to_be_bytes()));
+        for i in 0..values.len() {
+            bytes.append(&Self::encode_address(env, &values.get(i).unwrap()));
+        }
+        bytes
+    }
+
+    fn encode_bytes_vec(env: &Env, values: &Vec<Bytes>) -> Bytes {
+        let mut bytes = Bytes::new(env);
+        bytes.append(&Bytes::from_array(env, &values.len().to_be_bytes()));
+        for i in 0..values.len() {
+            let value = values.get(i).unwrap();
+            bytes.append(&Bytes::from_array(env, &value.len().to_be_bytes()));
+            bytes.append(&value);
+        }
+        bytes
+    }
+
+    fn encode_deletion_policy(env: &Env, policy: &DeletionApprovalPolicy) -> Bytes {
+        let mut bytes = Bytes::new(env);
+        bytes.append(&Self::encode_bool(env, policy.enabled));
+        bytes.append(&Self::encode_option_address(env, &policy.approver));
+        bytes
+    }
+
+    fn encode_score_floor_policy(env: &Env, policy: &ScoreFloorPolicy) -> Bytes {
+        let mut bytes = Bytes::new(env);
+        bytes.append(&Self::encode_bool(env, policy.enabled));
+        bytes.append(&Self::encode_u32(env, policy.high_water_mark));
+        bytes.append(&Self::encode_u32(env, policy.floor_value));
+        bytes
+    }
+
+    fn encode_velocity_cap(env: &Env, cap: &ScoreVelocityCap) -> Bytes {
+        let mut bytes = Bytes::new(env);
+        bytes.append(&Self::encode_bool(env, cap.enabled));
+        bytes.append(&Self::encode_u32(env, cap.points_per_hour));
+        bytes
+    }
+
+    fn encode_adaptive_rate_limit(env: &Env, config: &AdaptiveRateLimit) -> Bytes {
+        let mut bytes = Bytes::new(env);
+        bytes.append(&Self::encode_bool(env, config.enabled));
+        bytes.append(&Self::encode_u32(env, config.variance_scale));
+        bytes
+    }
+
+    fn encode_adaptive_threshold(env: &Env, config: &AdaptiveThresholdConfig) -> Bytes {
+        let mut bytes = Bytes::new(env);
+        bytes.append(&Self::encode_bool(env, config.enabled));
+        bytes.append(&Self::encode_u32(env, config.target_percentile));
+        bytes.append(&Self::encode_u32(env, config.min_value));
+        bytes.append(&Self::encode_u32(env, config.max_value));
+        bytes.append(&Self::encode_u32(env, config.last_computed));
+        bytes
+    }
+
+    fn encode_flash_protection_mode(env: &Env, mode: FlashProtectionMode) -> Bytes {
+        let tag = match mode {
+            FlashProtectionMode::Warn => 0u32,
+            FlashProtectionMode::Reject => 1u32,
+        };
+        Self::encode_u32(env, tag)
+    }
+
+    fn encode_interpolation_method(env: &Env, method: InterpolationMethod) -> Bytes {
+        let tag = match method {
+            InterpolationMethod::Linear => 0u32,
+            InterpolationMethod::CubicSpline => 1u32,
+        };
+        Self::encode_u32(env, tag)
+    }
+
+    fn collect_active_config_entries(env: &Env) -> Vec<ConfigExportEntry> {
+        let mut entries = Vec::new(env);
+        let (consensus_k, consensus_epsilon) = (
+            storage::get_consensus_threshold_k(env),
+            storage::get_consensus_epsilon(env),
+        );
+        let (adaptive_bounds_enabled, adaptive_min, adaptive_max) = (
+            storage::get_adaptive_epsilon_enabled(env),
+            storage::get_adaptive_epsilon_min(env),
+            storage::get_adaptive_epsilon_max(env),
+        );
+        let adaptive_epsilon_scale = storage::get_adaptive_epsilon_scale_factor(env);
+        let adaptive_rate_limit = storage::get_adaptive_rate_limit(env);
+        let score_floor_policy = storage::get_score_floor_policy(env);
+        let deletion_policy = storage::get_deletion_approval_policy(env);
+        let velocity_cap = storage::get_score_velocity_cap(env);
+        let adaptive_threshold = storage::get_adaptive_threshold_config(env);
+
+        let mut consensus_bytes = Bytes::new(env);
+        consensus_bytes.append(&Self::encode_u32(env, consensus_k));
+        consensus_bytes.append(&Self::encode_u32(env, consensus_epsilon));
+
+        let mut adaptive_bounds_bytes = Bytes::new(env);
+        adaptive_bounds_bytes.append(&Self::encode_bool(env, adaptive_bounds_enabled));
+        adaptive_bounds_bytes.append(&Self::encode_u32(env, adaptive_min));
+        adaptive_bounds_bytes.append(&Self::encode_u32(env, adaptive_max));
+        adaptive_bounds_bytes.append(&Self::encode_u32(env, adaptive_epsilon_scale));
+
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("version"),
+            Self::encode_u32(env, constants::CONTRACT_VERSION),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("admin"),
+            Self::encode_address(env, &storage::get_admin(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("adm_set"),
+            Self::encode_address_vec(env, &storage::get_admin_set(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("adm_thr"),
+            Self::encode_u32(env, storage::get_admin_threshold(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("service"),
+            Self::encode_address(env, &storage::get_service(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("svc_set"),
+            Self::encode_address_vec(env, &storage::get_service_set(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("svc_thr"),
+            Self::encode_u32(env, storage::get_service_threshold(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("risk_thr"),
+            Self::encode_u32(env, storage::get_risk_threshold(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("cooldown"),
+            Self::encode_u64(env, storage::get_cooldown_secs(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("stale_w"),
+            Self::encode_u64(env, storage::get_staleness_window(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("upg_dly"),
+            Self::encode_u64(env, storage::get_upgrade_delay(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("hist_dep"),
+            Self::encode_u32(env, storage::get_history_max_depth(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("fin_buf"),
+            Self::encode_u64(env, storage::get_finality_buffer_secs(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("rvl_win"),
+            Self::encode_u64(env, storage::get_reveal_window_secs(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("hb_alrt"),
+            Self::encode_u64(env, storage::get_heartbeat_alert_threshold(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("min_conf"),
+            Self::encode_u32(env, storage::get_global_min_confidence(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("priv_eps"),
+            Self::encode_u32(env, storage::get_privacy_epsilon(env)),
+        ));
+        entries.push_back(Self::config_entry(env, symbol_short!("cons_cfg"), consensus_bytes));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("adp_eps"),
+            adaptive_bounds_bytes,
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("adp_rate"),
+            Self::encode_adaptive_rate_limit(env, &adaptive_rate_limit),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("burst"),
+            Self::encode_u32(env, storage::get_burst_capacity(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("vel_cap"),
+            Self::encode_velocity_cap(env, &velocity_cap),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("scr_flr"),
+            Self::encode_score_floor_policy(env, &score_floor_policy),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("del_pol"),
+            Self::encode_deletion_policy(env, &deletion_policy),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("esc_thr"),
+            Self::encode_u32(env, storage::get_escalation_threshold(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("hyst_mg"),
+            Self::encode_u32(env, storage::get_hysteresis_margin(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("hll_prec"),
+            Self::encode_u32(env, storage::get_hll_precision(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("flash"),
+            Self::encode_flash_protection_mode(env, storage::get_flash_protection_mode(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("failovr"),
+            Self::encode_option_address(env, &storage::get_failover_contract(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("gate_fee"),
+            Self::encode_i128(env, storage::get_gate_query_fee(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("gate_opn"),
+            Self::encode_bool(env, storage::get_gate_open(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("gate_acl"),
+            Self::encode_address_vec(env, &storage::get_gate_callers(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("ora_stl"),
+            Self::encode_u64(env, storage::get_oracle_staleness_threshold(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("pair_vol"),
+            Self::encode_u64(env, storage::get_pair_volatility_window(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("mom_win"),
+            Self::encode_u64(env, storage::get_momentum_window(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("mom_alt"),
+            Self::encode_u32(env, storage::get_momentum_alert_threshold(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("clstrs"),
+            Self::encode_u32_vec(env, &storage::get_cluster_boundaries(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("fin_dep"),
+            Self::encode_u32(env, storage::get_finality_depth(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("interp"),
+            Self::encode_interpolation_method(env, storage::get_interpolation_method(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("ath_cfg"),
+            Self::encode_adaptive_threshold(env, &adaptive_threshold),
+        ));
+        entries
+    }
+
+    fn collect_pending_config_entries(env: &Env) -> Vec<PendingConfigExportEntry> {
+        let mut entries = Vec::new(env);
+
+        let legacy_keys = Vec::from_array(
+            env,
+            [
+                symbol_short!("risk_thr"),
+                symbol_short!("hist_dep"),
+                symbol_short!("upg_dly"),
+                symbol_short!("stale_w"),
+                symbol_short!("cooldown"),
+            ],
+        );
+        for i in 0..legacy_keys.len() {
+            let key = legacy_keys.get(i).unwrap();
+            if let Some(pending) = storage::get_pending_param_change(env, &key) {
+                let value = match pending.new_value {
+                    ParamValue::U32(v) => Self::encode_u32(env, v),
+                    ParamValue::U64(v) => Self::encode_u64(env, v),
+                };
+                entries.push_back(Self::pending_config_entry(
+                    env,
+                    key,
+                    value,
+                    0,
+                    pending.proposed_at,
+                    pending.apply_after,
+                ));
+            }
+        }
+
+        let proposal_ids = storage::get_pending_parameter_proposal_ids(env);
+        for i in 0..proposal_ids.len() {
+            let proposal_id = proposal_ids.get(i).unwrap();
+            if let Some(record) = storage::get_parameter_proposal_record(env, proposal_id) {
+                if record.status != ParameterProposalStatus::Pending {
+                    continue;
+                }
+                let proposal = record.proposal;
+                entries.push_back(Self::pending_config_entry(
+                    env,
+                    proposal.param_key,
+                    proposal.new_value,
+                    proposal_id,
+                    proposal.proposed_at,
+                    proposal.proposed_at.saturating_add(proposal.time_lock_secs),
+                ));
+            }
+        }
+
+        entries
+    }
+
+    fn encode_entry_key(env: &Env, key: &Symbol) -> Bytes {
+        let key_bytes = Self::encode_symbol(env, key);
+        let mut out = Bytes::new(env);
+        out.append(&Bytes::from_array(env, &key_bytes.len().to_be_bytes()));
+        out.append(&key_bytes);
+        out
+    }
+
+    fn encode_active_entries(env: &Env, entries: &Vec<ConfigExportEntry>) -> Bytes {
+        let mut bytes = Bytes::new(env);
+        bytes.append(&Bytes::from_array(env, &entries.len().to_be_bytes()));
+        for i in 0..entries.len() {
+            let entry = entries.get(i).unwrap();
+            bytes.append(&Self::encode_entry_key(env, &entry.key));
+            bytes.append(&Bytes::from_array(env, &entry.value.len().to_be_bytes()));
+            bytes.append(&entry.value);
+        }
+        bytes
+    }
+
+    fn encode_pending_entries(env: &Env, entries: &Vec<PendingConfigExportEntry>) -> Bytes {
+        let mut bytes = Bytes::new(env);
+        bytes.append(&Bytes::from_array(env, &entries.len().to_be_bytes()));
+        for i in 0..entries.len() {
+            let entry = entries.get(i).unwrap();
+            bytes.append(&Self::encode_entry_key(env, &entry.key));
+            bytes.append(&Bytes::from_array(env, &entry.proposal_id.to_be_bytes()));
+            bytes.append(&Bytes::from_array(env, &entry.proposed_at.to_be_bytes()));
+            bytes.append(&Bytes::from_array(env, &entry.executable_after.to_be_bytes()));
+            bytes.append(&Bytes::from_array(env, &entry.value.len().to_be_bytes()));
+            bytes.append(&entry.value);
+        }
+        bytes
     }
 
     /// Verifies `attestation` (recomputing the commitment independently
