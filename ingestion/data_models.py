@@ -57,6 +57,131 @@ class Trade(BaseModel):
     def amount(self) -> Decimal:
         """Primary amount used for Benford digit analysis."""
         return self.base_amount
+    
+    def normalize_base_amount(
+        self,
+        strategy: "NormalizationStrategy",
+    ) -> "NormalizedAmount":
+        """Normalize base amount to strategy's base currency.
+        
+        Parameters
+        ----------
+        strategy : NormalizationStrategy
+            Normalization strategy (e.g., XLMNormalization, USDNormalization)
+        
+        Returns
+        -------
+        NormalizedAmount
+            Normalized base amount
+        
+        Examples
+        --------
+        >>> from utils.currency_normalization import create_xlm_strategy
+        >>> 
+        >>> trade = Trade(...)
+        >>> strategy = create_xlm_strategy()
+        >>> normalized = trade.normalize_base_amount(strategy)
+        >>> print(f"Base: {normalized.value} XLM")
+        """
+        from utils.currency_normalization import NormalizationStrategy, NormalizedAmount
+        
+        return strategy.normalize(
+            self.base_amount,
+            self.base_asset,
+            self.ledger_close_time,
+        )
+    
+    def normalize_counter_amount(
+        self,
+        strategy: "NormalizationStrategy",
+    ) -> "NormalizedAmount":
+        """Normalize counter amount to strategy's base currency.
+        
+        Parameters
+        ----------
+        strategy : NormalizationStrategy
+            Normalization strategy
+        
+        Returns
+        -------
+        NormalizedAmount
+            Normalized counter amount
+        
+        Examples
+        --------
+        >>> trade = Trade(...)
+        >>> strategy = create_xlm_strategy()
+        >>> normalized = trade.normalize_counter_amount(strategy)
+        >>> print(f"Counter: {normalized.value} XLM")
+        """
+        from utils.currency_normalization import NormalizationStrategy, NormalizedAmount
+        
+        return strategy.normalize(
+            self.counter_amount,
+            self.counter_asset,
+            self.ledger_close_time,
+        )
+    
+    def normalize_both_amounts(
+        self,
+        strategy: "NormalizationStrategy",
+    ) -> tuple["NormalizedAmount", "NormalizedAmount"]:
+        """Normalize both base and counter amounts.
+        
+        This is the most common use case for fraud detection: normalize both
+        sides of a trade to a common currency for comparison.
+        
+        Parameters
+        ----------
+        strategy : NormalizationStrategy
+            Normalization strategy
+        
+        Returns
+        -------
+        tuple[NormalizedAmount, NormalizedAmount]
+            (normalized_base, normalized_counter)
+        
+        Examples
+        --------
+        >>> trade = Trade(...)
+        >>> strategy = create_xlm_strategy()
+        >>> norm_base, norm_counter = trade.normalize_both_amounts(strategy)
+        >>> 
+        >>> # Now comparable!
+        >>> if abs(norm_base.value - norm_counter.value) > Decimal("0.01"):
+        ...     print("Trade amounts don't match after normalization")
+        """
+        return (
+            self.normalize_base_amount(strategy),
+            self.normalize_counter_amount(strategy),
+        )
+    
+    def get_normalized_trade_value(
+        self,
+        strategy: "NormalizationStrategy",
+    ) -> "NormalizedAmount":
+        """Get total trade value in base currency.
+        
+        Returns the base amount normalized (typically used as the "trade value").
+        
+        Parameters
+        ----------
+        strategy : NormalizationStrategy
+            Normalization strategy
+        
+        Returns
+        -------
+        NormalizedAmount
+            Trade value in base currency
+        
+        Examples
+        --------
+        >>> trade = Trade(...)
+        >>> strategy = create_xlm_strategy()
+        >>> value = trade.get_normalized_trade_value(strategy)
+        >>> print(f"Trade value: {value.value} XLM")
+        """
+        return self.normalize_base_amount(strategy)
 
 
 class OrderBookEvent(BaseModel):
@@ -84,6 +209,75 @@ class OrderBookEvent(BaseModel):
         from utils.decimal_guards import validate_stellar_amount
 
         return validate_stellar_amount(v)
+    
+    def normalize_amount(
+        self,
+        strategy: "NormalizationStrategy",
+    ) -> "NormalizedAmount":
+        """Normalize order amount to strategy's base currency.
+        
+        Parameters
+        ----------
+        strategy : NormalizationStrategy
+            Normalization strategy
+        
+        Returns
+        -------
+        NormalizedAmount
+            Normalized amount
+        
+        Examples
+        --------
+        >>> from utils.currency_normalization import create_xlm_strategy
+        >>> 
+        >>> order = OrderBookEvent(...)
+        >>> strategy = create_xlm_strategy()
+        >>> normalized = order.normalize_amount(strategy)
+        >>> print(f"Order size: {normalized.value} XLM")
+        """
+        from utils.currency_normalization import NormalizationStrategy, NormalizedAmount
+        
+        return strategy.normalize(
+            self.amount,
+            self.selling,
+            self.ledger_close_time,
+        )
+    
+    def get_normalized_order_value(
+        self,
+        strategy: "NormalizationStrategy",
+    ) -> "NormalizedAmount":
+        """Get total order value (amount * price) in base currency.
+        
+        Calculates the order value and normalizes it to base currency.
+        
+        Parameters
+        ----------
+        strategy : NormalizationStrategy
+            Normalization strategy
+        
+        Returns
+        -------
+        NormalizedAmount
+            Order value in base currency
+        
+        Examples
+        --------
+        >>> order = OrderBookEvent(...)
+        >>> strategy = create_xlm_strategy()
+        >>> value = order.get_normalized_order_value(strategy)
+        >>> print(f"Order value: {value.value} XLM")
+        """
+        # Calculate order value in selling asset
+        order_value = self.amount * self.price
+        
+        from utils.currency_normalization import NormalizationStrategy, NormalizedAmount
+        
+        return strategy.normalize(
+            order_value,
+            self.selling,
+            self.ledger_close_time,
+        )
 
 
 class AccountActivity(BaseModel):
