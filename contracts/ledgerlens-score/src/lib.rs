@@ -7511,6 +7511,26 @@ impl LedgerLensScoreContract {
         storage::get_rate_limit_override_log(&env)
     }
 
+    /// Read-only preview of what either score-deletion path would affect for
+    /// `(wallet, asset_pair)`.
+    ///
+    /// This query never deletes data and intentionally avoids refreshing the
+    /// history entry's TTL so operators can inspect irreversible operations
+    /// without mutating the targeted records.
+    pub fn get_deletion_preflight(
+        env: Env,
+        wallet: Address,
+        asset_pair: Symbol,
+    ) -> DeletionPreflight {
+        DeletionPreflight {
+            latest_score_present: storage::peek_score(&env, &wallet, &asset_pair).is_some(),
+            history_count: storage::peek_score_history_len(&env, &wallet, &asset_pair),
+            audit_warning: DeletionAuditWarning::Irreversible,
+            wallet,
+            asset_pair,
+        }
+    }
+
     /// Read-only lookup of the current velocity cap configuration.
     pub fn get_score_velocity_cap(env: Env) -> ScoreVelocityCap {
         storage::get_score_velocity_cap(&env)
@@ -7609,6 +7629,21 @@ impl LedgerLensScoreContract {
         wallet: Address,
         asset_pair: Symbol,
     ) -> Result<(), Error> {
+        let reason = Bytes::from_slice(&env, b"unspecified");
+        let category = Bytes::from_slice(&env, b"history-clear");
+        Self::clear_score_history_with_audit(env, admin_signers, wallet, asset_pair, reason, category)
+    }
+
+    /// Same as `clear_score_history`, but lets operators attach explicit
+    /// reason/category payloads that are hashed into the audit event.
+    pub fn clear_score_history_with_audit(
+        env: Env,
+        admin_signers: Vec<Address>,
+        wallet: Address,
+        asset_pair: Symbol,
+        reason: Bytes,
+        category: Bytes,
+    ) -> Result<(), Error> {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
@@ -7616,8 +7651,24 @@ impl LedgerLensScoreContract {
         if let Some(risk) = storage::peek_score(&env, &wallet, &asset_pair) {
             storage::update_histogram_on_clear(&env, risk.score);
         }
+        let reason_hash: BytesN<32> = env.crypto().sha256(&reason).into();
+        let category_hash: BytesN<32> = env.crypto().sha256(&category).into();
+        let (admin, multisig_enabled, signer_count, threshold) =
+            Self::deletion_authorization_context(&env, &admin_signers);
         storage::clear_score_history(&env, &wallet, &asset_pair);
-        events::score_history_cleared(&env, &wallet, &asset_pair);
+        events::score_history_cleared(
+            &env,
+            &wallet,
+            &asset_pair,
+            &admin,
+            latest_score_present,
+            history_count,
+            &reason_hash,
+            &category_hash,
+            multisig_enabled,
+            signer_count,
+            threshold,
+        );
         Ok(())
     }
 
@@ -7635,6 +7686,21 @@ impl LedgerLensScoreContract {
         wallet: Address,
         asset_pair: Symbol,
     ) -> Result<(), Error> {
+        let reason = Bytes::from_slice(&env, b"unspecified");
+        let category = Bytes::from_slice(&env, b"score-clear");
+        Self::clear_score_with_audit(env, admin_signers, wallet, asset_pair, reason, category)
+    }
+
+    /// Same as `clear_score`, but lets operators attach explicit
+    /// reason/category payloads that are hashed into the audit event.
+    pub fn clear_score_with_audit(
+        env: Env,
+        admin_signers: Vec<Address>,
+        wallet: Address,
+        asset_pair: Symbol,
+        reason: Bytes,
+        category: Bytes,
+    ) -> Result<(), Error> {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
@@ -7642,8 +7708,24 @@ impl LedgerLensScoreContract {
         if let Some(risk) = storage::peek_score(&env, &wallet, &asset_pair) {
             storage::update_histogram_on_clear(&env, risk.score);
         }
+        let reason_hash: BytesN<32> = env.crypto().sha256(&reason).into();
+        let category_hash: BytesN<32> = env.crypto().sha256(&category).into();
+        let (admin, multisig_enabled, signer_count, threshold) =
+            Self::deletion_authorization_context(&env, &admin_signers);
         storage::clear_score(&env, &wallet, &asset_pair);
-        events::score_cleared(&env, &wallet, &asset_pair);
+        events::score_cleared(
+            &env,
+            &wallet,
+            &asset_pair,
+            &admin,
+            latest_score_present,
+            history_count,
+            &reason_hash,
+            &category_hash,
+            multisig_enabled,
+            signer_count,
+            threshold,
+        );
         Ok(())
     }
 
@@ -10018,6 +10100,18 @@ impl LedgerLensScoreContract {
             .instance()
             .get(&types::DataKeyC::AdminAuditRoot)
             .unwrap_or_else(|| BytesN::from_array(&env, &[0u8; 32]))
+    }
+
+    fn deletion_authorization_context(
+        env: &Env,
+        admin_signers: &Vec<Address>,
+    ) -> (Address, bool, u32, u32) {
+        let admin = storage::get_admin(env);
+        let threshold = storage::get_admin_threshold(env);
+        let multisig_enabled = !storage::get_admin_set(env).is_empty() && threshold > 0;
+        let signer_count = if multisig_enabled { admin_signers.len() } else { 1 };
+        let required_threshold = if multisig_enabled { threshold } else { 1 };
+        (admin, multisig_enabled, signer_count, required_threshold)
     }
 
     /// Verifies admin authorization. In multisig mode (AdminSet non-empty and

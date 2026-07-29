@@ -441,3 +441,83 @@ fn lending_borrow_rejects_non_positive_amount_before_consulting_ledgerlens() {
     let result = fixture.lending.try_borrow(&wallet, &symbol_short!("XLM_USDC"), &-5);
     assert_eq!(result, Err(Ok(MockLendingError::InvalidAmount)));
 }
+
+// ── Sandwich simulations around suspicious score updates (issue #797) ────────
+
+#[test]
+fn sandwich_simulation_fail_closed_blocks_consumers_before_first_score_and_after_clear() {
+    let fixture = setup();
+    let wallet = Address::generate(&fixture.env);
+    let pair = symbol_short!("XLM_USDC");
+
+    // Before any score exists, both consumers fail closed.
+    assert_eq!(fixture.amm.try_swap(&wallet, &pair, &1_000), Err(Ok(MockAmmError::HighRiskWallet)));
+    assert_eq!(
+        fixture.lending.try_borrow(&wallet, &pair, &1_000),
+        Err(Ok(MockLendingError::RiskGateRejected))
+    );
+
+    // A suspicious but syntactically valid low-risk update immediately flips
+    // both consumers to "allow".
+    submit_score(&fixture, &wallet, 10, 95);
+    assert_eq!(fixture.amm.try_swap(&wallet, &pair, &1_000), Ok(Ok(())));
+    assert_eq!(fixture.lending.try_borrow(&wallet, &pair, &1_000), Ok(Ok(())));
+
+    // If operators later clear the score, both consumers revert to fail-closed.
+    fixture.ledgerlens.clear_score(&Vec::new(&fixture.env), &wallet, &pair);
+    assert_eq!(fixture.amm.try_swap(&wallet, &pair, &1_000), Err(Ok(MockAmmError::HighRiskWallet)));
+    assert_eq!(
+        fixture.lending.try_borrow(&wallet, &pair, &1_000),
+        Err(Ok(MockLendingError::RiskGateRejected))
+    );
+}
+
+#[test]
+fn sandwich_simulation_cooldown_prevents_immediate_score_flip_back() {
+    let fixture = setup();
+    let wallet = Address::generate(&fixture.env);
+    let pair = symbol_short!("XLM_USDC");
+
+    submit_score(&fixture, &wallet, 10, 95);
+
+    // Consumer query immediately after a suspicious low-risk update succeeds.
+    assert_eq!(fixture.amm.try_swap(&wallet, &pair, &1_000), Ok(Ok(())));
+
+    // An immediate corrective/high-risk overwrite is blocked by cooldown, so
+    // the exploitable window is bounded by the cooldown rather than allowing
+    // intra-window oscillation.
+    let immediate_flip = fixture.ledgerlens.try_submit_score(
+        &Vec::new(&fixture.env),
+        &wallet,
+        &pair,
+        &95,
+        &false,
+        &false,
+        &fixture.env.ledger().timestamp(),
+        &95,
+        &1,
+        &None,
+    );
+    assert!(immediate_flip.is_err(), "cooldown should block immediate score flip");
+
+    // Once the cooldown elapses, the updated risk score takes effect and
+    // consumers query the stricter state on the next call.
+    fixture.env.ledger().with_mut(|l| l.timestamp += 3_601);
+    fixture.ledgerlens.submit_score(
+        &Vec::new(&fixture.env),
+        &wallet,
+        &pair,
+        &95,
+        &false,
+        &false,
+        &fixture.env.ledger().timestamp(),
+        &95,
+        &1,
+        &None,
+    );
+    assert_eq!(fixture.amm.try_swap(&wallet, &pair, &1_000), Err(Ok(MockAmmError::HighRiskWallet)));
+    assert_eq!(
+        fixture.lending.try_borrow(&wallet, &pair, &1_000),
+        Err(Ok(MockLendingError::RiskGateRejected))
+    );
+}

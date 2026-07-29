@@ -326,6 +326,24 @@ pub struct RateLimitOverrideEntry {
     pub justification_hash: BytesN<32>,
 }
 
+/// Fixed warning returned by deletion preflight previews.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum DeletionAuditWarning {
+    Irreversible,
+}
+
+/// Read-only preview of what a deletion operation would affect.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DeletionPreflight {
+    pub wallet: Address,
+    pub asset_pair: Symbol,
+    pub latest_score_present: bool,
+    pub history_count: u32,
+    pub audit_warning: DeletionAuditWarning,
+}
+
 /// Per-(wallet, asset_pair) trend state persisted between submissions.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]

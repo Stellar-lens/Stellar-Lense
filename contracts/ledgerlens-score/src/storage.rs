@@ -536,6 +536,13 @@ pub fn get_score_history(env: &Env, wallet: &Address, asset_pair: &Symbol) -> Ve
     history
 }
 
+pub fn peek_score_history_len(env: &Env, wallet: &Address, asset_pair: &Symbol) -> u32 {
+    let key = DataKey::ScoreHistory(wallet.clone(), asset_pair.clone());
+    let history: Vec<RiskScore> =
+        env.storage().persistent().get(&key).unwrap_or_else(|| Vec::new(env));
+    history.len()
+}
+
 /// Read-only windowed view into the score-history ring buffer.
 ///
 /// `offset` is 0-indexed from the **most recent** entry (offset `0` == newest);
