@@ -1,6 +1,6 @@
 use soroban_sdk::{contracttype, symbol_short, Address, Bytes, BytesN, Env, Symbol};
 
-use crate::types::RiskScore;
+use crate::types::{AlertAckRecord, AlertType, RiskScore};
 
 /// Event Schema Versioning
 ///
@@ -192,6 +192,10 @@ pub fn score_cleared(
             threshold,
         ),
     );
+}
+
+pub fn deletion_policy_updated(env: &Env, enabled: bool, approver: &Option<Address>) {
+    env.events().publish((symbol_short!("del_pol"), EVENT_VERSION), (enabled, approver.clone()));
 }
 
 pub fn cooldown_updated(env: &Env, cooldown_secs: u64) {
@@ -761,4 +765,37 @@ pub fn suspicious_same_ledger_submission(
 
 pub fn wallet_cluster_assigned(env: &Env, wallet: &Address, cluster: u32) {
     env.events().publish((symbol_short!("wc_asgn"), wallet.clone()), cluster);
+}
+
+pub fn escalation_triggered(
+    env: &Env,
+    wallet: &Address,
+    asset_pair: &Symbol,
+    breach_count: u32,
+    score: u32,
+    escalation_threshold: u32,
+) {
+    env.events().publish(
+        (symbol_short!("esc_trig"), wallet.clone(), asset_pair.clone()),
+        (breach_count, score, escalation_threshold),
+    );
+}
+
+pub fn escalation_resolved(
+    env: &Env,
+    wallet: &Address,
+    asset_pair: &Symbol,
+    breach_count: u32,
+    score: u32,
+) {
+    env.events().publish(
+        (symbol_short!("esc_res"), wallet.clone(), asset_pair.clone()),
+        (breach_count, score),
+    );
+}
+
+
+
+pub fn escalation_threshold_updated(env: &Env, old_threshold: u32, new_threshold: u32) {
+    env.events().publish((symbol_short!("esc_thr"),), (old_threshold, new_threshold));
 }

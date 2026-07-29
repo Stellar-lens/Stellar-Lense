@@ -50,6 +50,27 @@ fn test_initialize_twice_fails() {
     assert_eq!(result, Err(Ok(Error::AlreadyInitialized)));
 }
 
+#[test]
+fn test_initialize_requires_nominated_admin_and_rolls_back() {
+    let env = Env::default();
+    let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let admin = Address::generate(&env);
+    let service = Address::generate(&env);
+
+    // No mocked authorization: the host must reject this before either
+    // privileged address becomes persistent state.
+    assert!(client.try_initialize(&admin, &service).is_err());
+    assert_eq!(client.try_get_admin(), Err(Ok(Error::NotInitialized)));
+    assert_eq!(client.try_get_service(), Err(Ok(Error::NotInitialized)));
+
+    // A legitimately authorized retry can still initialize the same instance.
+    env.mock_all_auths();
+    client.initialize(&admin, &service);
+    assert_eq!(client.get_admin(), admin);
+    assert_eq!(client.get_service(), service);
+}
+
 // ── Score submission & retrieval ──────────────────────────────────────────────
 
 #[test]
@@ -80,6 +101,100 @@ fn test_submit_and_get_score() {
     assert_eq!(score.timestamp, 1_700_000_000);
     assert_eq!(score.confidence, 92);
     assert_eq!(score.model_version, 1);
+}
+
+#[test]
+fn test_submit_score_rejects_oversized_asset_pair_without_mutation() {
+    let (env, client, admin, service) = initialized();
+    let wallet = Address::generate(&env);
+    let oversized_pair = Symbol::new(&env, "PAIR123456");
+
+    let result = client.try_submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &oversized_pair,
+        &42,
+        &false,
+        &false,
+        &1,
+        &90,
+        &1,
+        &None,
+    );
+
+    assert_eq!(result, Err(Ok(Error::InvalidAttestation)));
+    assert_eq!(client.try_get_score(&wallet, &oversized_pair), Err(Ok(Error::InvalidAttestation)));
+    assert_eq!(client.get_wallet_pair_list(&wallet).len(), 0);
+}
+
+#[test]
+fn test_submit_score_rejects_oversized_commitment_bytes_without_mutation() {
+    let (env, client, admin, service) = initialized();
+    let wallet = Address::generate(&env);
+    let pair = Symbol::new(&env, "PAIR12345");
+    let malformed_commitment = soroban_sdk::Bytes::from_array(&env, &[7u8; 31]);
+
+    let result = client.try_submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &42,
+        &false,
+        &false,
+        &1,
+        &90,
+        &1,
+        &Some(crate::ScoreAttestationInput {
+            attestation: crate::MaybeScoreAttestation::None,
+            threshold_attestation: crate::MaybeThresholdAttestation::None,
+            commitment: Some(malformed_commitment),
+        }),
+    );
+
+    assert_eq!(result, Err(Ok(Error::InvalidAttestation)));
+    assert_eq!(client.try_get_score(&wallet, &pair), Err(Ok(Error::ScoreNotFound)));
+    assert_eq!(client.get_wallet_pair_list(&wallet).len(), 0);
+}
+
+#[test]
+fn test_submit_scores_batch_rejects_oversized_pair_per_entry() {
+    let (env, client, admin, service) = initialized();
+    let valid_wallet = Address::generate(&env);
+    let invalid_wallet = Address::generate(&env);
+    let valid_pair = Symbol::new(&env, "PAIR12345");
+    let oversized_pair = Symbol::new(&env, "PAIR123456");
+    let mut batch = Vec::new(&env);
+
+    batch.push_back(ScoreSubmission {
+        wallet: valid_wallet.clone(),
+        asset_pair: valid_pair.clone(),
+        score: 11,
+        benford_flag: false,
+        ml_flag: false,
+        timestamp: 1,
+        confidence: 80,
+        model_version: 1,
+    });
+    batch.push_back(ScoreSubmission {
+        wallet: invalid_wallet.clone(),
+        asset_pair: oversized_pair.clone(),
+        score: 22,
+        benford_flag: false,
+        ml_flag: false,
+        timestamp: 2,
+        confidence: 80,
+        model_version: 1,
+    });
+
+    let result = client.submit_scores_batch(&batch);
+
+    assert_eq!(result.accepted_count, 1);
+    assert_eq!(result.rejected_count, 1);
+    assert!(result.results.get(0).unwrap().accepted);
+    assert_eq!(result.results.get(1).unwrap().rejection_code, Error::InvalidAttestation as u32);
+    assert_eq!(client.get_score(&valid_wallet, &valid_pair).score, 11);
+    assert_eq!(client.try_get_score(&invalid_wallet, &oversized_pair), Err(Ok(Error::InvalidAttestation)));
+    assert_eq!(client.get_wallet_pair_list(&invalid_wallet).len(), 0);
 }
 
 #[test]
@@ -3593,4 +3708,62 @@ fn test_private_aggregate_score_not_initialized_fails() {
     let (env, client, _admin, _service) = setup();
     let wallet = Address::generate(&env);
     assert_eq!(client.get_private_aggregate_score(&wallet, &0), 0);
+}
+#[test]
+fn test_arch_owner_management() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let arch_owner_1 = Address::generate(&env);
+    let arch_owner_2 = Address::generate(&env);
+
+    client.initialize(&admin, &service_address);
+
+    // Initial getter returns None
+    assert_eq!(client.get_arch_owner(), None);
+
+    // Admin sets initial arch owner
+    client.set_arch_owner(&arch_owner_1);
+    assert_eq!(client.get_arch_owner(), Some(arch_owner_1.clone()));
+
+    // Arch owner transfers to new arch owner
+    client.set_arch_owner(&arch_owner_2);
+    assert_eq!(client.get_arch_owner(), Some(arch_owner_2));
+}
+
+#[test]
+fn test_mandatory_reviewers_validation() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    client.initialize(&admin, &service_address);
+
+    let r1 = Address::generate(&env);
+    let r2 = Address::generate(&env);
+
+    // Set valid reviewers
+    let reviewers = vec![&env, r1.clone(), r2.clone()];
+    client.set_mandatory_reviewers(&reviewers);
+    assert_eq!(client.get_mandatory_reviewers().len(), 2);
+
+    // Duplicate reviewer triggers ReviewerAlreadyExists (mapped to SignerAlreadyInSet)
+    let duplicate_reviewers = vec![&env, r1.clone(), r1.clone()];
+    let res = client.try_set_mandatory_reviewers(&duplicate_reviewers);
+    assert_eq!(res, Err(Ok(Error::ReviewerAlreadyExists)));
+
+    // Exceeding MAX_MANDATORY_REVIEWERS (10) triggers MaxReviewersExceeded (mapped to ServiceSetFull)
+    let mut too_many = vec![&env];
+    for _ in 0..11 {
+        too_many.push_back(Address::generate(&env));
+    }
+    let res = client.try_set_mandatory_reviewers(&too_many);
+    assert_eq!(res, Err(Ok(Error::MaxReviewersExceeded)));
 }
