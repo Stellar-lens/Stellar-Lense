@@ -60,7 +60,7 @@ from ingestion.avro_codec import deserialize, load_schema, record_to_trade, vali
 from streaming.alert_dispatcher import AlertDispatcher
 from streaming.feature_buffer import FeatureBuffer
 from streaming.streaming_scorer import StreamingScorer
-from utils.logging import get_logger
+from utils.logging import correlation_id_from_headers, get_logger, log_context
 
 logger = get_logger(__name__)
 
@@ -335,6 +335,20 @@ class KafkaWorker:
 
     def process_message(self, msg) -> None:
         """Decode, score, dispatch, then commit the offset (at-least-once)."""
+        correlation_id = correlation_id_from_headers(msg.headers())
+        if correlation_id is None:
+            correlation_id = f"kafka-{msg.topic()}-{msg.partition()}-{msg.offset()}"
+        with log_context(
+            correlation_id=correlation_id,
+            pipeline_stage="streaming.kafka_worker",
+            kafka_topic=msg.topic(),
+            kafka_partition=msg.partition(),
+            kafka_offset=msg.offset(),
+        ):
+            self._process_correlated_message(msg)
+
+    def _process_correlated_message(self, msg) -> None:
+        """Process one Kafka message with its transport correlation context bound."""
         # Never process the dead-letter topic — DLQ/DLT requires human review.
         if msg.topic() in (self._dlq_topic, config.KAFKA_DEAD_LETTER_TOPIC):
             self._consumer.commit(message=msg, asynchronous=False)

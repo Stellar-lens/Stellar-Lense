@@ -45,7 +45,7 @@ from confluent_kafka import KafkaException, Producer
 from config import config
 from ingestion.avro_codec import load_schema, serialize, trade_to_record
 from ingestion.data_models import Trade
-from utils.logging import get_logger
+from utils.logging import correlation_headers, get_logger, log_context
 from utils.retry import retry_with_backoff
 
 logger = get_logger(__name__)
@@ -154,25 +154,26 @@ class HorizonKafkaProducer:
         """
         from ingestion.avro_codec import _avro_crc32_fingerprint
 
-        record = trade_to_record(trade)
-        try:
-            value = serialize(record, self._schema)
-        except Exception as exc:  # serialisation / validation failure → DLQ
-            logger.error(
-                "Serialisation failed for trade %s — routing to DLQ: %s",
-                record.get("trade_id"),
-                exc,
-            )
-            self._produce_to_dlq(record, reason=str(exc))
-            return
+        with log_context(pipeline_stage="ingestion.kafka_producer", trade_id=trade.trade_id):
+            record = trade_to_record(trade)
+            try:
+                value = serialize(record, self._schema)
+            except Exception as exc:  # serialisation / validation failure → DLQ
+                logger.error(
+                    "Serialisation failed for trade %s — routing to DLQ: %s",
+                    record.get("trade_id"),
+                    exc,
+                )
+                self._produce_to_dlq(record, reason=str(exc))
+                return
 
-        topic = self.topic_for_pair(record["asset_pair"])
-        # Partition key = wallet_id (base account) → per-wallet ordering.
-        key = record["base_account"].encode("utf-8")
-        # Schema version header: hex CRC-32 fingerprint of the encoding schema.
-        schema_fp = hex(_avro_crc32_fingerprint(self._schema) & 0xFFFFFFFF).encode("utf-8")
-        self._produce_with_headers(topic, value, key, schema_fp)
-        self._producer.poll(0)
+            topic = self.topic_for_pair(record["asset_pair"])
+            # Partition key = wallet_id (base account) → per-wallet ordering.
+            key = record["base_account"].encode("utf-8")
+            # Schema version header: hex CRC-32 fingerprint of the encoding schema.
+            schema_fp = hex(_avro_crc32_fingerprint(self._schema) & 0xFFFFFFFF).encode("utf-8")
+            self._produce_with_headers(topic, value, key, schema_fp)
+            self._producer.poll(0)
 
     def begin_transaction(self) -> None:
         """Begin a Kafka transaction (requires transactional=True at construction)."""
@@ -230,7 +231,7 @@ class HorizonKafkaProducer:
             topic=topic,
             value=value,
             key=key,
-            headers=[("avro-schema-version", schema_fp)],
+            headers=[("avro-schema-version", schema_fp), *correlation_headers()],
             on_delivery=_on_delivery,
         )
 
