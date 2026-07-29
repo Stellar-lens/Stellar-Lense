@@ -54,6 +54,9 @@ mod test_deprecation_compat;
 // #[cfg(test)]
 // mod test_attestation;
 
+#[cfg(test)]
+mod test_attestation_domain_compat;
+
 // #[cfg(test)]
 // mod test_batch_attestation;
 

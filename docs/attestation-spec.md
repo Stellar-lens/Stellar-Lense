@@ -82,7 +82,11 @@ field is either fixed-width or zero-padded to a fixed width):
 | `contract_id` | 32 bytes | contract's own address as raw 32 bytes |
 | `contract_version` | 4 bytes | `u32`, little-endian |
 
-Total preimage length: 243 bytes.
+Total preimage length: 211 bytes (56 + 9 + 4 + 1 + 1 + 8 + 4 + 4 + 56 + 32 +
+32 + 4). This exact width, and the order and encoding of every field above, is
+locked down by the golden-vector and domain-separation tests in
+`test_attestation_domain_compat.rs` (issue #696): any field that is omitted,
+resized, or reordered changes the pinned digest and fails the suite.
 
 Rationale for the StrKey (`to_string()`) encoding of `wallet` and the
 contract address: these are the only stable, deterministic byte
@@ -140,7 +144,7 @@ preventing cross-deployment and cross-version replay attacks.
 `contract_id` and `contract_version` in the digest.** Existing signatures without these
 fields will be rejected as `InvalidAttestation` after this upgrade.
 
-The digest layout changed from 175 bytes to 243 bytes (see §3). Signers must recompute
+The digest layout changed from 175 bytes to 211 bytes (see §3). Signers must recompute
 all attestations using the updated preimage format.
 
 ### Domain-separation review (issue #401)
@@ -172,3 +176,29 @@ No ABI change or attestation-version bump was needed — the binding predates
 this review; the gap was that it wasn't documented or covered by a
 cross-instance test, both of which this section and the test above now
 provide.
+
+### Cross-version domain compatibility (issue #696)
+
+`test_attestation_domain_compat.rs` extends the review above to the full set of
+domain fields, verifying that a commitment signed for one
+`(model_version, contract_version, chain, deployment)` tuple can never be
+recomputed to the same digest for a different tuple:
+
+- **Golden vector.** An independent re-implementation of the §3 layout is
+  pinned against an offline-computed SHA-256 of a fully-fixed 211-byte
+  preimage, and `compute_commitment` is asserted byte-for-byte equal to that
+  reference across a spread of vectors. Omitting, resizing, or reordering any
+  domain separator changes the digest and fails the suite.
+- **Domain-separation matrix.** Every field — including `model_version`,
+  `contract_version`, `network_id` (chain), and the self-derived contract
+  address (deployment) — is flipped in isolation and shown to change the
+  commitment, so no two distinct domains collide.
+- **End-to-end enforcement.** An attestation signed for `model_version = 1`,
+  replayed with the payload's `model_version` bumped, is rejected by
+  `submit_score` with `InvalidAttestation` — confirming the separation holds on
+  the real submit path, not just in the pure hash.
+
+No ABI, event, error, or storage change is involved; this is test and
+documentation coverage of an existing binding. The one behavioural-adjacent
+correction is the preimage length in §3, previously documented as 243 bytes and
+now corrected to the actual 211.
