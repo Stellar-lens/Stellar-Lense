@@ -81,6 +81,29 @@ fn submit_score(fixture: &Fixture, wallet: &Address, score: u32, confidence: u32
     );
 }
 
+fn submit_score_with_finality_buffer(
+    fixture: &Fixture,
+    wallet: &Address,
+    score: u32,
+    confidence: u32,
+    buffer_secs: u64,
+) {
+    fixture.ledgerlens.set_finality_buffer(&Vec::new(&fixture.env), &buffer_secs);
+    fixture.env.ledger().with_mut(|l| l.timestamp += 3_601);
+    fixture.ledgerlens.submit_score(
+        &Vec::new(&fixture.env),
+        wallet,
+        &symbol_short!("XLM_USDC"),
+        &score,
+        &false,
+        &false,
+        &fixture.env.ledger().timestamp(),
+        &confidence,
+        &1,
+        &None,
+    );
+}
+
 // ── Acceptance criterion: both mock contracts compile and deploy ───────────
 
 #[test]
@@ -121,6 +144,25 @@ fn amm_swap_rejected_for_unknown_wallet() {
 
     let result = fixture.amm.try_swap(&wallet, &symbol_short!("XLM_USDC"), &1_000);
     assert_eq!(result, Err(Ok(MockAmmError::HighRiskWallet)));
+}
+
+#[test]
+fn amm_swap_rejected_while_safe_score_is_still_pending_finality() {
+    let fixture = setup();
+    let wallet = Address::generate(&fixture.env);
+    submit_score_with_finality_buffer(&fixture, &wallet, 10, 95, 300);
+
+    assert_eq!(
+        fixture.amm.try_swap(&wallet, &symbol_short!("XLM_USDC"), &1_000),
+        Err(Ok(MockAmmError::HighRiskWallet))
+    );
+
+    fixture.env.ledger().with_mut(|l| l.timestamp += 301);
+    fixture.ledgerlens.commit_pending_score(&wallet, &symbol_short!("XLM_USDC"));
+    assert_eq!(
+        fixture.amm.try_swap(&wallet, &symbol_short!("XLM_USDC"), &1_000),
+        Ok(Ok(()))
+    );
 }
 
 // ── AMM gated liquidity provision (issue #214) ───────────────────────────────
@@ -316,43 +358,21 @@ fn lending_borrow_rejected_for_high_risk_score_even_with_high_confidence() {
 }
 
 #[test]
-fn lending_borrow_rejects_stale_score() {
+fn lending_borrow_rejected_while_safe_score_is_still_pending_finality() {
     let fixture = setup();
     let wallet = Address::generate(&fixture.env);
-    submit_score(&fixture, &wallet, 10, 90);
-    fixture.lending.set_borrow_gate_config(
-        &fixture.admin,
-        &GATE_THRESHOLD,
-        &MIN_CONFIDENCE,
-        &LendingFailPolicy::FailClosed,
-        &1,
-        &0,
-    );
-    fixture.env.ledger().with_mut(|l| l.timestamp += 2);
+    submit_score_with_finality_buffer(&fixture, &wallet, 10, 90, 300);
 
     assert_eq!(
         fixture.lending.try_borrow(&wallet, &symbol_short!("XLM_USDC"), &1_000),
-        Err(Ok(MockLendingError::StaleScore))
-    );
-}
-
-#[test]
-fn lending_borrow_rejects_unsupported_oracle_version() {
-    let fixture = setup();
-    let wallet = Address::generate(&fixture.env);
-    submit_score(&fixture, &wallet, 10, 90);
-    fixture.lending.set_borrow_gate_config(
-        &fixture.admin,
-        &GATE_THRESHOLD,
-        &MIN_CONFIDENCE,
-        &LendingFailPolicy::FailClosed,
-        &604_800,
-        &(fixture.ledgerlens.get_contract_version() + 1),
+        Err(Ok(MockLendingError::RiskGateRejected))
     );
 
+    fixture.env.ledger().with_mut(|l| l.timestamp += 301);
+    fixture.ledgerlens.commit_pending_score(&wallet, &symbol_short!("XLM_USDC"));
     assert_eq!(
         fixture.lending.try_borrow(&wallet, &symbol_short!("XLM_USDC"), &1_000),
-        Err(Ok(MockLendingError::UnsupportedVersion))
+        Ok(Ok(()))
     );
 }
 

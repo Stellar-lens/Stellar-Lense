@@ -20,6 +20,9 @@ mod zk_range_proof;
 mod test;
 
 #[cfg(test)]
+mod test_builders;
+
+#[cfg(test)]
 mod event_emission;
 
 #[cfg(test)]
@@ -139,24 +142,29 @@ mod test_replay_audit;
 #[cfg(test)]
 mod test_gdpr_accumulator;
 
+#[cfg(test)]
+mod test_memory_exhaustion;
+
 use soroban_sdk::{
     contract, contractimpl, crypto::Hash, symbol_short, token, Address, Bytes, BytesN, Env,
     IntoVal, Symbol, SymbolStr, TryFromVal, Vec,
 };
 use subtle::ConstantTimeEq;
 
+pub use constants::CONFIG_DRIFT_MANIFEST_FIELDS;
 pub use errors::Error;
 pub use events::{ServiceResumedEvent, ServiceSilenceAlertEvent};
 pub use types::{
-    AdaptiveRateLimit, AdaptiveThresholdConfig, AggregateRiskScore, BatchAttestation,
-    BatchEntryResult, BatchResult, BatchScoreResult, DecayCurve, EffectiveRiskScore, EmbargoExpiry,
-    FlashProtectionMode, HllSketch, InterpolationMethod, MaybeRiskScore, MaybeScoreAttestation,
-    MaybeThresholdAttestation, ModelSubmission, ModelVersionStats, ModelVersionStatus,
-    ParamChangeProposal, ParamValue, ParameterProposal, ParameterProposalRecord,
-    ParameterProposalStatus, PendingScoreEntry, RiskScore, ScoreAttestation, ScoreAttestationInput,
-    ScoreDispute, ScoreFloorPolicy, ScoreHistogram, ScoreQuery, ScoreSubmission,
-    ScoreSubmissionWithProof, ScoreTrend, ScoreVelocityCap, SignerAccuracyRecord,
-    ThresholdAttestation, TierBounds, TokenBucket, UpgradeProposal, WelfordCorrState,
+    AdaptiveRateLimit, AdaptiveThresholdConfig, AggregateRiskScore, AlertAckRecord, AlertType,
+    BatchAttestation, BatchEntryResult, BatchResult, BatchScoreResult, DecayCurve,
+    EffectiveRiskScore, EmbargoExpiry, FlashProtectionMode, HllSketch, InterpolationMethod,
+    MaybeRiskScore, MaybeScoreAttestation, MaybeThresholdAttestation, ModelSubmission,
+    ModelVersionStats, ModelVersionStatus, ParamChangeProposal, ParamValue, ParameterProposal,
+    ParameterProposalRecord, ParameterProposalStatus, PendingScoreEntry, RiskScore,
+    ScoreAttestation, ScoreAttestationInput, ScoreDispute, ScoreFloorPolicy, ScoreHistogram,
+    ScoreQuery, ScoreSubmission, ScoreSubmissionWithProof, ScoreTrend, ScoreVelocityCap,
+    SignerAccuracyRecord, ThresholdAttestation, TierBounds, TokenBucket, UpgradeProposal,
+    WelfordCorrState,
 };
 /// The 32-byte all-zeros field element used as the value in non-membership proofs.
 pub use verkle::NON_MEMBER_SENTINEL;
@@ -172,6 +180,34 @@ pub struct LedgerLensScoreContract;
 
 #[contractimpl]
 impl LedgerLensScoreContract {
+    fn asset_pair_len(env: &Env, asset_pair: &Symbol) -> Option<u32> {
+        let pair_str = SymbolStr::try_from_val(env, &asset_pair.to_symbol_val()).ok()?;
+        Some(pair_str.as_ref().len() as u32)
+    }
+
+    fn asset_pair_is_bounded(env: &Env, asset_pair: &Symbol) -> bool {
+        Self::asset_pair_len(env, asset_pair)
+            .map(|len| len <= constants::MAX_ASSET_PAIR_BYTES)
+            .unwrap_or(false)
+    }
+
+    fn ensure_asset_pair_bounded(env: &Env, asset_pair: &Symbol) -> Result<(), Error> {
+        if Self::asset_pair_is_bounded(env, asset_pair) {
+            Ok(())
+        } else {
+            Err(Error::InvalidAttestation)
+        }
+    }
+
+    fn ensure_score_commitment_bounded(commitment: &Option<Bytes>) -> Result<(), Error> {
+        match commitment {
+            Some(bytes) if bytes.len() != constants::MAX_SCORE_COMMITMENT_BYTES => {
+                Err(Error::InvalidAttestation)
+            }
+            _ => Ok(()),
+        }
+    }
+
     // ── Lifecycle ────────────────────────────────────────────────────────────
 
     /// One-time setup.  `admin` can rotate the scoring service address
@@ -199,6 +235,10 @@ impl LedgerLensScoreContract {
         if storage::has_admin(&env) {
             return Err(Error::AlreadyInitialized);
         }
+        // Initialization is a privileged state transition too. Requiring the
+        // nominated admin prevents a third party from front-running deployment
+        // and permanently installing attacker-controlled admin/service values.
+        admin.require_auth();
         storage::set_admin(&env, &admin);
         storage::set_service(&env, &service);
         env.storage()
@@ -299,6 +339,7 @@ impl LedgerLensScoreContract {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
+        Self::ensure_asset_pair_bounded(&env, &asset_pair)?;
         if storage::is_paused(&env) {
             return Err(Error::ContractPaused);
         }
@@ -324,6 +365,8 @@ impl LedgerLensScoreContract {
             }
             None => (None, None, None),
         };
+
+        Self::ensure_score_commitment_bounded(&commitment)?;
 
         if let Some(ref ta) = threshold_attestation {
             // ── Threshold-sig path ───────────────────────────────────────
@@ -721,7 +764,7 @@ impl LedgerLensScoreContract {
         Self::authorize_submission(&env, &signers)?;
 
         if submissions.is_empty() {
-            return Err(Error::InvalidConsensusConfig);
+            return Err(Error::ConsensusInputEmpty);
         }
         if submissions.len() != nonces.len() {
             return Err(Error::CommitmentMismatch); // Or some other length mismatch
@@ -870,7 +913,7 @@ impl LedgerLensScoreContract {
         Self::ensure_active(&env)?;
         Self::authorize_submission(&env, &signers)?;
         if submissions.is_empty() {
-            return Err(Error::InvalidConsensusConfig);
+            return Err(Error::ConsensusInputEmpty);
         }
         if timestamp == 0 {
             return Err(Error::InvalidTimestamp);
@@ -1058,7 +1101,9 @@ impl LedgerLensScoreContract {
             let mut accepted = false;
             let mut rejection_code: u32 = 0;
 
-            if storage::is_pair_paused(&env, &sub.asset_pair) {
+            if !Self::asset_pair_is_bounded(&env, &sub.asset_pair) {
+                rejection_code = Error::InvalidAttestation as u32;
+            } else if storage::is_pair_paused(&env, &sub.asset_pair) {
                 rejection_code = Error::ContractPaused as u32;
             } else if sub.score > 100 {
                 rejection_code = Error::InvalidScore as u32;
@@ -1359,6 +1404,14 @@ impl LedgerLensScoreContract {
             if signers.len() < threshold {
                 return Err(Error::InsufficientSigners);
             }
+            // Bound the M-of-N loop before it does any storage read or
+            // `require_auth` host call: a caller cannot legitimately need
+            // more signers than currently exist in the service set, so a
+            // larger `signers` Vec is padding aimed at burning CPU/memory
+            // on `check_signer_expired` storage reads (#612).
+            if signers.len() > service_set.len() {
+                return Err(Error::TooManySigners);
+            }
             for i in 0..signers.len() {
                 let signer = signers.get(i).unwrap();
                 if !service_set.contains(&signer) {
@@ -1411,6 +1464,15 @@ impl LedgerLensScoreContract {
             let entry = submissions.get(i).unwrap();
             let mut accepted = false;
             let mut rejection_code: u32 = 0;
+
+            if !Self::asset_pair_is_bounded(&env, &entry.submission.asset_pair) {
+                results.push_back(BatchEntryResult {
+                    index: i,
+                    accepted: false,
+                    rejection_code: Error::InvalidAttestation as u32,
+                });
+                continue;
+            }
 
             // Per-entry Merkle proof check. A failure here rejects only
             // this entry with `InvalidAttestation` — siblings in the same
@@ -1640,6 +1702,9 @@ impl LedgerLensScoreContract {
     /// assert_eq!(proof.len(), 97);
     /// ```
     pub fn get_membership_proof(env: Env, wallet: Address, asset_pair: Symbol) -> Bytes {
+        if !Self::asset_pair_is_bounded(&env, &asset_pair) {
+            return Bytes::new(&env);
+        }
         // Derive the evaluation point z for this key.
         let mut wallet_buf = [0u8; 56];
         wallet.to_string().copy_into_slice(&mut wallet_buf);
@@ -1745,6 +1810,9 @@ impl LedgerLensScoreContract {
         timestamp: u64,
         proof: Bytes,
     ) -> bool {
+        if !Self::asset_pair_is_bounded(&env, &asset_pair) {
+            return false;
+        }
         // Decode the 48-byte commitment to its inner 32-byte hash.
         let commit_inner = match verkle::bytes48_to_commitment(&commitment) {
             Some(c) => c,
@@ -1826,6 +1894,7 @@ impl LedgerLensScoreContract {
     /// assert_eq!(score.score, 10);
     /// ```
     pub fn get_score(env: Env, wallet: Address, asset_pair: Symbol) -> Result<RiskScore, Error> {
+        Self::ensure_asset_pair_bounded(&env, &asset_pair)?;
         Self::check_service_silence(&env);
         Self::lookup_score(&env, &wallet, &asset_pair)?.ok_or(Error::ScoreNotFound)
     }
@@ -1857,6 +1926,9 @@ impl LedgerLensScoreContract {
     /// assert!(client.get_score_exists(&wallet, &asset_pair));
     /// ```
     pub fn get_score_exists(env: Env, wallet: Address, asset_pair: Symbol) -> bool {
+        if !Self::asset_pair_is_bounded(&env, &asset_pair) {
+            return false;
+        }
         storage::peek_score(&env, &wallet, &asset_pair).is_some()
     }
 
@@ -3709,6 +3781,9 @@ impl LedgerLensScoreContract {
         proof: Bytes,
         threshold: u32,
     ) -> bool {
+        if !Self::asset_pair_is_bounded(&env, &asset_pair) {
+            return false;
+        }
         let stored_score = match storage::get_score(&env, &wallet, &asset_pair) {
             Some(s) => s,
             None => return false,
@@ -3769,6 +3844,9 @@ impl LedgerLensScoreContract {
         asset_pair: Symbol,
         gate_threshold: u32,
     ) -> bool {
+        if !Self::asset_pair_is_bounded(&env, &asset_pair) {
+            return false;
+        }
         // Flash-loan protection: record this gate read in temporary storage (#300).
         storage::set_gate_read_ledger(&env, &wallet, &asset_pair);
         Self::query_risk_gate_with_confidence(env, wallet, asset_pair, gate_threshold, 0)
@@ -3886,6 +3964,9 @@ impl LedgerLensScoreContract {
     /// `None` rather than an `Error` so it can be invoked cross-contract via
     /// `env.invoke_contract` without needing to decode a `Result`.
     pub fn get_score_opt(env: Env, wallet: Address, asset_pair: Symbol) -> Option<RiskScore> {
+        if !Self::asset_pair_is_bounded(&env, &asset_pair) {
+            return None;
+        }
         storage::get_score(&env, &wallet, &asset_pair)
     }
 
@@ -3915,6 +3996,9 @@ impl LedgerLensScoreContract {
         gate_threshold: u32,
         min_confidence: u32,
     ) -> bool {
+        if !Self::asset_pair_is_bounded(&env, &asset_pair) {
+            return false;
+        }
         Self::check_service_silence(&env);
         // #302: strict gate enforcement — reject callers not in the allowlist.
         if storage::get_gate_enforcement_mode(&env) {
@@ -4115,6 +4199,7 @@ impl LedgerLensScoreContract {
         if top_percentile == 0 || top_percentile > 100 {
             return Err(Error::InvalidThreshold);
         }
+        Self::ensure_asset_pair_bounded(&env, &asset_pair)?;
         let percentile = Self::get_score_percentile(env, wallet, asset_pair)?;
         Ok(percentile >= 100u32.saturating_sub(top_percentile))
     }
@@ -6553,6 +6638,10 @@ impl LedgerLensScoreContract {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
+        Self::ensure_asset_pair_bounded(&env, &asset_pair)?;
+        if bond_amount_salt.len() > constants::MAX_DISPUTE_BOND_PREIMAGE_BYTES {
+            return Err(Error::InvalidAttestation);
+        }
 
         // Require caller to be the challenger
         challenger.require_auth();
@@ -6574,6 +6663,10 @@ impl LedgerLensScoreContract {
         bond_salt: Bytes,
     ) -> Result<(), Error> {
         Self::ensure_active(&env)?;
+        Self::ensure_asset_pair_bounded(&env, &asset_pair)?;
+        if bond_salt.len() > constants::MAX_DISPUTE_BOND_SALT_BYTES {
+            return Err(Error::InvalidAttestation);
+        }
 
         if bond <= 0 {
             return Err(Error::InvalidDisputeBond);
@@ -7461,6 +7554,47 @@ impl LedgerLensScoreContract {
         Ok(())
     }
 
+    /// Configures the separate approval policy for irreversible deletion.
+    ///
+    /// When `enabled == false`, `clear_score` and `clear_score_history` keep
+    /// using routine admin authorization only. When `enabled == true`, both
+    /// deletion functions additionally require `approver.require_auth()`, and
+    /// the approver must stay disjoint from the routine admin key / admin set.
+    ///
+    /// This is intentionally fail-closed: an enabled policy with a missing or
+    /// overlapping approver blocks deletion until governance repairs the
+    /// configuration.
+    pub fn set_deletion_approval_policy(
+        env: Env,
+        admin_signers: Vec<Address>,
+        enabled: bool,
+        approver: Option<Address>,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+
+        if enabled {
+            let approver_ref = approver.as_ref().ok_or(Error::InvalidThreshold)?;
+            if Self::deletion_approver_conflicts_with_admin(&env, approver_ref) {
+                return Err(Error::InvalidThreshold);
+            }
+        }
+
+        let policy = DeletionApprovalPolicy { enabled, approver };
+        storage::set_deletion_approval_policy(&env, &policy);
+        events::deletion_policy_updated(&env, enabled, &policy.approver);
+        Ok(())
+    }
+
+    /// Returns the current approval policy for irreversible deletion.
+    ///
+    /// Defaults to `enabled = false` and `approver = None`.
+    pub fn get_deletion_approval_policy(env: Env) -> DeletionApprovalPolicy {
+        storage::get_deletion_approval_policy(&env)
+    }
+
     /// Erase the score history ring buffer for `wallet` / `asset_pair`.
     ///
     /// Does nothing (returns `Ok`) if no history exists. After this call,
@@ -7478,7 +7612,7 @@ impl LedgerLensScoreContract {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
-        Self::require_admin_auth(&env, &admin_signers)?;
+        Self::require_deletion_auth(&env, &admin_signers)?;
         if let Some(risk) = storage::peek_score(&env, &wallet, &asset_pair) {
             storage::update_histogram_on_clear(&env, risk.score);
         }
@@ -7504,7 +7638,7 @@ impl LedgerLensScoreContract {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
-        Self::require_admin_auth(&env, &admin_signers)?;
+        Self::require_deletion_auth(&env, &admin_signers)?;
         if let Some(risk) = storage::peek_score(&env, &wallet, &asset_pair) {
             storage::update_histogram_on_clear(&env, risk.score);
         }
@@ -8415,6 +8549,48 @@ impl LedgerLensScoreContract {
     /// ```
     pub fn get_admin_threshold(env: Env) -> u32 {
         storage::get_admin_threshold(&env)
+    }
+
+    /// Returns a deterministic machine-readable export of governance-controlled
+    /// configuration, including active values, pending values, and integrity
+    /// hashes over both sections.
+    ///
+    /// Schema version `1` uses an ordered key/value list whose values are
+    /// canonical binary encodings documented in `docs/configuration-export.md`.
+    pub fn export_configuration(env: Env) -> ConfigExportBundle {
+        let active_values = Self::collect_active_config_entries(&env);
+        let pending_values = Self::collect_pending_config_entries(&env);
+
+        let active_hash = env.crypto().sha256(&Self::encode_active_entries(&env, &active_values));
+        let pending_hash =
+            env.crypto().sha256(&Self::encode_pending_entries(&env, &pending_values));
+
+        let mut rationale = Vec::new(&env);
+        rationale.push_back(Bytes::from_slice(
+            &env,
+            b"off-chain private keys, seed material, and operator playbooks are not stored on-chain; this export covers only public governance state",
+        ));
+        rationale.push_back(Bytes::from_slice(
+            &env,
+            b"rate-limit override justifications are exported as hashes only because the contract persists only justification_hash for bounded public auditability",
+        ));
+
+        let mut export_preimage = Bytes::new(&env);
+        export_preimage.append(&Bytes::from_array(&env, &1u32.to_be_bytes()));
+        export_preimage.append(&Bytes::from_array(&env, &active_hash.to_array()));
+        export_preimage.append(&Bytes::from_array(&env, &pending_hash.to_array()));
+        export_preimage.append(&Self::encode_bytes_vec(&env, &rationale));
+        let export_hash = env.crypto().sha256(&export_preimage);
+
+        ConfigExportBundle {
+            schema_version: 1,
+            active_hash,
+            pending_hash,
+            export_hash,
+            active_values,
+            pending_values,
+            omitted_secret_rationale: rationale,
+        }
     }
 
     /// Returns the age (in seconds) of the last score submission for `(wallet, asset_pair)`.
@@ -9856,6 +10032,13 @@ impl LedgerLensScoreContract {
             if admin_signers.len() < threshold {
                 return Err(Error::InsufficientAdminSigners);
             }
+            // Same bound as the service-signer paths (#612): an
+            // `admin_signers` Vec longer than the admin set itself carries
+            // no legitimate signature it couldn't already carry at set
+            // size, so reject before the per-signer `require_auth` loop.
+            if admin_signers.len() > admin_set.len() {
+                return Err(Error::TooManySigners);
+            }
             for i in 0..admin_signers.len() {
                 let signer = admin_signers.get(i).unwrap();
                 if !admin_set.contains(&signer) {
@@ -9879,6 +10062,11 @@ impl LedgerLensScoreContract {
             if service_signers.len() < threshold {
                 return Err(Error::InsufficientSigners);
             }
+            // Same bound as `submit_scores_batch_attested` (#612): reject
+            // before the loop touches storage or `require_auth`.
+            if service_signers.len() > service_set.len() {
+                return Err(Error::TooManySigners);
+            }
             for i in 0..service_signers.len() {
                 let signer = service_signers.get(i).unwrap();
                 if !service_set.contains(&signer) {
@@ -9891,6 +10079,487 @@ impl LedgerLensScoreContract {
             storage::get_service(env).require_auth();
         }
         Ok(())
+    }
+
+    fn deletion_approver_conflicts_with_admin(env: &Env, approver: &Address) -> bool {
+        if storage::get_admin(env) == *approver {
+            return true;
+        }
+        storage::get_admin_set(env).contains(approver)
+    }
+
+    fn require_deletion_auth(env: &Env, admin_signers: &Vec<Address>) -> Result<(), Error> {
+        Self::require_admin_auth(env, admin_signers)?;
+        let policy = storage::get_deletion_approval_policy(env);
+        if !policy.enabled {
+            return Ok(());
+        }
+
+        let approver = policy.approver.ok_or(Error::Unauthorized)?;
+        if Self::deletion_approver_conflicts_with_admin(env, &approver) {
+            return Err(Error::Unauthorized);
+        }
+        approver.require_auth();
+        Ok(())
+    }
+
+    fn config_entry(env: &Env, key: Symbol, value: Bytes) -> ConfigExportEntry {
+        ConfigExportEntry { key, value }
+    }
+
+    fn pending_config_entry(
+        env: &Env,
+        key: Symbol,
+        value: Bytes,
+        proposal_id: u64,
+        proposed_at: u64,
+        executable_after: u64,
+    ) -> PendingConfigExportEntry {
+        let _ = env;
+        PendingConfigExportEntry { key, value, proposal_id, proposed_at, executable_after }
+    }
+
+    fn encode_bool(env: &Env, value: bool) -> Bytes {
+        Bytes::from_slice(env, &[if value { 1 } else { 0 }])
+    }
+
+    fn encode_u32(env: &Env, value: u32) -> Bytes {
+        Bytes::from_array(env, &value.to_be_bytes())
+    }
+
+    fn encode_u64(env: &Env, value: u64) -> Bytes {
+        Bytes::from_array(env, &value.to_be_bytes())
+    }
+
+    fn encode_i128(env: &Env, value: i128) -> Bytes {
+        Bytes::from_array(env, &value.to_be_bytes())
+    }
+
+    fn encode_symbol(env: &Env, value: &Symbol) -> Bytes {
+        let text = value.to_string();
+        let len = text.len().min(64) as usize;
+        let mut buf = [0u8; 64];
+        text.copy_into_slice(&mut buf);
+        Bytes::from_slice(env, &buf[..len])
+    }
+
+    fn encode_address(env: &Env, value: &Address) -> Bytes {
+        let text = value.to_string();
+        let len = text.len().min(64) as usize;
+        let mut buf = [0u8; 64];
+        text.copy_into_slice(&mut buf);
+        Bytes::from_slice(env, &buf[..len])
+    }
+
+    fn encode_option_address(env: &Env, value: &Option<Address>) -> Bytes {
+        let mut bytes = Bytes::new(env);
+        match value {
+            Some(address) => {
+                bytes.append(&Self::encode_bool(env, true));
+                bytes.append(&Self::encode_address(env, address));
+            }
+            None => bytes.append(&Self::encode_bool(env, false)),
+        }
+        bytes
+    }
+
+    fn encode_u32_vec(env: &Env, values: &Vec<u32>) -> Bytes {
+        let mut bytes = Bytes::new(env);
+        bytes.append(&Bytes::from_array(env, &values.len().to_be_bytes()));
+        for i in 0..values.len() {
+            bytes.append(&Self::encode_u32(env, values.get(i).unwrap()));
+        }
+        bytes
+    }
+
+    fn encode_address_vec(env: &Env, values: &Vec<Address>) -> Bytes {
+        let mut bytes = Bytes::new(env);
+        bytes.append(&Bytes::from_array(env, &values.len().to_be_bytes()));
+        for i in 0..values.len() {
+            bytes.append(&Self::encode_address(env, &values.get(i).unwrap()));
+        }
+        bytes
+    }
+
+    fn encode_bytes_vec(env: &Env, values: &Vec<Bytes>) -> Bytes {
+        let mut bytes = Bytes::new(env);
+        bytes.append(&Bytes::from_array(env, &values.len().to_be_bytes()));
+        for i in 0..values.len() {
+            let value = values.get(i).unwrap();
+            bytes.append(&Bytes::from_array(env, &value.len().to_be_bytes()));
+            bytes.append(&value);
+        }
+        bytes
+    }
+
+    fn encode_deletion_policy(env: &Env, policy: &DeletionApprovalPolicy) -> Bytes {
+        let mut bytes = Bytes::new(env);
+        bytes.append(&Self::encode_bool(env, policy.enabled));
+        bytes.append(&Self::encode_option_address(env, &policy.approver));
+        bytes
+    }
+
+    fn encode_score_floor_policy(env: &Env, policy: &ScoreFloorPolicy) -> Bytes {
+        let mut bytes = Bytes::new(env);
+        bytes.append(&Self::encode_bool(env, policy.enabled));
+        bytes.append(&Self::encode_u32(env, policy.high_water_mark));
+        bytes.append(&Self::encode_u32(env, policy.floor_value));
+        bytes
+    }
+
+    fn encode_velocity_cap(env: &Env, cap: &ScoreVelocityCap) -> Bytes {
+        let mut bytes = Bytes::new(env);
+        bytes.append(&Self::encode_bool(env, cap.enabled));
+        bytes.append(&Self::encode_u32(env, cap.points_per_hour));
+        bytes
+    }
+
+    fn encode_adaptive_rate_limit(env: &Env, config: &AdaptiveRateLimit) -> Bytes {
+        let mut bytes = Bytes::new(env);
+        bytes.append(&Self::encode_bool(env, config.enabled));
+        bytes.append(&Self::encode_u32(env, config.variance_scale));
+        bytes
+    }
+
+    fn encode_adaptive_threshold(env: &Env, config: &AdaptiveThresholdConfig) -> Bytes {
+        let mut bytes = Bytes::new(env);
+        bytes.append(&Self::encode_bool(env, config.enabled));
+        bytes.append(&Self::encode_u32(env, config.target_percentile));
+        bytes.append(&Self::encode_u32(env, config.min_value));
+        bytes.append(&Self::encode_u32(env, config.max_value));
+        bytes.append(&Self::encode_u32(env, config.last_computed));
+        bytes
+    }
+
+    fn encode_flash_protection_mode(env: &Env, mode: FlashProtectionMode) -> Bytes {
+        let tag = match mode {
+            FlashProtectionMode::Warn => 0u32,
+            FlashProtectionMode::Reject => 1u32,
+        };
+        Self::encode_u32(env, tag)
+    }
+
+    fn encode_interpolation_method(env: &Env, method: InterpolationMethod) -> Bytes {
+        let tag = match method {
+            InterpolationMethod::Linear => 0u32,
+            InterpolationMethod::CubicSpline => 1u32,
+        };
+        Self::encode_u32(env, tag)
+    }
+
+    fn collect_active_config_entries(env: &Env) -> Vec<ConfigExportEntry> {
+        let mut entries = Vec::new(env);
+        let (consensus_k, consensus_epsilon) = (
+            storage::get_consensus_threshold_k(env),
+            storage::get_consensus_epsilon(env),
+        );
+        let (adaptive_bounds_enabled, adaptive_min, adaptive_max) = (
+            storage::get_adaptive_epsilon_enabled(env),
+            storage::get_adaptive_epsilon_min(env),
+            storage::get_adaptive_epsilon_max(env),
+        );
+        let adaptive_epsilon_scale = storage::get_adaptive_epsilon_scale_factor(env);
+        let adaptive_rate_limit = storage::get_adaptive_rate_limit(env);
+        let score_floor_policy = storage::get_score_floor_policy(env);
+        let deletion_policy = storage::get_deletion_approval_policy(env);
+        let velocity_cap = storage::get_score_velocity_cap(env);
+        let adaptive_threshold = storage::get_adaptive_threshold_config(env);
+
+        let mut consensus_bytes = Bytes::new(env);
+        consensus_bytes.append(&Self::encode_u32(env, consensus_k));
+        consensus_bytes.append(&Self::encode_u32(env, consensus_epsilon));
+
+        let mut adaptive_bounds_bytes = Bytes::new(env);
+        adaptive_bounds_bytes.append(&Self::encode_bool(env, adaptive_bounds_enabled));
+        adaptive_bounds_bytes.append(&Self::encode_u32(env, adaptive_min));
+        adaptive_bounds_bytes.append(&Self::encode_u32(env, adaptive_max));
+        adaptive_bounds_bytes.append(&Self::encode_u32(env, adaptive_epsilon_scale));
+
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("version"),
+            Self::encode_u32(env, constants::CONTRACT_VERSION),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("admin"),
+            Self::encode_address(env, &storage::get_admin(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("adm_set"),
+            Self::encode_address_vec(env, &storage::get_admin_set(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("adm_thr"),
+            Self::encode_u32(env, storage::get_admin_threshold(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("service"),
+            Self::encode_address(env, &storage::get_service(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("svc_set"),
+            Self::encode_address_vec(env, &storage::get_service_set(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("svc_thr"),
+            Self::encode_u32(env, storage::get_service_threshold(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("risk_thr"),
+            Self::encode_u32(env, storage::get_risk_threshold(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("cooldown"),
+            Self::encode_u64(env, storage::get_cooldown_secs(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("stale_w"),
+            Self::encode_u64(env, storage::get_staleness_window(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("upg_dly"),
+            Self::encode_u64(env, storage::get_upgrade_delay(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("hist_dep"),
+            Self::encode_u32(env, storage::get_history_max_depth(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("fin_buf"),
+            Self::encode_u64(env, storage::get_finality_buffer_secs(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("rvl_win"),
+            Self::encode_u64(env, storage::get_reveal_window_secs(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("hb_alrt"),
+            Self::encode_u64(env, storage::get_heartbeat_alert_threshold(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("min_conf"),
+            Self::encode_u32(env, storage::get_global_min_confidence(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("priv_eps"),
+            Self::encode_u32(env, storage::get_privacy_epsilon(env)),
+        ));
+        entries.push_back(Self::config_entry(env, symbol_short!("cons_cfg"), consensus_bytes));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("adp_eps"),
+            adaptive_bounds_bytes,
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("adp_rate"),
+            Self::encode_adaptive_rate_limit(env, &adaptive_rate_limit),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("burst"),
+            Self::encode_u32(env, storage::get_burst_capacity(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("vel_cap"),
+            Self::encode_velocity_cap(env, &velocity_cap),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("scr_flr"),
+            Self::encode_score_floor_policy(env, &score_floor_policy),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("del_pol"),
+            Self::encode_deletion_policy(env, &deletion_policy),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("esc_thr"),
+            Self::encode_u32(env, storage::get_escalation_threshold(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("hyst_mg"),
+            Self::encode_u32(env, storage::get_hysteresis_margin(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("hll_prec"),
+            Self::encode_u32(env, storage::get_hll_precision(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("flash"),
+            Self::encode_flash_protection_mode(env, storage::get_flash_protection_mode(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("failovr"),
+            Self::encode_option_address(env, &storage::get_failover_contract(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("gate_fee"),
+            Self::encode_i128(env, storage::get_gate_query_fee(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("gate_opn"),
+            Self::encode_bool(env, storage::get_gate_open(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("gate_acl"),
+            Self::encode_address_vec(env, &storage::get_gate_callers(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("ora_stl"),
+            Self::encode_u64(env, storage::get_oracle_staleness_threshold(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("pair_vol"),
+            Self::encode_u64(env, storage::get_pair_volatility_window(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("mom_win"),
+            Self::encode_u64(env, storage::get_momentum_window(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("mom_alt"),
+            Self::encode_u32(env, storage::get_momentum_alert_threshold(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("clstrs"),
+            Self::encode_u32_vec(env, &storage::get_cluster_boundaries(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("fin_dep"),
+            Self::encode_u32(env, storage::get_finality_depth(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("interp"),
+            Self::encode_interpolation_method(env, storage::get_interpolation_method(env)),
+        ));
+        entries.push_back(Self::config_entry(
+            env,
+            symbol_short!("ath_cfg"),
+            Self::encode_adaptive_threshold(env, &adaptive_threshold),
+        ));
+        entries
+    }
+
+    fn collect_pending_config_entries(env: &Env) -> Vec<PendingConfigExportEntry> {
+        let mut entries = Vec::new(env);
+
+        let legacy_keys = Vec::from_array(
+            env,
+            [
+                symbol_short!("risk_thr"),
+                symbol_short!("hist_dep"),
+                symbol_short!("upg_dly"),
+                symbol_short!("stale_w"),
+                symbol_short!("cooldown"),
+            ],
+        );
+        for i in 0..legacy_keys.len() {
+            let key = legacy_keys.get(i).unwrap();
+            if let Some(pending) = storage::get_pending_param_change(env, &key) {
+                let value = match pending.new_value {
+                    ParamValue::U32(v) => Self::encode_u32(env, v),
+                    ParamValue::U64(v) => Self::encode_u64(env, v),
+                };
+                entries.push_back(Self::pending_config_entry(
+                    env,
+                    key,
+                    value,
+                    0,
+                    pending.proposed_at,
+                    pending.apply_after,
+                ));
+            }
+        }
+
+        let proposal_ids = storage::get_pending_parameter_proposal_ids(env);
+        for i in 0..proposal_ids.len() {
+            let proposal_id = proposal_ids.get(i).unwrap();
+            if let Some(record) = storage::get_parameter_proposal_record(env, proposal_id) {
+                if record.status != ParameterProposalStatus::Pending {
+                    continue;
+                }
+                let proposal = record.proposal;
+                entries.push_back(Self::pending_config_entry(
+                    env,
+                    proposal.param_key,
+                    proposal.new_value,
+                    proposal_id,
+                    proposal.proposed_at,
+                    proposal.proposed_at.saturating_add(proposal.time_lock_secs),
+                ));
+            }
+        }
+
+        entries
+    }
+
+    fn encode_entry_key(env: &Env, key: &Symbol) -> Bytes {
+        let key_bytes = Self::encode_symbol(env, key);
+        let mut out = Bytes::new(env);
+        out.append(&Bytes::from_array(env, &key_bytes.len().to_be_bytes()));
+        out.append(&key_bytes);
+        out
+    }
+
+    fn encode_active_entries(env: &Env, entries: &Vec<ConfigExportEntry>) -> Bytes {
+        let mut bytes = Bytes::new(env);
+        bytes.append(&Bytes::from_array(env, &entries.len().to_be_bytes()));
+        for i in 0..entries.len() {
+            let entry = entries.get(i).unwrap();
+            bytes.append(&Self::encode_entry_key(env, &entry.key));
+            bytes.append(&Bytes::from_array(env, &entry.value.len().to_be_bytes()));
+            bytes.append(&entry.value);
+        }
+        bytes
+    }
+
+    fn encode_pending_entries(env: &Env, entries: &Vec<PendingConfigExportEntry>) -> Bytes {
+        let mut bytes = Bytes::new(env);
+        bytes.append(&Bytes::from_array(env, &entries.len().to_be_bytes()));
+        for i in 0..entries.len() {
+            let entry = entries.get(i).unwrap();
+            bytes.append(&Self::encode_entry_key(env, &entry.key));
+            bytes.append(&Bytes::from_array(env, &entry.proposal_id.to_be_bytes()));
+            bytes.append(&Bytes::from_array(env, &entry.proposed_at.to_be_bytes()));
+            bytes.append(&Bytes::from_array(env, &entry.executable_after.to_be_bytes()));
+            bytes.append(&Bytes::from_array(env, &entry.value.len().to_be_bytes()));
+            bytes.append(&entry.value);
+        }
+        bytes
     }
 
     /// Verifies `attestation` (recomputing the commitment independently
@@ -10497,6 +11166,70 @@ impl LedgerLensScoreContract {
         storage::get_oracle_staleness_threshold(&env)
     }
 
+// ── Architecture Ownership & Reviewer Routing ─────────────────────────────
+
+pub fn set_arch_owner(env: Env, new_owner: Address) -> Result<(), Error> {
+    // Requires authorization from current admin or existing arch owner
+    if let Some(current_owner) = storage::get_arch_owner(&env) {
+        current_owner.require_auth();
+    } else {
+        storage::get_admin(&env).require_auth();
+    }
+
+    storage::set_arch_owner(&env, &new_owner);
+
+    // Emit event for architecture ownership change
+    env.events().publish(
+        (Symbol::new(&env, "arch_owner_updated"),),
+        new_owner,
+    );
+
+    Ok(())
+}
+
+pub fn get_arch_owner(env: Env) -> Option<Address> {
+    storage::get_arch_owner(&env)
+}
+
+pub fn set_mandatory_reviewers(env: Env, reviewers: Vec<Address>) -> Result<(), Error> {
+    // Ensure caller is authorized (arch owner or contract admin)
+    if let Some(owner) = storage::get_arch_owner(&env) {
+        owner.require_auth();
+    } else {
+        storage::get_admin(&env).require_auth();
+    }
+
+    // Bound check against MAX_MANDATORY_REVIEWERS
+    if reviewers.len() > storage::MAX_MANDATORY_REVIEWERS {
+        return Err(Error::MaxReviewersExceeded);
+    }
+
+    // Check for duplicate reviewers in vector
+    for i in 0..reviewers.len() {
+        let rev_i = reviewers.get(i).unwrap();
+        for j in (i + 1)..reviewers.len() {
+            let rev_j = reviewers.get(j).unwrap();
+            if rev_i == rev_j {
+                return Err(Error::ReviewerAlreadyExists);
+            }
+        }
+    }
+
+    storage::set_mandatory_reviewers(&env, &reviewers);
+
+    // Emit event for reviewer set update
+    env.events().publish(
+        (Symbol::new(&env, "mandatory_reviewers_updated"),),
+        reviewers.len(),
+    );
+
+    Ok(())
+}
+
+pub fn get_mandatory_reviewers(env: Env) -> Vec<Address> {
+    storage::get_mandatory_reviewers(&env)
+}
+
     /// Returns `true` if the oracle registered for `asset_pair` is considered
     /// stale — i.e. the last recorded price consultation is older than the
     /// current staleness threshold — or if no oracle consultation has ever been
@@ -10517,7 +11250,105 @@ impl LedgerLensScoreContract {
         }
         ledger_now.saturating_sub(last_updated) > threshold
     }
+
+    // ── Operator alert acknowledgement (issue #630) ───────────────────────────
+
+    /// Records an operator acknowledgement for a critical alert.
+    ///
+    /// Once an alert (momentum threshold crossed, service silence) has been
+    /// triaged, an authorized operator calls this function to create an
+    /// immutable on-chain audit trail of who acknowledged it and when.
+    ///
+    /// # Parameters
+    /// - `admin_signers` — M-of-N admin co-signers (empty in legacy single-admin mode).
+    /// - `alert_type`    — Which alert is being acknowledged (`AlertType::Momentum`
+    ///                     for a specific wallet / pair, or `AlertType::ServiceSilence`).
+    /// - `note_hash`     — SHA-256 digest of an off-chain remediation note (runbook
+    ///                     entry, ticket URL, etc.). Pass `[0u8; 32]` when no note
+    ///                     is required — this is deliberately permitted so that the
+    ///                     acknowledgement itself is the audit signal.
+    ///
+    /// # Invariants
+    /// - Only one record per `AlertType` is stored; re-acknowledging overwrites the
+    ///   previous record (useful when a recurring alert is retriggered).
+    /// - Storage cost is O(1) — no collection is appended to.
+    /// - Emits [`events::alert_acknowledged`] on success.
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if the contract has not been initialized.
+    /// - [`Error::Unauthorized`] / [`Error::InsufficientAdminSigners`] if the
+    ///   caller does not satisfy the admin quorum.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient, AlertType};
+    /// # use soroban_sdk::{testutils::Address as _, symbol_short, BytesN, Env, Address, Vec};
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// let note_hash = BytesN::from_array(&env, &[0u8; 32]);
+    /// client.acknowledge_alert(
+    ///     &Vec::new(&env),
+    ///     &AlertType::ServiceSilence,
+    ///     &note_hash,
+    /// );
+    /// let record = client.get_alert_acknowledgement(&AlertType::ServiceSilence).unwrap();
+    /// assert_eq!(record.operator, admin);
+    /// assert_eq!(record.note_hash, note_hash);
+    /// ```
+    pub fn acknowledge_alert(
+        env: Env,
+        admin_signers: Vec<Address>,
+        alert_type: AlertType,
+        note_hash: BytesN<32>,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+
+        let operator = storage::get_admin(&env);
+        let acknowledged_at = env.ledger().timestamp();
+
+        let record = types::AlertAckRecord { operator, acknowledged_at, note_hash };
+        storage::set_alert_acknowledgement(&env, &alert_type, &record);
+        events::alert_acknowledged(&env, &alert_type, &record);
+        Ok(())
+    }
+
+    /// Returns the most recent operator acknowledgement record for `alert_type`,
+    /// or `None` if that alert class has never been acknowledged.
+    ///
+    /// Read-only — callable by any account or contract without authorization.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient, AlertType};
+    /// # use soroban_sdk::{testutils::Address as _, symbol_short, BytesN, Env, Address, Vec};
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// // Not yet acknowledged.
+    /// assert!(client.get_alert_acknowledgement(&AlertType::ServiceSilence).is_none());
+    /// ```
+    pub fn get_alert_acknowledgement(
+        env: Env,
+        alert_type: AlertType,
+    ) -> Option<types::AlertAckRecord> {
+        storage::get_alert_acknowledgement(&env, &alert_type)
+    }
 }
+
 
 /// Integer square root (floor) for use in volatility std-dev computation.
 fn isqrt_u64(n: u64) -> u64 {
