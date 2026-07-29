@@ -1,5 +1,5 @@
 .PHONY: install lint format test run scale-workers mutation-test
-.PHONY: install lint format test run typecheck mutation-test check-boundaries
+.PHONY: install lint format test run typecheck mutation-test check-boundaries check-deps
 
 VENV_BIN := $(abspath .venv/bin)
 ifeq ($(wildcard $(VENV_BIN)/python),)
@@ -34,6 +34,10 @@ test:
 check-boundaries:
 	@echo "==> Validating typed service boundaries (utils/boundaries.py)..."
 	$(PYTHON) scripts/check_service_boundaries.py
+
+check-deps:
+	@echo "==> Checking module dependency/layering rules (config/module_boundaries.yml)..."
+	$(PYTHON) scripts/check_module_dependencies.py
 
 fuzz:
 	@echo "Running fuzz tests for 60 seconds each..."

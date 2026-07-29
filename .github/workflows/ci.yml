@@ -100,6 +100,9 @@ jobs:
       - name: Check typed service boundaries (utils/boundaries.py)
         run: python scripts/check_service_boundaries.py
 
+      - name: Check module dependency rules (config/module_boundaries.yml)
+        run: python scripts/check_module_dependencies.py
+
       - name: Test
         run: pytest -q
 
