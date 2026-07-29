@@ -144,6 +144,8 @@ mod test_replay_audit;
 
 #[cfg(test)]
 mod test_gdpr_accumulator;
+#[cfg(test)]
+mod test_fail_closed_invariants;
 
 #[cfg(test)]
 mod test_memory_exhaustion;
