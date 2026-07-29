@@ -326,6 +326,24 @@ pub struct RateLimitOverrideEntry {
     pub justification_hash: BytesN<32>,
 }
 
+/// Fixed warning returned by deletion preflight previews.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum DeletionAuditWarning {
+    Irreversible,
+}
+
+/// Read-only preview of what a deletion operation would affect.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DeletionPreflight {
+    pub wallet: Address,
+    pub asset_pair: Symbol,
+    pub latest_score_present: bool,
+    pub history_count: u32,
+    pub audit_warning: DeletionAuditWarning,
+}
+
 /// Per-(wallet, asset_pair) trend state persisted between submissions.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -382,6 +400,46 @@ pub struct SnapshotRecord {
 pub struct ScoreVelocityCap {
     pub enabled: bool,
     pub points_per_hour: u32,
+}
+
+/// Separate approval policy for irreversible score deletion operations.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DeletionApprovalPolicy {
+    pub enabled: bool,
+    pub approver: Option<Address>,
+}
+
+/// One canonical key/value entry in the machine-readable configuration export.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ConfigExportEntry {
+    pub key: Symbol,
+    pub value: Bytes,
+}
+
+/// One pending key/value entry in the machine-readable configuration export.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PendingConfigExportEntry {
+    pub key: Symbol,
+    pub value: Bytes,
+    pub proposal_id: u64,
+    pub proposed_at: u64,
+    pub executable_after: u64,
+}
+
+/// Deterministic machine-readable export of governance-controlled configuration.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ConfigExportBundle {
+    pub schema_version: u32,
+    pub active_hash: BytesN<32>,
+    pub pending_hash: BytesN<32>,
+    pub export_hash: BytesN<32>,
+    pub active_values: Vec<ConfigExportEntry>,
+    pub pending_values: Vec<PendingConfigExportEntry>,
+    pub omitted_secret_rationale: Vec<Bytes>,
 }
 
 /// Score histogram returned by `get_score_histogram`.
@@ -483,6 +541,7 @@ pub enum DataKeyB {
     ScoreEmbargo(Address),
     ConsensusThresholdK,
     ConsensusEpsilon,
+
     /// Adaptive epsilon enabled flag (issue #204).
     AdaptiveEpsilonEnabled,
     /// Minimum epsilon bound for adaptive mode (issue #204).
@@ -660,6 +719,9 @@ pub enum DataKeyD {
     PendingParamChange(Symbol),
     ModelVersionExecutableAfter(u32),
     ModelVersionDescription(u32),
+    /// Latest operator acknowledgement record for a given alert class.
+    /// Keyed by `AlertType` so each class has its own O(1) slot (issue #630).
+    AlertAcknowledgement(AlertType),
 }
 
 #[contracttype]
@@ -668,6 +730,7 @@ pub struct TierBounds {
     pub min_score: u32,
     pub max_score: u32,
 }
+
 
 /// Histogram of all score submissions across 101 buckets (0–100).
 #[contracttype]
@@ -812,3 +875,4 @@ pub struct TokenBucket {
     pub tokens: u32,
     pub last_refill: u64,
 }
+

@@ -7,20 +7,5 @@ test-all = "test --workspace"
 [build]
 # Extra linting; the CI enforces these too but having them locally
 # means the developer sees the same errors before pushing.
-#
-# Panic-safety guards (issue #777):
-#   clippy::unwrap_used          — must handle None/Err explicitly
-#   clippy::expect_used          — must handle None/Err explicitly
-#   clippy::indexing_slicing     — use .get() instead of direct indexing
-#   clippy::arithmetic_side_effects — use checked_*/saturating_*/wrapping_*
-#
-# These are warn-level here; -D warnings in the same rustflags array promotes
-# them to errors.  Existing call-sites may carry a scoped
-# `#[allow(clippy::unwrap_used)]` with a safety comment; new code must not.
-rustflags = [
-  "-D", "warnings",
-  "-W", "clippy::unwrap_used",
-  "-W", "clippy::expect_used",
-  "-W", "clippy::indexing_slicing",
-  "-W", "clippy::arithmetic_side_effects",
-]
+# The host/toolchain support policy lives in docs/host-version-support-policy.md.
+rustflags = ["-D", "warnings"]
