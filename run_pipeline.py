@@ -36,6 +36,7 @@ from ingestion.historical_loader import (
 )
 from ingestion.orderbook_loader import load_accounts_orderbook_events
 from utils.logging import get_logger
+from utils.pipeline_observability import PipelineRun
 
 logger = get_logger(__name__)
 
@@ -80,6 +81,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     config.validate()
     args = parse_args()
+    run = PipelineRun("detection_pipeline")
 
     if args.dry_run:
         logger.info("[DRY RUN] No data will be written.")
@@ -89,17 +91,19 @@ def main() -> None:
     # --- Stage 1: load trades per pair ---
     logger.info("[1] Loading trades per pair: %s", config.WATCHED_ASSET_PAIRS)
     pairs_df: dict[str, pd.DataFrame] = {}
-    for code, issuer in config.WATCHED_ASSET_PAIRS:
-        asset = xlm if issuer == "native" else SdkAsset(code, issuer)
-        if asset == xlm:
-            continue
-        pair_id = f"{code}:{issuer}/XLM:native"
-        logger.info("    Loading pair %s", pair_id)
-        pairs_df[pair_id] = load_pair_to_dataframe(asset, xlm, start_time=args.since)
-        logger.info("    Loaded %d trades for %s", len(pairs_df[pair_id]), pair_id)
+    with run.stage("load_trades_all_pairs", pair_count=len(config.WATCHED_ASSET_PAIRS)):
+        for code, issuer in config.WATCHED_ASSET_PAIRS:
+            asset = xlm if issuer == "native" else SdkAsset(code, issuer)
+            if asset == xlm:
+                continue
+            pair_id = f"{code}:{issuer}/XLM:native"
+            logger.info("    Loading pair %s", pair_id)
+            pairs_df[pair_id] = load_pair_to_dataframe(asset, xlm, start_time=args.since)
+            logger.info("    Loaded %d trades for %s", len(pairs_df[pair_id]), pair_id)
 
     if not pairs_df:
         logger.warning("No pairs configured or all pairs skipped.")
+        logger.info("Pipeline run complete", extra=run.summary())
         return
 
     all_flagged: list[pd.DataFrame] = []
@@ -112,93 +116,107 @@ def main() -> None:
             logger.info("[pair=%s] No trades — skipping", pair_id)
             continue
 
-        wallets = list(pd.unique(trades_df[["base_account", "counter_account"]].values.ravel()))
-
-        # --- Stage 2a: order-book events ---
-        orderbook_events = None
-        if not args.no_orderbook:
-            logger.info("[pair=%s] Loading order-book events", pair_id)
-            orderbook_events = load_accounts_orderbook_events(wallets)
-            logger.info("[pair=%s] Loaded %d order-book events", pair_id, len(orderbook_events))
-
-        # --- Stage 2b: funding graph ---
-        funding_graph = None
-        if not args.no_graph:
-            logger.info("[pair=%s] Loading account activity and building funding graph", pair_id)
-            activities = load_accounts_activity(wallets)
-            funding_graph = build_funding_graph(activities)
-            logger.info(
-                "[pair=%s] Funding graph: %d nodes, %d edges",
-                pair_id,
-                funding_graph.number_of_nodes(),
-                funding_graph.number_of_edges(),
-            )
-
-        # --- Stage 2c: feature matrix ---
-        logger.info("[pair=%s] Building feature matrix", pair_id)
-        feature_matrix = build_feature_matrix(
-            trades_df, orderbook_events=orderbook_events, funding_graph=funding_graph
-        )
-        logger.info("[pair=%s] Built features for %d wallets", pair_id, len(feature_matrix))
-
-        # --- Stage 2d: scoring ---
-        logger.info("[pair=%s] Scoring wallets", pair_id)
-        try:
-            from detection.model_inference import RiskScorer
-
-            scorer = RiskScorer()
-            scored = scorer.score_matrix(feature_matrix)
-        except (RuntimeError, ImportError) as exc:
-            logger.warning("[pair=%s] Skipping ML scoring: %s", pair_id, exc)
-            logger.warning("[pair=%s] Falling back to Benford-only flags", pair_id)
-            mad_cols = [c for c in feature_matrix.columns if c.startswith("benford_mad_")]
-            scored = feature_matrix[["wallet"] + mad_cols].copy()
-            scored["benford_flag"] = (scored[mad_cols] > 0.015).any(axis=1)
-
-        # --- Stage 2d.5: wash-trading ring id per wallet ---
-        if funding_graph is not None and funding_graph.number_of_nodes() > 0:
-            community_map = detect_wash_trading_rings(funding_graph)
-            rid_map = ring_id_map(community_map, funding_graph)
-        else:
-            rid_map = {}
-        scored["ring_id"] = [rid_map.get(w) for w in scored["wallet"]]
-
-        # --- Stage 2e: persist + flag ---
-        if "score" in scored:
-            flagged = scored[scored["score"] >= config.RISK_SCORE_FLAG_THRESHOLD]
-
-            if store is not None:
-                for _, row in scored.iterrows():
-                    store.upsert(
-                        wallet=row["wallet"],
-                        asset_pair=pair_id,
-                        risk_score={
-                            "score": row["score"],
-                            "benford_flag": row["benford_flag"],
-                            "ml_flag": row["ml_flag"],
-                            "confidence": row["confidence"],
-                            "ring_id": row.get("ring_id"),
-                        },
-                    )
-                logger.info("[pair=%s] Persisted %d scored wallets", pair_id, len(scored))
-        else:
-            flagged = scored[scored["benford_flag"]]
-
-        logger.info("[pair=%s] Flagged wallets (%d):\n%s", pair_id, len(flagged), flagged)
-        all_flagged.append(flagged)
-
-        if args.submit_onchain:
-            if args.dry_run:
-                logger.warning("[pair=%s] [DRY RUN] Skipping on-chain submission", pair_id)
-            elif "score" not in scored:
-                logger.warning(
-                    "[pair=%s] Skipping on-chain submission: no ML scores available", pair_id
-                )
-            else:
-                submit_flagged_onchain(flagged, pair_id)
+        with run.stage("process_pair", pair_id=pair_id, trade_count=len(trades_df)):
+            _process_pair(run, args, store, pair_id, trades_df, all_flagged)
 
     combined_flagged = pd.concat(all_flagged, ignore_index=True) if all_flagged else pd.DataFrame()
     logger.info("Total flagged wallets across all pairs: %d", len(combined_flagged))
+    logger.info("Pipeline run complete", extra=run.summary())
+
+
+def _process_pair(
+    run: PipelineRun,
+    args: argparse.Namespace,
+    store: RiskScoreStore | None,
+    pair_id: str,
+    trades_df: pd.DataFrame,
+    all_flagged: list[pd.DataFrame],
+) -> None:
+    wallets = list(pd.unique(trades_df[["base_account", "counter_account"]].values.ravel()))
+
+    # --- Stage 2a: order-book events ---
+    orderbook_events = None
+    if not args.no_orderbook:
+        logger.info("[pair=%s] Loading order-book events", pair_id)
+        orderbook_events = load_accounts_orderbook_events(wallets)
+        logger.info("[pair=%s] Loaded %d order-book events", pair_id, len(orderbook_events))
+
+    # --- Stage 2b: funding graph ---
+    funding_graph = None
+    if not args.no_graph:
+        logger.info("[pair=%s] Loading account activity and building funding graph", pair_id)
+        activities = load_accounts_activity(wallets)
+        funding_graph = build_funding_graph(activities)
+        logger.info(
+            "[pair=%s] Funding graph: %d nodes, %d edges",
+            pair_id,
+            funding_graph.number_of_nodes(),
+            funding_graph.number_of_edges(),
+        )
+
+    # --- Stage 2c: feature matrix ---
+    logger.info("[pair=%s] Building feature matrix", pair_id)
+    feature_matrix = build_feature_matrix(
+        trades_df, orderbook_events=orderbook_events, funding_graph=funding_graph
+    )
+    logger.info("[pair=%s] Built features for %d wallets", pair_id, len(feature_matrix))
+
+    # --- Stage 2d: scoring ---
+    logger.info("[pair=%s] Scoring wallets", pair_id)
+    try:
+        from detection.model_inference import RiskScorer
+
+        scorer = RiskScorer()
+        scored = scorer.score_matrix(feature_matrix)
+    except (RuntimeError, ImportError) as exc:
+        logger.warning("[pair=%s] Skipping ML scoring: %s", pair_id, exc)
+        logger.warning("[pair=%s] Falling back to Benford-only flags", pair_id)
+        mad_cols = [c for c in feature_matrix.columns if c.startswith("benford_mad_")]
+        scored = feature_matrix[["wallet"] + mad_cols].copy()
+        scored["benford_flag"] = (scored[mad_cols] > 0.015).any(axis=1)
+
+    # --- Stage 2d.5: wash-trading ring id per wallet ---
+    if funding_graph is not None and funding_graph.number_of_nodes() > 0:
+        community_map = detect_wash_trading_rings(funding_graph)
+        rid_map = ring_id_map(community_map, funding_graph)
+    else:
+        rid_map = {}
+    scored["ring_id"] = [rid_map.get(w) for w in scored["wallet"]]
+
+    # --- Stage 2e: persist + flag ---
+    if "score" in scored:
+        flagged = scored[scored["score"] >= config.RISK_SCORE_FLAG_THRESHOLD]
+
+        if store is not None:
+            for _, row in scored.iterrows():
+                store.upsert(
+                    wallet=row["wallet"],
+                    asset_pair=pair_id,
+                    risk_score={
+                        "score": row["score"],
+                        "benford_flag": row["benford_flag"],
+                        "ml_flag": row["ml_flag"],
+                        "confidence": row["confidence"],
+                        "ring_id": row.get("ring_id"),
+                    },
+                )
+            logger.info("[pair=%s] Persisted %d scored wallets", pair_id, len(scored))
+    else:
+        flagged = scored[scored["benford_flag"]]
+
+    logger.info("[pair=%s] Flagged wallets (%d):\n%s", pair_id, len(flagged), flagged)
+    all_flagged.append(flagged)
+
+    if args.submit_onchain:
+        if args.dry_run:
+            logger.warning("[pair=%s] [DRY RUN] Skipping on-chain submission", pair_id)
+        elif "score" not in scored:
+            logger.warning(
+                "[pair=%s] Skipping on-chain submission: no ML scores available", pair_id
+            )
+        else:
+            with run.stage("submit_onchain", pair_id=pair_id, flagged_count=len(flagged)):
+                submit_flagged_onchain(flagged, pair_id)
 
 
 def submit_flagged_onchain(flagged: pd.DataFrame, pair_id: str) -> None:
