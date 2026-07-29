@@ -15,6 +15,7 @@ from stellar_sdk import Server
 
 from config import config
 from ingestion.data_models import Asset, Trade
+from ingestion.exceptions import InvalidInputError, SourceUnavailableError, record_context
 from utils.logging import get_logger
 from utils.retry import retry_with_backoff
 
@@ -23,14 +24,16 @@ logger = get_logger(__name__)
 _POOL_ID_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
-class PoolNotFoundError(Exception):
+class PoolNotFoundError(SourceUnavailableError):
     """Raised when a liquidity pool ID is not found on Horizon (HTTP 404)."""
 
 
 def _validate_pool_id(pool_id: str) -> None:
     if not _POOL_ID_RE.match(pool_id):
-        raise ValueError(
-            f"Invalid pool ID {pool_id!r} — must be a 64-character lowercase hex string"
+        raise InvalidInputError(
+            f"Invalid pool ID {pool_id!r} — must be a 64-character lowercase hex string",
+            source="amm_pool_loader._validate_pool_id",
+            reason="pool_id must be a 64-character lowercase hex string",
         )
 
 
@@ -41,30 +44,35 @@ def _amm_record_to_trade(record: dict) -> Trade:
     except (KeyError, TypeError, ZeroDivisionError, ValueError):
         price = 0.0
 
-    return Trade(
-        trade_id=record.get("id", record["paging_token"]),
-        ledger_close_time=record["ledger_close_time"],
-        base_account=record.get("base_account", ""),
-        counter_account=record.get("counter_account", ""),
-        base_asset=Asset(
-            code=record.get("base_asset_code") or "XLM",
-            issuer=record.get("base_asset_issuer"),
-        ),
-        counter_asset=Asset(
-            code=record.get("counter_asset_code") or "XLM",
-            issuer=record.get("counter_asset_issuer"),
-        ),
-        base_amount=float(record.get("base_amount", 0.0)),
-        counter_amount=float(record.get("counter_amount", 0.0)),
-        price=price,
-    )
+    with record_context("amm_pool_loader._amm_record_to_trade", record):
+        return Trade(
+            trade_id=record.get("id", record["paging_token"]),
+            ledger_close_time=record["ledger_close_time"],
+            base_account=record.get("base_account", ""),
+            counter_account=record.get("counter_account", ""),
+            base_asset=Asset(
+                code=record.get("base_asset_code") or "XLM",
+                issuer=record.get("base_asset_issuer"),
+            ),
+            counter_asset=Asset(
+                code=record.get("counter_asset_code") or "XLM",
+                issuer=record.get("counter_asset_issuer"),
+            ),
+            base_amount=float(record.get("base_amount", 0.0)),
+            counter_amount=float(record.get("counter_amount", 0.0)),
+            price=price,
+        )
 
 
 @retry_with_backoff(exceptions=(ConnectionError, TimeoutError, OSError))
 def _fetch_page(session: requests.Session, url: str, params: dict) -> dict:
     resp = session.get(url, params=params, timeout=30)
     if resp.status_code == 404:
-        raise PoolNotFoundError(f"Liquidity pool not found: {url}")
+        raise PoolNotFoundError(
+            f"Liquidity pool not found: {url}",
+            source="amm_pool_loader._fetch_page",
+            reason="Horizon returned HTTP 404",
+        )
     resp.raise_for_status()
     return cast(dict[Any, Any], resp.json())
 
@@ -83,7 +91,8 @@ def load_amm_pool_trades(
     base_asset, counter_asset, amount, price.
 
     Raises:
-        ValueError: If pool_id is not a valid 64-character hex string.
+        InvalidInputError: If pool_id is not a valid 64-character hex string
+            (also a ``ValueError``).
         PoolNotFoundError: If the pool does not exist on Horizon (HTTP 404).
     """
     _validate_pool_id(pool_id)
@@ -173,7 +182,8 @@ def stream_amm_pool_trades(pool_id: str) -> Generator[Trade, None, None]:
     new trades from the moment of subscription are returned.
 
     Raises:
-        ValueError: If pool_id is not a valid 64-character hex string.
+        InvalidInputError: If pool_id is not a valid 64-character hex string
+            (also a ``ValueError``).
         PoolNotFoundError: If the pool does not exist on Horizon (HTTP 404).
     """
     _validate_pool_id(pool_id)

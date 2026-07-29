@@ -76,6 +76,12 @@ hnswlib>=0.8.0
 # Static type checking
 mypy>=1.10.0
 
+# Security linting (issue #545 — static analysis gate)
+bandit>=1.7.9
+
+# Cyclomatic complexity analysis (issue #545 — static analysis gate)
+radon>=6.0.1
+
 # Label quality estimation — confident learning (#271)
 cleanlab>=2.6.0
 

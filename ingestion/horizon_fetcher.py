@@ -14,6 +14,7 @@ from collections.abc import Callable
 from typing import TypeVar
 
 from config import config
+from ingestion.exceptions import SourceUnavailableError
 from ingestion.rate_limiter import TokenBucketLimiter
 from utils.logging import get_logger
 
@@ -34,8 +35,12 @@ def get_limiter() -> TokenBucketLimiter:
     return _limiter
 
 
-class HorizonRateLimitExceeded(RuntimeError):
-    """Raised when HORIZON_MAX_RETRIES consecutive 429s are exhausted."""
+class HorizonRateLimitExceeded(SourceUnavailableError, RuntimeError):
+    """Raised when HORIZON_MAX_RETRIES consecutive 429s are exhausted.
+
+    Retains the ``RuntimeError`` base so existing callers catching it keep
+    working; ``SourceUnavailableError`` places it in the ingestion taxonomy.
+    """
 
 
 def _status_code(exc: Exception) -> int | None:
@@ -72,7 +77,9 @@ def fetch(
                 raise
             if attempt == config.HORIZON_MAX_RETRIES:
                 raise HorizonRateLimitExceeded(
-                    f"Horizon returned 429 on all {attempt} attempts"
+                    f"Horizon returned 429 on all {attempt} attempts",
+                    source="horizon_fetcher.fetch",
+                    reason=str(exc),
                 ) from exc
 
             delay = min(max_delay, base_delay * (2 ** (attempt - 1)))

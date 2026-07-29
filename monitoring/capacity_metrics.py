@@ -18,7 +18,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 try:
-    from prometheus_client import Gauge
+    from prometheus_client import Gauge, Histogram
 
     _PROM_AVAILABLE = True
 except ImportError:  # pragma: no cover
@@ -31,6 +31,7 @@ except ImportError:  # pragma: no cover
 CPU_USAGE_RATIO: Gauge | None = None
 MEMORY_USAGE_BYTES: Gauge | None = None
 TRADES_PER_SECOND: Gauge | None = None
+E2E_LATENCY_SECONDS: Histogram | None = None
 
 if _PROM_AVAILABLE:
     try:
@@ -63,6 +64,15 @@ if _PROM_AVAILABLE:
         else:
             TRADES_PER_SECOND = REGISTRY._names_to_collectors["ledgerlens_trades_per_second"]  # type: ignore[attr-defined]
 
+        if "ledgerlens_e2e_latency_seconds" not in REGISTRY._names_to_collectors:  # type: ignore[attr-defined]
+            E2E_LATENCY_SECONDS = Histogram(
+                "ledgerlens_e2e_latency_seconds",
+                "End-to-end latency from ingestion to consumer decision",
+                buckets=[0.1, 0.5, 1.0, 2.0, 5.0, 10.0]
+            )
+        else:
+            E2E_LATENCY_SECONDS = REGISTRY._names_to_collectors["ledgerlens_e2e_latency_seconds"]  # type: ignore[attr-defined]
+
     except Exception as exc:  # pragma: no cover
         logger.warning("Failed to register capacity metrics: %s", exc)
 
@@ -91,3 +101,9 @@ def set_trades_per_second(asset_pair: str, rate: float) -> None:
     """Record trade-event ingestion rate for *asset_pair*."""
     if TRADES_PER_SECOND is not None:
         TRADES_PER_SECOND.labels(asset_pair=asset_pair).set(rate)
+
+
+def record_e2e_latency(latency_seconds: float) -> None:
+    """Record end-to-end latency observation."""
+    if E2E_LATENCY_SECONDS is not None:
+        E2E_LATENCY_SECONDS.observe(latency_seconds)
