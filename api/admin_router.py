@@ -1,32 +1,24 @@
 """Admin REST API for model lifecycle and system configuration (Issue #160)."""
 
-import glob
+import logging
 import os
 import sqlite3
-import time
 import uuid
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from pydantic import BaseModel
-from slowapi import Limiter
-from slowapi.util import get_remote_address
 
 from api.auth import require_admin_key
-from api.webhook_sender import list_dlq, get_dlq_entry
-from api.webhook_sender import WebhookRetryQueue
-from detection.webhook_registry import get_subscriber
 from config.settings import settings, bump_config_version, invalidate_runtime_config_cache
 from detection.model_registry import get_current_version, list_model_versions
-from detection.storage import get_krum_aggregation_log
+
+logger = logging.getLogger("ledgerlens.admin")
 
 router = APIRouter(prefix="/admin", dependencies=[Depends(require_admin_key)])
 
 _MODEL_NAMES = ["random_forest", "xgboost", "lightgbm"]
-
-# Rate limiter instance for the reset endpoint
-_limiter = Limiter(key_func=get_remote_address)
 
 
 # ---------------------------------------------------------------------------
@@ -47,12 +39,11 @@ def list_models() -> list[dict]:
         except (FileNotFoundError, OSError):
             versions = []
         for v in versions:
-            key = v
-            if key not in result:
-                result[key] = {"version": v, "models": [], "active": v == current}
-            result[key]["models"].append(name)
+            if v not in result:
+                result[v] = {"version": v, "models": [], "active": v == current}
+            result[v]["models"].append(name)
             if v == current:
-                result[key]["active"] = True
+                result[v]["active"] = True
 
     return list(result.values())
 
@@ -99,7 +90,8 @@ def get_config() -> dict:
             for key, value in conn.execute("SELECT key, value FROM runtime_config"):
                 config[key] = value
     except sqlite3.OperationalError:
-        pass
+        # Table is created lazily by PATCH /admin/config; treat "missing" as empty.
+        logger.debug("runtime_config table not present yet", exc_info=True)
     return config
 
 
@@ -156,8 +148,7 @@ def patch_config(body: RuntimeConfigPatch) -> dict:
 def oracle_status() -> list[dict]:
     """Return the status of the oracle nodes in the quorum."""
     from detection.oracle_node import OracleNode
-    from config.settings import settings as _settings
-    nodes = [OracleNode(name, key) for name, key in getattr(_settings, "oracle_nodes", {}).items()]
+    nodes = [OracleNode(name, key) for name, key in getattr(settings, "oracle_nodes", {}).items()]
     return [
         {
             "name": node.name,
@@ -169,7 +160,7 @@ def oracle_status() -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
-# POST /admin/retrain
+# Retrain job helpers
 # ---------------------------------------------------------------------------
 
 
@@ -202,6 +193,7 @@ def _run_retrain(job_id: str) -> None:
         train_models(trades, model_dir=settings.model_dir)
         status = "completed"
     except Exception:
+        logger.exception("Retrain job %s failed", job_id)
         status = "failed"
 
     completed_at = datetime.now(timezone.utc).isoformat()
@@ -246,14 +238,6 @@ def trigger_retrain(background_tasks: BackgroundTasks) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# FL Privacy endpoint  (Issue #145)
-# ---------------------------------------------------------------------------
-
-import logging as _logging
-_logger = _logging.getLogger("ledgerlens.admin")
-
-
-# ---------------------------------------------------------------------------
 # GET /admin/feature-store/stats
 # ---------------------------------------------------------------------------
 
@@ -285,8 +269,9 @@ def feature_store_stats() -> FeatureStoreStats:
                 hot_rows = row[0] or 0
                 if row[1]:
                     oldest_hot = datetime.fromisoformat(str(row[1]).replace("Z", "+00:00"))
-    except Exception:
-        pass
+    except (sqlite3.Error, ValueError):
+        # Hot tier not initialised yet, or an unparseable timestamp: report zeroes.
+        logger.debug("Feature-store hot-tier stats unavailable", exc_info=True)
 
     # Cold tier: count rows and find oldest record in Parquet
     archive_dir = Path(settings.feature_archive_dir)
@@ -302,8 +287,9 @@ def feature_store_stats() -> FeatureStoreStats:
                 f.stat().st_size for f in archive_dir.rglob("*") if f.is_file()
             )
             archive_size_mb = round(total_bytes / (1024 * 1024), 3)
-    except Exception:
-        pass
+    except OSError:
+        # Archive directory unreadable or removed mid-walk: report 0 MB.
+        logger.debug("Feature archive size unavailable", exc_info=True)
 
     return FeatureStoreStats(
         hot_tier_rows=hot_rows,
@@ -413,7 +399,6 @@ def get_waf_blocked_requests(limit: int = Query(100, ge=1, le=1000)) -> list[dic
 @router.get("/model-cards/{model_name}/{version}", tags=["Admin"], summary="Get model card metadata")
 def get_model_card_metadata(model_name: str, version: str) -> dict:
     """Return model card metadata (admin-only)."""
-    from config.settings import settings
     from detection.model_card import generate_model_card
     card = generate_model_card(model_name, version)
     return {
@@ -432,7 +417,6 @@ def get_model_card_metadata(model_name: str, version: str) -> dict:
 def get_model_card_markdown(model_name: str, version: str):
     """Return model card as Markdown (admin-only)."""
     from fastapi.responses import PlainTextResponse
-    from config.settings import settings
     from detection.model_card import generate_model_card, render_markdown
     card = generate_model_card(model_name, version)
     return PlainTextResponse(render_markdown(card), media_type="text/markdown")
@@ -442,7 +426,6 @@ def get_model_card_markdown(model_name: str, version: str):
 def get_model_card_pdf(model_name: str, version: str):
     """Return model card as PDF (admin-only, requires model_card_pdf_enabled=True)."""
     from fastapi.responses import Response
-    from config.settings import settings
     if not settings.model_card_pdf_enabled:
         return Response(status_code=404, content="PDF rendering is disabled")
     from detection.model_card import generate_model_card, render_pdf

@@ -209,21 +209,23 @@ def _load_recent_trades(db_path: str, wallet: str, limit: int = 500) -> list:
 
     try:
         conn = sqlite3.connect(db_path)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            SELECT base_account, counter_account, base_amount,
-                   base_asset_code, counter_asset_code, ledger_close_time
-            FROM trades
-            WHERE base_account = ? OR counter_account = ?
-            ORDER BY ledger_close_time DESC
-            LIMIT ?
-            """,
-            (wallet, wallet, limit),
-        )
-        rows = cursor.fetchall()
-        conn.close()
+        try:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT base_account, counter_account, base_amount,
+                       base_asset_code, counter_asset_code, ledger_close_time
+                FROM trades
+                WHERE base_account = ? OR counter_account = ?
+                ORDER BY ledger_close_time DESC
+                LIMIT ?
+                """,
+                (wallet, wallet, limit),
+            )
+            rows = cursor.fetchall()
+        finally:
+            conn.close()
     except Exception:
         return []
 

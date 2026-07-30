@@ -113,7 +113,6 @@ async def _score_wallet(wallet: str) -> dict:
 
 
 async def _process_batch(job_id: str, wallets: list[str]) -> None:
-    _active_jobs.add(job_id)
     _update_job(job_id, status="processing")
     try:
         results = await asyncio.gather(*[_score_wallet(w) for w in wallets])
@@ -153,6 +152,11 @@ async def create_batch_job(body: BatchRequest, background_tasks: BackgroundTasks
     job_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
     estimated = max(1, len(body.wallets) // 50)
+
+    # Reserve the concurrency slot synchronously so a burst of requests
+    # arriving before any background task starts can't all pass the
+    # `_active_jobs` check above.
+    _active_jobs.add(job_id)
 
     with _connect() as conn:
         conn.execute(

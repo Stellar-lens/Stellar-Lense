@@ -52,7 +52,7 @@ def ann(request: Request, routes: list | None = None) -> str | None:
 
     Checks (in order):
     1. ``request.scope["route"].required_scope`` (set by ``ScopedAPIRoute``)
-    2. ``request.scope["route"].endpoint.__scoped_route__`` (set by ``@ScopedRoute``)
+    2. ``request.scope["route"].endpoint.__scoped_route__`` (set by ``@scope_required``)
     3. When *routes* is provided and scope lookup fails, attempts manual
        path-based matching against each route's ``endpoint.__scoped_route__``.
 
@@ -384,72 +384,6 @@ class GatewayMiddleware(BaseHTTPMiddleware):
 # ---------------------------------------------------------------------------
 
 
-class ScopedRoute:
-    """Descriptor that attaches a ``required_scope`` to a route handler.
-
-    Usage::
-
-        @router.get("/scores/{wallet}")
-        @ScopedRoute("read:scores")
-        async def get_wallet_scores(wallet: str): ...
-    """
-
-    def __init__(self, scope: str) -> None:
-        self.scope = scope
-
-    def __call__(self, func):
-        func.__scoped_route__ = self.scope
-        return func
-
-
-def _resolve_required_scope(request: Request) -> str | None:
-    """Return the required scope for a request's matched route.
-
-    Checks (in order):
-    1. ``route.required_scope`` attribute (set by ``ScopedAPIRoute``)
-    2. ``route.endpoint.__scoped_route__`` (set by ``@ScopedRoute`` decorator)
-    3. Endpoint's ``dependencies`` list for any ``require_scope`` or
-       ``require_admin_key`` dependency
-
-    Returns None for public (unauthenticated) routes.
-    """
-    route = request.scope.get("route")
-    if route is None:
-        return None
-
-    # Check the custom attribute first
-    required = getattr(route, "required_scope", None)
-    if required:
-        return required
-
-    # Check decorator annotation on the endpoint
-    endpoint = getattr(route, "endpoint", None)
-    if endpoint is not None:
-        required = getattr(endpoint, "__scoped_route__", None)
-        if required:
-            return required
-
-    # Infer from dependencies (backward compat)
-    deps = getattr(route, "dependencies", [])
-    for dep in deps:
-        dep_callable = getattr(dep, "dependency", None) or dep
-        dep_name = getattr(dep_callable, "__name__", "") or getattr(dep_callable, "__class__", "").__name__
-        dep_name = str(dep_name)
-        if "require_admin_key" in dep_name:
-            return "admin"
-        if "require_compliance_key" in dep_name:
-            return "compliance:read"
-        if "require_scope" in dep_name:
-            scope = getattr(dep_callable, "__closure__", None)
-            if scope:
-                for cell in scope:
-                    if isinstance(cell.cell_contents, str):
-                        return cell.cell_contents
-            return "read:scores"
-
-    return None
-
-
 def scope_required(scope: str):
     """Decorator that marks a route handler as requiring a scope.
 
@@ -463,19 +397,3 @@ def scope_required(scope: str):
         func.__scoped_route__ = scope
         return func
     return decorator
-
-
-# ---------------------------------------------------------------------------
-# Middleware adapter for existing routers
-# ---------------------------------------------------------------------------
-
-_scoped_endpoints: dict[str, str] = {}
-
-
-def register_scoped_endpoint(path: str, scope: str) -> None:
-    """Register a path + method as requiring a specific scope.
-
-    Used by deprecated ``api/api_keys_router.py`` and ``api/api_key_router.py``
-    during the transition period.
-    """
-    _scoped_endpoints[path] = scope

@@ -48,11 +48,17 @@ _lstm_loaded = False
 def _get_lstm_model():
     global _lstm_model, _lstm_loaded
     if not _lstm_loaded:
-        from detection.temporal_patterns import load_lstm_autoencoder
+        try:
+            from detection.temporal_patterns import load_lstm_autoencoder
 
-        model_path = getattr(settings, "temporal_lstm_model_path", "models/lstm_autoencoder.pt")
-        _lstm_model = load_lstm_autoencoder(model_path)
-        _lstm_loaded = True
+            model_path = getattr(settings, "temporal_lstm_model_path", "models/lstm_autoencoder.pt")
+            _lstm_model = load_lstm_autoencoder(model_path)
+        except Exception as exc:
+            logger.debug("LSTM model load failed or absent: %s", exc)
+            _lstm_model = None
+        finally:
+            # Mark as attempted so repeated requests don't keep re-trying on failure
+            _lstm_loaded = True
     return _lstm_model
 
 

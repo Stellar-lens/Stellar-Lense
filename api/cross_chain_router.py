@@ -5,6 +5,7 @@ GET /cross-chain/links/{stellar_wallet} — accepted hypotheses sorted by confid
 GET /cross-chain/links/{stellar_wallet}/explain — evidence feature breakdown.
 """
 
+import threading
 import time
 from collections import defaultdict
 from typing import List
@@ -21,16 +22,19 @@ router = APIRouter(prefix="/cross-chain", tags=["cross-chain"])
 # Rate limiter: 30 requests per minute per IP
 _RATE_LIMIT = 30
 _RATE_WINDOW = 60.0
+_rate_limit_lock = threading.Lock()
 _rate_buckets: dict[str, list[float]] = defaultdict(list)
 
 
 def _check_rate_limit(client_ip: str) -> None:
     now = time.monotonic()
-    bucket = _rate_buckets[client_ip]
-    _rate_buckets[client_ip] = [t for t in bucket if now - t < _RATE_WINDOW]
-    if len(_rate_buckets[client_ip]) >= _RATE_LIMIT:
-        raise HTTPException(status_code=429, detail="Rate limit exceeded.")
-    _rate_buckets[client_ip].append(now)
+    with _rate_limit_lock:
+        bucket = [t for t in _rate_buckets[client_ip] if now - t < _RATE_WINDOW]
+        if len(bucket) >= _RATE_LIMIT:
+            _rate_buckets[client_ip] = bucket
+            raise HTTPException(status_code=429, detail="Rate limit exceeded.")
+        bucket.append(now)
+        _rate_buckets[client_ip] = bucket
 
 
 class WalletLinkOut(BaseModel):

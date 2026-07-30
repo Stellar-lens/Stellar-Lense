@@ -9,7 +9,7 @@ from datetime import datetime, timezone, timedelta
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
 from api.auth import require_admin_key
@@ -81,7 +81,7 @@ def export_csv(
     to_date: str = Query(..., alias="to", description="End date YYYY-MM-DD"),
     min_score: int = Query(default=0, ge=0, le=100),
     wallet: str | None = Query(default=None),
-    x_ledgerlens_admin_key: str = Query(default="", include_in_schema=False),
+    x_ledgerlens_admin_key: str = Header(default="", include_in_schema=False),
 ) -> StreamingResponse:
     """Stream risk scores as CSV. Max 90-day window. Requires admin key."""
     _check_rate_limit(x_ledgerlens_admin_key or "")
@@ -107,7 +107,7 @@ def export_parquet(
     to_date: str = Query(..., alias="to", description="End date YYYY-MM-DD"),
     min_score: int = Query(default=0, ge=0, le=100),
     wallet: str | None = Query(default=None),
-    x_ledgerlens_admin_key: str = Query(default="", include_in_schema=False),
+    x_ledgerlens_admin_key: str = Header(default="", include_in_schema=False),
 ) -> StreamingResponse:
     """Stream risk scores as Parquet (snappy compressed). Max 90-day window. Requires admin key."""
     _check_rate_limit(x_ledgerlens_admin_key or "")
