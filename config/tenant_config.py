@@ -1,6 +1,6 @@
 """Tenant configuration for multi-tenant namespace isolation."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 import yaml
@@ -12,6 +12,8 @@ class TenantConfig:
     benford_min_sample: int
     alert_channels: list[str]
     asset_pair_whitelist: list[str]
+    threshold_strategy: str = "static"
+    threshold_config: dict[str, Any] = field(default_factory=dict)
 
 
 class TenantNotFoundError(Exception):
@@ -32,6 +34,8 @@ def load_tenants_config(path: str = "config/tenants.yaml") -> None:
             benford_min_sample=cfg["benford_min_sample"],
             alert_channels=cfg["alert_channels"],
             asset_pair_whitelist=cfg["asset_pair_whitelist"],
+            threshold_strategy=cfg.get("threshold_strategy", "static"),
+            threshold_config=cfg.get("threshold_config", {}),
         )
         for tid, cfg in data.get("tenants", {}).items()
     }
@@ -42,6 +46,21 @@ def get_tenant_config(tenant_id: str) -> TenantConfig:
     if tenant_id not in _allowed_tenant_ids:
         raise TenantNotFoundError(f"Unknown tenant ID: {tenant_id}")
     return _tenant_configs[tenant_id]
+
+
+def build_threshold_strategy(tenant_id: str) -> Any:
+    """Build a ThresholdStrategy instance for the given tenant.
+
+    Returns the appropriate strategy based on the tenant's
+    ``threshold_strategy`` and ``threshold_config`` settings.
+    """
+    from detection.threshold_strategy import build_strategy
+
+    tc = get_tenant_config(tenant_id)
+    kwargs: dict[str, Any] = dict(tc.threshold_config)
+    if tc.threshold_strategy == "static" and "threshold" not in kwargs:
+        kwargs["threshold"] = tc.risk_threshold / 100.0
+    return build_strategy(tc.threshold_strategy, **kwargs)
 
 
 class TenantContext:
@@ -56,3 +75,4 @@ class TenantContext:
 
     def prometheus_labels(self, labels: dict[str, Any]) -> dict[str, Any]:
         return {"tenant": self.tenant_id, **labels}
+

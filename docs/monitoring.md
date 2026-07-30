@@ -63,3 +63,28 @@ When Redis is unavailable, state is in-memory only (lost on restart).
    the corresponding API endpoint) to reset the statistics.
 4. **Model action**: If the alarm is caused by feature drift, trigger a
    retraining run via `scripts/retrain_if_drifted.py`.
+
+## End-to-End Latency Budgets
+
+### Theory
+
+LedgerLens operates with strict latency budgets from data ingestion (Horizon) to consumer decision (scoring and alerting). Exceeding this budget undermines the relevance of risk scores in fast-moving markets.
+
+### Configuration
+
+Latency budgets are governed by:
+- `E2E_LATENCY_BUDGET_MS` (default `2000`): The target latency limit from Horizon ingestion through the scoring worker.
+- `LATENCY_ANOMALY_RATE_THRESHOLD` (default `0.90`): The proportion of events in the rolling 60-second window that must exceed the budget to trigger an emergency pause.
+
+### Prometheus Metrics
+
+- `ledgerlens_e2e_latency_seconds` — Histogram tracking end-to-end latency for successfully scored events.
+
+### Emergency Watchdog
+
+The `EmergencyWatchdog` monitors the stream of e2e latency observations dynamically.
+If the fraction of events exceeding `E2E_LATENCY_BUDGET_MS` surpasses `LATENCY_ANOMALY_RATE_THRESHOLD`, the watchdog proposes an on-chain emergency pause. 
+
+### Latency Drill Procedures
+
+An automated rehearsal drill is provided in `scripts/rehearsal_latency_pause.py`. Operators should routinely run this drill on Testnet to verify that partial failures (latency injection) properly trigger the watchdog and result in a valid on-chain proposal without disrupting state.

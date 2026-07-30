@@ -37,6 +37,7 @@ import pandas as pd
 from stellar_sdk import Asset as SdkAsset
 
 from config import config
+from config.contracts import validate_mode
 from detection.feature_engineering import build_feature_matrix
 from detection.risk_score_store import RiskScoreStore
 from detection.wallet_graph import build_funding_graph, detect_wash_trading_rings, ring_id_map
@@ -45,7 +46,7 @@ from ingestion.historical_loader import (
     load_pair_to_dataframe,
 )
 from ingestion.orderbook_loader import load_accounts_orderbook_events
-from utils.checkpoint import PipelineCheckpoint
+from utils.correlation import PipelineStage, correlation_context, generate_correlation_id
 from utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -222,83 +223,156 @@ def _process_pair(
 
 
 def main() -> None:
-    config.validate()
     args = parse_args()
+    # Validated *after* parsing --submit-onchain: calling this before parsing
+    # args always validated the non-onchain contract, silently skipping the
+    # LEDGERLENS_CONTRACT_ID / LEDGERLENS_SUBMITTER_SECRET checks even when
+    # --submit-onchain was passed.
+    validate_mode("pipeline_onchain" if args.submit_onchain else "pipeline")
 
-    if args.dry_run:
-        logger.info("[DRY RUN] No data will be written.")
+    pipeline_run_id = generate_correlation_id()
+    with correlation_context(
+        pipeline_run_id,
+        stage=PipelineStage.DETECTION,
+        extra={"pipeline": "batch", "dry_run": args.dry_run},
+    ):
+        if args.dry_run:
+            logger.info("[DRY RUN] No data will be written.")
 
-    xlm = SdkAsset.native()
-    pair_specs = _build_pair_specs(xlm)
+        xlm = SdkAsset.native()
 
-    if not pair_specs:
-        logger.warning("No pairs configured or all pairs skipped.")
-        return
+        # --- Stage 1: load trades per pair ---
+        logger.info("[ingestion] Loading trades per pair: %s", config.WATCHED_ASSET_PAIRS)
+        pairs_df: dict[str, pd.DataFrame] = {}
+        for code, issuer in config.WATCHED_ASSET_PAIRS:
+            asset = xlm if issuer == "native" else SdkAsset(code, issuer)
+            if asset == xlm:
+                continue
+            pair_id = f"{code}:{issuer}/XLM:native"
+            with correlation_context(
+                pipeline_run_id,
+                stage=PipelineStage.INGESTION,
+                pair_id=pair_id,
+            ):
+                logger.info("Loading pair %s", pair_id)
+                pairs_df[pair_id] = load_pair_to_dataframe(asset, xlm, start_time=args.since)
+                logger.info("Loaded %d trades for %s", len(pairs_df[pair_id]), pair_id)
 
-    checkpoint: PipelineCheckpoint | None = None
-    if args.checkpoint_file and not args.dry_run:
-        checkpoint = PipelineCheckpoint.load_or_create(
-            path=args.checkpoint_file,
-            pipeline="run_pipeline",
-            fingerprint_inputs={
-                "since": args.since.isoformat() if args.since else None,
-                "pairs": sorted(pair_id for pair_id, _ in pair_specs),
-                "no_orderbook": args.no_orderbook,
-                "no_graph": args.no_graph,
-            },
-            fresh=args.fresh,
-        )
-    elif args.checkpoint_file and args.dry_run:
-        logger.warning("--checkpoint-file has no effect with --dry-run — ignoring")
+        if not pairs_df:
+            logger.warning("No pairs configured or all pairs skipped.")
+            return
 
-    pending_ids = (
-        set(checkpoint.pending([pair_id for pair_id, _ in pair_specs]))
-        if checkpoint is not None
-        else None
-    )
-    pending_specs = (
-        pair_specs if pending_ids is None else [s for s in pair_specs if s[0] in pending_ids]
-    )
+        all_flagged: list[pd.DataFrame] = []
+        store = RiskScoreStore() if not args.no_persist and not args.dry_run else None
 
-    logger.info(
-        "[1] Processing %d/%d pair(s): %s",
-        len(pending_specs),
-        len(pair_specs),
-        [pair_id for pair_id, _ in pending_specs],
-    )
+        for pair_id, trades_df in pairs_df.items():
+            with correlation_context(
+                pipeline_run_id,
+                stage=PipelineStage.DETECTION,
+                pair_id=pair_id,
+            ):
+                logger.info("Processing pair %s", pair_id)
 
-    all_flagged: list[pd.DataFrame] = []
-    store = RiskScoreStore() if not args.no_persist and not args.dry_run else None
+                if trades_df.empty:
+                    logger.info("No trades — skipping")
+                    continue
 
-    for pair_id, asset in pending_specs:
-        logger.info("[pair=%s] Processing", pair_id)
+                wallets = list(pd.unique(trades_df[["base_account", "counter_account"]].values.ravel()))
 
-        if checkpoint is None:
-            flagged = _process_pair(pair_id, asset, xlm, args, store)
-            all_flagged.append(flagged)
-            continue
+                # --- Stage 2a: order-book events ---
+                orderbook_events = None
+                if not args.no_orderbook:
+                    logger.info("Loading order-book events")
+                    orderbook_events = load_accounts_orderbook_events(wallets)
+                    logger.info("Loaded %d order-book events", len(orderbook_events))
 
-        try:
-            flagged = _process_pair(pair_id, asset, xlm, args, store)
-        except Exception as exc:
-            logger.exception("[pair=%s] Failed — recording for retry on next --resume", pair_id)
-            checkpoint.record_failure(pair_id, exc)
-            continue
+                # --- Stage 2b: funding graph ---
+                funding_graph = None
+                if not args.no_graph:
+                    logger.info("Loading account activity and building funding graph")
+                    activities = load_accounts_activity(wallets)
+                    funding_graph = build_funding_graph(activities)
+                    logger.info(
+                        "Funding graph: %d nodes, %d edges",
+                        funding_graph.number_of_nodes(),
+                        funding_graph.number_of_edges(),
+                    )
 
-        checkpoint.record_success(pair_id, metadata={"flagged": len(flagged)})
-        all_flagged.append(flagged)
+                # --- Stage 2c: feature matrix ---
+                logger.info("Building feature matrix")
+                feature_matrix = build_feature_matrix(
+                    trades_df, orderbook_events=orderbook_events, funding_graph=funding_graph
+                )
+                logger.info("Built features for %d wallets", len(feature_matrix))
 
-    if checkpoint is not None:
-        summary = checkpoint.summary()
-        logger.info(
-            "[checkpoint] Run summary: %d completed, %d failed (%s)",
-            summary["completed"],
-            len(summary["failed"]),
-            summary["failed"] or "none",
-        )
+                # --- Stage 2d: scoring ---
+                logger.info("Scoring wallets")
+                try:
+                    from detection.model_inference import RiskScorer
 
-    combined_flagged = pd.concat(all_flagged, ignore_index=True) if all_flagged else pd.DataFrame()
-    logger.info("Total flagged wallets across all pairs: %d", len(combined_flagged))
+                    scorer = RiskScorer()
+                    scored = scorer.score_matrix(feature_matrix)
+                except (RuntimeError, ImportError) as exc:
+                    logger.warning("Skipping ML scoring: %s", exc)
+                    logger.warning("Falling back to Benford-only flags")
+                    mad_cols = [c for c in feature_matrix.columns if c.startswith("benford_mad_")]
+                    scored = feature_matrix[["wallet"] + mad_cols].copy()
+                    scored["benford_flag"] = (scored[mad_cols] > 0.015).any(axis=1)
+
+                # --- Stage 2d.5: wash-trading ring id per wallet ---
+                if funding_graph is not None and funding_graph.number_of_nodes() > 0:
+                    community_map = detect_wash_trading_rings(funding_graph)
+                    rid_map = ring_id_map(community_map, funding_graph)
+                else:
+                    rid_map = {}
+                scored["ring_id"] = [rid_map.get(w) for w in scored["wallet"]]
+
+                # --- Stage 2e: persist + flag ---
+                if "score" in scored:
+                    flagged = scored[scored["score"] >= config.RISK_SCORE_FLAG_THRESHOLD]
+
+                    if store is not None:
+                        with correlation_context(
+                            pipeline_run_id,
+                            stage=PipelineStage.PERSISTENCE,
+                            pair_id=pair_id,
+                        ):
+                            for _, row in scored.iterrows():
+                                store.upsert(
+                                    wallet=row["wallet"],
+                                    asset_pair=pair_id,
+                                    risk_score={
+                                        "score": row["score"],
+                                        "benford_flag": row["benford_flag"],
+                                        "ml_flag": row["ml_flag"],
+                                        "confidence": row["confidence"],
+                                        "ring_id": row.get("ring_id"),
+                                    },
+                                )
+                            logger.info("Persisted %d scored wallets", len(scored))
+                else:
+                    flagged = scored[scored["benford_flag"]]
+
+                logger.info("Flagged wallets (%d):\n%s", len(flagged), flagged)
+                all_flagged.append(flagged)
+
+                if args.submit_onchain:
+                    if args.dry_run:
+                        logger.warning("[DRY RUN] Skipping on-chain submission")
+                    elif "score" not in scored:
+                        logger.warning(
+                            "Skipping on-chain submission: no ML scores available"
+                        )
+                    else:
+                        with correlation_context(
+                            pipeline_run_id,
+                            stage=PipelineStage.ONCHAIN,
+                            pair_id=pair_id,
+                        ):
+                            submit_flagged_onchain(flagged, pair_id)
+
+        combined_flagged = pd.concat(all_flagged, ignore_index=True) if all_flagged else pd.DataFrame()
+        logger.info("Total flagged wallets across all pairs: %d", len(combined_flagged))
 
 
 def submit_flagged_onchain(flagged: pd.DataFrame, pair_id: str) -> None:

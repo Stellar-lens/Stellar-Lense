@@ -39,3 +39,41 @@ if os.environ.get("CI") or os.environ.get("GITHUB_ACTIONS"):
     settings.load_profile("ci")
 else:
     settings.load_profile("dev")
+
+# Typed deployment-mode fixtures (Issue #543) — reusable, validated Config
+# overlays for local/testnet/production. Each fixture restores prior Config
+# state on teardown, so tests using it never leak overrides into other tests.
+import pytest
+
+from config.deployment_modes import DeploymentMode, apply_deployment_mode
+
+
+@pytest.fixture
+def local_deployment_config():
+    with apply_deployment_mode(DeploymentMode.LOCAL) as fixture:
+        yield fixture
+
+
+@pytest.fixture
+def testnet_deployment_config():
+    with apply_deployment_mode(DeploymentMode.TESTNET) as fixture:
+        yield fixture
+
+
+@pytest.fixture
+def production_deployment_config():
+    with apply_deployment_mode(DeploymentMode.PRODUCTION) as fixture:
+        yield fixture
+
+
+# Source package integrity check (Issue #540) — runs once before any test
+# collects. A structurally broken tree (missing __init__.py, unresolved
+# merge conflict markers, syntax errors) fails the whole session immediately
+# with a single readable report instead of surfacing as a scatter of
+# unrelated collection/import errors across the suite.
+def pytest_sessionstart(session):  # noqa: ARG001
+    from utils.package_integrity import check_source_package_integrity
+
+    report = check_source_package_integrity(root=project_root)
+    if not report.ok:
+        pytest.exit(f"\n{report.render()}", returncode=1)
