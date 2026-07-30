@@ -1,0 +1,8 @@
+# requirements/fuzz.in
+# ─────────────────────────────────────────────────────────────────────────────
+# Atheris fuzzing harnesses surface.  Includes base runtime + fuzz extra.
+# Regenerate with: make lock
+# ─────────────────────────────────────────────────────────────────────────────
+
+-r base.in
+-e ".[fuzz]"

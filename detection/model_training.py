@@ -23,7 +23,17 @@ Stacking ensemble (Issue-111):
 
 import logging
 import joblib
-import mlflow
+
+# ---------------------------------------------------------------------------
+# Optional dependency: mlflow  (pip install 'ledgerlens-core[ml]')
+# ---------------------------------------------------------------------------
+try:
+    import mlflow as mlflow
+    _HAS_MLFLOW = True
+except ImportError:  # pragma: no cover
+    mlflow = None  # type: ignore[assignment]
+    _HAS_MLFLOW = False
+
 import numpy as np
 import pandas as pd
 from detection.model_signing import sign_model_file
@@ -398,12 +408,13 @@ def _train_ensemble_base(
     _applied_imbalance_strategy = imbalance_strategy
 
     # Log hyperparameters
-    mlflow.log_param("random_state", random_state)
-    mlflow.log_param("adversarial_augment", adversarial_augment)
-    mlflow.log_param("calibrate", calibrate)
-    mlflow.log_param("adversarial_hardening", adversarial_hardening)
-    mlflow.log_param("smote_k_neighbors", getattr(oversampler, "k_neighbors", None))
-    mlflow.log_param("has_sample_weights", sample_weights is not None)
+    if _HAS_MLFLOW:
+        mlflow.log_param("random_state", random_state)
+        mlflow.log_param("adversarial_augment", adversarial_augment)
+        mlflow.log_param("calibrate", calibrate)
+        mlflow.log_param("adversarial_hardening", adversarial_hardening)
+        mlflow.log_param("smote_k_neighbors", getattr(oversampler, "k_neighbors", None))
+        mlflow.log_param("has_sample_weights", sample_weights is not None)
 
     models = {
         "random_forest": RandomForestClassifier(n_estimators=200, random_state=random_state, n_jobs=-1),
@@ -415,7 +426,7 @@ def _train_ensemble_base(
     # there's an actual run to attach them to (e.g. `train_ensemble`'s
     # wrapping `mlflow_run()`) -- callers like `compare_oversamplers` that
     # invoke this function directly have no such run.
-    _active_run = mlflow.active_run() is not None
+    _active_run = _HAS_MLFLOW and mlflow.active_run() is not None
 
     if _active_run:
         for mname, m in models.items():
@@ -932,6 +943,8 @@ def _collect_aggregate_metrics(results: dict) -> dict:
 
 def _log_train_test_split_params(random_state: int, calibrate: bool) -> None:
     """Log the train/test/calibration split configuration."""
+    if not _HAS_MLFLOW:
+        return
     mlflow.log_param("test_split_ratio", 0.2)
     mlflow.log_param("calibration_split_ratio", 0.1 if calibrate else 0.0)
 

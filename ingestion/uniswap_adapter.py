@@ -13,14 +13,27 @@ import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from web3 import Web3
+# ---------------------------------------------------------------------------
+# Optional dependency: web3  (pip install 'ledgerlens-core[chain]')
+# ---------------------------------------------------------------------------
+try:
+    from web3 import Web3
+    _HAS_WEB3 = True
+except ImportError:  # pragma: no cover
+    Web3 = None  # type: ignore[assignment,misc]
+    _HAS_WEB3 = False
 
 
 logger = logging.getLogger("ledgerlens.uniswap_adapter")
 
-UNISWAP_V3_SWAP_TOPIC = "0x" + Web3.keccak(
-    text="Swap(address,address,int256,int256,uint160,uint128,int24)"
-).hex()
+if _HAS_WEB3:
+    UNISWAP_V3_SWAP_TOPIC = "0x" + Web3.keccak(
+        text="Swap(address,address,int256,int256,uint160,uint128,int24)"
+    ).hex()
+else:
+    # Known keccak-256 topic hash — fallback so the module can be imported
+    # without web3 installed.
+    UNISWAP_V3_SWAP_TOPIC = "0xc42079f94a6350d7e6235f29174924f928cc2ac818eb64fed8004e115fbcca67"
 
 
 def _is_enabled() -> bool:

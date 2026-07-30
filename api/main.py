@@ -2667,8 +2667,15 @@ def legacy_governance_proposal_vote(proposal_id: str, request: Request):
 # ---------------------------------------------------------------------------
 # GraphQL endpoint (Issue #337)
 # ---------------------------------------------------------------------------
-from api.graphql_schema import schema
-from strawberry.fastapi import GraphQLRouter
-
-graphql_app = GraphQLRouter(schema, graphql_ide=None)
-app.include_router(graphql_app, prefix="/graphql")
+try:
+    from api.graphql_schema import schema
+    from strawberry.fastapi import GraphQLRouter as _GraphQLRouter
+    _graphql_app = _GraphQLRouter(schema, graphql_ide=None)
+    app.include_router(_graphql_app, prefix="/graphql")
+except ImportError:
+    import logging as _logging
+    _logging.getLogger("ledgerlens.api").warning(
+        "GraphQL endpoint disabled: 'strawberry-graphql' is not installed. "
+        "Install the 'graphql' extra to enable it: "
+        "pip install 'ledgerlens-core[graphql]'"
+    )

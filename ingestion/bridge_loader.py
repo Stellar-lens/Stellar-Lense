@@ -23,7 +23,25 @@ from datetime import datetime, timezone
 from enum import Enum
 
 import requests
-from web3 import Web3
+
+# ---------------------------------------------------------------------------
+# Optional dependency: web3  (pip install 'ledgerlens-core[chain]')
+# ---------------------------------------------------------------------------
+try:
+    from web3 import Web3
+    _HAS_WEB3 = True
+except ImportError:  # pragma: no cover
+    Web3 = None  # type: ignore[assignment,misc]
+    _HAS_WEB3 = False
+
+
+def _require_web3(location: str = "ingestion/bridge_loader.py") -> None:
+    if not _HAS_WEB3:
+        raise ImportError(
+            f"'web3' is required by {location} but is not installed.\n"
+            "  Install the 'chain' extra:  pip install 'ledgerlens-core[chain]'\n"
+            "  Or install directly:        pip install web3"
+        )
 
 from config.settings import settings
 from ingestion.data_models import BridgeTransfer
@@ -31,9 +49,13 @@ from ingestion.data_models import BridgeTransfer
 logger = logging.getLogger("ledgerlens.bridge_loader")
 
 # Allbridge TokensSent(address indexed sender, bytes32 recipient, uint256 amount, ...)
-ALLBRIDGE_TOKENS_SENT_TOPIC = "0x" + Web3.keccak(
-    text="TokensSent(address,bytes32,uint256)"
-).hex()
+if _HAS_WEB3:
+    ALLBRIDGE_TOKENS_SENT_TOPIC = "0x" + Web3.keccak(
+        text="TokensSent(address,bytes32,uint256)"
+    ).hex()
+else:
+    # Known keccak-256 topic hash — kept in sync with the web3 computation above.
+    ALLBRIDGE_TOKENS_SENT_TOPIC = "0x01a2566a0fba237a9cf3e94b1fedb67e08bac59d2d234fd4bf2f48f617843d78"
 
 _RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 

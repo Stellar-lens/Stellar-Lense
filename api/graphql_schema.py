@@ -2,8 +2,19 @@ import secrets
 import logging
 from typing import Optional
 
-import strawberry
-from strawberry.types import Info
+# ---------------------------------------------------------------------------
+# Optional dependency: strawberry-graphql  (pip install 'ledgerlens-core[graphql]')
+# ---------------------------------------------------------------------------
+try:
+    import strawberry
+    from strawberry.types import Info
+    _HAS_STRAWBERRY = True
+except ImportError as _strawberry_err:  # pragma: no cover
+    raise ImportError(
+        "'strawberry-graphql' is required by api/graphql_schema.py but is not installed.\n"
+        "  Install the 'graphql' extra:  pip install 'ledgerlens-core[graphql]'\n"
+        "  Or install directly:          pip install 'strawberry-graphql[fastapi]'"
+    ) from _strawberry_err
 
 from config.settings import settings
 from detection import storage
