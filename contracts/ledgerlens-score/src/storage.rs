@@ -2906,6 +2906,24 @@ pub fn clear_pending_service_pubkey(env: &Env) {
     env.storage().instance().remove(&DataKeyD::PendingServicePubKey);
 }
 
+// ── Aggregate (threshold-signature) service pubkey rotation overlap window ────
+// Mirrors the single-signer overlap window above; see `rotate_aggregate_service_pubkey`
+// and `verify_threshold_attestation` (issue #697).
+
+pub fn get_pending_aggregate_service_pubkey(env: &Env) -> Option<(Bytes, u64)> {
+    env.storage().instance().get(&DataKeyD::PendingAggregateServicePubKey)
+}
+
+pub fn set_pending_aggregate_service_pubkey(env: &Env, new_key: &Bytes, expiry: u64) {
+    env.storage()
+        .instance()
+        .set(&DataKeyD::PendingAggregateServicePubKey, &(new_key.clone(), expiry));
+}
+
+pub fn clear_pending_aggregate_service_pubkey(env: &Env) {
+    env.storage().instance().remove(&DataKeyD::PendingAggregateServicePubKey);
+}
+
 /// Compares a recovered 65-byte uncompressed secp256k1 pubkey against a
 /// stored pubkey, which may be either the same 65-byte uncompressed form or
 /// the 33-byte compressed form.

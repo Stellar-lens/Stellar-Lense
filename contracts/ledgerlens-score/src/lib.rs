@@ -4892,6 +4892,58 @@ impl LedgerLensScoreContract {
         storage::get_aggregate_service_pubkey(&env).ok_or(Error::ServicePubkeyNotSet)
     }
 
+    /// Rotates the active aggregate (threshold-signature) service pubkey
+    /// with an optional dual-key overlap window (issue #697), mirroring
+    /// `rotate_service_pubkey` for the single-signer attestation path.
+    /// During `overlap_secs` seconds both the old and new aggregate keys
+    /// are accepted by `verify_threshold_attestation`, allowing in-flight
+    /// threshold-signed submissions to complete; once the window elapses
+    /// the old key can no longer validate anything, bounding the replay
+    /// exposure of a retired key to exactly `overlap_secs`.
+    ///
+    /// When `overlap_secs == 0` the rotation is instant: the old key is
+    /// replaced immediately with no overlap.
+    ///
+    /// Admin only.
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if the contract has no admin yet.
+    /// - [`Error::InvalidPubkeyLength`] if `new_key` is not 33 or 65 bytes.
+    pub fn rotate_aggregate_service_pubkey(
+        env: Env,
+        admin_signers: Vec<Address>,
+        new_key: Bytes,
+        overlap_secs: u64,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        if new_key.len() != 33 && new_key.len() != 65 {
+            return Err(Error::InvalidPubkeyLength);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+        // Any previous pending key is superseded.
+        storage::clear_pending_aggregate_service_pubkey(&env);
+        let overlap_expiry = if overlap_secs == 0 {
+            // Instant rotation: promote straight to active.
+            storage::set_aggregate_service_pubkey(&env, &new_key);
+            events::aggregate_service_pubkey_updated(&env, &new_key);
+            0u64
+        } else {
+            let expiry = env.ledger().timestamp().saturating_add(overlap_secs);
+            storage::set_pending_aggregate_service_pubkey(&env, &new_key, expiry);
+            expiry
+        };
+        events::aggregate_service_pubkey_rotation_started(&env, &new_key, overlap_expiry);
+        Ok(())
+    }
+
+    /// Returns the pending aggregate pubkey and its overlap-window expiry,
+    /// or `None` if no aggregate-key rotation is currently in flight.
+    pub fn get_pending_aggregate_service_pubkey(env: Env) -> Option<(Bytes, u64)> {
+        storage::get_pending_aggregate_service_pubkey(&env)
+    }
+
     // ── Consensus configuration ─────────────────────────────────────────────
 
     /// Atomically sets the minimum agreeing model count (`k`) and the maximum
@@ -10967,7 +11019,11 @@ impl LedgerLensScoreContract {
     /// `ta.threshold_sig` and compares it against the key stored by
     /// `set_aggregate_service_pubkey`.  Supports both 33-byte compressed and
     /// 65-byte uncompressed stored keys — same decompression logic as
-    /// [`verify_signature`].
+    /// [`verify_signature`]. During an active dual-key overlap window
+    /// (issue #697, see `rotate_aggregate_service_pubkey`) the pending
+    /// aggregate key is also accepted; once the window expires the pending
+    /// key is automatically promoted to active and the old key can no
+    /// longer validate anything.
     ///
     /// Returns [`Error::InvalidAttestation`] on any mismatch.
     #[allow(clippy::too_many_arguments)]
@@ -11007,6 +11063,17 @@ impl LedgerLensScoreContract {
             return Err(Error::InvalidAttestation);
         }
 
+        // If an aggregate-key rotation is pending, resolve the overlap state
+        // first so the active-key slot always reflects the current state
+        // before we check it — same pattern as `verify_signature` (#697).
+        if let Some((pending_key, expiry)) = storage::get_pending_aggregate_service_pubkey(env) {
+            if env.ledger().timestamp() > expiry {
+                // Overlap has elapsed — promote pending key to active now.
+                storage::set_aggregate_service_pubkey(env, &pending_key);
+                storage::clear_pending_aggregate_service_pubkey(env);
+            }
+        }
+
         let pubkey =
             storage::get_aggregate_service_pubkey(env).ok_or(Error::ServicePubkeyNotSet)?;
 
@@ -11021,31 +11088,20 @@ impl LedgerLensScoreContract {
 
         let recovered = env.crypto().secp256k1_recover(&digest, &sig64, recovery_id);
 
-        let matches = match pubkey.len() {
-            65 => {
-                let mut stored = [0u8; 65];
-                pubkey.copy_into_slice(&mut stored);
-                recovered.to_array().ct_eq(&stored).unwrap_u8() != 0
-            }
-            33 => {
-                let recovered_arr = recovered.to_array();
-                let mut compressed = [0u8; 33];
-                compressed[0] = if recovered_arr[64] % 2 == 0 { 0x02 } else { 0x03 };
-                compressed[1..33].copy_from_slice(&recovered_arr[1..33]);
-                let mut stored = [0u8; 33];
-                pubkey.copy_into_slice(&mut stored);
-                compressed.ct_eq(&stored).unwrap_u8() != 0
-            }
-            // `set_aggregate_service_pubkey` rejects any other length, so
-            // this is unreachable in practice.
-            _ => false,
-        };
-
-        if !matches {
-            return Err(Error::InvalidAttestation);
+        if storage::pubkeys_match(&recovered, &pubkey) {
+            return Ok(());
         }
 
-        Ok(())
+        // During the overlap window, also accept the pending aggregate key.
+        if let Some((pending_key, expiry)) = storage::get_pending_aggregate_service_pubkey(env) {
+            if env.ledger().timestamp() <= expiry
+                && storage::pubkeys_match(&recovered, &pending_key)
+            {
+                return Ok(());
+            }
+        }
+
+        Err(Error::InvalidAttestation)
     }
 
     // ── Merkle batch attestation internals ───────────────────────────────────

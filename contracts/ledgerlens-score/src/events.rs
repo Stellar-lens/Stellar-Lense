@@ -246,6 +246,13 @@ pub fn service_pubkey_rotation_started(env: &Env, new_key: &Bytes, overlap_expir
     env.events().publish((symbol_short!("pk_rot"),), (new_key.clone(), overlap_expiry));
 }
 
+/// Emitted when `rotate_aggregate_service_pubkey` is called (issue #697).
+/// Same shape as `service_pubkey_rotation_started`, for the aggregate
+/// (threshold-signature) key instead of the single-signer key.
+pub fn aggregate_service_pubkey_rotation_started(env: &Env, new_key: &Bytes, overlap_expiry: u64) {
+    env.events().publish((symbol_short!("agg_pkrt"),), (new_key.clone(), overlap_expiry));
+}
+
 // ── Merkle-root batch attestation ───────────────────────────────────────────
 
 /// Emitted by `submit_scores_batch_attested` once the batch has been

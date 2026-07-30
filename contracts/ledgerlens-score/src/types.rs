@@ -766,6 +766,10 @@ pub enum DataKeyD {
     BurstCapacity,
     UpgradeApprovals,
     PendingServicePubKey,
+    /// Pending aggregate (threshold-signature) service pubkey and its
+    /// overlap-window expiry, mirroring `PendingServicePubKey` for
+    /// `rotate_aggregate_service_pubkey` (issue #697).
+    PendingAggregateServicePubKey,
     RateLimitOverrideLog,
     IqrRejectionMultiplier,
     PendingParamChange(Symbol),
