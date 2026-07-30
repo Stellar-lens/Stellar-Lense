@@ -9,6 +9,7 @@ from datetime import datetime
 import pytest
 
 from detection.feature_engineering import compute_payment_path_features
+from ingestion.exceptions import RecordValidationError
 from ingestion.payment_path_analyzer import (
     MAX_PATH_LENGTH,
     ReconstructedPathFlow,
@@ -138,12 +139,28 @@ class TestReconstructPathFlow:
             reconstruct_path_flow(op)
 
     def test_reject_missing_required_fields(self):
-        """Test that missing required fields raise KeyError."""
+        """Missing required fields raise RecordValidationError.
+
+        Deliberately not a ``KeyError``: ``RecordValidationError`` also wraps
+        pydantic failures elsewhere, and inheriting ``KeyError`` would let those
+        satisfy unrelated ``except KeyError`` control flow (see
+        ``ingestion/sketches.py``'s wallet-lock lookup).
+        """
         op = sample_path_payment_strict_send()
         del op["source_account"]
-        
-        with pytest.raises(KeyError, match="required fields"):
+
+        with pytest.raises(RecordValidationError, match="required fields"):
             reconstruct_path_flow(op)
+
+    def test_missing_required_fields_is_not_key_error(self):
+        op = sample_path_payment_strict_send()
+        del op["source_account"]
+
+        with pytest.raises(RecordValidationError) as excinfo:
+            reconstruct_path_flow(op)
+
+        assert not isinstance(excinfo.value, KeyError)
+        assert excinfo.value.source == "payment_path_analyzer.reconstruct_path_flow"
 
     def test_reject_oversized_path(self):
         """Test that paths exceeding MAX_PATH_LENGTH are rejected."""

@@ -15,3 +15,23 @@ _spec.loader.exec_module(_mod)  # type: ignore[union-attr]
 
 Config = _mod.Config
 config = _mod.config
+
+from config.deployment_modes import (  # noqa: E402
+    DeploymentMode,
+    DeploymentModeFixture,
+    DeploymentModeValidationError,
+    UnknownDeploymentModeError,
+    apply_deployment_mode,
+    get_deployment_mode_fixture,
+)
+
+__all__ = [
+    "Config",
+    "config",
+    "DeploymentMode",
+    "DeploymentModeFixture",
+    "DeploymentModeValidationError",
+    "UnknownDeploymentModeError",
+    "apply_deployment_mode",
+    "get_deployment_mode_fixture",
+]
