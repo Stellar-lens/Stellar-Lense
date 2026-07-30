@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel
 
 from api.auth import require_admin_key
@@ -20,6 +20,7 @@ from detection.api_key_store import (
     list_api_keys,
     lookup_key,
     revoke_api_key,
+    rotate_api_key,
 )
 
 router = APIRouter(prefix="/admin/api-keys", tags=["API Keys"], dependencies=[Depends(require_admin_key)])
@@ -50,7 +51,7 @@ def create_key(body: ApiKeyCreate) -> dict:
             expires_at=body.expires_at,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @router.delete(
@@ -74,13 +75,12 @@ def rotate_key_endpoint(
     key_id: str,
     grace_period_seconds: int = 604800,
 ) -> dict:
-    from detection.api_key_store import rotate_api_key
+    if grace_period_seconds <= 0:
+        raise HTTPException(status_code=422, detail="Grace period must be positive")
     try:
-        if grace_period_seconds <= 0:
-            raise HTTPException(status_code=422, detail="Grace period must be positive")
         return rotate_api_key(key_id, grace_period_seconds=grace_period_seconds)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.get(
@@ -102,7 +102,6 @@ def require_scope(required_scope: str):
     def _dependency(
         x_ledgerlens_api_key: str = Header(default="", alias="X-LedgerLens-Api-Key"),
         x_ledgerlens_admin_key: str = Header(default="", alias="X-LedgerLens-Admin-Key"),
-        request: Request = None,
     ) -> None:
         plaintext = x_ledgerlens_api_key or x_ledgerlens_admin_key
         if not plaintext:
@@ -112,7 +111,7 @@ def require_scope(required_scope: str):
         if key_meta is None:
             raise HTTPException(status_code=401, detail="Invalid or revoked API key")
 
-        scopes = set(key_meta["scopes"].split(",")) if key_meta["scopes"] else set()
+        scopes = {s.strip() for s in (key_meta["scopes"] or "").split(",") if s.strip()}
         if required_scope not in scopes and "admin" not in scopes:
             raise HTTPException(
                 status_code=403,
