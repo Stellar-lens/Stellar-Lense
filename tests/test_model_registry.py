@@ -6,6 +6,8 @@ import os
 import pytest
 from sklearn.ensemble import RandomForestClassifier
 
+import config.settings as settings_module
+
 from detection.model_registry import (
     _compute_version_hash,
     get_current_version,
@@ -318,18 +320,15 @@ class TestSigningIntegration:
         """
         import config.settings as settings_module
 
+        Uses ``monkeypatch.setattr`` on the property so the original value
+        is automatically restored after the test — no more try/finally
+        or ``object.__setattr__`` global-state coupling.
+        """
         model_dir = str(tmp_path)
         save_versioned_model(dummy_model, "rf", "v001", model_dir)
-        object.__setattr__(settings_module.settings, "model_signing_key", "")
-        try:
-            with pytest.raises(ModelIntegrityError, match="LEDGERLENS_MODEL_SIGNING_KEY"):
-                load_latest_model("rf", model_dir)
-        finally:
-            object.__setattr__(
-                settings_module.settings,
-                "model_signing_key",
-                "test-signing-key-for-unit-tests-only",
-            )
+        monkeypatch.setattr(settings_module.settings, "model_signing_key", "")
+        with pytest.raises(ModelIntegrityError, match="LEDGERLENS_MODEL_SIGNING_KEY"):
+            load_latest_model("rf", model_dir)
 
 
 # ---------------------------------------------------------------------------

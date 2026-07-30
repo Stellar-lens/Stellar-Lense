@@ -24,24 +24,14 @@ TEST_SIGNING_KEY = "test-signing-key-for-unit-tests-only"
 def patch_signing_key(monkeypatch):
     """Inject a test signing key into settings for every test.
 
-    The fixture **yields** so that monkeypatch's own teardown runs *after*
-    the test body, not before it.  Without the yield the monkeypatch context
-    manager would restore the original value before the test even ran,
-    leaving tests with the production key instead of the test stub.
+    Uses ``monkeypatch.setattr`` on the property rather than
+    ``object.__setattr__`` on the backing field so that pytest
+    automatically restores the original value after each test.
     """
     import config.settings as settings_module
 
-    previous_signing_key = settings_module.settings.ledgerlens_model_signing_key
     monkeypatch.setenv("LEDGERLENS_MODEL_SIGNING_KEY", TEST_SIGNING_KEY)
-    object.__setattr__(settings_module.settings, "ledgerlens_model_signing_key", TEST_SIGNING_KEY)
-    try:
-        yield
-    finally:
-        object.__setattr__(
-            settings_module.settings,
-            "ledgerlens_model_signing_key",
-            previous_signing_key,
-        )
+    monkeypatch.setattr(settings_module.settings, "model_signing_key", TEST_SIGNING_KEY)
 
 
 # Files that need the real stellar_sdk during test execution.
