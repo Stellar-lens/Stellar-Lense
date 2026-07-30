@@ -10,9 +10,9 @@ use crate::types::{
     DataKeyD, DecayCurve, EmbargoExpiry, FlashProtectionMode, GateDataKey, HllSketch,
     InterpolationMethod, JumpStats, ModelVersionStats, ModelVersionStatus, PairVolatilityState,
     ParamChangeProposal, ParameterProposalRecord, ParameterProposalStatus, PendingScoreEntry,
-    RateLimitOverrideEntry, RiskScore, ScoreDispute, ScoreFloorPolicy, ScoreHistogram, ScoreTrend,
-    ScoreVelocityCap, SignerAccuracyRecord, SubscorePayload, TokenBucket, UpgradeProposal,
-    WelfordCorrState,
+    Policy, PolicyApproval, RateLimitOverrideEntry, RiskScore, ScoreDispute, ScoreFloorPolicy,
+    ScoreHistogram, ScoreTrend, ScoreVelocityCap, SignerAccuracyRecord, SubscorePayload,
+    TokenBucket, UpgradeProposal, WelfordCorrState,
 };
 use soroban_sdk::{Address, Bytes, BytesN, Env, Symbol, Vec};
 
@@ -1110,6 +1110,27 @@ pub fn set_deletion_approval_policy(
     match &policy.approver {
         Some(approver) => env.storage().instance().set(&DataKeyD::DeletionApprover, approver),
         None => env.storage().instance().remove(&DataKeyD::DeletionApprover),
+    }
+}
+
+/// Reads the separate-approver policy for one of the four `Policy`
+/// variants other than `DataDeletion` (issue #695). Defaults to
+/// `enabled = false, approver = None` until configured via
+/// `set_policy_approval`.
+pub fn get_policy_approval(env: &Env, policy: Policy) -> PolicyApproval {
+    let enabled =
+        env.storage().instance().get(&DataKeyD::PolicyApprovalEnabled(policy)).unwrap_or(false);
+    let approver = env.storage().instance().get(&DataKeyD::PolicyApprovalApprover(policy));
+    PolicyApproval { enabled, approver }
+}
+
+pub fn set_policy_approval(env: &Env, policy: Policy, approval: &PolicyApproval) {
+    env.storage().instance().set(&DataKeyD::PolicyApprovalEnabled(policy), &approval.enabled);
+    match &approval.approver {
+        Some(approver) => {
+            env.storage().instance().set(&DataKeyD::PolicyApprovalApprover(policy), approver)
+        }
+        None => env.storage().instance().remove(&DataKeyD::PolicyApprovalApprover(policy)),
     }
 }
 

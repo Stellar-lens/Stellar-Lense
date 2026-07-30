@@ -429,6 +429,39 @@ pub struct DeletionApprovalPolicy {
     pub approver: Option<Address>,
 }
 
+/// Named administrative capability policy, partitioned by operation risk
+/// (issue #695). Each privileged endpoint is mapped to exactly one policy
+/// rather than sharing one undifferentiated "admin" capability.
+///
+/// `DataDeletion` denotes the capability already gated by the pre-existing
+/// `DeletionApprovalPolicy` / `require_deletion_auth` (see `clear_score`,
+/// `clear_score_history`) and is not reconfigured via `set_policy_approval`
+/// — it is listed here only so all five categories named in #695 share one
+/// canonical enum for documentation and event/telemetry purposes.
+#[contracttype]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum Policy {
+    ScorePolicy,
+    UpgradeGovernance,
+    EmergencyPause,
+    DataDeletion,
+    SignerAdmin,
+}
+
+/// Separate approval policy for one of the four `Policy` variants other
+/// than `DataDeletion` (issue #695). Same shape and semantics as
+/// `DeletionApprovalPolicy`: when `enabled`, the endpoints mapped to this
+/// policy require `approver.require_auth()` in addition to routine admin
+/// quorum, and the approver must stay disjoint from the admin key/set —
+/// otherwise the partitioning would be meaningless (any admin quorum
+/// member could satisfy both roles).
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PolicyApproval {
+    pub enabled: bool,
+    pub approver: Option<Address>,
+}
+
 /// One canonical key/value entry in the machine-readable configuration export.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -741,6 +774,13 @@ pub enum DataKeyD {
     /// Latest operator acknowledgement record for a given alert class.
     /// Keyed by `AlertType` so each class has its own O(1) slot (issue #630).
     AlertAcknowledgement(AlertType),
+    /// Whether the separate-approver policy is enabled for a named
+    /// administrative capability (issue #695). Keyed by `Policy` so each
+    /// category has its own slot, mirroring `DeletionPolicyEnabled`.
+    PolicyApprovalEnabled(Policy),
+    /// The disjoint approver address for a named administrative capability
+    /// policy (issue #695), when its `PolicyApprovalEnabled` slot is `true`.
+    PolicyApprovalApprover(Policy),
 }
 
 #[contracttype]

@@ -151,6 +151,12 @@ mod test_replay_audit;
 mod test_gdpr_accumulator;
 #[cfg(test)]
 mod test_fail_closed_invariants;
+#[cfg(test)]
+mod test_capability_partitioning;
+#[cfg(test)]
+mod test_aggregate_key_rotation;
+#[cfg(test)]
+mod test_dual_key_pubkey;
 
 #[cfg(test)]
 mod test_memory_exhaustion;
@@ -170,11 +176,11 @@ pub use types::{
     EffectiveRiskScore, EmbargoExpiry, FlashProtectionMode, HllSketch, InterpolationMethod,
     MaybeRiskScore, MaybeScoreAttestation, MaybeThresholdAttestation, ModelSubmission,
     ModelVersionStats, ModelVersionStatus, ParamChangeProposal, ParamValue, ParameterProposal,
-    ParameterProposalRecord, ParameterProposalStatus, PendingScoreEntry, RiskScore,
-    ScoreAttestation, ScoreAttestationInput, ScoreDispute, ScoreFloorPolicy, ScoreHistogram,
-    ScoreQuery, ScoreSubmission, ScoreSubmissionWithProof, ScoreTrend, ScoreVelocityCap,
-    SignerAccuracyRecord, ThresholdAttestation, TierBounds, TokenBucket, UpgradeProposal,
-    WelfordCorrState,
+    ParameterProposalRecord, ParameterProposalStatus, PendingScoreEntry, Policy, PolicyApproval,
+    RiskScore, ScoreAttestation, ScoreAttestationInput, ScoreDispute, ScoreFloorPolicy,
+    ScoreHistogram, ScoreQuery, ScoreSubmission, ScoreSubmissionWithProof, ScoreTrend,
+    ScoreVelocityCap, SignerAccuracyRecord, ThresholdAttestation, TierBounds, TokenBucket,
+    UpgradeProposal, WelfordCorrState,
 };
 /// The 32-byte all-zeros field element used as the value in non-membership proofs.
 pub use verkle::NON_MEMBER_SENTINEL;
@@ -5234,7 +5240,7 @@ impl LedgerLensScoreContract {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
-        Self::require_admin_auth(&env, &admin_signers)?;
+        Self::require_policy_auth(&env, Policy::EmergencyPause, &admin_signers)?;
         let admin = storage::get_admin(&env);
         storage::set_paused(&env, true);
         events::contract_paused(&env, &admin);
@@ -5267,7 +5273,7 @@ impl LedgerLensScoreContract {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
-        Self::require_admin_auth(&env, &admin_signers)?;
+        Self::require_policy_auth(&env, Policy::EmergencyPause, &admin_signers)?;
         let admin = storage::get_admin(&env);
         storage::set_paused(&env, false);
         events::contract_unpaused(&env, &admin);
@@ -5519,7 +5525,7 @@ impl LedgerLensScoreContract {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
-        Self::require_admin_auth(&env, &admin_signers)?;
+        Self::require_policy_auth(&env, Policy::UpgradeGovernance, &admin_signers)?;
         let admin = storage::get_admin(&env);
 
         if storage::has_pending_upgrade(&env) {
@@ -5593,7 +5599,7 @@ impl LedgerLensScoreContract {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
-        Self::require_admin_auth(&env, &admin_signers)?;
+        Self::require_policy_auth(&env, Policy::UpgradeGovernance, &admin_signers)?;
 
         let proposal = storage::get_pending_upgrade(&env).ok_or(Error::NoPendingUpgrade)?;
 
@@ -5629,7 +5635,7 @@ impl LedgerLensScoreContract {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
-        Self::require_admin_auth(&env, &admin_signers)?;
+        Self::require_policy_auth(&env, Policy::UpgradeGovernance, &admin_signers)?;
         let admin = storage::get_admin(&env);
 
         if !storage::has_pending_upgrade(&env) {
@@ -5739,7 +5745,7 @@ impl LedgerLensScoreContract {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
-        Self::require_admin_auth(&env, &admin_signers)?;
+        Self::require_policy_auth(&env, Policy::ScorePolicy, &admin_signers)?;
         let admin = storage::get_admin(&env);
 
         parameter_governance::validate_parameter_value(&env, &param_key, &new_value)?;
@@ -5791,7 +5797,7 @@ impl LedgerLensScoreContract {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
-        Self::require_admin_auth(&env, &admin_signers)?;
+        Self::require_policy_auth(&env, Policy::ScorePolicy, &admin_signers)?;
 
         let record = storage::get_parameter_proposal_record(&env, proposal_id)
             .ok_or(Error::ParameterProposalNotFound)?;
@@ -7700,6 +7706,59 @@ impl LedgerLensScoreContract {
         storage::get_deletion_approval_policy(&env)
     }
 
+    /// Configures the separate-approver policy for one of the four named
+    /// administrative capabilities partitioned by operation risk (issue
+    /// #695): `Policy::ScorePolicy`, `Policy::UpgradeGovernance`,
+    /// `Policy::EmergencyPause`, or `Policy::SignerAdmin`.
+    ///
+    /// `Policy::DataDeletion` is rejected here with
+    /// [`Error::InvalidPolicy`] — it is configured via the pre-existing
+    /// `set_deletion_approval_policy` instead, so there is exactly one
+    /// configuration entry point per policy.
+    ///
+    /// When `enabled == false` (the default), the mapped endpoints keep
+    /// using routine admin authorization only. When `enabled == true`, they
+    /// additionally require `approver.require_auth()`, and the approver
+    /// must stay disjoint from the routine admin key / admin set — an
+    /// enabled policy with a missing or overlapping approver is rejected
+    /// (fail-closed) rather than silently accepted.
+    pub fn set_policy_approval(
+        env: Env,
+        admin_signers: Vec<Address>,
+        policy: Policy,
+        enabled: bool,
+        approver: Option<Address>,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        if policy == Policy::DataDeletion {
+            return Err(Error::InvalidPolicy);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+
+        if enabled {
+            let approver_ref = approver.as_ref().ok_or(Error::InvalidThreshold)?;
+            if Self::policy_approver_conflicts_with_admin(&env, approver_ref) {
+                return Err(Error::InvalidThreshold);
+            }
+        }
+
+        let approval = PolicyApproval { enabled, approver };
+        storage::set_policy_approval(&env, policy, &approval);
+        events::policy_approval_updated(&env, policy, enabled, &approval.approver);
+        Ok(())
+    }
+
+    /// Returns the current separate-approver policy for `policy`.
+    ///
+    /// Defaults to `enabled = false` and `approver = None` until configured
+    /// via `set_policy_approval`. For `Policy::DataDeletion`, use
+    /// `get_deletion_approval_policy` instead.
+    pub fn get_policy_approval(env: Env, policy: Policy) -> PolicyApproval {
+        storage::get_policy_approval(&env, policy)
+    }
+
     /// Erase the score history ring buffer for `wallet` / `asset_pair`.
     ///
     /// Does nothing (returns `Ok`) if no history exists. After this call,
@@ -8578,7 +8637,7 @@ impl LedgerLensScoreContract {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
-        Self::require_admin_auth(&env, &admin_signers)?;
+        Self::require_policy_auth(&env, Policy::SignerAdmin, &admin_signers)?;
         let mut set = storage::get_admin_set(&env);
         if set.len() >= constants::MAX_ADMIN_SIGNERS {
             return Err(Error::AdminSetFull);
@@ -8604,7 +8663,7 @@ impl LedgerLensScoreContract {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
-        Self::require_admin_auth(&env, &admin_signers)?;
+        Self::require_policy_auth(&env, Policy::SignerAdmin, &admin_signers)?;
         let mut set = storage::get_admin_set(&env);
         let pos = set.first_index_of(&signer);
         let idx = pos.ok_or(Error::AdminSignerNotInSet)?;
@@ -8632,7 +8691,7 @@ impl LedgerLensScoreContract {
         if !storage::has_admin(&env) {
             return Err(Error::NotInitialized);
         }
-        Self::require_admin_auth(&env, &admin_signers)?;
+        Self::require_policy_auth(&env, Policy::SignerAdmin, &admin_signers)?;
         let set = storage::get_admin_set(&env);
         if threshold == 0 || threshold > set.len() {
             return Err(Error::InvalidThreshold);
@@ -10271,6 +10330,45 @@ impl LedgerLensScoreContract {
             return true;
         }
         storage::get_admin_set(env).contains(approver)
+    }
+
+    /// Same disjointness rule as `deletion_approver_conflicts_with_admin`,
+    /// generalized for the four `Policy` variants configured via
+    /// `set_policy_approval` (issue #695).
+    fn policy_approver_conflicts_with_admin(env: &Env, approver: &Address) -> bool {
+        if storage::get_admin(env) == *approver {
+            return true;
+        }
+        storage::get_admin_set(env).contains(approver)
+    }
+
+    /// Verifies authorization for a named administrative capability policy
+    /// (issue #695): routine admin quorum via `require_admin_auth`, plus —
+    /// when configured via `set_policy_approval` — an additional
+    /// `require_auth()` from a policy-specific approver disjoint from the
+    /// admin key/set. Mirrors `require_deletion_auth`, generalized across
+    /// `Policy::{ScorePolicy, UpgradeGovernance, EmergencyPause,
+    /// SignerAdmin}`. `Policy::DataDeletion` continues to use the
+    /// pre-existing dedicated `require_deletion_auth` mechanism and is not
+    /// accepted here — see `set_policy_approval`.
+    ///
+    /// Because each policy's approver is an independent, disjoint address,
+    /// a signer set (or approver) authorized under one policy cannot
+    /// satisfy a different policy's gate: the wrong approver simply never
+    /// calls `require_auth()`, so the call fails closed with the same
+    /// `Error::Unauthorized` as any other denied privileged call.
+    fn require_policy_auth(env: &Env, policy: Policy, admin_signers: &Vec<Address>) -> Result<(), Error> {
+        Self::require_admin_auth(env, admin_signers)?;
+        let approval = storage::get_policy_approval(env, policy);
+        if !approval.enabled {
+            return Ok(());
+        }
+        let approver = approval.approver.ok_or(Error::Unauthorized)?;
+        if Self::policy_approver_conflicts_with_admin(env, &approver) {
+            return Err(Error::Unauthorized);
+        }
+        approver.require_auth();
+        Ok(())
     }
 
     fn require_deletion_auth(env: &Env, admin_signers: &Vec<Address>) -> Result<(), Error> {

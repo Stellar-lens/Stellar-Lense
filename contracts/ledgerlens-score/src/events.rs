@@ -1,6 +1,6 @@
 use soroban_sdk::{contracttype, symbol_short, Address, Bytes, BytesN, Env, Symbol};
 
-use crate::types::{AlertAckRecord, AlertType, RiskScore};
+use crate::types::{AlertAckRecord, AlertType, Policy, RiskScore};
 
 /// Event Schema Versioning
 ///
@@ -196,6 +196,15 @@ pub fn score_cleared(
 
 pub fn deletion_policy_updated(env: &Env, enabled: bool, approver: &Option<Address>) {
     env.events().publish((symbol_short!("del_pol"), EVENT_VERSION), (enabled, approver.clone()));
+}
+
+/// Emitted by `set_policy_approval` (issue #695). `policy` identifies which
+/// of the four non-`DataDeletion` named capabilities was reconfigured.
+pub fn policy_approval_updated(env: &Env, policy: Policy, enabled: bool, approver: &Option<Address>) {
+    env.events().publish(
+        (symbol_short!("pol_appr"), EVENT_VERSION, policy),
+        (enabled, approver.clone()),
+    );
 }
 
 pub fn cooldown_updated(env: &Env, cooldown_secs: u64) {
