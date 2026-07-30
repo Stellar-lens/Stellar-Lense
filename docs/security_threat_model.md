@@ -119,7 +119,7 @@ TRUST BOUNDARIES:
 | Category | Threat | Impact | Current Mitigation | Strength | Recommendation |
 |----------|--------|--------|---------------------|----------|-----------------|
 | **S** (Spoofing) | Attacker spoof Horizon API responses | Fake trade data fed into feature pipeline | SSL/TLS pinning to Horizon domain; certificate validation | High | Implement DNS pinning; validate Ledger timestamp in response; detect timestamp gaps |
-| **T** (Tampering) | MITM intercepts Stellar trade stream | Trade amounts altered before Benford analysis | TLS 1.3 required for Horizon connection | High | Implement message authentication codes (HMAC-SHA256) over trade payload; log any TLS downgrades |
+| **T** (Tampering) | MITM intercepts Stellar trade stream, or a compromised/buggy Horizon endpoint returns semantically invalid records (NaN amount, zero-denominator price, forged account ID, out-of-range timestamp) | Trade amounts altered or corrupted before Benford analysis; poisoned records silently skew feature/wallet-graph output | TLS 1.3 required for Horizon connection; `ingestion/untrusted_input.py` validates every `Trade`/`OrderBookEvent`/`AccountActivity` field (account ID checksum, asset code format, finite/positive amounts, timestamp bounds, string length caps) before it reaches the pipeline — invalid records are logged and dropped per-record, never trusted | High | Implement message authentication codes (HMAC-SHA256) over trade payload; log any TLS downgrades |
 | **R** (Repudiation) | Horizon claims they didn't serve certain trades | Scoring inconsistency / audit mismatch | Ingestion logs include cursor position and ledger hash | Medium | Record full Horizon response body (encrypted) for 30 days; hash response and store offchain |
 | **I** (Information Disclosure) | Trade stream includes sensitive wallet metadata | PII exposed if not filtered | Ingestion fetches only trade amounts, counterparties, timestamps — no email/identity | Medium | Implement column-level access control; audit which fields are stored |
 | **D** (Denial of Service) | Horizon rate limit exhausted (10 req/sec default) | Feature buffer backlog grows unbounded | Exponential backoff + circuit breaker in `utils/retry.py` | Medium | Implement token bucket; detect rate-limit headers; scale ingestion workers dynamically |
@@ -129,6 +129,7 @@ TRUST BOUNDARIES:
 - `ingestion/horizon_streamer.py` — SSE stream handler
 - `ingestion/kafka_producer.py` — Kafka producer serialization
 - `ingestion/historical_loader.py` — Bulk historical data loader
+- `ingestion/untrusted_input.py` — Untrusted-record validation contract (see `docs/ingestion.md#untrusted-input-handling`)
 - `utils/retry.py` — Backoff/circuit breaker
 
 ---

@@ -1,6 +1,6 @@
 {
   "alpha": 0.1,
-  "q_hat": 0.030000000000000027,
+  "q_hat": 0.0,
   "n_cal": 1,
   "random_state": 42,
   "mode": "classification",
@@ -88,5 +88,5 @@
     0,
     1
   ],
-  "sha256": "42fa9d8823b1a584dd141910aebd31825a93df9329ea4d4e4c7993fc5233930d"
+  "sha256": "d5dab6e385bd7bf3d74cb906fac935adeb03f4030a827f8cec5b0352b3bdbf06"
 }

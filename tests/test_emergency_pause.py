@@ -63,6 +63,31 @@ def test_pause_proposed_above_anomaly_rate():
     assert proposed_ids == [42]
 
 
+def test_pause_proposed_latency_budget_breached():
+    """When > 90% of scores exceed latency budget, a pause proposal is submitted."""
+    watchdog = make_watchdog(latency_budget_ms=2000)
+
+    # Inject 95 events exceeding latency
+    for i in range(95):
+        watchdog.record_score(f"hash{i}", 50, e2e_latency_ms=2500)
+    # Inject 5 normal latency events
+    for i in range(5):
+        watchdog.record_score(f"hash_lo{i}", 50, e2e_latency_ms=100)
+
+    with patch(
+        "integrations.contract_client.LedgerLensContractClient"
+    ) as MockClient:
+        instance = MockClient.return_value
+        instance.initiate_emergency_pause.return_value = 84
+
+        proposed = watchdog.check()
+
+    assert proposed is True
+    instance.initiate_emergency_pause.assert_called_once()
+    call_kwargs = instance.initiate_emergency_pause.call_args
+    assert "Latency budget breached" in call_kwargs.kwargs["reason"]
+
+
 def test_pause_proposed_only_once():
     """A second check should not propose a second pause."""
     watchdog = make_watchdog()

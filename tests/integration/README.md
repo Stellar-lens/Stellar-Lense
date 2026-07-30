@@ -5,6 +5,19 @@ Testnet. They are **not** executed by `make test` and require explicit opt-in.
 
 ---
 
+## Developing offline
+
+If you're iterating on code that *calls* `LedgerLensContractClient` (a new
+script, alert dispatch, manual smoke-testing) and don't need to hit the real
+contract, use `integrations.offline_stubs.get_contract_client()` instead of
+running through the Testnet setup below. Set `LEDGERLENS_OFFLINE=1` (or pass
+`offline=True`) to get an in-memory `StubContractClient` with the same
+`submit_score` / `get_score` / governance method surface — no Friendbot
+funding or contract deploy required. See `integrations/offline_stubs.py` and
+`tests/test_offline_stubs.py`.
+
+---
+
 ## Available Tests
 
 | Test | File | Purpose |
