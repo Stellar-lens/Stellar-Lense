@@ -35,6 +35,8 @@ from ingestion.historical_loader import (
     load_pair_to_dataframe,
 )
 from ingestion.orderbook_loader import load_accounts_orderbook_events
+from pipeline.idempotency import CheckpointStore, idempotent_upsert
+from pipeline.recovery import RecoveryManager, rollback_partial_writes
 from utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -103,10 +105,30 @@ def main() -> None:
         return
 
     all_flagged: list[pd.DataFrame] = []
-    store = RiskScoreStore() if not args.no_persist and not args.dry_run else None
+    checkpoint_store = CheckpointStore()
+    score_store = RiskScoreStore() if not args.no_persist and not args.dry_run else None
+    recovery_manager = RecoveryManager(checkpoint_store)
 
     for pair_id, trades_df in pairs_df.items():
         logger.info("[pair=%s] Processing", pair_id)
+        run_id = CheckpointStore.make_run_id(
+            pair_id,
+            args.since.isoformat() if args.since else "all",
+            str(args.no_orderbook),
+            str(args.no_graph),
+        )
+        resume_info = recovery_manager.resume_info(run_id, pair_id)
+        logger.info(
+            "[pair=%s] Resume info: completed=%s first_incomplete=%s will_resume=%s",
+            pair_id,
+            resume_info["completed_stages"],
+            resume_info["first_incomplete_stage"],
+            resume_info["will_resume"],
+        )
+
+        with recovery_manager.stage(run_id, pair_id, "ingest") as cp:
+            if not cp.skip:
+                cp.set_result({"row_count": len(trades_df)})
 
         if trades_df.empty:
             logger.info("[pair=%s] No trades — skipping", pair_id)
@@ -120,6 +142,9 @@ def main() -> None:
             logger.info("[pair=%s] Loading order-book events", pair_id)
             orderbook_events = load_accounts_orderbook_events(wallets)
             logger.info("[pair=%s] Loaded %d order-book events", pair_id, len(orderbook_events))
+        with recovery_manager.stage(run_id, pair_id, "orderbook") as cp:
+            if not cp.skip:
+                cp.set_result({"event_count": len(orderbook_events) if orderbook_events is not None else 0})
 
         # --- Stage 2b: funding graph ---
         funding_graph = None
@@ -133,6 +158,14 @@ def main() -> None:
                 funding_graph.number_of_nodes(),
                 funding_graph.number_of_edges(),
             )
+        with recovery_manager.stage(run_id, pair_id, "funding_graph") as cp:
+            if not cp.skip:
+                cp.set_result(
+                    {
+                        "node_count": funding_graph.number_of_nodes() if funding_graph is not None else 0,
+                        "edge_count": funding_graph.number_of_edges() if funding_graph is not None else 0,
+                    }
+                )
 
         # --- Stage 2c: feature matrix ---
         logger.info("[pair=%s] Building feature matrix", pair_id)
@@ -140,6 +173,9 @@ def main() -> None:
             trades_df, orderbook_events=orderbook_events, funding_graph=funding_graph
         )
         logger.info("[pair=%s] Built features for %d wallets", pair_id, len(feature_matrix))
+        with recovery_manager.stage(run_id, pair_id, "features") as cp:
+            if not cp.skip:
+                cp.set_result({"wallet_count": len(feature_matrix)})
 
         # --- Stage 2d: scoring ---
         logger.info("[pair=%s] Scoring wallets", pair_id)
@@ -154,6 +190,9 @@ def main() -> None:
             mad_cols = [c for c in feature_matrix.columns if c.startswith("benford_mad_")]
             scored = feature_matrix[["wallet"] + mad_cols].copy()
             scored["benford_flag"] = (scored[mad_cols] > 0.015).any(axis=1)
+        with recovery_manager.stage(run_id, pair_id, "scoring") as cp:
+            if not cp.skip:
+                cp.set_result({"wallet_count": len(scored)})
 
         # --- Stage 2d.5: wash-trading ring id per wallet ---
         if funding_graph is not None and funding_graph.number_of_nodes() > 0:
@@ -167,35 +206,53 @@ def main() -> None:
         if "score" in scored:
             flagged = scored[scored["score"] >= config.RISK_SCORE_FLAG_THRESHOLD]
 
-            if store is not None:
-                for _, row in scored.iterrows():
-                    store.upsert(
-                        wallet=row["wallet"],
-                        asset_pair=pair_id,
-                        risk_score={
-                            "score": row["score"],
-                            "benford_flag": row["benford_flag"],
-                            "ml_flag": row["ml_flag"],
-                            "confidence": row["confidence"],
-                            "ring_id": row.get("ring_id"),
-                        },
-                    )
-                logger.info("[pair=%s] Persisted %d scored wallets", pair_id, len(scored))
+            if score_store is not None:
+                written_wallets: list[str] = []
+                try:
+                    with recovery_manager.stage(run_id, pair_id, "persist") as cp:
+                        if not cp.skip:
+                            for _, row in scored.iterrows():
+                                risk_score = {
+                                    "score": row["score"],
+                                    "benford_flag": row["benford_flag"],
+                                    "ml_flag": row["ml_flag"],
+                                    "confidence": row["confidence"],
+                                    "ring_id": row.get("ring_id"),
+                                }
+                                written, _ = idempotent_upsert(
+                                    score_store,
+                                    wallet=row["wallet"],
+                                    asset_pair=pair_id,
+                                    risk_score=risk_score,
+                                )
+                                if written:
+                                    written_wallets.append(row["wallet"])
+                            cp.set_result({"written_count": len(written_wallets)})
+                    logger.info("[pair=%s] Persisted %d scored wallets", pair_id, len(scored))
+                except Exception:
+                    rollback_partial_writes(score_store, written_wallets, pair_id)
+                    raise
+            elif args.no_persist:
+                logger.info("[pair=%s] Skipping persistence because --no-persist", pair_id)
+            elif args.dry_run:
+                logger.info("[pair=%s] Skipping persistence because dry run", pair_id)
         else:
             flagged = scored[scored["benford_flag"]]
 
         logger.info("[pair=%s] Flagged wallets (%d):\n%s", pair_id, len(flagged), flagged)
         all_flagged.append(flagged)
 
-        if args.submit_onchain:
-            if args.dry_run:
-                logger.warning("[pair=%s] [DRY RUN] Skipping on-chain submission", pair_id)
-            elif "score" not in scored:
-                logger.warning(
-                    "[pair=%s] Skipping on-chain submission: no ML scores available", pair_id
-                )
-            else:
-                submit_flagged_onchain(flagged, pair_id)
+        if args.submit_onchain and not args.dry_run and "score" in scored:
+            with recovery_manager.stage(run_id, pair_id, "onchain") as cp:
+                if not cp.skip:
+                    submit_flagged_onchain(flagged, pair_id)
+                    cp.set_result({"submitted_count": len(flagged)})
+        elif args.submit_onchain and args.dry_run:
+            logger.warning("[pair=%s] [DRY RUN] Skipping on-chain submission", pair_id)
+        elif args.submit_onchain and "score" not in scored:
+            logger.warning(
+                "[pair=%s] Skipping on-chain submission: no ML scores available", pair_id
+            )
 
     combined_flagged = pd.concat(all_flagged, ignore_index=True) if all_flagged else pd.DataFrame()
     logger.info("Total flagged wallets across all pairs: %d", len(combined_flagged))

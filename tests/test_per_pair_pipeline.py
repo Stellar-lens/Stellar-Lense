@@ -178,6 +178,52 @@ def test_pipeline_upserts_one_record_per_wallet_per_pair():
     assert len(pair_ids) == 2  # two distinct pair_ids
 
 
+def test_run_pipeline_uses_idempotent_upsert_and_checkpointing():
+    """The full pipeline should persist scores through idempotent writes."""
+    ts = pd.Timestamp("2024-01-01", tz="UTC")
+    trades = pd.DataFrame(
+        {
+            "base_account": ["GA"],
+            "counter_account": ["GB"],
+            "ledger_close_time": [ts],
+            "amount": [100.0],
+        }
+    )
+    feature_matrix = pd.DataFrame({"wallet": ["GA", "GB"], "benford_mad_1h": [0.0, 0.0]})
+    scored = pd.DataFrame(
+        {
+            "wallet": ["GA", "GB"],
+            "score": [85, 10],
+            "benford_flag": [True, False],
+            "ml_flag": [True, False],
+            "confidence": [90, 30],
+        }
+    )
+
+    fake_scorer = MagicMock()
+    fake_scorer.score_matrix.return_value = scored
+
+    fake_score_store = MagicMock()
+    fake_score_store.get.return_value = None
+    fake_score_store.upsert.return_value = None
+
+    usdc_issuer = "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN"
+
+    with (
+        patch("sys.argv", ["run_pipeline.py", "--no-orderbook", "--no-graph"]),
+        patch.object(run_pipeline.config, "WATCHED_ASSET_PAIRS", [("USDC", usdc_issuer)]),
+        patch.object(run_pipeline, "load_pair_to_dataframe", return_value=trades),
+        patch.object(run_pipeline, "build_feature_matrix", return_value=feature_matrix),
+        patch("detection.model_inference.RiskScorer", return_value=fake_scorer),
+        patch.object(run_pipeline, "RiskScoreStore", return_value=fake_score_store),
+        patch("pipeline.idempotency._IDEMPOTENCY_DB_URL", "sqlite:///:memory:"),
+    ):
+        with patch.object(run_pipeline, "idempotent_upsert", return_value=(True, None)) as mock_upsert:
+            run_pipeline.main()
+
+    assert mock_upsert.call_count == 2
+
+
 # ---------------------------------------------------------------------------
 # 4. watched_pairs_label is no longer present in run_pipeline
 # ---------------------------------------------------------------------------
