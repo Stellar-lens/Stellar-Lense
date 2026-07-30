@@ -22,6 +22,7 @@ import urllib.request
 from collections import deque
 from collections.abc import Iterator
 
+from pydantic import ValidationError
 from stellar_sdk import Asset as SdkAsset
 from stellar_sdk import Server
 
