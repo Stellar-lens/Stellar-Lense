@@ -136,7 +136,8 @@ def lookup_namespace(
     ensure_namespace_tables(db_path)
     db_path = db_path or _get_db_path()
     key_hash = _hash_key(api_key)
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(timezone.utc)
+    now_iso = now.isoformat()
     with _connect(db_path) as conn:
         existing = {r[1] for r in conn.execute("PRAGMA table_info(api_keys)").fetchall()}
         if "status" not in existing:
@@ -151,7 +152,7 @@ def lookup_namespace(
                 )
             conn.execute(
                 "UPDATE api_keys SET last_used_at = ? WHERE api_key_hash = ?",
-                (now, key_hash),
+                (now_iso, key_hash),
             )
             conn.commit()
             return row[0]
@@ -177,16 +178,26 @@ def lookup_namespace(
             detail="Invalid or deactivated API key",
         )
 
-    if status == "rotating" and rotation_deadline and rotation_deadline < now:
-        raise HTTPException(
-            status_code=401,
-            detail="API key has expired after grace period",
-        )
+    # If a rotation_deadline exists, compare as datetimes for robust semantics
+    if status == "rotating" and rotation_deadline:
+        try:
+            rd = datetime.fromisoformat(rotation_deadline)
+            if rd < now:
+                raise HTTPException(
+                    status_code=401,
+                    detail="API key has expired after grace period",
+                )
+        except Exception:
+            # If parsing fails, conservatively reject to avoid allowing expired keys
+            raise HTTPException(
+                status_code=401,
+                detail="API key has expired or is invalid",
+            )
 
     with _connect(db_path) as conn:
         conn.execute(
             "UPDATE api_keys SET last_used_at = ? WHERE api_key_hash = ?",
-            (now, key_hash),
+            (now_iso, key_hash),
         )
         conn.commit()
     return row[0]

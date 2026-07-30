@@ -45,6 +45,7 @@ from api.streaming import (
     _increment_connection_count,
     _validate_wallet_address,
 )
+from config.settings import settings
 
 router = APIRouter(prefix="/stream", tags=["Score Streaming (SSE)"])
 
@@ -162,7 +163,8 @@ async def stream_scores(
             ),
         )
 
-    wallet_list = raw_wallets[:_MAX_CONNECTIONS_PER_KEY * 5]  # hard cap
+    # Respect configured per-connection wallet limit (fallback 50)
+    wallet_list = raw_wallets[: getattr(settings, 'sse_max_wallets_per_connection', 50) ]
 
     # Connection limit per API key (best-effort when Redis available)
     api_key_id = request.headers.get("X-LedgerLens-Admin-Key", "anonymous")
