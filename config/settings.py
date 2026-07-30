@@ -176,6 +176,18 @@ class Settings(BaseSettings):
     openlineage_namespace: str = "ledgerlens-core"
     lineage_queue_maxsize: int = 1000
 
+    # ── Cost coefficients (used by Prometheus cost gauges) ────────────────────
+    # Operator-configurable cost coefficients for capacity planning.
+    # All values must be non-negative; validated by `non_negative_cost`.
+    cost_per_vcpu_hour_usd: float = 0.048
+    cost_per_gb_memory_hour_usd: float = 0.006
+    cost_per_gb_storage_month_usd: float = 0.023
+
+    # ── Capacity projection (used by capacity planning CLI) ───────────────────
+    # Both values must be >= 1 day; validated by `positive_capacity_days`.
+    capacity_projection_window_days: int = 30
+    capacity_projection_lead_time_days: int = 7
+
     # ── Event Bus (RiskScore Handoff) ─────────────────────────────────────────
     event_bus_backend: str = "none"  # none | kafka | nats
     event_bus_kafka_bootstrap_servers: str = "localhost:9092"
@@ -213,6 +225,7 @@ class Settings(BaseSettings):
     ledgerlens_webhook_encryption_key: str = ""
     ledgerlens_webhook_encryption_key_previous: str = ""
     api_key_rotation_grace_seconds: int = 604800
+    ws_max_connections: int = 100
     api_key_max_age_days: int = 90
     # Minimum LedgerLens risk score (0-100) required to export a SAR package.
     compliance_sar_min_score: int = 70
@@ -324,6 +337,14 @@ class Settings(BaseSettings):
     #   the pre-existing setting.
     gateway_quota_store: str = "redis"
     gateway_log_body: bool = False
+
+    # ── Cost & capacity monitoring ────────────────────────────────────────────
+    # See COST_CAPACITY_IMPLEMENTATION.md and config/cost_exporter.py for usage.
+    cost_per_vcpu_hour_usd: float = 0.0416
+    cost_per_gb_memory_hour_usd: float = 0.0056
+    cost_per_gb_storage_month_usd: float = 0.10
+    capacity_projection_window_days: int = 7
+    capacity_projection_lead_time_days: int = 14
 
     # ── Performance monitoring ────────────────────────────────────────────────
     performance_min_feedback_samples: int = 20
@@ -438,6 +459,18 @@ class Settings(BaseSettings):
     zk_snark_proving_key_path: str = "circuits/keys/score_range_proof.zkey"
     zk_snark_verification_key_path: str = "circuits/keys/verification_key.json"
     zk_snark_prover_timeout_seconds: float = 10.0
+
+    # ── Cost & Capacity ─────────────────────────────────────
+    cost_per_vcpu_hour_usd: float = 0.0416
+    """Cost per vCPU-hour in USD (operator-configurable coefficient)."""
+    cost_per_gb_memory_hour_usd: float = 0.0056
+    """Cost per GB memory-hour in USD (operator-configurable coefficient)."""
+    cost_per_gb_storage_month_usd: float = 0.10
+    """Cost per GB storage per month in USD (operator-configurable coefficient)."""
+    capacity_projection_window_days: int = 7
+    """Number of days to look back for capacity trend projection (must be >= 1)."""
+    capacity_projection_lead_time_days: int = 14
+    """Number of days ahead to alert for capacity shortfall (must be >= 1)."""
 
     # ── Validators ────────────────────────────────────────────────────────────
 
@@ -573,9 +606,9 @@ class Settings(BaseSettings):
 
     @field_validator("cursor_flush_seconds", "historical_chunk_hours", mode="before")
     @classmethod
-    def positive_cursor_flush_seconds(cls, v: object) -> object:
+    def positive_float_gt_zero(cls, v: object) -> object:
         if float(v) <= 0:
-            raise ValueError("CURSOR_FLUSH_SECONDS must be positive")
+            raise ValueError("must be positive")
         return v
 
     @field_validator("streamer_overflow_strategy", mode="before")
@@ -713,7 +746,7 @@ class Settings(BaseSettings):
         return val
 
     @field_validator("cost_per_vcpu_hour_usd", "cost_per_gb_memory_hour_usd",
-                     "cost_per_gb_storage_month_usd", mode="before", check_fields=False)
+                     "cost_per_gb_storage_month_usd", mode="before")
     @classmethod
     def non_negative_cost(cls, v: object) -> object:
         val = float(v)
@@ -722,7 +755,7 @@ class Settings(BaseSettings):
         return val
 
     @field_validator("capacity_projection_window_days",
-                     "capacity_projection_lead_time_days", mode="before", check_fields=False)
+                     "capacity_projection_lead_time_days", mode="before")
     @classmethod
     def positive_capacity_days(cls, v: object) -> object:
         val = int(v)

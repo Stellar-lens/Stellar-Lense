@@ -14,9 +14,9 @@ import hashlib
 import logging
 import secrets
 import sqlite3
+import uuid
 from contextlib import contextmanager
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import datetime, timedelta, timezone
 
 from config.settings import settings
 from detection.rate_limiter import check_rate_limit as _distributed_check_rate_limit
@@ -131,7 +131,7 @@ def create_api_key(
     scopes: list[str],
     namespace_id: str = "",
     rate_limit_per_minute: int = 60,
-    expires_at: Optional[str] = None,
+    expires_at: str | None = None,
 ) -> dict:
     """Create a new API key. Returns the plaintext key once — it is not stored."""
     _init_table()
@@ -139,7 +139,6 @@ def create_api_key(
     if invalid:
         raise ValueError(f"Invalid scopes: {sorted(invalid)}. Valid: {sorted(_VALID_SCOPES)}")
 
-    import uuid
     key_id = str(uuid.uuid4())
     plaintext = f"ll_{secrets.token_urlsafe(32)}"
     key_hash = _hash_key(plaintext)
@@ -215,12 +214,10 @@ def rotate_api_key(key_id: str, grace_period_seconds: int = 604800) -> dict:
         monthly_quota = row["monthly_quota"]
         namespace_monthly_quota = row["namespace_monthly_quota"]
 
-        import uuid
         new_key_id = str(uuid.uuid4())
         plaintext = f"ll_{secrets.token_urlsafe(32)}"
         new_key_hash = _hash_key(plaintext)
 
-        from datetime import timedelta
         deadline = (now_dt + timedelta(seconds=grace_period_seconds)).isoformat()
 
         conn.execute(
@@ -277,7 +274,6 @@ def sweep_expired_api_keys() -> int:
 def get_overdue_api_keys_count() -> int:
     """Count active keys that exceed the maximum age without rotation."""
     _init_table()
-    from datetime import timedelta
     max_age_days = getattr(settings, "api_key_max_age_days", 90)
     cutoff = (datetime.now(timezone.utc) - timedelta(days=max_age_days)).isoformat()
     with _connect() as conn:
@@ -288,7 +284,7 @@ def get_overdue_api_keys_count() -> int:
         return row[0] if row else 0
 
 
-def lookup_key(plaintext: str) -> Optional[dict]:
+def lookup_key(plaintext: str) -> dict | None:
     """Resolve a plaintext key to its metadata row, or None if invalid/revoked/expired."""
     _init_table()
     key_hash = _hash_key(plaintext)
@@ -336,7 +332,7 @@ def list_api_keys() -> list[dict]:
         return [dict(r) for r in rows]
 
 
-def get_api_key_by_hash(key_hash: str) -> Optional[dict]:
+def get_api_key_by_hash(key_hash: str) -> dict | None:
     """Look up an API key by its BLAKE2b hash.
 
     Returns the full record dict (including key_id) or None if not found,
@@ -384,7 +380,6 @@ def check_daily_quota(key_id: str, daily_limit: int) -> tuple[bool, str]:
             (key_id, today),
         ).fetchone()[0]
     if count >= daily_limit:
-        from datetime import timedelta
         next_reset = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
         return False, next_reset.isoformat()
     return True, ""
@@ -405,7 +400,6 @@ def check_namespace_quota(namespace_id: str, daily_limit: int) -> tuple[bool, st
             (namespace_id, today),
         ).fetchone()[0]
     if count >= daily_limit:
-        from datetime import timedelta
         next_reset = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
         return False, next_reset.isoformat()
     return True, ""
@@ -427,7 +421,6 @@ def check_monthly_quota(key_id: str, monthly_limit: int) -> tuple[bool, str]:
             (key_id, month),
         ).fetchone()[0]
     if count >= monthly_limit:
-        from datetime import timedelta
         now = datetime.now(timezone.utc)
         next_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0) + timedelta(days=32)
         next_month = next_month.replace(day=1)
@@ -450,7 +443,6 @@ def check_namespace_monthly_quota(namespace_id: str, monthly_limit: int) -> tupl
             (namespace_id, month),
         ).fetchone()[0]
     if count >= monthly_limit:
-        from datetime import timedelta
         now = datetime.now(timezone.utc)
         next_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0) + timedelta(days=32)
         next_month = next_month.replace(day=1)
@@ -513,11 +505,6 @@ def _ensure_gateway_log_table(conn: sqlite3.Connection) -> None:
 # Consolidation migration helpers
 # ---------------------------------------------------------------------------
 
-_LEGACY_API_KEYS_COLS = ["key_hash", "namespace_id", "scopes", "rate_limit_per_minute",
-                          "created_at", "expires_at", "last_used_at", "revoked"]
-_NAMESPACE_API_KEYS_COLS = ["api_key_hash", "namespace_id", "description", "is_active",
-                            "created_at", "last_used_at"]
-
 
 def migrate_legacy_api_keys(conn: sqlite3.Connection) -> dict:
     """Ensure the canonical api_keys table has all required columns and data.
@@ -556,7 +543,6 @@ def migrate_legacy_api_keys(conn: sqlite3.Connection) -> dict:
         logger.warning("Some columns could not be verified: %s", still_missing)
 
     # Populate key_id for rows that have NULL (legacy schema used id autoincrement)
-    import uuid
     rows_without_key_id = conn.execute(
         "SELECT rowid FROM api_keys WHERE key_id IS NULL"
     ).fetchall()
