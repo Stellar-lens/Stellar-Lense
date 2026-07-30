@@ -1,0 +1,13 @@
+# Shared configuration defaults layered under every environment-specific
+# overlay (local.yaml, ci.yaml, production.yaml). See config/layering.py.
+#
+# Precedence: hardcoded defaults < base.yaml (this file) < {environment}.yaml
+#             < LEDGERLENS_* env vars < explicit runtime overrides.
+
+log_level: INFO
+log_format: json
+risk_score_flag_threshold: 70
+benford_min_sample_size: 50
+alert_channel: stdout
+db_pool_size: 5
+db_max_overflow: 10

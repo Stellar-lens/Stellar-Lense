@@ -44,94 +44,159 @@ logs a warning once and grants every request immediately rather than
 blocking ingestion on a rate-limiter outage. This sacrifices the global cap
 under Redis downtime in favor of not stalling data collection.
 
-## Untrusted input handling
+## Error handling
 
-Every trade, order-book event, and account activity record LedgerLens
-ingests originates from a Horizon REST/SSE endpoint or an AMM pool
-endpoint -- a network service outside this system's trust boundary. A
-misbehaving relay, a MITM'd HTTP proxy, or a buggy Horizon fork can hand
-back JSON that parses fine but is semantically bogus: a NaN amount, a
-zero-denominator price fraction, a 300-character "asset code", an account
-ID that isn't a real Stellar key, a timestamp decades in the future.
-Nothing downstream (Benford analysis, the wallet graph, forensic reports)
-re-validates these fields, so a bad record that isn't caught at the
-boundary either crashes the ingestion worker or silently corrupts
-detection output.
+Ingestion and validation failures raise typed exceptions rather than bare
+`ValueError` / `KeyError`, so callers can distinguish a malformed upstream
+record from a bad argument from an unavailable source, and so every failure
+carries enough context to triage without reproducing it.
 
-### The contract
+### Hierarchy
 
-`ingestion/untrusted_input.py` is the single place this validation lives.
-Every loader that turns a raw external record into a `Trade` /
-`OrderBookEvent` / `AccountActivity` (`ingestion/data_models.py`) passes
-the result through the matching `validate_*` function before the record
-is allowed to reach the rest of the pipeline:
+```
+LedgerLensError                     utils/exceptions.py
+└── IngestionError                  ingestion/exceptions.py
+    ├── InvalidInputError           (also a ValueError)
+    ├── RecordValidationError
+    │   └── SchemaValidationError
+    └── SourceUnavailableError
+        ├── HorizonRateLimitExceeded    ingestion/horizon_fetcher.py
+        └── PoolNotFoundError           ingestion/amm_pool_loader.py
+```
 
-| Domain model | Validator | Called from |
+The base lives in `utils/exceptions.py` and the domain taxonomy in
+`ingestion/exceptions.py` because `utils/` is the repo's home for
+cross-cutting infrastructure with no upward dependencies: other packages can
+adopt `LedgerLensError` later without importing `ingestion/`.
+
+* `InvalidInputError` -- a caller-supplied argument failed validation before
+  any I/O was attempted. Also inherits `ValueError` so existing
+  `except ValueError` handlers and tests keep working.
+* `RecordValidationError` -- an upstream record could not be turned into a
+  typed model (missing field, wrong type, pydantic failure). Deliberately
+  **not** a `KeyError`: pydantic-originated failures would otherwise satisfy
+  unrelated `except KeyError` control flow, such as
+  `ingestion/sketches.py`'s hot-path wallet-lock lookup.
+* `SchemaValidationError` -- a record failed Avro schema validation.
+* `SourceUnavailableError` -- an upstream source was unavailable or exhausted
+  its retry budget.
+
+### Context convention
+
+`IngestionError` carries three optional fields, mirroring the two conventions
+already in the codebase -- the dead-letter envelope written by
+`ingestion/kafka_producer.py::_produce_to_dlq` (`reason` plus a best-effort
+`raw` payload), and the `component` attribute on
+`utils/circuit_breaker.py::CircuitOpenError` (which `source` plays the role
+of):
+
+| Field | Meaning |
+|---|---|
+| `source` | Module/function that raised it, e.g. `horizon_streamer._to_trade` |
+| `reason` | Underlying cause, typically `str(original_exception)` |
+| `raw` | The offending record, scrubbed to JSON-safe values |
+
+`raw` is scrubbed by `ingestion.exceptions.safe_raw`, which mirrors
+`kafka_producer._safe_raw` so an exception and a DLQ envelope describe the
+same failed record identically. All three are also collected into
+`exc.context` for logging.
+
+`ingestion.exceptions.record_context` is the shared helper that translates raw
+construction failures at a boundary:
+
+```python
+with record_context("horizon_streamer._to_trade", record):
+    return Trade(...)
+```
+
+It wraps `KeyError`, `TypeError`, `ValueError` (which covers pydantic's
+`ValidationError`) and `ZeroDivisionError`, and passes anything already in
+this hierarchy through unchanged so a more specific type is never downgraded.
+
+### Logging context
+
+Pass the context through as a logging `extra` so it survives into structured
+output:
+
+```python
+logger.error("%s", exc, extra={"context": exc.context})
+```
+
+`utils/logging.py` emits these fields when `LOG_FORMAT=json` (via
+`python-json-logger`). The plain-text fallback formatter does **not** render
+`extra` fields -- they are attached to the `LogRecord` but invisible in
+dev-mode text logs. This is pre-existing behaviour of `utils/logging.py`, not
+something the typed exceptions changed; be aware of it when debugging
+locally with the default formatter.
+
+### Raise vs degrade
+
+Several ingestion paths degrade deliberately rather than failing. Typing the
+exceptions did **not** change whether any path degrades -- only what type
+propagates when one does raise.
+
+These keep degrading and are unchanged:
+
+* `rate_limiter.py` -- if Redis is unreachable the limiter grants every
+  request rather than stalling ingestion (see *Degraded mode* above).
+* `account_activity_loader.py::load_accounts_activity` -- per-item failures
+  are logged and skipped so the rest of the batch is unaffected. The
+  single-item `load_account_activity` raises `RecordValidationError`; the
+  batch caller still swallows it, along with network errors.
+* `asset_metadata_fetcher.py` -- Redis cache read/write failures are
+  swallowed, and a failed Horizon fetch returns `None`.
+* `amm_pool_loader.py::stream_amm_pool_trades` -- the SSE loop logs and
+  reconnects. `_amm_record_to_trade`'s price fallback to `0.0` on an
+  unparseable price is also preserved.
+* `horizon_streamer.py::stream_trades` -- the reconnect loop still retries
+  connection errors up to `max_reconnect_attempts`.
+* `kafka_producer.py::produce_trade` -- serialisation failures still route to
+  the DLQ. `SchemaValidationError` is an ordinary `Exception`, so the
+  existing broad catch is unaffected.
+* `trade_deduplicator.py` -- every Redis failure is handled internally; the
+  cache never raises to its caller.
+
+These now raise a typed exception where they previously raised a bare stdlib
+one. **They still propagate** -- a malformed record continues to terminate the
+stream or bulk load it occurs in, exactly as before:
+
+| Location | Was | Now |
 |---|---|---|
-| `Trade` | `validate_trade` | `historical_loader.load_trades`, `horizon_streamer.stream_trades`, `amm_pool_loader.load_amm_pool_trades` / `stream_amm_pool_trades` |
-| `OrderBookEvent` | `validate_orderbook_event` | `orderbook_loader.load_orderbook_events` |
-| `AccountActivity` | `validate_account_activity` | `account_activity_loader.load_account_activity` |
+| `horizon_streamer._to_trade` | `KeyError` / pydantic | `RecordValidationError` |
+| `orderbook_loader._to_orderbook_event` | `KeyError` / pydantic | `RecordValidationError` |
+| `amm_pool_loader._amm_record_to_trade` | `KeyError` / pydantic | `RecordValidationError` |
+| `avro_codec.record_to_trade` | `KeyError` / pydantic | `RecordValidationError` |
+| `account_activity_loader.load_account_activity` | `KeyError` / pydantic | `RecordValidationError` |
+| `avro_codec.serialize` / `validate` | `fastavro` `ValidationError` | `SchemaValidationError` |
+| `avro_codec.SchemaRegistry` fingerprint lookup | `KeyError` | `InvalidInputError` |
+| `horizon_streamer._validate_urls` | `ValueError` | `InvalidInputError` |
+| `horizon_streamer.stream_all_watched_pairs` | `ValueError` | `InvalidInputError` |
+| `amm_pool_loader._validate_pool_id` | `ValueError` | `InvalidInputError` |
+| `kafka_producer._to_canonical_pair_id` | `ValueError` | `InvalidInputError` |
+| `payment_path_analyzer.reconstruct_path_flow` (bad op type) | `ValueError` | `InvalidInputError` |
 
-Each validator checks, and raises `UntrustedInputError` (a `ValueError`
-subclass) on the first field that fails:
+Whether the four malformed-record paths above should *skip and continue*
+instead of terminating is a separate decision: dropping records silently
+changes the input distribution the Benford engine and feature pipeline see,
+so it was left alone here.
 
-* **Account IDs** (`base_account`, `counter_account`, `account`,
-  `account_id`, `funding_account`) must be a structurally valid Stellar
-  ed25519 public key per `stellar_sdk.strkey.StrKey` (checksum included --
-  a regex alone can't catch a corrupted checksum).
-* **Asset codes** must satisfy Stellar's own 1-12 alphanumeric-character
-  rule (`stellar_sdk.Asset.check_if_asset_code_is_valid`), with `"XLM"` /
-  `"native"` accepted as this repo's sentinel for the native asset.
-* **Amounts and prices** must be finite (no NaN/Inf) and non-negative;
-  `Trade.base_amount` / `counter_amount` / `price` must additionally be
-  strictly positive (a zero-amount trade or a zero price is not a real
-  trade -- it is what a poisoned or malformed record most often looks
-  like).
-* **Timestamps** must fall between the Stellar public network's genesis
-  (2015-09-30) and a few minutes into the future (small clock-skew
-  allowance).
-* **String fields** (`trade_id`, `event_id`, account IDs, asset codes) are
-  capped at `MAX_STRING_FIELD_LENGTH` (128 chars) as a defense-in-depth
-  guard against a record designed to waste memory/CPU downstream (pandas,
-  logging, forensic report rendering).
+One behaviour change is intentional and visible to callers:
+`payment_path_analyzer.reconstruct_path_flow` raised `KeyError` for missing
+required fields and now raises `RecordValidationError`, which is **not** a
+`KeyError` subclass, for the reason given under *Hierarchy* above.
 
-`safe_ratio(n, d, default=0.0)` centralizes the one recurring crash we
-found while building this: Horizon encodes `price` as an `{"n": ..., "d":
-...}` fraction, and a zero or malformed denominator previously raised an
-unguarded `ZeroDivisionError` inside `horizon_streamer._to_trade` --
-crashing the whole SSE stream on one bad tick. All four loaders now
-compute untrusted price fractions through `safe_ratio` instead of
-open-coding `float(n) / float(d)`.
+### Known gap
 
-### Failure handling: skip, log, continue -- never crash the batch
+Pydantic models are wrapped at the five boundary call sites that build them
+from untrusted upstream dicts (`horizon_streamer._to_trade`,
+`orderbook_loader._to_orderbook_event`,
+`amm_pool_loader._amm_record_to_trade`, `avro_codec.record_to_trade`,
+`account_activity_loader.load_account_activity`) rather than inside
+`ingestion/data_models.py`, which is untouched. Wrapping in the models
+themselves would route every construction -- including tests and trusted
+internal re-validation -- through the wrapper, which is neither idiomatic
+pydantic nor needed here.
 
-Validation failures are not fatal to the surrounding page or stream. Each
-loop that calls a `validate_*` function catches `UntrustedInputError`
-(alongside `pydantic.ValidationError` for structural issues and the raw
-`KeyError`/`ValueError` a malformed record can still raise before a
-`Trade`/`OrderBookEvent` is even constructed), logs a warning identifying
-the record (trade/event id or paging token) and the failing field, and
-continues to the next record. One poisoned record degrades to "one row
-missing," not "ingestion worker down."
-
-### Diagnostics
-
-If `prometheus_client` is installed, every rejection increments
-`ledgerlens_untrusted_records_rejected_total{source, field}` --
-`source` identifies the loader (`historical_loader`, `horizon_streamer`,
-`orderbook_loader`, `account_activity_loader`, `amm_pool_loader`,
-`amm_pool_loader_stream`) and `field` identifies which validator caught
-the problem, so a sustained spike in one label pair (e.g. a compromised
-or misbehaving Horizon mirror producing a wave of invalid account IDs) is
-directly actionable without grepping logs.
-
-### What this does *not* change
-
-The `validate_*` functions run only inside the loaders above -- they are
-not added as `pydantic` field constraints on `Trade` / `OrderBookEvent` /
-`AccountActivity` themselves. Those models remain constructible with
-arbitrary field values (as `tests/factories.py` and much of the test
-suite already do) for anything that isn't crossing the untrusted-external
-boundary. This keeps the security contract scoped to where it actually
-matters -- data arriving from Horizon/AMM -- without changing the public
-shape of the domain models themselves.
+The accepted consequence: **a future call site that constructs these models
+from raw external data will not get typed wrapping automatically.** New
+ingestion boundaries must opt in with `record_context`.

@@ -730,6 +730,8 @@ and keeps running. Scaling `ledgerlens-scorer` replicas adds consumers to the
 
 | Metric | Type | Description |
 |---|---|---|
+| `ledgerlens_ingestion_trades_produced_total` | Counter (`topic`) | Number of trades successfully produced to Kafka |
+| `ledgerlens_ingestion_trades_failed_total` | Counter (`reason`) | Number of trades failed during ingestion |
 | `kafka_messages_consumed_total` | Counter | Trade messages fully processed |
 | `kafka_lag_by_partition` | Gauge (`topic`, `partition`) | Consumer lag |
 | `scoring_latency_ms` | Histogram | Per-wallet scoring latency |

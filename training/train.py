@@ -24,6 +24,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 
 from config import config
+from config.contracts import validate_mode
 from training.calibration import PlattCalibrator
 from utils.logging import get_logger
 
@@ -102,6 +103,13 @@ def main() -> None:
         "--model-dir", default=config.MODEL_DIR, help="Directory to write model artifacts"
     )
     args = parser.parse_args()
+
+    try:
+        validate_mode("training", model_dir=args.model_dir)
+    except OSError as exc:
+        logger.error(str(exc))
+        sys.exit(1)
+
     train_and_calibrate(args.data_path, args.model_dir)
 
 
