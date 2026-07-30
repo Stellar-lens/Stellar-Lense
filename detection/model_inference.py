@@ -452,6 +452,14 @@ class RiskScorer:
             span.set_attribute("wallet.id", hash_span_id(wallet) if wallet else "unknown")
             result = self._score_impl(feature_row, labelled_count, caller_id)
             span.set_attribute("model.score", result.get("score", -1))
+            # Embed a lightweight version stamp so every score output carries
+            # its provenance (Issue #4).
+            try:
+                from utils.version_stamp import get_version as _ll_version
+
+                result["ledgerlens_version"] = _ll_version()
+            except Exception:
+                pass
             return result
 
     def _score_impl(
