@@ -309,7 +309,13 @@ class TestSigningIntegration:
         with pytest.raises(ModelIntegrityError):
             load_latest_model("rf", model_dir)
 
-    def test_load_raises_on_missing_signing_key(self, tmp_path, dummy_model):
+    def test_load_raises_on_missing_signing_key(self, tmp_path, dummy_model, monkeypatch):
+        """Clearing the signing key must cause ModelIntegrityError on load.
+
+        Relies on the conftest ``patch_signing_key`` autouse fixture to
+        pre-populate the key; monkeypatch clears it for the duration of
+        this single test without leaking global state.
+        """
         import config.settings as settings_module
 
         model_dir = str(tmp_path)
