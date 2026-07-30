@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import logging
 from dataclasses import dataclass
-from typing import List, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from detection.oracle_node import OracleNode
 
@@ -13,7 +15,7 @@ logger = logging.getLogger("ledgerlens.oracle_coordinator")
 @dataclass
 class QuorumSignature:
     message_bytes: bytes            # canonical message that was signed
-    signatures: List[Tuple[str, str]]  # [(public_key_hex, signature_hex), ...]
+    signatures: list[tuple[str, str]]  # [(public_key_hex, signature_hex), ...]
     signers_count: int
     threshold: int
     is_valid_quorum: bool           # True if signers_count >= threshold
@@ -24,7 +26,7 @@ class OracleCoordinator:
     Coordinates threshold signatures across multiple OracleNodes.
     """
 
-    def __init__(self, nodes: List[OracleNode], threshold: int = 3):
+    def __init__(self, nodes: list[OracleNode], threshold: int = 3):
         if threshold > len(nodes):
             raise ValueError(f"Threshold {threshold} > node count {len(nodes)}")
         self.nodes = nodes

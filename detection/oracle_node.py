@@ -1,8 +1,9 @@
+from __future__ import annotations
+
 import hashlib
 import os
 import struct
 import time
-from typing import Optional
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
@@ -31,7 +32,7 @@ class OracleNode:
             raise EnvironmentError(f"Invalid oracle key format in {private_key_env_var}: {e}")
             
         self.name = name
-        self.last_seen: Optional[float] = None
+        self.last_seen: float | None = None
 
     @property
     def public_key_hex(self) -> str:
