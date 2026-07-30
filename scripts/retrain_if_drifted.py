@@ -34,6 +34,10 @@ from config import config
 from detection.drift_monitor import DriftMonitor
 from detection.feature_cache import RecentDataBuffer
 from detection.feature_engineering import build_feature_matrix
+from detection.model_compatibility import (
+    FeatureContractError,
+    validate_feature_compatibility,
+)
 from detection.model_training import (
     MODEL_REGISTRY,
     IncrementalTrainingStalenessDetector,
@@ -711,6 +715,33 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     promote, reason = should_promote(old_metrics or {}, new_metrics)
+
+    candidate_metadata = load_model_metadata(temp_model_dir)
+    if promote and "feature_columns" in metadata:
+        if candidate_metadata is None:
+            promote = False
+            reason = "Feature compatibility gate failed: candidate metadata is missing"
+        else:
+            try:
+                compatibility = validate_feature_compatibility(
+                    metadata,
+                    candidate_metadata,
+                    reference_source=os.path.join(model_dir, "model_metadata.json"),
+                    candidate_source=os.path.join(
+                        temp_model_dir,
+                        "model_metadata.json",
+                    ),
+                )
+                if not compatibility.compatible:
+                    promote = False
+                    reason = (
+                        "Feature compatibility gate failed: "
+                        + " ".join(compatibility.diagnostics)
+                    )
+            except FeatureContractError as exc:
+                promote = False
+                reason = f"Feature compatibility gate failed: {exc}"
+
     logger.info("Promotion decision: %s — %s", promote, reason)
 
     if promote:
