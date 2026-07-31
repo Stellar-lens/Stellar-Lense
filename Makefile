@@ -253,6 +253,26 @@ validate-all: check-cycles probe-deps validate-readme validate-notebooks
 	@echo "==> All validation checks complete."
 
 # ---------------------------------------------------------------------------
+# Repository health diagnostics (Issue #477)
+#
+# Usage:
+#   make diagnose                    # Run all diagnostic checks (text output)
+#   make diagnose-json               # JSON output for CI/automation
+#   make diagnose CATEGORIES="environment dependencies"  # Filter by category
+#
+# Exit codes: 0 = healthy, 1 = failures detected
+# ---------------------------------------------------------------------------
+
+CATEGORIES ?=
+
+diagnose:
+	@echo "==> Running repository health diagnostics..."
+	$(PYTHON) -m scripts.diagnose $(if $(CATEGORIES),--categories $(CATEGORIES),)
+
+diagnose-json:
+	$(PYTHON) -m scripts.diagnose --json
+
+# ---------------------------------------------------------------------------
 # Issue #527 — Partitioned dataset helpers
 #
 # Usage:
