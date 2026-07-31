@@ -40,6 +40,9 @@ mod test_batch_error_events;
 mod test_parameter_governance;
 
 #[cfg(test)]
+mod test_two_person_control;
+
+#[cfg(test)]
 mod test_batch_ttl_optimization;
 
 #[cfg(test)]
@@ -3687,6 +3690,11 @@ impl LedgerLensScoreContract {
             return Err(Error::NotInitialized);
         }
         Self::require_admin_auth(&env, &admin_signers)?;
+
+        if storage::get_require_multisig_for_destructive(&env) && admin_signers.len() < 2 {
+            return Err(Error::InsufficientAdminSigners);
+        }
+
         for i in 0..pairs.len() {
             let pair = pairs.get(i).unwrap();
             if !storage::has_pair_weight(&env, &pair) {
@@ -3696,6 +3704,27 @@ impl LedgerLensScoreContract {
             events::pair_weight_reset(&env, &pair);
         }
         Ok(())
+    }
+
+    /// Require multi-admin approval for destructive operations.
+    /// Admin only. When enabled, destructive operations (e.g., `bulk_reset_pair_weight`)
+    /// reject single-admin authorization and require M-of-N multi-sig.
+    pub fn set_require_multisig_for_destructive(
+        env: Env,
+        admin_signers: Vec<Address>,
+        required: bool,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+        storage::set_require_multisig_for_destructive(&env, required);
+        Ok(())
+    }
+
+    /// Returns whether multi-admin approval is required for destructive operations.
+    pub fn get_require_multisig_for_destructive(env: Env) -> bool {
+        storage::get_require_multisig_for_destructive(&env)
     }
 
     // ── Global minimum confidence floor ──────────────────────────────────────
@@ -5965,6 +5994,62 @@ impl LedgerLensScoreContract {
     /// Returns the IDs of all proposals currently marked pending.
     pub fn get_pending_param_prop_ids(env: Env) -> Vec<u64> {
         storage::get_pending_parameter_proposal_ids(&env)
+    }
+
+    /// Clean up expired parameter change proposals that have been expired for at least 48 hours.
+    /// Admin only. Idempotent; safe to call repeatedly.
+    /// Returns the number of proposals deleted.
+    pub fn cleanup_expired_parameter_proposals(
+        env: Env,
+        admin_signers: Vec<Address>,
+    ) -> Result<u32, Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+
+        let (count, oldest_kept) = storage::cleanup_expired_parameter_proposals(&env);
+        events::parameter_change_cleanup(&env, count, oldest_kept);
+        Ok(count)
+    }
+
+    /// Simulate the effect of a parameter change without applying it.
+    /// Returns before/after values, affected capabilities, and execution window.
+    /// Read-only, callable by anyone.
+    pub fn simulate_parameter_change(
+        env: Env,
+        param_key: Symbol,
+        new_value: Bytes,
+    ) -> Result<types::ParameterSimulation, Error> {
+        let now = env.ledger().timestamp();
+        let time_lock_secs = storage::get_upgrade_delay(&env);
+        parameter_governance::simulate_parameter_change(&env, &param_key, &new_value, now, time_lock_secs)
+    }
+
+    /// Simulate the effect of an existing proposal without applying it.
+    /// Returns before/after values, affected capabilities, and execution window.
+    /// Read-only, callable by anyone.
+    pub fn get_proposal_simulation(
+        env: Env,
+        proposal_id: u64,
+    ) -> Result<types::ProposalSimulationOutput, Error> {
+        let record = storage::get_parameter_proposal_record(&env, proposal_id)
+            .ok_or(Error::ParameterProposalNotFound)?;
+
+        let p = &record.proposal;
+        let sim = parameter_governance::simulate_parameter_change(
+            &env,
+            &p.param_key,
+            &p.new_value,
+            p.proposed_at,
+            p.time_lock_secs,
+        )?;
+
+        Ok(types::ProposalSimulationOutput {
+            proposal_id,
+            simulation: sim,
+            simulated_at: env.ledger().timestamp(),
+        })
     }
 
     // ── Watchlist ────────────────────────────────────────────────────────────
