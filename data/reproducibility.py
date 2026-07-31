@@ -223,11 +223,16 @@ class DatasetSnapshot:
 
         if ledgerlens_version is None:
             try:
-                from config import config  # type: ignore
+                from utils.version_stamp import get_version
 
-                ledgerlens_version = getattr(config, "LEDGERLENS_VERSION", "unknown")
+                ledgerlens_version = get_version()
             except Exception:
-                ledgerlens_version = "unknown"
+                try:
+                    from config import config  # type: ignore
+
+                    ledgerlens_version = getattr(config, "LEDGERLENS_VERSION", "unknown")
+                except Exception:
+                    ledgerlens_version = "unknown"
         self.ledgerlens_version = ledgerlens_version
 
         self._signing_key = None

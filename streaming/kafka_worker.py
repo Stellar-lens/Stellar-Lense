@@ -59,6 +59,7 @@ from config import config
 from ingestion.avro_codec import deserialize, load_schema, record_to_trade, validate
 from streaming.alert_dispatcher import AlertDispatcher
 from streaming.feature_buffer import FeatureBuffer
+from streaming.health import WorkerHealthMonitor, get_health_registry
 from streaming.streaming_scorer import StreamingScorer
 from monitoring.capacity_metrics import record_e2e_latency
 from monitoring.emergency_watchdog import EmergencyWatchdog
@@ -287,6 +288,8 @@ class KafkaWorker:
             else None
         )
         self._dedup_cache = DeduplicationCache()
+        self._health_monitor = WorkerHealthMonitor("kafka_worker")
+        get_health_registry().register(self._health_monitor)
 
     # ------------------------------------------------------------------
     # Public API
@@ -316,6 +319,7 @@ class KafkaWorker:
                     if msg.error().code() == KafkaError._PARTITION_EOF:
                         continue
                     logger.warning("Consumer error: %s", msg.error())
+                    self._health_monitor.update_details("last_consumer_error", str(msg.error()))
                     continue
                 try:
                     self.process_message(msg)
@@ -328,13 +332,16 @@ class KafkaWorker:
                         msg.offset(),
                         exc,
                     )
+                    self._health_monitor.record_heartbeat(error_message=str(exc))
         finally:
             self.close()
 
     def stop(self) -> None:
         self._running = False
+        self._health_monitor.mark_stopped("KafkaWorker stopped")
 
     def close(self) -> None:
+        self._health_monitor.mark_stopped("KafkaWorker closed")
         if self._backpressure is not None:
             self._backpressure.flush()
         try:
@@ -344,6 +351,20 @@ class KafkaWorker:
 
     def process_message(self, msg) -> None:
         """Decode, score, dispatch, then commit the offset (at-least-once)."""
+        correlation_id = correlation_id_from_headers(msg.headers())
+        if correlation_id is None:
+            correlation_id = f"kafka-{msg.topic()}-{msg.partition()}-{msg.offset()}"
+        with log_context(
+            correlation_id=correlation_id,
+            pipeline_stage="streaming.kafka_worker",
+            kafka_topic=msg.topic(),
+            kafka_partition=msg.partition(),
+            kafka_offset=msg.offset(),
+        ):
+            self._process_correlated_message(msg)
+
+    def _process_correlated_message(self, msg) -> None:
+        """Process one Kafka message with its transport correlation context bound."""
         # Never process the dead-letter topic — DLQ/DLT requires human review.
         if msg.topic() in (self._dlq_topic, config.KAFKA_DEAD_LETTER_TOPIC):
             self._consumer.commit(message=msg, asynchronous=False)

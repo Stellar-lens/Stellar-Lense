@@ -39,6 +39,7 @@ import pandas as pd
 
 from config import config
 from streaming.feature_store import RedisFeatureStore
+from streaming.health import WorkerHealthMonitor, get_health_registry
 from utils.logging import get_logger
 
 if TYPE_CHECKING:
@@ -111,6 +112,8 @@ class FeatureStoreWorker:
         self._thread: threading.Thread | None = None
         self._running = threading.Event()
         self._worker_id = "feature_store_worker"
+        self._health_monitor = WorkerHealthMonitor(self._worker_id)
+        get_health_registry().register(self._health_monitor)
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -139,6 +142,7 @@ class FeatureStoreWorker:
     def stop(self, timeout: float = 5.0) -> None:
         """Signal the worker to stop and wait for it to drain."""
         self._running.clear()
+        self._health_monitor.mark_stopped("FeatureStoreWorker stopped")
         if self._router is not None:
             try:
                 self._router.unsubscribe(self._worker_id, [self.INTERNAL_TRADE_CHANNEL])
@@ -191,6 +195,12 @@ class FeatureStoreWorker:
     def _run(self) -> None:
         """Main loop: drain the queue and refresh feature vectors."""
         while self._running.is_set():
+            self._health_monitor.record_heartbeat(
+                details={
+                    "queue_depth": self._queue.qsize(),
+                    "max_queue_depth": self._queue.maxsize,
+                }
+            )
             try:
                 task = self._queue.get(timeout=1.0)
             except queue.Empty:
@@ -208,6 +218,7 @@ class FeatureStoreWorker:
                     exc,
                     exc_info=True,
                 )
+                self._health_monitor.record_heartbeat(error_message=str(exc))
                 if _refresh_errors_total is not None:
                     try:
                         _refresh_errors_total.inc()

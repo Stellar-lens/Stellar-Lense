@@ -46,6 +46,7 @@ from detection.model_compatibility import (
     compute_feature_contract_hash,
 )
 from utils.logging import get_logger
+from utils.version_stamp import get_version as _get_ledgerlens_version
 
 logger = get_logger(__name__)
 
@@ -528,9 +529,7 @@ def compute_feature_distributions(
 
 def compute_feature_schema_hash(feature_columns: list[str]) -> str:
     """Compute a SHA-256 hash of the sorted feature column names."""
-    sorted_cols = sorted(feature_columns)
-    schema_str = "\n".join(sorted_cols)
-    return f"sha256:{hashlib.sha256(schema_str.encode()).hexdigest()}"
+    return _compute_feature_schema_hash(feature_columns)
 
 
 def load_training_data(path: str) -> pd.DataFrame:
@@ -906,12 +905,30 @@ def load_trigger_vectors(path: str | None = None) -> np.ndarray:
     return arr.copy()
 
 
-def save_models(results: dict, model_dir: str | None = None) -> None:
+def save_models(
+    results: dict,
+    model_dir: str | None = None,
+    feature_columns: list[str] | None = None,
+    feature_schema_hash: str | None = None,
+    training_data_sha256: str = "",
+    n_training_samples: int = 0,
+) -> None:
     model_dir = model_dir or config.MODEL_DIR
     os.makedirs(model_dir, exist_ok=True)
     to_save = results.get("results", results) if isinstance(results, dict) else results
     for name, result in to_save.items():
-        joblib.dump(result["model"], os.path.join(model_dir, f"{name}.joblib"))
+        model_path = os.path.join(model_dir, f"{name}.joblib")
+        joblib.dump(result["model"], model_path)
+        if feature_columns is not None and feature_schema_hash is not None:
+            write_artifact_manifest(
+                model_name=name,
+                model_path=model_path,
+                feature_columns=feature_columns,
+                feature_schema_hash=feature_schema_hash,
+                model_dir=model_dir,
+                training_data_sha256=training_data_sha256,
+                n_training_samples=n_training_samples,
+            )
 
 
 def save_training_artifacts(
@@ -971,7 +988,7 @@ def save_training_artifacts(
         ),
         "model_names": list(results.keys()),
         "python_version": sys.version.split()[0],
-        "ledgerlens_version": "0.2.0",
+        "ledgerlens_version": _get_ledgerlens_version(),
         "feature_distributions": feature_distributions,
     }
 
@@ -1273,7 +1290,18 @@ def main() -> None:
     for name, result in results.items():
         logger.info("%s metrics: %s", name, result["metrics"])
 
-    save_models(results, model_dir)
+    data_sha = sha256_dataframe(df)
+    n_samples = training_output.get("n_train", 0)
+    feature_cols = training_output.get("feature_columns", [])
+    feature_hash = compute_feature_schema_hash(feature_cols)
+    save_models(
+        results,
+        model_dir,
+        feature_columns=feature_cols,
+        feature_schema_hash=feature_hash,
+        training_data_sha256=data_sha,
+        n_training_samples=n_samples,
+    )
     save_training_artifacts(training_output, args.data_path, model_dir)
 
     # FGSM adversarial training (Issue #191)

@@ -9,3 +9,12 @@ from utils.dependency_probe import (  # noqa: F401
     probe_all,
     require,
 )
+from utils.version_stamp import (  # noqa: F401
+    STAMP_KEY,
+    VersionMismatchError,
+    build_stamp,
+    get_version,
+    read_stamp,
+    stamp_artifact,
+    verify_stamp,
+)

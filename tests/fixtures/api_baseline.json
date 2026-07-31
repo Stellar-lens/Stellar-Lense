@@ -1,0 +1,167 @@
+{
+  "analysis": {
+    "discover_feature_dag": {
+      "kind": "function",
+      "signature": "(features_df: pd.DataFrame, significance_level: float = 0.05, max_cond_set_size: int = 3, timeout_seconds: int = 600, dot_path: str = _DEFAULT_DOT_PATH, json_path: str = _DEFAULT_JSON_PATH)"
+    }
+  },
+  "detection": {
+    "ConformalCalibrator": {
+      "init_signature": "(self, alpha: float = 0.1, random_state: int = 42)",
+      "kind": "class",
+      "public_methods": {
+        "calibrate": "(self, model: Any, X_cal: pd.DataFrame, y_cal: pd.Series, alpha: float | None = None)",
+        "load": "(cls, path: str)",
+        "predict_set": "(self, model: Any, X: pd.DataFrame)",
+        "predict_with_interval": "(self, model: Any, X: pd.DataFrame)",
+        "save": "(self, path: str)"
+      }
+    },
+    "build_feature_matrix": {
+      "kind": "function",
+      "signature": "(trades_df: pd.DataFrame, orderbook_events: pd.DataFrame | None = None, funding_graph: nx.DiGraph | None = None, all_pairs_df: pd.DataFrame | None = None, amm_trades: pd.DataFrame | None = None, gnn_embeddings: dict[str, dict] | None = None, community_map: dict[str, int] | None = None, ring_stats: dict[int, dict] | None = None)"
+    },
+    "compute_benford_metrics": {
+      "kind": "function",
+      "signature": "(amounts: pd.Series, asset_code: str | None = None)"
+    }
+  },
+  "ingestion": {
+    "AccountActivity": {
+      "init_signature": "(self)",
+      "kind": "class",
+      "public_methods": {}
+    },
+    "OrderBookEvent": {
+      "init_signature": "(self)",
+      "kind": "class",
+      "public_methods": {}
+    },
+    "Trade": {
+      "init_signature": "(self)",
+      "kind": "class",
+      "public_methods": {
+        "amount": "(self)"
+      }
+    },
+    "WalletSketchBook": {
+      "init_signature": "(self, max_wallets: int = 100000)",
+      "kind": "class",
+      "public_methods": {
+        "add_trade": "(self, wallet: str, counterparty: str, amount: float)",
+        "all_wallets": "(self)",
+        "amount_mode": "(self, wallet: str)",
+        "counterparty_count": "(self, wallet: str)",
+        "wallet_memory_bytes": "(self, wallet: str)"
+      }
+    }
+  },
+  "privacy": {
+    "ConfigurationError": {
+      "init_signature": "(self)",
+      "kind": "class",
+      "public_methods": {}
+    },
+    "DPAggregator": {
+      "init_signature": "(self, epsilon: float, delta: float, random_seed: int | None = None)",
+      "kind": "class",
+      "public_methods": {
+        "budget_consumed": "(self)",
+        "private_count": "(self, values: np.ndarray)",
+        "private_histogram": "(self, values: np.ndarray, bins: int | np.ndarray)",
+        "private_mean": "(self, values: np.ndarray, feature_min: float, feature_max: float)"
+      }
+    },
+    "PrivacyBudget": {
+      "init_signature": "(self)",
+      "kind": "class",
+      "public_methods": {}
+    }
+  },
+  "reporting": {
+    "MetadataValidationError": {
+      "init_signature": "(self)",
+      "kind": "class",
+      "public_methods": {}
+    },
+    "generate_model_card": {
+      "kind": "function",
+      "signature": "(model_metadata_path: str, output_path: str, fmt: Literal['markdown', 'html'] = 'markdown')"
+    }
+  },
+  "streaming": {
+    "FeatureBuffer": {
+      "init_signature": "(self, max_trades: int = 1000)",
+      "kind": "class",
+      "public_methods": {
+        "all_wallets": "(self)",
+        "get_feature_row": "(self, wallet: str)",
+        "update": "(self, trade: Trade)",
+        "wallet_trade_count": "(self, wallet: str)"
+      }
+    },
+    "StreamingScorer": {
+      "init_signature": "(self, model_dir: str | None = None, gnn_encoder: GNNEncoder | None = None, funding_graph: nx.DiGraph | None = None, feature_cache: FeatureCache | None = None)",
+      "kind": "class",
+      "public_methods": {
+        "observe_new_edges": "(self, wallet: str, new_edges: list[tuple[str, str]])",
+        "score_wallet": "(self, wallet: str, buffer: FeatureBuffer)"
+      }
+    }
+  },
+  "utils": {
+    "CircuitBreakerPort": {
+      "init_signature": "(self)",
+      "kind": "class",
+      "public_methods": {
+        "call": "(self, func: Callable[..., T], *args, **kwargs)",
+        "state": "(self)"
+      }
+    },
+    "FieldEncryptionPort": {
+      "init_signature": "(self)",
+      "kind": "class",
+      "public_methods": {
+        "decrypt": "(self, blob: bytes)",
+        "encrypt": "(self, plaintext: str)"
+      }
+    },
+    "RetryPolicyPort": {
+      "init_signature": "(self)",
+      "kind": "class",
+      "public_methods": {}
+    },
+    "ServiceBoundaryError": {
+      "init_signature": "(self)",
+      "kind": "class",
+      "public_methods": {}
+    },
+    "ServiceRegistry": {
+      "init_signature": "(self)",
+      "kind": "class",
+      "public_methods": {
+        "bound_protocols": "(self)",
+        "register": "(self, protocol: type, factory: Callable[[], Any], *, description: str = '')",
+        "resolve": "(self, protocol: type[T])"
+      }
+    },
+    "StructuredLoggerFactoryPort": {
+      "init_signature": "(self)",
+      "kind": "class",
+      "public_methods": {}
+    },
+    "TracerFactoryPort": {
+      "init_signature": "(self)",
+      "kind": "class",
+      "public_methods": {}
+    },
+    "registry": {
+      "kind": "unresolved",
+      "signature": "<could not statically resolve definition>"
+    },
+    "validate_service_boundaries": {
+      "kind": "function",
+      "signature": "(target: ServiceRegistry | None = None)"
+    }
+  }
+}

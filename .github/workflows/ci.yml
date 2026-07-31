@@ -157,25 +157,17 @@ jobs:
             --ExecutePreprocessor.timeout=120 \
             --inplace benford_explainer.ipynb
 
-      - name: Repository health diagnostics (Issue #477)
-        # Runs the full diagnostic suite and emits a machine-readable JSON
-        # report as a build artifact. Checks that always need network (Horizon
-        # API, database) are skipped automatically when env vars are absent.
-        # CI fails if any check returns FAIL or ERROR status.
-        run: |
-          mkdir -p reports/ci
-          python -m scripts.diagnose \
-            --categories environment dependencies code_health data_artifacts \
-            --json > reports/ci/diagnostics.json
-        continue-on-error: false
+      - name: Check typed service boundaries (utils/boundaries.py)
+        run: python scripts/check_service_boundaries.py
 
-      - name: Upload diagnostics report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: diagnostics-report-py${{ matrix.python-version }}
-          path: reports/ci/diagnostics.json
-          retention-days: 14
+      - name: Check module dependency rules (config/module_boundaries.yml)
+        run: python scripts/check_module_dependencies.py
+
+      - name: Check public API compatibility (tests/fixtures/api_baseline.json)
+        run: python scripts/check_api_compatibility.py
+
+      - name: Check CLI command contracts (scripts/cli_contracts.py)
+        run: python scripts/check_cli_contracts.py
 
       - name: Test
         run: pytest -q --junitxml=reports/ci/junit_results.xml
