@@ -58,6 +58,8 @@ class EmergencyWatchdog:
         A score is considered anomalous when it exceeds this value.
     anomaly_rate_threshold:
         Pause is proposed when the anomalous fraction exceeds this rate.
+    latency_budget_ms:
+        End-to-end latency threshold in milliseconds. If the rate of events exceeding this budget surpasses `anomaly_rate_threshold`, a pause is proposed.
     """
 
     def __init__(
@@ -69,6 +71,7 @@ class EmergencyWatchdog:
         window_seconds: int = _WINDOW_SECONDS,
         anomaly_score_threshold: int = ANOMALY_SCORE_THRESHOLD,
         anomaly_rate_threshold: float = ANOMALY_RATE_THRESHOLD,
+        latency_budget_ms: int = 2000,
     ) -> None:
         self.pause_contract_id = pause_contract_id
         self._signing_key = signing_key
@@ -77,17 +80,18 @@ class EmergencyWatchdog:
         self._window_seconds = window_seconds
         self._anomaly_score_threshold = anomaly_score_threshold
         self._anomaly_rate_threshold = anomaly_rate_threshold
-        # Deque of (timestamp, score) tuples
-        self._window: deque[tuple[float, int]] = deque()
+        self._latency_budget_ms = latency_budget_ms
+        # Deque of (timestamp, score, e2e_latency_ms) tuples
+        self._window: deque[tuple[float, int, float | None]] = deque()
         self._pause_proposed = False
 
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
 
-    def record_score(self, wallet_id_hash: str, score: int) -> None:
+    def record_score(self, wallet_id_hash: str, score: int, e2e_latency_ms: float | None = None) -> None:
         """Record a new score observation from the pipeline."""
-        self._window.append((time.monotonic(), score))
+        self._window.append((time.monotonic(), score, e2e_latency_ms))
 
     def check(self) -> bool:
         """Evaluate the rolling window and propose a pause if anomalous.
@@ -102,8 +106,15 @@ class EmergencyWatchdog:
             # Not enough data yet
             return False
 
-        anomalous = sum(1 for _, s in self._window if s > self._anomaly_score_threshold)
+        anomalous = sum(1 for _, s, _ in self._window if s > self._anomaly_score_threshold)
         rate = anomalous / len(self._window)
+        
+        latency_records = sum(1 for _, _, lat in self._window if lat is not None)
+        if latency_records > 0:
+            anomalous_latency = sum(1 for _, _, lat in self._window if lat is not None and lat > self._latency_budget_ms)
+            latency_rate = anomalous_latency / latency_records
+        else:
+            latency_rate = 0.0
 
         if rate > self._anomaly_rate_threshold:
             reason = (
@@ -114,6 +125,17 @@ class EmergencyWatchdog:
             logger.warning("EmergencyWatchdog: %s — proposing pause", reason)
             self._propose_pause(reason)
             return True
+            
+        if latency_rate > self._anomaly_rate_threshold:
+            reason = (
+                f"Latency budget breached: {latency_rate:.0%} of events in the last "
+                f"{self._window_seconds}s exceed {self._latency_budget_ms}ms "
+                f"(threshold: {self._anomaly_rate_threshold:.0%})"
+            )
+            logger.warning("EmergencyWatchdog: %s — proposing pause", reason)
+            self._propose_pause(reason)
+            return True
+            
         return False
 
     @property
@@ -122,7 +144,7 @@ class EmergencyWatchdog:
         self._evict_old()
         if not self._window:
             return 0.0
-        return sum(1 for _, s in self._window if s > self._anomaly_score_threshold) / len(
+        return sum(1 for _, s, _ in self._window if s > self._anomaly_score_threshold) / len(
             self._window
         )
 
