@@ -41,6 +41,11 @@ import numpy as np
 import pandas as pd
 
 from config import config
+from detection.artifact_compatibility import (
+    ArtifactCompatibilityError,
+    ArtifactCompatibilityGate,
+    load_model_with_compatibility,
+)
 from detection.conformal import ConformalCalibrator
 from detection.differential_privacy import add_laplace_noise, laplace_scale
 from detection.list_override import ListOverride
@@ -323,18 +328,44 @@ class RiskScorer:
         from detection.persistence import ModelArtifact, ModelIntegrityError
 
         artifact = ModelArtifact(self.model_dir)
+        gate = ArtifactCompatibilityGate(self.model_dir)
         models = {}
         for name in MODEL_REGISTRY:
             path = os.path.join(self.model_dir, f"{name}.joblib")
-            if os.path.exists(path):
+            if not os.path.exists(path):
+                continue
+
+            try:
+                gate.check(name, feature_columns=self.metadata.get("feature_columns") if self.metadata else None)
+            except Exception as exc:
+                logger.warning(
+                    "Compatibility gate check failed for %s: %s — loading with best effort",
+                    name, exc,
+                )
+
+            try:
+                model = load_model_with_compatibility(
+                    name,
+                    model_dir=self.model_dir,
+                    feature_columns=self.metadata.get("feature_columns") if self.metadata else None,
+                    strict=False,
+                )
+            except ArtifactCompatibilityError as exc:
+                logger.warning(
+                    "Compatibility gate blocked loading %s: %s — falling back to direct load",
+                    name, exc,
+                )
                 model = joblib.load(path)
-                try:
-                    artifact.verify_chain(name)
-                except ModelIntegrityError as exc:
-                    logger.warning(
-                        "Artifact integrity check skipped or failed for %s: %s", name, exc
-                    )
-                models[name] = model
+            except FileNotFoundError:
+                continue
+
+            try:
+                artifact.verify_chain(name)
+            except ModelIntegrityError as exc:
+                logger.warning(
+                    "Artifact integrity check skipped or failed for %s: %s", name, exc
+                )
+            models[name] = model
         return models
 
     def _load_selected_features(self) -> list[str] | None:
@@ -452,6 +483,14 @@ class RiskScorer:
             span.set_attribute("wallet.id", hash_span_id(wallet) if wallet else "unknown")
             result = self._score_impl(feature_row, labelled_count, caller_id)
             span.set_attribute("model.score", result.get("score", -1))
+            # Embed a lightweight version stamp so every score output carries
+            # its provenance (Issue #4).
+            try:
+                from utils.version_stamp import get_version as _ll_version
+
+                result["ledgerlens_version"] = _ll_version()
+            except Exception:
+                pass
             return result
 
     def _score_impl(

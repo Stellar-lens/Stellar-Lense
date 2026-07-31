@@ -145,9 +145,11 @@ class ForensicReport:
         return d
 
     def to_dict(self) -> dict:
+        from utils.version_stamp import stamp_artifact
+
         d = self._to_dict_without_hash()
         d["report_sha256"] = self.report_sha256
-        return d
+        return stamp_artifact(d, include_git=False)
 
     def verify_integrity(self) -> bool:
         """Recompute the SHA-256 and assert it matches the stored value."""

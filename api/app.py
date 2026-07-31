@@ -7,6 +7,7 @@ Endpoints:
 """
 
 import re
+from contextlib import asynccontextmanager
 
 import bcrypt
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Security
@@ -18,9 +19,13 @@ from slowapi.util import get_remote_address
 from sqlalchemy import select
 
 from config import config
+from config.contracts import validate_mode
 from detection.persistence import RiskScoreRecord, get_session_factory
 from detection.risk_score_store import RiskScoreStore
 from detection.shap_explainer import ShapExplainer
+from utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 # ---------------------------------------------------------------------------
 # Stellar address validation
@@ -54,10 +59,25 @@ def _check_api_key(api_key: str | None = Security(_api_key_header)) -> str:
 # ---------------------------------------------------------------------------
 limiter = Limiter(key_func=get_remote_address)
 
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    # Fail fast on a missing/misconfigured var (e.g. no API_KEYS, meaning
+    # every request would 401 forever) instead of discovering it from the
+    # first request that hits the affected code path.
+    try:
+        validate_mode("api")
+    except OSError as exc:
+        logger.error(str(exc))
+        raise
+    yield
+
+
 app = FastAPI(
     title="LedgerLens Risk Score API",
     version="1.0.0",
     description="Wallet risk scores for Stellar DEX wash-trade detection.",
+    lifespan=_lifespan,
 )
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
@@ -100,6 +120,7 @@ class HealthResponse(BaseModel):
     status: str
     db: str
     model: str
+    workers: dict[str, dict] | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -144,8 +165,32 @@ async def health(request: Request):
 
     model_status = "ok" if os.path.isdir(config.MODEL_DIR) else "unavailable"
 
-    overall = "ok" if db_status == "ok" else "degraded"
-    return HealthResponse(status=overall, db=db_status, model=model_status)
+    registry = get_health_registry()
+    worker_status, worker_report = registry.get_overall_status()
+
+    if db_status != "ok" or worker_status in (HealthStatus.UNHEALTHY, HealthStatus.DEGRADED):
+        overall = "degraded" if db_status == "ok" else "unavailable"
+    else:
+        overall = "ok"
+
+    return HealthResponse(
+        status=overall,
+        db=db_status,
+        model=model_status,
+        workers=worker_report.get("components"),
+    )
+
+
+@app.get("/v1/health/workers", tags=["ops"])
+@limiter.limit(f"{config.API_RATE_LIMIT_RPM}/minute")
+async def worker_health(request: Request):
+    """Detailed health probe for all registered background worker processes."""
+    registry = get_health_registry()
+    overall_status, report = registry.get_overall_status()
+    return {
+        "status": overall_status.value,
+        "report": report,
+    }
 
 
 @app.get(

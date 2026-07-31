@@ -1,7 +1,7 @@
 {
   "alpha": 0.1,
-  "q_hat": 0.048000991344451904,
-  "n_cal": 4,
+  "q_hat": 0.2043430209159851,
+  "n_cal": 1,
   "random_state": 42,
   "mode": "classification",
   "feature_columns": [
@@ -88,5 +88,5 @@
     0,
     1
   ],
-  "sha256": "fe30a5a9639ed9d4ef8ad8e6af318c7cb8092deb686c3bb4634baae0ba6dc561"
+  "sha256": "fd80e1157e0580d8807932e07456359f5e4f72eb064dffdade07b75b1e7c63eb"
 }

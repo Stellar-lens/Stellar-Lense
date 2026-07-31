@@ -39,8 +39,14 @@ from sklearn.model_selection import train_test_split
 from xgboost import XGBClassifier
 
 from config import config
+from config.contracts import validate_mode
 from detection.conformal import ConformalCalibrator
+from detection.model_compatibility import (
+    FEATURE_CONTRACT_VERSION,
+    compute_feature_contract_hash,
+)
 from utils.logging import get_logger
+from utils.version_stamp import get_version as _get_ledgerlens_version
 
 logger = get_logger(__name__)
 
@@ -523,9 +529,7 @@ def compute_feature_distributions(
 
 def compute_feature_schema_hash(feature_columns: list[str]) -> str:
     """Compute a SHA-256 hash of the sorted feature column names."""
-    sorted_cols = sorted(feature_columns)
-    schema_str = "\n".join(sorted_cols)
-    return f"sha256:{hashlib.sha256(schema_str.encode()).hexdigest()}"
+    return _compute_feature_schema_hash(feature_columns)
 
 
 def load_training_data(path: str) -> pd.DataFrame:
@@ -620,6 +624,7 @@ def train_models(
             ...
           },
           "feature_columns": [...],
+          "feature_dtypes": {"feature_name": "float64", ...},
           "feature_distributions": {...},
           "n_train": int,
           "n_test": int,
@@ -767,6 +772,7 @@ def train_models(
     return {
         "results": results,
         "feature_columns": list(X.columns),
+        "feature_dtypes": {column: str(dtype) for column, dtype in X.dtypes.items()},
         "feature_distributions": compute_feature_distributions(X),
         "X_cal": X_cal,
         "y_cal": y_cal,
@@ -899,12 +905,30 @@ def load_trigger_vectors(path: str | None = None) -> np.ndarray:
     return arr.copy()
 
 
-def save_models(results: dict, model_dir: str | None = None) -> None:
+def save_models(
+    results: dict,
+    model_dir: str | None = None,
+    feature_columns: list[str] | None = None,
+    feature_schema_hash: str | None = None,
+    training_data_sha256: str = "",
+    n_training_samples: int = 0,
+) -> None:
     model_dir = model_dir or config.MODEL_DIR
     os.makedirs(model_dir, exist_ok=True)
     to_save = results.get("results", results) if isinstance(results, dict) else results
     for name, result in to_save.items():
-        joblib.dump(result["model"], os.path.join(model_dir, f"{name}.joblib"))
+        model_path = os.path.join(model_dir, f"{name}.joblib")
+        joblib.dump(result["model"], model_path)
+        if feature_columns is not None and feature_schema_hash is not None:
+            write_artifact_manifest(
+                model_name=name,
+                model_path=model_path,
+                feature_columns=feature_columns,
+                feature_schema_hash=feature_schema_hash,
+                model_dir=model_dir,
+                training_data_sha256=training_data_sha256,
+                n_training_samples=n_training_samples,
+            )
 
 
 def save_training_artifacts(
@@ -918,6 +942,18 @@ def save_training_artifacts(
 
     results = training_output["results"]
     feature_columns = training_output["feature_columns"]
+    feature_dtypes = training_output.get("feature_dtypes")
+    if feature_dtypes is None:
+        test_features = training_output.get("X_test")
+        if isinstance(test_features, pd.DataFrame):
+            feature_dtypes = {
+                column: str(test_features[column].dtype)
+                for column in feature_columns
+            }
+        else:
+            # Backward compatibility for callers constructing the historical
+            # training-output mapping by hand.
+            feature_dtypes = {column: "float64" for column in feature_columns}
     feature_distributions = training_output.get("feature_distributions")
 
     # Save metrics.json
@@ -943,10 +979,16 @@ def save_training_artifacts(
         "n_training_rows": training_output["n_train"],
         "n_test_rows": training_output["n_test"],
         "feature_columns": feature_columns,
+        "feature_dtypes": feature_dtypes,
+        "feature_contract_version": FEATURE_CONTRACT_VERSION,
         "feature_schema_hash": compute_feature_schema_hash(feature_columns),
+        "feature_contract_hash": compute_feature_contract_hash(
+            feature_columns,
+            feature_dtypes,
+        ),
         "model_names": list(results.keys()),
         "python_version": sys.version.split()[0],
-        "ledgerlens_version": "0.2.0",
+        "ledgerlens_version": _get_ledgerlens_version(),
         "feature_distributions": feature_distributions,
     }
 
@@ -1025,6 +1067,12 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     model_dir = args.model_dir or config.MODEL_DIR
+
+    try:
+        validate_mode("training", model_dir=model_dir)
+    except OSError as exc:
+        logger.error(str(exc))
+        sys.exit(1)
 
     logger.info("Loading training data from %s", args.data_path)
     df = load_training_data(args.data_path)
@@ -1242,7 +1290,18 @@ def main() -> None:
     for name, result in results.items():
         logger.info("%s metrics: %s", name, result["metrics"])
 
-    save_models(results, model_dir)
+    data_sha = sha256_dataframe(df)
+    n_samples = training_output.get("n_train", 0)
+    feature_cols = training_output.get("feature_columns", [])
+    feature_hash = compute_feature_schema_hash(feature_cols)
+    save_models(
+        results,
+        model_dir,
+        feature_columns=feature_cols,
+        feature_schema_hash=feature_hash,
+        training_data_sha256=data_sha,
+        n_training_samples=n_samples,
+    )
     save_training_artifacts(training_output, args.data_path, model_dir)
 
     # FGSM adversarial training (Issue #191)
