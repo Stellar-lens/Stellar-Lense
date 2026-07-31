@@ -270,3 +270,47 @@ All of the following checks must pass before this PR is considered production-re
 ---
 
 closes #635
+
+---
+
+## Issues #709, #710, #711 — Storage Invariants, Migration Rollback Fixtures, Shard Capability Attestation
+
+### Summary
+
+This change implements three storage-hardening issues:
+
+| Issue | Title | Files Changed |
+|-------|-------|---------------|
+| #710 | Executable storage invariants | `invariants.rs`, `test_invariants.rs`, `lib.rs` |
+| #709 | Migration rollback fixtures | `test_migration_rollback.rs`, `lib.rs` |
+| #711 | Shard capability attestation | `aggregator/lib.rs`, `aggregator/test.rs` |
+
+### ABI Compatibility
+
+**ledgerlens-score:** No new public methods. `invariants.rs` helpers are `#[cfg(any(test, feature = "testutils"))]` only — zero WASM footprint impact in production builds.
+
+**ledgerlens-aggregator:** Two new read-only methods added:
+- `get_shard_capabilities(shard: Address) → Vec<Symbol>` — returns snapshot stored at `add_shard` time.
+- `shard_capabilities_downgraded(shard: Address) → bool` — live capability check against snapshot.
+
+Both are purely additive and do not change the behaviour of any existing method.
+
+### Event Compatibility
+
+No new events emitted. Existing event schemas unchanged.
+
+### Storage Compatibility
+
+- **`ShardCapabilities(Address)`** — new instance-storage key in the aggregator. Written on `add_shard`, removed on `remove_shard`. Shards registered before deployment have no snapshot; `get_shard_capabilities` returns an empty `Vec` for those.
+- All score-contract storage schemas are unchanged.
+
+### Resource Usage
+
+- `invariant_check` is gated to `#[cfg(test)]` — zero production overhead.
+- `probe_capabilities` in `add_shard` adds N cross-contract reads (one per candidate capability, bounded by the `all_caps` array length of 8). This is a one-time cost at registration time, not on the hot path.
+- Migration fixture tests use `env.budget().reset_unlimited()` for the worst-case index capacity test only; all other tests run within default budgets.
+
+### Rollback/Recovery
+
+- The new `ShardCapabilities` key is benign to leave behind if a rollback is necessary: it is read-only and skipped when the shard is not in the `Shards` list.
+- The invariant functions are test-only and have no state impact on production.

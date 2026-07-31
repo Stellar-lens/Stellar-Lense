@@ -82,7 +82,11 @@ field is either fixed-width or zero-padded to a fixed width):
 | `contract_id` | 32 bytes | contract's own address as raw 32 bytes |
 | `contract_version` | 4 bytes | `u32`, little-endian |
 
-Total preimage length: 243 bytes.
+Total preimage length: 211 bytes (56 + 9 + 4 + 1 + 1 + 8 + 4 + 4 + 56 + 32 +
+32 + 4). This exact width, and the order and encoding of every field above, is
+locked down by the golden-vector and domain-separation tests in
+`test_attestation_domain_compat.rs` (issue #696): any field that is omitted,
+resized, or reordered changes the pinned digest and fails the suite.
 
 Rationale for the StrKey (`to_string()`) encoding of `wallet` and the
 contract address: these are the only stable, deterministic byte
@@ -199,7 +203,7 @@ preventing cross-deployment and cross-version replay attacks.
 `contract_id` and `contract_version` in the digest.** Existing signatures without these
 fields will be rejected as `InvalidAttestation` after this upgrade.
 
-The digest layout changed from 175 bytes to 243 bytes (see §3). Signers must recompute
+The digest layout changed from 175 bytes to 211 bytes (see §3). Signers must recompute
 all attestations using the updated preimage format.
 
 ### Domain-separation review (issue #401)
@@ -232,60 +236,67 @@ this review; the gap was that it wasn't documented or covered by a
 cross-instance test, both of which this section and the test above now
 provide.
 
+## 7. Key-rotation overlap window (issue #697)
 
-## 7. Compatibility impact of prefix-byte canonicalization (issue #700)
+Both attestation key slots — the single service pubkey (`set_service_pubkey`
+/ `ScoreAttestation`) and the aggregate threshold pubkey
+(`set_aggregate_service_pubkey` / `ThresholdAttestation`) — support a
+**bounded overlap window** during rotation, so in-flight submissions signed
+with the outgoing key are not orphaned by a rotation that happens mid-flight,
+while still bounding how long the outgoing key remains usable.
 
-### 7.1 Behavior change
+### Rotation record
 
-Before issue #700, `set_service_pubkey` and `rotate_service_pubkey` checked
-only the **length** of the supplied key (`33` or `65` bytes). Any blob of the
-right length was stored, regardless of its first byte.
+`rotate_service_pubkey(admin_signers, new_key, overlap_secs)` and
+`rotate_aggregate_service_pubkey(admin_signers, new_key, overlap_secs)` each
+record a **pending key** paired with an **expiry bound**:
 
-After #700, both functions additionally check the **prefix byte** via
-`storage::validate_pubkey_format`. A key with correct length but an invalid
-prefix is now rejected with `Error::InvalidPubkeyLength`.
+- Activation is implicit and immediate: the new key is accepted (as the
+  *pending* key) from the moment the rotation call executes.
+- `expiry = env.ledger().timestamp() + overlap_secs` at the time of the call
+  — the upper bound of the window. `get_pending_service_pubkey()` /
+  `get_pending_aggregate_service_pubkey()` return `(pending_key, expiry)` so
+  operators and monitoring tooling can read both bounds of the window
+  on-chain.
+- `overlap_secs == 0` skips the pending state entirely: the new key is
+  promoted to active immediately and the old key stops verifying in the same
+  call.
 
-### 7.2 ABI compatibility
+### Verification during the window
 
-- **Error codes**: no new error variants were added. `Error::InvalidPubkeyLength`
-  (discriminant `28`) is reused for prefix violations. Its documented meaning
-  now covers "wrong length **or** wrong prefix". Off-chain code that already
-  treats `InvalidPubkeyLength` as "key was rejected" requires no change.
-- **Function signatures**: `set_service_pubkey` and `rotate_service_pubkey`
-  are unchanged. No new parameters, no return-type change.
-- **Storage layout**: the key is stored as-is after passing validation. The
-  `ServicePubKey` storage slot format is unchanged.
-- **Events**: `mg_pub` / `service_pubkey_rotation_started` are emitted
-  identically to before — only when the key is accepted. No new events.
+`verify_signature` (single-key) and `verify_threshold_attestation`
+(aggregate) both:
 
-### 7.3 Impact on existing deployments
+1. First check whether a pending key exists and its `expiry` has already
+   passed. If so, the pending key is **promoted to active and the pending
+   slot is cleared** before verification proceeds — this happens on the very
+   next call after expiry, not on a timer, so there is no ledger-close race
+   where neither slot is authoritative.
+2. Check the signature against the **active** key.
+3. If that fails and a pending key is still recorded with `now <= expiry`,
+   check the signature against the **pending** key too.
 
-Any deployment whose admin has already called `set_service_pubkey` with a
-**valid** 33- or 65-byte SEC-1 key (i.e. one produced by a real secp256k1
-library) is unaffected — all properly-encoded keys already have the correct
-prefix byte.
+The net effect: during `[rotation call, expiry]`, both the old (active) and
+new (pending) keys verify. After `expiry`, only the new key verifies — a
+signature from the retired key is rejected with `Error::InvalidAttestation`
+exactly as any other unrecognized key, closing the window rather than
+leaving it open indefinitely. See `test_dual_key_pubkey.rs` (single-key) and
+`test_aggregate_key_rotation.rs` (aggregate) for the deterministic tests
+proving this, including the post-expiry rejection case.
 
-The only affected case would be a deployment that previously stored a key with
-a semantically wrong prefix (`0x00`, `0x01`, `0x04` on a 33-byte key, etc.).
-Such a key would have caused every attestation to fail with
-`InvalidAttestation` anyway (it would never match any recovered point), so the
-practical impact is that the error surfaces earlier — at key-set time — and
-with the more meaningful `InvalidPubkeyLength` code instead of a later
-`InvalidAttestation`.
+### Compatibility
 
-### 7.4 Resource usage
-
-`validate_pubkey_format` reads a single byte (`pubkey.get(0)`) and performs a
-constant-time match against two or one literal values. Cost is O(1) with
-negligible compute budget impact.
-
-### 7.5 Test coverage added (issue #700)
-
-`test_pubkey_canonicalization.rs` covers:
-
-- `storage::validate_pubkey_format` directly (unit tests for all table entries
-  in §5.1 and §5.2).
-- `set_service_pubkey` and `rotate_service_pubkey` at the contract level: each
-  accepted encoding, each rejected prefix byte, each boundary length.
-- Round-trip: stored key bytes are returned unchanged by `get_service_pubkey`.
-- Adversarial fill patterns (all-zero, all-`0xFF` payloads with valid prefix).
+- **No ABI break**: `rotate_aggregate_service_pubkey` /
+  `get_pending_aggregate_service_pubkey` are new, additive endpoints;
+  `set_aggregate_service_pubkey` (instant, no-overlap rotation) is
+  unchanged. The single-key `rotate_service_pubkey` /
+  `get_pending_service_pubkey` pair already existed (issue #295) and is
+  unchanged here.
+- **New storage key**: `PendingAggregateServicePubKey` (instance storage),
+  mirroring the pre-existing `PendingServicePubKey`.
+- **New event** `agg_pkrt` (topics: `agg_pkrt`; data: `(new_key,
+  overlap_expiry)`), mirroring the pre-existing `pk_rot`. Additive only.
+- **Bounded work**: verification does at most one extra storage read and one
+  extra signature comparison, regardless of how many rotations have
+  occurred — there is exactly one pending-key slot per key type, not a
+  growing history.

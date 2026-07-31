@@ -106,7 +106,6 @@ pub struct SplitBrainReport {
 /// advertise all of them via `supports_interface`, so a shard whose interface
 /// has drifted is rejected at registration time instead of failing silently
 /// during a later cross-contract call.
-const REQUIRED_SHARD_CAPABILITIES: [&str; 3] = ["score", "gate", "aggr"];
 const MAX_ASSET_PAIR_BYTES: u32 = 9;
 
 /// Returns `true` only when `shard` reports support for every capability in
@@ -241,6 +240,10 @@ impl LedgerLensAggregator {
         if !shard_supports_required_interface(&env, &shard) {
             return Err(Error::IncompatibleInterface);
         }
+        // Record capability snapshot at registration time so operators and
+        // tests can detect post-registration capability downgrades.
+        let snapshot = probe_capabilities(&env, &shard);
+        env.storage().instance().set(&DataKey::ShardCapabilities(shard.clone()), &snapshot);
         shards.push_back(shard);
         env.storage().instance().set(&DataKey::Shards, &shards);
         Ok(())
@@ -266,12 +269,49 @@ impl LedgerLensAggregator {
             return Err(Error::ShardNotRegistered);
         }
         env.storage().instance().set(&DataKey::Shards, &out);
-        env.storage().instance().remove(&DataKey::ShardHealth(shard));
+        env.storage().instance().remove(&DataKey::ShardHealth(shard.clone()));
+        env.storage().instance().remove(&DataKey::ShardCapabilities(shard));
         Ok(())
     }
 
     pub fn get_shards(env: Env) -> Vec<Address> {
         env.storage().instance().get(&DataKey::Shards).unwrap_or_else(|| Vec::new(&env))
+    }
+
+    /// Returns the capability snapshot recorded when `shard` was registered via
+    /// `add_shard`, or an empty `Vec` if no snapshot exists (e.g. the shard was
+    /// registered before this feature was deployed).
+    pub fn get_shard_capabilities(env: Env, shard: Address) -> Vec<Symbol> {
+        env.storage()
+            .instance()
+            .get(&DataKey::ShardCapabilities(shard))
+            .unwrap_or_else(|| Vec::new(&env))
+    }
+
+    /// Returns `true` if `shard` no longer advertises all the capabilities it
+    /// reported at registration time — i.e. a post-registration downgrade is
+    /// detected.  Returns `false` when the shard is healthy and still passes
+    /// every capability check, or when no snapshot exists.
+    ///
+    /// This is a read-only probe intended for monitoring and governance flows.
+    pub fn shard_capabilities_downgraded(env: Env, shard: Address) -> bool {
+        let snapshot: Vec<Symbol> = env
+            .storage()
+            .instance()
+            .get(&DataKey::ShardCapabilities(shard.clone()))
+            .unwrap_or_else(|| Vec::new(&env));
+        if snapshot.is_empty() {
+            return false;
+        }
+        let client = ledgerlens_score::LedgerLensScoreContractClient::new(&env, &shard);
+        for i in 0..snapshot.len() {
+            let cap = snapshot.get(i).unwrap();
+            match client.try_supports_interface(&cap) {
+                Ok(Ok(true)) => {}
+                _ => return true,
+            }
+        }
+        false
     }
 
     /// Infallible, side-effect-free (beyond recording `LastShardFailure`) gate
@@ -626,6 +666,32 @@ impl LedgerLensAggregator {
     }
 }
 
+/// Queries the shard for every capability in the known universe and returns
+/// those it acknowledges.  Used to build the snapshot stored at registration
+/// time.  Unknown/future capabilities are simply absent from the snapshot.
+fn probe_capabilities(env: &Env, shard: &Address) -> Vec<Symbol> {
+    let all_caps = vec![
+        env,
+        Symbol::new(env, "score"),
+        Symbol::new(env, "gate"),
+        Symbol::new(env, "aggr"),
+        Symbol::new(env, "arch"),
+        Symbol::new(env, "federated"),
+        Symbol::new(env, "sbrain"),
+        Symbol::new(env, "health"),
+        Symbol::new(env, "batch_attested"),
+    ];
+    let client = ledgerlens_score::LedgerLensScoreContractClient::new(env, shard);
+    let mut found: Vec<Symbol> = Vec::new(env);
+    for i in 0..all_caps.len() {
+        let cap = all_caps.get(i).unwrap();
+        if let Ok(Ok(true)) = client.try_supports_interface(&cap) {
+            found.push_back(cap);
+        }
+    }
+    found
+}
+
 fn is_shard_healthy(env: &Env, shard: &Address) -> bool {
     env.storage().instance().get(&DataKey::ShardHealth(shard.clone())).unwrap_or(true)
 }
@@ -728,4 +794,9 @@ enum DataKey {
     Shards,
     LastShardFailure,
     ShardHealth(Address),
+    /// Capability snapshot recorded at `add_shard` time.
+    /// Stores a `Vec<Symbol>` of the capabilities the shard advertised via
+    /// `supports_interface` when it was registered.  Used by
+    /// `get_shard_capabilities` and downgrade-detection tests.
+    ShardCapabilities(Address),
 }
