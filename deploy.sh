@@ -50,6 +50,10 @@ while [ "$#" -gt 0 ]; do
       sed -n '3,22p' "$0"
       exit 0
       ;;
+    --canary)
+      CANARY=true
+      shift
+      ;;
     *)
       POSITIONAL+=("$1")
       shift
