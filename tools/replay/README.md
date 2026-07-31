@@ -37,6 +37,28 @@ cargo run -p replay --manifest-path tools/replay/Cargo.toml
 
 The binary expects `testdata/reference.ndjson` relative to the current working directory.
 
+### Configuration drift detection
+
+The same binary can compare an approved deployment manifest against an
+observed live snapshot:
+
+```bash
+cargo run -p replay --manifest-path tools/replay/Cargo.toml -- \
+  config-drift approved.json observed.json
+```
+
+To emit a template containing the supported config surface:
+
+```bash
+cargo run -p replay --manifest-path tools/replay/Cargo.toml -- \
+  config-drift --template
+```
+
+Diff output is deterministic JSON sorted by field name. Unknown approved
+fields, unknown observed fields, missing observed fields, and value drift are
+reported separately so operators can distinguish manifest mistakes from
+unauthorized on-chain changes.
+
 ## Testing
 
 Integration tests verify replay logic and contract call safety:
@@ -56,4 +78,3 @@ cargo test -p replay
 ## CI Integration
 
 The workflow `.github/workflows/replay-regression.yml` runs the replay harness on every PR to detect regressions in score submissions or contract behavior.
-

@@ -10,9 +10,9 @@ use crate::types::{
     DataKeyD, DecayCurve, EmbargoExpiry, FlashProtectionMode, GateDataKey, HllSketch,
     InterpolationMethod, JumpStats, ModelVersionStats, ModelVersionStatus, PairVolatilityState,
     ParamChangeProposal, ParameterProposalRecord, ParameterProposalStatus, PendingScoreEntry,
-    RateLimitOverrideEntry, RiskScore, ScoreDispute, ScoreFloorPolicy, ScoreHistogram, ScoreTrend,
-    ScoreVelocityCap, SignerAccuracyRecord, SubscorePayload, TokenBucket, UpgradeProposal,
-    WelfordCorrState,
+    Policy, PolicyApproval, RateLimitOverrideEntry, RiskScore, ScoreDispute, ScoreFloorPolicy,
+    ScoreHistogram, ScoreTrend, ScoreVelocityCap, SignerAccuracyRecord, SubscorePayload,
+    TokenBucket, UpgradeProposal, WelfordCorrState,
 };
 use soroban_sdk::{Address, Bytes, BytesN, Env, Symbol, Vec};
 
@@ -29,22 +29,36 @@ pub enum DataKey {
 
 // ── Admin / Service ─────────────────────────────────────────────────────────
 
+/// Precondition: none. Postcondition: does not mutate storage.
 pub fn has_admin(env: &Env) -> bool {
     env.storage().instance().has(&DataKey::Admin)
 }
 
+/// Precondition: none — safe to call before or after `initialize`.
+/// Postcondition: overwrites any previously stored admin unconditionally;
+/// callers are responsible for authorization (this function performs none).
 pub fn set_admin(env: &Env, admin: &Address) {
     env.storage().instance().set(&DataKey::Admin, admin);
 }
 
+/// Precondition: `set_admin` must have been called at least once (normally
+/// via `initialize`) — callers must check [`has_admin`] first if the admin
+/// may not yet be set. Panics (unwraps `None`) if no admin has been stored.
+/// Postcondition: does not mutate storage.
 pub fn get_admin(env: &Env) -> Address {
     env.storage().instance().get(&DataKey::Admin).unwrap()
 }
 
+/// Precondition: none — safe to call before or after `initialize`.
+/// Postcondition: overwrites any previously stored service address
+/// unconditionally; callers are responsible for authorization.
 pub fn set_service(env: &Env, service: &Address) {
     env.storage().instance().set(&DataKey::Service, service);
 }
 
+/// Precondition: `set_service` must have been called at least once (normally
+/// via `initialize`). Panics (unwraps `None`) if no service has been stored.
+/// Postcondition: does not mutate storage.
 pub fn get_service(env: &Env) -> Address {
     env.storage().instance().get(&DataKey::Service).unwrap()
 }
@@ -132,6 +146,26 @@ pub fn get_score_entry_index(env: &Env) -> Vec<(Address, Symbol)> {
         );
     }
     index
+}
+
+/// Removes `(wallet, asset_pair)` from the proactive rent-management index.
+/// No-op if the pair is not tracked.
+pub fn remove_score_entry(env: &Env, wallet: &Address, asset_pair: &Symbol) {
+    let entry = (wallet.clone(), asset_pair.clone());
+    let mut index = get_score_entry_index(env);
+    if let Some(pos) = index.first_index_of(&entry) {
+        index.remove(pos);
+        if index.is_empty() {
+            env.storage().persistent().remove(&DataKeyB::ScoreEntryIndex);
+        } else {
+            env.storage().persistent().set(&DataKeyB::ScoreEntryIndex, &index);
+            env.storage().persistent().extend_ttl(
+                &DataKeyB::ScoreEntryIndex,
+                SCORE_TTL_THRESHOLD,
+                SCORE_TTL_EXTEND_TO,
+            );
+        }
+    }
 }
 
 /// Registers `(wallet, asset_pair)` in the rent-management index — if it
@@ -536,6 +570,13 @@ pub fn get_score_history(env: &Env, wallet: &Address, asset_pair: &Symbol) -> Ve
     history
 }
 
+pub fn peek_score_history_len(env: &Env, wallet: &Address, asset_pair: &Symbol) -> u32 {
+    let key = DataKey::ScoreHistory(wallet.clone(), asset_pair.clone());
+    let history: Vec<RiskScore> =
+        env.storage().persistent().get(&key).unwrap_or_else(|| Vec::new(env));
+    history.len()
+}
+
 /// Read-only windowed view into the score-history ring buffer.
 ///
 /// `offset` is 0-indexed from the **most recent** entry (offset `0` == newest);
@@ -619,6 +660,24 @@ pub fn register_pair_for_wallet(env: &Env, wallet: &Address, asset_pair: &Symbol
         env.storage().persistent().set(&key, &pairs);
     }
     env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+}
+
+/// Removes `asset_pair` from the live pair list for `wallet`.
+///
+/// This keeps live-read aggregates and pair counts aligned with the set of
+/// scores that still exist on chain. No-op if the pair is not present.
+pub fn remove_pair_for_wallet(env: &Env, wallet: &Address, asset_pair: &Symbol) {
+    let key = DataKey::AssetPairs(wallet.clone());
+    let mut pairs: Vec<Symbol> = env.storage().persistent().get(&key).unwrap_or_else(|| Vec::new(env));
+    if let Some(pos) = pairs.first_index_of(asset_pair) {
+        pairs.remove(pos);
+        if pairs.is_empty() {
+            env.storage().persistent().remove(&key);
+        } else {
+            env.storage().persistent().set(&key, &pairs);
+            env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+        }
+    }
 }
 
 pub fn get_wallet_pairs(env: &Env, wallet: &Address) -> Vec<Symbol> {
@@ -777,6 +836,41 @@ pub fn prune_expired_parameter_proposals(env: &Env) {
             }
         }
     }
+}
+
+/// Deletes all expired proposals from storage that have been expired for at least 48 hours.
+/// Returns (count_deleted, oldest_proposal_kept_timestamp).
+pub fn cleanup_expired_parameter_proposals(env: &Env) -> (u32, u64) {
+    use soroban_sdk::Env;
+
+    let now = env.ledger().timestamp();
+    let ttl_buffer_secs = 48 * 3600;
+    let mut count = 0;
+    let mut oldest_kept = u64::MAX;
+
+    let next_id = env.storage()
+        .instance()
+        .get::<DataKeyB, u64>(&DataKeyB::ParameterProposalNextId)
+        .unwrap_or(1);
+
+    for id in 1..next_id {
+        if let Some(record) = get_parameter_proposal_record(env, id) {
+            if record.status == ParameterProposalStatus::Expired {
+                let expiry = record.proposal.proposed_at
+                    .saturating_add(record.proposal.time_lock_secs.saturating_mul(2));
+                if now > expiry.saturating_add(ttl_buffer_secs) {
+                    env.storage().persistent().remove(&DataKeyB::ParameterProposal(id));
+                    count += 1;
+                    continue;
+                }
+            }
+            if record.proposal.proposed_at < oldest_kept {
+                oldest_kept = record.proposal.proposed_at;
+            }
+        }
+    }
+
+    (count, if oldest_kept == u64::MAX { now } else { oldest_kept })
 }
 
 /// Seeds `count` pending proposals directly in storage for cap tests without
@@ -1035,6 +1129,44 @@ pub fn clear_score_history(env: &Env, wallet: &Address, asset_pair: &Symbol) {
 pub fn clear_score(env: &Env, wallet: &Address, asset_pair: &Symbol) {
     let key = DataKey::Score(wallet.clone(), asset_pair.clone());
     env.storage().persistent().remove(&key);
+}
+
+pub fn get_deletion_approval_policy(env: &Env) -> DeletionApprovalPolicy {
+    let enabled = env.storage().instance().get(&DataKeyD::DeletionPolicyEnabled).unwrap_or(false);
+    let approver = env.storage().instance().get(&DataKeyD::DeletionApprover);
+    DeletionApprovalPolicy { enabled, approver }
+}
+
+pub fn set_deletion_approval_policy(
+    env: &Env,
+    policy: &DeletionApprovalPolicy,
+) {
+    env.storage().instance().set(&DataKeyD::DeletionPolicyEnabled, &policy.enabled);
+    match &policy.approver {
+        Some(approver) => env.storage().instance().set(&DataKeyD::DeletionApprover, approver),
+        None => env.storage().instance().remove(&DataKeyD::DeletionApprover),
+    }
+}
+
+/// Reads the separate-approver policy for one of the four `Policy`
+/// variants other than `DataDeletion` (issue #695). Defaults to
+/// `enabled = false, approver = None` until configured via
+/// `set_policy_approval`.
+pub fn get_policy_approval(env: &Env, policy: Policy) -> PolicyApproval {
+    let enabled =
+        env.storage().instance().get(&DataKeyD::PolicyApprovalEnabled(policy)).unwrap_or(false);
+    let approver = env.storage().instance().get(&DataKeyD::PolicyApprovalApprover(policy));
+    PolicyApproval { enabled, approver }
+}
+
+pub fn set_policy_approval(env: &Env, policy: Policy, approval: &PolicyApproval) {
+    env.storage().instance().set(&DataKeyD::PolicyApprovalEnabled(policy), &approval.enabled);
+    match &approval.approver {
+        Some(approver) => {
+            env.storage().instance().set(&DataKeyD::PolicyApprovalApprover(policy), approver)
+        }
+        None => env.storage().instance().remove(&DataKeyD::PolicyApprovalApprover(policy)),
+    }
 }
 
 // ── Score count ──────────────────────────────────────────────────────────────
@@ -2809,6 +2941,24 @@ pub fn clear_pending_service_pubkey(env: &Env) {
     env.storage().instance().remove(&DataKeyD::PendingServicePubKey);
 }
 
+// ── Aggregate (threshold-signature) service pubkey rotation overlap window ────
+// Mirrors the single-signer overlap window above; see `rotate_aggregate_service_pubkey`
+// and `verify_threshold_attestation` (issue #697).
+
+pub fn get_pending_aggregate_service_pubkey(env: &Env) -> Option<(Bytes, u64)> {
+    env.storage().instance().get(&DataKeyD::PendingAggregateServicePubKey)
+}
+
+pub fn set_pending_aggregate_service_pubkey(env: &Env, new_key: &Bytes, expiry: u64) {
+    env.storage()
+        .instance()
+        .set(&DataKeyD::PendingAggregateServicePubKey, &(new_key.clone(), expiry));
+}
+
+pub fn clear_pending_aggregate_service_pubkey(env: &Env) {
+    env.storage().instance().remove(&DataKeyD::PendingAggregateServicePubKey);
+}
+
 /// Compares a recovered 65-byte uncompressed secp256k1 pubkey against a
 /// stored pubkey, which may be either the same 65-byte uncompressed form or
 /// the 33-byte compressed form.
@@ -2872,6 +3022,24 @@ pub fn clear_pending_param_change(env: &Env, key: &Symbol) {
     env.storage().instance().remove(&DataKeyD::PendingParamChange(key.clone()));
 }
 
+// ── Policy bundles (risk threshold + cooldown, activated atomically) ──────────
+
+pub fn has_pending_policy_bundle(env: &Env) -> bool {
+    env.storage().instance().has(&DataKeyD::PendingPolicyBundle)
+}
+
+pub fn set_pending_policy_bundle(env: &Env, proposal: &PolicyBundleProposal) {
+    env.storage().instance().set(&DataKeyD::PendingPolicyBundle, proposal);
+}
+
+pub fn get_pending_policy_bundle(env: &Env) -> Option<PolicyBundleProposal> {
+    env.storage().instance().get(&DataKeyD::PendingPolicyBundle)
+}
+
+pub fn clear_pending_policy_bundle(env: &Env) {
+    env.storage().instance().remove(&DataKeyD::PendingPolicyBundle);
+}
+
 pub fn get_param_change_delay(env: &Env) -> u64 {
     crate::constants::DEFAULT_PARAM_CHANGE_DELAY_SECS
 }
@@ -2900,7 +3068,7 @@ pub fn get_accumulated_fees(env: &Env) -> i128 {
     env.storage().instance().get(&GateDataKey::AccumulatedFees).unwrap_or(0)
 }
 
-pub fn set_arch_owner(env: &Env, owner: &Address) {
+ pub fn set_arch_owner(env: &Env, owner: &Address) {
     env.storage().instance().set(&DataKey::ArchOwner, owner);
 }
 
