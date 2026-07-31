@@ -20,6 +20,8 @@ def test_load_pair_to_dataframe_filters_correctly(mock_fetch):
     from stellar_sdk import Asset as SdkAsset
 
     usdc_issuer = "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN"
+    base_account = "GCGPQMCLRXCUPCL3AVMYUUQML2WVC7A5M6HO5RKYSU4CIA7O7SI4VKWE"
+    counter_account = "GB2HHLFDCBSBDAMU2QRDU4AJV63WQE2DWT7MBZWZRQDFYUXJXIPPUG7M"
     xlm = SdkAsset.native()
     usdc = SdkAsset("USDC", usdc_issuer)
 
@@ -27,8 +29,8 @@ def test_load_pair_to_dataframe_filters_correctly(mock_fetch):
         "id": "t1",
         "paging_token": "1",
         "ledger_close_time": "2024-01-01T00:00:00Z",
-        "base_account": "GA",
-        "counter_account": "GB",
+        "base_account": base_account,
+        "counter_account": counter_account,
         "base_asset_type": "credit_alphanum4",
         "base_asset_code": "USDC",
         "base_asset_issuer": usdc_issuer,
@@ -47,8 +49,8 @@ def test_load_pair_to_dataframe_filters_correctly(mock_fetch):
 
     assert not result.empty
     assert len(result) == 1
-    assert result.iloc[0]["base_account"] == "GA"
-    assert result.iloc[0]["counter_account"] == "GB"
+    assert result.iloc[0]["base_account"] == base_account
+    assert result.iloc[0]["counter_account"] == counter_account
 
 
 # ---------------------------------------------------------------------------

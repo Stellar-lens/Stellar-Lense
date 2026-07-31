@@ -1,170 +1,353 @@
-"""Tests for detection/artifact_compatibility.py and scripts/check_artifact_compatibility.py
-(Issue #510)."""
+"""Tests for the artifact compatibility gate and manifest system."""
+
+"""Tests for the artifact compatibility gate and manifest system."""
 
 import json
+import os
+import sys
 
-from detection.artifact_compatibility import (
-    check_backward_compatibility,
-    parse_version,
+import joblib
+import pytest
+from sklearn.ensemble import RandomForestClassifier
+
+# Import directly without going through detection.__init__ to avoid pulling in
+# every transitive dependency of the full package.
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+from detection.artifact_compatibility import (  # noqa: E402
+    ARTIFACT_SCHEMA_VERSION,
+    ARTIFACT_SCHEMA_VERSION_MAJOR,
+    ArtifactCompatibilityError,
+    ArtifactCompatibilityGate,
+    ArtifactManifest,
+    build_manifest,
+    check_artifact_compatibility,
+    load_model_with_compatibility,
+    write_artifact_manifest,
+    _parse_version,
 )
-from scripts.check_artifact_compatibility import main as check_artifact_compatibility_main
-
-BASE_METADATA = {
-    "feature_schema_hash": "sha256:abc",
-    "feature_columns": ["trade_count", "benford_score"],
-    "ledgerlens_version": "0.2.0",
-}
-BASE_METRICS = {"rf": {"auc_roc": 0.90}}
 
 
-def test_identical_artifacts_are_compatible():
-    report = check_backward_compatibility(BASE_METADATA, dict(BASE_METADATA))
-    assert report.compatible
-    assert bool(report) is True
-    assert not report.breaking
+class TestVersionParsing:
+    def test_parse_full_version(self):
+        assert _parse_version("v1.0") == (1, 0)
+
+    def test_parse_major_only(self):
+        assert _parse_version("v2") == (2, 0)
+
+    def test_parse_no_v_prefix(self):
+        assert _parse_version("1.5") == (1, 5)
+
+    def test_parse_invalid(self):
+        assert _parse_version("invalid") == (0, 0)
+
+    def test_parse_empty(self):
+        assert _parse_version("") == (0, 0)
 
 
-def test_removed_feature_column_is_breaking():
-    new_metadata = dict(BASE_METADATA, feature_columns=["trade_count"])
-    report = check_backward_compatibility(BASE_METADATA, new_metadata)
-    assert not report.compatible
-    assert any(i.field == "feature_columns" for i in report.breaking)
+class TestArtifactManifest:
+    def test_build_manifest(self):
+        manifest = ArtifactManifest(
+            model_name="random_forest",
+            feature_schema_hash="sha256:abc123",
+            feature_columns=["feat_a", "feat_b"],
+        )
+        assert manifest.model_name == "random_forest"
+        assert manifest.artifact_schema_version == ARTIFACT_SCHEMA_VERSION
+
+    def test_round_trip_json(self, tmp_path):
+        original = ArtifactManifest(
+            model_name="xgboost",
+            artifact_schema_version="v1.0",
+            trained_at="2026-01-01T00:00:00Z",
+            feature_schema_hash="sha256:def456",
+            feature_columns=["col1", "col2"],
+            python_version="3.11.0",
+            dependencies={"scikit-learn": "1.4.0"},
+            n_training_samples=1000,
+        )
+        data = original.to_json()
+        restored = ArtifactManifest.from_json(data)
+        assert restored.model_name == original.model_name
+        assert restored.feature_schema_hash == original.feature_schema_hash
+        assert restored.n_training_samples == original.n_training_samples
+
+    def test_save_and_load(self, tmp_path):
+        manifest = ArtifactManifest(
+            model_name="lightgbm",
+            feature_schema_hash="sha256:789ghi",
+            feature_columns=["col_a"],
+        )
+        manifest.save(str(tmp_path))
+
+        loaded = ArtifactManifest.load(str(tmp_path), "lightgbm")
+        assert loaded.model_name == "lightgbm"
+        assert loaded.feature_schema_hash == "sha256:789ghi"
+
+    def test_load_missing_manifest(self, tmp_path):
+        with pytest.raises(ArtifactCompatibilityError):
+            ArtifactManifest.load(str(tmp_path), "nonexistent")
 
 
-def test_added_feature_column_is_only_a_warning():
-    new_metadata = dict(
-        BASE_METADATA, feature_columns=["trade_count", "benford_score", "new_feature"]
-    )
-    report = check_backward_compatibility(BASE_METADATA, new_metadata)
-    assert report.compatible
-    assert any(i.field == "feature_columns" for i in report.warnings)
+class TestCheckArtifactCompatibility:
+    def test_perfect_match(self):
+        manifest = ArtifactManifest(
+            model_name="rf",
+            artifact_schema_version=ARTIFACT_SCHEMA_VERSION,
+            feature_schema_hash="sha256:match",
+            feature_columns=["a", "b"],
+            python_version=sys.version.split()[0],
+        )
+        report = check_artifact_compatibility(
+            manifest,
+            expected_feature_schema_hash="sha256:match",
+            expected_feature_columns=["a", "b"],
+            expected_python_version=sys.version.split()[0],
+        )
+        assert report.passed
+        assert len(report.errors) == 0
+
+    def test_major_version_mismatch(self):
+        manifest = ArtifactManifest(
+            model_name="rf",
+            artifact_schema_version="v99.0",
+            feature_schema_hash="sha256:x",
+        )
+        report = check_artifact_compatibility(manifest)
+        assert not report.passed
+        assert any("schema version mismatch" in e.lower() for e in report.errors)
+
+    def test_feature_hash_mismatch(self):
+        manifest = ArtifactManifest(
+            model_name="rf",
+            artifact_schema_version=ARTIFACT_SCHEMA_VERSION,
+            feature_schema_hash="sha256:old_hash",
+            feature_columns=["a", "b"],
+        )
+        report = check_artifact_compatibility(
+            manifest,
+            expected_feature_schema_hash="sha256:new_hash",
+        )
+        assert not report.passed
+        assert any("hash mismatch" in e.lower() for e in report.errors)
+
+    def test_missing_feature_columns(self):
+        manifest = ArtifactManifest(
+            model_name="rf",
+            artifact_schema_version=ARTIFACT_SCHEMA_VERSION,
+            feature_schema_hash="sha256:x",
+            feature_columns=["a"],
+        )
+        report = check_artifact_compatibility(
+            manifest,
+            expected_feature_columns=["a", "b"],
+        )
+        assert not report.passed
+        assert any("missing" in e.lower() for e in report.errors)
+
+    def test_extra_feature_columns_warning(self):
+        common_hash = "sha256:abc123def456"
+        manifest = ArtifactManifest(
+            model_name="rf",
+            artifact_schema_version=ARTIFACT_SCHEMA_VERSION,
+            feature_schema_hash=common_hash,
+            feature_columns=["a", "b", "c"],
+        )
+        report = check_artifact_compatibility(
+            manifest,
+            expected_feature_schema_hash=common_hash,
+            expected_feature_columns=["a", "b"],
+        )
+        assert report.passed
+        assert any("missing from runtime" in w.lower() for w in report.warnings)
+
+    def test_minor_version_ahead(self):
+        manifest = ArtifactManifest(
+            model_name="rf",
+            artifact_schema_version=f"v{ARTIFACT_SCHEMA_VERSION_MAJOR}.99",
+            feature_schema_hash="sha256:x",
+        )
+        report = check_artifact_compatibility(manifest)
+        assert report.passed
+        assert any("newer" in w.lower() for w in report.warnings)
 
 
-def test_missing_required_field_is_breaking():
-    new_metadata = {"feature_columns": ["trade_count"]}
-    report = check_backward_compatibility(BASE_METADATA, new_metadata)
-    assert not report.compatible
-    breaking_fields = {i.field for i in report.breaking}
-    assert "feature_schema_hash" in breaking_fields
-    assert "ledgerlens_version" in breaking_fields
+class TestArtifactCompatibilityGate:
+    def test_gate_with_valid_manifest(self, tmp_path):
+        model_dir = str(tmp_path)
+
+        meta = {
+            "feature_schema_hash": "sha256:abc",
+            "feature_columns": ["x", "y"],
+            "trained_at": "2026-01-01T00:00:00Z",
+        }
+        with open(os.path.join(model_dir, "model_metadata.json"), "w") as f:
+            json.dump(meta, f)
+
+        manifest = ArtifactManifest(
+            model_name="random_forest",
+            artifact_schema_version=ARTIFACT_SCHEMA_VERSION,
+            feature_schema_hash="sha256:abc",
+            feature_columns=["x", "y"],
+        )
+        manifest.save(model_dir)
+
+        gate = ArtifactCompatibilityGate(model_dir)
+        report = gate.check("random_forest")
+        assert report.passed, f"Gate failed: {report.errors}"
+
+    def test_gate_without_metadata(self, tmp_path):
+        gate = ArtifactCompatibilityGate(str(tmp_path))
+        report = gate.check("random_forest")
+        assert report.passed
+
+    def test_gate_without_manifest(self, tmp_path):
+        model_dir = str(tmp_path)
+        meta = {
+            "feature_schema_hash": "sha256:abc",
+            "feature_columns": ["x", "y"],
+        }
+        with open(os.path.join(model_dir, "model_metadata.json"), "w") as f:
+            json.dump(meta, f)
+
+        gate = ArtifactCompatibilityGate(model_dir)
+        report = gate.check("random_forest")
+        assert not report.passed
+        assert any("manifest not found" in e.lower() for e in report.errors)
 
 
-def test_version_regression_is_breaking():
-    new_metadata = dict(BASE_METADATA, ledgerlens_version="0.1.9")
-    report = check_backward_compatibility(BASE_METADATA, new_metadata)
-    assert not report.compatible
-    assert any(i.field == "ledgerlens_version" for i in report.breaking)
+class TestBuildManifest:
+    def test_build_manifest_with_real_file(self, tmp_path):
+        model_path = os.path.join(str(tmp_path), "test.joblib")
+        joblib.dump(RandomForestClassifier(), model_path)
+
+        manifest = build_manifest(
+            model_name="test_model",
+            model_path=model_path,
+            feature_columns=["a", "b"],
+            feature_schema_hash="sha256:test",
+            n_training_samples=500,
+        )
+        assert manifest.model_name == "test_model"
+        assert manifest.artifact_sha256 != ""
+        assert manifest.n_training_samples == 500
+        assert "scikit-learn" in manifest.dependencies
+
+    def test_manifest_persistence(self, tmp_path):
+        model_path = os.path.join(str(tmp_path), "rf.joblib")
+        joblib.dump(RandomForestClassifier(), model_path)
+
+        written = write_artifact_manifest(
+            model_name="rf",
+            model_path=model_path,
+            feature_columns=["a", "b"],
+            feature_schema_hash="sha256:xyz",
+            model_dir=str(tmp_path),
+            n_training_samples=100,
+        )
+        assert os.path.exists(written)
+
+        loaded = ArtifactManifest.load(str(tmp_path), "rf")
+        assert loaded.artifact_sha256 != ""
 
 
-def test_version_bump_is_fine():
-    new_metadata = dict(BASE_METADATA, ledgerlens_version="0.3.0")
-    report = check_backward_compatibility(BASE_METADATA, new_metadata)
-    assert report.compatible
+class TestLoadModelWithCompatibility:
+    def test_load_with_compatibility_success(self, tmp_path):
+        model_dir = str(tmp_path)
+        model = RandomForestClassifier()
+        model.fit([[0, 0], [1, 1]], [0, 1])
 
+        meta = {
+            "feature_schema_hash": "sha256:abc",
+            "feature_columns": ["x", "y"],
+        }
+        with open(os.path.join(model_dir, "model_metadata.json"), "w") as f:
+            json.dump(meta, f)
 
-def test_metric_regression_within_budget_is_a_warning():
-    new_metrics = {"rf": {"auc_roc": 0.885}}  # 0.015 drop, budget 0.02
-    report = check_backward_compatibility(
-        BASE_METADATA, dict(BASE_METADATA), BASE_METRICS, new_metrics
-    )
-    assert report.compatible
-    assert any(i.field == "metrics.rf.auc_roc" for i in report.warnings)
+        model_path = os.path.join(model_dir, "test_model.joblib")
+        joblib.dump(model, model_path)
 
+        manifest = ArtifactManifest(
+            model_name="test_model",
+            artifact_schema_version=ARTIFACT_SCHEMA_VERSION,
+            feature_schema_hash="sha256:abc",
+            feature_columns=["x", "y"],
+        )
+        manifest.save(model_dir)
 
-def test_metric_regression_beyond_budget_is_breaking():
-    new_metrics = {"rf": {"auc_roc": 0.80}}  # 0.10 drop
-    report = check_backward_compatibility(
-        BASE_METADATA, dict(BASE_METADATA), BASE_METRICS, new_metrics
-    )
-    assert not report.compatible
-    assert any(i.field == "metrics.rf.auc_roc" for i in report.breaking)
+        loaded = load_model_with_compatibility(
+            "test_model",
+            model_dir=model_dir,
+            strict=True,
+        )
+        assert loaded is not None
 
+    def test_load_with_compatibility_blocks_mismatch(self, tmp_path):
+        model_dir = str(tmp_path)
+        model = RandomForestClassifier()
+        model.fit([[0, 0], [1, 1]], [0, 1])
 
-def test_metric_improvement_raises_no_issue():
-    new_metrics = {"rf": {"auc_roc": 0.95}}
-    report = check_backward_compatibility(
-        BASE_METADATA, dict(BASE_METADATA), BASE_METRICS, new_metrics
-    )
-    assert report.compatible
-    assert not report.issues
+        meta = {
+            "feature_schema_hash": "sha256:old_hash",
+            "feature_columns": ["x", "y"],
+        }
+        with open(os.path.join(model_dir, "model_metadata.json"), "w") as f:
+            json.dump(meta, f)
 
+        model_path = os.path.join(model_dir, "bad.joblib")
+        joblib.dump(model, model_path)
 
-def test_parse_version_handles_prerelease_suffix():
-    assert parse_version("0.2.0") == (0, 2, 0)
-    assert parse_version("1.10.2") > parse_version("1.9.9")
-    assert parse_version("0.2.0-rc1") == (0, 2, 0)
+        manifest = ArtifactManifest(
+            model_name="bad",
+            artifact_schema_version=ARTIFACT_SCHEMA_VERSION,
+            feature_schema_hash="sha256:old_hash",
+            feature_columns=["x", "y"],
+        )
+        manifest.save(model_dir)
 
+        with pytest.raises(ArtifactCompatibilityError):
+            load_model_with_compatibility(
+                "bad",
+                model_dir=model_dir,
+                expected_hash="sha256:different_hash",
+                strict=True,
+            )
 
-def test_report_format_lists_all_issues():
-    new_metadata = dict(BASE_METADATA, feature_columns=["trade_count"])
-    report = check_backward_compatibility(BASE_METADATA, new_metadata)
-    text = report.format()
-    assert "INCOMPATIBLE" in text
-    assert "BREAKING" in text
+    def test_load_nonexistent_model(self, tmp_path):
+        with pytest.raises(FileNotFoundError):
+            load_model_with_compatibility(
+                "nonexistent",
+                model_dir=str(tmp_path),
+                strict=True,
+            )
 
+    def test_load_non_strict_fallback(self, tmp_path):
+        model_dir = str(tmp_path)
+        model = RandomForestClassifier()
+        model.fit([[0, 0], [1, 1]], [0, 1])
 
-# ---------------------------------------------------------------------------
-# CLI (scripts/check_artifact_compatibility.py)
-# ---------------------------------------------------------------------------
+        meta = {
+            "feature_schema_hash": "sha256:hash_a",
+            "feature_columns": ["x", "y"],
+        }
+        with open(os.path.join(model_dir, "model_metadata.json"), "w") as f:
+            json.dump(meta, f)
 
+        model_path = os.path.join(model_dir, "ns.joblib")
+        joblib.dump(model, model_path)
 
-def _write_artifact(tmp_dir, metadata=None, metrics=None):
-    tmp_dir.mkdir(parents=True, exist_ok=True)
-    if metadata is not None:
-        (tmp_dir / "model_metadata.json").write_text(json.dumps(metadata))
-    if metrics is not None:
-        (tmp_dir / "metrics.json").write_text(json.dumps(metrics))
+        manifest = ArtifactManifest(
+            model_name="ns",
+            artifact_schema_version=ARTIFACT_SCHEMA_VERSION,
+            feature_schema_hash="sha256:hash_a",
+            feature_columns=["x", "y"],
+        )
+        manifest.save(model_dir)
 
-
-def test_cli_skips_when_no_baseline(tmp_path, capsys):
-    baseline_dir = tmp_path / "baseline"
-    candidate_dir = tmp_path / "candidate"
-    _write_artifact(candidate_dir, BASE_METADATA, BASE_METRICS)
-
-    exit_code = check_artifact_compatibility_main(
-        ["--baseline-dir", str(baseline_dir), "--candidate-dir", str(candidate_dir)]
-    )
-
-    assert exit_code == 0
-    assert "skipping" in capsys.readouterr().out.lower()
-
-
-def test_cli_fails_when_candidate_missing_metadata(tmp_path):
-    baseline_dir = tmp_path / "baseline"
-    candidate_dir = tmp_path / "candidate"
-    _write_artifact(baseline_dir, BASE_METADATA, BASE_METRICS)
-    candidate_dir.mkdir()
-
-    exit_code = check_artifact_compatibility_main(
-        ["--baseline-dir", str(baseline_dir), "--candidate-dir", str(candidate_dir)]
-    )
-
-    assert exit_code == 2
-
-
-def test_cli_exits_nonzero_on_incompatible_change(tmp_path):
-    baseline_dir = tmp_path / "baseline"
-    candidate_dir = tmp_path / "candidate"
-    _write_artifact(baseline_dir, BASE_METADATA, BASE_METRICS)
-    _write_artifact(
-        candidate_dir, dict(BASE_METADATA, feature_columns=["trade_count"]), BASE_METRICS
-    )
-
-    exit_code = check_artifact_compatibility_main(
-        ["--baseline-dir", str(baseline_dir), "--candidate-dir", str(candidate_dir)]
-    )
-
-    assert exit_code == 1
-
-
-def test_cli_exits_zero_on_compatible_change(tmp_path):
-    baseline_dir = tmp_path / "baseline"
-    candidate_dir = tmp_path / "candidate"
-    _write_artifact(baseline_dir, BASE_METADATA, BASE_METRICS)
-    _write_artifact(candidate_dir, dict(BASE_METADATA), BASE_METRICS)
-
-    exit_code = check_artifact_compatibility_main(
-        ["--baseline-dir", str(baseline_dir), "--candidate-dir", str(candidate_dir)]
-    )
-
-    assert exit_code == 0
+        loaded = load_model_with_compatibility(
+            "ns",
+            model_dir=model_dir,
+            expected_hash="sha256:wrong",
+            strict=False,
+        )
+        assert loaded is not None

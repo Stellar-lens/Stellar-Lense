@@ -22,11 +22,13 @@ import urllib.request
 from collections import deque
 from collections.abc import Iterator
 
+from pydantic import ValidationError
 from stellar_sdk import Asset as SdkAsset
 from stellar_sdk import Server
 
 from config import config
 from ingestion.data_models import Asset, Trade
+from ingestion.exceptions import InvalidInputError, RecordValidationError, record_context
 from utils.logging import get_logger
 from utils.tracing import get_tracer, hash_span_id
 
@@ -89,6 +91,24 @@ class HorizonEndpointPool:
         )
         self._health_thread.start()
 
+        self._health_monitor = WorkerHealthMonitor(
+            "horizon_endpoint_pool",
+            health_check_fn=self._get_health_status,
+        )
+        get_health_registry().register(self._health_monitor)
+
+    def _get_health_status(self) -> tuple[HealthStatus, str | None]:
+        with self._lock:
+            healthy_count = sum(1 for h in self._healthy.values() if h)
+            total = len(self._urls)
+
+        if healthy_count == total:
+            return HealthStatus.HEALTHY, f"All {total} endpoints healthy"
+        elif healthy_count > 0:
+            return HealthStatus.DEGRADED, f"{healthy_count}/{total} endpoints healthy"
+        else:
+            return HealthStatus.UNHEALTHY, "All Horizon endpoints unhealthy"
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
@@ -118,6 +138,7 @@ class HorizonEndpointPool:
 
     def stop(self) -> None:
         self._stop_event.set()
+        self._health_monitor.mark_stopped("HorizonEndpointPool stopped")
 
     # ------------------------------------------------------------------
     # Internal
@@ -128,9 +149,11 @@ class HorizonEndpointPool:
         for url in urls:
             parsed = urllib.parse.urlparse(url)
             if parsed.scheme == "http" and not self._dev_mode:
-                raise ValueError(
+                raise InvalidInputError(
                     f"Horizon endpoint {url!r} uses HTTP — only HTTPS is allowed "
-                    "(set HORIZON_DEV_MODE=1 to allow HTTP in development)"
+                    "(set HORIZON_DEV_MODE=1 to allow HTTP in development)",
+                    source="horizon_streamer.HorizonEndpointPool._validate_urls",
+                    reason="non-HTTPS Horizon endpoint rejected outside dev mode",
                 )
             validated.append(url)
         return validated
@@ -196,23 +219,30 @@ def _get_pool() -> HorizonEndpointPool | None:
 
 
 def _to_trade(record: dict) -> Trade:
-    return Trade(
-        trade_id=record["id"],
-        ledger_close_time=record["ledger_close_time"],
-        base_account=record["base_account"],
-        counter_account=record["counter_account"],
-        base_asset=Asset(
-            code=record["base_asset_code"] or "XLM",
-            issuer=record.get("base_asset_issuer"),
-        ),
-        counter_asset=Asset(
-            code=record["counter_asset_code"] or "XLM",
-            issuer=record.get("counter_asset_issuer"),
-        ),
-        base_amount=float(record["base_amount"]),
-        counter_amount=float(record["counter_amount"]),
-        price=float(record["price"]["n"]) / float(record["price"]["d"]),
-    )
+    """Build a :class:`Trade` from a raw Horizon trade record.
+
+    Raises:
+        RecordValidationError: If the record is missing fields, has wrong-typed
+            values, or otherwise fails ``Trade`` validation.
+    """
+    with record_context("horizon_streamer._to_trade", record):
+        return Trade(
+            trade_id=record["id"],
+            ledger_close_time=record["ledger_close_time"],
+            base_account=record["base_account"],
+            counter_account=record["counter_account"],
+            base_asset=Asset(
+                code=record["base_asset_code"] or "XLM",
+                issuer=record.get("base_asset_issuer"),
+            ),
+            counter_asset=Asset(
+                code=record["counter_asset_code"] or "XLM",
+                issuer=record.get("counter_asset_issuer"),
+            ),
+            base_amount=float(record["base_amount"]),
+            counter_amount=float(record["counter_amount"]),
+            price=float(record["price"]["n"]) / float(record["price"]["d"]),
+        )
 
 
 def stream_trades(
@@ -220,6 +250,8 @@ def stream_trades(
     counter_asset: SdkAsset,
     cursor: str = "now",
     max_reconnect_attempts: int = 5,
+    cursor_store: BaseCursorStore | None = None,
+    stream_id: str | None = None,
 ) -> Iterator[Trade]:
     """Yield `Trade` objects as they are streamed from Horizon.
 
@@ -230,11 +262,17 @@ def stream_trades(
     ledger cursor is preserved across failover so no events are missed or
     duplicated.
 
-    Without failover URLs this behaves identically to the original single-endpoint
-    implementation.
+    When a ``cursor_store`` is provided (or if default config cursor store is active),
+    the streaming cursor is automatically restored on restart and saved on each event.
     """
     pool = _get_pool()
     attempts = 0
+
+    active_stream_id = stream_id or f"trades:{base_asset.code}:{counter_asset.code}"
+    active_store = cursor_store or get_cursor_store()
+
+    # Restore persisted cursor if available
+    cursor = active_store.get_cursor(active_stream_id, default=cursor)
 
     while True:
         horizon_url = pool.best_url() if pool is not None else config.HORIZON_URL
@@ -242,13 +280,34 @@ def stream_trades(
         call_builder = server.trades().for_asset_pair(base_asset, counter_asset).cursor(cursor)
         try:
             for response in call_builder.stream():
-                trade = _to_trade(response)
                 with _tracer.start_as_current_span("trade_event.received") as span:
+                    try:
+                        trade = _to_trade(response)
+                    except RecordValidationError as exc:
+                        # Only scrubbed fields reach the span: this module's
+                        # tracing contract forbids raw wallet addresses and
+                        # amounts, and a pydantic validation message embeds the
+                        # offending input value. Full context goes to the log.
+                        span.set_attribute("error", True)
+                        span.set_attribute("error.type", type(exc).__name__)
+                        span.set_attribute("error.source", exc.source or "")
+                        logger.error(
+                            "Malformed trade record on %s: %s",
+                            horizon_url,
+                            exc,
+                            extra={"context": exc.context},
+                        )
+                        raise
                     span.set_attribute("trade.id", hash_span_id(trade.trade_id))
                     span.set_attribute("trade.base_asset", trade.base_asset.code)
                     span.set_attribute("trade.counter_asset", trade.counter_asset.code)
                 yield trade
                 cursor = response["paging_token"]
+                active_store.save_cursor(
+                    active_stream_id,
+                    cursor,
+                    metadata={"trade_id": trade.trade_id, "timestamp": time.time()},
+                )
                 attempts = 0
         except (ConnectionError, TimeoutError, OSError) as exc:
             attempts += 1
@@ -273,7 +332,11 @@ def stream_all_watched_pairs() -> Iterator[Trade]:
     its own task/thread rather than interleaving here.
     """
     if not config.WATCHED_ASSET_PAIRS:
-        raise ValueError("WATCHED_ASSET_PAIRS is not configured")
+        raise InvalidInputError(
+            "WATCHED_ASSET_PAIRS is not configured",
+            source="horizon_streamer.stream_all_watched_pairs",
+            reason="WATCHED_ASSET_PAIRS is empty",
+        )
 
     streams = []
     for code, issuer in config.WATCHED_ASSET_PAIRS:
