@@ -8809,6 +8809,10 @@ impl LedgerLensScoreContract {
         }
         set.push_back(signer);
         storage::set_admin_set(&env, &set);
+        // Invalidate any partially-accumulated upgrade approvals: they were
+        // collected under the old signer set and must not carry over to the
+        // new one (signer-set snapshot invalidation — issue #1).
+        storage::clear_upgrade_approvals(&env);
         Ok(())
     }
 
@@ -8837,6 +8841,10 @@ impl LedgerLensScoreContract {
         } else if threshold > set.len() {
             storage::set_admin_threshold(&env, set.len());
         }
+        // Invalidate any partially-accumulated upgrade approvals: approvals from
+        // a signer that was just removed must not count toward the new threshold
+        // (signer-set snapshot invalidation — issue #1).
+        storage::clear_upgrade_approvals(&env);
         Ok(())
     }
 
