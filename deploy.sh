@@ -23,6 +23,7 @@ set -euo pipefail
 DRY_RUN=false
 CHECK_TOOLCHAIN_ONLY=false
 MANIFEST_OVERRIDE=""
+CANARY=false
 POSITIONAL=()
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 
@@ -44,6 +45,10 @@ while [ "$#" -gt 0 ]; do
     --help)
       sed -n '3,22p' "$0"
       exit 0
+      ;;
+    --canary)
+      CANARY=true
+      shift
       ;;
     *)
       POSITIONAL+=("$1")
@@ -275,7 +280,7 @@ else
 fi
 
 log "Initializing contract (admin=$ADMIN_ADDRESS, service=$SERVICE_ADDRESS)"
-run "$CLI_BIN" contract invoke \
+if ! run "$CLI_BIN" contract invoke \
   --id "$CONTRACT_ID" \
   --source "$ADMIN_IDENTITY" \
   --rpc-url "$RPC_URL" \
@@ -317,6 +322,47 @@ if [ "$DRY_RUN" = false ]; then
     }
 
   log "Contract version: $CONTRACT_VERSION"
+
+  # ── Canary checks (testnet only) ──────────────────────────────────────────
+  if [ "$CANARY" = true ] && [ "$NETWORK" = "testnet" ]; then
+    log "Running canary checks for post-incident reconciliation (#631)..."
+
+    # Check supported interfaces
+    for cap in checksum snapshot freeze export_score reconcile; do
+      RESULT=$(soroban contract invoke \
+        --id "$CONTRACT_ID" \
+        --source "$ADMIN_IDENTITY" \
+        --network "$NETWORK" \
+        -- \
+        supports_interface \
+        --capability "\"$cap\"" 2>/dev/null || echo "false")
+      if echo "$RESULT" | grep -q "true"; then
+        log "  ✅ Interface '$cap' supported"
+      else
+        echo "  ⚠ WARNING: Interface '$cap' not supported" >&2
+      fi
+    done
+
+    # Verify freeze/unfreeze cycle
+    log "  Testing freeze/unfreeze cycle..."
+    soroban contract invoke \
+      --id "$CONTRACT_ID" \
+      --source "$ADMIN_IDENTITY" \
+      --network "$NETWORK" \
+      -- \
+      freeze_contract \
+      --admin_signants "[\"$ADMIN_ADDRESS\"]" 2>/dev/null && log "  ✅ freeze_contract OK" || echo "  ⚠ freeze_contract failed" >&2
+
+    soroban contract invoke \
+      --id "$CONTRACT_ID" \
+      --source "$ADMIN_IDENTITY" \
+      --network "$NETWORK" \
+      -- \
+      unfreeze_contract \
+      --admin_signants "[\"$ADMIN_ADDRESS\"]" 2>/dev/null && log "  ✅ unfreeze_contract OK" || echo "  ⚠ unfreeze_contract failed" >&2
+
+    log "Canary checks complete."
+  fi
 fi
 
 # ── Summary ───────────────────────────────────────────────────────────────────
