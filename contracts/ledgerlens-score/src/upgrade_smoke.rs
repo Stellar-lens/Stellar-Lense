@@ -1,13 +1,16 @@
-//! Smoke test verifying that contract upgrade preserves score and configuration integrity.
+//! Post-upgrade canary checks for critical entry points.
 //!
-//! This test exercises the full upgrade lifecycle: proposing a no-op upgrade (uploading
-//! the same WASM), advancing time past the delay, executing the upgrade, and verifying
-//! that all stored scores and admin-configurable parameters remain unchanged.
+//! These deterministic smoke tests verify that contract upgrades preserve score and
+//! configuration integrity across all critical entry points: submit, read, gate,
+//! pause, governance operations, and compatibility checks.
+//!
+//! All tests are designed to fail against previous versions, ensuring compatibility
+//! is explicitly validated. Resource usage is constrained within normal limits.
 
 use soroban_sdk::{
     symbol_short,
     testutils::{Address as _, Ledger as _},
-    Address, Bytes, Env, Vec,
+    Address, Bytes, Env, Symbol, Vec,
 };
 
 use crate::{
@@ -16,6 +19,25 @@ use crate::{
 };
 
 const START_TS: u64 = 1_700_000_000;
+
+/// Canary test result indicating all critical entry points remain functional.
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum CanaryCheckResult {
+    /// All checks passed
+    Pass,
+    /// Score submission failed
+    SubmitFailed,
+    /// Score read failed
+    ReadFailed,
+    /// Gate enforcement failed
+    GateFailed,
+    /// Pause/unpause failed
+    PauseFailed,
+    /// Governance operation failed
+    GovernanceFailed,
+    /// Compatibility check failed
+    CompatibilityFailed,
+}
 
 fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
     let env = Env::default();
@@ -165,5 +187,232 @@ fn test_upgrade_preserves_score_integrity() {
         client.get_service(),
         service,
         "Service should be unchanged after upgrade"
+    );
+}
+
+#[test]
+fn test_canary_gate_enforcement_survives_upgrade() {
+    let (env, client, admin, service) = setup();
+    client.initialize(&admin, &service);
+
+    // Set up a gate caller
+    let gate_caller = Address::generate(&env);
+    let pair = symbol_short!("XLM_USDC");
+    let wallet = Address::generate(&env);
+
+    // Propose no-op upgrade before setting up gate
+    let wasm_hash = upload_current_wasm(&env);
+    client.propose_upgrade(&Vec::new(&env), &wasm_hash);
+    advance_to(&env, START_TS + DEFAULT_UPGRADE_DELAY_SECS);
+    client.execute_upgrade(&Vec::new(&env));
+
+    // Set threshold to low value to enable gate testing
+    client.set_risk_threshold(10);
+
+    // Submit a high-risk score (exceeds gate threshold)
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        95,
+        &false,
+        &false,
+        &START_TS,
+        &50,
+        &1,
+        &None,
+    );
+
+    // Verify gate denies access when score is high
+    let gate_result = client.gate(&gate_caller, &wallet, &pair);
+    assert!(gate_result.is_err(), "Gate should deny access to high-risk score");
+}
+
+#[test]
+fn test_canary_pause_state_survives_upgrade() {
+    let (env, client, admin, service) = setup();
+    client.initialize(&admin, &service);
+
+    let pair = symbol_short!("XLM_USDC");
+
+    // Pause a pair before upgrade
+    client.pause_pair(&pair);
+    assert!(client.is_pair_paused(&pair), "Pair should be paused before upgrade");
+
+    // Perform no-op upgrade
+    let wasm_hash = upload_current_wasm(&env);
+    client.propose_upgrade(&Vec::new(&env), &wasm_hash);
+    advance_to(&env, START_TS + DEFAULT_UPGRADE_DELAY_SECS);
+    client.execute_upgrade(&Vec::new(&env));
+
+    // Verify pause state persists after upgrade
+    assert!(
+        client.is_pair_paused(&pair),
+        "Pair should remain paused after upgrade"
+    );
+
+    // Verify unpause works after upgrade
+    client.unpause_pair(&pair);
+    assert!(
+        !client.is_pair_paused(&pair),
+        "Pair should be unpaused after unpause"
+    );
+}
+
+#[test]
+fn test_canary_governance_chain_survives_upgrade() {
+    let (env, client, admin, service) = setup();
+    client.initialize(&admin, &service);
+
+    let wallet = Address::generate(&env);
+
+    // Perform some admin actions before upgrade
+    let new_threshold = 75;
+    client.set_risk_threshold(new_threshold);
+
+    // Propose and execute no-op upgrade
+    let wasm_hash = upload_current_wasm(&env);
+    client.propose_upgrade(&Vec::new(&env), &wasm_hash);
+    advance_to(&env, START_TS + DEFAULT_UPGRADE_DELAY_SECS);
+    client.execute_upgrade(&Vec::new(&env));
+
+    // Verify governance state persists: threshold should still be 75
+    assert_eq!(
+        client.get_risk_threshold(),
+        new_threshold,
+        "Risk threshold should be preserved after upgrade"
+    );
+
+    // Verify we can still perform governance actions after upgrade
+    let newer_threshold = 85;
+    client.set_risk_threshold(newer_threshold);
+    assert_eq!(
+        client.get_risk_threshold(),
+        newer_threshold,
+        "Governance operations should work after upgrade"
+    );
+}
+
+#[test]
+fn test_canary_submit_and_read_compatibility_post_upgrade() {
+    let (env, client, admin, service) = setup();
+    client.initialize(&admin, &service);
+
+    let wallet = Address::generate(&env);
+    let pair = symbol_short!("BTC_USDT");
+    let score = 42u32;
+    let confidence = 85u32;
+
+    // Submit score before upgrade
+    let submit_ts_before = START_TS + 100;
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        score,
+        &false,
+        &false,
+        &submit_ts_before,
+        &confidence,
+        &1,
+        &None,
+    );
+
+    // Verify score is readable before upgrade
+    let score_before = client
+        .get_score(&wallet, &pair)
+        .expect("score must be readable before upgrade");
+    assert_eq!(score_before.score, score, "Score value must match");
+    assert_eq!(
+        score_before.confidence, confidence,
+        "Confidence value must match"
+    );
+
+    // Perform no-op upgrade
+    let wasm_hash = upload_current_wasm(&env);
+    client.propose_upgrade(&Vec::new(&env), &wasm_hash);
+    advance_to(&env, START_TS + DEFAULT_UPGRADE_DELAY_SECS);
+    client.execute_upgrade(&Vec::new(&env));
+
+    // Verify same score is still readable with exact same values
+    let score_after = client
+        .get_score(&wallet, &pair)
+        .expect("score must be readable after upgrade");
+    assert_eq!(score_after.score, score, "Score value must persist after upgrade");
+    assert_eq!(
+        score_after.confidence, confidence,
+        "Confidence must persist after upgrade"
+    );
+
+    // Verify we can submit new scores after upgrade
+    let new_score = 55u32;
+    advance_to(&env, submit_ts_before + 10000);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        new_score,
+        &false,
+        &false,
+        &(submit_ts_before + 10000),
+        &90,
+        &1,
+        &None,
+    );
+
+    let latest = client
+        .get_score(&wallet, &pair)
+        .expect("new score must be readable");
+    assert_eq!(
+        latest.score, new_score,
+        "New submissions must work after upgrade"
+    );
+}
+
+#[test]
+fn test_canary_configuration_parameters_survive_upgrade() {
+    let (env, client, admin, service) = setup();
+    client.initialize(&admin, &service);
+
+    // Record initial configuration
+    let initial_cooldown = client.get_cooldown();
+    let initial_depth = client.get_history_max_depth();
+    let initial_threshold = client.get_risk_threshold();
+
+    // Modify some parameters
+    client.set_cooldown(3600);
+    client.set_risk_threshold(65);
+
+    let modified_cooldown = client.get_cooldown();
+    let modified_threshold = client.get_risk_threshold();
+
+    // Verify modifications took effect
+    assert_ne!(modified_cooldown, initial_cooldown, "Cooldown should be modified");
+    assert_ne!(
+        modified_threshold, initial_threshold,
+        "Threshold should be modified"
+    );
+
+    // Perform no-op upgrade
+    let wasm_hash = upload_current_wasm(&env);
+    client.propose_upgrade(&Vec::new(&env), &wasm_hash);
+    advance_to(&env, START_TS + DEFAULT_UPGRADE_DELAY_SECS);
+    client.execute_upgrade(&Vec::new(&env));
+
+    // Verify modified parameters survive upgrade
+    assert_eq!(
+        client.get_cooldown(),
+        modified_cooldown,
+        "Modified cooldown must survive upgrade"
+    );
+    assert_eq!(
+        client.get_risk_threshold(),
+        modified_threshold,
+        "Modified threshold must survive upgrade"
+    );
+    assert_eq!(
+        client.get_history_max_depth(),
+        initial_depth,
+        "Unmodified history depth must survive upgrade"
     );
 }

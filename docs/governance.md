@@ -82,6 +82,30 @@ If a proposal is neither executed nor vetoed within `time_lock_secs * 2`, it
 expires and can no longer be executed. Attempting execution marks it `Expired`
 and returns `ParameterProposalExpired`.
 
+## Proposal-spam bounds and cleanup behavior
+
+Current contract behavior as of July 25, 2026:
+
+- Pending parameter proposals are capped at `MAX_PENDING_PARAMETER_PROPOSALS = 10`.
+- A proposal leaves the pending index immediately when it is executed or vetoed.
+- Expired proposals are pruned before new proposals are accepted, and also when
+  `get_parameter_proposal` is queried.
+- Proposal IDs remain monotonic after cleanup; pruning frees pending capacity,
+  not IDs.
+
+This means a compromised admin can create at most 10 concurrent pending
+parameter proposals before the contract fails closed with
+`TooManyPendingParameterProposals`. The operational load is therefore bounded
+by the pending index plus the cost of reviewing at most 10 live proposals.
+
+Recommended operator limits:
+
+- Alert when pending proposals reach 8 of 10.
+- Treat any proposal still pending near `time_lock_secs * 2` as cleanup debt
+  and either execute, veto, or let the next governance read/propose prune it.
+- Keep monitoring keyed to `prm_prop`, `prm_exec`, and `prm_veto` so off-chain
+  responders can measure backlog without scanning full storage.
+
 ## Supported Parameters
 
 | `param_key` symbol | Direct setter | `new_value` encoding |
@@ -242,8 +266,36 @@ stay unaffected; dApps querying LedgerLens can continue operating during the fre
 - Integrate with off-chain logging to build a tamper-evident proposal history.
 - Use `simulated_at` timestamp in `get_proposal_simulation()` output to track audit window.
 
+## Policy Bundles
+
+`propose_policy_bundle` / `apply_policy_bundle` group the risk threshold and
+submission cooldown into a single named change so operators review and roll
+out both together, instead of as two independently-timelocked changes that
+could land at different times (e.g. a lowered risk threshold taking effect
+before its paired cooldown increase, temporarily over-tightening the gate).
+
+This uses the same simple time-lock as `set_risk_threshold` /
+`set_history_max_depth` (no veto window, single time-lock, `apply_after` gate
+callable by anyone) rather than the richer `propose_parameter_change` flow
+documented above — it is a separate, lighter-weight mechanism, not an
+extension of the `Supported Parameters` table.
+
+Both fields are validated before anything is stored: an invalid
+`risk_threshold` (>100) or `cooldown_secs` (outside
+`[MIN_COOLDOWN_SECS, MAX_COOLDOWN_SECS]`) rejects the whole proposal, so
+there is no partial proposal. `apply_policy_bundle` writes both fields in the
+same call, so no caller can observe one field updated while the other is
+still pending.
+
+| Topic | When |
+|-------|------|
+| `pbdl_prop` | Bundle proposed `(risk_threshold, cooldown_secs, apply_after)` |
+| `pbdl_appl` | Bundle applied `(risk_threshold, cooldown_secs)` |
+
 ## Related
 
 - WASM upgrade governance: `propose_upgrade` / `execute_upgrade` / `veto_upgrade`
 - Upgrade delay configuration: `set_upgrade_delay` / `get_upgrade_delay`
 - Threat model: [`SECURITY.md`](../SECURITY.md#upgrade-governance--threat-model)
+- Canonical export: [`configuration-export.md`](./configuration-export.md)
+- Safe defaults: [`configuration-safe-defaults.md`](./configuration-safe-defaults.md)

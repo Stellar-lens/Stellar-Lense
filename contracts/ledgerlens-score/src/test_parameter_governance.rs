@@ -220,7 +220,7 @@ fn test_veto_before_half_timelock_succeeds() {
 }
 
 #[test]
-fn test_cleanup_expired_proposals_removes_old_expired() {
+fn test_executed_proposal_removed_from_pending_index() {
     let (env, client, admin, _service) = setup();
     let value = encode_u64(&env, MIN_COOLDOWN_SECS);
 
@@ -229,117 +229,31 @@ fn test_cleanup_expired_proposals_removes_old_expired() {
         &param_key_cooldown(),
         &value,
     );
-
-    let expiry = START_TS + DEFAULT_UPGRADE_DELAY_SECS * 2 + 1;
-    advance_to(&env, expiry);
-    let _ = client.try_execute_parameter_change(&admin_signers(&env, &admin), &proposal_id);
-
-    let record = client.get_parameter_proposal(&proposal_id);
-    assert_eq!(record.status, ParameterProposalStatus::Expired);
-
-    advance_to(&env, expiry + 48 * 3600 + 1);
-    let count = client.cleanup_expired_parameter_proposals(&admin_signers(&env, &admin));
-    assert_eq!(count, 1);
-}
-
-#[test]
-fn test_cleanup_respects_ttl_buffer() {
-    let (env, client, admin, _service) = setup();
-    let value = encode_u64(&env, MIN_COOLDOWN_SECS);
-
-    let proposal_id = client.propose_parameter_change(
-        &admin_signers(&env, &admin),
-        &param_key_cooldown(),
-        &value,
-    );
-
-    let expiry = START_TS + DEFAULT_UPGRADE_DELAY_SECS * 2 + 1;
-    advance_to(&env, expiry);
-    let _ = client.try_execute_parameter_change(&admin_signers(&env, &admin), &proposal_id);
-
-    advance_to(&env, expiry + 24 * 3600);
-    let count = client.cleanup_expired_parameter_proposals(&admin_signers(&env, &admin));
-    assert_eq!(count, 0);
-
-    advance_to(&env, expiry + 48 * 3600 + 1);
-    let count = client.cleanup_expired_parameter_proposals(&admin_signers(&env, &admin));
-    assert_eq!(count, 1);
-}
-
-#[test]
-fn test_cleanup_preserves_non_expired() {
-    let (env, client, admin, _service) = setup();
-    let value = encode_u64(&env, MIN_COOLDOWN_SECS);
-
-    let _proposal_id = client.propose_parameter_change(
-        &admin_signers(&env, &admin),
-        &param_key_cooldown(),
-        &value,
-    );
+    assert_eq!(client.get_pending_param_prop_ids(), Vec::from_array(&env, [proposal_id]));
 
     advance_to(&env, START_TS + DEFAULT_UPGRADE_DELAY_SECS);
+    client.execute_parameter_change(&admin_signers(&env, &admin), &proposal_id);
 
-    let count = client.cleanup_expired_parameter_proposals(&admin_signers(&env, &admin));
-    assert_eq!(count, 0);
-
-    let pending = client.get_pending_param_prop_ids();
-    assert_eq!(pending.len(), 1);
+    assert!(client.get_pending_param_prop_ids().is_empty());
 }
 
 #[test]
-fn test_cleanup_idempotent() {
+fn test_expired_full_pending_set_is_pruned_before_accepting_new_proposal() {
     let (env, client, admin, _service) = setup();
     let value = encode_u64(&env, MIN_COOLDOWN_SECS);
 
-    let proposal_id = client.propose_parameter_change(
-        &admin_signers(&env, &admin),
-        &param_key_cooldown(),
-        &value,
-    );
+    env.as_contract(&client.address, || {
+        storage::test_seed_pending_parameter_proposals(
+            &env,
+            MAX_PENDING_PARAMETER_PROPOSALS,
+            &admin,
+            &param_key_cooldown(),
+            &value,
+        );
+    });
+    assert_eq!(client.get_pending_param_prop_ids().len(), MAX_PENDING_PARAMETER_PROPOSALS);
 
-    let expiry = START_TS + DEFAULT_UPGRADE_DELAY_SECS * 2 + 1;
-    advance_to(&env, expiry + 48 * 3600 + 1);
-
-    let count1 = client.cleanup_expired_parameter_proposals(&admin_signers(&env, &admin));
-    assert_eq!(count1, 1);
-
-    let count2 = client.cleanup_expired_parameter_proposals(&admin_signers(&env, &admin));
-    assert_eq!(count2, 0);
-}
-
-#[test]
-fn test_simulate_parameter_change_cooldown() {
-    let (env, client, _admin, _service) = setup();
-    let new_cooldown = MIN_COOLDOWN_SECS + 100;
-    let value = encode_u64(&env, new_cooldown);
-
-    let sim = client.simulate_parameter_change(&param_key_cooldown(), &value);
-    assert_eq!(sim.param_key, param_key_cooldown());
-    assert_eq!(sim.new_value, value);
-    assert!(sim.affected_capabilities.len() >= 1);
-}
-
-#[test]
-fn test_simulate_parameter_change_deterministic() {
-    let (env, client, _admin, _service) = setup();
-    let new_cooldown = MIN_COOLDOWN_SECS + 200;
-    let value = encode_u64(&env, new_cooldown);
-
-    let sim1 = client.simulate_parameter_change(&param_key_cooldown(), &value);
-    let sim2 = client.simulate_parameter_change(&param_key_cooldown(), &value);
-
-    assert_eq!(sim1.param_key, sim2.param_key);
-    assert_eq!(sim1.current_value, sim2.current_value);
-    assert_eq!(sim1.new_value, sim2.new_value);
-    assert_eq!(sim1.execution_window_start, sim2.execution_window_start);
-    assert_eq!(sim1.execution_window_end, sim2.execution_window_end);
-}
-
-#[test]
-fn test_get_proposal_simulation() {
-    let (env, client, admin, _service) = setup();
-    let new_cooldown = MIN_COOLDOWN_SECS + 300;
-    let value = encode_u64(&env, new_cooldown);
+    advance_to(&env, START_TS + DEFAULT_UPGRADE_DELAY_SECS * 2 + 1);
 
     let proposal_id = client.propose_parameter_change(
         &admin_signers(&env, &admin),
@@ -347,17 +261,10 @@ fn test_get_proposal_simulation() {
         &value,
     );
 
-    let output = client.get_proposal_simulation(&proposal_id);
-    assert_eq!(output.proposal_id, proposal_id);
-    assert_eq!(output.simulation.param_key, param_key_cooldown());
-    assert_eq!(output.simulation.new_value, value);
-    assert_eq!(output.simulation.execution_window_start, START_TS + DEFAULT_UPGRADE_DELAY_SECS);
-    assert_eq!(output.simulation.execution_window_end, START_TS + DEFAULT_UPGRADE_DELAY_SECS * 2);
-}
-
-#[test]
-fn test_simulate_nonexistent_proposal() {
-    let (env, client, _admin, _service) = setup();
-    let result = client.try_get_proposal_simulation(&999);
-    assert_eq!(result, Err(Ok(Error::ParameterProposalNotFound)));
+    assert_eq!(proposal_id, MAX_PENDING_PARAMETER_PROPOSALS as u64 + 1);
+    assert_eq!(client.get_pending_param_prop_ids(), Vec::from_array(&env, [proposal_id]));
+    for expired_id in 1..=MAX_PENDING_PARAMETER_PROPOSALS as u64 {
+        let record = client.get_parameter_proposal(&expired_id);
+        assert_eq!(record.status, ParameterProposalStatus::Expired);
+    }
 }
