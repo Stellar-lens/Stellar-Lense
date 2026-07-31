@@ -1,0 +1,91 @@
+diff --git a/contracts/ledgerlens-score/src/errors.rs b/contracts/ledgerlens-score/src/errors.rs
+index 1f3b452..09edbe2 100644
+--- a/contracts/ledgerlens-score/src/errors.rs
++++ b/contracts/ledgerlens-score/src/errors.rs
+@@ -83,7 +83,6 @@ pub enum Error {
+     /// Returned when `set_history_max_depth` is called with `0` or a value
+     /// above `MAX_HISTORY_DEPTH`.
+     InvalidHistoryDepth = 29,
+-feat/confidence-gated-risk-gate
+     /// Returned when `set_global_min_confidence` is called with a value
+     /// above 100 (confidence is bounded to 0–100).
+     InvalidMinConfidence = 30,
+diff --git a/contracts/ledgerlens-score/src/lib.rs b/contracts/ledgerlens-score/src/lib.rs
+index d51e7dd..754a40a 100644
+--- a/contracts/ledgerlens-score/src/lib.rs
++++ b/contracts/ledgerlens-score/src/lib.rs
+@@ -22,6 +22,9 @@ mod test_rate_limit;
+ #[cfg(test)]
+ mod test_multisig_service;
+ 
++#[cfg(test)]
++mod test_escalation;
++
+ #[cfg(test)]
+ mod test_attestation;
+ 
+@@ -1411,22 +1414,11 @@ impl LedgerLensScoreContract {
+             return false;
+         }
+         match storage::peek_score(&env, &wallet, &asset_pair) {
+-feat/confidence-gated-risk-gate
++
+             Some(risk) => risk.score < gate_threshold && risk.confidence >= effective_floor,
+             None => false,
+-
+-            Some(risk) => risk.score < gate_threshold,
+-            None => {
+-                if let Some(custodian) = storage::peek_score_delegate(&env, &wallet) {
+-                    if let Some(risk) = storage::peek_score(&env, &custodian, &asset_pair) {
+-                        return risk.score < gate_threshold;
+-                    }
+-                }
+-                false
+-            }
+- main
+-        }
+-    }
++}
++}    
+ 
+     /// Capability-detection registry for the composability interface.
+     ///
+diff --git a/contracts/ledgerlens-score/src/storage.rs b/contracts/ledgerlens-score/src/storage.rs
+index a19deac..c2ca921 100644
+--- a/contracts/ledgerlens-score/src/storage.rs
++++ b/contracts/ledgerlens-score/src/storage.rs
+@@ -529,7 +529,6 @@ pub fn set_decay_rate(env: &Env, numerator: u32, denominator: u32) {
+     env.storage().instance().set(&DataKey::DecayRateDenominator, &denominator);
+ }
+ 
+- feat/confidence-gated-risk-gate
+ // ── Global minimum confidence floor ──────────────────────────────────────────
+ 
+ /// Returns the admin-configured global minimum confidence floor (0–100).
+@@ -539,7 +538,7 @@ pub fn set_decay_rate(env: &Env, numerator: u32, denominator: u32) {
+ /// `query_risk_gate_with_confidence` using `max(param, global)` so the admin
+ /// can enforce a system-wide floor without requiring every integrating protocol
+ /// to specify one. Both values are bounded to 0–100, so the `max` cannot
+-/// overflow.
++/// overflow.ub fn get_global_min_confidence(env: &Env) -> u32 {
+ pub fn get_global_min_confidence(env: &Env) -> u32 {
+     let result: Option<u32> = env.storage().instance().get(&DataKey::GlobalMinConfidence);
+     result.unwrap_or(0)
+@@ -549,9 +548,16 @@ pub fn get_global_min_confidence(env: &Env) -> u32 {
+ /// Caller is responsible for validating the range (0–100) before calling.
+ pub fn set_global_min_confidence(env: &Env, min_confidence: u32) {
+     env.storage().instance().set(&DataKey::GlobalMinConfidence, &min_confidence);
+-
++}
+ // ── Fee withdrawal ────────────────────────────────────────────────────────────
++pub fn get_global_min_confidence(env: &Env) -> u32 {
++    let result: Option<u32> = env.storage().instance().get(&DataKey::GlobalMinConfidence);
++    result.unwrap_or(0)
++}
+ 
++pub fn set_global_min_confidence(env: &Env, min_confidence: u32) {
++    env.storage().instance().set(&DataKey::GlobalMinConfidence, &min_confidence);
++}
+ pub fn get_fee_token(env: &Env) -> Option<Address> {
+     env.storage().instance().get(&DataKey::FeeToken)
+ }
