@@ -323,77 +323,45 @@ if [ "$DRY_RUN" = false ]; then
 
   log "Contract version: $CONTRACT_VERSION"
 
-  # ── Key-rotation canary (testnet only) ────────────────────────────────────
-  if [ "$CANARY_KEYS" = true ] && [ "$NETWORK" = "testnet" ]; then
-    log "Running key-rotation canary checks (#633)..."
+  # ── Canary checks (testnet only) ──────────────────────────────────────────
+  if [ "$CANARY" = true ] && [ "$NETWORK" = "testnet" ]; then
+    log "Running canary checks for post-incident reconciliation (#631)..."
 
-    # Canary: add a service signer and verify
-    log "  Testing service signer rotation..."
-    ADD_RESULT=$(soroban contract invoke \
-      --id "$CONTRACT_ID" \
-      --source "$ADMIN_IDENTITY" \
-      --network "$NETWORK" \
-      -- \
-      add_service_signer \
-      --admin_signants "[\"$ADMIN_ADDRESS\"]" \
-      --signer "$SERVICE_ADDRESS" 2>/dev/null || echo "FAILED")
-    if echo "$ADD_RESULT" | grep -q "FAILED"; then
-      echo "  ⚠ add_service_signer failed" >&2
-    else
-      log "  ✅ add_service_signer OK"
-    fi
+    # Check supported interfaces
+    for cap in checksum snapshot freeze export_score reconcile; do
+      RESULT=$(soroban contract invoke \
+        --id "$CONTRACT_ID" \
+        --source "$ADMIN_IDENTITY" \
+        --network "$NETWORK" \
+        -- \
+        supports_interface \
+        --capability "\"$cap\"" 2>/dev/null || echo "false")
+      if echo "$RESULT" | grep -q "true"; then
+        log "  ✅ Interface '$cap' supported"
+      else
+        echo "  ⚠ WARNING: Interface '$cap' not supported" >&2
+      fi
+    done
 
-    # Canary: set threshold
-    SET_RESULT=$(soroban contract invoke \
-      --id "$CONTRACT_ID" \
-      --source "$ADMIN_IDENTITY" \
-      --network "$NETWORK" \
-      -- \
-      set_service_threshold \
-      --admin_signants "[\"$ADMIN_ADDRESS\"]" \
-      --threshold 1 2>/dev/null || echo "FAILED")
-    if echo "$SET_RESULT" | grep -q "FAILED"; then
-      echo "  ⚠ set_service_threshold failed" >&2
-    else
-      log "  ✅ set_service_threshold OK"
-    fi
-
-    # Canary: remove signer and verify threshold auto-adjust
-    REMOVE_RESULT=$(soroban contract invoke \
-      --id "$CONTRACT_ID" \
-      --source "$ADMIN_IDENTITY" \
-      --network "$NETWORK" \
-      -- \
-      remove_service_signer \
-      --admin_signants "[\"$ADMIN_ADDRESS\"]" \
-      --signer "$SERVICE_ADDRESS" 2>/dev/null || echo "FAILED")
-    if echo "$REMOVE_RESULT" | grep -q "FAILED"; then
-      echo "  ⚠ remove_service_signer failed" >&2
-    else
-      log "  ✅ remove_service_signer (threshold auto-adjust) OK"
-    fi
-
-    # Canary: admin signer operations
-    log "  Testing admin signer rotation..."
+    # Verify freeze/unfreeze cycle
+    log "  Testing freeze/unfreeze cycle..."
     soroban contract invoke \
       --id "$CONTRACT_ID" \
       --source "$ADMIN_IDENTITY" \
       --network "$NETWORK" \
       -- \
-      add_admin_signer \
-      --admin_signants "[\"$ADMIN_ADDRESS\"]" \
-      --signer "$SERVICE_ADDRESS" 2>/dev/null && log "  ✅ add_admin_signer OK" || echo "  ⚠ add_admin_signer failed" >&2
+      freeze_contract \
+      --admin_signants "[\"$ADMIN_ADDRESS\"]" 2>/dev/null && log "  ✅ freeze_contract OK" || echo "  ⚠ freeze_contract failed" >&2
 
     soroban contract invoke \
       --id "$CONTRACT_ID" \
       --source "$ADMIN_IDENTITY" \
       --network "$NETWORK" \
       -- \
-      remove_admin_signer \
-      --admin_signants "[\"$ADMIN_ADDRESS\"]" \
-      --signer "$SERVICE_ADDRESS" 2>/dev/null && log "  ✅ remove_admin_signer OK" || echo "  ⚠ remove_admin_signer failed" >&2
+      unfreeze_contract \
+      --admin_signants "[\"$ADMIN_ADDRESS\"]" 2>/dev/null && log "  ✅ unfreeze_contract OK" || echo "  ⚠ unfreeze_contract failed" >&2
 
-    log "Key-rotation canary checks complete."
+    log "Canary checks complete."
   fi
 fi
 

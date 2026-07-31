@@ -1,26 +1,27 @@
 //! # LedgerLens Post-Incident Recovery & Reconciliation Tool
 //!
-//! Off-chain tooling for state snapshot, reconciliation, backup, key-rotation
-//! verification, and post-action verification workflows.
+//! Off-chain tooling for state snapshot, reconciliation, backup, and
+//! post-action verification workflows.
 //!
 //! ## Commands
 //!
-//! * `snapshot` — Save a state snapshot to a JSON file.
-//! * `export` — Export score entries for off-chain backup.
+//! * `snapshot` — Take a deterministic state snapshot (invokes
+//!   `compute_state_checksum` on-chain, saves the result to disk).
+//! * `export` — Export all scored entries as a JSON file for off-chain backup.
 //! * `reconcile` — Compare two snapshot files and produce a diff report.
-//! * `verify` — Verify a saved snapshot against current state metadata.
-//! * `report` — Generate a post-action verification report.
-//! * `verify-rotation` — Verify a key-rotation operation produced the expected
-//!   signer set configuration.
+//! * `verify` — Verify a saved snapshot against the current on-chain state.
+//! * `report` — Generate a post-action verification report from a snapshot
+//!   and an export.
 
 use std::fs;
+use std::io::Write;
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 
-// ── Data types ──────────────────────────────────────────────────────────────
+// ── Data types (mirrors on-chain types for off-chain processing) ────────────
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct StateSnapshot {
@@ -71,39 +72,10 @@ struct PostActionReport {
     verification_notes: Vec<String>,
 }
 
-/// Describes a key-rotation operation and its expected outcome.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-struct RotationVerificationRequest {
-    /// Expected number of service signers after rotation.
-    expected_service_signer_count: u32,
-    /// Expected number of admin signers after rotation.
-    expected_admin_signer_count: u32,
-    /// Expected service threshold, or 0 if unchanged.
-    expected_service_threshold: u32,
-    /// Expected admin threshold, or 0 if unchanged.
-    expected_admin_threshold: u32,
-    /// Whether a pubkey rotation was performed.
-    pubkey_rotated: bool,
-    /// Whether an overlap window was used (vs instant rotation).
-    overlap_used: bool,
-}
-
-/// Result of verifying a key-rotation operation.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-struct RotationVerificationReport {
-    request: RotationVerificationRequest,
-    service_signer_count_match: bool,
-    admin_signer_count_match: bool,
-    service_threshold_match: bool,
-    admin_threshold_match: bool,
-    all_match: bool,
-    notes: Vec<String>,
-}
-
-// ── CLI ─────────────────────────────────────────────────────────────────────
+// ── CLI ────────────────────────────────────────────────────────────────────
 
 #[derive(Parser)]
-#[command(name = "recovery", about = "LedgerLens post-incident recovery & key-rotation tooling")]
+#[command(name = "recovery", about = "LedgerLens post-incident recovery & reconciliation tool")]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -111,79 +83,81 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Save a snapshot description to a JSON file.
+    /// Save a snapshot description to a JSON file (intended for use after
+    /// calling compute_state_checksum on-chain and recording the output).
     Snapshot {
+        /// Path to the output snapshot JSON file.
         #[arg(short, long, default_value = "snapshot.json")]
         output: PathBuf,
+        /// Score root hex string from on-chain compute_state_checksum.
         #[arg(short = 'r', long)]
         score_root: String,
+        /// Config root hex string.
         #[arg(short = 'c', long)]
         config_root: String,
+        /// Auth root hex string.
         #[arg(short = 'a', long)]
         auth_root: String,
+        /// Number of scored entries.
         #[arg(short = 'n', long)]
         entry_count: u32,
+        /// Ledger sequence.
         #[arg(short = 's', long)]
         ledger_seq: u32,
+        /// Ledger timestamp.
         #[arg(short = 't', long)]
         timestamp: u64,
     },
 
-    /// Export score entries to a JSON lines file.
+    /// Export score entries to a JSON lines file (one entry per line).
+    /// This is an off-chain helper; use the contract's export_all_scores_paginated
+    /// to fetch the actual data from the chain.
     Export {
+        /// Path to save the export JSON to.
         #[arg(short, long, default_value = "export.json")]
         output: PathBuf,
+        /// Path to a JSON array of ExportableScoreEntry items (simulated
+        /// from off-chain data or collected from the contract).
         #[arg(short = 'i', long)]
         input: Option<PathBuf>,
     },
 
     /// Reconcile two snapshot files and produce a diff report.
     Reconcile {
+        /// First snapshot file (pre-incident / baseline).
         snapshot_a: PathBuf,
+        /// Second snapshot file (post-recovery / current).
         snapshot_b: PathBuf,
+        /// Path to save the reconciliation report.
         #[arg(short, long, default_value = "reconciliation-report.json")]
         output: PathBuf,
     },
 
     /// Verify that a snapshot file has internally consistent roots.
+    /// (Full on-chain verification requires calling the contract's
+    /// `verify_state_checksum` function.)
     Verify {
+        /// Path to the snapshot JSON file.
         snapshot: PathBuf,
+        /// Path to an optional export JSON to cross-check entry count.
         #[arg(short = 'e', long)]
         export: Option<PathBuf>,
     },
 
-    /// Generate a post-action verification report.
+    /// Generate a post-action verification report from a snapshot,
+    /// export, and action description.
     Report {
+        /// Path to the pre-action snapshot file.
         snapshot: PathBuf,
+        /// Type of action performed (e.g. "freeze", "restore", "upgrade").
         #[arg(short, long)]
         action: String,
+        /// Description of what was done and why.
         #[arg(short, long)]
         description: String,
+        /// Path to save the report.
         #[arg(short, long, default_value = "post-action-report.json")]
         output: PathBuf,
-    },
-
-    /// Verify that a key-rotation operation produced the expected signer set
-    /// configuration. Reads a configuration file describing the expected outcome
-    /// and produces a verification report.
-    VerifyRotation {
-        /// Path to a JSON file containing the RotationVerificationRequest.
-        config: PathBuf,
-        /// Path to save the verification report.
-        #[arg(short, long, default_value = "rotation-verification.json")]
-        output: PathBuf,
-        /// Actual service signer count observed after rotation.
-        #[arg(short = 's', long)]
-        actual_service_count: u32,
-        /// Actual admin signer count observed after rotation.
-        #[arg(short = 'a', long)]
-        actual_admin_count: u32,
-        /// Actual service threshold observed after rotation.
-        #[arg(short = 't', long)]
-        actual_service_threshold: u32,
-        /// Actual admin threshold observed after rotation.
-        #[arg(short = 'A', long)]
-        actual_admin_threshold: u32,
     },
 }
 
@@ -197,13 +171,10 @@ fn main() -> Result<()> {
         Commands::Reconcile { snapshot_a, snapshot_b, output } => cmd_reconcile(&snapshot_a, &snapshot_b, &output),
         Commands::Verify { snapshot, export } => cmd_verify(&snapshot, export.as_deref()),
         Commands::Report { snapshot, action, description, output } => cmd_report(&snapshot, &action, &description, &output),
-        Commands::VerifyRotation { config, output, actual_service_count, actual_admin_count, actual_service_threshold, actual_admin_threshold } => {
-            cmd_verify_rotation(&config, &output, actual_service_count, actual_admin_count, actual_service_threshold, actual_admin_threshold)
-        }
     }
 }
 
-// ── Command handlers ────────────────────────────────────────────────────────
+// ── Command handlers ───────────────────────────────────────────────────────
 
 fn cmd_snapshot(
     output: &PathBuf,
@@ -232,8 +203,10 @@ fn cmd_snapshot(
 
 fn cmd_export(output: &PathBuf, input: Option<&PathBuf>) -> Result<()> {
     if let Some(input_path) = input {
+        // Read existing export data from a JSON file
         let content = fs::read_to_string(input_path)
             .with_context(|| format!("Failed to read {}", input_path.display()))?;
+        // Validate by deserializing
         let entries: Vec<ExportableScoreEntry> = serde_json::from_str(&content)
             .context("Export file is not a valid JSON array of ExportableScoreEntry")?;
         eprintln!("Loaded {} entries from {}", entries.len(), input_path.display());
@@ -241,7 +214,9 @@ fn cmd_export(output: &PathBuf, input: Option<&PathBuf>) -> Result<()> {
             .with_context(|| format!("Failed to write export to {}", output.display()))?;
         eprintln!("Export written to {} ({} entries)", output.display(), entries.len());
     } else {
-        fs::write(output, "[]")
+        // Generate a minimal template
+        let template = r#"[]"#;
+        fs::write(output, template)
             .with_context(|| format!("Failed to write export to {}", output.display()))?;
         eprintln!(
             "Empty export created at {}. Populate it with data from \
@@ -263,20 +238,21 @@ fn cmd_reconcile(snapshot_a: &PathBuf, snapshot_b: &PathBuf, output: &PathBuf) -
     let all_match = score_match && config_match && auth_match && count_match;
 
     let mut details = Vec::new();
+
     details.push(format!(
-        "Score root: {} {} → {}",
+        "Score root: {} == {} → {}",
         &snap_a.score_root[..16],
         &snap_b.score_root[..16],
         if score_match { "MATCH" } else { "DIVERGE" }
     ));
     details.push(format!(
-        "Config root: {} {} → {}",
+        "Config root: {} == {} → {}",
         &snap_a.config_root[..16],
         &snap_b.config_root[..16],
         if config_match { "MATCH" } else { "DIVERGE" }
     ));
     details.push(format!(
-        "Auth root: {} {} → {}",
+        "Auth root: {} == {} → {}",
         &snap_a.auth_root[..16],
         &snap_b.auth_root[..16],
         if auth_match { "MATCH" } else { "DIVERGE" }
@@ -304,9 +280,21 @@ fn cmd_reconcile(snapshot_a: &PathBuf, snapshot_b: &PathBuf, output: &PathBuf) -
         .with_context(|| format!("Failed to write reconciliation report to {}", output.display()))?;
 
     if all_match {
-        eprintln!("Snapshots MATCH — state is consistent.");
+        eprintln!("✅ Snapshots MATCH — state is consistent.");
     } else {
-        eprintln!("Snapshots DIVERGE — state has changed.");
+        eprintln!("❌ Snapshots DIVERGE — state has changed:");
+        if !score_match {
+            eprintln!("   - Score entries differ");
+        }
+        if !config_match {
+            eprintln!("   - Configuration differs");
+        }
+        if !auth_match {
+            eprintln!("   - Auth/signer config differs");
+        }
+        if !count_match {
+            eprintln!("   - Entry count: {} vs {}", snap_a.entry_count, snap_b.entry_count);
+        }
     }
     eprintln!("Report saved to {}", output.display());
     Ok(())
@@ -322,14 +310,15 @@ fn cmd_verify(snapshot_path: &PathBuf, export_path: Option<&PathBuf>) -> Result<
     eprintln!("  Ledger seq:  {}", snapshot.ledger_seq);
     eprintln!("  Timestamp:   {}", snapshot.timestamp);
 
+    // Validate hex strings
     if snapshot.score_root.len() != 64 {
-        eprintln!("  WARNING: score_root is not 64 hex chars");
+        eprintln!("  ⚠ WARNING: score_root is not 64 hex chars ({} chars)", snapshot.score_root.len());
     }
     if snapshot.config_root.len() != 64 {
-        eprintln!("  WARNING: config_root is not 64 hex chars");
+        eprintln!("  ⚠ WARNING: config_root is not 64 hex chars", snapshot.config_root.len());
     }
     if snapshot.auth_root.len() != 64 {
-        eprintln!("  WARNING: auth_root is not 64 hex chars");
+        eprintln!("  ⚠ WARNING: auth_root is not 64 hex chars", snapshot.auth_root.len());
     }
 
     if let Some(export_path) = export_path {
@@ -339,17 +328,18 @@ fn cmd_verify(snapshot_path: &PathBuf, export_path: Option<&PathBuf>) -> Result<
             .context("Export is not a valid JSON array")?;
         if entries.len() as u32 != snapshot.entry_count {
             eprintln!(
-                "  WARNING: Export entry count mismatch: {} vs expected {}",
+                "  ⚠ Entry count mismatch: export has {} entries, snapshot says {}",
                 entries.len(),
                 snapshot.entry_count
             );
         } else {
-            eprintln!("  Export entry count ({}) matches snapshot.", entries.len());
+            eprintln!("  ✅ Export entry count ({}) matches snapshot.", entries.len());
         }
     }
 
     eprintln!("Snapshot verification complete.");
-    eprintln!("Run `verify_state_checksum` on the contract for full on-chain verification.");
+    // Full on-chain verification requires calling verify_state_checksum on the contract.
+    eprintln!("Note: Run `verify_state_checksum` on the contract for full on-chain verification.");
     Ok(())
 }
 
@@ -360,7 +350,7 @@ fn cmd_report(
     output: &PathBuf,
 ) -> Result<()> {
     let snapshot: StateSnapshot = load_snapshot(snapshot_path)?;
-    let now = iso_timestamp();
+    let now = chrono_now();
 
     let report = PostActionReport {
         snapshot,
@@ -371,8 +361,8 @@ fn cmd_report(
         post_action_entry_count: None,
         checksum_verified: false,
         verification_notes: vec![
-            "Pre-action snapshot recorded.".to_string(),
-            "Run compute_state_checksum after the action and reconcile.".to_string(),
+            "Pre-action snapshot recorded. Run `compute_state_checksum` after".to_string(),
+            "the action and reconcile the two snapshots to confirm consistency.".to_string(),
         ],
     };
 
@@ -383,83 +373,7 @@ fn cmd_report(
     Ok(())
 }
 
-fn cmd_verify_rotation(
-    config_path: &PathBuf,
-    output: &PathBuf,
-    actual_service_count: u32,
-    actual_admin_count: u32,
-    actual_service_threshold: u32,
-    actual_admin_threshold: u32,
-) -> Result<()> {
-    let content = fs::read_to_string(config_path)
-        .with_context(|| format!("Failed to read config from {}", config_path.display()))?;
-    let request: RotationVerificationRequest = serde_json::from_str(&content)
-        .context("Config is not a valid RotationVerificationRequest")?;
-
-    let svc_count_match = request.expected_service_signer_count == actual_service_count;
-    let adm_count_match = request.expected_admin_signer_count == actual_admin_count;
-    let svc_thr_match = if request.expected_service_threshold > 0 {
-        request.expected_service_threshold == actual_service_threshold
-    } else {
-        true // 0 means "don't verify"
-    };
-    let adm_thr_match = if request.expected_admin_threshold > 0 {
-        request.expected_admin_threshold == actual_admin_threshold
-    } else {
-        true
-    };
-
-    let all_match = svc_count_match && adm_count_match && svc_thr_match && adm_thr_match;
-
-    let mut notes = Vec::new();
-    notes.push(format!(
-        "Service signers: expected {}, got {} → {}",
-        request.expected_service_signer_count,
-        actual_service_count,
-        if svc_count_match { "MATCH" } else { "MISMATCH" }
-    ));
-    notes.push(format!(
-        "Admin signers: expected {}, got {} → {}",
-        request.expected_admin_signer_count,
-        actual_admin_count,
-        if adm_count_match { "MATCH" } else { "MISMATCH" }
-    ));
-
-    if request.pubkey_rotated {
-        notes.push(if request.overlap_used {
-            "Pubkey rotation: overlap window used (gradual)".to_string()
-        } else {
-            "Pubkey rotation: instant (no overlap)".to_string()
-        });
-    }
-
-    let report = RotationVerificationReport {
-        request,
-        service_signer_count_match: svc_count_match,
-        admin_signer_count_match: adm_count_match,
-        service_threshold_match: svc_thr_match,
-        admin_threshold_match: adm_thr_match,
-        all_match,
-        notes,
-    };
-
-    let json = serde_json::to_string_pretty(&report)?;
-    fs::write(output, &json)
-        .with_context(|| format!("Failed to write verification report to {}", output.display()))?;
-
-    if all_match {
-        eprintln!("Key-rotation verification: ALL MATCH");
-    } else {
-        eprintln!("Key-rotation verification: MISMATCH DETECTED");
-        for note in &report.notes {
-            eprintln!("  {}", note);
-        }
-    }
-    eprintln!("Report saved to {}", output.display());
-    Ok(())
-}
-
-// ── Helpers ─────────────────────────────────────────────────────────────────
+// ── Helpers ────────────────────────────────────────────────────────────────
 
 fn load_snapshot(path: &PathBuf) -> Result<StateSnapshot> {
     let content = fs::read_to_string(path)
@@ -469,11 +383,13 @@ fn load_snapshot(path: &PathBuf) -> Result<StateSnapshot> {
     Ok(snapshot)
 }
 
-fn iso_timestamp() -> String {
+/// Returns an ISO-8601-like timestamp string. Uses system time via std::time.
+fn chrono_now() -> String {
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default();
     let secs = now.as_secs();
+    // Format as ISO-8601 approximate
     let days = secs / 86400;
     let time_secs = secs % 86400;
     let hours = time_secs / 3600;

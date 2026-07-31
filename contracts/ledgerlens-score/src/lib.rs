@@ -102,6 +102,9 @@ mod test_batch_attestation_replay;
 mod test_staleness;
 
 #[cfg(test)]
+mod test_reconciliation;
+
+#[cfg(test)]
 mod test_oracle_staleness;
 
 #[cfg(test)]
@@ -186,6 +189,9 @@ mod test_memory_exhaustion;
 
 #[cfg(test)]
 mod test_audit_replay;
+
+#[cfg(test)]
+mod test_signer_governance;
 
 use soroban_sdk::{
     contract, contractimpl, crypto::Hash, symbol_short, token, Address, Bytes, BytesN, Env,
@@ -306,7 +312,7 @@ impl LedgerLensScoreContract {
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
-    /// assert_eq!(client.get_version(), 4);
+    /// assert_eq!(client.get_version(), 5);
     /// ```
     pub fn get_version(env: Env) -> u32 {
         storage::get_contract_version(&env)
@@ -5442,6 +5448,53 @@ impl LedgerLensScoreContract {
     /// ```
     pub fn is_paused(env: Env) -> bool {
         storage::is_paused(&env)
+    }
+
+    // ── #631: Emergency freeze / thaw (post-incident reconciliation) ────────────
+
+    /// Puts the contract into emergency freeze mode. While frozen, **all**
+    /// mutating operations are rejected — stronger than `pause`, which still
+    /// permits admin governance actions. Designed for post-incident isolation
+    /// so that operators can inspect, snapshot, and reconcile state before
+    /// allowing mutations again.
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if the contract has no admin yet.
+    /// - [`Error::Unauthorized`] if caller is not an admin signer.
+    pub fn freeze_contract(env: Env, admin_signers: Vec<Address>) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+        let admin = storage::get_admin(&env);
+        storage::set_frozen(&env, true);
+        events::contract_frozen(&env, &admin);
+        let action_bytes = Bytes::new(&env);
+        Self::update_audit_root(&env, symbol_short!("freeze"), admin.clone(), action_bytes);
+        Ok(())
+    }
+
+    /// Lifts an emergency freeze and resumes normal operations. Admin only.
+    ///
+    /// # Errors
+    /// - [`Error::NotInitialized`] if the contract has no admin yet.
+    /// - [`Error::Unauthorized`] if caller is not an admin signer.
+    pub fn unfreeze_contract(env: Env, admin_signers: Vec<Address>) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+        let admin = storage::get_admin(&env);
+        storage::set_frozen(&env, false);
+        events::contract_unfrozen(&env, &admin);
+        let action_bytes = Bytes::new(&env);
+        Self::update_audit_root(&env, symbol_short!("unfroz"), admin.clone(), action_bytes);
+        Ok(())
+    }
+
+    /// Returns `true` when the contract is in emergency freeze mode.
+    pub fn is_frozen(env: Env) -> bool {
+        storage::is_frozen(&env)
     }
 
     // ── Epoch sealing (#301) ─────────────────────────────────────────────────
