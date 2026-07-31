@@ -171,6 +171,16 @@ Any invariant violation TLC produces should be converted into a Rust regression 
 
 During development of this extension (issues #405, #403), no violations were found in the token-bucket or consensus invariants.
 
+## References
+
+- `spec/LedgerLens.tla` — The abstract TLA+ specification
+- `spec/LedgerLens.cfg` — TLC model-checking configuration
+- [`spec/refinement-mapping.md`](refinement-mapping.md) — **Refinement mapping: how Rust storage keys and structs correspond to TLA+ variables** (issue #754)
+- `contracts/ledgerlens-score/src/types.rs` — All storage key enums (`DataKey`, `DataKeyB`, `DataKeyC`, `DataKeyD`)
+- `contracts/ledgerlens-score/src/storage.rs` — Storage read/write helpers
+- `contracts/ledgerlens-score/src/constants.rs` — Numeric constants referenced by the spec
+- `docs/storage-layout.md` — Exhaustive storage layout reference
+
 ## How to Install and Run TLC
 
 TLC is the official model checker for TLA+ specifications. You can run TLC from the command line using Java.

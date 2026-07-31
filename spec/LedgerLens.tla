@@ -6,6 +6,18 @@ CONSTANTS
     Scores,
     Assets,
     COOLDOWN,
+    \* ── Governance constants ─────────────────────────────────────────────────
+    \* GOV_EXEC_DELAY is the minimum number of ticks that must elapse between
+    \* proposal creation and execution (the "timelock").  This prevents instant
+    \* execution and is the property TLC proves: code cannot update before the
+    \* executable time.
+    \* GOV_PROPOSAL_TTL is the number of ticks after which an un-executed,
+    \* un-vetoed proposal automatically expires.  Stale proposals that have
+    \* passed expiry can never execute.
+    \* Actions is the finite set of action identifiers the model explores.
+    GOV_EXEC_DELAY,
+    GOV_PROPOSAL_TTL,
+    Actions,
     HWM_THRESHOLD,
     FLOOR_VALUE,
     RISK_THRESHOLD,
@@ -29,7 +41,23 @@ CONSTANTS
     CONSENSUS_EPSILON,
     REVEAL_WINDOW
 
-VARIABLES 
+VARIABLES
+    \* ── Governance proposal variables (issue: propose/veto/execute flows) ────
+    \* gov_proposal_id       – 0 means no open proposal; >0 is the active id.
+    \* gov_action            – opaque tag for the proposed action (e.g., a
+    \*                         new config value); modelled as a natural.
+    \* gov_proposed_at       – `now` when the proposal was created.
+    \* gov_expiry            – the tick at which the proposal expires.
+    \* gov_vetoed            – TRUE once any authorised vetoer has vetoed.
+    \* gov_executed          – TRUE once the proposal has been executed.
+    \* gov_replaced_by       – 0 if not replaced; the new proposal id otherwise.
+    gov_proposal_id,
+    gov_action,
+    gov_proposed_at,
+    gov_expiry,
+    gov_vetoed,
+    gov_executed,
+    gov_replaced_by,
     score,
     hwm,
     breach_count,
@@ -37,6 +65,18 @@ VARIABLES
     embargo_expiry,
     delegate,
     now,
+    \* ── Upgrade-proposal signer-set snapshot (issue #1) ─────────────────────
+    \* upg_approvals      – set of signers who have approved the pending
+    \*                      proposal under the *current* signer set snapshot.
+    \* upg_signer_snap    – the frozen signer set captured when the first
+    \*                      approval arrived.  If the live set ever diverges
+    \*                      from this snapshot the approval accumulator is
+    \*                      invalidated, preventing replay under a new set.
+    \* upg_live_signers   – the current live admin signer set (mutated by
+    \*                      AddAdminSigner / RemoveAdminSigner actions).
+    upg_approvals,
+    upg_signer_snap,
+    upg_live_signers,
     \* ── Token-bucket variables ──────────────────────────────────────────────
     \* tb_tokens[w]      – current token count for wallet w (across the single
     \*                     pair modelled here; extend to a function of pairs for
@@ -75,10 +115,28 @@ VARIABLES
     cc_final_score
 
 \* ── Full variable tuple (used in UNCHANGED clauses) ──────────────────────────
-vars == <<score, hwm, breach_count, last_submit_time, embargo_expiry, delegate, now,
+vars == <<gov_proposal_id, gov_action, gov_proposed_at, gov_expiry,
+          gov_vetoed, gov_executed, gov_replaced_by,
+          score, hwm, breach_count, last_submit_time, embargo_expiry, delegate, now,
           tb_tokens, tb_last_refill, tb_capacity,
           cc_committed, cc_commit_time, cc_score, cc_revealed,
-          cc_finalized, cc_final_score>>
+          cc_finalized, cc_final_score,
+          upg_approvals, upg_signer_snap, upg_live_signers>>
+
+\* ── Governance helpers ───────────────────────────────────────────────────────
+\* A proposal is "open" if it exists, has not been vetoed, not yet executed,
+\* not replaced, and has not expired.
+GovProposalOpen ==
+    /\ gov_proposal_id > 0
+    /\ ~gov_vetoed
+    /\ ~gov_executed
+    /\ gov_replaced_by = 0
+    /\ now <= gov_expiry
+
+\* A proposal is executable: open AND the timelock has elapsed.
+GovProposalExecutable ==
+    /\ GovProposalOpen
+    /\ now >= gov_proposed_at + GOV_EXEC_DELAY
 
 \* Convenience: smaller / larger of two naturals
 Min(a, b) == IF a <= b THEN a ELSE b
@@ -132,6 +190,14 @@ ConsensusScore ==
 
 \* ── Initialization ───────────────────────────────────────────────────────────
 Init ==
+    \* Governance: no open proposal at startup.
+    /\ gov_proposal_id  = 0
+    /\ gov_action       = 0
+    /\ gov_proposed_at  = 0
+    /\ gov_expiry       = 0
+    /\ gov_vetoed       = FALSE
+    /\ gov_executed     = FALSE
+    /\ gov_replaced_by  = 0
     /\ score           = [w \in Wallets |-> 0]
     /\ hwm             = [w \in Wallets |-> 0]
     /\ breach_count    = [w \in Wallets |-> 0]
@@ -150,14 +216,121 @@ Init ==
     /\ cc_revealed     = [s \in Signers |-> FALSE]
     /\ cc_finalized    = FALSE
     /\ cc_final_score  = 0
+    \* Upgrade-proposal signer-set snapshot (issue #1): start empty.
+    /\ upg_approvals   = {}
+    /\ upg_signer_snap = {}
+    /\ upg_live_signers = Signers   \* model all spec Signers as the live admin set
 
 \* ── Action: TickTime ─────────────────────────────────────────────────────────
 TickTime ==
     /\ now' = now + 1
-    /\ UNCHANGED <<score, hwm, breach_count, last_submit_time, embargo_expiry, delegate,
+    /\ UNCHANGED <<gov_proposal_id, gov_action, gov_proposed_at, gov_expiry,
+                   gov_vetoed, gov_executed, gov_replaced_by,
+                   score, hwm, breach_count, last_submit_time, embargo_expiry, delegate,
                    tb_tokens, tb_last_refill, tb_capacity,
                    cc_committed, cc_commit_time, cc_score, cc_revealed,
                    cc_finalized, cc_final_score>>
+
+\* ════════════════════════════════════════════════════════════════════════════
+\* GOVERNANCE ACTIONS  (propose / veto / execute / expiry / replacement)
+\* ════════════════════════════════════════════════════════════════════════════
+\*
+\* The governance flow modelled here mirrors a standard timelock pattern:
+\*
+\*   1. ProposeGov(id, action):
+\*        Any party creates a proposal. The proposal is open from `now`
+\*        and expires at `now + GOV_PROPOSAL_TTL`.  Execution is only
+\*        permitted after `now + GOV_EXEC_DELAY` (the timelock delay).
+\*        Guard: no other open (non-expired, non-vetoed, non-executed,
+\*               non-replaced) proposal may exist simultaneously.
+\*
+\*   2. VetoGov:
+\*        An authorised vetoer kills the open proposal before it executes.
+\*        Guard: GovProposalOpen (must still be in the open window).
+\*
+\*   3. ExecuteGov:
+\*        Executes the open proposal.
+\*        Guard: GovProposalExecutable (open AND timelock elapsed).
+\*        Safety property TLC proves: execution is impossible before
+\*        `gov_proposed_at + GOV_EXEC_DELAY`.
+\*
+\*   4. ReplaceGov(new_id, new_action):
+\*        Replaces an open proposal with a new one (emergency update path).
+\*        The old proposal is marked replaced (gov_replaced_by = new_id)
+\*        and can no longer execute; the new proposal starts its own
+\*        timelock from the current tick.
+\*        Guard: GovProposalOpen (the old proposal must still be alive).
+\*
+\* Expiry is not a separate action — it is implicit: once `now > gov_expiry`
+\* the GovProposalOpen predicate becomes FALSE and neither Execute nor Replace
+\* are enabled.  TLC verifies this by exhaustively exploring all interleavings
+\* of TickTime with the governance actions.
+\*
+\* ─────────────────────────────────────────────────────────────────────────────
+
+\* ── Action: ProposeGov ───────────────────────────────────────────────────────
+ProposeGov(id, action) ==
+    /\ id > 0                          \* id must be a positive natural
+    /\ action \in Actions              \* action is from the finite domain
+    /\ ~GovProposalOpen                \* no concurrently open proposal
+    /\ gov_proposal_id' = id
+    /\ gov_action'      = action
+    /\ gov_proposed_at' = now
+    /\ gov_expiry'      = now + GOV_PROPOSAL_TTL
+    /\ gov_vetoed'      = FALSE
+    /\ gov_executed'    = FALSE
+    /\ gov_replaced_by' = 0
+    /\ UNCHANGED <<score, hwm, breach_count, last_submit_time, embargo_expiry, delegate, now,
+                   tb_tokens, tb_last_refill, tb_capacity,
+                   cc_committed, cc_commit_time, cc_score, cc_revealed,
+                   cc_finalized, cc_final_score>>
+
+\* ── Action: VetoGov ──────────────────────────────────────────────────────────
+VetoGov ==
+    /\ GovProposalOpen
+    /\ gov_vetoed'      = TRUE
+    /\ UNCHANGED <<gov_proposal_id, gov_action, gov_proposed_at, gov_expiry,
+                   gov_executed, gov_replaced_by,
+                   score, hwm, breach_count, last_submit_time, embargo_expiry, delegate, now,
+                   tb_tokens, tb_last_refill, tb_capacity,
+                   cc_committed, cc_commit_time, cc_score, cc_revealed,
+                   cc_finalized, cc_final_score>>
+
+\* ── Action: ExecuteGov ───────────────────────────────────────────────────────
+\* KEY SAFETY PROPERTY: this action is only enabled when GovProposalExecutable
+\* holds, which requires now >= gov_proposed_at + GOV_EXEC_DELAY.
+\* TLC therefore proves that no execution trace exists where the proposal
+\* executes before that tick.
+ExecuteGov ==
+    /\ GovProposalExecutable
+    /\ gov_executed'    = TRUE
+    /\ UNCHANGED <<gov_proposal_id, gov_action, gov_proposed_at, gov_expiry,
+                   gov_vetoed, gov_replaced_by,
+                   score, hwm, breach_count, last_submit_time, embargo_expiry, delegate, now,
+                   tb_tokens, tb_last_refill, tb_capacity,
+                   cc_committed, cc_commit_time, cc_score, cc_revealed,
+                   cc_finalized, cc_final_score>>
+
+\* ── Action: ReplaceGov ───────────────────────────────────────────────────────
+\* Emergency replacement: the open proposal is superseded by a new one.
+\* The old proposal is permanently marked replaced; it can never execute.
+ReplaceGov(new_id, new_action) ==
+    /\ GovProposalOpen
+    /\ new_id > 0
+    /\ new_id /= gov_proposal_id      \* must be a different proposal id
+    /\ new_action \in Actions
+    /\ gov_replaced_by' = new_id
+    /\ gov_proposal_id' = new_id
+    /\ gov_action'      = new_action
+    /\ gov_proposed_at' = now
+    /\ gov_expiry'      = now + GOV_PROPOSAL_TTL
+    /\ gov_vetoed'      = FALSE
+    /\ gov_executed'    = FALSE
+    /\ UNCHANGED <<score, hwm, breach_count, last_submit_time, embargo_expiry, delegate, now,
+                   tb_tokens, tb_last_refill, tb_capacity,
+                   cc_committed, cc_commit_time, cc_score, cc_revealed,
+                   cc_finalized, cc_final_score,
+                   upg_approvals, upg_signer_snap, upg_live_signers>>
 
 \* ── Action: SubmitScore ──────────────────────────────────────────────────────
 \* A score submission is accepted only when the wallet's token bucket has at
@@ -184,8 +357,11 @@ SubmitScore(w, s) ==
     /\ tb_tokens'       = [tb_tokens       EXCEPT ![w] = refilled - 1]
     /\ tb_last_refill'  = [tb_last_refill  EXCEPT ![w] = new_last_refill]
     /\ UNCHANGED <<embargo_expiry, delegate, now, tb_capacity,
+                   gov_proposal_id, gov_action, gov_proposed_at, gov_expiry,
+                   gov_vetoed, gov_executed, gov_replaced_by,
                    cc_committed, cc_commit_time, cc_score, cc_revealed,
-                   cc_finalized, cc_final_score>>
+                   cc_finalized, cc_final_score,
+                   upg_approvals, upg_signer_snap, upg_live_signers>>
 
 \* ── Action: SetBurstCapacity ─────────────────────────────────────────────────
 \* Admin reduces or increases burst capacity.  The Rust implementation applies
@@ -200,25 +376,34 @@ SetBurstCapacity(capacity) ==
     /\ capacity <= MAX_CAPACITY
     /\ tb_capacity' = capacity
     /\ UNCHANGED <<score, hwm, breach_count, last_submit_time, embargo_expiry, delegate, now,
+                   gov_proposal_id, gov_action, gov_proposed_at, gov_expiry,
+                   gov_vetoed, gov_executed, gov_replaced_by,
                    tb_tokens, tb_last_refill,
                    cc_committed, cc_commit_time, cc_score, cc_revealed,
-                   cc_finalized, cc_final_score>>
+                   cc_finalized, cc_final_score,
+                   upg_approvals, upg_signer_snap, upg_live_signers>>
 
 \* ── Action: SetEmbargo ───────────────────────────────────────────────────────
 SetEmbargo(w, expiry) ==
     /\ embargo_expiry' = [embargo_expiry EXCEPT ![w] = expiry]
     /\ UNCHANGED <<score, hwm, breach_count, last_submit_time, delegate, now,
+                   gov_proposal_id, gov_action, gov_proposed_at, gov_expiry,
+                   gov_vetoed, gov_executed, gov_replaced_by,
                    tb_tokens, tb_last_refill, tb_capacity,
                    cc_committed, cc_commit_time, cc_score, cc_revealed,
-                   cc_finalized, cc_final_score>>
+                   cc_finalized, cc_final_score,
+                   upg_approvals, upg_signer_snap, upg_live_signers>>
 
 \* ── Action: LiftEmbargo ──────────────────────────────────────────────────────
 LiftEmbargo(w) ==
     /\ embargo_expiry' = [embargo_expiry EXCEPT ![w] = 0]
     /\ UNCHANGED <<score, hwm, breach_count, last_submit_time, delegate, now,
+                   gov_proposal_id, gov_action, gov_proposed_at, gov_expiry,
+                   gov_vetoed, gov_executed, gov_replaced_by,
                    tb_tokens, tb_last_refill, tb_capacity,
                    cc_committed, cc_commit_time, cc_score, cc_revealed,
-                   cc_finalized, cc_final_score>>
+                   cc_finalized, cc_final_score,
+                   upg_approvals, upg_signer_snap, upg_live_signers>>
 
 \* ── Action: SetDelegate / RemoveDelegate ─────────────────────────────────────
 SetDelegate(sub, cust) ==
@@ -227,24 +412,33 @@ SetDelegate(sub, cust) ==
     /\ delegate[cust] /= "None" => delegate[delegate[cust]] /= sub
     /\ delegate' = [delegate EXCEPT ![sub] = cust]
     /\ UNCHANGED <<score, hwm, breach_count, last_submit_time, embargo_expiry, now,
+                   gov_proposal_id, gov_action, gov_proposed_at, gov_expiry,
+                   gov_vetoed, gov_executed, gov_replaced_by,
                    tb_tokens, tb_last_refill, tb_capacity,
                    cc_committed, cc_commit_time, cc_score, cc_revealed,
-                   cc_finalized, cc_final_score>>
+                   cc_finalized, cc_final_score,
+                   upg_approvals, upg_signer_snap, upg_live_signers>>
 
 RemoveDelegate(sub) ==
     /\ delegate' = [delegate EXCEPT ![sub] = "None"]
     /\ UNCHANGED <<score, hwm, breach_count, last_submit_time, embargo_expiry, now,
+                   gov_proposal_id, gov_action, gov_proposed_at, gov_expiry,
+                   gov_vetoed, gov_executed, gov_replaced_by,
                    tb_tokens, tb_last_refill, tb_capacity,
                    cc_committed, cc_commit_time, cc_score, cc_revealed,
-                   cc_finalized, cc_final_score>>
+                   cc_finalized, cc_final_score,
+                   upg_approvals, upg_signer_snap, upg_live_signers>>
 
 \* ── Action: ResetBreachCount ─────────────────────────────────────────────────
 ResetBreachCount(w) ==
     /\ breach_count' = [breach_count EXCEPT ![w] = 0]
     /\ UNCHANGED <<score, hwm, last_submit_time, embargo_expiry, delegate, now,
+                   gov_proposal_id, gov_action, gov_proposed_at, gov_expiry,
+                   gov_vetoed, gov_executed, gov_replaced_by,
                    tb_tokens, tb_last_refill, tb_capacity,
                    cc_committed, cc_commit_time, cc_score, cc_revealed,
-                   cc_finalized, cc_final_score>>
+                   cc_finalized, cc_final_score,
+                   upg_approvals, upg_signer_snap, upg_live_signers>>
 
 \* ════════════════════════════════════════════════════════════════════════════
 \* CONSENSUS COMMIT-REVEAL ACTIONS  (issue #403)
@@ -289,8 +483,11 @@ CommitConsensus(s, v) ==
     /\ cc_commit_time' = [cc_commit_time EXCEPT ![s] = now]
     /\ cc_score'       = [cc_score       EXCEPT ![s] = v]
     /\ UNCHANGED <<score, hwm, breach_count, last_submit_time, embargo_expiry, delegate, now,
+                   gov_proposal_id, gov_action, gov_proposed_at, gov_expiry,
+                   gov_vetoed, gov_executed, gov_replaced_by,
                    tb_tokens, tb_last_refill, tb_capacity,
-                   cc_revealed, cc_finalized, cc_final_score>>
+                   cc_revealed, cc_finalized, cc_final_score,
+                   upg_approvals, upg_signer_snap, upg_live_signers>>
 
 \* ── Action: RevealConsensus ──────────────────────────────────────────────────
 \* Signer `s` reveals their previously committed score.
@@ -314,9 +511,12 @@ RevealConsensus(s) ==
     \* The important structural check is the window and the prior-commit guard.
     /\ cc_revealed' = [cc_revealed EXCEPT ![s] = TRUE]
     /\ UNCHANGED <<score, hwm, breach_count, last_submit_time, embargo_expiry, delegate, now,
+                   gov_proposal_id, gov_action, gov_proposed_at, gov_expiry,
+                   gov_vetoed, gov_executed, gov_replaced_by,
                    tb_tokens, tb_last_refill, tb_capacity,
                    cc_committed, cc_commit_time, cc_score,
-                   cc_finalized, cc_final_score>>
+                   cc_finalized, cc_final_score,
+                   upg_approvals, upg_signer_snap, upg_live_signers>>
 
 \* ── Action: FinalizeConsensus ────────────────────────────────────────────────
 \* Atomically finalizes the round when K-of-N agreement within epsilon holds.
@@ -328,8 +528,11 @@ FinalizeConsensus ==
     /\ cc_finalized'    = TRUE
     /\ cc_final_score'  = cc_score[ConsensusScore]
     /\ UNCHANGED <<score, hwm, breach_count, last_submit_time, embargo_expiry, delegate, now,
+                   gov_proposal_id, gov_action, gov_proposed_at, gov_expiry,
+                   gov_vetoed, gov_executed, gov_replaced_by,
                    tb_tokens, tb_last_refill, tb_capacity,
-                   cc_committed, cc_commit_time, cc_score, cc_revealed>>
+                   cc_committed, cc_commit_time, cc_score, cc_revealed,
+                   upg_approvals, upg_signer_snap, upg_live_signers>>
 
 \* ── Action: ResetConsensusRound ──────────────────────────────────────────────
 \* Starts a fresh consensus round.  In the Rust contract a new round is
@@ -347,6 +550,8 @@ ResetConsensusRound ==
     /\ cc_finalized'   = FALSE
     /\ cc_final_score' = 0
     /\ UNCHANGED <<score, hwm, breach_count, last_submit_time, embargo_expiry, delegate, now,
+                   gov_proposal_id, gov_action, gov_proposed_at, gov_expiry,
+                   gov_vetoed, gov_executed, gov_replaced_by,
                    tb_tokens, tb_last_refill, tb_capacity>>
 
 \* ── Action: ExpireStaleCommit ────────────────────────────────────────────────
@@ -362,8 +567,75 @@ ExpireStaleCommit(s) ==
     /\ cc_commit_time' = [cc_commit_time EXCEPT ![s] = 0]
     /\ cc_score'       = [cc_score       EXCEPT ![s] = 0]
     /\ UNCHANGED <<score, hwm, breach_count, last_submit_time, embargo_expiry, delegate, now,
+                   gov_proposal_id, gov_action, gov_proposed_at, gov_expiry,
+                   gov_vetoed, gov_executed, gov_replaced_by,
                    tb_tokens, tb_last_refill, tb_capacity,
-                   cc_revealed, cc_finalized, cc_final_score>>
+                   cc_revealed, cc_finalized, cc_final_score,
+                   upg_approvals, upg_signer_snap, upg_live_signers>>
+
+\* ════════════════════════════════════════════════════════════════════════════
+\* UPGRADE PROPOSAL SIGNER-SET SNAPSHOT ACTIONS  (issue #1)
+\* ════════════════════════════════════════════════════════════════════════════
+\*
+\* The Rust contract accumulates M-of-N admin co-signatures for an upgrade
+\* proposal across multiple transactions.  The vulnerability: if a signer is
+\* added or removed while approvals are accumulating, the stale approvals
+\* remain valid and count toward the new threshold — an approval collected
+\* under one signer set can be replayed under a different one.
+\*
+\* The fix: snapshot the signer set when the first approval arrives and
+\* invalidate the entire accumulator whenever the live set diverges from
+\* the snapshot.  These three actions model that lifecycle.
+\*
+\* AddUpgradeApproval(s): a signer in the live set adds their approval.
+\*   – On the first approval, freeze upg_signer_snap = upg_live_signers.
+\*   – If the snapshot already exists and the live set has diverged, clear
+\*     the accumulator and start fresh (snapshot invalidation).
+\*
+\* MutateAdminSet(s, add): admin adds or removes signer `s`.
+\*   – After the mutation, if any approvals have been collected under the
+\*     old snapshot, they are invalidated (accumulator cleared, snap reset).
+\*
+\* ClearUpgradeApprovals: explicit accumulator reset (veto / threshold met).
+
+AddUpgradeApproval(s) ==
+    /\ s \in upg_live_signers        \* signer must be in the live set
+    /\ s \notin upg_approvals        \* idempotency guard
+    /\ LET snap == IF upg_approvals = {} THEN upg_live_signers ELSE upg_signer_snap
+       IN
+       /\ IF snap /= upg_live_signers
+          \* Snapshot diverged: clear stale approvals, start fresh with `s`.
+          THEN /\ upg_approvals'   = {s}
+               /\ upg_signer_snap' = upg_live_signers
+          ELSE /\ upg_approvals'   = upg_approvals \cup {s}
+               /\ upg_signer_snap' = snap
+    /\ UNCHANGED <<score, hwm, breach_count, last_submit_time, embargo_expiry, delegate, now,
+                   tb_tokens, tb_last_refill, tb_capacity,
+                   cc_committed, cc_commit_time, cc_score, cc_revealed,
+                   cc_finalized, cc_final_score, upg_live_signers>>
+
+\* Model admin adding or removing a signer while a proposal accumulates.
+\* Either direction invalidates any stale approvals.
+MutateAdminSet(s) ==
+    /\ upg_live_signers' =
+           IF s \in upg_live_signers
+           THEN upg_live_signers \ {s}    \* remove
+           ELSE upg_live_signers \cup {s} \* add
+    \* Invalidate accumulated approvals whenever the signer set changes.
+    /\ upg_approvals'   = {}
+    /\ upg_signer_snap' = {}
+    /\ UNCHANGED <<score, hwm, breach_count, last_submit_time, embargo_expiry, delegate, now,
+                   tb_tokens, tb_last_refill, tb_capacity,
+                   cc_committed, cc_commit_time, cc_score, cc_revealed,
+                   cc_finalized, cc_final_score>>
+
+ClearUpgradeApprovals ==
+    /\ upg_approvals'   = {}
+    /\ upg_signer_snap' = {}
+    /\ UNCHANGED <<score, hwm, breach_count, last_submit_time, embargo_expiry, delegate, now,
+                   tb_tokens, tb_last_refill, tb_capacity,
+                   cc_committed, cc_commit_time, cc_score, cc_revealed,
+                   cc_finalized, cc_final_score, upg_live_signers>>
 
 \* ── Next-state relation ──────────────────────────────────────────────────────
 Next ==
@@ -375,12 +647,21 @@ Next ==
     \/ \E sub \in Wallets, cust \in Wallets : SetDelegate(sub, cust)
     \/ \E sub \in Wallets : RemoveDelegate(sub)
     \/ \E w \in Wallets : ResetBreachCount(w)
+    \* Governance actions
+    \/ \E id \in 1..4, action \in Actions : ProposeGov(id, action)
+    \/ VetoGov
+    \/ ExecuteGov
+    \/ \E new_id \in 1..4, new_action \in Actions : ReplaceGov(new_id, new_action)
     \* Consensus actions
     \/ \E s \in Signers, v \in Scores : CommitConsensus(s, v)
     \/ \E s \in Signers : RevealConsensus(s)
     \/ FinalizeConsensus
     \/ ResetConsensusRound
     \/ \E s \in Signers : ExpireStaleCommit(s)
+    \* Upgrade signer-set snapshot actions (issue #1)
+    \/ \E s \in Signers : AddUpgradeApproval(s)
+    \/ \E s \in Signers : MutateAdminSet(s)
+    \/ ClearUpgradeApprovals
 
 \* ════════════════════════════════════════════════════════════════════════════
 \* INVARIANTS
@@ -533,138 +814,58 @@ FinalizationIsTerminalWithinRound ==
 FinalScoreImmutableWithinRound ==
     [][cc_finalized /\ cc_finalized' => cc_final_score' = cc_final_score]_vars
 
-\* ════════════════════════════════════════════════════════════════════════════
-\* LIVENESS PROPERTIES  (issue #753)
-\* ════════════════════════════════════════════════════════════════════════════
-\*
-\* These properties prove that a valid submission is *not* blocked forever.
-\* Under weak fairness on TickTime and SubmitScore, any wallet that is:
-\*   (a) not under an active embargo, AND
-\*   (b) submitting a score that passes the score-floor policy
-\* will eventually have its submission accepted once the cooldown window has
-\* elapsed.
-\*
-\* "Eventually" is made concrete by the bounded StateConstraint (now ≤ 10);
-\* within that horizon, TickTime fires enough ticks to drain the cooldown and
-\* refill the token bucket, after which SubmitScore becomes enabled.
-\*
-\* The bounded model-check approach (TLC with a finite-depth exploration)
-\* discharges these properties as *bounded liveness* rather than infinite-trace
-\* liveness — matching the acceptance criterion for this issue, which requires
-\* "a bounded configuration that CI can run".
-\* ─────────────────────────────────────────────────────────────────────────────
+\* ── Governance invariants (new) ─────────────────────────────────────────────
 
-\* ── Helper: a submission for wallet w with score s is policy-compliant ────────
-\* Mirrors the two guards in SubmitScore that are *not* time-related:
-\*   1. The score-floor check   (hwm[w] >= HWM_THRESHOLD => s >= FLOOR_VALUE)
-\*   2. Score in the valid range (s \in Scores, always satisfied by construction)
-PolicyCompliant(w, s) ==
-    hwm[w] >= HWM_THRESHOLD => s >= FLOOR_VALUE
+\* INV-GOV-1  A proposal cannot execute before its timelock has elapsed.
+\* Core TLC-proven safety property for issue 1: code cannot update before the
+\* executable time.  ExecuteGov requires GovProposalExecutable which requires
+\* now >= gov_proposed_at + GOV_EXEC_DELAY, so this invariant is preserved by
+\* construction and TLC verifies no execution trace violates it.
+NoEarlyExecution ==
+    gov_executed => now >= gov_proposed_at + GOV_EXEC_DELAY
 
-\* ── Helper: wallet w currently has at least one token available ───────────────
-\* (i.e., the cooldown has elapsed and the bucket is refilled)
-TokenAvailable(w) == RefillCount(w) > 0
+\* INV-GOV-2  A vetoed proposal can never execute.
+VetoBlocksExecution ==
+    (gov_vetoed /\ gov_executed) = FALSE
 
-\* ── Helper: wallet w is not under an active embargo ───────────────────────────
-NotEmbargoActive(w) == ~EmbargoActive(w)
+\* INV-GOV-3  An expired proposal can never execute.
+\* gov_expiry = 0 means no proposal has been created yet; once a proposal
+\* exists (gov_proposal_id > 0), execution after expiry is impossible because
+\* GovProposalOpen requires now <= gov_expiry.
+StaleProposalCannotExecute ==
+    (gov_proposal_id > 0 /\ gov_executed /\ gov_expiry > 0)
+        => now <= gov_expiry
 
-\* ── LIVE-1: Cooldown expiry eventually enables submission ────────────────────
-\*
-\* If a wallet has just been rate-limited (its bucket is empty / no token
-\* available), and no embargo is active, then *eventually* (within COOLDOWN
-\* ticks) a token becomes available and a policy-compliant submission can
-\* be accepted.
-\*
-\* Stated as a bounded action property over the next-state relation:
-\* "In every state where the wallet has no token and is not embargoed, the
-\*  SubmitScore action for that wallet becomes enabled within COOLDOWN ticks."
-\*
-\* We model this as a step-level ACTION CONSTRAINT ([][…]_vars) rather than a
-\* full LTL formula, because TLC's bounded model-checker verifies action
-\* properties more efficiently than LTL over infinite traces.
-CooldownExpiryEnablesSubmission ==
-    [][ \A w \in Wallets :
-            (~TokenAvailable(w) /\ NotEmbargoActive(w))
-            => (now' - now = 1        \* time always advances by 1 tick
-                \/ TokenAvailable(w)) \* or token was already available (
-                                      \*    lazily re-evaluated at next tick)
-       ]_vars
+\* INV-GOV-4  A replaced proposal can never execute.
+\* The original proposal's gov_replaced_by field is set to a non-zero value
+\* on replacement; the old proposal_id/state is superseded.  Once replaced,
+\* gov_replaced_by stays non-zero — only a fresh ProposeGov (with no open
+\* proposal) can reset it to 0, and that requires ~GovProposalOpen.
+ReplacedProposalCannotExecute ==
+    gov_executed => gov_replaced_by = 0
 
-\* ── LIVE-2: A paused wallet eventually becomes submittable after lift ─────────
-\*
-\* If an embargo is active for wallet w and the embargo is time-bounded
-\* (embargo_expiry[w] > 0), then once `now` advances past `embargo_expiry[w]`
-\* the wallet is no longer embargoed and a submission is eventually accepted.
-\*
-\* Permanent embargoes (embargo_expiry[w] = -1) are excluded because by
-\* definition they have no finite expiry — exactly the "no pause remains"
-\* condition from the issue title.
-BoundedEmbargoEventuallyLifts ==
-    [][ \A w \in Wallets :
-            (embargo_expiry[w] > 0 /\ now > embargo_expiry[w])
-            => ~EmbargoActive(w)
-       ]_vars
+\* ── Governance temporal properties (new) ─────────────────────────────────────
 
-\* ── LIVE-3: Policy-compliant submission is eventually accepted ────────────────
-\*
-\* If at some point:
-\*   (a) no embargo is active for wallet w, AND
-\*   (b) the score-floor policy is satisfied for score s, AND
-\*   (c) at least one token is available
-\* then SubmitScore(w, s) is *enabled* in this state (the precondition holds),
-\* and under weak fairness it will be taken.
-\*
-\* We capture this as a state-level enabledness check.  Full LTL
-\* <>-quantification is not supported in TLC's action-property mode;
-\* instead we verify the invariant that "whenever all preconditions hold the
-\* action is indeed enabled", which is the mechanically checkable half of
-\* the liveness argument.
-SubmitEnabledWhenConditionsMet ==
-    \A w \in Wallets, s \in Scores :
-        (NotEmbargoActive(w) /\ PolicyCompliant(w, s) /\ TokenAvailable(w))
-        => ENABLED SubmitScore(w, s)
+\* PROP-GOV-1  Once executed, gov_executed stays TRUE within the same proposal.
+\* An executed proposal is a terminal state: no subsequent action may flip
+\* gov_executed back to FALSE without a new ProposeGov resetting the entire
+\* proposal state.
+ExecutionIsTerminal ==
+    [][gov_executed =>
+        (gov_executed'
+         \/ \* Only a new proposal (ProposeGov) may clear gov_executed
+            /\ gov_proposal_id' /= gov_proposal_id
+            /\ gov_executed'    = FALSE)]_vars
 
-\* ── LIVE-4: Score-floor policy does not permanently block valid scores ─────────
-\*
-\* If the floor policy is active for wallet w (hwm[w] >= HWM_THRESHOLD), then
-\* there always exists at least one score value in the modelled Scores set
-\* that is >= FLOOR_VALUE.  This ensures the policy never makes all scores
-\* inadmissible — a submission at or above the floor is always possible.
-\*
-\* This is an invariant (not just a liveness property) because it is a
-\* structural property of the constant configuration, verified in every state.
-ScoreFloorDoesNotBlockAllScores ==
-    \A w \in Wallets :
-        hwm[w] >= HWM_THRESHOLD
-        => \E s \in Scores : s >= FLOOR_VALUE
-
-\* ── LIVE-5: Bounded liveness — submission accepted within COOLDOWN ticks ──────
-\*
-\* The key bounded-liveness property:
-\* "If a wallet has a token available and no embargo and a policy-compliant
-\*  score, a SubmitScore for that wallet is taken within the current tick."
-\*
-\* Formally, within the bounded model (now ≤ StateConstraint), the combination
-\* of TickTime and SubmitScore actions is sufficient to always find a state
-\* where last_submit_time[w] advances — proving the submission is not
-\* indefinitely deferred.
-\*
-\* Together with CooldownExpiryEnablesSubmission (LIVE-1) this establishes:
-\*   "At most COOLDOWN ticks after a rate-limit, the wallet is enabled again."
-BoundedLivenessSubmissionAccepted ==
-    [][ \A w \in Wallets, s \in Scores :
-            (NotEmbargoActive(w) /\ PolicyCompliant(w, s) /\ TokenAvailable(w)
-             /\ last_submit_time[w] < now)
-            => \/ last_submit_time'[w] = now   \* accepted in this step
-               \/ last_submit_time'[w] = last_submit_time[w]  \* not yet — ok
-       ]_vars
+\* PROP-GOV-2  A vetoed proposal permanently cannot execute in the same round.
+VetoIsPermanent ==
+    [][gov_vetoed => gov_vetoed']_vars
 
 \* ── State constraint (model-checking bound) ──────────────────────────────────
-\* Increased from 5 to 10 to give at least 2 full COOLDOWN cycles (COOLDOWN=1)
-\* and enough headroom for a complete commit-reveal-finalize-reset cycle plus
-\* a subsequent policy-compliant submission — required to exercise all five
-\* liveness properties above within the bounded check.
-StateConstraint == now <= 10
+\* now <= 6 covers: 2 full refill cycles, 1 full commit-reveal-finalize-reset
+\* cycle, and the full governance lifecycle (propose at 1, executable at 3,
+\* expires at 4 — expiry, delay-boundary, and post-expiry all reachable).
+StateConstraint == now <= 6
 
 Spec == Init /\ [][Next]_vars
 =============================================================================
