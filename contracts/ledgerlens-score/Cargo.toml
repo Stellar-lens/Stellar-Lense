@@ -29,6 +29,11 @@ harness = false
 path = "benches/batch_submit.rs"
 
 [[bench]]
+name = "batch_attested"
+harness = false
+path = "benches/batch_attested.rs"
+
+[[bench]]
 name = "rent_sweep"
 harness = false
 path = "benches/rent_sweep.rs"
@@ -37,6 +42,11 @@ path = "benches/rent_sweep.rs"
 name = "history_eviction"
 harness = false
 path = "benches/history_eviction.rs"
+
+[[bench]]
+name = "batch_worst_case_profiles"
+harness = false
+path = "benches/batch_worst_case_profiles.rs"
 
 [features]
 testutils = ["soroban-sdk/testutils"]
