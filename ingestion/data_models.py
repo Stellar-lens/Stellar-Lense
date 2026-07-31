@@ -3,11 +3,17 @@
 These models are the shared contract between the ingestion layer and the
 detection layer (Benford engine + feature engineering). Keep field names
 stable — downstream code and the `ledgerlens-core` shared types mirror them.
+
+Precision Handling
+------------------
+Financial fields (amounts, prices) use Decimal type with validation to prevent
+float precision errors. See utils.decimal_guards for the precision guard system.
 """
 
 from datetime import datetime
+from decimal import Decimal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class Asset(BaseModel):
@@ -19,7 +25,15 @@ class Asset(BaseModel):
 
 
 class Trade(BaseModel):
-    """A single executed trade on the SDEX."""
+    """A single executed trade on the SDEX.
+
+    Precision Note
+    --------------
+    Amount and price fields use Decimal type to prevent floating-point
+    precision errors. Stellar amounts have 7-decimal precision (stroops).
+    Values are validated on initialization to ensure they meet Stellar
+    constraints (7 decimals max, int64 bounds).
+    """
 
     trade_id: str
     ledger_close_time: datetime
@@ -27,27 +41,49 @@ class Trade(BaseModel):
     counter_account: str
     base_asset: Asset
     counter_asset: Asset
-    base_amount: float
-    counter_amount: float
-    price: float
+    base_amount: Decimal
+    counter_amount: Decimal
+    price: Decimal
+
+    @field_validator("base_amount", "counter_amount", "price", mode="before")
+    @classmethod
+    def validate_stellar_amounts(cls, v):
+        """Validate amounts meet Stellar precision requirements."""
+        from utils.decimal_guards import validate_stellar_amount
+
+        return validate_stellar_amount(v)
 
     @property
-    def amount(self) -> float:
+    def amount(self) -> Decimal:
         """Primary amount used for Benford digit analysis."""
         return self.base_amount
 
 
 class OrderBookEvent(BaseModel):
-    """Order placement / cancellation event."""
+    """Order placement / cancellation event.
+
+    Precision Note
+    --------------
+    Amount and price fields use Decimal type to prevent floating-point
+    precision errors. Values are validated on initialization.
+    """
 
     event_id: str
     account: str
     ledger_close_time: datetime
     selling: Asset
     buying: Asset
-    amount: float
-    price: float
+    amount: Decimal
+    price: Decimal
     action: str = Field(description="one of: created, cancelled, updated")
+
+    @field_validator("amount", "price", mode="before")
+    @classmethod
+    def validate_stellar_amounts(cls, v):
+        """Validate amounts meet Stellar precision requirements."""
+        from utils.decimal_guards import validate_stellar_amount
+
+        return validate_stellar_amount(v)
 
 
 class AccountActivity(BaseModel):
