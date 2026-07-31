@@ -61,6 +61,8 @@ from streaming.alert_dispatcher import AlertDispatcher
 from streaming.feature_buffer import FeatureBuffer
 from streaming.health import WorkerHealthMonitor, get_health_registry
 from streaming.streaming_scorer import StreamingScorer
+from monitoring.capacity_metrics import record_e2e_latency
+from monitoring.emergency_watchdog import EmergencyWatchdog
 from utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -246,6 +248,7 @@ class KafkaWorker:
         scorer: StreamingScorer,
         dispatcher: AlertDispatcher,
         buffer: FeatureBuffer | None = None,
+        watchdog: EmergencyWatchdog | None = None,
         *,
         consumer: Consumer | None = None,
         bootstrap_servers: str | None = None,
@@ -260,6 +263,7 @@ class KafkaWorker:
         self._scorer = scorer
         self._dispatcher = dispatcher
         self._buffer = buffer if buffer is not None else FeatureBuffer()
+        self._watchdog = watchdog
         self._schema = load_schema(schema_path)
         self._dlq_topic = dlq_topic or config.KAFKA_DLQ_TOPIC
         self._lag_threshold = (
@@ -301,14 +305,13 @@ class KafkaWorker:
 
         self._running = True
         logger.info("KafkaWorker started — consuming trade topics")
+        
+        import threading
+        from streaming.health_check import heartbeat
+
         try:
             while self._running:
-                self._health_monitor.record_heartbeat(
-                    details={
-                        "in_flight_partitions": len(self._in_flight),
-                        "running": True,
-                    }
-                )
+                heartbeat(threading.current_thread().name)
                 msg = self._consumer.poll(1.0)
                 if msg is None:
                     continue
@@ -348,6 +351,20 @@ class KafkaWorker:
 
     def process_message(self, msg) -> None:
         """Decode, score, dispatch, then commit the offset (at-least-once)."""
+        correlation_id = correlation_id_from_headers(msg.headers())
+        if correlation_id is None:
+            correlation_id = f"kafka-{msg.topic()}-{msg.partition()}-{msg.offset()}"
+        with log_context(
+            correlation_id=correlation_id,
+            pipeline_stage="streaming.kafka_worker",
+            kafka_topic=msg.topic(),
+            kafka_partition=msg.partition(),
+            kafka_offset=msg.offset(),
+        ):
+            self._process_correlated_message(msg)
+
+    def _process_correlated_message(self, msg) -> None:
+        """Process one Kafka message with its transport correlation context bound."""
         # Never process the dead-letter topic — DLQ/DLT requires human review.
         if msg.topic() in (self._dlq_topic, config.KAFKA_DEAD_LETTER_TOPIC):
             self._consumer.commit(message=msg, asynchronous=False)
@@ -396,6 +413,16 @@ class KafkaWorker:
 
         self._buffer.update(record_to_trade(record))
         pair_id = record["asset_pair"]
+        
+        ingestion_timestamp_ms = None
+        if msg.headers():
+            for k, v in msg.headers():
+                if k == "ingestion_timestamp_ms":
+                    try:
+                        ingestion_timestamp_ms = int(v.decode("utf-8"))
+                    except Exception:
+                        pass
+                        
         for wallet in (record["base_account"], record["counter_account"]):
             start = time.perf_counter()
             score = self._scorer.score_wallet(wallet, self._buffer)
@@ -404,6 +431,14 @@ class KafkaWorker:
                 # If dispatch raises, we never reach commit() below → redelivery.
                 self._dispatcher.dispatch(wallet, score, pair_id)
                 ALERTS_DISPATCHED.inc()
+                
+                e2e_latency_ms = None
+                if ingestion_timestamp_ms is not None:
+                    e2e_latency_ms = (time.time() * 1000) - ingestion_timestamp_ms
+                    record_e2e_latency(e2e_latency_ms / 1000.0)
+                    
+                if self._watchdog is not None:
+                    self._watchdog.record_score(wallet, score, e2e_latency_ms)
 
         self._consumer.commit(message=msg, asynchronous=False)
         KAFKA_MESSAGES_CONSUMED.inc()

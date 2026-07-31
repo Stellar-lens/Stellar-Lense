@@ -8,10 +8,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Typed exceptions for ingestion and validation failures: a `LedgerLensError`
+  base (`utils/exceptions.py`) and the ingestion taxonomy
+  (`ingestion/exceptions.py`): `IngestionError` with `InvalidInputError`,
+  `RecordValidationError`, `SchemaValidationError`, and
+  `SourceUnavailableError`. Failures carry `source` / `reason` / `raw`
+  context mirroring the Kafka dead-letter envelope. Adopted across
+  `ingestion/`; degraded-mode behaviour (rate limiter, batch account loads,
+  metadata cache) is unchanged. Documented in `docs/ingestion.md` under
+  "Error handling".
 - Cryptographically committed forensic audit trail (`detection/audit_trail.py`):
   signed NDJSON append-only log for report scores, feature/SHAP hashes, and model
   version; `scripts/verify_audit_trail.py` for regulator verification.
   Config: `AUDIT_LOG_PATH`, `AUDIT_VERIFY_PUBLIC_KEY_PATH`.
+
+### Changed
+- `ingestion.payment_path_analyzer.reconstruct_path_flow` raises
+  `RecordValidationError` instead of `KeyError` when required fields are
+  missing. `RecordValidationError` is deliberately not a `KeyError` subclass,
+  so callers relying on `except KeyError` here must be updated.
 
 ## [0.2.0] - 2026-06-13
 
