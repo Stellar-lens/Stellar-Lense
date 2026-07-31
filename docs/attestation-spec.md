@@ -125,14 +125,73 @@ instance) cannot be replayed against another.
      known.
 5. Any mismatch at any step is `Error::InvalidAttestation`.
 
-## 5. Key format
+## 5. Key format and canonicalization
 
-`set_service_pubkey` accepts a SEC-1-encoded secp256k1 public key, either:
+`set_service_pubkey` (and `rotate_service_pubkey`) enforce **SEC-1 canonical
+encoding** on the supplied public key. The check is performed by
+`storage::validate_pubkey_format` before the key is written to storage.
 
-- 33 bytes, compressed (`0x02`/`0x03` prefix + x-coordinate), or
-- 65 bytes, uncompressed (`0x04` prefix + x + y coordinates).
+### 5.1 Accepted encodings
 
-Any other length is rejected with `Error::InvalidPubkeyLength`.
+| Length | Prefix byte | SEC-1 meaning       | Accepted? |
+|--------|-------------|---------------------|-----------|
+| 33     | `0x02`      | Compressed, even y  | ✅ yes    |
+| 33     | `0x03`      | Compressed, odd y   | ✅ yes    |
+| 65     | `0x04`      | Uncompressed        | ✅ yes    |
+
+### 5.2 Rejected encodings
+
+Any input **not** matching the table above is rejected with
+`Error::InvalidPubkeyLength`. This covers both wrong-length and wrong-prefix
+cases — the error code is reused for prefix violations because the error enum
+is at the XDR 50-variant limit and a prefix error has the same operational
+meaning (the key is not usable).
+
+Examples of rejected inputs:
+
+| Length | Prefix byte | Reason for rejection                                   |
+|--------|-------------|--------------------------------------------------------|
+| 0      | —           | Empty; wrong length                                    |
+| 1      | any         | Wrong length                                           |
+| 32     | any         | Wrong length (one byte short of a compressed key)      |
+| 34     | any         | Wrong length (one byte over a compressed key)          |
+| 64     | any         | Wrong length (one byte short of an uncompressed key)   |
+| 66     | any         | Wrong length (one byte over an uncompressed key)       |
+| 33     | `0x00`      | Invalid prefix for compressed key                      |
+| 33     | `0x01`      | Invalid prefix for compressed key                      |
+| 33     | `0x04`      | `0x04` is only valid for 65-byte uncompressed keys     |
+| 33     | `0x05`–`0xFF` | Invalid prefix for compressed key                   |
+| 65     | `0x00`–`0x03` | Invalid prefix for uncompressed key                 |
+| 65     | `0x05`–`0xFF` | Invalid prefix for uncompressed key                 |
+
+### 5.3 What canonicalization does NOT check
+
+- **Point-on-curve validity**: Soroban's host does not expose a secp256k1
+  point-validation function at key-set time. A blob with a valid prefix but
+  coordinates that do not lie on secp256k1 is accepted at storage time; it
+  will simply never match any key recovered by `secp256k1_recover` during
+  `verify_attestation`, making every subsequent attestation fail with
+  `Error::InvalidAttestation`. Operators should set only genuine public keys.
+- **Low-order or weak points**: same reasoning — rejected at signature-verify
+  time by the host, not at key-set time.
+- **All-zero or all-`0xFF` payloads**: a 33-byte `0x02 || 0x00…00` passes the
+  prefix check. It is not a valid secp256k1 point, so no signature will ever
+  verify against it.
+
+### 5.4 Verification path (recap from §4)
+
+`secp256k1_recover` always returns a 65-byte uncompressed point. Comparison
+against the stored key depends on the stored format:
+
+- **Stored as 65 bytes**: constant-time compare directly.
+- **Stored as 33 bytes**: derive the compressed form from the recovered point
+  (`0x02`/`0x03` parity prefix + x-coordinate), then constant-time compare.
+  No additional elliptic-curve arithmetic is required — the recovered point's
+  coordinates are already available.
+
+The `pubkeys_match` helper in `storage.rs` encapsulates this dispatch and is
+shared between the active-key and pending-key (overlap-window) comparison
+paths.
 
 ## 6. Migration & Cross-Deployment Binding
 
