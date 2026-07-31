@@ -46,6 +46,7 @@ from detection.model_compatibility import (
     compute_feature_contract_hash,
 )
 from utils.logging import get_logger
+from utils.version_stamp import get_version as _get_ledgerlens_version
 
 logger = get_logger(__name__)
 
@@ -987,7 +988,7 @@ def save_training_artifacts(
         ),
         "model_names": list(results.keys()),
         "python_version": sys.version.split()[0],
-        "ledgerlens_version": "0.2.0",
+        "ledgerlens_version": _get_ledgerlens_version(),
         "feature_distributions": feature_distributions,
     }
 
