@@ -190,6 +190,9 @@ mod test_memory_exhaustion;
 #[cfg(test)]
 mod test_audit_replay;
 
+#[cfg(test)]
+mod test_signer_governance;
+
 use soroban_sdk::{
     contract, contractimpl, crypto::Hash, symbol_short, token, Address, Bytes, BytesN, Env,
     IntoVal, Symbol, SymbolStr, TryFromVal, Vec,

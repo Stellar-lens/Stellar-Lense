@@ -6,7 +6,8 @@ use crate::constants::{
 };
 use crate::errors::Error;
 use crate::types::{
-    AdaptiveRateLimit, AggregateRiskScore, AlertAckRecord, AlertType, DataKey, DataKeyB, DataKeyC,
+ \
+  AdaptiveRateLimit, AggregateRiskScore, AlertAckRecord, AlertType, DataKey, DataKeyB, DataKeyC,
     DataKeyD, DecayCurve, EmbargoExpiry, FlashProtectionMode, GateDataKey, HllSketch,
     InterpolationMethod, JumpStats, ModelVersionStats, ModelVersionStatus, PairVolatilityState,
     ParamChangeProposal, ParameterProposalRecord, ParameterProposalStatus, PendingScoreEntry,
