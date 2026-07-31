@@ -8,6 +8,8 @@ mod constants;
 extern crate std;
 mod errors;
 mod events;
+mod event_causality;
+mod event_stability;
 #[cfg(any(test, feature = "testutils"))]
 mod invariants;
 mod parameter_governance;
@@ -179,6 +181,9 @@ mod test_dual_key_pubkey;
 #[cfg(test)]
 mod test_memory_exhaustion;
 
+#[cfg(test)]
+mod test_audit_replay;
+
 use soroban_sdk::{
     contract, contractimpl, crypto::Hash, symbol_short, token, Address, Bytes, BytesN, Env,
     IntoVal, Symbol, SymbolStr, TryFromVal, Vec,
@@ -187,6 +192,8 @@ use subtle::ConstantTimeEq;
 
 pub use constants::CONFIG_DRIFT_MANIFEST_FIELDS;
 pub use errors::Error;
+pub use event_causality::{EventCausality, WorkflowTracker};
+pub use event_stability::{EventStability, EventStabilityRegistry};
 pub use events::{ServiceResumedEvent, ServiceSilenceAlertEvent};
 pub use types::{
     AdaptiveRateLimit, AdaptiveThresholdConfig, AggregateRiskScore, AlertAckRecord, AlertType,
