@@ -46,11 +46,28 @@ from confluent_kafka import KafkaException, Producer
 from config import config
 from ingestion.avro_codec import load_schema, serialize, trade_to_record
 from ingestion.data_models import Trade
-from monitoring.ingestion_metrics import emit_ingestion_failure, emit_ingestion_success
-from utils.logging import correlation_headers, get_logger, log_context
+from ingestion.exceptions import InvalidInputError
+from utils.logging import get_logger
 from utils.retry import retry_with_backoff
 
 logger = get_logger(__name__)
+
+try:
+    from prometheus_client import Counter
+
+    ledgerlens_ingestion_trades_produced_total = Counter(
+        "ledgerlens_ingestion_trades_produced_total",
+        "Number of trades successfully produced to Kafka",
+        ["topic"],
+    )
+    ledgerlens_ingestion_trades_failed_total = Counter(
+        "ledgerlens_ingestion_trades_failed_total",
+        "Number of trades failed during ingestion",
+        ["reason"],
+    )
+except ImportError:
+    ledgerlens_ingestion_trades_produced_total = None
+    ledgerlens_ingestion_trades_failed_total = None
 
 _SANITISE_RE = re.compile(r"[^a-zA-Z0-9._-]+")
 
@@ -83,13 +100,29 @@ def _to_canonical_pair_id(code_a: str, issuer_a: str, code_b: str, issuer_b: str
     all trades for a pair on the same Kafka partition.
     """
     if not _validate_asset_code(code_a):
-        raise ValueError(f"Invalid asset A code: {code_a!r}")
+        raise InvalidInputError(
+            f"Invalid asset A code: {code_a!r}",
+            source="kafka_producer._to_canonical_pair_id",
+            reason="asset A code failed Stellar format validation",
+        )
     if not _validate_issuer(issuer_a):
-        raise ValueError(f"Invalid asset A issuer: {issuer_a!r}")
+        raise InvalidInputError(
+            f"Invalid asset A issuer: {issuer_a!r}",
+            source="kafka_producer._to_canonical_pair_id",
+            reason="asset A issuer failed Stellar format validation",
+        )
     if not _validate_asset_code(code_b):
-        raise ValueError(f"Invalid asset B code: {code_b!r}")
+        raise InvalidInputError(
+            f"Invalid asset B code: {code_b!r}",
+            source="kafka_producer._to_canonical_pair_id",
+            reason="asset B code failed Stellar format validation",
+        )
     if not _validate_issuer(issuer_b):
-        raise ValueError(f"Invalid asset B issuer: {issuer_b!r}")
+        raise InvalidInputError(
+            f"Invalid asset B issuer: {issuer_b!r}",
+            source="kafka_producer._to_canonical_pair_id",
+            reason="asset B issuer failed Stellar format validation",
+        )
 
     asset_a = f"{code_a}:{issuer_a}"
     asset_b = f"{code_b}:{issuer_b}"
@@ -197,7 +230,25 @@ class HorizonKafkaProducer:
                 record_count=1,
                 duration_seconds=time.perf_counter() - started_at,
             )
-            self._producer.poll(0)
+            if ledgerlens_ingestion_trades_failed_total:
+                ledgerlens_ingestion_trades_failed_total.labels(reason="serialisation_error").inc()
+            self._produce_to_dlq(record, reason=str(exc))
+            return
+
+        topic = self.topic_for_pair(record["asset_pair"])
+        # Partition key = wallet_id (base account) → per-wallet ordering.
+        key = record["base_account"].encode("utf-8")
+        # Schema version header: hex CRC-32 fingerprint of the encoding schema.
+        schema_fp = hex(_avro_crc32_fingerprint(self._schema) & 0xFFFFFFFF).encode("utf-8")
+        ingestion_ts = str(int(time.time() * 1000)).encode("utf-8")
+        
+        headers = [
+            ("avro-schema-version", schema_fp),
+            ("ingestion_timestamp_ms", ingestion_ts)
+        ]
+        
+        self._produce_with_headers(topic, value, key, headers)
+        self._producer.poll(0)
 
     def begin_transaction(self) -> None:
         """Begin a Kafka transaction (requires transactional=True at construction)."""
@@ -249,13 +300,13 @@ class HorizonKafkaProducer:
         exceptions=(KafkaException, BufferError),
     )
     def _produce_with_headers(
-        self, topic: str, value: bytes, key: bytes, schema_fp: bytes
+        self, topic: str, value: bytes, key: bytes, headers: list[tuple[str, bytes]]
     ) -> None:
         self._producer.produce(
             topic=topic,
             value=value,
             key=key,
-            headers=[("avro-schema-version", schema_fp), *correlation_headers()],
+            headers=headers,
             on_delivery=_on_delivery,
         )
 
@@ -278,6 +329,8 @@ class HorizonKafkaProducer:
             )
             self._producer.poll(0)
         except (KafkaException, BufferError) as exc:
+            if ledgerlens_ingestion_trades_failed_total:
+                ledgerlens_ingestion_trades_failed_total.labels(reason="dlq_produce_error").inc()
             logger.critical("Failed to write to DLQ topic %s: %s", self._dlq_topic, exc)
 
 
@@ -292,6 +345,11 @@ def _safe_raw(record: dict) -> dict:
 def _on_delivery(err, msg) -> None:
     if err is not None:
         logger.warning("Delivery failed for topic %s: %s", msg.topic() if msg else "?", err)
+        if ledgerlens_ingestion_trades_failed_total:
+            ledgerlens_ingestion_trades_failed_total.labels(reason="kafka_delivery_error").inc()
+    else:
+        if ledgerlens_ingestion_trades_produced_total and msg and msg.topic():
+            ledgerlens_ingestion_trades_produced_total.labels(topic=msg.topic()).inc()
 
 
 def _build_producer_conf(bootstrap_servers: str) -> dict:

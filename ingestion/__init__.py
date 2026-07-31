@@ -1,3 +1,15 @@
+from .contracts import (
+    AnomalyDetectionStrategy,
+    BatchSource,
+    DataSource,
+    SourceConfig,
+    SourceRegistry,
+    SourceState,
+    StreamSource,
+    TradeBatchSource,
+    TradeSourceConfig,
+    TradeStreamSource,
+)
 from .data_models import AccountActivity, OrderBookEvent, Trade
 from .exceptions import (
     IngestionError,
@@ -11,17 +23,34 @@ from .exceptions import (
 )
 from .sketches import WalletSketchBook
 
+
+def _register_builtin_sources() -> None:
+    """Lazy-register adapter implementations (avoids heavy imports at package level)."""
+    try:
+        from .adapters import HorizonHistoricalSource, HorizonSSESource, KafkaTradeSource
+
+        SourceRegistry.register("horizon_sse", HorizonSSESource)
+        SourceRegistry.register("horizon_historical", HorizonHistoricalSource)
+        SourceRegistry.register("kafka", KafkaTradeSource)
+    except ImportError:
+        pass
+
 __all__ = [
     "AccountActivity",
-    "IngestionError",
-    "IngestionNotFoundError",
-    "IngestionRateLimitError",
-    "IngestionTransportError",
-    "IngestionValidationError",
+    "AnomalyDetectionStrategy",
+    "BatchSource",
+    "DataSource",
+    "HorizonHistoricalSource",
+    "HorizonSSESource",
+    "KafkaTradeSource",
     "OrderBookEvent",
-    "RecordValidationError",
-    "SchemaDecodeError",
-    "SchemaValidationError",
+    "SourceConfig",
+    "SourceRegistry",
+    "SourceState",
+    "StreamSource",
     "Trade",
+    "TradeBatchSource",
+    "TradeSourceConfig",
+    "TradeStreamSource",
     "WalletSketchBook",
 ]

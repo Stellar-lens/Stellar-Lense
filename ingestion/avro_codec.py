@@ -23,7 +23,7 @@ import fastavro
 
 from config import config
 from ingestion.data_models import Asset, Trade
-from ingestion.exceptions import SchemaDecodeError, SchemaValidationError
+from ingestion.exceptions import InvalidInputError, SchemaValidationError, record_context
 
 
 @lru_cache(maxsize=4)
@@ -60,54 +60,67 @@ def record_to_trade(record: dict) -> Trade:
 
     The ``asset_pair`` string ("CODE:ISSUER/CODE:ISSUER") is split back into its
     two :class:`Asset` operands.
+
+    Raises:
+        RecordValidationError: If the decoded record is missing fields, has
+            wrong-typed values, or otherwise fails ``Trade`` validation.
     """
-    base_part, _, counter_part = record["asset_pair"].partition("/")
-    base_code, _, base_issuer = base_part.partition(":")
-    counter_code, _, counter_issuer = counter_part.partition(":")
+    with record_context("avro_codec.record_to_trade", record):
+        base_part, _, counter_part = record["asset_pair"].partition("/")
+        base_code, _, base_issuer = base_part.partition(":")
+        counter_code, _, counter_issuer = counter_part.partition(":")
 
-    close_time = record["ledger_close_time"]
-    if isinstance(close_time, int):
-        close_time = datetime.fromtimestamp(close_time / 1000, tz=UTC)
+        close_time = record["ledger_close_time"]
+        if isinstance(close_time, int):
+            close_time = datetime.fromtimestamp(close_time / 1000, tz=UTC)
 
-    return Trade(
-        trade_id=record["trade_id"],
-        ledger_close_time=close_time,
-        base_account=record["base_account"],
-        counter_account=record["counter_account"],
-        base_asset=Asset(
-            code=base_code,
-            issuer=None if base_issuer in ("", "native") else base_issuer,
-        ),
-        counter_asset=Asset(
-            code=counter_code,
-            issuer=None if counter_issuer in ("", "native") else counter_issuer,
-        ),
-        base_amount=record["base_amount"],
-        counter_amount=record["counter_amount"],
-        price=record["price"],
-    )
+        return Trade(
+            trade_id=record["trade_id"],
+            ledger_close_time=close_time,
+            base_account=record["base_account"],
+            counter_account=record["counter_account"],
+            base_asset=Asset(
+                code=base_code,
+                issuer=None if base_issuer in ("", "native") else base_issuer,
+            ),
+            counter_asset=Asset(
+                code=counter_code,
+                issuer=None if counter_issuer in ("", "native") else counter_issuer,
+            ),
+            base_amount=record["base_amount"],
+            counter_amount=record["counter_amount"],
+            price=record["price"],
+        )
+
+
+def _validate_against_schema(record: dict, schema: dict, source: str) -> None:
+    """Run fastavro validation, re-raising failures as :class:`SchemaValidationError`."""
+    try:
+        fastavro.validation.validate(record, schema, raise_errors=True)
+    except SchemaValidationError:
+        raise
+    except Exception as exc:
+        raise SchemaValidationError(
+            f"{source}: record does not match the Avro schema — {exc}",
+            source=source,
+            reason=str(exc),
+            raw=record,
+        ) from exc
 
 
 def serialize(record: dict, schema: dict) -> bytes:
     """Encode *record* to schemaless Avro binary bytes.
 
-    Raises if *record* is missing fields or has wrong-typed values — this is the
-    first line of defence against poison-pill messages.
+    This is the first line of defence against poison-pill messages.
+
+    Raises:
+        SchemaValidationError: If *record* is missing fields or has wrong-typed
+            values.
     """
-    try:
-        fastavro.validation.validate(record, schema, raise_errors=True)
-        buffer = io.BytesIO()
-        fastavro.schemaless_writer(buffer, schema, record)
-        return cast(bytes, buffer.getvalue())
-    except SchemaValidationError:
-        raise
-    except Exception as exc:
-        raise SchemaValidationError.from_exception(
-            exc,
-            source="kafka",
-            operation="serialize_avro",
-            details={"record_type": schema.get("name", "unknown")},
-        ) from exc
+    _validate_against_schema(record, schema, "avro_codec.serialize")
+    buffer = io.BytesIO()
+    fastavro.schemaless_writer(buffer, schema, record)
+    return cast(bytes, buffer.getvalue())
 
 
 def deserialize(value: bytes, schema: dict) -> dict:
@@ -126,18 +139,12 @@ def deserialize(value: bytes, schema: dict) -> dict:
 
 
 def validate(record: dict, schema: dict) -> None:
-    """Raise ``fastavro`` validation error if *record* does not match *schema*."""
-    try:
-        fastavro.validation.validate(record, schema, raise_errors=True)
-    except SchemaValidationError:
-        raise
-    except Exception as exc:
-        raise SchemaValidationError.from_exception(
-            exc,
-            source="kafka",
-            operation="validate_avro",
-            details={"record_type": schema.get("name", "unknown")},
-        ) from exc
+    """Validate *record* against *schema*.
+
+    Raises:
+        SchemaValidationError: If *record* does not match *schema*.
+    """
+    _validate_against_schema(record, schema, "avro_codec.validate")
 
 
 # ---------------------------------------------------------------------------
@@ -317,9 +324,17 @@ class SchemaRegistry:
         old = self.get_schema(old_fp)
         new = self.get_schema(new_fp)
         if old is None:
-            raise KeyError(f"Unknown fingerprint (old): {old_fp}")
+            raise InvalidInputError(
+                f"Unknown fingerprint (old): {old_fp}",
+                source="avro_codec.SchemaRegistry",
+                reason="fingerprint is not registered",
+            )
         if new is None:
-            raise KeyError(f"Unknown fingerprint (new): {new_fp}")
+            raise InvalidInputError(
+                f"Unknown fingerprint (new): {new_fp}",
+                source="avro_codec.SchemaRegistry",
+                reason="fingerprint is not registered",
+            )
         return check_backward_compatibility(old, new)
 
     def check_forward_compatibility(
@@ -329,9 +344,17 @@ class SchemaRegistry:
         old = self.get_schema(old_fp)
         new = self.get_schema(new_fp)
         if old is None:
-            raise KeyError(f"Unknown fingerprint (old): {old_fp}")
+            raise InvalidInputError(
+                f"Unknown fingerprint (old): {old_fp}",
+                source="avro_codec.SchemaRegistry",
+                reason="fingerprint is not registered",
+            )
         if new is None:
-            raise KeyError(f"Unknown fingerprint (new): {new_fp}")
+            raise InvalidInputError(
+                f"Unknown fingerprint (new): {new_fp}",
+                source="avro_codec.SchemaRegistry",
+                reason="fingerprint is not registered",
+            )
         return check_forward_compatibility(old, new)
 
     def all_fingerprints(self) -> list[tuple[int, int]]:
