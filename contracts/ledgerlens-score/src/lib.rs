@@ -40,6 +40,12 @@ mod test_storage_contracts;
 mod test_ttl_rent_manager;
 
 #[cfg(test)]
+mod test_invariants;
+
+#[cfg(test)]
+mod test_migration_rollback;
+
+#[cfg(test)]
 mod test_interface;
 
 #[cfg(test)]
