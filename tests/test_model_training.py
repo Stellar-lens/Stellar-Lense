@@ -6,6 +6,7 @@ import os
 import pandas as pd
 import pytest
 
+from detection.model_compatibility import compute_feature_contract_hash
 from detection.model_training import (
     MODEL_REGISTRY,
     compute_feature_schema_hash,
@@ -74,6 +75,12 @@ def test_save_models_and_training_artifacts(tmp_path, trained_output):
         meta = json.load(f)
     expected_hash = compute_feature_schema_hash(output["feature_columns"])
     assert meta["feature_schema_hash"] == expected_hash
+    assert meta["feature_contract_version"] == 1
+    assert meta["feature_dtypes"] == output["feature_dtypes"]
+    assert meta["feature_contract_hash"] == compute_feature_contract_hash(
+        output["feature_columns"],
+        output["feature_dtypes"],
+    )
 
 
 # ---------------------------------------------------------------------------

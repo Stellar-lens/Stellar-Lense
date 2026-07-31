@@ -16,7 +16,7 @@ artifact without verifying the chain raises `ModelIntegrityError`.
 | `gnn_encoder.pt` | GNN (GraphSAGE) encoder (full-precision float32 PyTorch state dict) |
 | `metrics.json` | SHA-256 manifest + training metrics for all artifacts |
 | `metrics.json.sig` | Ed25519 detached signature over `metrics.json` |
-| `model_metadata.json` | Feature schema hash, training provenance, column list |
+| `model_metadata.json` | Versioned feature contract (ordered names and dtypes), schema hash, and training provenance |
 | `label_distribution_baseline.json` | Baseline wash-trade ratio for label-poisoning detection |
 | `*_leafq.joblib` | Tree models with float16 leaf values (edge deployment) |
 | `*_int8.pt` | INT8-quantised PyTorch encoders (edge deployment) |

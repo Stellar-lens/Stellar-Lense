@@ -102,6 +102,16 @@ All security-relevant PRs must reference the threat model and document which mit
   It covers naming conventions, function signatures, range validation,
   dataset card updates, SHAP integration, and required test patterns —
   with a complete worked example using `counterparty_variance`.
+- **Replacing a trained model artifact?** Run `make validate-artifacts`
+  before committing — see
+  [`docs/artifact_backward_compatibility.md`](docs/artifact_backward_compatibility.md)
+  for the backward compatibility rules enforced against archived versions.
+- **Deprecating a public function or class?** Use the `@deprecated` decorator
+  documented in
+  [`docs/deprecation_policy.md`](docs/deprecation_policy.md) and run
+  `make check-deprecations` so removal versions are tracked and enforced.
+- Run `make validate-docs` after editing any doc linked from this file — it
+  checks for dead links, missing headings, and broken code examples.
 
 ## Reporting issues
 
