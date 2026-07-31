@@ -44,7 +44,10 @@ pub const DEFAULT_JUMP_THRESHOLD: u32 = 30;
 /// * `4` — Added contract_id and contract_version binding to attestations (#200),
 ///   Merkle audit chain for admin actions (#201), configurable decay profiles (#202),
 ///   and multi-dimensional risk scores with sub-components (#203).
-pub const CONTRACT_VERSION: u32 = 4;
+/// * `5` — Added post-incident replay and reconciliation workflow (#631): emergency
+///   freeze/unfreeze, deterministic state checksums, paginated score export, on-chain
+///   snapshot history, reconciliation verification, and off-chain recovery tooling.
+pub const CONTRACT_VERSION: u32 = 5;
 
 /// Hard upper bound on Merkle proof length.
 pub const MAX_MERKLE_PROOF_DEPTH: u32 = 30;
@@ -57,6 +60,8 @@ pub const MAX_UPGRADE_DELAY_SECS: u64 = 1_209_600;
 pub const DEFAULT_UPGRADE_DELAY_SECS: u64 = 172_800;
 pub const MAX_SERVICE_SIGNERS: u32 = 10;
 pub const MAX_ADMIN_SIGNERS: u32 = 5;
+/// Grace period (seconds) before a newly added signer transitions from Pending to Active (issue #691).
+pub const DEFAULT_SIGNER_GRACE_PERIOD_SECS: u64 = 3_600; // 1 hour
 pub const DEFAULT_STALENESS_WINDOW_SECS: u64 = 604_800;
 
 /// Default maximum age (seconds) of an oracle's last price update before the

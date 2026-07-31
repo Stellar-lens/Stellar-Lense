@@ -177,28 +177,67 @@ this review; the gap was that it wasn't documented or covered by a
 cross-instance test, both of which this section and the test above now
 provide.
 
-### Cross-version domain compatibility (issue #696)
+## 7. Key-rotation overlap window (issue #697)
 
-`test_attestation_domain_compat.rs` extends the review above to the full set of
-domain fields, verifying that a commitment signed for one
-`(model_version, contract_version, chain, deployment)` tuple can never be
-recomputed to the same digest for a different tuple:
+Both attestation key slots — the single service pubkey (`set_service_pubkey`
+/ `ScoreAttestation`) and the aggregate threshold pubkey
+(`set_aggregate_service_pubkey` / `ThresholdAttestation`) — support a
+**bounded overlap window** during rotation, so in-flight submissions signed
+with the outgoing key are not orphaned by a rotation that happens mid-flight,
+while still bounding how long the outgoing key remains usable.
 
-- **Golden vector.** An independent re-implementation of the §3 layout is
-  pinned against an offline-computed SHA-256 of a fully-fixed 211-byte
-  preimage, and `compute_commitment` is asserted byte-for-byte equal to that
-  reference across a spread of vectors. Omitting, resizing, or reordering any
-  domain separator changes the digest and fails the suite.
-- **Domain-separation matrix.** Every field — including `model_version`,
-  `contract_version`, `network_id` (chain), and the self-derived contract
-  address (deployment) — is flipped in isolation and shown to change the
-  commitment, so no two distinct domains collide.
-- **End-to-end enforcement.** An attestation signed for `model_version = 1`,
-  replayed with the payload's `model_version` bumped, is rejected by
-  `submit_score` with `InvalidAttestation` — confirming the separation holds on
-  the real submit path, not just in the pure hash.
+### Rotation record
 
-No ABI, event, error, or storage change is involved; this is test and
-documentation coverage of an existing binding. The one behavioural-adjacent
-correction is the preimage length in §3, previously documented as 243 bytes and
-now corrected to the actual 211.
+`rotate_service_pubkey(admin_signers, new_key, overlap_secs)` and
+`rotate_aggregate_service_pubkey(admin_signers, new_key, overlap_secs)` each
+record a **pending key** paired with an **expiry bound**:
+
+- Activation is implicit and immediate: the new key is accepted (as the
+  *pending* key) from the moment the rotation call executes.
+- `expiry = env.ledger().timestamp() + overlap_secs` at the time of the call
+  — the upper bound of the window. `get_pending_service_pubkey()` /
+  `get_pending_aggregate_service_pubkey()` return `(pending_key, expiry)` so
+  operators and monitoring tooling can read both bounds of the window
+  on-chain.
+- `overlap_secs == 0` skips the pending state entirely: the new key is
+  promoted to active immediately and the old key stops verifying in the same
+  call.
+
+### Verification during the window
+
+`verify_signature` (single-key) and `verify_threshold_attestation`
+(aggregate) both:
+
+1. First check whether a pending key exists and its `expiry` has already
+   passed. If so, the pending key is **promoted to active and the pending
+   slot is cleared** before verification proceeds — this happens on the very
+   next call after expiry, not on a timer, so there is no ledger-close race
+   where neither slot is authoritative.
+2. Check the signature against the **active** key.
+3. If that fails and a pending key is still recorded with `now <= expiry`,
+   check the signature against the **pending** key too.
+
+The net effect: during `[rotation call, expiry]`, both the old (active) and
+new (pending) keys verify. After `expiry`, only the new key verifies — a
+signature from the retired key is rejected with `Error::InvalidAttestation`
+exactly as any other unrecognized key, closing the window rather than
+leaving it open indefinitely. See `test_dual_key_pubkey.rs` (single-key) and
+`test_aggregate_key_rotation.rs` (aggregate) for the deterministic tests
+proving this, including the post-expiry rejection case.
+
+### Compatibility
+
+- **No ABI break**: `rotate_aggregate_service_pubkey` /
+  `get_pending_aggregate_service_pubkey` are new, additive endpoints;
+  `set_aggregate_service_pubkey` (instant, no-overlap rotation) is
+  unchanged. The single-key `rotate_service_pubkey` /
+  `get_pending_service_pubkey` pair already existed (issue #295) and is
+  unchanged here.
+- **New storage key**: `PendingAggregateServicePubKey` (instance storage),
+  mirroring the pre-existing `PendingServicePubKey`.
+- **New event** `agg_pkrt` (topics: `agg_pkrt`; data: `(new_key,
+  overlap_expiry)`), mirroring the pre-existing `pk_rot`. Additive only.
+- **Bounded work**: verification does at most one extra storage read and one
+  extra signature comparison, regardless of how many rotations have
+  occurred — there is exactly one pending-key slot per key type, not a
+  growing history.

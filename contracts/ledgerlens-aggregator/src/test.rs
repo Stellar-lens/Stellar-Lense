@@ -778,3 +778,149 @@ fn test_contagion_depth_across_shards_no_shards() {
     let pair = symbol_short!("XLM_USDC");
     assert_eq!(client.contagion_depth_across_shards(&wallet, &pair), 0);
 }
+
+// ── Issue #711: Shard capability attestation tests ────────────────────────────
+
+/// A shard that claims all required capabilities at registration time but
+/// then stops advertising one of them (simulates a post-registration downgrade
+/// caused by a bad upgrade or roll-forward to an older WASM).
+mod downgraded_shard {
+    use soroban_sdk::{contract, contractimpl, Env, Symbol};
+
+    #[contract]
+    pub struct DowngradedShard;
+
+    #[contractimpl]
+    impl DowngradedShard {
+        pub fn supports_interface(env: Env, capability: Symbol) -> bool {
+            let downgraded: bool =
+                env.storage().instance().get(&Symbol::new(&env, "dg")).unwrap_or(false);
+            let aggr = Symbol::new(&env, "aggr");
+            if downgraded && capability == aggr {
+                return false;
+            }
+            capability == Symbol::new(&env, "score")
+                || capability == Symbol::new(&env, "gate")
+                || capability == Symbol::new(&env, "aggr")
+                || capability == Symbol::new(&env, "arch")
+        }
+
+        // Required by shard_supports_required_interface arch-getter checks
+        pub fn get_arch_owner(_env: Env) -> Option<soroban_sdk::Address> {
+            None
+        }
+        pub fn get_mandatory_reviewers(env: Env) -> soroban_sdk::Vec<soroban_sdk::Address> {
+            soroban_sdk::Vec::new(&env)
+        }
+    }
+}
+
+use crate::{LedgerLensAggregator, LedgerLensAggregatorClient};
+
+/// After registration the capability snapshot is stored and readable.
+#[test]
+fn test_get_shard_capabilities_returns_snapshot_after_registration() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let client = init_aggregator(&env);
+    let (shard_id, _) = setup_score_shard(&env);
+    client.add_shard(&shard_id);
+
+    let caps = client.get_shard_capabilities(&shard_id);
+    // A full LedgerLensScoreContract must advertise at least score, gate, aggr.
+    assert!(caps.contains(&soroban_sdk::Symbol::new(&env, "score")));
+    assert!(caps.contains(&soroban_sdk::Symbol::new(&env, "gate")));
+    assert!(caps.contains(&soroban_sdk::Symbol::new(&env, "aggr")));
+}
+
+/// A shard with no snapshot (e.g. registered before the feature) returns empty.
+#[test]
+fn test_get_shard_capabilities_returns_empty_for_no_snapshot() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let agg_id = env.register_contract(None, LedgerLensAggregator);
+    let client = LedgerLensAggregatorClient::new(&env, &agg_id);
+    let admin = Address::generate(&env);
+    client.initialize(&admin);
+
+    // Use an unknown address (never registered).
+    let random = Address::generate(&env);
+    let caps = client.get_shard_capabilities(&random);
+    assert_eq!(caps.len(), 0);
+}
+
+/// A shard that is incompatible must be rejected — snapshot must NOT be written.
+#[test]
+fn test_incompatible_shard_has_no_capability_snapshot() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let client = init_aggregator(&env);
+
+    let shard = env.register_contract(None, incompatible_shard::IncompatibleShard);
+    let _ = client.try_add_shard(&shard); // expected to fail
+
+    let caps = client.get_shard_capabilities(&shard);
+    assert_eq!(caps.len(), 0, "no snapshot must be written for a rejected shard");
+}
+
+/// `shard_capabilities_downgraded` returns false for a healthy shard.
+#[test]
+fn test_shard_capabilities_downgraded_returns_false_for_healthy_shard() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let client = init_aggregator(&env);
+    let (shard_id, _) = setup_score_shard(&env);
+    client.add_shard(&shard_id);
+
+    assert!(!client.shard_capabilities_downgraded(&shard_id));
+}
+
+/// `shard_capabilities_downgraded` returns true after the shard drops a capability.
+#[test]
+fn test_shard_capabilities_downgraded_detects_post_registration_downgrade() {
+    use downgraded_shard::DowngradedShard;
+
+    let env = Env::default();
+    env.mock_all_auths();
+    let client = init_aggregator(&env);
+
+    // Register a shard that initially advertises all required caps.
+    let shard_id = env.register_contract(None, DowngradedShard);
+    client.add_shard(&shard_id);
+
+    // Healthy at registration.
+    assert!(!client.shard_capabilities_downgraded(&shard_id));
+
+    // Simulate a bad upgrade: write the downgrade flag directly into the
+    // shard's storage (same as calling downgrade() would do).
+    env.as_contract(&shard_id, || {
+        env.storage()
+            .instance()
+            .set(&soroban_sdk::Symbol::new(&env, "dg"), &true);
+    });
+
+    // Downgrade detected.
+    assert!(
+        client.shard_capabilities_downgraded(&shard_id),
+        "must detect that the shard dropped the 'aggr' capability post-registration"
+    );
+}
+
+/// Capability snapshot is removed when the shard is deregistered.
+#[test]
+fn test_capability_snapshot_removed_on_shard_removal() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let client = init_aggregator(&env);
+    let (shard_id, _) = setup_score_shard(&env);
+    client.add_shard(&shard_id);
+
+    // Snapshot exists.
+    assert!(!client.get_shard_capabilities(&shard_id).is_empty());
+
+    client.remove_shard(&shard_id);
+
+    // After removal the snapshot is gone.
+    let caps = client.get_shard_capabilities(&shard_id);
+    assert_eq!(caps.len(), 0, "snapshot must be cleared on shard removal");
+}

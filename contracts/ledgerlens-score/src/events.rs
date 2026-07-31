@@ -1,6 +1,6 @@
 use soroban_sdk::{contracttype, symbol_short, Address, Bytes, BytesN, Env, Symbol};
 
-use crate::types::{AlertAckRecord, AlertType, RiskScore};
+use crate::types::{AlertAckRecord, AlertType, Policy, RiskScore};
 
 /// Event Schema Versioning
 ///
@@ -198,6 +198,15 @@ pub fn deletion_policy_updated(env: &Env, enabled: bool, approver: &Option<Addre
     env.events().publish((symbol_short!("del_pol"), EVENT_VERSION), (enabled, approver.clone()));
 }
 
+/// Emitted by `set_policy_approval` (issue #695). `policy` identifies which
+/// of the four non-`DataDeletion` named capabilities was reconfigured.
+pub fn policy_approval_updated(env: &Env, policy: Policy, enabled: bool, approver: &Option<Address>) {
+    env.events().publish(
+        (symbol_short!("pol_appr"), EVENT_VERSION, policy),
+        (enabled, approver.clone()),
+    );
+}
+
 pub fn cooldown_updated(env: &Env, cooldown_secs: u64) {
     env.events().publish((symbol_short!("cd_upd"), EVENT_VERSION), cooldown_secs);
 }
@@ -237,6 +246,13 @@ pub fn service_pubkey_rotation_started(env: &Env, new_key: &Bytes, overlap_expir
     env.events().publish((symbol_short!("pk_rot"),), (new_key.clone(), overlap_expiry));
 }
 
+/// Emitted when `rotate_aggregate_service_pubkey` is called (issue #697).
+/// Same shape as `service_pubkey_rotation_started`, for the aggregate
+/// (threshold-signature) key instead of the single-signer key.
+pub fn aggregate_service_pubkey_rotation_started(env: &Env, new_key: &Bytes, overlap_expiry: u64) {
+    env.events().publish((symbol_short!("agg_pkrt"),), (new_key.clone(), overlap_expiry));
+}
+
 // ── Merkle-root batch attestation ───────────────────────────────────────────
 
 /// Emitted by `submit_scores_batch_attested` once the batch has been
@@ -247,6 +263,106 @@ pub fn service_pubkey_rotation_started(env: &Env, new_key: &Bytes, overlap_expir
 /// re-reading the per-entry proofs.
 pub fn batch_attested(env: &Env, accepted: u32, rejected: u32, merkle_root: &BytesN<32>) {
     env.events().publish((symbol_short!("bat_ok"), merkle_root.clone()), (accepted, rejected));
+}
+
+// ── Batch rejection event mapping ──────────────────────────────────────────────────
+//
+// Machine-readable rejection summaries without sensitive input data.
+// Each event maps to a documented rejection category for operator alerting.
+
+/// Rejection category for structured error-event mapping.
+/// These categories enable deterministic alerts without leaking sensitive wallet data.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum BatchRejectionCategory {
+    /// Contract paused (operational/governance)
+    ContractPaused = 1,
+    /// Invalid score value (data quality)
+    InvalidScore = 2,
+    /// Invalid confidence (data quality)
+    InvalidConfidence = 3,
+    /// Invalid timestamp (data quality)
+    InvalidTimestamp = 4,
+    /// Model version not registered (configuration)
+    ModelVersionNotRegistered = 5,
+    /// Model version deprecated (configuration)
+    ModelVersionDeprecated = 6,
+    /// Rate limit exceeded (policy)
+    RateLimitExceeded = 7,
+    /// Invalid attestation (validation failure)
+    InvalidAttestation = 8,
+    /// Gateway/gate enforcement failure
+    GateFailure = 9,
+}
+
+/// Emitted when a batch entry is rejected due to contract pause.
+/// Topics: ("bat_rej_pause",)  Data: (count)
+pub fn batch_rejected_contract_paused(env: &Env, count: u32) {
+    env.events()
+        .publish((symbol_short!("bat_rej_pa"),), count);
+}
+
+/// Emitted when batch entries are rejected due to data quality issues.
+/// Topics: ("bat_rej_data",)  Data: (reason_code, count)
+/// reason_code: 1 = invalid_score, 2 = invalid_confidence, 3 = invalid_timestamp
+pub fn batch_rejected_data_quality(env: &Env, reason_code: u32, count: u32) {
+    env.events()
+        .publish((symbol_short!("bat_rej_dq"),), (reason_code, count));
+}
+
+/// Emitted when batch entries are rejected due to model version issues.
+/// Topics: ("bat_rej_model",)  Data: (reason_code, count)
+/// reason_code: 1 = not_registered, 2 = deprecated
+pub fn batch_rejected_model_version(env: &Env, reason_code: u32, count: u32) {
+    env.events()
+        .publish((symbol_short!("bat_rej_mv"),), (reason_code, count));
+}
+
+/// Emitted when batch entries exceed rate limits.
+/// Topics: ("bat_rej_ratelimit",)  Data: (count)
+pub fn batch_rejected_rate_limit(env: &Env, count: u32) {
+    env.events()
+        .publish((symbol_short!("bat_rej_rl"),), count);
+}
+
+/// Emitted when batch entries fail attestation validation.
+/// Topics: ("bat_rej_attest",)  Data: (count)
+pub fn batch_rejected_attestation(env: &Env, count: u32) {
+    env.events()
+        .publish((symbol_short!("bat_rej_at"),), count);
+}
+
+/// Emitted when batch entries fail gate enforcement.
+/// Topics: ("bat_rej_gate",)  Data: (count)
+pub fn batch_rejected_gate_failure(env: &Env, count: u32) {
+    env.events()
+        .publish((symbol_short!("bat_rej_gt"),), count);
+}
+
+/// Summary event emitted after batch processing completes.
+/// Aggregates all rejection categories for easy monitoring.
+/// Topics: ("bat_summary",)  Data: (accepted, rejected_pause, rejected_data, rejected_model, rejected_ratelimit, rejected_attestation, rejected_gate)
+pub fn batch_processing_summary(
+    env: &Env,
+    accepted: u32,
+    rejected_pause: u32,
+    rejected_data: u32,
+    rejected_model: u32,
+    rejected_ratelimit: u32,
+    rejected_attestation: u32,
+    rejected_gate: u32,
+) {
+    env.events().publish(
+        (symbol_short!("bat_summ"),),
+        (
+            accepted,
+            rejected_pause,
+            rejected_data,
+            rejected_model,
+            rejected_ratelimit,
+            rejected_attestation,
+            rejected_gate,
+        ),
+    );
 }
 
 // ── Multi-model consensus scoring ─────────────────────────────────────────────
@@ -607,6 +723,30 @@ pub fn upgrade_approval_added(env: &Env, signer: &Address, count: u32, required:
 
 pub fn governance_action_appended(env: &Env, new_head: &soroban_sdk::BytesN<32>) {
     env.events().publish((symbol_short!("gov_app"),), new_head.clone());
+}
+
+/// Emitted whenever a privileged admin action is appended to the Merkle audit
+/// chain.  `action_id` is the stable [`crate::governance_actions`] discriminant
+/// (e.g. `GOV_ACTION_PAUSE = 0x04`) so off-chain indexers can filter by action
+/// type without decoding raw chain bytes.  `new_head` is the updated chain root
+/// after the action was folded in.
+///
+/// Topic: `("gov_action", EVENT_VERSION)`
+/// Data:  `(action_id: u32, action_name: Symbol, new_head: BytesN<32>)`
+pub fn gov_action(
+    env: &Env,
+    action_id: u8,
+    action_name: &str,
+    new_head: &soroban_sdk::BytesN<32>,
+) {
+    env.events().publish(
+        (symbol_short!("gov_action"), EVENT_VERSION),
+        (
+            action_id as u32,
+            soroban_sdk::Symbol::new(env, action_name),
+            new_head.clone(),
+        ),
+    );
 }
 
 // ── #302: Gate enforcement mode ───────────────────────────────────────────────

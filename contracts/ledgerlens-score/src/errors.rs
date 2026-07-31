@@ -137,4 +137,10 @@ impl Error {
     pub const ReviewerAlreadyExists: Error = Error::SignerAlreadyInSet;
     /// Returned when a reviewer to be removed is not in the set.
     pub const ReviewerNotFound: Error = Error::SignerNotInSet;
+
+    // ── Administrative capability partitioning (issue #695) ────────────────
+    /// Returned by `set_policy_approval` when called with
+    /// `Policy::DataDeletion`, which is configured via
+    /// `set_deletion_approval_policy` instead.
+    pub const InvalidPolicy: Error = Error::InvalidThreshold;
 }

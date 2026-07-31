@@ -6,13 +6,14 @@ use crate::constants::{
 };
 use crate::errors::Error;
 use crate::types::{
-    AdaptiveRateLimit, AggregateRiskScore, AlertAckRecord, AlertType, DataKey, DataKeyB, DataKeyC,
+ \
+  AdaptiveRateLimit, AggregateRiskScore, AlertAckRecord, AlertType, DataKey, DataKeyB, DataKeyC,
     DataKeyD, DecayCurve, EmbargoExpiry, FlashProtectionMode, GateDataKey, HllSketch,
     InterpolationMethod, JumpStats, ModelVersionStats, ModelVersionStatus, PairVolatilityState,
     ParamChangeProposal, ParameterProposalRecord, ParameterProposalStatus, PendingScoreEntry,
-    RateLimitOverrideEntry, RiskScore, ScoreDispute, ScoreFloorPolicy, ScoreHistogram, ScoreTrend,
-    ScoreVelocityCap, SignerAccuracyRecord, SubscorePayload, TokenBucket, UpgradeProposal,
-    WelfordCorrState,
+    Policy, PolicyApproval, RateLimitOverrideEntry, RiskScore, ScoreDispute, ScoreFloorPolicy,
+    ScoreHistogram, ScoreTrend, ScoreVelocityCap, SignerAccuracyRecord, SubscorePayload,
+    TokenBucket, UpgradeProposal, WelfordCorrState,
 };
 use soroban_sdk::{Address, Bytes, BytesN, Env, Symbol, Vec};
 
@@ -838,6 +839,41 @@ pub fn prune_expired_parameter_proposals(env: &Env) {
     }
 }
 
+/// Deletes all expired proposals from storage that have been expired for at least 48 hours.
+/// Returns (count_deleted, oldest_proposal_kept_timestamp).
+pub fn cleanup_expired_parameter_proposals(env: &Env) -> (u32, u64) {
+    use soroban_sdk::Env;
+
+    let now = env.ledger().timestamp();
+    let ttl_buffer_secs = 48 * 3600;
+    let mut count = 0;
+    let mut oldest_kept = u64::MAX;
+
+    let next_id = env.storage()
+        .instance()
+        .get::<DataKeyB, u64>(&DataKeyB::ParameterProposalNextId)
+        .unwrap_or(1);
+
+    for id in 1..next_id {
+        if let Some(record) = get_parameter_proposal_record(env, id) {
+            if record.status == ParameterProposalStatus::Expired {
+                let expiry = record.proposal.proposed_at
+                    .saturating_add(record.proposal.time_lock_secs.saturating_mul(2));
+                if now > expiry.saturating_add(ttl_buffer_secs) {
+                    env.storage().persistent().remove(&DataKeyB::ParameterProposal(id));
+                    count += 1;
+                    continue;
+                }
+            }
+            if record.proposal.proposed_at < oldest_kept {
+                oldest_kept = record.proposal.proposed_at;
+            }
+        }
+    }
+
+    (count, if oldest_kept == u64::MAX { now } else { oldest_kept })
+}
+
 /// Seeds `count` pending proposals directly in storage for cap tests without
 /// replaying the full propose flow (keeps Soroban test snapshots small).
 #[cfg(test)]
@@ -1110,6 +1146,27 @@ pub fn set_deletion_approval_policy(
     match &policy.approver {
         Some(approver) => env.storage().instance().set(&DataKeyD::DeletionApprover, approver),
         None => env.storage().instance().remove(&DataKeyD::DeletionApprover),
+    }
+}
+
+/// Reads the separate-approver policy for one of the four `Policy`
+/// variants other than `DataDeletion` (issue #695). Defaults to
+/// `enabled = false, approver = None` until configured via
+/// `set_policy_approval`.
+pub fn get_policy_approval(env: &Env, policy: Policy) -> PolicyApproval {
+    let enabled =
+        env.storage().instance().get(&DataKeyD::PolicyApprovalEnabled(policy)).unwrap_or(false);
+    let approver = env.storage().instance().get(&DataKeyD::PolicyApprovalApprover(policy));
+    PolicyApproval { enabled, approver }
+}
+
+pub fn set_policy_approval(env: &Env, policy: Policy, approval: &PolicyApproval) {
+    env.storage().instance().set(&DataKeyD::PolicyApprovalEnabled(policy), &approval.enabled);
+    match &approval.approver {
+        Some(approver) => {
+            env.storage().instance().set(&DataKeyD::PolicyApprovalApprover(policy), approver)
+        }
+        None => env.storage().instance().remove(&DataKeyD::PolicyApprovalApprover(policy)),
     }
 }
 
@@ -2885,6 +2942,24 @@ pub fn clear_pending_service_pubkey(env: &Env) {
     env.storage().instance().remove(&DataKeyD::PendingServicePubKey);
 }
 
+// ── Aggregate (threshold-signature) service pubkey rotation overlap window ────
+// Mirrors the single-signer overlap window above; see `rotate_aggregate_service_pubkey`
+// and `verify_threshold_attestation` (issue #697).
+
+pub fn get_pending_aggregate_service_pubkey(env: &Env) -> Option<(Bytes, u64)> {
+    env.storage().instance().get(&DataKeyD::PendingAggregateServicePubKey)
+}
+
+pub fn set_pending_aggregate_service_pubkey(env: &Env, new_key: &Bytes, expiry: u64) {
+    env.storage()
+        .instance()
+        .set(&DataKeyD::PendingAggregateServicePubKey, &(new_key.clone(), expiry));
+}
+
+pub fn clear_pending_aggregate_service_pubkey(env: &Env) {
+    env.storage().instance().remove(&DataKeyD::PendingAggregateServicePubKey);
+}
+
 /// Compares a recovered 65-byte uncompressed secp256k1 pubkey against a
 /// stored pubkey, which may be either the same 65-byte uncompressed form or
 /// the 33-byte compressed form.
@@ -2994,7 +3069,7 @@ pub fn get_accumulated_fees(env: &Env) -> i128 {
     env.storage().instance().get(&GateDataKey::AccumulatedFees).unwrap_or(0)
 }
 
-pub fn set_arch_owner(env: &Env, owner: &Address) {
+ pub fn set_arch_owner(env: &Env, owner: &Address) {
     env.storage().instance().set(&DataKey::ArchOwner, owner);
 }
 
