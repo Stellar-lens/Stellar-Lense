@@ -23,6 +23,7 @@ set -euo pipefail
 DRY_RUN=false
 CHECK_TOOLCHAIN_ONLY=false
 MANIFEST_OVERRIDE=""
+CANARY_KEYS=false
 POSITIONAL=()
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 
@@ -40,6 +41,10 @@ while [ "$#" -gt 0 ]; do
       [ "$#" -ge 2 ] || { echo "ERROR: --manifest requires a path." >&2; exit 1; }
       MANIFEST_OVERRIDE="$2"
       shift 2
+      ;;
+    --canary-keys)
+      CANARY_KEYS=true
+      shift
       ;;
     --help)
       sed -n '3,22p' "$0"
@@ -275,7 +280,7 @@ else
 fi
 
 log "Initializing contract (admin=$ADMIN_ADDRESS, service=$SERVICE_ADDRESS)"
-run "$CLI_BIN" contract invoke \
+if ! run "$CLI_BIN" contract invoke \
   --id "$CONTRACT_ID" \
   --source "$ADMIN_IDENTITY" \
   --rpc-url "$RPC_URL" \
