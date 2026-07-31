@@ -48,6 +48,7 @@ from ingestion.historical_loader import (
 from ingestion.orderbook_loader import load_accounts_orderbook_events
 from utils.correlation import PipelineStage, correlation_context, generate_correlation_id
 from utils.logging import get_logger
+from utils.pipeline_observability import PipelineRun
 
 logger = get_logger(__name__)
 
