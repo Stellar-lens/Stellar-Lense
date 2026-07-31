@@ -18,6 +18,17 @@ pub struct ScoreDispute {
     pub challenged_score: u32,
 }
 
+/// Lightweight interface metadata exposed by the contract for runtime
+/// capability discovery and semantically-stable integration.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct InterfaceMetadata {
+    pub interface_version: u32,
+    pub contract_version: u32,
+    pub capabilities: Vec<Symbol>,
+    pub semantic_constraints: Vec<Symbol>,
+}
+
 /// On-chain record of the latest LedgerLens risk assessment for a
 /// wallet / asset-pair combination.
 #[contracttype]
@@ -296,6 +307,27 @@ pub struct ParameterProposalRecord {
     pub status: ParameterProposalStatus,
 }
 
+/// Simulated impact of a parameter change without applying it.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParameterSimulation {
+    pub param_key: Symbol,
+    pub current_value: Bytes,
+    pub new_value: Bytes,
+    pub affected_capabilities: Vec<Symbol>,
+    pub execution_window_start: u64,
+    pub execution_window_end: u64,
+}
+
+/// Output of a parameter change simulation for audit and preview.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProposalSimulationOutput {
+    pub proposal_id: u64,
+    pub simulation: ParameterSimulation,
+    pub simulated_at: u64,
+}
+
 /// Typed value for a simple, single-parameter time-locked change (see
 /// `set_pending_param_change`). Distinct from the richer `ParameterProposal`
 /// governance flow above.
@@ -315,6 +347,25 @@ pub struct ParamChangeProposal {
     pub apply_after: u64,
 }
 
+/// A named group of related risk-gate parameters that must be reviewed and
+/// activated together, so the risk threshold and cooldown can never diverge
+/// mid-rollout (one applied, the other still pending).
+#[contracttype]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub struct PolicyBundle {
+    pub risk_threshold: u32,
+    pub cooldown_secs: u64,
+}
+
+/// A pending policy bundle change awaiting its time-lock delay.
+#[contracttype]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub struct PolicyBundleProposal {
+    pub bundle: PolicyBundle,
+    pub proposed_at: u64,
+    pub apply_after: u64,
+}
+
 /// One entry in the `override_rate_limit` admin audit log.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -324,6 +375,24 @@ pub struct RateLimitOverrideEntry {
     pub asset_pair: Symbol,
     pub timestamp: u64,
     pub justification_hash: BytesN<32>,
+}
+
+/// Fixed warning returned by deletion preflight previews.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum DeletionAuditWarning {
+    Irreversible,
+}
+
+/// Read-only preview of what a deletion operation would affect.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DeletionPreflight {
+    pub wallet: Address,
+    pub asset_pair: Symbol,
+    pub latest_score_present: bool,
+    pub history_count: u32,
+    pub audit_warning: DeletionAuditWarning,
 }
 
 /// Per-(wallet, asset_pair) trend state persisted between submissions.
@@ -382,6 +451,79 @@ pub struct SnapshotRecord {
 pub struct ScoreVelocityCap {
     pub enabled: bool,
     pub points_per_hour: u32,
+}
+
+/// Separate approval policy for irreversible score deletion operations.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DeletionApprovalPolicy {
+    pub enabled: bool,
+    pub approver: Option<Address>,
+}
+
+/// Named administrative capability policy, partitioned by operation risk
+/// (issue #695). Each privileged endpoint is mapped to exactly one policy
+/// rather than sharing one undifferentiated "admin" capability.
+///
+/// `DataDeletion` denotes the capability already gated by the pre-existing
+/// `DeletionApprovalPolicy` / `require_deletion_auth` (see `clear_score`,
+/// `clear_score_history`) and is not reconfigured via `set_policy_approval`
+/// — it is listed here only so all five categories named in #695 share one
+/// canonical enum for documentation and event/telemetry purposes.
+#[contracttype]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum Policy {
+    ScorePolicy,
+    UpgradeGovernance,
+    EmergencyPause,
+    DataDeletion,
+    SignerAdmin,
+}
+
+/// Separate approval policy for one of the four `Policy` variants other
+/// than `DataDeletion` (issue #695). Same shape and semantics as
+/// `DeletionApprovalPolicy`: when `enabled`, the endpoints mapped to this
+/// policy require `approver.require_auth()` in addition to routine admin
+/// quorum, and the approver must stay disjoint from the admin key/set —
+/// otherwise the partitioning would be meaningless (any admin quorum
+/// member could satisfy both roles).
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PolicyApproval {
+    pub enabled: bool,
+    pub approver: Option<Address>,
+}
+
+/// One canonical key/value entry in the machine-readable configuration export.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ConfigExportEntry {
+    pub key: Symbol,
+    pub value: Bytes,
+}
+
+/// One pending key/value entry in the machine-readable configuration export.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PendingConfigExportEntry {
+    pub key: Symbol,
+    pub value: Bytes,
+    pub proposal_id: u64,
+    pub proposed_at: u64,
+    pub executable_after: u64,
+}
+
+/// Deterministic machine-readable export of governance-controlled configuration.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ConfigExportBundle {
+    pub schema_version: u32,
+    pub active_hash: BytesN<32>,
+    pub pending_hash: BytesN<32>,
+    pub export_hash: BytesN<32>,
+    pub active_values: Vec<ConfigExportEntry>,
+    pub pending_values: Vec<PendingConfigExportEntry>,
+    pub omitted_secret_rationale: Vec<Bytes>,
 }
 
 /// Score histogram returned by `get_score_histogram`.
@@ -483,6 +625,7 @@ pub enum DataKeyB {
     ScoreEmbargo(Address),
     ConsensusThresholdK,
     ConsensusEpsilon,
+
     /// Adaptive epsilon enabled flag (issue #204).
     AdaptiveEpsilonEnabled,
     /// Minimum epsilon bound for adaptive mode (issue #204).
@@ -627,6 +770,31 @@ pub enum DataKeyC {
     AdaptiveThresholdEnabled,
 }
 
+/// Signer lifecycle state for explicit state machine governance.
+#[contracttype]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[repr(u32)]
+pub enum SignerState {
+    /// Signer added but awaiting grace period before becoming active.
+    Pending = 0,
+    /// Signer is authorized to participate in threshold signatures.
+    Active = 1,
+    /// Signer was active but is now superseded (removed and replaced).
+    Superseded = 2,
+    /// Signer explicitly revoked and no longer participates.
+    Revoked = 3,
+}
+
+/// Record tracking signer lifecycle state and timing for audit compliance.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SignerStateRecord {
+    pub signer: Address,
+    pub state: SignerState,
+    pub state_changed_at: u64,
+    pub state_changed_by: Address,
+}
+
 #[contracttype]
 #[derive(Clone)]
 pub enum DataKeyD {
@@ -655,11 +823,25 @@ pub enum DataKeyD {
     BurstCapacity,
     UpgradeApprovals,
     PendingServicePubKey,
+    /// Pending aggregate (threshold-signature) service pubkey and its
+    /// overlap-window expiry, mirroring `PendingServicePubKey` for
+    /// `rotate_aggregate_service_pubkey` (issue #697).
+    PendingAggregateServicePubKey,
     RateLimitOverrideLog,
     IqrRejectionMultiplier,
     PendingParamChange(Symbol),
     ModelVersionExecutableAfter(u32),
     ModelVersionDescription(u32),
+    /// Latest operator acknowledgement record for a given alert class.
+    /// Keyed by `AlertType` so each class has its own O(1) slot (issue #630).
+    AlertAcknowledgement(AlertType),
+    /// Whether the separate-approver policy is enabled for a named
+    /// administrative capability (issue #695). Keyed by `Policy` so each
+    /// category has its own slot, mirroring `DeletionPolicyEnabled`.
+    PolicyApprovalEnabled(Policy),
+    /// The disjoint approver address for a named administrative capability
+    /// policy (issue #695), when its `PolicyApprovalEnabled` slot is `true`.
+    PolicyApprovalApprover(Policy),
 }
 
 #[contracttype]
@@ -668,6 +850,7 @@ pub struct TierBounds {
     pub min_score: u32,
     pub max_score: u32,
 }
+
 
 /// Histogram of all score submissions across 101 buckets (0–100).
 #[contracttype]
@@ -813,54 +996,3 @@ pub struct TokenBucket {
     pub last_refill: u64,
 }
 
-// ── #688: Submission provenance snapshot ──────────────────────────────────────
-//
-// Persisted beside every accepted score so operators can answer "why was this
-// submission accepted?" long after the fact.  The snapshot captures the
-// policy state and signer context that were _active at the moment of
-// acceptance_, not the live values (which an admin may have changed since).
-//
-// Fields:
-//   `model_version`     — the model version carried by the accepted submission.
-//   `service_threshold` — M-of-N threshold active at acceptance time (0 = legacy
-//                         single-service path).
-//   `signers_count`     — number of distinct signers that authorised the call.
-//   `score_floor_enabled` — whether the score-floor policy was enabled.
-//   `score_floor_high_water_mark` — HWM value at acceptance (meaningful only
-//                         when `score_floor_enabled` is true).
-//   `score_floor_value` — floor value at acceptance (meaningful only when
-//                         `score_floor_enabled` is true).
-//   `cooldown_secs`     — effective per-(wallet, pair) cooldown at acceptance.
-//   `epoch_id`          — epoch that was open when the score was accepted.
-//   `ledger_sequence`   — ledger sequence number of the accepting ledger.
-//   `submitted_at`      — ledger timestamp of acceptance (mirrors
-//                         `RiskScore.timestamp` is the pipeline timestamp;
-//                         this is the on-chain clock).
-//   `validation_branch` — human-readable tag describing the auth path taken
-//                         (`"single_service"`, `"multisig"`, `"threshold_sig"`,
-//                         `"batch"`).
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct SubmissionProvenance {
-    pub model_version: u32,
-    pub service_threshold: u32,
-    pub signers_count: u32,
-    pub score_floor_enabled: bool,
-    pub score_floor_high_water_mark: u32,
-    pub score_floor_value: u32,
-    pub cooldown_secs: u64,
-    pub epoch_id: u32,
-    pub ledger_sequence: u32,
-    pub submitted_at: u64,
-    pub validation_branch: soroban_sdk::Symbol,
-}
-
-/// Storage key namespace for provenance records (issue #688).
-#[contracttype]
-#[derive(Clone)]
-pub enum DataKeyE {
-    /// Provenance snapshot for the most recent accepted submission for
-    /// (wallet, asset_pair).  Stored in persistent storage with the same
-    /// TTL envelope as the score entry itself.
-    SubmissionProvenance(Address, Symbol),
-}
