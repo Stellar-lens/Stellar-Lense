@@ -189,14 +189,46 @@ class HorizonKafkaProducer:
         """
         from ingestion.avro_codec import _avro_crc32_fingerprint
 
-        record = trade_to_record(trade)
-        try:
-            value = serialize(record, self._schema)
-        except Exception as exc:  # serialisation / validation failure → DLQ
-            logger.error(
-                "Serialisation failed for trade %s — routing to DLQ: %s",
-                record.get("trade_id"),
-                exc,
+        with log_context(pipeline_stage="ingestion.kafka_producer", trade_id=trade.trade_id):
+            started_at = time.perf_counter()
+            record = trade_to_record(trade)
+            try:
+                value = serialize(record, self._schema)
+            except Exception as exc:  # serialisation / validation failure → DLQ
+                emit_ingestion_failure(
+                    "kafka",
+                    exc,
+                    stage="validation",
+                    duration_seconds=time.perf_counter() - started_at,
+                )
+                logger.error(
+                    "Serialisation failed for trade %s — routing to DLQ: %s",
+                    record.get("trade_id"),
+                    exc,
+                )
+                self._produce_to_dlq(record, reason=str(exc))
+                return
+
+            topic = self.topic_for_pair(record["asset_pair"])
+            # Partition key = wallet_id (base account) → per-wallet ordering.
+            key = record["base_account"].encode("utf-8")
+            # Schema version header: hex CRC-32 fingerprint of the encoding schema.
+            schema_fp = hex(_avro_crc32_fingerprint(self._schema) & 0xFFFFFFFF).encode("utf-8")
+            try:
+                self._produce_with_headers(topic, value, key, schema_fp)
+            except Exception as exc:
+                emit_ingestion_failure(
+                    "kafka",
+                    exc,
+                    stage="publish",
+                    duration_seconds=time.perf_counter() - started_at,
+                )
+                raise
+            emit_ingestion_success(
+                "kafka",
+                stage="publish",
+                record_count=1,
+                duration_seconds=time.perf_counter() - started_at,
             )
             if ledgerlens_ingestion_trades_failed_total:
                 ledgerlens_ingestion_trades_failed_total.labels(reason="serialisation_error").inc()

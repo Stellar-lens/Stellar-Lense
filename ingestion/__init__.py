@@ -11,6 +11,16 @@ from .contracts import (
     TradeStreamSource,
 )
 from .data_models import AccountActivity, OrderBookEvent, Trade
+from .exceptions import (
+    IngestionError,
+    IngestionNotFoundError,
+    IngestionRateLimitError,
+    IngestionTransportError,
+    IngestionValidationError,
+    RecordValidationError,
+    SchemaDecodeError,
+    SchemaValidationError,
+)
 from .sketches import WalletSketchBook
 
 

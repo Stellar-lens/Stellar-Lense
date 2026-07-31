@@ -125,7 +125,17 @@ def serialize(record: dict, schema: dict) -> bytes:
 
 def deserialize(value: bytes, schema: dict) -> dict:
     """Decode schemaless Avro binary *value* back into a record dict."""
-    return cast(dict[Any, Any], fastavro.schemaless_reader(io.BytesIO(value), schema))
+    try:
+        return cast(dict[Any, Any], fastavro.schemaless_reader(io.BytesIO(value), schema))
+    except SchemaDecodeError:
+        raise
+    except Exception as exc:
+        raise SchemaDecodeError.from_exception(
+            exc,
+            source="kafka",
+            operation="deserialize_avro",
+            details={"payload_size_bytes": len(value)},
+        ) from exc
 
 
 def validate(record: dict, schema: dict) -> None:
