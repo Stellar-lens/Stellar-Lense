@@ -1,104 +1,90 @@
-# CODEOWNERS for LedgerLens-data
-#
-# Each line defines who must review PRs that touch the matching paths.
-# Entries lower in the file take precedence over higher ones.
-#
-# Format:  <pattern>  <@team-or-user> [<@team-or-user> ...]
-#
-# Teams are defined in the Ledger-Lenz GitHub org:
-#   @Ledger-Lenz/data-core       – ingestion & feature pipeline leads
-#   @Ledger-Lenz/ml-core         – model training, inference, drift
-#   @Ledger-Lenz/security        – auth, DP, adversarial, cryptography
-#   @Ledger-Lenz/infra           – CI/CD, Docker, Kafka, monitoring
-#   @Ledger-Lenz/contracts       – Soroban / smart contract integration
-#   @Ledger-Lenz/maintainers     – catch-all; fallback reviewers
+# LedgerLens CODEOWNERS
+# Each line is a file pattern followed by one or more owners.
+# Order matters: later rules override earlier ones for matching files.
+# See https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
 
-# ─── Catch-all (lowest precedence) ────────────────────────────────────────────
-*                                       @Ledger-Lenz/maintainers
+# ── Default owners for everything ────────────────────────────────────────────
+*                               @Ledger-Lenz/core-maintainers
 
-# ─── CI / repo config ─────────────────────────────────────────────────────────
-.github/                                @Ledger-Lenz/infra @Ledger-Lenz/maintainers
-.github/workflows/                      @Ledger-Lenz/infra
-Makefile                                @Ledger-Lenz/infra
-Dockerfile                              @Ledger-Lenz/infra
-docker-compose.yml                      @Ledger-Lenz/infra
-pyproject.toml                          @Ledger-Lenz/infra @Ledger-Lenz/maintainers
-requirements.txt                        @Ledger-Lenz/infra @Ledger-Lenz/maintainers
+# ── Data ingestion pipeline ──────────────────────────────────────────────────
+/ingestion/                     @Ledger-Lenz/data-team
+/ingestion/horizon_streamer.py  @Ledger-Lenz/data-team @Ledger-Lenz/infra-team
+/ingestion/kafka_producer.py    @Ledger-Lenz/data-team @Ledger-Lenz/streaming-team
+/ingestion/rate_limiter.py      @Ledger-Lenz/infra-team
 
-# ─── Data ingestion pipeline ──────────────────────────────────────────────────
-ingestion/                              @Ledger-Lenz/data-core
-ingestion/data_models.py                @Ledger-Lenz/data-core @Ledger-Lenz/maintainers
-ingestion/kafka_producer.py             @Ledger-Lenz/data-core @Ledger-Lenz/infra
-ingestion/avro_codec.py                 @Ledger-Lenz/data-core @Ledger-Lenz/infra
+# ── Detection engine ─────────────────────────────────────────────────────────
+/detection/                     @Ledger-Lenz/ml-team
+/detection/benford_engine.py    @Ledger-Lenz/ml-team
+/detection/feature_engineering.py @Ledger-Lenz/ml-team
+/detection/model_training.py    @Ledger-Lenz/ml-team
+/detection/model_inference.py   @Ledger-Lenz/ml-team
+/detection/wallet_graph.py      @Ledger-Lenz/ml-team
+/detection/gnn_encoder.py       @Ledger-Lenz/ml-team
+/detection/shap_explainer.py    @Ledger-Lenz/ml-team
+/detection/differential_privacy.py @Ledger-Lenz/ml-team @Ledger-Lenz/security-team
+/detection/adversarial/         @Ledger-Lenz/ml-team @Ledger-Lenz/security-team
+/detection/persistence.py       @Ledger-Lenz/data-team
+/detection/risk_score_store.py  @Ledger-Lenz/data-team
 
-# ─── Detection engine (ML + Benford) ──────────────────────────────────────────
-detection/                              @Ledger-Lenz/ml-core
-detection/feature_engineering.py       @Ledger-Lenz/ml-core @Ledger-Lenz/data-core
-detection/benford_engine.py             @Ledger-Lenz/ml-core
-detection/model_training.py             @Ledger-Lenz/ml-core
-detection/model_inference.py            @Ledger-Lenz/ml-core @Ledger-Lenz/maintainers
-detection/ensemble_calibrator.py        @Ledger-Lenz/ml-core
-detection/drift_monitor.py              @Ledger-Lenz/ml-core @Ledger-Lenz/infra
-detection/wallet_graph.py               @Ledger-Lenz/ml-core @Ledger-Lenz/data-core
-detection/gnn_encoder.py                @Ledger-Lenz/ml-core
-detection/risk_score_store.py           @Ledger-Lenz/ml-core @Ledger-Lenz/maintainers
-detection/persistence.py                @Ledger-Lenz/ml-core @Ledger-Lenz/infra
+# ── Streaming / real-time pipeline ───────────────────────────────────────────
+/streaming/                     @Ledger-Lenz/streaming-team
+/streaming/pipeline.py          @Ledger-Lenz/streaming-team
+/streaming/kafka_worker.py      @Ledger-Lenz/streaming-team @Ledger-Lenz/infra-team
+/streaming/ws_server.py         @Ledger-Lenz/streaming-team
+/streaming/alert_dispatcher.py  @Ledger-Lenz/streaming-team
 
-# ─── Privacy & security subsystems ───────────────────────────────────────────
-detection/privacy/                      @Ledger-Lenz/security @Ledger-Lenz/ml-core
-detection/differential_privacy.py      @Ledger-Lenz/security
-detection/shap_explainer.py             @Ledger-Lenz/security @Ledger-Lenz/ml-core
-detection/adversarial/                  @Ledger-Lenz/security @Ledger-Lenz/ml-core
-detection/federated/                    @Ledger-Lenz/security @Ledger-Lenz/ml-core
-detection/audit_trail.py               @Ledger-Lenz/security @Ledger-Lenz/maintainers
-utils/field_encryption.py               @Ledger-Lenz/security
+# ── Integrations / smart contracts ───────────────────────────────────────────
+/integrations/                  @Ledger-Lenz/contract-team
+/integrations/contract_client.py @Ledger-Lenz/contract-team
+/integrations/soroban/          @Ledger-Lenz/contract-team
+/integrations/zk_attestor.py    @Ledger-Lenz/contract-team
 
-# ─── Streaming & real-time pipeline ──────────────────────────────────────────
-streaming/                              @Ledger-Lenz/data-core @Ledger-Lenz/infra
-streaming/kafka_worker.py               @Ledger-Lenz/infra @Ledger-Lenz/data-core
-streaming/ws_server.py                  @Ledger-Lenz/infra
-streaming/ws_auth.py                    @Ledger-Lenz/security @Ledger-Lenz/infra
-streaming/rl_threshold_controller.py    @Ledger-Lenz/ml-core
+# ── Monitoring & observability ───────────────────────────────────────────────
+/monitoring/                    @Ledger-Lenz/infra-team
+/monitoring/prometheus.yml      @Ledger-Lenz/infra-team
+/monitoring/alert_rules.yml     @Ledger-Lenz/infra-team
 
-# ─── Soroban / contract integrations ─────────────────────────────────────────
-integrations/                           @Ledger-Lenz/contracts @Ledger-Lenz/maintainers
-integrations/contract_client.py         @Ledger-Lenz/contracts
-integrations/soroban/                   @Ledger-Lenz/contracts
-integrations/governance_contract.rs     @Ledger-Lenz/contracts @Ledger-Lenz/security
-integrations/emergency_pause_contract.rs @Ledger-Lenz/contracts @Ledger-Lenz/security
+# ── Configuration ────────────────────────────────────────────────────────────
+/config.py                      @Ledger-Lenz/core-maintainers
+/config/                        @Ledger-Lenz/core-maintainers
+/.env.example                   @Ledger-Lenz/core-maintainers
 
-# ─── Monitoring & alerting ─────────────────────────────────────────────────
-monitoring/                             @Ledger-Lenz/infra
-monitoring/incident_responder.py        @Ledger-Lenz/infra @Ledger-Lenz/maintainers
-monitoring/emergency_watchdog.py        @Ledger-Lenz/infra @Ledger-Lenz/security
-alerts/                                 @Ledger-Lenz/infra @Ledger-Lenz/ml-core
+# ── Reporting ────────────────────────────────────────────────────────────────
+/reporting/                     @Ledger-Lenz/data-team
+/reporting/fatf_exporter.py     @Ledger-Lenz/data-team @Ledger-Lenz/compliance-team
 
-# ─── Data assets & model artifacts ───────────────────────────────────────────
-data/                                   @Ledger-Lenz/data-core @Ledger-Lenz/maintainers
-data/feature_dictionary.md              @Ledger-Lenz/ml-core @Ledger-Lenz/data-core
-data/known_manipulation_events.csv      @Ledger-Lenz/ml-core @Ledger-Lenz/maintainers
-data/synthetic_dataset.parquet         @Ledger-Lenz/ml-core @Ledger-Lenz/data-core
-models/                                 @Ledger-Lenz/ml-core @Ledger-Lenz/security
+# ── Privacy & differential privacy ───────────────────────────────────────────
+/privacy/                       @Ledger-Lenz/ml-team @Ledger-Lenz/security-team
 
-# ─── Training pipeline ────────────────────────────────────────────────────────
-training/                               @Ledger-Lenz/ml-core
-scripts/retrain_if_drifted.py           @Ledger-Lenz/ml-core @Ledger-Lenz/maintainers
-scripts/generate_synthetic_dataset.py   @Ledger-Lenz/ml-core @Ledger-Lenz/data-core
+# ── CI/CD & build ───────────────────────────────────────────────────────────
+/.github/                       @Ledger-Lenz/core-maintainers
+/.github/workflows/             @Ledger-Lenz/infra-team
+/Dockerfile                     @Ledger-Lenz/infra-team
+/docker-compose.yml             @Ledger-Lenz/infra-team
+/Makefile                       @Ledger-Lenz/core-maintainers
 
-# ─── Active learning ─────────────────────────────────────────────────────────
-detection/active_learning/              @Ledger-Lenz/ml-core @Ledger-Lenz/data-core
+# ── Testing ──────────────────────────────────────────────────────────────────
+/tests/                         @Ledger-Lenz/core-maintainers
+/tests/integration/             @Ledger-Lenz/core-maintainers @Ledger-Lenz/infra-team
+/tests/fuzz/                    @Ledger-Lenz/ml-team
 
-# ─── API surface ─────────────────────────────────────────────────────────────
-api/                                    @Ledger-Lenz/maintainers
+# ── Scripts ──────────────────────────────────────────────────────────────────
+/scripts/                       @Ledger-Lenz/core-maintainers
+/scripts/stream.py              @Ledger-Lenz/streaming-team
+/scripts/retrain_if_drifted.py  @Ledger-Lenz/ml-team
+/scripts/testnet_setup.py       @Ledger-Lenz/contract-team
 
-# ─── Reporting & compliance ───────────────────────────────────────────────────
-reporting/                              @Ledger-Lenz/maintainers @Ledger-Lenz/ml-core
-docs/regulatory_reporting.md            @Ledger-Lenz/maintainers @Ledger-Lenz/security
-docs/forensic_reporting.md              @Ledger-Lenz/maintainers @Ledger-Lenz/security
+# ── Utilities ────────────────────────────────────────────────────────────────
+/utils/                         @Ledger-Lenz/core-maintainers
+/utils/logging.py               @Ledger-Lenz/infra-team
+/utils/tracing.py               @Ledger-Lenz/infra-team
 
-# ─── Core project files ───────────────────────────────────────────────────────
-README.md                               @Ledger-Lenz/maintainers
-CHANGELOG.md                            @Ledger-Lenz/maintainers
-CONTRIBUTING.md                         @Ledger-Lenz/maintainers
-config.py                               @Ledger-Lenz/maintainers @Ledger-Lenz/infra
-run_pipeline.py                         @Ledger-Lenz/maintainers
+# ── Models & data artifacts ──────────────────────────────────────────────────
+/models/                        @Ledger-Lenz/ml-team
+/data/                          @Ledger-Lenz/data-team
+
+# ── Documentation ────────────────────────────────────────────────────────────
+/docs/                          @Ledger-Lenz/core-maintainers
+/README.md                      @Ledger-Lenz/core-maintainers
+/CONTRIBUTING.md                @Ledger-Lenz/core-maintainers
+/CHANGELOG.md                   @Ledger-Lenz/core-maintainers

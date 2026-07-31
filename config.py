@@ -169,6 +169,10 @@ class Config:
     KAFKA_LAG_ALERT_THRESHOLD: int = int(os.getenv("KAFKA_LAG_ALERT_THRESHOLD", "500"))
     KAFKA_METRICS_PORT: int = int(os.getenv("KAFKA_METRICS_PORT", "9100"))
     TRADE_AVRO_SCHEMA_PATH: str = os.getenv("TRADE_AVRO_SCHEMA_PATH", "data/trade_avro_schema.json")
+    
+    # End-to-end latency budget (Issue #124)
+    E2E_LATENCY_BUDGET_MS: int = int(os.getenv("E2E_LATENCY_BUDGET_MS", "2000"))
+    LATENCY_ANOMALY_RATE_THRESHOLD: float = float(os.getenv("LATENCY_ANOMALY_RATE_THRESHOLD", "0.90"))
 
     # Account metadata streaming join (streaming/account_metadata_stream.py,
     # streaming/pipeline.py MetadataJoinState)
@@ -465,8 +469,89 @@ class Config:
         "TRADE_DEDUP_CACHE_KEY_PREFIX", "ledgerlens:trades:"
     )
 
+    # ---------------------------------------------------------------------------
+    # Parallel processing controls — Issue #528
+    # (ingestion/parallel_executor.py)
+    # ---------------------------------------------------------------------------
+    # Executor backend: "process" uses ProcessPoolExecutor (bypasses the GIL,
+    # best for CPU-heavy Benford / feature engineering work); "thread" uses
+    # ThreadPoolExecutor (lower overhead for I/O-bound tasks).
+    PARALLEL_EXECUTOR_BACKEND: str = os.getenv("PARALLEL_EXECUTOR_BACKEND", "process")
+    # Maximum number of worker processes/threads.  Defaults to CPU count − 1 (≥ 1).
+    PARALLEL_EXECUTOR_MAX_WORKERS: int = max(
+        1,
+        int(os.getenv("PARALLEL_EXECUTOR_MAX_WORKERS", str(max(1, (os.cpu_count() or 2) - 1))))
+    )
+    # Maximum number of futures that may be in-flight simultaneously (back-pressure).
+    # 0 disables the limit.
+    PARALLEL_EXECUTOR_MAX_PENDING: int = int(os.getenv("PARALLEL_EXECUTOR_MAX_PENDING", "64"))
+    # Items per chunk submitted in map_chunks() to reduce process-spawn overhead.
+    PARALLEL_EXECUTOR_CHUNK_SIZE: int = int(os.getenv("PARALLEL_EXECUTOR_CHUNK_SIZE", "16"))
+    # Per-task timeout in seconds for map() calls.  0 means unlimited.
+    PARALLEL_EXECUTOR_TIMEOUT_SECONDS: float = float(
+        os.getenv("PARALLEL_EXECUTOR_TIMEOUT_SECONDS", "300")
+    )
+
+    # ---------------------------------------------------------------------------
+    # Dataset storage abstraction — Issue #529
+    # (ingestion/dataset_store.py)
+    # ---------------------------------------------------------------------------
+    # Storage backend: "local" (default) writes Parquet/CSV/JSON to the local
+    # filesystem; "object" routes through fsspec (S3, GCS, Azure Blob, …).
+    DATASET_STORE_BACKEND: str = os.getenv("DATASET_STORE_BACKEND", "local")
+    # Root directory (local backend) or bucket prefix (object backend).
+    DATASET_STORE_BASE_PATH: str = os.getenv("DATASET_STORE_BASE_PATH", "./data")
+    # Default serialisation format for generated datasets.
+    DATASET_STORE_FORMAT: str = os.getenv("DATASET_STORE_FORMAT", "parquet")
+    # Object store URI for the "object" backend, e.g. s3://my-bucket/ledgerlens.
+    # Leave empty to fall back to LocalDatasetStore even when backend="object".
+    DATASET_STORE_OBJECT_STORE_URL: str = os.getenv("DATASET_STORE_OBJECT_STORE_URL", "")
+
+    # ---------------------------------------------------------------------------
+    # Model input validators — Issue #531
+    # (detection/model_input_validator.py)
+    # ---------------------------------------------------------------------------
+    # Strictness level for schema and range validation at inference time.
+    #   "raise"   — raise ValueError on the first issue found.
+    #   "warn"    — log warnings and return cleaned data (default).
+    #   "coerce"  — silently drop / fix violating rows, no logging.
+    #   "ignore"  — pass data through unchanged (validation disabled).
+    MODEL_INPUT_VALIDATOR_STRICTNESS: str = os.getenv(
+        "MODEL_INPUT_VALIDATOR_STRICTNESS", "warn"
+    )
+    # Path to feature_ranges.json, which supplies per-feature [min, max] bounds.
+    MODEL_INPUT_VALIDATOR_RANGES_PATH: str = os.getenv(
+        "MODEL_INPUT_VALIDATOR_RANGES_PATH", "data/feature_ranges.json"
+    )
+    # Strategy for handling NaN / ±Inf values before model scoring.
+    #   "drop"           — drop rows containing NaN / Inf (default).
+    #   "impute_zero"    — replace NaN / Inf with 0.
+    #   "impute_median"  — replace NaN / Inf with the column median.
+    #   "raise"          — raise ValueError if any NaN / Inf is present.
+    MODEL_INPUT_VALIDATOR_NAN_STRATEGY: str = os.getenv(
+        "MODEL_INPUT_VALIDATOR_NAN_STRATEGY", "drop"
+    )
+
+    # ---------------------------------------------------------------------------
+    # Watermark tracking for incremental ledger ingestion — Issue #526
+    # (ingestion/watermark_tracker.py)
+    # ---------------------------------------------------------------------------
+    # Path to the JSON file that persists per-pair ingestion watermarks.
+    # The file is written atomically (tmpfile + rename) so it is crash-safe.
+    WATERMARK_STORE_PATH: str = os.getenv("WATERMARK_STORE_PATH", "data/watermarks.json")
+    # Automatically flush the watermark store to disk every N advance() calls.
+    # 1 (default) flushes after every trade page — safest, slight I/O overhead.
+    # 0 disables auto-flush; callers must invoke WatermarkTracker.flush() manually.
+    WATERMARK_FLUSH_EVERY_N: int = int(os.getenv("WATERMARK_FLUSH_EVERY_N", "1"))
+
     @classmethod
-    def validate(cls, require_onchain: bool = False):
+    def _core_errors(cls, require_onchain: bool = False) -> list[str]:
+        """Collect (not raise) the baseline config errors shared by every entry point.
+
+        Split out from `validate()` so `config/contracts.py` can compose these
+        checks with mode-specific ones (API, streaming, training, ...) instead of
+        re-implementing the same field-by-field logic per runtime mode.
+        """
         errors = []
 
         if not cls.WATCHED_ASSET_PAIRS:
@@ -490,6 +575,12 @@ class Config:
 
             if not cls.LEDGERLENS_SUBMITTER_SECRET.strip():
                 errors.append("LEDGERLENS_SUBMITTER_SECRET is not set.")
+
+        return errors
+
+    @classmethod
+    def validate(cls, require_onchain: bool = False):
+        errors = cls._core_errors(require_onchain)
 
         if errors:
             raise OSError("LedgerLens configuration errors:\n- " + "\n- ".join(errors))

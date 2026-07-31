@@ -56,8 +56,12 @@ What does this PR change and why?
 - [ ] `CHANGELOG.md` updated under `[Unreleased]`
 - [ ] If a shared contract changed (`RiskScore`, asset pair format, feature
       schema), linked issues/PRs in `ledgerlens-core` and downstream repos
-- [ ] `data/feature_dictionary.md` updated if feature columns added/removed
-- [ ] Model metrics (AUC/F1) documented if models were retrained
-- [ ] Security review requested if touching `detection/privacy/`,
-      `detection/adversarial/`, `utils/field_encryption.py`, or
-      `detection/audit_trail.py`
+
+<!--
+If this PR touches a high-risk path (wire schema, shared contracts, feature
+or training code, DB schema, tenant config, model metadata), CI will ask you
+to add a short note under a specific heading. See
+.github/review-checklists.md — or run `make check-review-gates` to see which
+apply before you push.
+-->
+
