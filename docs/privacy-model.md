@@ -29,7 +29,7 @@ Noise is drawn from a discrete Laplace distribution `Lap(0, b)` with scale
 b = sensitivity / ε = 100 / ε
 ```
 
-using the inverse‑CDF (quantile) method:
+using the inverse-CDF (quantile) method:
 
 ```
 noise = sign × Lap_magnitude
@@ -119,6 +119,13 @@ let private_score: u32 = client.get_private_aggregate_score(&wallet, &seed);
    (`get_private_aggregate_score`) has a private variant.  The per-pair
    `get_score` query is exact and not noise-calibrated.
 
+## Deletion-policy note
+
+Privacy-related score deletion is now intentionally separated from routine
+admin rights. `clear_score` and `clear_score_history` can be placed behind an
+explicit deletion-approval policy so normal governance operators cannot perform
+irreversible deletion without the separately configured high-risk approver.
+
 ## Example
 
 ```text
@@ -133,31 +140,77 @@ Noised score: 70 + Lap(0, 100) → e.g. 42 or 91
               (always clamped to [0, 100])
 ```
 
-## Event Privacy Audit
+## Irreversible score deletion operations
 
-Every event published from `contracts/ledgerlens-score/src/events.rs` was
-reviewed for whether its topic/data fields leak information beyond what is
-already visible from the calling transaction's public arguments (which, on
-Soroban, are public regardless of event emission). Findings below list each
-risk-relevant event group, what it exposes, and the assessed risk. No event
-schema changes were made as a result of this audit — see rationale per
-finding.
+`clear_score` and `clear_score_history` are intentionally destructive operator
+tools. Before the changes for issues #791 and #792, the concrete behavior was:
 
-| Event(s) | Data exposed | Risk | Mitigation / rationale |
-|---|---|---|---|
-| `score_submitted` | `benford_flag`, `ml_flag`, `confidence`, `timestamp` alongside the score | **Medium** — exposes model-confidence and anomaly-flag internals per wallet/pair, which could let an observer infer when the scoring model is uncertain or flagging a wallet, beyond the raw score itself | Accepted: these flags are the mechanism's core output and downstream consumers (disputes, risk gates) require them on-chain to function; `get_private_aggregate_score` remains the noise-calibrated path for callers who need a privacy-preserving read |
-| `wallet_cluster_assigned`, `counterparty_link_added/removed`, `contagion_propagated` | Wallet-to-wallet relationships and cluster membership | **Medium** — reveals wallet monitoring/linkage strategy (which wallets are treated as related) | Accepted: correlation is the documented product behavior (contagion/cluster risk propagation); the alternative of suppressing it would break the on-chain audit trail these features exist to provide |
-| `embargo_set/lifted`, `delegate_set/removed`, `watchlist_updated` | Regulatory-hold, delegation, and watchlist status per wallet | **Medium** — publicly tags a wallet as flagged/embargoed/delegated | Accepted: these are admin-authorized compliance actions that must be auditable; addresses are already public on Stellar, so this adds status metadata rather than new identity linkage |
-| `signer_accuracy_updated/reset`, `consensus_signer_rejected`, `signer_tier_updated` | Per-signer accuracy/deviation stats and tier | **Low–Medium** — exposes signer performance/behavior, which is a service-operator concern rather than an end-user wallet, and is required for `signer_tier` gating to be independently verifiable | No change: signer addresses are already known from `signer_added`/`add_signer` calls; accuracy is operational telemetry, not end-user PII |
-| `score_jump_anomaly`, `momentum_threshold_crossed`, `dormancy_decay_applied`, `risk_band_entered/cleared`, `threshold_breach`, `escalation_triggered/resolved`, `failover_triggered`, `suspicious_same_ledger_submission` | Wallet + asset-pair + score/threshold values | **Low** — derivable from the existing `score_submitted`/`score` history already on-chain; these events only summarize state transitions over that same public data | No change: no new inference surface beyond the base score event already audited above |
-| Admin/config events (`*_updated`, `*_proposed`, `*_executed`, `pair_weight_*`, `cooldown_*`, `decay_rate_updated`, `fee_*`, upgrade/governance/model-version events) | Global parameters, proposal ids, admin addresses | **Low** — configuration is intentionally public for governance transparency | No change: no per-wallet or model-confidence data present |
+- both calls were admin-only and no-op on missing data;
+- `clear_score` removed only the latest `Score(wallet, pair)` entry;
+- `clear_score_history` removed only the `ScoreHistory(wallet, pair)` ring;
+- each path updated the histogram using only the current latest score when one
+  existed;
+- the emitted events (`clr_scr`, `clr_hist`) contained only the wallet topic
+  and the asset pair payload, so operators had no hashed reason/category or
+  auth-context evidence on chain.
 
-### Conclusion
+The current operator workflow is:
 
-No event schema or field changes are required by this audit. The
-highest-exposure events (`score_submitted`, wallet-linkage events, and
-compliance-status events) are inherent to the contract's documented risk-gate
-and compliance features rather than incidental leakage, and callers needing a
-privacy-preserving score read already have `get_private_aggregate_score`
-available. Since no event schema changed, no new tests were added for this
-audit.
+1. Call `get_deletion_preflight(wallet, pair)` to inspect the deletion scope.
+2. Execute `clear_score*` or `clear_score_history*`.
+3. Persist the unhashed case notes off chain if a human-readable record is
+   required.
+
+### Preflight output
+
+`get_deletion_preflight` is read-only and returns:
+
+- `wallet`
+- `asset_pair`
+- `latest_score_present`
+- `history_count`
+- `audit_warning = Irreversible`
+
+This preview intentionally avoids touching the history TTL, so operators can
+inspect the target without mutating its retention horizon.
+
+### Audit trail shape
+
+`clr_scr` and `clr_hist` keep their existing topic shape
+`(event_name, EVENT_VERSION, wallet)` but now append richer payload data:
+
+- `asset_pair`
+- `by` (the configured admin address)
+- `latest_score_present`
+- `history_count`
+- `reason_hash = sha256(reason_bytes)`
+- `category_hash = sha256(category_bytes)`
+- `multisig_enabled`
+- `signer_count`
+- `threshold`
+
+Raw deleted `RiskScore` values are still excluded from the event payload.
+
+For backwards-compatible callers, `clear_score` and `clear_score_history`
+continue to exist and emit deterministic default hashes for
+`reason = "unspecified"` and categories `"score-clear"` / `"history-clear"`.
+Operators that want case-specific hashes can call
+`clear_score_with_audit(...)` or `clear_score_history_with_audit(...)`.
+
+### Compatibility impact
+
+- Public ABI: additive only. Existing delete entrypoints are preserved; new
+  preflight and `*_with_audit` functions are optional.
+- Event topics: unchanged.
+- Event payloads: append-only expansion of `clr_scr` / `clr_hist`.
+- Errors: unchanged.
+- Storage layout: unchanged. No new persistent deletion log is stored on chain.
+
+### Resource bounds
+
+- `history_count` is derived from the bounded score-history ring, whose maximum
+  depth remains `MAX_HISTORY_DEPTH = 50`.
+- Batch submission boundaries remain capped at `MAX_BATCH_SIZE = 20`.
+- The worst relevant cases are therefore still bounded by existing constants,
+  and the existing batch/history TTL tests and benches remain the governing
+  budget references for these paths.
