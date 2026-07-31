@@ -23,7 +23,7 @@ set -euo pipefail
 DRY_RUN=false
 CHECK_TOOLCHAIN_ONLY=false
 MANIFEST_OVERRIDE=""
-CANARY=false
+CANARY_KEYS=false
 POSITIONAL=()
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 
@@ -41,6 +41,10 @@ while [ "$#" -gt 0 ]; do
       [ "$#" -ge 2 ] || { echo "ERROR: --manifest requires a path." >&2; exit 1; }
       MANIFEST_OVERRIDE="$2"
       shift 2
+      ;;
+    --canary-keys)
+      CANARY_KEYS=true
+      shift
       ;;
     --help)
       sed -n '3,22p' "$0"

@@ -40,6 +40,9 @@ mod test_batch_error_events;
 mod test_parameter_governance;
 
 #[cfg(test)]
+mod test_two_person_control;
+
+#[cfg(test)]
 mod test_batch_ttl_optimization;
 
 #[cfg(test)]
@@ -67,6 +70,9 @@ mod test_deprecation_compat;
 
 // #[cfg(test)]
 // mod test_attestation;
+
+#[cfg(test)]
+mod test_attestation_domain_compat;
 
 // #[cfg(test)]
 // mod test_batch_attestation;
@@ -138,6 +144,15 @@ mod test_slo_defaults;
 mod test_breach_counter_reset;
 
 #[cfg(test)]
+mod test_adversarial_validation;
+
+#[cfg(test)]
+mod test_submission_provenance;
+
+#[cfg(test)]
+mod test_rejection_precedence;
+
+#[cfg(test)]
 mod test_admin_transfer;
 
 #[cfg(test)]
@@ -186,6 +201,9 @@ mod test_memory_exhaustion;
 
 #[cfg(test)]
 mod test_audit_replay;
+
+#[cfg(test)]
+mod test_signer_governance;
 
 use soroban_sdk::{
     contract, contractimpl, crypto::Hash, symbol_short, token, Address, Bytes, BytesN, Env,
@@ -310,6 +328,40 @@ impl LedgerLensScoreContract {
     /// ```
     pub fn get_version(env: Env) -> u32 {
         storage::get_contract_version(&env)
+    }
+
+    /// Exposes lightweight runtime metadata for integrators and tooling.
+    ///
+    /// The returned metadata is intentionally compact: it advertises the
+    /// interface version, contract version, the supported capability symbols,
+    /// and the semantic constraints that callers must respect. This allows
+    /// clients to discover the published surface without hard-coding the ABI.
+    pub fn get_interface_metadata(env: Env) -> InterfaceMetadata {
+        let mut capabilities = Vec::new(&env);
+        capabilities.push_back(Symbol::new(&env, "score"));
+        capabilities.push_back(Symbol::new(&env, "history"));
+        capabilities.push_back(Symbol::new(&env, "batch"));
+        capabilities.push_back(Symbol::new(&env, "gate"));
+        capabilities.push_back(Symbol::new(&env, "aggr"));
+        capabilities.push_back(Symbol::new(&env, "count"));
+        capabilities.push_back(Symbol::new(&env, "cgate"));
+        capabilities.push_back(Symbol::new(&env, "batch_attested"));
+        capabilities.push_back(Symbol::new(&env, "emb"));
+        capabilities.push_back(Symbol::new(&env, "cons"));
+        capabilities.push_back(Symbol::new(&env, "pr_rd"));
+        capabilities.push_back(Symbol::new(&env, "meta"));
+
+        let mut constraints = Vec::new(&env);
+        constraints.push_back(Symbol::new(&env, "fail_closed"));
+        constraints.push_back(Symbol::new(&env, "side_effect_free"));
+        constraints.push_back(Symbol::new(&env, "bounded_score_range"));
+
+        InterfaceMetadata {
+            interface_version: 3,
+            contract_version: storage::get_contract_version(&env),
+            capabilities,
+            semantic_constraints: constraints,
+        }
     }
 
     // ── Score submission ─────────────────────────────────────────────────────
@@ -1088,6 +1140,26 @@ impl LedgerLensScoreContract {
     /// one batch are subject to the same cooldown — the second is rejected,
     /// since both share the same ledger timestamp.
     ///
+    /// ## #689 — Deterministic rejection-precedence table
+    ///
+    /// When a single entry violates multiple rules the **first matching rule**
+    /// wins, in this fixed order (highest priority → lowest):
+    ///
+    /// | Priority | `rejection_code` | Value | Condition |
+    /// |---:|---|---:|---|
+    /// | 1 | `PairPaused` (`ContractPaused`) | 7 | asset pair individually frozen |
+    /// | 2 | `InvalidScore` | 4 | `score > 100` |
+    /// | 3 | `InvalidConfidence` | 5 | `confidence > 100` |
+    /// | 4 | `InvalidTimestamp` | 25 | `timestamp == 0` |
+    /// | 5 | `ModelVersion*` | various | model version not registered / not ready / deprecated |
+    /// | 6 | `RateLimitExceeded` | 23 | cooldown not elapsed or velocity cap exceeded |
+    /// | 7 | `BelowScoreFloor` | **43** | score < floor for high-risk wallet |
+    ///
+    /// Note: `BelowScoreFloor` (priority 7) emits `rejection_code = 43` —
+    /// **distinct from `InvalidScore` (4)** even though they share an alias in
+    /// the `Error` enum, so callers can always distinguish a range violation
+    /// from a policy floor rejection by inspecting the numeric code.
+    ///
     /// # Examples
     ///
     /// ```
@@ -1181,7 +1253,8 @@ impl LedgerLensScoreContract {
                 if last_submit != 0 && now < last_submit.saturating_add(cooldown) {
                     rejection_code = Error::RateLimitExceeded as u32;
                 } else if Self::score_floor_blocks(&env, &sub.wallet, &sub.asset_pair, sub.score) {
-                    rejection_code = Error::InvalidScore as u32;
+                    // code 43 = BelowScoreFloor (distinct from InvalidScore=4 for score > 100)
+                    rejection_code = 43u32;
                 } else {
                     let previous_score =
                         storage::peek_score(&env, &sub.wallet, &sub.asset_pair).map(|s| s.score);
@@ -1245,6 +1318,32 @@ impl LedgerLensScoreContract {
                         // Increment unique wallet-pair counter on first-ever submission (Issue 3).
                         if previous_score.is_none() {
                             storage::increment_total_wallets_scored(&env);
+                        }
+                        // #688: persist provenance snapshot for this batch entry.
+                        {
+                            let floor_policy = storage::get_score_floor_policy(&env);
+                            let provenance = SubmissionProvenance {
+                                model_version: sub.model_version,
+                                service_threshold: storage::get_service_threshold(&env),
+                                signers_count: 1,
+                                score_floor_enabled: floor_policy.enabled,
+                                score_floor_high_water_mark: floor_policy.high_water_mark,
+                                score_floor_value: floor_policy.floor_value,
+                                cooldown_secs: storage::get_pair_cooldown_secs(
+                                    &env,
+                                    &sub.asset_pair,
+                                ),
+                                epoch_id: storage::get_current_epoch(&env),
+                                ledger_sequence: env.ledger().sequence(),
+                                submitted_at: now,
+                                validation_branch: symbol_short!("batch"),
+                            };
+                            storage::set_submission_provenance(
+                                &env,
+                                &sub.wallet,
+                                &sub.asset_pair,
+                                &provenance,
+                            );
                         }
                         storage::update_model_stats(&env, sub.model_version, sub.score);
                         storage::update_historical_max_score(
@@ -2678,6 +2777,62 @@ impl LedgerLensScoreContract {
         storage::get_score_count(&env, &wallet, &asset_pair)
     }
 
+    // ── #688: Submission provenance snapshots ────────────────────────────────
+
+    /// Returns the provenance snapshot recorded for the most recently accepted
+    /// submission for `wallet` / `asset_pair`.
+    ///
+    /// The snapshot captures the policy state, signer context, and validation
+    /// branch that were active **at the moment of acceptance** — not the live
+    /// values, which the admin may have changed since.
+    ///
+    /// Returns [`Error::ScoreNotFound`] when no submission has ever been
+    /// accepted for this pair (i.e. no snapshot exists yet).
+    ///
+    /// # Fields returned
+    ///
+    /// | Field | Description |
+    /// |---|---|
+    /// | `model_version` | Model version of the accepted submission |
+    /// | `service_threshold` | M-of-N threshold active at acceptance (0 = single-service) |
+    /// | `signers_count` | Number of signers that authorised the call |
+    /// | `score_floor_enabled` | Whether the score-floor policy was enabled |
+    /// | `score_floor_high_water_mark` | HWM value at acceptance |
+    /// | `score_floor_value` | Floor value at acceptance |
+    /// | `cooldown_secs` | Effective per-(wallet,pair) cooldown at acceptance |
+    /// | `epoch_id` | Epoch open at acceptance |
+    /// | `ledger_sequence` | Ledger sequence of the accepting ledger |
+    /// | `submitted_at` | On-chain ledger timestamp at acceptance |
+    /// | `validation_branch` | Auth path taken: `"single"`, `"multisig"`, `"thr_sig"`, or `"batch"` |
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+    /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec, symbol_short};
+    /// let env = Env::default();
+    /// env.mock_all_auths();
+    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let admin = Address::generate(&env);
+    /// let service = Address::generate(&env);
+    /// client.initialize(&admin, &service);
+    /// let wallet = Address::generate(&env);
+    /// let pair = symbol_short!("XLM_USDC");
+    /// client.submit_score(&Vec::new(&env), &wallet, &pair, &50, &false, &false, &1, &90, &1, &None);
+    /// let prov = client.get_submission_provenance(&wallet, &pair).unwrap();
+    /// assert_eq!(prov.model_version, 1);
+    /// assert_eq!(prov.validation_branch, symbol_short!("single"));
+    /// ```
+    pub fn get_submission_provenance(
+        env: Env,
+        wallet: Address,
+        asset_pair: Symbol,
+    ) -> Result<SubmissionProvenance, Error> {
+        storage::get_submission_provenance(&env, &wallet, &asset_pair)
+            .ok_or(Error::ScoreNotFound)
+    }
+
     /// Returns the total number of successful score submissions ever recorded
     /// for `asset_pair` across **all** wallets.
     ///
@@ -3693,6 +3848,11 @@ impl LedgerLensScoreContract {
             return Err(Error::NotInitialized);
         }
         Self::require_admin_auth(&env, &admin_signers)?;
+
+        if storage::get_require_multisig_for_destructive(&env) && admin_signers.len() < 2 {
+            return Err(Error::InsufficientAdminSigners);
+        }
+
         for i in 0..pairs.len() {
             let pair = pairs.get(i).unwrap();
             if !storage::has_pair_weight(&env, &pair) {
@@ -3702,6 +3862,27 @@ impl LedgerLensScoreContract {
             events::pair_weight_reset(&env, &pair);
         }
         Ok(())
+    }
+
+    /// Require multi-admin approval for destructive operations.
+    /// Admin only. When enabled, destructive operations (e.g., `bulk_reset_pair_weight`)
+    /// reject single-admin authorization and require M-of-N multi-sig.
+    pub fn set_require_multisig_for_destructive(
+        env: Env,
+        admin_signers: Vec<Address>,
+        required: bool,
+    ) -> Result<(), Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+        storage::set_require_multisig_for_destructive(&env, required);
+        Ok(())
+    }
+
+    /// Returns whether multi-admin approval is required for destructive operations.
+    pub fn get_require_multisig_for_destructive(env: Env) -> bool {
+        storage::get_require_multisig_for_destructive(&env)
     }
 
     // ── Global minimum confidence floor ──────────────────────────────────────
@@ -4374,11 +4555,7 @@ impl LedgerLensScoreContract {
             || capability == symbol_short!("cons")
             || capability == symbol_short!("pr_rd")
             || capability == symbol_short!("dprv")
-            || capability == Symbol::new(&env, "reconcile")
-            || capability == Symbol::new(&env, "checksum")
-            || capability == Symbol::new(&env, "snapshot")
-            || capability == Symbol::new(&env, "export_score")
-            || capability == Symbol::new(&env, "freeze")
+            || capability == Symbol::new(&env, "meta")
     }
 
     // ── Service management ───────────────────────────────────────────────────
@@ -4409,10 +4586,10 @@ impl LedgerLensScoreContract {
         storage::set_service_set(&env, &set);
         storage::set_signer_added_at(&env, &signer, env.ledger().timestamp());
         events::signer_added(&env, &signer);
-        // #299: governance audit chain
+        // #299: governance audit chain — stable discriminant from governance_actions registry
         let mut data = [0u8; 32];
-        data[0] = 0x02; // action: add_service_signer
-        Self::append_governance_action_raw(&env, &data);
+        data[0] = governance_actions::GOV_ACTION_ADD_SERVICE_SIGNER;
+        Self::append_governance_action(&env, governance_actions::GOV_ACTION_ADD_SERVICE_SIGNER, &data);
         Ok(())
     }
 
@@ -4674,10 +4851,10 @@ impl LedgerLensScoreContract {
         storage::get_admin(&env).require_auth();
         storage::set_service(&env, &new_service);
         events::service_updated(&env, &new_service);
-        // #299: append to governance audit chain (action discriminant 0x01)
+        // #299: append to governance audit chain — stable discriminant from governance_actions registry
         let mut data = [0u8; 32];
-        data[0] = 0x01; // action: set_service
-        Self::append_governance_action_raw(&env, &data);
+        data[0] = governance_actions::GOV_ACTION_SET_SERVICE;
+        Self::append_governance_action(&env, governance_actions::GOV_ACTION_SET_SERVICE, &data);
         Ok(())
     }
 
@@ -5333,7 +5510,12 @@ impl LedgerLensScoreContract {
         storage::set_paused(&env, true);
         events::contract_paused(&env, &admin);
         let action_bytes = Bytes::new(&env);
-        Self::update_audit_root(&env, symbol_short!("pause"), admin.clone(), action_bytes);
+        Self::update_audit_root(
+            &env,
+            Symbol::new(&env, governance_actions::GOV_ACTION_NAME_PAUSE),
+            admin.clone(),
+            action_bytes,
+        );
         Ok(())
     }
 
@@ -5366,7 +5548,12 @@ impl LedgerLensScoreContract {
         storage::set_paused(&env, false);
         events::contract_unpaused(&env, &admin);
         let action_bytes = Bytes::new(&env);
-        Self::update_audit_root(&env, symbol_short!("unpause"), admin.clone(), action_bytes);
+        Self::update_audit_root(
+            &env,
+            Symbol::new(&env, governance_actions::GOV_ACTION_NAME_UNPAUSE),
+            admin.clone(),
+            action_bytes,
+        );
         Ok(())
     }
 
@@ -5707,12 +5894,24 @@ impl LedgerLensScoreContract {
             proposed_by: admin.clone(),
         };
         storage::set_pending_upgrade(&env, &proposal);
-        Self::append_governance_action_raw(&env, &new_wasm_hash.to_array());
+        // The propose_upgrade audit payload is the new WASM hash (32 bytes) rather
+        // than a discriminant byte so the committed hash is unconditionally captured.
+        // append_governance_action emits the typed gov_action event alongside it.
+        Self::append_governance_action(
+            &env,
+            governance_actions::GOV_ACTION_PROPOSE_UPGRADE,
+            &new_wasm_hash.to_array(),
+        );
 
         events::upgrade_proposed(&env, &new_wasm_hash, executable_after);
         let mut params_bytes = Bytes::new(&env);
         params_bytes.extend_from_array(&new_wasm_hash.to_array());
-        Self::update_audit_root(&env, symbol_short!("upg_prop"), admin.clone(), params_bytes);
+        Self::update_audit_root(
+            &env,
+            Symbol::new(&env, governance_actions::GOV_ACTION_NAME_PROPOSE_UPGRADE),
+            admin.clone(),
+            params_bytes,
+        );
         Ok(())
     }
 
@@ -6023,6 +6222,62 @@ impl LedgerLensScoreContract {
     /// Returns the IDs of all proposals currently marked pending.
     pub fn get_pending_param_prop_ids(env: Env) -> Vec<u64> {
         storage::get_pending_parameter_proposal_ids(&env)
+    }
+
+    /// Clean up expired parameter change proposals that have been expired for at least 48 hours.
+    /// Admin only. Idempotent; safe to call repeatedly.
+    /// Returns the number of proposals deleted.
+    pub fn cleanup_expired_parameter_proposals(
+        env: Env,
+        admin_signers: Vec<Address>,
+    ) -> Result<u32, Error> {
+        if !storage::has_admin(&env) {
+            return Err(Error::NotInitialized);
+        }
+        Self::require_admin_auth(&env, &admin_signers)?;
+
+        let (count, oldest_kept) = storage::cleanup_expired_parameter_proposals(&env);
+        events::parameter_change_cleanup(&env, count, oldest_kept);
+        Ok(count)
+    }
+
+    /// Simulate the effect of a parameter change without applying it.
+    /// Returns before/after values, affected capabilities, and execution window.
+    /// Read-only, callable by anyone.
+    pub fn simulate_parameter_change(
+        env: Env,
+        param_key: Symbol,
+        new_value: Bytes,
+    ) -> Result<types::ParameterSimulation, Error> {
+        let now = env.ledger().timestamp();
+        let time_lock_secs = storage::get_upgrade_delay(&env);
+        parameter_governance::simulate_parameter_change(&env, &param_key, &new_value, now, time_lock_secs)
+    }
+
+    /// Simulate the effect of an existing proposal without applying it.
+    /// Returns before/after values, affected capabilities, and execution window.
+    /// Read-only, callable by anyone.
+    pub fn get_proposal_simulation(
+        env: Env,
+        proposal_id: u64,
+    ) -> Result<types::ProposalSimulationOutput, Error> {
+        let record = storage::get_parameter_proposal_record(&env, proposal_id)
+            .ok_or(Error::ParameterProposalNotFound)?;
+
+        let p = &record.proposal;
+        let sim = parameter_governance::simulate_parameter_change(
+            &env,
+            &p.param_key,
+            &p.new_value,
+            p.proposed_at,
+            p.time_lock_secs,
+        )?;
+
+        Ok(types::ProposalSimulationOutput {
+            proposal_id,
+            simulation: sim,
+            simulated_at: env.ledger().timestamp(),
+        })
     }
 
     // ── Watchlist ────────────────────────────────────────────────────────────
@@ -8782,6 +9037,10 @@ impl LedgerLensScoreContract {
         }
         set.push_back(signer);
         storage::set_admin_set(&env, &set);
+        // Invalidate any partially-accumulated upgrade approvals: they were
+        // collected under the old signer set and must not carry over to the
+        // new one (signer-set snapshot invalidation — issue #1).
+        storage::clear_upgrade_approvals(&env);
         Ok(())
     }
 
@@ -8810,6 +9069,10 @@ impl LedgerLensScoreContract {
         } else if threshold > set.len() {
             storage::set_admin_threshold(&env, set.len());
         }
+        // Invalidate any partially-accumulated upgrade approvals: approvals from
+        // a signer that was just removed must not count toward the new threshold
+        // (signer-set snapshot invalidation — issue #1).
+        storage::clear_upgrade_approvals(&env);
         Ok(())
     }
 
@@ -8832,11 +9095,11 @@ impl LedgerLensScoreContract {
             return Err(Error::InvalidThreshold);
         }
         storage::set_admin_threshold(&env, threshold);
-        // #299: governance audit chain
+        // #299: governance audit chain — stable discriminant from governance_actions registry
         let mut data = [0u8; 32];
-        data[0] = 0x03; // action: set_admin_threshold
+        data[0] = governance_actions::GOV_ACTION_SET_ADMIN_THRESHOLD;
         data[28..32].copy_from_slice(&threshold.to_be_bytes());
-        Self::append_governance_action_raw(&env, &data);
+        Self::append_governance_action(&env, governance_actions::GOV_ACTION_SET_ADMIN_THRESHOLD, &data);
         Ok(())
     }
 
@@ -9955,6 +10218,32 @@ impl LedgerLensScoreContract {
         let is_new_wallet_pair = previous_score.is_none();
         storage::set_score(env, wallet, asset_pair, risk_score);
         storage::set_score_submission_ledger(env, wallet, asset_pair, env.ledger().sequence());
+        // #688: persist provenance snapshot so operators can audit why this submission
+        // was accepted and which policy parameters were in effect at the time.
+        {
+            let floor_policy = storage::get_score_floor_policy(env);
+            let service_set = storage::get_service_set(env);
+            let provenance = SubmissionProvenance {
+                model_version: risk_score.model_version,
+                service_threshold: storage::get_service_threshold(env),
+                signers_count: service_set.len(),
+                score_floor_enabled: floor_policy.enabled,
+                score_floor_high_water_mark: floor_policy.high_water_mark,
+                score_floor_value: floor_policy.floor_value,
+                cooldown_secs: storage::get_pair_cooldown_secs(env, asset_pair),
+                epoch_id: storage::get_current_epoch(env),
+                ledger_sequence: env.ledger().sequence(),
+                submitted_at: now,
+                validation_branch: if !service_set.is_empty()
+                    && storage::get_service_threshold(env) > 0
+                {
+                    symbol_short!("multisig")
+                } else {
+                    symbol_short!("single")
+                },
+            };
+            storage::set_submission_provenance(env, wallet, asset_pair, &provenance);
+        }
         storage::set_last_global_submission_time(env, now);
         storage::push_score_history(env, wallet, asset_pair, risk_score);
         storage::register_pair_for_wallet(env, wallet, asset_pair);
@@ -10379,7 +10668,28 @@ impl LedgerLensScoreContract {
         );
     }
 
-    /// Returns the current Merkle audit root over all admin governance actions since initialization.
+    /// Hash-chains `data` into the audit root **and** emits a `gov_action`
+    /// event carrying the stable [`governance_actions`] `action_id` discriminant
+    /// and its human-readable name.
+    ///
+    /// All new governance audit chain writes should call this wrapper instead
+    /// of [`append_governance_action_raw`] directly so that off-chain indexers
+    /// receive a queryable, typed event for every chain entry.
+    fn append_governance_action(env: &Env, action_id: u8, data: &[u8; 32]) {
+        Self::append_governance_action_raw(env, data);
+        let new_head = env
+            .storage()
+            .instance()
+            .get::<_, BytesN<32>>(&types::DataKeyC::AdminAuditRoot)
+            .unwrap_or_else(|| BytesN::from_array(env, &[0u8; 32]));
+        events::gov_action(
+            env,
+            action_id,
+            governance_actions::action_name(action_id),
+            &new_head,
+        );
+    }
+
     pub fn get_admin_audit_root(env: Env) -> BytesN<32> {
         env.storage()
             .instance()

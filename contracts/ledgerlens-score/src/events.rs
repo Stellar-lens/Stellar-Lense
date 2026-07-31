@@ -725,6 +725,30 @@ pub fn governance_action_appended(env: &Env, new_head: &soroban_sdk::BytesN<32>)
     env.events().publish((symbol_short!("gov_app"),), new_head.clone());
 }
 
+/// Emitted whenever a privileged admin action is appended to the Merkle audit
+/// chain.  `action_id` is the stable [`crate::governance_actions`] discriminant
+/// (e.g. `GOV_ACTION_PAUSE = 0x04`) so off-chain indexers can filter by action
+/// type without decoding raw chain bytes.  `new_head` is the updated chain root
+/// after the action was folded in.
+///
+/// Topic: `("gov_action", EVENT_VERSION)`
+/// Data:  `(action_id: u32, action_name: Symbol, new_head: BytesN<32>)`
+pub fn gov_action(
+    env: &Env,
+    action_id: u8,
+    action_name: &str,
+    new_head: &soroban_sdk::BytesN<32>,
+) {
+    env.events().publish(
+        (symbol_short!("gov_action"), EVENT_VERSION),
+        (
+            action_id as u32,
+            soroban_sdk::Symbol::new(env, action_name),
+            new_head.clone(),
+        ),
+    );
+}
+
 // ── #302: Gate enforcement mode ───────────────────────────────────────────────
 
 pub fn gate_enforcement_mode_set(env: &Env, strict: bool) {
