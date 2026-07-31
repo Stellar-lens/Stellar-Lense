@@ -10,9 +10,9 @@ use crate::types::{
     DataKeyD, DecayCurve, EmbargoExpiry, FlashProtectionMode, GateDataKey, HllSketch,
     InterpolationMethod, JumpStats, ModelVersionStats, ModelVersionStatus, PairVolatilityState,
     ParamChangeProposal, ParameterProposalRecord, ParameterProposalStatus, PendingScoreEntry,
-    RateLimitOverrideEntry, RiskScore, ScoreDispute, ScoreFloorPolicy, ScoreHistogram, ScoreTrend,
-    ScoreVelocityCap, SignerAccuracyRecord, SubscorePayload, TokenBucket, UpgradeProposal,
-    WelfordCorrState,
+    Policy, PolicyApproval, RateLimitOverrideEntry, RiskScore, ScoreDispute, ScoreFloorPolicy,
+    ScoreHistogram, ScoreTrend, ScoreVelocityCap, SignerAccuracyRecord, SubscorePayload,
+    TokenBucket, UpgradeProposal, WelfordCorrState,
 };
 use soroban_sdk::{Address, Bytes, BytesN, Env, Symbol, Vec};
 
@@ -1110,6 +1110,27 @@ pub fn set_deletion_approval_policy(
     match &policy.approver {
         Some(approver) => env.storage().instance().set(&DataKeyD::DeletionApprover, approver),
         None => env.storage().instance().remove(&DataKeyD::DeletionApprover),
+    }
+}
+
+/// Reads the separate-approver policy for one of the four `Policy`
+/// variants other than `DataDeletion` (issue #695). Defaults to
+/// `enabled = false, approver = None` until configured via
+/// `set_policy_approval`.
+pub fn get_policy_approval(env: &Env, policy: Policy) -> PolicyApproval {
+    let enabled =
+        env.storage().instance().get(&DataKeyD::PolicyApprovalEnabled(policy)).unwrap_or(false);
+    let approver = env.storage().instance().get(&DataKeyD::PolicyApprovalApprover(policy));
+    PolicyApproval { enabled, approver }
+}
+
+pub fn set_policy_approval(env: &Env, policy: Policy, approval: &PolicyApproval) {
+    env.storage().instance().set(&DataKeyD::PolicyApprovalEnabled(policy), &approval.enabled);
+    match &approval.approver {
+        Some(approver) => {
+            env.storage().instance().set(&DataKeyD::PolicyApprovalApprover(policy), approver)
+        }
+        None => env.storage().instance().remove(&DataKeyD::PolicyApprovalApprover(policy)),
     }
 }
 
@@ -2883,6 +2904,24 @@ pub fn set_pending_service_pubkey(env: &Env, new_key: &Bytes, expiry: u64) {
 
 pub fn clear_pending_service_pubkey(env: &Env) {
     env.storage().instance().remove(&DataKeyD::PendingServicePubKey);
+}
+
+// ── Aggregate (threshold-signature) service pubkey rotation overlap window ────
+// Mirrors the single-signer overlap window above; see `rotate_aggregate_service_pubkey`
+// and `verify_threshold_attestation` (issue #697).
+
+pub fn get_pending_aggregate_service_pubkey(env: &Env) -> Option<(Bytes, u64)> {
+    env.storage().instance().get(&DataKeyD::PendingAggregateServicePubKey)
+}
+
+pub fn set_pending_aggregate_service_pubkey(env: &Env, new_key: &Bytes, expiry: u64) {
+    env.storage()
+        .instance()
+        .set(&DataKeyD::PendingAggregateServicePubKey, &(new_key.clone(), expiry));
+}
+
+pub fn clear_pending_aggregate_service_pubkey(env: &Env) {
+    env.storage().instance().remove(&DataKeyD::PendingAggregateServicePubKey);
 }
 
 /// Compares a recovered 65-byte uncompressed secp256k1 pubkey against a

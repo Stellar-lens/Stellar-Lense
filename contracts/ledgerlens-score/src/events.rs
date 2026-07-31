@@ -1,6 +1,6 @@
 use soroban_sdk::{contracttype, symbol_short, Address, Bytes, BytesN, Env, Symbol};
 
-use crate::types::{AlertAckRecord, AlertType, RiskScore};
+use crate::types::{AlertAckRecord, AlertType, Policy, RiskScore};
 
 /// Event Schema Versioning
 ///
@@ -198,6 +198,15 @@ pub fn deletion_policy_updated(env: &Env, enabled: bool, approver: &Option<Addre
     env.events().publish((symbol_short!("del_pol"), EVENT_VERSION), (enabled, approver.clone()));
 }
 
+/// Emitted by `set_policy_approval` (issue #695). `policy` identifies which
+/// of the four non-`DataDeletion` named capabilities was reconfigured.
+pub fn policy_approval_updated(env: &Env, policy: Policy, enabled: bool, approver: &Option<Address>) {
+    env.events().publish(
+        (symbol_short!("pol_appr"), EVENT_VERSION, policy),
+        (enabled, approver.clone()),
+    );
+}
+
 pub fn cooldown_updated(env: &Env, cooldown_secs: u64) {
     env.events().publish((symbol_short!("cd_upd"), EVENT_VERSION), cooldown_secs);
 }
@@ -235,6 +244,13 @@ pub fn aggregate_service_pubkey_updated(env: &Env, pubkey: &Bytes) {
 /// stops being accepted. When `overlap_expiry == 0` the rotation was instant.
 pub fn service_pubkey_rotation_started(env: &Env, new_key: &Bytes, overlap_expiry: u64) {
     env.events().publish((symbol_short!("pk_rot"),), (new_key.clone(), overlap_expiry));
+}
+
+/// Emitted when `rotate_aggregate_service_pubkey` is called (issue #697).
+/// Same shape as `service_pubkey_rotation_started`, for the aggregate
+/// (threshold-signature) key instead of the single-signer key.
+pub fn aggregate_service_pubkey_rotation_started(env: &Env, new_key: &Bytes, overlap_expiry: u64) {
+    env.events().publish((symbol_short!("agg_pkrt"),), (new_key.clone(), overlap_expiry));
 }
 
 // ── Merkle-root batch attestation ───────────────────────────────────────────
