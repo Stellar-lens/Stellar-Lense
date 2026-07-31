@@ -29,7 +29,7 @@ Noise is drawn from a discrete Laplace distribution `Lap(0, b)` with scale
 b = sensitivity / ε = 100 / ε
 ```
 
-using the inverse‑CDF (quantile) method:
+using the inverse-CDF (quantile) method:
 
 ```
 noise = sign × Lap_magnitude
