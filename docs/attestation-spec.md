@@ -82,7 +82,11 @@ field is either fixed-width or zero-padded to a fixed width):
 | `contract_id` | 32 bytes | contract's own address as raw 32 bytes |
 | `contract_version` | 4 bytes | `u32`, little-endian |
 
-Total preimage length: 243 bytes.
+Total preimage length: 211 bytes (56 + 9 + 4 + 1 + 1 + 8 + 4 + 4 + 56 + 32 +
+32 + 4). This exact width, and the order and encoding of every field above, is
+locked down by the golden-vector and domain-separation tests in
+`test_attestation_domain_compat.rs` (issue #696): any field that is omitted,
+resized, or reordered changes the pinned digest and fails the suite.
 
 Rationale for the StrKey (`to_string()`) encoding of `wallet` and the
 contract address: these are the only stable, deterministic byte
@@ -140,7 +144,7 @@ preventing cross-deployment and cross-version replay attacks.
 `contract_id` and `contract_version` in the digest.** Existing signatures without these
 fields will be rejected as `InvalidAttestation` after this upgrade.
 
-The digest layout changed from 175 bytes to 243 bytes (see §3). Signers must recompute
+The digest layout changed from 175 bytes to 211 bytes (see §3). Signers must recompute
 all attestations using the updated preimage format.
 
 ### Domain-separation review (issue #401)
