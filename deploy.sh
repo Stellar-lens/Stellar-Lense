@@ -20,6 +20,10 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=deploy/validate_manifest.sh
+source "$SCRIPT_DIR/deploy/validate_manifest.sh"
+
 DRY_RUN=false
 CHECK_TOOLCHAIN_ONLY=false
 MANIFEST_OVERRIDE=""
