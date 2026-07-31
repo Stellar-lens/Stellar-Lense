@@ -154,6 +154,9 @@ mod test_signer_tier;
 mod test_verkle;
 
 #[cfg(test)]
+mod test_malformed_proof_corpus;
+
+#[cfg(test)]
 mod test_replay_audit;
 
 #[cfg(test)]
