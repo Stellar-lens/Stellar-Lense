@@ -196,8 +196,9 @@ fn process_snapshot(
                     .map_err(|e| anyhow::anyhow!("Schema validation failed: {}", e))?;
                 schema_version = Some(header.schema_version);
                 println!(
-                    "Loaded replay with schema version {} (supported: {})",
+                    "Loaded replay with schema version {} (current: {}, supported: {})",
                     header.schema_version,
+                    schema::current_version(),
                     schema::supported_versions()
                         .iter()
                         .map(|v| v.to_string())
