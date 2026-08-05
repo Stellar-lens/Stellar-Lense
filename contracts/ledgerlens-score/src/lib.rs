@@ -370,6 +370,11 @@ impl LedgerLensScoreContract {
         capabilities.push_back(Symbol::new(&env, "cons"));
         capabilities.push_back(Symbol::new(&env, "pr_rd"));
         capabilities.push_back(Symbol::new(&env, "meta"));
+        capabilities.push_back(Symbol::new(&env, "reconcile"));
+        capabilities.push_back(Symbol::new(&env, "checksum"));
+        capabilities.push_back(Symbol::new(&env, "snapshot"));
+        capabilities.push_back(Symbol::new(&env, "export_score"));
+        capabilities.push_back(Symbol::new(&env, "freeze"));
 
         let mut constraints = Vec::new(&env);
         constraints.push_back(Symbol::new(&env, "fail_closed"));
@@ -4836,6 +4841,11 @@ impl LedgerLensScoreContract {
     /// | `emb`            | `set_score_embargo` / `lift_score_embargo`         |
     /// | `cons`           | `commit_consensus` / `reveal_consensus` / `set_consensus_config` |
     /// | `pr_rd`          | `is_pair_paused` (per-asset-pair pause read)        |
+    /// | `reconcile`      | `reconcile_state`                                   |
+    /// | `checksum`       | `compute_state_checksum` / `verify_state_checksum`  |
+    /// | `snapshot`       | reconciliation snapshot history                     |
+    /// | `export_score`   | `export_score` / `export_all_scores`                |
+    /// | `freeze`         | `freeze_contract` / `unfreeze_contract`             |
     ///
     /// Any unrecognised `capability` returns `false`.
     ///
@@ -4863,6 +4873,11 @@ impl LedgerLensScoreContract {
             || capability == symbol_short!("pr_rd")
             || capability == symbol_short!("dprv")
             || capability == Symbol::new(&env, "meta")
+            || capability == Symbol::new(&env, "reconcile")
+            || capability == Symbol::new(&env, "checksum")
+            || capability == Symbol::new(&env, "snapshot")
+            || capability == Symbol::new(&env, "export_score")
+            || capability == symbol_short!("freeze")
     }
 
     // ── Service management ───────────────────────────────────────────────────
