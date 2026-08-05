@@ -135,7 +135,7 @@ fn querying_gate_does_not_alter_stored_risk_score() {
     let wallet = Address::generate(&env);
     submit_score(&env, &ledgerlens, &wallet, 55, 80);
 
-    let score_before = ledgerlens.get_score(&wallet, &symbol_short!("XLM_USDC")).unwrap();
+    let score_before = ledgerlens.get_score(&wallet, &symbol_short!("XLM_USDC"));
 
     // Issue a flurry of gate queries.
     for _ in 0..10 {
@@ -148,7 +148,7 @@ fn querying_gate_does_not_alter_stored_risk_score() {
         );
     }
 
-    let score_after = ledgerlens.get_score(&wallet, &symbol_short!("XLM_USDC")).unwrap();
+    let score_after = ledgerlens.get_score(&wallet, &symbol_short!("XLM_USDC"));
 
     assert_eq!(
         score_before.score, score_after.score,
@@ -306,7 +306,7 @@ fn gate_result_from_failover_is_determined_by_score_value_only() {
     env.mock_all_auths();
     env.ledger().with_mut(|l| l.timestamp = 100_000);
 
-    let (primary, primary_id) = deploy_ledgerlens(&env);
+    let (primary, _primary_id) = deploy_ledgerlens(&env);
     let (secondary, _secondary_id) = deploy_ledgerlens(&env);
     let secondary_id = secondary.address.clone();
 

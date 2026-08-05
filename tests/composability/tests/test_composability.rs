@@ -11,9 +11,7 @@
 
 use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
 use mock_amm::{FailPolicy as AmmFailPolicy, MockAmm, MockAmmClient, MockAmmError};
-use mock_lending::{
-    FailPolicy as LendingFailPolicy, MockLending, MockLendingClient, MockLendingError,
-};
+use mock_lending::{MockLending, MockLendingClient, MockLendingError};
 use soroban_sdk::{
     symbol_short,
     testutils::{Address as _, Ledger as _},
