@@ -41,10 +41,12 @@ fn advance_to(env: &Env, ts: u64) {
 
 #[test]
 fn test_high_cardinality_wallet_pair_stress() {
-    let (env, client, admin, _service) = setup();
+    let (env, client, _admin, _service) = setup();
     env.budget().reset_unlimited();
-    let num_wallets = 100;
-    let num_pairs = 50;
+    // Exercise enough independent keys to detect collisions without making a
+    // debug CI run perform 10,000 contract calls.
+    let num_wallets = 20;
+    let num_pairs = 10;
 
     // Track unique combinations submitted
     let mut submitted_count = 0;
