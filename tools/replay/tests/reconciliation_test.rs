@@ -193,7 +193,12 @@ mod reconciliation_tests {
         assert_eq!(client.get_score(&wallet, &pair).score, 10);
 
         // Admin clears rate limit for immediate re-submission.
-        client.override_rate_limit(&SVec::new(&env), &wallet, &pair);
+        client.override_rate_limit(
+            &SVec::new(&env),
+            &wallet,
+            &pair,
+            &soroban_sdk::Bytes::from_slice(&env, b"incident reconciliation"),
+        );
 
         // Re-submit corrected pipeline score without waiting for cooldown.
         env.ledger().with_mut(|l| l.timestamp = BASE_TS + 1);
