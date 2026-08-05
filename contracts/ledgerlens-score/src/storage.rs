@@ -1149,6 +1149,8 @@ pub fn clear_score_history(env: &Env, wallet: &Address, asset_pair: &Symbol) {
 pub fn clear_score(env: &Env, wallet: &Address, asset_pair: &Symbol) {
     let key = DataKey::Score(wallet.clone(), asset_pair.clone());
     env.storage().persistent().remove(&key);
+    remove_pair_for_wallet(env, wallet, asset_pair);
+    remove_score_entry(env, wallet, asset_pair);
 }
 
 pub fn get_deletion_approval_policy(env: &Env) -> DeletionApprovalPolicy {
