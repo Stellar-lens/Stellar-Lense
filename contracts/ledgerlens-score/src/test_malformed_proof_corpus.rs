@@ -231,18 +231,18 @@ fn test_decode_proof_controls_roundtrip() {
 fn test_decode_proof_malformed_corpus() {
     let env = env();
 
-    let mut corpus: std::vec::Vec<(std::string::String, Bytes, Reject)> = std::vec::Vec::new();
-
-    // Size rejections.
-    corpus.push(("empty".into(), Bytes::new(&env), Reject::BadLength));
-    corpus.push(("short_96".into(), Bytes::from_slice(&env, &[0u8; 96]), Reject::BadLength));
-    corpus.push(("long_98".into(), Bytes::from_slice(&env, &[1u8; 98]), Reject::BadLength));
-    // Oversized: O(1) length-gate rejection (bounded-resource guarantee).
-    corpus.push((
-        "oversized_100k".into(),
-        Bytes::from_slice(&env, &std::vec::from_elem(0x01u8, 100_000)),
-        Reject::BadLength,
-    ));
+    // Size rejections. The oversized case verifies the O(1) length gate and
+    // its bounded-resource guarantee.
+    let mut corpus: std::vec::Vec<(std::string::String, Bytes, Reject)> = std::vec![
+        ("empty".into(), Bytes::new(&env), Reject::BadLength),
+        ("short_96".into(), Bytes::from_slice(&env, &[0u8; 96]), Reject::BadLength,),
+        ("long_98".into(), Bytes::from_slice(&env, &[1u8; 98]), Reject::BadLength,),
+        (
+            "oversized_100k".into(),
+            Bytes::from_slice(&env, &std::vec::from_elem(0x01u8, 100_000)),
+            Reject::BadLength,
+        ),
+    ];
 
     // Discriminant rejections — correct 97-byte length, invalid type byte.
     for t in [0x00u8, 0x03, 0x7f, 0xff] {

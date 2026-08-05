@@ -11,14 +11,12 @@ echo "Checking contract-only builds for dead code with wasm-target lints enabled
 
 for package in "${PACKAGES[@]}"; do
   echo "==> ${package}"
-  cargo rustc \
+  RUSTFLAGS="${RUSTFLAGS:-} -Dwarnings" cargo check \
     --package "${package}" \
     --lib \
     --target wasm32-unknown-unknown \
     --release \
-    --locked \
-    -- \
-    -Dwarnings
+    --locked
 done
 
 echo ""

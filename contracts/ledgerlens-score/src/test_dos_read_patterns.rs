@@ -43,7 +43,7 @@ use crate::{
 
 const START_TS: u64 = 1_700_000_000;
 
-fn setup<'a>(env: &'a Env) -> LedgerLensScoreContractClient<'a> {
+fn setup(env: &Env) -> LedgerLensScoreContractClient<'_> {
     env.mock_all_auths();
     env.budget().reset_unlimited();
     env.ledger().with_mut(|l| l.timestamp = START_TS);

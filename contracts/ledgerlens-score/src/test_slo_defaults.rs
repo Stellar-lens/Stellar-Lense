@@ -1,4 +1,3 @@
-#![cfg(test)]
 //! Guards the numeric defaults documented in `docs/slo-operational-targets.md`.
 //!
 //! If someone changes a default in `constants.rs` without updating the SLO

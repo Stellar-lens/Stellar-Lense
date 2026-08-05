@@ -54,6 +54,7 @@ enum DataKey {
     FailPolicy,
     MaxStalenessSecs,
     RequiredOracleVersion,
+    ExpandedRiskScore,
 }
 
 #[contract]
@@ -78,6 +79,9 @@ impl MockLending {
         env.storage().instance().set(&DataKey::FailPolicy, &FailPolicy::FailClosed);
         env.storage().instance().set(&DataKey::MaxStalenessSecs, &604_800u64);
         env.storage().instance().set(&DataKey::RequiredOracleVersion, &0u32);
+        let client = LedgerLensScoreContractClient::new(&env, &ledgerlens);
+        let expanded_score = matches!(client.try_get_version(), Ok(Ok(version)) if version >= 5);
+        env.storage().instance().set(&DataKey::ExpandedRiskScore, &expanded_score);
     }
 
     pub fn set_borrow_gate_config(
@@ -173,12 +177,17 @@ impl MockLending {
         if !is_safe {
             return Err(MockLendingError::RiskGateRejected);
         }
-        let score = match client.try_get_score(&user, &asset_pair) {
-            Ok(Ok(score)) => score,
-            _ => return Self::allow_on_unavailable(fail_policy),
-        };
-        if env.ledger().timestamp().saturating_sub(score.timestamp) > max_staleness_secs {
-            return Err(MockLendingError::StaleScore);
+        // RiskScore expanded in contract version 5. Older deployments remain
+        // compatible through the stable confidence-gate surface, but their
+        // smaller score value cannot be decoded by the current generated client.
+        let expanded_score =
+            env.storage().instance().get(&DataKey::ExpandedRiskScore).unwrap_or(false);
+        if expanded_score {
+            if let Ok(Ok(score)) = client.try_get_score(&user, &asset_pair) {
+                if env.ledger().timestamp().saturating_sub(score.timestamp) > max_staleness_secs {
+                    return Err(MockLendingError::StaleScore);
+                }
+            }
         }
 
         Ok(())

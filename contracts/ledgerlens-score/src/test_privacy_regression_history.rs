@@ -8,7 +8,6 @@ use crate::{
     constants::DEFAULT_PARAM_CHANGE_DELAY_SECS, LedgerLensScoreContract,
     LedgerLensScoreContractClient,
 };
-use std::vec;
 
 fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
     let env = Env::default();
@@ -537,7 +536,7 @@ fn test_history_order_preserved() {
     env.ledger().with_mut(|l| l.timestamp = 1_000_000);
 
     // Submit scores in specific order
-    let scores = vec![30, 45, 60, 50, 75];
+    let scores = [30, 45, 60, 50, 75];
     for (idx, &score) in scores.iter().enumerate() {
         env.ledger().with_mut(|l| l.timestamp = 1_000_000 + (idx as u64 * 3_601));
         client.submit_score(

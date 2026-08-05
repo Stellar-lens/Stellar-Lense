@@ -1,3 +1,5 @@
+#![cfg_attr(target_family = "wasm", allow(dead_code))]
+
 pub const SCORE_TTL_THRESHOLD: u32 = 518_400;
 pub const SCORE_TTL_EXTEND_TO: u32 = 777_600;
 

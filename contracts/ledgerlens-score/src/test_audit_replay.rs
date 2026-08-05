@@ -1,4 +1,5 @@
 #[cfg(test)]
+#[allow(clippy::module_inception)]
 mod test_audit_replay {
     use std::vec;
     use std::vec::Vec as StdVec;

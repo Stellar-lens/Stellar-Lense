@@ -54,7 +54,6 @@ use soroban_sdk::{
     Address, Bytes, BytesN, Env, Symbol, SymbolStr, TryFromVal, Vec,
 };
 
-const MAX_BATCH: u32 = 20;
 const START_TS: u64 = 1_700_000_000;
 
 // ── Crypto helpers (same as batch_attested.rs) ───────────────────────────────

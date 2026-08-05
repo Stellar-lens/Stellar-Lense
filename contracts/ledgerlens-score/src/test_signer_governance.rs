@@ -154,10 +154,10 @@ fn test_stress_ordering_independence() {
     assert_eq!(client.get_score(&wallet2, &pair1).score, 65);
 
     // Verify flags are preserved correctly
-    assert_eq!(client.get_score(&wallet1, &pair1).benford_flag, false);
-    assert_eq!(client.get_score(&wallet2, &pair2).benford_flag, true);
-    assert_eq!(client.get_score(&wallet1, &pair2).ml_flag, true);
-    assert_eq!(client.get_score(&wallet2, &pair1).ml_flag, true);
+    assert!(!client.get_score(&wallet1, &pair1).benford_flag);
+    assert!(client.get_score(&wallet2, &pair2).benford_flag);
+    assert!(client.get_score(&wallet1, &pair2).ml_flag);
+    assert!(client.get_score(&wallet2, &pair1).ml_flag);
 }
 
 // ── Issue #691: Signer state machine tests ──────────────────────────────────
@@ -198,9 +198,9 @@ fn test_signer_grace_period_before_active() {
     // Advance past grace period
     advance_to(&env, START_TS + DEFAULT_SIGNER_GRACE_PERIOD_SECS + 1);
 
-    // Verify signer can now be used (would transition to Active on next interaction)
-    // This tests the boundary condition
-    assert!(true); // Marker for boundary condition verification
+    // Verify the grace-period boundary has elapsed. The signer transitions to
+    // Active lazily on its next interaction.
+    assert!(env.ledger().timestamp() > START_TS + DEFAULT_SIGNER_GRACE_PERIOD_SECS);
 }
 
 #[test]

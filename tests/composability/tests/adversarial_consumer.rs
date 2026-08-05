@@ -268,6 +268,7 @@ fn submit_score_without_authorization_is_rejected() {
     // initialize is exempt from service-signer auth in the test fixture.
     env.mock_all_auths_allowing_non_root_auth();
     ledgerlens.initialize(&admin, &service);
+    env.set_auths(&[]);
 
     let attacker_wallet = Address::generate(&env);
     env.ledger().with_mut(|l| l.timestamp += 3_601);

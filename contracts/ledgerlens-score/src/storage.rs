@@ -1,3 +1,5 @@
+#![cfg_attr(target_family = "wasm", allow(dead_code))]
+
 use crate::constants::{
     BAND_STATE_TTL_EXTEND_TO, BAND_STATE_TTL_THRESHOLD, DEFAULT_CONSENSUS_EPSILON,
     DEFAULT_CONSENSUS_THRESHOLD_K, DEFAULT_COOLDOWN_SECS, DEFAULT_JUMP_THRESHOLD,
@@ -3376,17 +3378,6 @@ pub fn compute_auth_root(env: &Env) -> soroban_sdk::BytesN<32> {
     soroban_sdk::BytesN::<32>::from_array(env, &root.to_array())
 }
 
-#[cfg(test)]
-mod test_instrumentation {
-    use soroban_sdk::contracttype;
-
-    #[contracttype]
-    #[derive(Clone)]
-    pub enum TestKey {
-        ExtendCount,
-    }
-}
-
 pub fn get_escalation_threshold(env: &Env) -> u32 {
     let result: Option<u32> = env.storage().instance().get(&DataKeyC::EscalationThreshold);
     result.unwrap_or(crate::constants::DEFAULT_ESCALATION_THRESHOLD)
@@ -3418,4 +3409,15 @@ pub fn set_breach_count(env: &Env, wallet: &Address, asset_pair: &Symbol, count:
 pub fn clear_breach_count(env: &Env, wallet: &Address, asset_pair: &Symbol) {
     let key = DataKeyC::BreachCount(wallet.clone(), asset_pair.clone());
     env.storage().persistent().remove(&key);
+}
+
+#[cfg(test)]
+mod test_instrumentation {
+    use soroban_sdk::contracttype;
+
+    #[contracttype]
+    #[derive(Clone)]
+    pub enum TestKey {
+        ExtendCount,
+    }
 }

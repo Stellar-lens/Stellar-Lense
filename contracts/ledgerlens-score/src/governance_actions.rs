@@ -1,4 +1,5 @@
 //! Governance action registry — stable identifiers for every privileged operation.
+#![cfg_attr(target_family = "wasm", allow(dead_code))]
 //!
 //! ## Why this module exists
 //!

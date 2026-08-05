@@ -21,8 +21,6 @@
 //!  11. A score below global confidence floor is treated as "no data" by the gate.
 //!  12. Nested consumer call pattern: gate is safe to call from within a batch.
 
-#![cfg(test)]
-
 use soroban_sdk::{
     symbol_short,
     testutils::{Address as _, Ledger as _},

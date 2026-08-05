@@ -62,6 +62,7 @@ enum DataKey {
     FailPolicy,
     MaxStalenessSecs,
     RequiredOracleVersion,
+    ExpandedRiskScore,
 }
 
 #[contract]
@@ -81,12 +82,16 @@ impl MockAmm {
         env.storage().instance().set(&DataKey::FailPolicy, &FailPolicy::FailClosed);
         env.storage().instance().set(&DataKey::MaxStalenessSecs, &604_800u64);
         env.storage().instance().set(&DataKey::RequiredOracleVersion, &0u32);
+        let expanded_score = Self::oracle_has_expanded_score(&env, &ledgerlens);
+        env.storage().instance().set(&DataKey::ExpandedRiskScore, &expanded_score);
     }
 
     /// Register or rotate the LedgerLens oracle this AMM consults for gate checks.
     pub fn set_risk_oracle(env: Env, admin: Address, oracle: Address) -> Result<(), MockAmmError> {
         Self::require_admin(&env, &admin)?;
         env.storage().instance().set(&DataKey::LedgerLens, &oracle);
+        let expanded_score = Self::oracle_has_expanded_score(&env, &oracle);
+        env.storage().instance().set(&DataKey::ExpandedRiskScore, &expanded_score);
         Ok(())
     }
 
@@ -156,6 +161,11 @@ impl MockAmm {
         }
     }
 
+    fn oracle_has_expanded_score(env: &Env, oracle: &Address) -> bool {
+        let client = LedgerLensScoreContractClient::new(env, oracle);
+        matches!(client.try_get_version(), Ok(Ok(version)) if version >= 5)
+    }
+
     /// Attempt a swap for `user` on `asset_pair`. Rejected with
     /// `HighRiskWallet` whenever LedgerLens's `query_risk_gate` says the
     /// wallet is not safe — note there is no `try_query_risk_gate` and no
@@ -190,12 +200,20 @@ impl MockAmm {
         if !is_safe {
             return Err(MockAmmError::HighRiskWallet);
         }
-        let score = match client.try_get_score(&user, &asset_pair) {
-            Ok(Ok(score)) => score,
-            _ => return Self::allow_on_unavailable(fail_policy),
-        };
-        if env.ledger().timestamp().saturating_sub(score.timestamp) > max_staleness_secs {
-            return Err(MockAmmError::StaleScore);
+        // RiskScore gained additional fields in contract version 5. Older
+        // oracles still implement the stable gate surface, but decoding their
+        // smaller RiskScore with the current client would abort in the host.
+        let expanded_score =
+            env.storage().instance().get(&DataKey::ExpandedRiskScore).unwrap_or(false);
+        if expanded_score {
+            // A successful primary gate may have delegated to a configured
+            // failover. In that case the primary has no local score to decode,
+            // and the gate has already enforced the failover freshness window.
+            if let Ok(Ok(score)) = client.try_get_score(&user, &asset_pair) {
+                if env.ledger().timestamp().saturating_sub(score.timestamp) > max_staleness_secs {
+                    return Err(MockAmmError::StaleScore);
+                }
+            }
         }
 
         Ok(())
@@ -247,19 +265,26 @@ impl MockAmm {
             _ => return Self::allow_on_unavailable(fail_policy),
         };
         if !is_safe {
-            match client.try_get_score(&provider, &asset_pair) {
-                Ok(Ok(score)) if score.confidence < min_confidence => {
-                    return Err(MockAmmError::LowConfidence);
+            let expanded_score =
+                env.storage().instance().get(&DataKey::ExpandedRiskScore).unwrap_or(false);
+            if expanded_score {
+                match client.try_get_score(&provider, &asset_pair) {
+                    Ok(Ok(score)) if score.confidence < min_confidence => {
+                        return Err(MockAmmError::LowConfidence);
+                    }
+                    _ => {}
                 }
-                _ => return Err(MockAmmError::HighRiskWallet),
             }
+            return Err(MockAmmError::HighRiskWallet);
         }
-        let score = match client.try_get_score(&provider, &asset_pair) {
-            Ok(Ok(score)) => score,
-            _ => return Self::allow_on_unavailable(fail_policy),
-        };
-        if env.ledger().timestamp().saturating_sub(score.timestamp) > max_staleness_secs {
-            return Err(MockAmmError::StaleScore);
+        let expanded_score =
+            env.storage().instance().get(&DataKey::ExpandedRiskScore).unwrap_or(false);
+        if expanded_score {
+            if let Ok(Ok(score)) = client.try_get_score(&provider, &asset_pair) {
+                if env.ledger().timestamp().saturating_sub(score.timestamp) > max_staleness_secs {
+                    return Err(MockAmmError::StaleScore);
+                }
+            }
         }
 
         Ok(())

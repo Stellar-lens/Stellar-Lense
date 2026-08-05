@@ -8,6 +8,7 @@ use std::collections::HashMap;
 use std::env;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
+use std::path::Path;
 
 use soroban_sdk::testutils::Address as _;
 use soroban_sdk::testutils::Ledger as _;
@@ -97,6 +98,10 @@ fn parse_price_average(trades: &Option<Vec<serde_json::Value>>) -> Option<f64> {
             Some(sum / cnt as f64)
         }
     })
+}
+
+fn manifest_fixture_path(relative: &str) -> String {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join(relative).to_string_lossy().into_owned()
 }
 
 fn hash_json<T: Serialize>(value: &T) -> String {
@@ -246,7 +251,7 @@ fn process_snapshot(
         let result = client.submit_scores_batch(&batch);
         let tx_sequence = count as u64 + 1;
         let accepted = result.accepted_count > 0;
-        let rejection_code = if accepted { None } else { Some(result.rejected_count as u32) };
+        let rejection_code = if accepted { None } else { Some(result.rejected_count) };
 
         transactions.push(TransactionEvidence {
             sequence: tx_sequence,
@@ -351,7 +356,8 @@ fn run_failure_injection(env: &Env, client: &LedgerLensScoreContractClient, admi
 
     for (scenario_name, scenario_file) in scenarios {
         println!("--- Scenario: {} ---", scenario_name);
-        match process_failure_scenario(scenario_name, scenario_file, env, client, admin) {
+        let scenario_path = manifest_fixture_path(scenario_file);
+        match process_failure_scenario(scenario_name, &scenario_path, env, client, admin) {
             Ok(n) => println!("  Scenario '{}' processed {} entries", scenario_name, n),
             Err(e) => println!("  Scenario '{}' error: {}", scenario_name, e),
         }
@@ -364,7 +370,10 @@ fn main() -> Result<()> {
 
     match mode {
         "replay" => {
-            let path = args.get(2).map(|s| s.as_str()).unwrap_or("testdata/reference.ndjson");
+            let path = args
+                .get(2)
+                .cloned()
+                .unwrap_or_else(|| manifest_fixture_path("testdata/reference.ndjson"));
             println!("Replay — reading {}", path);
 
             let env = Env::default();
@@ -383,17 +392,16 @@ fn main() -> Result<()> {
             };
             let issue_references = parse_issue_references(args.get(3..).unwrap_or_default());
 
-            match process_snapshot(path, &env, &client, &config_snapshot, &issue_references) {
-                Ok((n, bundle)) => {
-                    println!("processed {} entries", n);
-                    println!("evidence_bundle={}", serde_json::to_string_pretty(&bundle)?);
-                }
-                Err(e) => println!("error processing snapshot: {:#}", e),
-            }
+            let (n, bundle) =
+                process_snapshot(&path, &env, &client, &config_snapshot, &issue_references)?;
+            println!("processed {} entries", n);
+            println!("evidence_bundle={}", serde_json::to_string_pretty(&bundle)?);
         }
         "failure-inject" => {
-            let path =
-                args.get(2).map(|s| s.as_str()).unwrap_or("testdata/failure_scenarios.ndjson");
+            let path = args
+                .get(2)
+                .cloned()
+                .unwrap_or_else(|| manifest_fixture_path("testdata/failure_scenarios.ndjson"));
             println!("Failure Injection — mode=failure-injection reading {}", path);
 
             let env = Env::default();

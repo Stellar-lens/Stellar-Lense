@@ -167,7 +167,7 @@ fn check_history_invariants(env: &Env) {
     // 18. HistoryMaxDepth must be in [1, MAX_HISTORY_DEPTH].
     let max_depth = storage::get_history_max_depth(env);
     assert!(
-        max_depth >= 1 && max_depth <= crate::constants::MAX_HISTORY_DEPTH,
+        (1..=crate::constants::MAX_HISTORY_DEPTH).contains(&max_depth),
         "INVARIANT #18 VIOLATED: history_max_depth={max_depth} is outside [1, {}]",
         crate::constants::MAX_HISTORY_DEPTH
     );

@@ -8,6 +8,7 @@ mod constants;
 #[cfg(test)]
 extern crate std;
 mod errors;
+#[cfg(not(target_family = "wasm"))]
 mod event_causality;
 mod event_stability;
 mod events;
@@ -233,6 +234,7 @@ use subtle::ConstantTimeEq;
 
 pub use constants::CONFIG_DRIFT_MANIFEST_FIELDS;
 pub use errors::Error;
+#[cfg(not(target_family = "wasm"))]
 pub use event_causality::{EventCausality, WorkflowTracker};
 pub use event_stability::{EventStability, EventStabilityRegistry};
 pub use events::{ServiceResumedEvent, ServiceSilenceAlertEvent};
@@ -2881,6 +2883,7 @@ impl LedgerLensScoreContract {
     /// Catmull-Rom cubic Hermite spline interpolation using fixed-point
     /// arithmetic (no floating point). Tangents are estimated from adjacent
     /// neighbours; boundary tangents use one-sided finite differences.
+    #[cfg_attr(target_family = "wasm", allow(dead_code))]
     fn cubic_spline_interpolate(history: &Vec<RiskScore>, timestamp: u64) -> u32 {
         let n = history.len();
         for i in 0..(n - 1) {
@@ -3082,7 +3085,7 @@ impl LedgerLensScoreContract {
     /// let wallet = Address::generate(&env);
     /// let pair = symbol_short!("XLM_USDC");
     /// client.submit_score(&Vec::new(&env), &wallet, &pair, &50, &false, &false, &1, &90, &1, &None);
-    /// let prov = client.get_submission_provenance(&wallet, &pair).unwrap();
+    /// let prov = client.get_submission_provenance(&wallet, &pair);
     /// assert_eq!(prov.model_version, 1);
     /// assert_eq!(prov.validation_branch, symbol_short!("single"));
     /// ```
@@ -4849,6 +4852,7 @@ impl LedgerLensScoreContract {
     /// | `snapshot`       | reconciliation snapshot history                     |
     /// | `export_score`   | `export_score` / `export_all_scores`                |
     /// | `freeze`         | `freeze_contract` / `unfreeze_contract`             |
+    /// | `arch`           | architecture owner and mandatory-reviewer reads      |
     ///
     /// Any unrecognised `capability` returns `false`.
     ///
@@ -4881,6 +4885,7 @@ impl LedgerLensScoreContract {
             || capability == Symbol::new(&env, "snapshot")
             || capability == Symbol::new(&env, "export_score")
             || capability == symbol_short!("freeze")
+            || capability == symbol_short!("arch")
     }
 
     // ── Service management ───────────────────────────────────────────────────
@@ -10240,6 +10245,7 @@ impl LedgerLensScoreContract {
     /// score over [0, 100]); `epsilon_scaled = ε × 100`.
     ///
     /// Returns a noise value in `[-3 × S/ε, 3 × S/ε]`.
+    #[cfg_attr(target_family = "wasm", allow(dead_code))]
     fn laplace_noise(env: &Env, seed: u32, sensitivity: u32, epsilon_scaled: u32) -> i64 {
         if epsilon_scaled == 0 {
             return 0;
@@ -10298,6 +10304,7 @@ impl LedgerLensScoreContract {
     ///   `-ln(v) = k·ln(2) + u + u²/2 + u³/3 + …`   where
     ///   `k` = number of doublings to bring v into (½, 1],
     ///   `u` = 1 − v·2^k ∈ [0, ½).
+    #[cfg_attr(target_family = "wasm", allow(dead_code))]
     fn neg_ln_fp(v_fp: u64, scale: u64) -> u64 {
         // ln(2) in 31‑bit fixed‑point (floor(ln(2) × 2³¹))
         const LN2_FP: u64 = 1_488_522_236;
@@ -10324,6 +10331,7 @@ impl LedgerLensScoreContract {
     /// in fixed‑point: `u + u²/2 + u³/3 + u⁴/4 + …`
     ///
     /// `u_fp = u × scale`.  Returns the result scaled by `scale`.
+    #[cfg_attr(target_family = "wasm", allow(dead_code))]
     fn taylor_neg_ln_1m_u(u_fp: u64, scale: u64) -> u64 {
         if u_fp == 0 {
             return 0;
@@ -10421,6 +10429,7 @@ impl LedgerLensScoreContract {
     /// Commits the score update to the in-memory Merkle accumulator.
     /// No-op in the base contract; overridden by the snapshot-spec compliant
     /// implementation.
+    #[cfg_attr(target_family = "wasm", allow(dead_code))]
     fn update_merkle_accumulator(
         _env: &Env,
         _wallet: &Address,
@@ -10803,6 +10812,7 @@ impl LedgerLensScoreContract {
     }
 
     /// Incremental Welford update for per-pair score volatility.
+    #[cfg_attr(target_family = "wasm", allow(dead_code))]
     fn update_pair_volatility(env: &Env, asset_pair: &Symbol, score: u32) {
         use crate::types::PairVolatilityState;
         let now = env.ledger().timestamp();

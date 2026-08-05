@@ -1,3 +1,5 @@
+#![cfg_attr(target_family = "wasm", allow(dead_code))]
+
 use soroban_sdk::{contracttype, symbol_short, Address, Bytes, BytesN, Env, Symbol};
 
 use crate::types::{AlertAckRecord, AlertType, Policy, RiskScore};
@@ -360,6 +362,7 @@ pub fn batch_rejected_gate_failure(env: &Env, count: u32) {
 /// Summary event emitted after batch processing completes.
 /// Aggregates all rejection categories for easy monitoring.
 /// Topics: ("bat_summary",)  Data: (accepted, rejected_pause, rejected_data, rejected_model, rejected_ratelimit, rejected_attestation, rejected_gate)
+#[allow(clippy::too_many_arguments)]
 pub fn batch_processing_summary(
     env: &Env,
     accepted: u32,

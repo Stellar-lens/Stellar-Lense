@@ -184,6 +184,13 @@ detect_cli() {
     CLI_LABEL="Soroban CLI"
     return
   fi
+  if [ "$DRY_RUN" = true ]; then
+    # Dry runs only print reviewed commands; use the current CLI name without
+    # requiring the binary to be installed on the CI runner.
+    CLI_BIN="stellar"
+    CLI_LABEL="Stellar CLI"
+    return
+  fi
   die "neither 'stellar' nor 'soroban' was found in PATH"
 }
 
@@ -211,6 +218,11 @@ check_toolchain_versions() {
     echo "  Actual:   $rust_actual" >&2
     echo "  Upgrade:  rustup toolchain install $EXPECTED_RUST_VERSION && rustup override set $EXPECTED_RUST_VERSION" >&2
     exit 1
+  fi
+
+  if [ "$DRY_RUN" = true ]; then
+    log "Dry run: reviewed CLI target is $CLI_BIN $EXPECTED_STELLAR_CLI_VERSION"
+    return
   fi
 
   cli_raw="$("$CLI_BIN" --version 2>/dev/null || true)"

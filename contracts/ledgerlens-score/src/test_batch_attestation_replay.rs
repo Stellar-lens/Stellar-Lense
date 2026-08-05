@@ -1,5 +1,3 @@
-#![cfg(test)]
-
 //! Batch attestation replay isolation across asset pairs and positions
 //! (issue #699).
 //!

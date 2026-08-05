@@ -33,7 +33,7 @@ use soroban_sdk::{
 
 use crate::{Error, LedgerLensScoreContract, LedgerLensScoreContractClient};
 
-fn setup<'a>(env: &'a Env) -> LedgerLensScoreContractClient<'a> {
+fn setup(env: &Env) -> LedgerLensScoreContractClient<'_> {
     env.mock_all_auths();
     env.ledger().with_mut(|l| l.timestamp = 1_700_000_000);
     let id = env.register_contract(None, LedgerLensScoreContract);

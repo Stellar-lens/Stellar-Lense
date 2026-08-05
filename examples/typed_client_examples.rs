@@ -38,7 +38,7 @@ pub mod score_flow {
     };
 
     /// Helper: deploy + initialize LedgerLens, return (client, admin, service).
-    fn setup<'a>(env: &'a Env) -> (LedgerLensScoreContractClient<'a>, Address, Address) {
+    fn setup(env: &Env) -> (LedgerLensScoreContractClient<'_>, Address, Address) {
         env.mock_all_auths();
         env.ledger().with_mut(|l| l.timestamp = 1_700_000_000);
         let id = env.register_contract(None, LedgerLensScoreContract);
@@ -184,7 +184,7 @@ pub mod gate_flow {
         Address, Env, Vec,
     };
 
-    fn setup<'a>(env: &'a Env) -> LedgerLensScoreContractClient<'a> {
+    fn setup(env: &Env) -> LedgerLensScoreContractClient<'_> {
         env.mock_all_auths();
         env.ledger().with_mut(|l| l.timestamp = 1_700_000_000);
         let id = env.register_contract(None, LedgerLensScoreContract);
@@ -316,7 +316,7 @@ pub mod history_flow {
         Address, Env, Vec,
     };
 
-    fn setup<'a>(env: &'a Env) -> (LedgerLensScoreContractClient<'a>, Address) {
+    fn setup(env: &Env) -> (LedgerLensScoreContractClient<'_>, Address) {
         env.mock_all_auths();
         env.ledger().with_mut(|l| l.timestamp = 1_700_000_000);
         let id = env.register_contract(None, LedgerLensScoreContract);
@@ -434,7 +434,7 @@ pub mod governance_flow {
         Address, BytesN, Env, Vec,
     };
 
-    fn setup<'a>(env: &'a Env) -> (LedgerLensScoreContractClient<'a>, Address) {
+    fn setup(env: &Env) -> (LedgerLensScoreContractClient<'_>, Address) {
         env.mock_all_auths();
         env.ledger().with_mut(|l| l.timestamp = 1_700_000_000);
         let id = env.register_contract(None, LedgerLensScoreContract);

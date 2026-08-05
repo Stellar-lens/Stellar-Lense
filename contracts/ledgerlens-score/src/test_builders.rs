@@ -17,6 +17,7 @@ pub(crate) struct BuiltState<'a> {
     pub admin_signers: Vec<Address>,
 }
 
+#[derive(Default)]
 pub(crate) struct ContractStateBuilder {
     service_signer_count: u32,
     service_threshold: Option<u32>,
@@ -25,20 +26,6 @@ pub(crate) struct ContractStateBuilder {
     finality_buffer: u64,
     paused: bool,
     score_history: &'static [(u64, u32, u32)],
-}
-
-impl Default for ContractStateBuilder {
-    fn default() -> Self {
-        Self {
-            service_signer_count: 0,
-            service_threshold: None,
-            admin_signer_count: 0,
-            admin_threshold: None,
-            finality_buffer: 0,
-            paused: false,
-            score_history: &[],
-        }
-    }
 }
 
 impl ContractStateBuilder {

@@ -72,6 +72,15 @@ mod deceptive_shard {
             capability == Symbol::new(&env, "score")
                 || capability == Symbol::new(&env, "gate")
                 || capability == Symbol::new(&env, "aggr")
+                || capability == Symbol::new(&env, "arch")
+        }
+
+        pub fn get_arch_owner(_env: Env) -> Option<soroban_sdk::Address> {
+            None
+        }
+
+        pub fn get_mandatory_reviewers(env: Env) -> soroban_sdk::Vec<soroban_sdk::Address> {
+            soroban_sdk::Vec::new(&env)
         }
 
         pub fn is_score_stale(_env: Env, _wallet: soroban_sdk::Address, _pair: Symbol) -> bool {
@@ -847,9 +856,9 @@ fn test_get_shard_capabilities_returns_snapshot_after_registration() {
 
     let caps = client.get_shard_capabilities(&shard_id);
     // A full LedgerLensScoreContract must advertise at least score, gate, aggr.
-    assert!(caps.contains(&soroban_sdk::Symbol::new(&env, "score")));
-    assert!(caps.contains(&soroban_sdk::Symbol::new(&env, "gate")));
-    assert!(caps.contains(&soroban_sdk::Symbol::new(&env, "aggr")));
+    assert!(caps.contains(soroban_sdk::Symbol::new(&env, "score")));
+    assert!(caps.contains(soroban_sdk::Symbol::new(&env, "gate")));
+    assert!(caps.contains(soroban_sdk::Symbol::new(&env, "aggr")));
 }
 
 /// A shard with no snapshot (e.g. registered before the feature) returns empty.

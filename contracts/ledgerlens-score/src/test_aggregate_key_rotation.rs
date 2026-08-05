@@ -1,5 +1,3 @@
-#![cfg(test)]
-
 //! Tests for the aggregate (threshold-signature) service pubkey dual-key
 //! overlap window (issue #697): `rotate_aggregate_service_pubkey` /
 //! `get_pending_aggregate_pubkey`, verified through

@@ -42,7 +42,7 @@ use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient, S
 use soroban_sdk::{
     symbol_short,
     testutils::{Address as _, Ledger as _},
-    Address, Env, Symbol, Vec,
+    Address, Bytes, Env, Symbol, Vec,
 };
 
 // ── Shared constants ────────────────────────────────────────────────────────
@@ -113,7 +113,7 @@ fn bench_get_score_found(c: &mut Criterion) {
             let wallet = Address::generate(&env);
             submit_one(&env, &client, &wallet, &asset_pair, 50);
             black_box(measure(&env, || {
-                black_box(client.get_score(&wallet, &asset_pair).unwrap());
+                black_box(client.get_score(&wallet, &asset_pair));
             }))
         });
     });
@@ -478,12 +478,13 @@ fn bench_set_cooldown(c: &mut Criterion) {
             let env = Env::default();
             let (client, _, _, _) = setup(&env);
             black_box(measure(&env, || {
-                client.set_cooldown(&7_200u64); // 2 hours
+                client.set_cooldown(&Vec::new(&env), &7_200u64); // 2 hours
             }))
         });
     });
 }
 
+#[allow(deprecated)]
 fn bench_set_service(c: &mut Criterion) {
     c.bench_function("set_service", |b| {
         b.iter(|| {
@@ -517,7 +518,12 @@ fn bench_override_rate_limit(c: &mut Criterion) {
             let wallet = Address::generate(&env);
             submit_one(&env, &client, &wallet, &asset_pair, 50);
             black_box(measure(&env, || {
-                client.override_rate_limit(&wallet, &asset_pair);
+                client.override_rate_limit(
+                    &Vec::new(&env),
+                    &wallet,
+                    &asset_pair,
+                    &Bytes::from_slice(&env, b"benchmark override"),
+                );
             }))
         });
     });

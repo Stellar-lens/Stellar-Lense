@@ -1,5 +1,3 @@
-#![cfg(test)]
-
 //! Tests for named administrative capability policies partitioned by
 //! operation risk (issue #695). Each of `Policy::{ScorePolicy,
 //! UpgradeGovernance, EmergencyPause, SignerAdmin}` gets its own optional

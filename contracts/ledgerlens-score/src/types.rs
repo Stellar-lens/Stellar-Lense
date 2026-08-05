@@ -1,3 +1,5 @@
+#![cfg_attr(target_family = "wasm", allow(dead_code))]
+
 use soroban_sdk::{contracttype, Address, Bytes, BytesN, Symbol, Vec};
 
 /// Embargo expiry configuration stored per wallet in temporary storage.
@@ -472,6 +474,7 @@ pub struct DeletionApprovalPolicy {
 /// canonical enum for documentation and event/telemetry purposes.
 #[contracttype]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[allow(clippy::enum_variant_names)]
 pub enum Policy {
     ScorePolicy,
     UpgradeGovernance,

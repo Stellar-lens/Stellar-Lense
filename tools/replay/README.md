@@ -35,7 +35,10 @@ cargo build -p replay
 cargo run -p replay --manifest-path tools/replay/Cargo.toml
 ```
 
-The binary expects `testdata/reference.ndjson` relative to the current working directory.
+By default, the binary reads `testdata/reference.ndjson` relative to the replay
+crate, so it works when launched from either the workspace root or this directory.
+An explicit snapshot path is still interpreted relative to the caller's current
+working directory.
 
 ### Configuration drift detection
 
