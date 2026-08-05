@@ -13,7 +13,10 @@ use soroban_sdk::{
     Address, Env, IntoVal, Symbol, TryFromVal, Val, Vec,
 };
 
-use crate::{Error, LedgerLensScoreContract, LedgerLensScoreContractClient, RiskScore};
+use crate::{
+    constants::CONTRACT_VERSION, Error, LedgerLensScoreContract, LedgerLensScoreContractClient,
+    RiskScore,
+};
 
 fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
     let env = Env::default();
@@ -217,7 +220,7 @@ fn test_get_interface_metadata_reports_capabilities_and_semantics() {
     let metadata = client.get_interface_metadata();
 
     assert_eq!(metadata.interface_version, 3);
-    assert_eq!(metadata.contract_version, 4);
+    assert_eq!(metadata.contract_version, CONTRACT_VERSION);
 
     let mut saw_gate = false;
     let mut saw_meta = false;
