@@ -40,8 +40,8 @@ mod test_audit_replay {
         let contract_events: StdVec<_> =
             all_events.iter().filter(|(addr, _, _)| addr == &contract_id).collect();
 
-        // Assert: We should have initialization and watchlist events
-        assert!(contract_events.len() >= 2, "Should have at least initialize and watchlist events");
+        // Initialization does not emit an audit event; the watchlist mutation does.
+        assert_eq!(contract_events.len(), 1, "Should have one watchlist event");
 
         // For each event, verify it can be used for audit trail
         for (addr, topics, data) in contract_events.iter() {
@@ -100,11 +100,8 @@ mod test_audit_replay {
         let contract_events: StdVec<_> =
             all_events.iter().filter(|(addr, _, _)| addr == &contract_id).collect();
 
-        // Should have initialization and admin_transfer_initiated events
-        assert!(
-            contract_events.len() >= 2,
-            "Should have at least initialize and admin_transfer_initiated events"
-        );
+        // Initialization does not emit an audit event; the transfer mutation does.
+        assert_eq!(contract_events.len(), 1, "Should have one admin transfer event");
 
         // All events should have consistent structure
         for (addr, topics, _data) in contract_events.iter() {
@@ -355,10 +352,7 @@ mod test_audit_replay {
             all_events.iter().filter(|(addr, _, _)| addr == &contract_id).collect();
 
         // Verify we have events from multiple operations
-        assert!(
-            contract_events.len() >= 3,
-            "Should have multiple events from different operations"
-        );
+        assert_eq!(contract_events.len(), 2, "Should have one event per watchlist operation");
 
         // Each event should be independently verifiable
         for (addr, topics, _data) in contract_events.iter() {
