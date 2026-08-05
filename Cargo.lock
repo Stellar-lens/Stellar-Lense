@@ -839,20 +839,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8e04e2fd2b8188ea827b32ef11de88377086d690286ab35747ef7f9bf3ccb590"
 
 [[package]]
-name = "invocation-fuzzer"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "ledgerlens-aggregator",
- "ledgerlens-score",
- "mock-amm",
- "mock-lending",
- "serde",
- "serde_json",
- "soroban-sdk",
-]
-
-[[package]]
 name = "is-terminal"
 version = "0.4.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -932,6 +918,7 @@ name = "ledgerlens-aggregator"
 version = "0.1.0"
 dependencies = [
  "ledgerlens-score",
+ "ledgerlens-test-support",
  "soroban-sdk",
 ]
 
@@ -941,9 +928,17 @@ version = "0.1.0"
 dependencies = [
  "criterion",
  "k256",
+ "ledgerlens-test-support",
  "libm",
  "soroban-sdk",
  "subtle",
+]
+
+[[package]]
+name = "ledgerlens-test-support"
+version = "0.1.0"
+dependencies = [
+ "soroban-sdk",
 ]
 
 [[package]]
@@ -1281,6 +1276,7 @@ dependencies = [
  "ledgerlens-score",
  "serde",
  "serde_json",
+ "sha2",
  "soroban-sdk",
 ]
 

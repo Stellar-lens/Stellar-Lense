@@ -38,9 +38,21 @@ run_case() {
 
   cat > "${mock_bin_dir}/cargo" <<'EOF'
 #!/usr/bin/env bash
+if [[ "${1:-}" == "--version" ]]; then
+  echo "cargo 1.81.0"
+fi
 exit 0
 EOF
   chmod +x "${mock_bin_dir}/cargo"
+
+  cat > "${mock_bin_dir}/rustc" <<'EOF'
+#!/usr/bin/env bash
+if [[ "${1:-}" == "--version" ]]; then
+  echo "rustc 1.81.0"
+fi
+exit 0
+EOF
+  chmod +x "${mock_bin_dir}/rustc"
 
   cat > "${mock_bin_dir}/soroban" <<EOF
 #!/usr/bin/env bash
@@ -48,6 +60,11 @@ set -euo pipefail
 scenario="${scenario}"
 command="\$1"
 shift
+
+if [[ "\${command}" == "--version" ]]; then
+  echo "soroban 21.0.0"
+  exit 0
+fi
 
 if [[ "\${command}" == "keys" && "\${1:-}" == "address" ]]; then
   echo "GADMINADDRESS"
