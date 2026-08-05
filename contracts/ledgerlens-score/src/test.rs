@@ -1,7 +1,7 @@
 use soroban_sdk::{
     symbol_short,
-    testutils::{Address as _, Ledger as _},
-    Address, Bytes, BytesN, Env, IntoVal, Symbol, Vec,
+    testutils::{Address as _, Events as _, Ledger as _},
+    vec, Address, Bytes, BytesN, Env, IntoVal, Symbol, Vec,
 };
 
 use crate::storage;
@@ -3755,6 +3755,7 @@ fn test_arch_owner_management() {
     let client = LedgerLensScoreContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
+    let service_address = Address::generate(&env);
     let arch_owner_1 = Address::generate(&env);
     let arch_owner_2 = Address::generate(&env);
 
@@ -3781,6 +3782,7 @@ fn test_mandatory_reviewers_validation() {
     let client = LedgerLensScoreContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
+    let service_address = Address::generate(&env);
     client.initialize(&admin, &service_address);
 
     let r1 = Address::generate(&env);

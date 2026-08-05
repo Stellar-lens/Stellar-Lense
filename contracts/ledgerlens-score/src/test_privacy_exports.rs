@@ -46,7 +46,7 @@ fn test_get_score_export_public_below_threshold() {
         &None,
     );
 
-    let export = client.get_score_export_public(&wallet, &pair).unwrap();
+    let export = client.get_score_export_public(&wallet, &pair);
     assert_eq!(export.wallet, wallet);
     assert_eq!(export.asset_pair, pair);
     // Public export only shows 0 for passing gate
@@ -55,14 +55,14 @@ fn test_get_score_export_public_below_threshold() {
 
 #[test]
 fn test_get_score_export_public_above_threshold() {
-    let (env, client, admin, _service) = setup();
+    let (env, client, _admin, _service) = setup();
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
 
     env.ledger().with_mut(|l| l.timestamp = 1_000_000);
 
     // Set a higher threshold to test
-    client.set_threshold(&admin, &80);
+    client.set_risk_threshold(&Vec::new(&env), &80);
 
     // Submit a score above threshold
     client.submit_score(
@@ -78,7 +78,7 @@ fn test_get_score_export_public_above_threshold() {
         &None,
     );
 
-    let export = client.get_score_export_public(&wallet, &pair).unwrap();
+    let export = client.get_score_export_public(&wallet, &pair);
     // Public export shows score value when breached
     assert_eq!(export.risk_gate_decision, 85);
 }
@@ -89,7 +89,7 @@ fn test_get_score_export_public_not_found() {
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
 
-    let result = client.get_score_export_public(&wallet, &pair);
+    let result = client.try_get_score_export_public(&wallet, &pair);
     assert!(result.is_err());
 }
 
@@ -114,7 +114,7 @@ fn test_get_score_export_operator_includes_details() {
         &None,
     );
 
-    let export = client.get_score_export_operator(&wallet, &pair).unwrap();
+    let export = client.get_score_export_operator(&wallet, &pair);
     assert_eq!(export.wallet, wallet);
     assert_eq!(export.asset_pair, pair);
     assert_eq!(export.score, 65);
@@ -125,7 +125,7 @@ fn test_get_score_export_operator_includes_details() {
 
 #[test]
 fn test_get_score_export_operator_detects_embargo() {
-    let (env, client, admin, _service) = setup();
+    let (env, client, _admin, _service) = setup();
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
 
@@ -145,9 +145,9 @@ fn test_get_score_export_operator_detects_embargo() {
     );
 
     // Set embargo
-    client.set_score_embargo(&admin, &wallet, &Some(2_000_000));
+    client.set_score_embargo(&wallet, &Some(2_000_000));
 
-    let export = client.get_score_export_operator(&wallet, &pair).unwrap();
+    let export = client.get_score_export_operator(&wallet, &pair);
     assert!(export.is_embargoed);
 }
 
@@ -172,7 +172,7 @@ fn test_get_score_export_auditor_full_disclosure() {
         &None,
     );
 
-    let export = client.get_score_export_auditor(&wallet, &pair).unwrap();
+    let export = client.get_score_export_auditor(&wallet, &pair);
     assert_eq!(export.wallet, wallet);
     assert_eq!(export.asset_pair, pair);
     assert_eq!(export.score, 72);
@@ -184,7 +184,7 @@ fn test_get_score_export_auditor_full_disclosure() {
 
 #[test]
 fn test_get_score_export_auditor_bypasses_embargo() {
-    let (env, client, admin, _service) = setup();
+    let (env, client, _admin, _service) = setup();
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
 
@@ -204,10 +204,10 @@ fn test_get_score_export_auditor_bypasses_embargo() {
     );
 
     // Set embargo
-    client.set_score_embargo(&admin, &wallet, &Some(2_000_000));
+    client.set_score_embargo(&wallet, &Some(2_000_000));
 
     // Auditor export should still work even with embargo
-    let export = client.get_score_export_auditor(&wallet, &pair).unwrap();
+    let export = client.get_score_export_auditor(&wallet, &pair);
     assert_eq!(export.score, 60);
     assert!(export.is_embargoed);
 }
@@ -218,7 +218,7 @@ fn test_get_score_export_auditor_not_found() {
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
 
-    let result = client.get_score_export_auditor(&wallet, &pair);
+    let result = client.try_get_score_export_auditor(&wallet, &pair);
     assert!(result.is_err());
 }
 
@@ -244,16 +244,16 @@ fn test_export_modes_deterministic() {
     );
 
     // Verify deterministic results across multiple reads
-    let pub1 = client.get_score_export_public(&wallet, &pair).unwrap();
-    let pub2 = client.get_score_export_public(&wallet, &pair).unwrap();
+    let pub1 = client.get_score_export_public(&wallet, &pair);
+    let pub2 = client.get_score_export_public(&wallet, &pair);
     assert_eq!(pub1.risk_gate_decision, pub2.risk_gate_decision);
 
-    let op1 = client.get_score_export_operator(&wallet, &pair).unwrap();
-    let op2 = client.get_score_export_operator(&wallet, &pair).unwrap();
+    let op1 = client.get_score_export_operator(&wallet, &pair);
+    let op2 = client.get_score_export_operator(&wallet, &pair);
     assert_eq!(op1.score, op2.score);
     assert_eq!(op1.confidence, op2.confidence);
 
-    let aud1 = client.get_score_export_auditor(&wallet, &pair).unwrap();
-    let aud2 = client.get_score_export_auditor(&wallet, &pair).unwrap();
+    let aud1 = client.get_score_export_auditor(&wallet, &pair);
+    let aud2 = client.get_score_export_auditor(&wallet, &pair);
     assert_eq!(aud1.benford_score, aud2.benford_score);
 }

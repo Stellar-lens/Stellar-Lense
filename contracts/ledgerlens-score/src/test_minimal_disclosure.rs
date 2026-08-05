@@ -58,7 +58,7 @@ fn test_is_score_risky_above_threshold() {
     env.ledger().with_mut(|l| l.timestamp = 1_000_000);
 
     // Set threshold and submit score above it
-    client.set_threshold(&admin, &70);
+    client.set_risk_threshold(&Vec::new(&env), &70);
     client.submit_score(
         &Vec::new(&env),
         &wallet,
@@ -109,7 +109,7 @@ fn test_is_score_risky_embargoed_wallet() {
     assert!(!client.is_score_risky(&wallet, &pair));
 
     // Embargo the wallet — should now be risky (fail-closed)
-    client.set_score_embargo(&admin, &wallet, &Some(2_000_000));
+    client.set_score_embargo(&wallet, &Some(2_000_000));
     assert!(client.is_score_risky(&wallet, &pair));
 }
 
@@ -158,7 +158,7 @@ fn test_is_score_risky_with_confidence_above_threshold() {
 
     env.ledger().with_mut(|l| l.timestamp = 1_000_000);
 
-    client.set_threshold(&admin, &65);
+    client.set_risk_threshold(&Vec::new(&env), &65);
     client.submit_score(
         &Vec::new(&env),
         &wallet,
@@ -199,7 +199,7 @@ fn test_is_score_risky_with_confidence_embargoed() {
     );
 
     // Embargo
-    client.set_score_embargo(&admin, &wallet, &Some(2_000_000));
+    client.set_score_embargo(&wallet, &Some(2_000_000));
 
     let (breached, confidence) = client.is_score_risky_with_confidence(&wallet, &pair);
     assert!(breached);
@@ -238,7 +238,7 @@ fn test_is_wallet_safe_fails_gate() {
 
     env.ledger().with_mut(|l| l.timestamp = 1_000_000);
 
-    client.set_threshold(&admin, &60);
+    client.set_risk_threshold(&Vec::new(&env), &60);
     client.submit_score(
         &Vec::new(&env),
         &wallet,
@@ -318,7 +318,7 @@ fn test_is_aggregate_risky_one_risky() {
 
     env.ledger().with_mut(|l| l.timestamp = 1_000_000);
 
-    client.set_threshold(&admin, &60);
+    client.set_risk_threshold(&Vec::new(&env), &60);
 
     client.submit_score(
         &Vec::new(&env),
@@ -374,7 +374,7 @@ fn test_is_aggregate_risky_embargoed() {
     assert!(!client.is_aggregate_risky(&wallet));
 
     // Embargo the wallet
-    client.set_score_embargo(&admin, &wallet, &Some(2_000_000));
+    client.set_score_embargo(&wallet, &Some(2_000_000));
 
     // Now aggregate should be risky (fail-closed)
     assert!(client.is_aggregate_risky(&wallet));
@@ -388,7 +388,7 @@ fn test_minimal_disclosure_no_field_leakage() {
 
     env.ledger().with_mut(|l| l.timestamp = 1_000_000);
 
-    client.set_threshold(&admin, &70);
+    client.set_risk_threshold(&Vec::new(&env), &70);
     client.submit_score(
         &Vec::new(&env),
         &wallet,

@@ -419,6 +419,7 @@ pub struct WorkflowStep {
 #[cfg(test)]
 mod test_event_causality {
     use super::*;
+    use soroban_sdk::testutils::Address as _;
 
     #[test]
     fn test_score_submission_correlation_id_is_deterministic() {

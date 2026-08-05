@@ -957,6 +957,7 @@ pub enum DataKeyD {
     DeletionApprover,
     PendingPolicyBundle,
     RequireDestructiveMultisig,
+    SignerState(Address),
 }
 
 #[contracttype]

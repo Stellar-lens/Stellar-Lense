@@ -110,8 +110,8 @@ fn submit(
         }),
     ) {
         Ok(Ok(())) => Ok(()),
-        Ok(Err(e)) => Err(e),
-        Err(e) => Err(e.unwrap()),
+        Err(Ok(e)) => Err(e),
+        Ok(Err(_)) | Err(Err(_)) => panic!("unexpected host conversion or invocation error"),
     }
 }
 
@@ -127,7 +127,7 @@ fn test_instant_aggregate_rotation_promotes_key_immediately() {
     client.rotate_aggregate_service_pubkey(&Vec::new(&env), &pubkey_bytes(&env, &new_key), &0u64);
 
     assert!(client.get_pending_aggregate_pubkey().is_none());
-    assert_eq!(client.get_aggregate_service_pubkey().unwrap(), pubkey_bytes(&env, &new_key));
+    assert_eq!(client.get_aggregate_service_pubkey(), pubkey_bytes(&env, &new_key));
 }
 
 #[test]
@@ -290,7 +290,7 @@ fn test_aggregate_pending_key_auto_promoted_after_expiry() {
     let _ = submit(&client, &env, &wallet, &pair, ta);
 
     assert!(client.get_pending_aggregate_pubkey().is_none());
-    assert_eq!(client.get_aggregate_service_pubkey().unwrap(), pubkey_bytes(&env, &new_key));
+    assert_eq!(client.get_aggregate_service_pubkey(), pubkey_bytes(&env, &new_key));
 }
 
 // ── Invalid pubkey length rejected ───────────────────────────────────────────

@@ -1,8 +1,11 @@
 #[cfg(test)]
 mod test_audit_replay {
+    use std::vec;
+    use std::vec::Vec as StdVec;
+
     use soroban_sdk::{
         testutils::{Address as _, Events as _},
-        Address, Env, IntoVal, Symbol, Vec,
+        Address, Env, Symbol, Vec,
     };
 
     use crate::{
@@ -34,7 +37,7 @@ mod test_audit_replay {
         let all_events = env.events().all();
 
         // Verify events carry enough information to reconstruct workflow
-        let contract_events: Vec<_> =
+        let contract_events: StdVec<_> =
             all_events.iter().filter(|(addr, _, _)| addr == &contract_id).collect();
 
         // Assert: We should have initialization and watchlist events
@@ -90,11 +93,11 @@ mod test_audit_replay {
 
         // Initiate admin transfer
         let new_admin = Address::generate(&env);
-        let _ = client.initiate_admin_transfer(&new_admin);
+        client.transfer_admin(&Vec::new(&env), &new_admin);
 
         // Collect events
         let all_events = env.events().all();
-        let contract_events: Vec<_> =
+        let contract_events: StdVec<_> =
             all_events.iter().filter(|(addr, _, _)| addr == &contract_id).collect();
 
         // Should have initialization and admin_transfer_initiated events
@@ -348,7 +351,7 @@ mod test_audit_replay {
 
         // Collect all events
         let all_events = env.events().all();
-        let contract_events: Vec<_> =
+        let contract_events: StdVec<_> =
             all_events.iter().filter(|(addr, _, _)| addr == &contract_id).collect();
 
         // Verify we have events from multiple operations
@@ -362,7 +365,7 @@ mod test_audit_replay {
             assert_eq!(addr, &contract_id, "All events must be from the contract");
             assert!(!topics.is_empty(), "All events must have topic information");
             // All events should have the event name as first topic
-            assert!(topics.get(0).is_ok(), "All events must have at least one topic");
+            assert!(topics.get(0).is_some(), "All events must have at least one topic");
         }
     }
 }

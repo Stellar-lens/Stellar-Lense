@@ -5,6 +5,7 @@ use soroban_sdk::{
 };
 
 use crate::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+use std::vec;
 
 fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
     let env = Env::default();
@@ -33,7 +34,7 @@ fn test_history_max_depth_no_overflow() {
     env.ledger().with_mut(|l| l.timestamp = 1_000_000);
 
     // Set max history depth to 5
-    client.set_history_max_depth(&admin, &5);
+    client.set_history_max_depth(&Vec::new(&env), &5);
 
     // Submit 10 scores
     for i in 0..10 {
@@ -74,7 +75,7 @@ fn test_history_respects_max_depth_boundary() {
     env.ledger().with_mut(|l| l.timestamp = 1_000_000);
 
     // Exact boundary: max_depth = 3, submit 3 scores
-    client.set_history_max_depth(&admin, &3);
+    client.set_history_max_depth(&Vec::new(&env), &3);
 
     for i in 0..3 {
         env.ledger().with_mut(|l| l.timestamp = 1_000_000 + (i as u64 * 100));
@@ -134,7 +135,7 @@ fn test_history_cleared_empty_result() {
     assert_eq!(history_before.len(), 2);
 
     // Clear history
-    client.clear_score_history(&admin, &wallet, &pair);
+    client.clear_score_history(&Vec::new(&env), &wallet, &pair);
 
     // History should be empty
     let history_after = client.get_score_history(&wallet, &pair);
@@ -176,7 +177,7 @@ fn test_history_after_clear_can_reaccumulate() {
     );
 
     // Clear
-    client.clear_score_history(&admin, &wallet, &pair);
+    client.clear_score_history(&Vec::new(&env), &wallet, &pair);
 
     // Submit new scores
     env.ledger().with_mut(|l| l.timestamp = 1_000_000 + 1000);
@@ -230,7 +231,7 @@ fn test_no_score_state_returns_not_found() {
     let pair = symbol_short!("XLM_USDC");
 
     // No score submitted — should error
-    let result = client.get_score(&wallet, &pair);
+    let result = client.try_get_score(&wallet, &pair);
     assert!(result.is_err());
 }
 
@@ -255,14 +256,14 @@ fn test_history_cleared_but_score_remains() {
         &1,
         &None,
     );
-    client.clear_score_history(&admin, &wallet, &pair);
+    client.clear_score_history(&Vec::new(&env), &wallet, &pair);
 
     // History is empty
     let history = client.get_score_history(&wallet, &pair);
     assert_eq!(history.len(), 0);
 
     // But latest score still exists
-    let score = client.get_score(&wallet, &pair).unwrap();
+    let score = client.get_score(&wallet, &pair);
     assert_eq!(score.score, 75);
 }
 
@@ -321,7 +322,7 @@ fn test_history_max_depth_change_takes_effect() {
     env.ledger().with_mut(|l| l.timestamp = 1_000_000);
 
     // Submit 5 scores with max_depth = 10
-    client.set_history_max_depth(&admin, &10);
+    client.set_history_max_depth(&Vec::new(&env), &10);
     for i in 0..5 {
         env.ledger().with_mut(|l| l.timestamp = 1_000_000 + (i as u64 * 100));
         client.submit_score(
@@ -342,7 +343,7 @@ fn test_history_max_depth_change_takes_effect() {
     assert_eq!(history1.len(), 5);
 
     // Reduce max_depth to 3 and submit 2 more scores
-    client.set_history_max_depth(&admin, &3);
+    client.set_history_max_depth(&Vec::new(&env), &3);
     for i in 5..7 {
         env.ledger().with_mut(|l| l.timestamp = 1_000_000 + (i as u64 * 100));
         client.submit_score(
@@ -414,7 +415,7 @@ fn test_history_no_metadata_leakage() {
 
     env.ledger().with_mut(|l| l.timestamp = 1_000_000);
 
-    client.set_history_max_depth(&admin, &5);
+    client.set_history_max_depth(&Vec::new(&env), &5);
 
     for i in 0..7 {
         env.ledger().with_mut(|l| l.timestamp = 1_000_000 + (i as u64 * 100));
@@ -489,7 +490,7 @@ fn test_history_cleared_different_pairs_unaffected() {
     );
 
     // Clear history for pair1 only
-    client.clear_score_history(&admin, &wallet, &pair1);
+    client.clear_score_history(&Vec::new(&env), &wallet, &pair1);
 
     // pair1 history should be empty
     let history1 = client.get_score_history(&wallet, &pair1);

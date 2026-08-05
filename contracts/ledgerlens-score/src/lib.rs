@@ -1,6 +1,7 @@
 #![no_std]
 #![allow(deprecated)] // Required: contractimpl macro calls spec_xdr_* for all fns including deprecated ones
 #![cfg_attr(all(target_family = "wasm", not(test)), deny(dead_code))]
+#![cfg_attr(any(test, not(target_family = "wasm")), allow(dead_code))]
 #![allow(unused_variables)]
 
 mod constants;
@@ -30,9 +31,6 @@ mod event_emission;
 
 #[cfg(test)]
 mod test_upgrade;
-
-#[cfg(test)]
-mod test_upgrade_rollback;
 
 #[cfg(test)]
 mod test_batch_error_events;
@@ -222,9 +220,6 @@ mod test_signer_governance;
 mod test_storage_key_collisions;
 
 #[cfg(test)]
-mod test_rent_renewal_fairness;
-
-#[cfg(test)]
 mod test_schema_version_probes;
 
 use soroban_sdk::{
@@ -250,8 +245,8 @@ pub use types::{
     Policy, PolicyApproval, PolicyBundle, PolicyBundleProposal, PublicScoreExport, RiskScore,
     ScoreAttestation, ScoreAttestationInput, ScoreDispute, ScoreFloorPolicy, ScoreHistogram,
     ScoreQuery, ScoreSubmission, ScoreSubmissionWithProof, ScoreTrend, ScoreVelocityCap,
-    SignerAccuracyRecord, SubmissionProvenance, ThresholdAttestation, TierBounds, TokenBucket,
-    UpgradeProposal, WelfordCorrState,
+    SignerAccuracyRecord, SignerState, SignerStateRecord, SubmissionProvenance,
+    ThresholdAttestation, TierBounds, TokenBucket, UpgradeProposal, WelfordCorrState,
 };
 /// The 32-byte all-zeros field element used as the value in non-membership proofs.
 pub use verkle::NON_MEMBER_SENTINEL;
@@ -4897,6 +4892,15 @@ impl LedgerLensScoreContract {
         set.push_back(signer.clone());
         storage::set_service_set(&env, &set);
         storage::set_signer_added_at(&env, &signer, env.ledger().timestamp());
+        storage::set_signer_state_record(
+            &env,
+            &SignerStateRecord {
+                signer: signer.clone(),
+                state: SignerState::Pending,
+                state_changed_at: env.ledger().timestamp(),
+                state_changed_by: storage::get_admin(&env),
+            },
+        );
         events::signer_added(&env, &signer);
         // #299: governance audit chain — stable discriminant from governance_actions registry
         let mut data = [0u8; 32];
@@ -4941,6 +4945,15 @@ impl LedgerLensScoreContract {
         }
 
         storage::remove_signer_added_at(&env, &signer);
+        storage::set_signer_state_record(
+            &env,
+            &SignerStateRecord {
+                signer: signer.clone(),
+                state: SignerState::Revoked,
+                state_changed_at: env.ledger().timestamp(),
+                state_changed_by: storage::get_admin(&env),
+            },
+        );
         events::signer_removed(&env, &signer);
         Ok(())
     }

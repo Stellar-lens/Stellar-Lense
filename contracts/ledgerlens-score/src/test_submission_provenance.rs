@@ -58,7 +58,7 @@ fn test_provenance_after_submit_score() {
         &5, // model_version = 5
         &None,
     );
-    let prov = client.get_submission_provenance(&wallet, &pair).unwrap();
+    let prov = client.get_submission_provenance(&wallet, &pair);
     assert_eq!(prov.model_version, 5, "model_version must match submitted value");
     assert_eq!(
         prov.validation_branch,
@@ -76,7 +76,7 @@ fn test_provenance_epoch_id() {
     // Open epoch 7
     client.open_epoch(&Vec::new(&env), &7);
     client.submit_score(&Vec::new(&env), &wallet, &pair, &50, &false, &false, &1, &80, &1, &None);
-    let prov = client.get_submission_provenance(&wallet, &pair).unwrap();
+    let prov = client.get_submission_provenance(&wallet, &pair);
     assert_eq!(prov.epoch_id, 7, "epoch_id must reflect the open epoch at acceptance");
 }
 
@@ -86,7 +86,7 @@ fn test_provenance_cooldown_secs() {
     let (env, client, _admin, _service, wallet, pair) = setup();
     // Default cooldown is 3600 seconds
     client.submit_score(&Vec::new(&env), &wallet, &pair, &30, &false, &false, &1, &70, &1, &None);
-    let prov = client.get_submission_provenance(&wallet, &pair).unwrap();
+    let prov = client.get_submission_provenance(&wallet, &pair);
     assert_eq!(prov.cooldown_secs, 3600, "default cooldown must be 3600 seconds");
 }
 
@@ -97,7 +97,7 @@ fn test_provenance_score_floor_fields() {
     // Enable score floor with HWM=80, floor=20
     client.set_score_floor_policy(&Vec::new(&env), &true, &80, &20);
     client.submit_score(&Vec::new(&env), &wallet, &pair, &85, &false, &false, &1, &90, &1, &None);
-    let prov = client.get_submission_provenance(&wallet, &pair).unwrap();
+    let prov = client.get_submission_provenance(&wallet, &pair);
     assert!(prov.score_floor_enabled, "score_floor_enabled must be true");
     assert_eq!(prov.score_floor_high_water_mark, 80);
     assert_eq!(prov.score_floor_value, 20);
@@ -109,13 +109,13 @@ fn test_provenance_updates_on_resubmit() {
     let (env, client, _admin, _service, wallet, pair) = setup();
     // First submission
     client.submit_score(&Vec::new(&env), &wallet, &pair, &10, &false, &false, &1, &80, &1, &None);
-    let prov1 = client.get_submission_provenance(&wallet, &pair).unwrap();
+    let prov1 = client.get_submission_provenance(&wallet, &pair);
     assert_eq!(prov1.model_version, 1);
 
     // Advance past cooldown and resubmit with model_version=2
     env.ledger().with_mut(|l| l.timestamp += 3_601);
     client.submit_score(&Vec::new(&env), &wallet, &pair, &20, &false, &false, &2, &85, &2, &None);
-    let prov2 = client.get_submission_provenance(&wallet, &pair).unwrap();
+    let prov2 = client.get_submission_provenance(&wallet, &pair);
     assert_eq!(prov2.model_version, 2, "provenance must update to latest submission");
     assert!(prov2.submitted_at > prov1.submitted_at, "submitted_at must advance");
 }
@@ -143,7 +143,7 @@ fn test_provenance_batch_validation_branch() {
     let result = client.submit_scores_batch(&batch);
     assert_eq!(result.accepted_count, 1);
 
-    let prov = client.get_submission_provenance(&wallet, &pair).unwrap();
+    let prov = client.get_submission_provenance(&wallet, &pair);
     assert_eq!(prov.model_version, 3);
     assert_eq!(
         prov.validation_branch,
@@ -155,8 +155,6 @@ fn test_provenance_batch_validation_branch() {
 /// Different wallets/pairs each get independent provenance records.
 #[test]
 fn test_provenance_independent_per_wallet_pair() {
-    use crate::ScoreSubmission;
-
     let (env, client, _admin, _service, _wallet, _pair) = setup();
     let pair_a = symbol_short!("XLM_USDC");
     let pair_b = symbol_short!("XLM_BTC");
@@ -177,8 +175,8 @@ fn test_provenance_independent_per_wallet_pair() {
     );
     client.submit_score(&Vec::new(&env), &wallet_b, &pair_b, &90, &true, &true, &1, &95, &2, &None);
 
-    let prov_a = client.get_submission_provenance(&wallet_a, &pair_a).unwrap();
-    let prov_b = client.get_submission_provenance(&wallet_b, &pair_b).unwrap();
+    let prov_a = client.get_submission_provenance(&wallet_a, &pair_a);
+    let prov_b = client.get_submission_provenance(&wallet_b, &pair_b);
 
     assert_eq!(prov_a.model_version, 1);
     assert_eq!(prov_b.model_version, 2);

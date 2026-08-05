@@ -12,7 +12,8 @@ use crate::types::{
     PairVolatilityState, ParamChangeProposal, ParameterProposalRecord, ParameterProposalStatus,
     PendingScoreEntry, Policy, PolicyApproval, PolicyBundleProposal, RateLimitOverrideEntry,
     RiskScore, ScoreDispute, ScoreFloorPolicy, ScoreHistogram, ScoreTrend, ScoreVelocityCap,
-    SignerAccuracyRecord, SubscorePayload, TokenBucket, UpgradeProposal, WelfordCorrState,
+    SignerAccuracyRecord, SignerStateRecord, SubscorePayload, TokenBucket, UpgradeProposal,
+    WelfordCorrState,
 };
 use soroban_sdk::{contracttype, Address, Bytes, BytesN, Env, Symbol, Vec};
 
@@ -3152,6 +3153,14 @@ pub fn get_alert_acknowledgement(env: &Env, alert_type: &AlertType) -> Option<Al
         env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
     }
     record
+}
+
+pub fn set_signer_state_record(env: &Env, record: &SignerStateRecord) {
+    env.storage().persistent().set(&DataKeyD::SignerState(record.signer.clone()), record);
+}
+
+pub fn get_signer_state_record(env: &Env, signer: &Address) -> Option<SignerStateRecord> {
+    env.storage().persistent().get(&DataKeyD::SignerState(signer.clone()))
 }
 
 // ── #631: Emergency freeze / thaw ──────────────────────────────────────────

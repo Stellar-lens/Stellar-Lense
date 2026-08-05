@@ -13,7 +13,7 @@
 use soroban_sdk::{
     symbol_short,
     testutils::{Address as _, Ledger as _},
-    Address, Env, Symbol,
+    Address, Env, Symbol, Vec,
 };
 
 use crate::{LedgerLensScoreContract, LedgerLensScoreContractClient};

@@ -13,6 +13,7 @@
 //! All tests use deterministic inputs and require no network access.
 
 use soroban_sdk::{testutils::Address as _, Address, Bytes, Env, Vec};
+use std::vec;
 
 use crate::{storage, Error, LedgerLensScoreContract, LedgerLensScoreContractClient};
 

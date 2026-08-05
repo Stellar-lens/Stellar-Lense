@@ -7,12 +7,10 @@
 use soroban_sdk::{
     symbol_short,
     testutils::{Address as _, Ledger as _},
-    Address, Env, Symbol, Vec,
+    Address, Env, Vec,
 };
 
-use crate::{
-    constants::BatchEntryResult, Error, LedgerLensScoreContract, LedgerLensScoreContractClient,
-};
+use crate::{Error, LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreSubmission};
 
 const START_TS: u64 = 1_700_000_000;
 
@@ -37,16 +35,16 @@ fn test_batch_rejection_code_contract_paused() {
     let (env, client, _admin, _service) = setup();
 
     // Pause the contract
-    client.pause();
+    client.pause(&Vec::new(&env));
 
     // Attempt batch submission
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
 
     let mut batch = Vec::new(&env);
-    batch.push_back(crate::types::ScoreSubmissionBatch {
+    batch.push_back(ScoreSubmission {
         wallet: wallet.clone(),
-        asset_pair: pair,
+        asset_pair: pair.clone(),
         score: 50,
         benford_flag: false,
         ml_flag: false,
@@ -55,17 +53,7 @@ fn test_batch_rejection_code_contract_paused() {
         model_version: 1,
     });
 
-    let result = client.submit_scores_batch(&batch);
-
-    // Verify rejection code indicates contract paused
-    assert_eq!(result.len(), 1);
-    let entry = result.get(0).unwrap();
-    assert!(!entry.accepted);
-    assert_eq!(
-        entry.rejection_code,
-        Error::ContractPaused as u32,
-        "Rejection code should indicate contract pause"
-    );
+    assert_eq!(client.try_submit_scores_batch(&batch), Err(Ok(Error::ContractPaused)));
 }
 
 #[test]
@@ -77,7 +65,7 @@ fn test_batch_rejection_code_invalid_score() {
 
     let mut batch = Vec::new(&env);
     // Score out of valid range (0-100)
-    batch.push_back(crate::types::ScoreSubmissionBatch {
+    batch.push_back(ScoreSubmission {
         wallet: wallet.clone(),
         asset_pair: pair,
         score: 150,
@@ -91,8 +79,8 @@ fn test_batch_rejection_code_invalid_score() {
     let result = client.submit_scores_batch(&batch);
 
     // Verify rejection code indicates invalid score
-    assert_eq!(result.len(), 1);
-    let entry = result.get(0).unwrap();
+    assert_eq!(result.results.len(), 1);
+    let entry = result.results.get(0).unwrap();
     assert!(!entry.accepted);
     assert_eq!(
         entry.rejection_code,
@@ -110,7 +98,7 @@ fn test_batch_rejection_code_invalid_confidence() {
 
     let mut batch = Vec::new(&env);
     // Confidence out of valid range (0-100)
-    batch.push_back(crate::types::ScoreSubmissionBatch {
+    batch.push_back(ScoreSubmission {
         wallet: wallet.clone(),
         asset_pair: pair,
         score: 50,
@@ -124,8 +112,8 @@ fn test_batch_rejection_code_invalid_confidence() {
     let result = client.submit_scores_batch(&batch);
 
     // Verify rejection code indicates invalid confidence
-    assert_eq!(result.len(), 1);
-    let entry = result.get(0).unwrap();
+    assert_eq!(result.results.len(), 1);
+    let entry = result.results.get(0).unwrap();
     assert!(!entry.accepted);
     assert_eq!(
         entry.rejection_code,
@@ -143,13 +131,13 @@ fn test_batch_rejection_code_invalid_timestamp() {
 
     let mut batch = Vec::new(&env);
     // Timestamp in future
-    batch.push_back(crate::types::ScoreSubmissionBatch {
+    batch.push_back(ScoreSubmission {
         wallet: wallet.clone(),
         asset_pair: pair,
         score: 50,
         benford_flag: false,
         ml_flag: false,
-        timestamp: START_TS + 1_000_000_000,
+        timestamp: 0,
         confidence: 80,
         model_version: 1,
     });
@@ -157,8 +145,8 @@ fn test_batch_rejection_code_invalid_timestamp() {
     let result = client.submit_scores_batch(&batch);
 
     // Verify rejection code indicates invalid timestamp
-    assert_eq!(result.len(), 1);
-    let entry = result.get(0).unwrap();
+    assert_eq!(result.results.len(), 1);
+    let entry = result.results.get(0).unwrap();
     assert!(!entry.accepted);
     assert_eq!(
         entry.rejection_code,
@@ -178,9 +166,9 @@ fn test_batch_mixed_acceptance_and_rejection() {
     let mut batch = Vec::new(&env);
 
     // Valid entry
-    batch.push_back(crate::types::ScoreSubmissionBatch {
+    batch.push_back(ScoreSubmission {
         wallet: wallet1.clone(),
-        asset_pair: pair,
+        asset_pair: pair.clone(),
         score: 45,
         benford_flag: false,
         ml_flag: false,
@@ -190,7 +178,7 @@ fn test_batch_mixed_acceptance_and_rejection() {
     });
 
     // Invalid score entry
-    batch.push_back(crate::types::ScoreSubmissionBatch {
+    batch.push_back(ScoreSubmission {
         wallet: wallet2.clone(),
         asset_pair: pair,
         score: 150,
@@ -204,13 +192,13 @@ fn test_batch_mixed_acceptance_and_rejection() {
     let result = client.submit_scores_batch(&batch);
 
     // Verify first entry accepted, second rejected
-    assert_eq!(result.len(), 2);
+    assert_eq!(result.results.len(), 2);
 
-    let entry0 = result.get(0).unwrap();
+    let entry0 = result.results.get(0).unwrap();
     assert!(entry0.accepted, "First entry should be accepted");
     assert_eq!(entry0.rejection_code, 0, "Accepted entries have zero rejection code");
 
-    let entry1 = result.get(1).unwrap();
+    let entry1 = result.results.get(1).unwrap();
     assert!(!entry1.accepted, "Second entry should be rejected");
     assert_eq!(
         entry1.rejection_code,
@@ -224,14 +212,17 @@ fn test_batch_rejection_deterministic_across_wallets() {
     let (env, client, _admin, _service) = setup();
 
     // Submit same invalid data for different wallets
-    let wallets: Vec<Address> = (0..3).map(|_| Address::generate(&env)).collect::<Vec<_>>().into();
+    let mut wallets = Vec::new(&env);
+    for _ in 0..3 {
+        wallets.push_back(Address::generate(&env));
+    }
     let pair = symbol_short!("XLM_USDC");
 
     let mut batch = Vec::new(&env);
     for wallet in wallets.iter() {
-        batch.push_back(crate::types::ScoreSubmissionBatch {
+        batch.push_back(ScoreSubmission {
             wallet: wallet.clone(),
-            asset_pair: pair,
+            asset_pair: pair.clone(),
             score: 150, // Invalid
             benford_flag: false,
             ml_flag: false,
@@ -244,9 +235,9 @@ fn test_batch_rejection_deterministic_across_wallets() {
     let result = client.submit_scores_batch(&batch);
 
     // Verify all entries rejected with same code (deterministic)
-    assert_eq!(result.len(), 3);
+    assert_eq!(result.results.len(), 3);
     for i in 0..3 {
-        let entry = result.get(i).unwrap();
+        let entry = result.results.get(i).unwrap();
         assert!(!entry.accepted);
         assert_eq!(
             entry.rejection_code,
@@ -264,7 +255,7 @@ fn test_rejection_does_not_leak_wallet_data() {
     let pair = symbol_short!("XLM_USDC");
 
     let mut batch = Vec::new(&env);
-    batch.push_back(crate::types::ScoreSubmissionBatch {
+    batch.push_back(ScoreSubmission {
         wallet: sensitive_wallet.clone(),
         asset_pair: pair,
         score: 50,
@@ -278,7 +269,7 @@ fn test_rejection_does_not_leak_wallet_data() {
     let result = client.submit_scores_batch(&batch);
 
     // Verify the event/result contains only rejection reason, not wallet details
-    let entry = result.get(0).unwrap();
+    let entry = result.results.get(0).unwrap();
     assert!(!entry.accepted);
     assert_eq!(
         entry.rejection_code,

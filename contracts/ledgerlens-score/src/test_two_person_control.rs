@@ -1,14 +1,8 @@
 //! Tests for two-person control on destructive operations.
 
-use soroban_sdk::{
-    testutils::{Address as _, Ledger as _},
-    Address, Env, Symbol, Vec,
-};
+use soroban_sdk::{testutils::Address as _, Address, Env, Symbol, Vec};
 
-use crate::{
-    parameter_governance::param_key_cooldown, Error, LedgerLensScoreContract,
-    LedgerLensScoreContractClient,
-};
+use crate::{Error, LedgerLensScoreContract, LedgerLensScoreContractClient};
 
 fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
     let env = Env::default();
@@ -25,14 +19,18 @@ fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
 }
 
 fn admin_signers(env: &Env, admins: &[Address]) -> Vec<Address> {
-    Vec::from_array(env, admins)
+    let mut result = Vec::new(env);
+    for admin in admins {
+        result.push_back(admin.clone());
+    }
+    result
 }
 
 fn pair_symbols(env: &Env, pairs: &[&str]) -> Vec<Symbol> {
     let vec = Vec::new(env);
     let mut result = vec;
     for pair_name in pairs {
-        result = result.push_back(Symbol::new(env, pair_name));
+        result.push_back(Symbol::new(env, pair_name));
     }
     result
 }
@@ -62,7 +60,7 @@ fn test_bulk_reset_single_admin_with_policy_rejected() {
         &Symbol::new(&env, "USD/EUR"),
         &1000,
     );
-    client.set_destructive_multisig(&admin_signers(&env, &[admin.clone()]), &true).unwrap();
+    client.set_destructive_multisig(&admin_signers(&env, &[admin.clone()]), &true);
 
     let result = client.try_bulk_reset_pair_weight(&admin_signers(&env, &[admin.clone()]), &pairs);
     assert_eq!(result, Err(Ok(Error::InsufficientAdminSigners)));
@@ -79,7 +77,7 @@ fn test_bulk_reset_multi_admin_with_policy_accepted() {
         &Symbol::new(&env, "USD/EUR"),
         &1000,
     );
-    client.set_destructive_multisig(&admin_signers(&env, &[admin1.clone()]), &true).unwrap();
+    client.set_destructive_multisig(&admin_signers(&env, &[admin1.clone()]), &true);
 
     let result =
         client.try_bulk_reset_pair_weight(&admin_signers(&env, &[admin1.clone(), admin2]), &pairs);
@@ -92,10 +90,10 @@ fn test_multisig_policy_toggle() {
 
     assert!(!client.get_destructive_multisig());
 
-    client.set_destructive_multisig(&admin_signers(&env, &[admin.clone()]), &true).unwrap();
+    client.set_destructive_multisig(&admin_signers(&env, &[admin.clone()]), &true);
     assert!(client.get_destructive_multisig());
 
-    client.set_destructive_multisig(&admin_signers(&env, &[admin.clone()]), &false).unwrap();
+    client.set_destructive_multisig(&admin_signers(&env, &[admin.clone()]), &false);
     assert!(!client.get_destructive_multisig());
 }
 
@@ -115,7 +113,7 @@ fn test_multisig_policy_persists_across_calls() {
         &Symbol::new(&env, "GBP/USD"),
         &2000,
     );
-    client.set_destructive_multisig(&admin_signers(&env, &[admin1.clone()]), &true).unwrap();
+    client.set_destructive_multisig(&admin_signers(&env, &[admin1.clone()]), &true);
 
     let result1 = client.try_bulk_reset_pair_weight(
         &admin_signers(&env, &[admin1.clone(), admin2.clone()]),

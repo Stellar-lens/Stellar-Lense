@@ -7,11 +7,10 @@ use soroban_sdk::{
 };
 
 use crate::{
-    constants::{DEFAULT_SIGNER_GRACE_PERIOD_SECS, MAX_SERVICE_SIGNERS},
-    storage,
-    types::SignerState,
-    Error, LedgerLensScoreContract, LedgerLensScoreContractClient,
+    constants::DEFAULT_SIGNER_GRACE_PERIOD_SECS, storage, types::SignerState, Error,
+    LedgerLensScoreContract, LedgerLensScoreContractClient,
 };
+use std::format;
 
 const START_TS: u64 = 1_700_000_000;
 
@@ -261,7 +260,7 @@ fn test_emergency_action_requires_explicit_threshold() {
     assert!(result.is_ok()); // Admin can pause with full auth
 
     // Verify pausing actually worked
-    assert_eq!(client.get_is_paused(), true);
+    assert!(client.is_paused());
 }
 
 #[test]
@@ -380,7 +379,7 @@ fn test_pending_decision_attribution_under_churn() {
 
     // Verify new set is different
     let signers_after = client.get_service_signers();
-    assert!(signers_after.len() > signer_count_at_proposal as usize);
+    assert!(signers_after.len() > signer_count_at_proposal);
 
     // Proposal should remain valid but attributed to original signer context
     let proposal = client.get_parameter_proposal(&proposal_id);

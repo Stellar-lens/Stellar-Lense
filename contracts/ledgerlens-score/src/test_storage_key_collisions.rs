@@ -10,13 +10,10 @@
 //! - Tests boundary cases and parameter combinations
 //! - Documents discovered collisions or legacy mappings if any
 
-use soroban_sdk::{
-    symbol_short,
-    testutils::{Address as _, Ledger as _},
-    Address, Env, Symbol, Vec,
-};
+use soroban_sdk::{symbol_short, testutils::Address as _, Address, Env};
 
 use crate::types::{DataKey, DataKeyB, DataKeyC, DataKeyD};
+use std::string::String;
 
 /// Test that basic DataKey variants encode distinctly.
 #[test]
