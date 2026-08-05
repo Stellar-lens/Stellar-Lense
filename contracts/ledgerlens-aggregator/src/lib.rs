@@ -138,7 +138,7 @@ fn shard_supports_required_interface(env: &Env, shard: &Address) -> bool {
 fn asset_pair_is_bounded(env: &Env, asset_pair: &Symbol) -> bool {
     let pair = soroban_sdk::SymbolStr::try_from_val(env, &asset_pair.to_symbol_val());
     match pair {
-        Ok(pair) => pair.as_ref().len() as u32 <= MAX_ASSET_PAIR_BYTES,
+        Ok(pair) => pair.len() as u32 <= MAX_ASSET_PAIR_BYTES,
         Err(_) => false,
     }
 }
