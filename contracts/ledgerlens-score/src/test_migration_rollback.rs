@@ -57,6 +57,10 @@ fn seed_scores(env: &Env, n: u32, pair: &Symbol) -> Vec<Address> {
     for i in 0..n {
         let w = Address::generate(env);
         storage::set_score(env, &w, pair, &sample_score(i * 10));
+        // `set_score` maintains current indexes automatically. Remove those
+        // entries to model the legacy, pre-migration state described above.
+        storage::remove_score_entry(env, &w, pair);
+        storage::remove_pair_for_wallet(env, &w, pair);
         wallets.push_back(w);
     }
     wallets
