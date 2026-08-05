@@ -271,11 +271,19 @@ if [ "$DRY_RUN" = true ]; then
   CONTRACT_ID="<CONTRACT_ID_PLACEHOLDER>"
   echo "[dry-run] $CLI_BIN contract deploy --wasm $OPTIMIZED_WASM_PATH --source $ADMIN_IDENTITY --rpc-url $RPC_URL --network-passphrase $NETWORK_PASSPHRASE"
 else
-  CONTRACT_ID=$("$CLI_BIN" contract deploy \
+  if ! CONTRACT_ID=$("$CLI_BIN" contract deploy \
     --wasm "$OPTIMIZED_WASM_PATH" \
     --source "$ADMIN_IDENTITY" \
     --rpc-url "$RPC_URL" \
-    --network-passphrase "$NETWORK_PASSPHRASE")
+    --network-passphrase "$NETWORK_PASSPHRASE" 2>&1); then
+    echo "$CONTRACT_ID" >&2
+    case "$CONTRACT_ID" in
+      *connection\ refused*|*dns\ error*|*request\ failed*)
+        die "RPC endpoint appears unavailable."
+        ;;
+      *) die "Deployment failed." ;;
+    esac
+  fi
 fi
 
 [ -n "$CONTRACT_ID" ] || die "Deployment returned an empty contract id."
@@ -290,7 +298,7 @@ else
 fi
 
 log "Initializing contract (admin=$ADMIN_ADDRESS, service=$SERVICE_ADDRESS)"
-if ! run "$CLI_BIN" contract invoke \
+if ! INIT_OUTPUT=$(run "$CLI_BIN" contract invoke \
   --id "$CONTRACT_ID" \
   --source "$ADMIN_IDENTITY" \
   --rpc-url "$RPC_URL" \
@@ -298,9 +306,18 @@ if ! run "$CLI_BIN" contract invoke \
   -- \
   initialize \
   --admin "$ADMIN_ADDRESS" \
-  --service "$SERVICE_ADDRESS" >/dev/null; then
+  --service "$SERVICE_ADDRESS" 2>&1); then
+  echo "$INIT_OUTPUT" >&2
   echo "Contract id: $CONTRACT_ID" >&2
-  die "Initialization failed; do not treat this deployment as successful."
+  case "$INIT_OUTPUT" in
+    *timed\ out*|*timeout*)
+      die "Initialization timed out; deployment state is unconfirmed."
+      ;;
+    *tx_bad_seq*|*bad\ sequence*)
+      die "Sequence number rejected during initialization."
+      ;;
+    *) die "Initialization failed; do not treat this deployment as successful." ;;
+  esac
 fi
 
 # ── Verify ────────────────────────────────────────────────────────────────────
