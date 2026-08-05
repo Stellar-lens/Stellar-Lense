@@ -188,7 +188,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: dtolnay/rust-toolchain@fcf085fcb917fba9e37c9eaa60e2e5dc4d0cd05f  # 1.81.0
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772  # master (2026-08-05)
         with:
           toolchain: "1.81.0"
           targets: wasm32-unknown-unknown
