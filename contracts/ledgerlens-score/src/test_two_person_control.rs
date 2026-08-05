@@ -38,11 +38,11 @@ fn pair_symbols(env: &Env, pairs: &[&str]) -> Vec<Symbol> {
 #[test]
 fn test_bulk_reset_single_admin_no_policy() {
     let (env, client, admin, _service) = setup();
-    let pairs = pair_symbols(&env, &["USD/EUR"]);
+    let pairs = pair_symbols(&env, &["USD_EUR"]);
 
     client.set_pair_weight(
         &admin_signers(&env, &[admin.clone()]),
-        &Symbol::new(&env, "USD/EUR"),
+        &Symbol::new(&env, "USD_EUR"),
         &1000,
     );
 
@@ -53,11 +53,11 @@ fn test_bulk_reset_single_admin_no_policy() {
 #[test]
 fn test_bulk_reset_single_admin_with_policy_rejected() {
     let (env, client, admin, _service) = setup();
-    let pairs = pair_symbols(&env, &["USD/EUR"]);
+    let pairs = pair_symbols(&env, &["USD_EUR"]);
 
     client.set_pair_weight(
         &admin_signers(&env, &[admin.clone()]),
-        &Symbol::new(&env, "USD/EUR"),
+        &Symbol::new(&env, "USD_EUR"),
         &1000,
     );
     client.set_destructive_multisig(&admin_signers(&env, &[admin.clone()]), &true);
@@ -70,11 +70,11 @@ fn test_bulk_reset_single_admin_with_policy_rejected() {
 fn test_bulk_reset_multi_admin_with_policy_accepted() {
     let (env, client, admin1, _service) = setup();
     let admin2 = Address::generate(&env);
-    let pairs = pair_symbols(&env, &["USD/EUR"]);
+    let pairs = pair_symbols(&env, &["USD_EUR"]);
 
     client.set_pair_weight(
         &admin_signers(&env, &[admin1.clone()]),
-        &Symbol::new(&env, "USD/EUR"),
+        &Symbol::new(&env, "USD_EUR"),
         &1000,
     );
     client.set_destructive_multisig(&admin_signers(&env, &[admin1.clone()]), &true);
@@ -101,16 +101,16 @@ fn test_multisig_policy_toggle() {
 fn test_multisig_policy_persists_across_calls() {
     let (env, client, admin1, _service) = setup();
     let admin2 = Address::generate(&env);
-    let pairs = pair_symbols(&env, &["USD/EUR", "GBP/USD"]);
+    let pairs = pair_symbols(&env, &["USD_EUR", "GBP_USD"]);
 
     client.set_pair_weight(
         &admin_signers(&env, &[admin1.clone()]),
-        &Symbol::new(&env, "USD/EUR"),
+        &Symbol::new(&env, "USD_EUR"),
         &1000,
     );
     client.set_pair_weight(
         &admin_signers(&env, &[admin1.clone()]),
-        &Symbol::new(&env, "GBP/USD"),
+        &Symbol::new(&env, "GBP_USD"),
         &2000,
     );
     client.set_destructive_multisig(&admin_signers(&env, &[admin1.clone()]), &true);
@@ -123,10 +123,10 @@ fn test_multisig_policy_persists_across_calls() {
 
     client.set_pair_weight(
         &admin_signers(&env, &[admin1.clone()]),
-        &Symbol::new(&env, "USD/EUR"),
+        &Symbol::new(&env, "USD_EUR"),
         &3000,
     );
-    let pairs2 = pair_symbols(&env, &["USD/EUR"]);
+    let pairs2 = pair_symbols(&env, &["USD_EUR"]);
     let result2 = client.try_bulk_reset_pair_weight(
         &admin_signers(&env, &[admin1.clone(), admin2.clone()]),
         &pairs2,
@@ -137,11 +137,11 @@ fn test_multisig_policy_persists_across_calls() {
 #[test]
 fn test_policy_default_disabled() {
     let (env, client, admin, _service) = setup();
-    let pairs = pair_symbols(&env, &["USD/EUR"]);
+    let pairs = pair_symbols(&env, &["USD_EUR"]);
 
     client.set_pair_weight(
         &admin_signers(&env, &[admin.clone()]),
-        &Symbol::new(&env, "USD/EUR"),
+        &Symbol::new(&env, "USD_EUR"),
         &1000,
     );
 
