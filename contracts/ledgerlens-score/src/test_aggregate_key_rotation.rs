@@ -2,7 +2,7 @@
 
 //! Tests for the aggregate (threshold-signature) service pubkey dual-key
 //! overlap window (issue #697): `rotate_aggregate_service_pubkey` /
-//! `get_pending_aggregate_service_pubkey`, verified through
+//! `get_pending_aggregate_pubkey`, verified through
 //! `verify_threshold_attestation`. Mirrors the single-signer coverage in
 //! `test_dual_key_pubkey.rs` (issue #295) for the `ThresholdAttestation`
 //! path, which previously had no rotation-overlap support at all — only
@@ -126,7 +126,7 @@ fn test_instant_aggregate_rotation_promotes_key_immediately() {
     client.set_aggregate_service_pubkey(&Vec::new(&env), &pubkey_bytes(&env, &old_key));
     client.rotate_aggregate_service_pubkey(&Vec::new(&env), &pubkey_bytes(&env, &new_key), &0u64);
 
-    assert!(client.get_pending_aggregate_service_pubkey().is_none());
+    assert!(client.get_pending_aggregate_pubkey().is_none());
     assert_eq!(client.get_aggregate_service_pubkey().unwrap(), pubkey_bytes(&env, &new_key));
 }
 
@@ -192,7 +192,7 @@ fn test_old_aggregate_key_accepted_during_overlap() {
 }
 
 #[test]
-fn test_get_pending_aggregate_service_pubkey_during_overlap() {
+fn test_get_pending_aggregate_pubkey_during_overlap() {
     let (env, client, _admin, _service) = setup();
     let old_key = signing_key(1);
     let new_key = signing_key(2);
@@ -205,7 +205,7 @@ fn test_get_pending_aggregate_service_pubkey_during_overlap() {
         &overlap,
     );
 
-    let pending = client.get_pending_aggregate_service_pubkey();
+    let pending = client.get_pending_aggregate_pubkey();
     assert!(pending.is_some());
     let (pk, expiry) = pending.unwrap();
     assert_eq!(pk, pubkey_bytes(&env, &new_key));
@@ -289,7 +289,7 @@ fn test_aggregate_pending_key_auto_promoted_after_expiry() {
     let ta = threshold_attest(&env, &contract_id, version, &new_key, &wallet, &pair);
     let _ = submit(&client, &env, &wallet, &pair, ta);
 
-    assert!(client.get_pending_aggregate_service_pubkey().is_none());
+    assert!(client.get_pending_aggregate_pubkey().is_none());
     assert_eq!(client.get_aggregate_service_pubkey().unwrap(), pubkey_bytes(&env, &new_key));
 }
 

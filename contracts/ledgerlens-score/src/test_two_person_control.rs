@@ -62,9 +62,7 @@ fn test_bulk_reset_single_admin_with_policy_rejected() {
         &Symbol::new(&env, "USD/EUR"),
         &1000,
     );
-    client
-        .set_require_multisig_for_destructive(&admin_signers(&env, &[admin.clone()]), &true)
-        .unwrap();
+    client.set_destructive_multisig(&admin_signers(&env, &[admin.clone()]), &true).unwrap();
 
     let result = client.try_bulk_reset_pair_weight(&admin_signers(&env, &[admin.clone()]), &pairs);
     assert_eq!(result, Err(Ok(Error::InsufficientAdminSigners)));
@@ -81,9 +79,7 @@ fn test_bulk_reset_multi_admin_with_policy_accepted() {
         &Symbol::new(&env, "USD/EUR"),
         &1000,
     );
-    client
-        .set_require_multisig_for_destructive(&admin_signers(&env, &[admin1.clone()]), &true)
-        .unwrap();
+    client.set_destructive_multisig(&admin_signers(&env, &[admin1.clone()]), &true).unwrap();
 
     let result =
         client.try_bulk_reset_pair_weight(&admin_signers(&env, &[admin1.clone(), admin2]), &pairs);
@@ -94,17 +90,13 @@ fn test_bulk_reset_multi_admin_with_policy_accepted() {
 fn test_multisig_policy_toggle() {
     let (env, client, admin, _service) = setup();
 
-    assert!(!client.get_require_multisig_for_destructive());
+    assert!(!client.get_destructive_multisig());
 
-    client
-        .set_require_multisig_for_destructive(&admin_signers(&env, &[admin.clone()]), &true)
-        .unwrap();
-    assert!(client.get_require_multisig_for_destructive());
+    client.set_destructive_multisig(&admin_signers(&env, &[admin.clone()]), &true).unwrap();
+    assert!(client.get_destructive_multisig());
 
-    client
-        .set_require_multisig_for_destructive(&admin_signers(&env, &[admin.clone()]), &false)
-        .unwrap();
-    assert!(!client.get_require_multisig_for_destructive());
+    client.set_destructive_multisig(&admin_signers(&env, &[admin.clone()]), &false).unwrap();
+    assert!(!client.get_destructive_multisig());
 }
 
 #[test]
@@ -123,9 +115,7 @@ fn test_multisig_policy_persists_across_calls() {
         &Symbol::new(&env, "GBP/USD"),
         &2000,
     );
-    client
-        .set_require_multisig_for_destructive(&admin_signers(&env, &[admin1.clone()]), &true)
-        .unwrap();
+    client.set_destructive_multisig(&admin_signers(&env, &[admin1.clone()]), &true).unwrap();
 
     let result1 = client.try_bulk_reset_pair_weight(
         &admin_signers(&env, &[admin1.clone(), admin2.clone()]),
@@ -157,7 +147,7 @@ fn test_policy_default_disabled() {
         &1000,
     );
 
-    assert!(!client.get_require_multisig_for_destructive());
+    assert!(!client.get_destructive_multisig());
 
     let result = client.try_bulk_reset_pair_weight(&admin_signers(&env, &[admin.clone()]), &pairs);
     assert!(result.is_ok());

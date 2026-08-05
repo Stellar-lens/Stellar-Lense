@@ -255,7 +255,7 @@ record a **pending key** paired with an **expiry bound**:
   *pending* key) from the moment the rotation call executes.
 - `expiry = env.ledger().timestamp() + overlap_secs` at the time of the call
   — the upper bound of the window. `get_pending_service_pubkey()` /
-  `get_pending_aggregate_service_pubkey()` return `(pending_key, expiry)` so
+  `get_pending_aggregate_pubkey()` return `(pending_key, expiry)` so
   operators and monitoring tooling can read both bounds of the window
   on-chain.
 - `overlap_secs == 0` skips the pending state entirely: the new key is
@@ -287,7 +287,7 @@ proving this, including the post-expiry rejection case.
 ### Compatibility
 
 - **No ABI break**: `rotate_aggregate_service_pubkey` /
-  `get_pending_aggregate_service_pubkey` are new, additive endpoints;
+  `get_pending_aggregate_pubkey` are new, additive endpoints;
   `set_aggregate_service_pubkey` (instant, no-overlap rotation) is
   unchanged. The single-key `rotate_service_pubkey` /
   `get_pending_service_pubkey` pair already existed (issue #295) and is

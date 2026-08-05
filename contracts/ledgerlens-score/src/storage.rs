@@ -7,16 +7,23 @@ use crate::constants::{
 use crate::errors::Error;
 use crate::types::{
     AdaptiveRateLimit, AggregateRiskScore, AlertAckRecord, AlertType, DataKey, DataKeyB, DataKeyC,
-    DataKeyD, DecayCurve, EmbargoExpiry, FlashProtectionMode, GateDataKey, HllSketch,
-    InterpolationMethod, JumpStats, ModelVersionStats, ModelVersionStatus, PairVolatilityState,
-    ParamChangeProposal, ParameterProposalRecord, ParameterProposalStatus, PendingScoreEntry,
-    Policy, PolicyApproval, RateLimitOverrideEntry, RiskScore, ScoreDispute, ScoreFloorPolicy,
-    ScoreHistogram, ScoreTrend, ScoreVelocityCap, SignerAccuracyRecord, SubscorePayload,
-    TokenBucket, UpgradeProposal, WelfordCorrState,
+    DataKeyD, DecayCurve, DeletionApprovalPolicy, EmbargoExpiry, FlashProtectionMode, GateDataKey,
+    HllSketch, InterpolationMethod, JumpStats, ModelVersionStats, ModelVersionStatus,
+    PairVolatilityState, ParamChangeProposal, ParameterProposalRecord, ParameterProposalStatus,
+    PendingScoreEntry, Policy, PolicyApproval, PolicyBundleProposal, RateLimitOverrideEntry,
+    RiskScore, ScoreDispute, ScoreFloorPolicy, ScoreHistogram, ScoreTrend, ScoreVelocityCap,
+    SignerAccuracyRecord, SubscorePayload, TokenBucket, UpgradeProposal, WelfordCorrState,
 };
-use soroban_sdk::{Address, Bytes, BytesN, Env, Symbol, Vec};
+use soroban_sdk::{contracttype, Address, Bytes, BytesN, Env, Symbol, Vec};
 
 pub const MAX_MANDATORY_REVIEWERS: u32 = 10;
+
+#[contracttype]
+#[derive(Clone)]
+enum ArchitectureDataKey {
+    ArchOwner,
+    MandatoryReviewers,
+}
 
 // ── Admin / Service ─────────────────────────────────────────────────────────
 
@@ -880,8 +887,6 @@ pub fn prune_expired_parameter_proposals(env: &Env) {
 /// Deletes all expired proposals from storage that have been expired for at least 48 hours.
 /// Returns (count_deleted, oldest_proposal_kept_timestamp).
 pub fn cleanup_expired_parameter_proposals(env: &Env) -> (u32, u64) {
-    use soroban_sdk::Env;
-
     let now = env.ledger().timestamp();
     let ttl_buffer_secs = 48 * 3600;
     let mut count = 0;
@@ -3080,19 +3085,73 @@ pub fn get_accumulated_fees(env: &Env) -> i128 {
 }
 
 pub fn set_arch_owner(env: &Env, owner: &Address) {
-    env.storage().instance().set(&DataKey::ArchOwner, owner);
+    env.storage().instance().set(&ArchitectureDataKey::ArchOwner, owner);
 }
 
 pub fn get_arch_owner(env: &Env) -> Option<Address> {
-    env.storage().instance().get(&DataKey::ArchOwner)
+    env.storage().instance().get(&ArchitectureDataKey::ArchOwner)
 }
 
 pub fn set_mandatory_reviewers(env: &Env, reviewers: &Vec<Address>) {
-    env.storage().instance().set(&DataKey::MandatoryReviewers, reviewers);
+    env.storage().instance().set(&ArchitectureDataKey::MandatoryReviewers, reviewers);
 }
 
 pub fn get_mandatory_reviewers(env: &Env) -> Vec<Address> {
-    env.storage().instance().get(&DataKey::MandatoryReviewers).unwrap_or_else(|| Vec::new(env))
+    env.storage()
+        .instance()
+        .get(&ArchitectureDataKey::MandatoryReviewers)
+        .unwrap_or_else(|| Vec::new(env))
+}
+
+pub fn set_submission_provenance(
+    env: &Env,
+    wallet: &Address,
+    asset_pair: &Symbol,
+    provenance: &crate::types::SubmissionProvenance,
+) {
+    let key = crate::types::DataKeyE::SubmissionProvenance(wallet.clone(), asset_pair.clone());
+    env.storage().persistent().set(&key, provenance);
+    env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+}
+
+pub fn get_submission_provenance(
+    env: &Env,
+    wallet: &Address,
+    asset_pair: &Symbol,
+) -> Option<crate::types::SubmissionProvenance> {
+    let key = crate::types::DataKeyE::SubmissionProvenance(wallet.clone(), asset_pair.clone());
+    let result = env.storage().persistent().get(&key);
+    if result.is_some() {
+        env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    }
+    result
+}
+
+pub fn set_require_multisig_for_destructive(env: &Env, required: bool) {
+    env.storage().instance().set(&DataKeyD::RequireDestructiveMultisig, &required);
+}
+
+pub fn get_require_multisig_for_destructive(env: &Env) -> bool {
+    env.storage().instance().get(&DataKeyD::RequireDestructiveMultisig).unwrap_or(false)
+}
+
+pub fn validate_pubkey_format(pubkey: &Bytes) -> bool {
+    matches!((pubkey.len(), pubkey.get(0)), (33, Some(0x02 | 0x03)) | (65, Some(0x04)))
+}
+
+pub fn set_alert_acknowledgement(env: &Env, alert_type: &AlertType, record: &AlertAckRecord) {
+    let key = DataKeyD::AlertAcknowledgement(alert_type.clone());
+    env.storage().persistent().set(&key, record);
+    env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+}
+
+pub fn get_alert_acknowledgement(env: &Env, alert_type: &AlertType) -> Option<AlertAckRecord> {
+    let key = DataKeyD::AlertAcknowledgement(alert_type.clone());
+    let record = env.storage().persistent().get(&key);
+    if record.is_some() {
+        env.storage().persistent().extend_ttl(&key, SCORE_TTL_THRESHOLD, SCORE_TTL_EXTEND_TO);
+    }
+    record
 }
 
 // ── #631: Emergency freeze / thaw ──────────────────────────────────────────

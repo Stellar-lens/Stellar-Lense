@@ -679,10 +679,6 @@ pub enum DataKey {
     HistoricalMaxScore(Address, Symbol),
     HysteresisMargin,
     RiskBandState(Address, Symbol),
-    /// Designated primary architecture owner.
-    ArchOwner,
-    /// Mandatory reviewers for administrative changes.
-    MandatoryReviewers,
 }
 
 #[contracttype]
@@ -862,6 +858,43 @@ pub struct SignerStateRecord {
 }
 
 #[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum AlertType {
+    Momentum(Address, Symbol),
+    ServiceSilence,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AlertAckRecord {
+    pub operator: Address,
+    pub acknowledged_at: u64,
+    pub note_hash: BytesN<32>,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SubmissionProvenance {
+    pub model_version: u32,
+    pub service_threshold: u32,
+    pub signers_count: u32,
+    pub score_floor_enabled: bool,
+    pub score_floor_high_water_mark: u32,
+    pub score_floor_value: u32,
+    pub cooldown_secs: u64,
+    pub epoch_id: u32,
+    pub ledger_sequence: u32,
+    pub submitted_at: u64,
+    pub validation_branch: Symbol,
+}
+
+#[contracttype]
+#[derive(Clone)]
+pub enum DataKeyE {
+    SubmissionProvenance(Address, Symbol),
+}
+
+#[contracttype]
 #[derive(Clone)]
 pub enum DataKeyD {
     RegisteredOracle(Symbol),
@@ -918,6 +951,12 @@ pub enum DataKeyD {
     SnapshotCount,
     /// Backup/restore record for post-incident recovery audit trail.
     BackupRestoreRecord,
+    PairAssetClass(Symbol),
+    AssetClassRiskThreshold(Symbol),
+    DeletionPolicyEnabled,
+    DeletionApprover,
+    PendingPolicyBundle,
+    RequireDestructiveMultisig,
 }
 
 #[contracttype]

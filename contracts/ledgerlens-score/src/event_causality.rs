@@ -38,7 +38,10 @@
 /// - Logged in event data for recovery
 /// - Computed deterministically from stable inputs
 /// - Documented in event sequences for human auditors
-use soroban_sdk::{crypto::Hash, Address, Bytes, Env, Symbol};
+extern crate alloc;
+
+use alloc::{vec, vec::Vec};
+use soroban_sdk::{xdr::ToXdr, Address, Bytes, Env, Symbol};
 
 /// Correlation ID uniquely identifying a causal workflow
 /// This is a 32-byte hash computed from workflow parameters
@@ -60,12 +63,16 @@ impl EventCausality {
         asset_pair: &Symbol,
         timestamp: u64,
     ) -> CorrelationId {
-        Self::hash_bytes(&[
-            b"score_submit".as_slice(),
-            wallet.to_xdr(&Env::default()).to_bytes().as_slice(),
-            asset_pair.to_xdr(&Env::default()).to_bytes().as_slice(),
-            timestamp.to_le_bytes().as_slice(),
-        ])
+        let env = Env::default();
+        Self::hash_bytes(
+            &env,
+            &[
+                Bytes::from_slice(&env, b"score_submit"),
+                wallet.to_xdr(&env),
+                asset_pair.to_xdr(&env),
+                Bytes::from_array(&env, &timestamp.to_le_bytes()),
+            ],
+        )
     }
 
     /// Generate correlation ID for admin transfer workflow
@@ -80,12 +87,16 @@ impl EventCausality {
         to: &Address,
         timestamp: u64,
     ) -> CorrelationId {
-        Self::hash_bytes(&[
-            b"admin_xfer".as_slice(),
-            from.to_xdr(&Env::default()).to_bytes().as_slice(),
-            to.to_xdr(&Env::default()).to_bytes().as_slice(),
-            timestamp.to_le_bytes().as_slice(),
-        ])
+        let env = Env::default();
+        Self::hash_bytes(
+            &env,
+            &[
+                Bytes::from_slice(&env, b"admin_xfer"),
+                from.to_xdr(&env),
+                to.to_xdr(&env),
+                Bytes::from_array(&env, &timestamp.to_le_bytes()),
+            ],
+        )
     }
 
     /// Generate correlation ID for upgrade workflow
@@ -95,11 +106,15 @@ impl EventCausality {
     /// - `new_wasm_hash`: The new contract WASM hash being proposed
     /// - `timestamp`: The proposal timestamp
     pub fn upgrade_correlation_id(new_wasm_hash: &[u8; 32], timestamp: u64) -> CorrelationId {
-        Self::hash_bytes(&[
-            b"upgrade_prop".as_slice(),
-            new_wasm_hash.as_slice(),
-            timestamp.to_le_bytes().as_slice(),
-        ])
+        let env = Env::default();
+        Self::hash_bytes(
+            &env,
+            &[
+                Bytes::from_slice(&env, b"upgrade_prop"),
+                Bytes::from_array(&env, new_wasm_hash),
+                Bytes::from_array(&env, &timestamp.to_le_bytes()),
+            ],
+        )
     }
 
     /// Generate correlation ID for parameter change workflow
@@ -114,12 +129,16 @@ impl EventCausality {
         param_key: &Symbol,
         timestamp: u64,
     ) -> CorrelationId {
-        Self::hash_bytes(&[
-            b"param_change".as_slice(),
-            proposal_id.to_le_bytes().as_slice(),
-            param_key.to_xdr(&Env::default()).to_bytes().as_slice(),
-            timestamp.to_le_bytes().as_slice(),
-        ])
+        let env = Env::default();
+        Self::hash_bytes(
+            &env,
+            &[
+                Bytes::from_slice(&env, b"param_change"),
+                Bytes::from_array(&env, &proposal_id.to_le_bytes()),
+                param_key.to_xdr(&env),
+                Bytes::from_array(&env, &timestamp.to_le_bytes()),
+            ],
+        )
     }
 
     /// Generate correlation ID for dispute workflow
@@ -134,12 +153,16 @@ impl EventCausality {
         asset_pair: &Symbol,
         timestamp: u64,
     ) -> CorrelationId {
-        Self::hash_bytes(&[
-            b"dispute_open".as_slice(),
-            challenger.to_xdr(&Env::default()).to_bytes().as_slice(),
-            asset_pair.to_xdr(&Env::default()).to_bytes().as_slice(),
-            timestamp.to_le_bytes().as_slice(),
-        ])
+        let env = Env::default();
+        Self::hash_bytes(
+            &env,
+            &[
+                Bytes::from_slice(&env, b"dispute_open"),
+                challenger.to_xdr(&env),
+                asset_pair.to_xdr(&env),
+                Bytes::from_array(&env, &timestamp.to_le_bytes()),
+            ],
+        )
     }
 
     /// Generate correlation ID for governance action chain
@@ -149,11 +172,15 @@ impl EventCausality {
     /// - `action_index`: Sequential index of this action in the governance chain
     /// - `timestamp`: The action timestamp
     pub fn governance_chain_correlation_id(action_index: u64, timestamp: u64) -> CorrelationId {
-        Self::hash_bytes(&[
-            b"gov_chain".as_slice(),
-            action_index.to_le_bytes().as_slice(),
-            timestamp.to_le_bytes().as_slice(),
-        ])
+        let env = Env::default();
+        Self::hash_bytes(
+            &env,
+            &[
+                Bytes::from_slice(&env, b"gov_chain"),
+                Bytes::from_array(&env, &action_index.to_le_bytes()),
+                Bytes::from_array(&env, &timestamp.to_le_bytes()),
+            ],
+        )
     }
 
     /// Generate correlation ID for consensus score workflow
@@ -168,12 +195,16 @@ impl EventCausality {
         asset_pair: &Symbol,
         round_id: u64,
     ) -> CorrelationId {
-        Self::hash_bytes(&[
-            b"consensus_round".as_slice(),
-            wallet.to_xdr(&Env::default()).to_bytes().as_slice(),
-            asset_pair.to_xdr(&Env::default()).to_bytes().as_slice(),
-            round_id.to_le_bytes().as_slice(),
-        ])
+        let env = Env::default();
+        Self::hash_bytes(
+            &env,
+            &[
+                Bytes::from_slice(&env, b"consensus_round"),
+                wallet.to_xdr(&env),
+                asset_pair.to_xdr(&env),
+                Bytes::from_array(&env, &round_id.to_le_bytes()),
+            ],
+        )
     }
 
     /// Generate correlation ID for escalation workflow
@@ -188,25 +219,25 @@ impl EventCausality {
         asset_pair: &Symbol,
         timestamp: u64,
     ) -> CorrelationId {
-        Self::hash_bytes(&[
-            b"escalation".as_slice(),
-            wallet.to_xdr(&Env::default()).to_bytes().as_slice(),
-            asset_pair.to_xdr(&Env::default()).to_bytes().as_slice(),
-            timestamp.to_le_bytes().as_slice(),
-        ])
+        let env = Env::default();
+        Self::hash_bytes(
+            &env,
+            &[
+                Bytes::from_slice(&env, b"escalation"),
+                wallet.to_xdr(&env),
+                asset_pair.to_xdr(&env),
+                Bytes::from_array(&env, &timestamp.to_le_bytes()),
+            ],
+        )
     }
 
     /// Internal: Hash multiple byte sequences to produce a correlation ID
-    fn hash_bytes(parts: &[&[u8]]) -> CorrelationId {
-        let mut combined = Vec::new();
+    fn hash_bytes(env: &Env, parts: &[Bytes]) -> CorrelationId {
+        let mut combined = Bytes::new(env);
         for part in parts {
-            combined.extend_from_slice(part);
+            combined.append(part);
         }
-        // Use SHA-256 to produce a deterministic 32-byte ID
-        let hash_result = Hash::sha256(&Bytes::from_slice(&Env::default(), &combined));
-        let mut result = [0u8; 32];
-        result.copy_from_slice(hash_result.as_slice());
-        result
+        env.crypto().sha256(&combined).to_array()
     }
 }
 

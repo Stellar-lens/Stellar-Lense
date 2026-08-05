@@ -17,8 +17,6 @@
 /// 2. Document the breaking change in CHANGELOG.md
 /// 3. Add migration notes in the PR and event documentation
 /// 4. Update off-chain indexers to handle both versions during the transition window
-use soroban_sdk::Symbol;
-
 /// Stability level for event topics
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EventStability {

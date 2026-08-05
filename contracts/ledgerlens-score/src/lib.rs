@@ -10,6 +10,7 @@ mod errors;
 mod event_causality;
 mod event_stability;
 mod events;
+mod governance_actions;
 #[cfg(any(test, feature = "testutils"))]
 mod invariants;
 mod parameter_governance;
@@ -239,14 +240,17 @@ pub use event_stability::{EventStability, EventStabilityRegistry};
 pub use events::{ServiceResumedEvent, ServiceSilenceAlertEvent};
 pub use types::{
     AdaptiveRateLimit, AdaptiveThresholdConfig, AggregateRiskScore, AlertAckRecord, AlertType,
-    BatchAttestation, BatchEntryResult, BatchResult, BatchScoreResult, DecayCurve,
-    EffectiveRiskScore, EmbargoExpiry, FlashProtectionMode, HllSketch, InterpolationMethod,
-    MaybeRiskScore, MaybeScoreAttestation, MaybeThresholdAttestation, ModelSubmission,
-    ModelVersionStats, ModelVersionStatus, ParamChangeProposal, ParamValue, ParameterProposal,
-    ParameterProposalRecord, ParameterProposalStatus, PendingScoreEntry, Policy, PolicyApproval,
-    RiskScore, ScoreAttestation, ScoreAttestationInput, ScoreDispute, ScoreFloorPolicy,
-    ScoreHistogram, ScoreQuery, ScoreSubmission, ScoreSubmissionWithProof, ScoreTrend,
-    ScoreVelocityCap, SignerAccuracyRecord, ThresholdAttestation, TierBounds, TokenBucket,
+    AuditorScoreExport, BatchAttestation, BatchEntryResult, BatchResult, BatchScoreResult,
+    ConfigExportBundle, ConfigExportEntry, DecayCurve, DeletionApprovalPolicy,
+    DeletionAuditWarning, DeletionPreflight, EffectiveRiskScore, EmbargoExpiry,
+    FlashProtectionMode, HllSketch, InterfaceMetadata, InterpolationMethod, MaybeRiskScore,
+    MaybeScoreAttestation, MaybeThresholdAttestation, ModelSubmission, ModelVersionStats,
+    ModelVersionStatus, OperatorScoreExport, ParamChangeProposal, ParamValue, ParameterProposal,
+    ParameterProposalRecord, ParameterProposalStatus, PendingConfigExportEntry, PendingScoreEntry,
+    Policy, PolicyApproval, PolicyBundle, PolicyBundleProposal, PublicScoreExport, RiskScore,
+    ScoreAttestation, ScoreAttestationInput, ScoreDispute, ScoreFloorPolicy, ScoreHistogram,
+    ScoreQuery, ScoreSubmission, ScoreSubmissionWithProof, ScoreTrend, ScoreVelocityCap,
+    SignerAccuracyRecord, SubmissionProvenance, ThresholdAttestation, TierBounds, TokenBucket,
     UpgradeProposal, WelfordCorrState,
 };
 /// The 32-byte all-zeros field element used as the value in non-membership proofs.
@@ -265,7 +269,7 @@ pub struct LedgerLensScoreContract;
 impl LedgerLensScoreContract {
     fn asset_pair_len(env: &Env, asset_pair: &Symbol) -> Option<u32> {
         let pair_str = SymbolStr::try_from_val(env, &asset_pair.to_symbol_val()).ok()?;
-        Some(pair_str.as_ref().len() as u32)
+        Some(pair_str.len() as u32)
     }
 
     fn asset_pair_is_bounded(env: &Env, asset_pair: &Symbol) -> bool {
@@ -2151,7 +2155,7 @@ impl LedgerLensScoreContract {
     ) -> Result<OperatorScoreExport, Error> {
         Self::check_service_silence(&env);
         let score = Self::lookup_score(&env, &wallet, &asset_pair)?.ok_or(Error::ScoreNotFound)?;
-        let is_embargoed = storage::get_score_embargo(&env, &wallet).is_some();
+        let is_embargoed = storage::is_embargoed(&env, &wallet);
 
         Ok(OperatorScoreExport {
             wallet,
@@ -2186,10 +2190,8 @@ impl LedgerLensScoreContract {
     ) -> Result<AuditorScoreExport, Error> {
         Self::check_service_silence(&env);
         // Auditors bypass embargo checks for full disclosure
-        let score = storage::peek_score(&env, &wallet, &asset_pair)
-            .flatten()
-            .ok_or(Error::ScoreNotFound)?;
-        let is_embargoed = storage::get_score_embargo(&env, &wallet).is_some();
+        let score = storage::peek_score(&env, &wallet, &asset_pair).ok_or(Error::ScoreNotFound)?;
+        let is_embargoed = storage::is_embargoed(&env, &wallet);
 
         Ok(AuditorScoreExport {
             wallet,
@@ -2233,7 +2235,8 @@ impl LedgerLensScoreContract {
     pub fn is_score_risky(env: Env, wallet: Address, asset_pair: Symbol) -> bool {
         Self::check_service_silence(&env);
         let score = match Self::lookup_score(&env, &wallet, &asset_pair) {
-            Ok(score) => score,
+            Ok(Some(score)) => score,
+            Ok(None) => return false,
             Err(Error::ScoreEmbargoed) => return true, // Fail-closed: embargoed = risky
             Err(_) => return false,                    // No score = safe default
         };
@@ -2266,7 +2269,8 @@ impl LedgerLensScoreContract {
     ) -> (bool, u32) {
         Self::check_service_silence(&env);
         let score = match Self::lookup_score(&env, &wallet, &asset_pair) {
-            Ok(score) => score,
+            Ok(Some(score)) => score,
+            Ok(None) => return (false, 0),
             Err(Error::ScoreEmbargoed) => return (true, 100), // Embargoed = high-confidence breach
             Err(_) => return (false, 0),                      // No score = 0 confidence
         };
@@ -2290,7 +2294,7 @@ impl LedgerLensScoreContract {
     /// }
     /// ```
     pub fn is_wallet_safe(env: Env, wallet: Address, asset_pair: Symbol) -> bool {
-        !Self::is_score_risky(&env, wallet, asset_pair)
+        !Self::is_score_risky(env, wallet, asset_pair)
     }
 
     /// Returns the aggregate risk-gate decision (any pair above threshold = RISKY)
@@ -2312,17 +2316,17 @@ impl LedgerLensScoreContract {
         Self::check_service_silence(&env);
 
         // Check embargo first (fail-closed)
-        if storage::get_score_embargo(&env, &wallet).is_some() {
+        if storage::is_embargoed(&env, &wallet) {
             return true;
         }
 
         // Check if ANY pair is at risk
         let risk_threshold = storage::get_risk_threshold(&env);
-        let asset_pairs = storage::get_asset_pairs_for_wallet(&env, &wallet);
+        let asset_pairs = storage::get_wallet_pairs(&env, &wallet);
 
         for i in 0..asset_pairs.len() {
             if let Some(pair) = asset_pairs.get(i) {
-                if let Ok(Some(score)) = storage::peek_score(&env, &wallet, &pair) {
+                if let Some(score) = storage::peek_score(&env, &wallet, &pair) {
                     if score.score >= risk_threshold {
                         return true;
                     }
@@ -4175,7 +4179,7 @@ impl LedgerLensScoreContract {
     /// Require multi-admin approval for destructive operations.
     /// Admin only. When enabled, destructive operations (e.g., `bulk_reset_pair_weight`)
     /// reject single-admin authorization and require M-of-N multi-sig.
-    pub fn set_require_multisig_for_destructive(
+    pub fn set_destructive_multisig(
         env: Env,
         admin_signers: Vec<Address>,
         required: bool,
@@ -4189,7 +4193,7 @@ impl LedgerLensScoreContract {
     }
 
     /// Returns whether multi-admin approval is required for destructive operations.
-    pub fn get_require_multisig_for_destructive(env: Env) -> bool {
+    pub fn get_destructive_multisig(env: Env) -> bool {
         storage::get_require_multisig_for_destructive(&env)
     }
 
@@ -5472,7 +5476,7 @@ impl LedgerLensScoreContract {
 
     /// Returns the pending aggregate pubkey and its overlap-window expiry,
     /// or `None` if no aggregate-key rotation is currently in flight.
-    pub fn get_pending_aggregate_service_pubkey(env: Env) -> Option<(Bytes, u64)> {
+    pub fn get_pending_aggregate_pubkey(env: Env) -> Option<(Bytes, u64)> {
         storage::get_pending_aggregate_service_pubkey(&env)
     }
 
@@ -6546,7 +6550,7 @@ impl LedgerLensScoreContract {
     /// Clean up expired parameter change proposals that have been expired for at least 48 hours.
     /// Admin only. Idempotent; safe to call repeatedly.
     /// Returns the number of proposals deleted.
-    pub fn cleanup_expired_parameter_proposals(
+    pub fn cleanup_expired_param_proposals(
         env: Env,
         admin_signers: Vec<Address>,
     ) -> Result<u32, Error> {
@@ -8517,6 +8521,8 @@ impl LedgerLensScoreContract {
             return Err(Error::NotInitialized);
         }
         Self::require_deletion_auth(&env, &admin_signers)?;
+        let latest_score_present = storage::peek_score(&env, &wallet, &asset_pair).is_some();
+        let history_count = storage::peek_score_history_len(&env, &wallet, &asset_pair);
         if let Some(risk) = storage::peek_score(&env, &wallet, &asset_pair) {
             storage::update_histogram_on_clear(&env, risk.score);
         }
@@ -8577,6 +8583,8 @@ impl LedgerLensScoreContract {
             return Err(Error::NotInitialized);
         }
         Self::require_deletion_auth(&env, &admin_signers)?;
+        let latest_score_present = storage::peek_score(&env, &wallet, &asset_pair).is_some();
+        let history_count = storage::peek_score_history_len(&env, &wallet, &asset_pair);
         if let Some(risk) = storage::peek_score(&env, &wallet, &asset_pair) {
             storage::update_histogram_on_clear(&env, risk.score);
         }
@@ -9550,9 +9558,9 @@ impl LedgerLensScoreContract {
 
         ConfigExportBundle {
             schema_version: 1,
-            active_hash,
-            pending_hash,
-            export_hash,
+            active_hash: active_hash.into(),
+            pending_hash: pending_hash.into(),
+            export_hash: export_hash.into(),
             active_values,
             pending_values,
             omitted_secret_rationale: rationale,
@@ -11199,11 +11207,8 @@ impl LedgerLensScoreContract {
     }
 
     fn encode_symbol(env: &Env, value: &Symbol) -> Bytes {
-        let text = value.to_string();
-        let len = text.len().min(64) as usize;
-        let mut buf = [0u8; 64];
-        text.copy_into_slice(&mut buf);
-        Bytes::from_slice(env, &buf[..len])
+        use soroban_sdk::xdr::ToXdr;
+        value.to_xdr(env)
     }
 
     fn encode_address(env: &Env, value: &Address) -> Bytes {

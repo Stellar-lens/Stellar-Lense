@@ -14,8 +14,7 @@
 //!   and an export.
 
 use std::fs;
-use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
@@ -218,7 +217,7 @@ fn cmd_snapshot(
     Ok(())
 }
 
-fn cmd_export(output: &PathBuf, input: Option<&PathBuf>) -> Result<()> {
+fn cmd_export(output: &PathBuf, input: Option<&Path>) -> Result<()> {
     if let Some(input_path) = input {
         // Read existing export data from a JSON file
         let content = fs::read_to_string(input_path)
@@ -318,7 +317,7 @@ fn cmd_reconcile(snapshot_a: &PathBuf, snapshot_b: &PathBuf, output: &PathBuf) -
     Ok(())
 }
 
-fn cmd_verify(snapshot_path: &PathBuf, export_path: Option<&PathBuf>) -> Result<()> {
+fn cmd_verify(snapshot_path: &PathBuf, export_path: Option<&Path>) -> Result<()> {
     let snapshot: StateSnapshot = load_snapshot(snapshot_path)?;
     eprintln!("Verifying snapshot from {}", snapshot_path.display());
     eprintln!("  Score root:  {}", snapshot.score_root);
@@ -336,10 +335,16 @@ fn cmd_verify(snapshot_path: &PathBuf, export_path: Option<&PathBuf>) -> Result<
         );
     }
     if snapshot.config_root.len() != 64 {
-        eprintln!("  ⚠ WARNING: config_root is not 64 hex chars", snapshot.config_root.len());
+        eprintln!(
+            "  ⚠ WARNING: config_root is not 64 hex chars ({} chars)",
+            snapshot.config_root.len()
+        );
     }
     if snapshot.auth_root.len() != 64 {
-        eprintln!("  ⚠ WARNING: auth_root is not 64 hex chars", snapshot.auth_root.len());
+        eprintln!(
+            "  ⚠ WARNING: auth_root is not 64 hex chars ({} chars)",
+            snapshot.auth_root.len()
+        );
     }
 
     if let Some(export_path) = export_path {

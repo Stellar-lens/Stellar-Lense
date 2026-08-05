@@ -195,25 +195,25 @@ pub fn get_current_parameter_value(env: &Env, param_key: &Symbol) -> Result<Byte
 }
 
 /// Returns the set of capabilities affected by a parameter change.
-fn get_affected_capabilities(env: &Env, param_key: &Symbol) -> Vec<Symbol> {
+fn get_affected_capabilities(env: &Env, param_key: &Symbol) -> soroban_sdk::Vec<Symbol> {
     use soroban_sdk::Vec as SorobanVec;
 
     let mut caps = SorobanVec::new(env);
     if param_key == &param_key_cooldown() {
-        caps = caps.push_back(symbol_short!("cooldown"));
-        caps = caps.push_back(symbol_short!("ratelimit"));
+        caps.push_back(symbol_short!("cooldown"));
+        caps.push_back(symbol_short!("ratelimit"));
     } else if param_key == &param_key_history_depth() {
-        caps = caps.push_back(symbol_short!("history"));
-        caps = caps.push_back(symbol_short!("decay"));
+        caps.push_back(symbol_short!("history"));
+        caps.push_back(symbol_short!("decay"));
     } else if param_key == &param_key_decay_rate() {
-        caps = caps.push_back(symbol_short!("decay"));
-        caps = caps.push_back(symbol_short!("score"));
+        caps.push_back(symbol_short!("decay"));
+        caps.push_back(symbol_short!("score"));
     } else if param_key == &param_key_velocity_cap() {
-        caps = caps.push_back(symbol_short!("velcap"));
-        caps = caps.push_back(symbol_short!("ratelimit"));
+        caps.push_back(symbol_short!("velcap"));
+        caps.push_back(symbol_short!("ratelimit"));
     } else if param_key == &param_key_upgrade_delay() {
-        caps = caps.push_back(symbol_short!("upgrade"));
-        caps = caps.push_back(symbol_short!("govern"));
+        caps.push_back(symbol_short!("upgrade"));
+        caps.push_back(symbol_short!("govern"));
     }
     caps
 }

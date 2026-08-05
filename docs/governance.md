@@ -218,7 +218,7 @@ Proposals expire at `proposed_at + time_lock_secs * 2` and can no longer be exec
 prevent unbounded growth:
 
 1. Call `get_parameter_proposal(proposal_id)` to check status — once `Expired`, ready for cleanup.
-2. Call `cleanup_expired_parameter_proposals(admin_signers)` to permanently remove expired proposals
+2. Call `cleanup_expired_param_proposals(admin_signers)` to permanently remove expired proposals
    that have been expired for **at least 48 hours**.
 3. Emits `prm_clean` event with count and oldest retained proposal timestamp.
 4. Idempotent — safe to call repeatedly without side effects.
@@ -244,7 +244,7 @@ Before proposing or executing a parameter change, preview its effects without ap
 Irreversible operations such as `bulk_reset_pair_weight` (clears all pair-weight assignments)
 can be gated to require multi-admin approval:
 
-1. Admin calls `set_require_multisig_for_destructive(admin_signers, true)` to **enable** the policy.
+1. Admin calls `set_destructive_multisig(admin_signers, true)` to **enable** the policy.
 2. When policy is **enabled**:
    - `bulk_reset_pair_weight` rejects if supplied with only 1 admin signer.
    - Returns `InsufficientAdminSigners` error.
@@ -252,7 +252,7 @@ can be gated to require multi-admin approval:
 3. When policy is **disabled** (default):
    - `bulk_reset_pair_weight` works as before — single admin sufficient.
 4. Policy defaults to **disabled** for backward compatibility.
-5. Admin can toggle on/off at any time with `set_require_multisig_for_destructive`.
+5. Admin can toggle on/off at any time with `set_destructive_multisig`.
 
 ## Emergency Pause Decision Trees
 
@@ -326,7 +326,7 @@ stay unaffected; dApps querying LedgerLens can continue operating during the fre
 ### Regular Maintenance Tasks
 
 1. **Weekly**: Review `get_pending_param_prop_ids()` for stalled proposals; veto or wait for expiry.
-2. **Monthly**: Run `cleanup_expired_parameter_proposals(admin_signers)` to reclaim storage.
+2. **Monthly**: Run `cleanup_expired_param_proposals(admin_signers)` to reclaim storage.
 3. **Before upgrades**: Simulate parameter changes with `simulate_parameter_change` to preview impact.
 4. **Incident response**: Check pause status with `is_paused()` and `is_pair_paused(pair)`.
 
