@@ -121,22 +121,23 @@ impl EventCausality {
     /// Workflow: param_change_proposed → param_change_executed/param_change_vetoed
     ///
     /// # Parameters
+    /// - `env`: The Soroban environment that owns `param_key`
     /// - `proposal_id`: Unique proposal identifier
     /// - `param_key`: The parameter key being changed
     /// - `timestamp`: The proposal timestamp
     pub fn parameter_change_correlation_id(
+        env: &Env,
         proposal_id: u64,
         param_key: &Symbol,
         timestamp: u64,
     ) -> CorrelationId {
-        let env = param_key.env().clone();
         Self::hash_bytes(
-            &env,
+            env,
             &[
-                Bytes::from_slice(&env, b"param_change"),
-                Bytes::from_array(&env, &proposal_id.to_le_bytes()),
-                param_key.to_xdr(&env),
-                Bytes::from_array(&env, &timestamp.to_le_bytes()),
+                Bytes::from_slice(env, b"param_change"),
+                Bytes::from_array(env, &proposal_id.to_le_bytes()),
+                param_key.to_xdr(env),
+                Bytes::from_array(env, &timestamp.to_le_bytes()),
             ],
         )
     }
