@@ -4,7 +4,7 @@ use soroban_sdk::{
     Address, Env, Vec,
 };
 
-use crate::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+use crate::{Error, LedgerLensScoreContract, LedgerLensScoreContractClient};
 
 fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
     let env = Env::default();
@@ -124,7 +124,7 @@ fn test_get_score_export_operator_includes_details() {
 }
 
 #[test]
-fn test_get_score_export_operator_detects_embargo() {
+fn test_get_score_export_operator_rejects_embargo() {
     let (env, client, _admin, _service) = setup();
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
@@ -147,8 +147,8 @@ fn test_get_score_export_operator_detects_embargo() {
     // Set embargo
     client.set_score_embargo(&wallet, &Some(2_000_000));
 
-    let export = client.get_score_export_operator(&wallet, &pair);
-    assert!(export.is_embargoed);
+    let result = client.try_get_score_export_operator(&wallet, &pair);
+    assert_eq!(result, Err(Ok(Error::ScoreEmbargoed)));
 }
 
 #[test]

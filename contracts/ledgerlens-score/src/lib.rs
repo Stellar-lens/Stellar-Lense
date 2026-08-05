@@ -2112,7 +2112,7 @@ impl LedgerLensScoreContract {
     /// # Returns
     /// - `PublicScoreExport` with only `risk_gate_decision` (0=pass, >0=breached).
     /// - `ScoreNotFound` if the score does not exist.
-    /// - Respects embargo: embargoed wallets return `ScoreNotFound`.
+    /// - Respects embargo: embargoed wallets return `ScoreEmbargoed`.
     ///
     /// # Examples
     ///
@@ -2143,7 +2143,7 @@ impl LedgerLensScoreContract {
     /// # Returns
     /// - `OperatorScoreExport` with: score, confidence, timestamp, model_version.
     /// - `ScoreNotFound` if the score does not exist.
-    /// - Respects embargo: embargoed wallets return `ScoreNotFound`.
+    /// - Respects embargo: embargoed wallets return `ScoreEmbargoed`.
     ///
     /// # Examples
     ///
