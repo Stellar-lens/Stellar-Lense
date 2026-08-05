@@ -16,7 +16,7 @@ use soroban_sdk::{
     Address, Env, Symbol, Vec,
 };
 
-use crate::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+use crate::{constants::CONTRACT_VERSION, LedgerLensScoreContract, LedgerLensScoreContractClient};
 
 fn setup() -> (Env, LedgerLensScoreContractClient<'static>, Address, Address) {
     let env = Env::default();
@@ -38,7 +38,7 @@ fn test_get_version_returns_abi_version() {
     let (_env, client, _admin, _service) = setup();
     let version = client.get_version();
     // Current ABI version from constants.rs
-    assert_eq!(version, 4u32);
+    assert_eq!(version, CONTRACT_VERSION);
 }
 
 /// Test that get_version is infallible and idempotent.
@@ -60,14 +60,14 @@ fn test_get_version_before_and_after_init() {
 
     // Before initialization
     let version_before = client.get_version();
-    assert_eq!(version_before, 4u32);
+    assert_eq!(version_before, CONTRACT_VERSION);
 
     // Initialize
     client.initialize(&admin, &service);
 
     // After initialization
     let version_after = client.get_version();
-    assert_eq!(version_after, 4u32);
+    assert_eq!(version_after, CONTRACT_VERSION);
     assert_eq!(version_before, version_after);
 }
 
@@ -132,7 +132,7 @@ fn test_get_version_side_effect_free() {
     // Don't mock auth — if get_version required it, this would fail
     // No mock_all_auths() here
     let version = client.get_version();
-    assert_eq!(version, 4u32);
+    assert_eq!(version, CONTRACT_VERSION);
 }
 
 /// Test that version probe result includes expected version bounds.
@@ -224,7 +224,7 @@ fn test_schema_version_available_before_init() {
 
     // Should be able to get version without initializing
     let version = client.get_version();
-    assert_eq!(version, 4u32);
+    assert_eq!(version, CONTRACT_VERSION);
 
     // Capabilities should also be queryable
     let cap_score = Symbol::new(&env, "score");
