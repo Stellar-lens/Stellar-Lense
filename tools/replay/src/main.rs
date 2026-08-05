@@ -1,20 +1,20 @@
 mod schema;
 
 use anyhow::{Context, Result};
-use replay::{compare_config_manifests, parse_manifest_json, recommended_manifest_template};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use serde_json::json;
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::env;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-use std::{env as std_env, fs};
 
 use soroban_sdk::testutils::Address as _;
 use soroban_sdk::testutils::Ledger as _;
 use soroban_sdk::{Address, Env, Symbol, Vec as SVec};
 
 use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreSubmission};
-use schema::{ReplayEntryV1, ReplayFileHeader, ReplayMetadata};
+use schema::ReplayFileHeader;
 
 #[derive(Debug, Deserialize)]
 struct SnapshotEntry {
@@ -32,6 +32,53 @@ struct FailureEntry {
     timestamp: Option<u64>,
     confidence: Option<u32>,
     model_version: Option<u32>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+struct ConfigSnapshot {
+    admin: String,
+    service: String,
+    cooldown_secs: u64,
+    default_score: u32,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+struct TransactionEvidence {
+    sequence: u64,
+    wallet: String,
+    asset_pair: String,
+    score: u32,
+    timestamp: u64,
+    accepted: bool,
+    rejection_code: Option<u32>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+struct EventEvidence {
+    sequence: u64,
+    kind: String,
+    wallet: String,
+    asset_pair: String,
+    message: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+struct BundleHashes {
+    transactions_hash: String,
+    events_hash: String,
+    config_hash: String,
+    issue_refs_hash: String,
+    bundle_hash: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+struct IncidentEvidenceBundle {
+    bundle_version: u32,
+    transactions: Vec<TransactionEvidence>,
+    events: Vec<EventEvidence>,
+    config_snapshot: ConfigSnapshot,
+    issue_references: Vec<String>,
+    hashes: BundleHashes,
 }
 
 fn parse_price_average(trades: &Option<Vec<serde_json::Value>>) -> Option<f64> {
@@ -132,6 +179,8 @@ fn process_snapshot(
     let mut count = 0usize;
     let mut addr_map: HashMap<String, Address> = HashMap::new();
     let mut schema_version: Option<u32> = None;
+    let mut transactions = Vec::new();
+    let mut events = Vec::new();
 
     for line in reader.lines() {
         let l = line?;
@@ -180,6 +229,7 @@ fn process_snapshot(
             })
             .unwrap_or(config_snapshot.default_score);
 
+        let timestamp = env.ledger().timestamp().saturating_add(count as u64);
         let mut batch: SVec<ScoreSubmission> = SVec::new(env);
         batch.push_back(ScoreSubmission {
             wallet: wallet_addr.clone(),
@@ -187,7 +237,7 @@ fn process_snapshot(
             score,
             benford_flag: false,
             ml_flag: false,
-            timestamp: env.ledger().timestamp().saturating_add(count as u64),
+            timestamp,
             confidence: 80u32,
             model_version: 1u32,
         });
@@ -202,7 +252,7 @@ fn process_snapshot(
             wallet: entry.wallet.clone(),
             asset_pair: entry.asset_pair.clone(),
             score,
-            timestamp: 1u64,
+            timestamp,
             accepted,
             rejection_code,
         });
@@ -228,7 +278,9 @@ fn process_snapshot(
         );
     }
 
-    Ok(count)
+    let bundle =
+        build_evidence_bundle(transactions, events, config_snapshot.clone(), issue_references);
+    Ok((count, bundle))
 }
 
 fn process_failure_scenario(
@@ -322,8 +374,19 @@ fn main() -> Result<()> {
             let service = Address::generate(&env);
             client.initialize(&admin, &service);
 
-            match process_snapshot(path, &env, &client) {
-                Ok(n) => println!("processed {} entries", n),
+            let config_snapshot = ConfigSnapshot {
+                admin: "initialized-admin".to_string(),
+                service: "initialized-service".to_string(),
+                cooldown_secs: 3600,
+                default_score: 50,
+            };
+            let issue_references = parse_issue_references(args.get(3..).unwrap_or_default());
+
+            match process_snapshot(path, &env, &client, &config_snapshot, &issue_references) {
+                Ok((n, bundle)) => {
+                    println!("processed {} entries", n);
+                    println!("evidence_bundle={}", serde_json::to_string_pretty(&bundle)?);
+                }
                 Err(e) => println!("error processing snapshot: {:#}", e),
             }
         }
