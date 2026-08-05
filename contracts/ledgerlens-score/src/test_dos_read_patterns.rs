@@ -228,7 +228,7 @@ fn batch_read_mixed_wallets_returns_per_entry_results() {
         queries.push_back(ScoreQuery { wallet, asset_pair: pair.clone() });
     }
 
-    let results = client.get_scores_batch(&queries).unwrap();
+    let results = client.get_scores_batch(&queries);
     assert_eq!(results.len(), half * 2);
 
     let found_count = results.iter().filter(|r| r.found).count();
@@ -247,10 +247,7 @@ fn batch_read_over_limit_returns_batch_too_large() {
 
     let mut queries: Vec<ScoreQuery> = Vec::new(&env);
     for _ in 0..(BATCH_READ_MAX + 1) {
-        queries.push_back(ScoreQuery {
-            wallet: Address::generate(&env),
-            asset_pair: pair.clone(),
-        });
+        queries.push_back(ScoreQuery { wallet: Address::generate(&env), asset_pair: pair.clone() });
     }
 
     let result = client.try_get_scores_batch(&queries);
