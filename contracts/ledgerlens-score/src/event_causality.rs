@@ -106,7 +106,7 @@ impl EventCausality {
     /// - `new_wasm_hash`: The new contract WASM hash being proposed
     /// - `timestamp`: The proposal timestamp
     pub fn upgrade_correlation_id(new_wasm_hash: &[u8; 32], timestamp: u64) -> CorrelationId {
-        let env = challenger.env().clone();
+        let env = Env::default();
         Self::hash_bytes(
             &env,
             &[
@@ -129,7 +129,7 @@ impl EventCausality {
         param_key: &Symbol,
         timestamp: u64,
     ) -> CorrelationId {
-        let env = wallet.env().clone();
+        let env = param_key.env().clone();
         Self::hash_bytes(
             &env,
             &[
@@ -153,7 +153,7 @@ impl EventCausality {
         asset_pair: &Symbol,
         timestamp: u64,
     ) -> CorrelationId {
-        let env = wallet.env().clone();
+        let env = challenger.env().clone();
         Self::hash_bytes(
             &env,
             &[
@@ -195,7 +195,7 @@ impl EventCausality {
         asset_pair: &Symbol,
         round_id: u64,
     ) -> CorrelationId {
-        let env = Env::default();
+        let env = wallet.env().clone();
         Self::hash_bytes(
             &env,
             &[
@@ -219,7 +219,7 @@ impl EventCausality {
         asset_pair: &Symbol,
         timestamp: u64,
     ) -> CorrelationId {
-        let env = Env::default();
+        let env = wallet.env().clone();
         Self::hash_bytes(
             &env,
             &[
