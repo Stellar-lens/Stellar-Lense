@@ -115,8 +115,8 @@ fn query_unscored_wallets_returns_not_found_for_all() {
 /// Boundary thresholds that a hostile caller might try to exploit.
 ///
 /// - threshold=0: impossible to pass (score must be < 0).
-/// - threshold=u32::MAX: any scored wallet passes (score is bounded ≤ 100).
-/// - threshold=101: any wallet with score ≤ 100 passes (scores are bounded).
+/// - threshold=u32::MAX: invalid input fails closed.
+/// - threshold=101: invalid input fails closed.
 #[test]
 fn gate_boundary_thresholds_are_safe() {
     let env = Env::default();
@@ -131,12 +131,12 @@ fn gate_boundary_thresholds_are_safe() {
     assert!(!client.query_risk_gate(&scored, &pair, &0));
     assert!(!client.query_risk_gate(&unscored, &pair, &0));
 
-    // threshold=u32::MAX: score=0 is well below MAX → passes; unscored fails closed
-    assert!(client.query_risk_gate(&scored, &pair, &u32::MAX));
+    // threshold=u32::MAX is outside 0..=100, so all queries fail closed.
+    assert!(!client.query_risk_gate(&scored, &pair, &u32::MAX));
     assert!(!client.query_risk_gate(&unscored, &pair, &u32::MAX));
 
-    // threshold=101: score=0 < 101 → passes; unscored still fails closed
-    assert!(client.query_risk_gate(&scored, &pair, &101));
+    // threshold=101 is outside 0..=100, so all queries fail closed.
+    assert!(!client.query_risk_gate(&scored, &pair, &101));
     assert!(!client.query_risk_gate(&unscored, &pair, &101));
 }
 

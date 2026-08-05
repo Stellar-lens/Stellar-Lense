@@ -110,19 +110,6 @@ fn gate_threshold_zero_always_returns_false() {
     assert!(!client.query_risk_gate(&wallet, &symbol_short!("XLM_USDC"), &0));
 }
 
-/// `gate_threshold = u32::MAX`: no on-chain score can ever reach u32::MAX
-/// (scores are capped at 100), so every scored wallet passes.
-// DEPRECATED_COMPAT: pinned for interface v3 compatibility
-#[test]
-fn gate_threshold_u32_max_passes_any_scored_wallet() {
-    let env = Env::default();
-    let client = setup(&env);
-    let wallet = Address::generate(&env);
-    submit_score(&env, &client, &wallet, 100); // Maximum possible score
-
-    assert!(client.query_risk_gate(&wallet, &symbol_short!("XLM_USDC"), &u32::MAX));
-}
-
 /// An unscored wallet returns `false` (fail-closed) for any threshold,
 /// including `u32::MAX`.
 // DEPRECATED_COMPAT: pinned for interface v3 compatibility

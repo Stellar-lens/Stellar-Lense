@@ -59,10 +59,8 @@ an exception.
 Tests `gate_threshold=0`, `gate_threshold=u32::MAX`, and `gate_threshold=101`.
 
 - `threshold=0`: impossible to satisfy (score must be `< 0`). Always `false`.
-- `threshold=u32::MAX`: satisfied by any scored wallet (score ≤ 100). Unscored
-  wallets still fail closed.
-- `threshold=101`: satisfied by any wallet with score ≤ 100. Unscored wallets
-  fail closed.
+- `threshold=u32::MAX`: outside the valid 0–100 range, so all wallets fail closed.
+- `threshold=101`: outside the valid 0–100 range, so all wallets fail closed.
 
 **Bound:** `O(1)`. No arithmetic overflow (score is a `u32`, comparison is
 safe).
