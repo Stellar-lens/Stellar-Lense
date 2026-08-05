@@ -425,7 +425,7 @@ mod test_event_causality {
     #[test]
     fn test_score_submission_correlation_id_is_deterministic() {
         let wallet = Address::generate(&Env::default());
-        let asset_pair = Symbol::new(&Env::default(), "stellar:usdc");
+        let asset_pair = Symbol::new(&Env::default(), "stellar_usdc");
         let timestamp = 1000;
 
         let id1 = EventCausality::score_submission_correlation_id(&wallet, &asset_pair, timestamp);
@@ -438,7 +438,7 @@ mod test_event_causality {
     fn test_score_submission_correlation_id_differs_by_wallet() {
         let wallet1 = Address::generate(&Env::default());
         let wallet2 = Address::generate(&Env::default());
-        let asset_pair = Symbol::new(&Env::default(), "stellar:usdc");
+        let asset_pair = Symbol::new(&Env::default(), "stellar_usdc");
         let timestamp = 1000;
 
         let id1 = EventCausality::score_submission_correlation_id(&wallet1, &asset_pair, timestamp);
@@ -450,7 +450,7 @@ mod test_event_causality {
     #[test]
     fn test_score_submission_correlation_id_differs_by_timestamp() {
         let wallet = Address::generate(&Env::default());
-        let asset_pair = Symbol::new(&Env::default(), "stellar:usdc");
+        let asset_pair = Symbol::new(&Env::default(), "stellar_usdc");
 
         let id1 = EventCausality::score_submission_correlation_id(&wallet, &asset_pair, 1000);
         let id2 = EventCausality::score_submission_correlation_id(&wallet, &asset_pair, 2000);
@@ -484,7 +484,7 @@ mod test_event_causality {
     #[test]
     fn test_dispute_correlation_id_is_deterministic() {
         let challenger = Address::generate(&Env::default());
-        let asset_pair = Symbol::new(&Env::default(), "xlm:usdc");
+        let asset_pair = Symbol::new(&Env::default(), "xlm_usdc");
         let timestamp = 7000;
 
         let id1 = EventCausality::dispute_correlation_id(&challenger, &asset_pair, timestamp);

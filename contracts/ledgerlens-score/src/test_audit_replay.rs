@@ -28,7 +28,7 @@ mod test_audit_replay {
 
         // Submit score
         let wallet = Address::generate(&env);
-        let asset_pair = Symbol::new(&env, "stellar:usdc");
+        let asset_pair = Symbol::new(&env, "stellar_usdc");
 
         // Simulate score submission
         client.set_watchlist(&Vec::new(&env), &wallet, &true);
@@ -56,7 +56,7 @@ mod test_audit_replay {
         let env = Env::default();
 
         let wallet = Address::generate(&env);
-        let asset_pair = Symbol::new(&env, "stellar:usdc");
+        let asset_pair = Symbol::new(&env, "stellar_usdc");
         let timestamp = 1000u64;
 
         // Compute correlation ID that would be used for this workflow
@@ -140,7 +140,7 @@ mod test_audit_replay {
         let env = Env::default();
 
         let challenger = Address::generate(&env);
-        let asset_pair = Symbol::new(&env, "stellar:usdc");
+        let asset_pair = Symbol::new(&env, "stellar_usdc");
         let timestamp = 7000u64;
 
         let correlation_id =
@@ -164,7 +164,7 @@ mod test_audit_replay {
         let env = Env::default();
 
         let wallet = Address::generate(&env);
-        let asset_pair = Symbol::new(&env, "stellar:usdc");
+        let asset_pair = Symbol::new(&env, "stellar_usdc");
         let timestamp = 9000u64;
 
         let correlation_id =
@@ -210,7 +210,7 @@ mod test_audit_replay {
         let env = Env::default();
 
         let wallet = Address::generate(&env);
-        let asset_pair = Symbol::new(&env, "stellar:usdc");
+        let asset_pair = Symbol::new(&env, "stellar_usdc");
         let round_id = 42u64;
 
         let correlation_id =
@@ -233,8 +233,8 @@ mod test_audit_replay {
         let env = Env::default();
 
         let wallet = Address::generate(&env);
-        let asset_pair1 = Symbol::new(&env, "stellar:usdc");
-        let asset_pair2 = Symbol::new(&env, "stellar:btc");
+        let asset_pair1 = Symbol::new(&env, "stellar_usdc");
+        let asset_pair2 = Symbol::new(&env, "stellar_btc");
         let timestamp = 10000u64;
 
         let correlation_id_1 =
@@ -255,7 +255,7 @@ mod test_audit_replay {
         let env = Env::default();
 
         let wallet = Address::generate(&env);
-        let asset_pair = Symbol::new(&env, "stellar:usdc");
+        let asset_pair = Symbol::new(&env, "stellar_usdc");
 
         // Test with various timestamp values
         let timestamps = vec![0u64, 1u64, u64::MAX / 2, u64::MAX];
@@ -311,7 +311,7 @@ mod test_audit_replay {
         let env = Env::default();
 
         let wallet = Address::generate(&env);
-        let asset_pair = Symbol::new(&env, "stellar:usdc");
+        let asset_pair = Symbol::new(&env, "stellar_usdc");
         let timestamp = 1000u64;
 
         // Compute correlation ID for a score submission
