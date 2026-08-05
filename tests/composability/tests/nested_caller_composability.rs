@@ -132,16 +132,10 @@ fn nested_amm_both_hops_reject_unknown_wallet() {
     let unknown = Address::generate(&f.env);
 
     let outer_result = f.outer_amm.try_swap(&unknown, &500i128, &symbol_short!("XLM_USDC"));
-    assert!(
-        outer_result.is_err(),
-        "outer AMM must reject wallet with no LedgerLens score"
-    );
+    assert!(outer_result.is_err(), "outer AMM must reject wallet with no LedgerLens score");
 
     let inner_result = f.inner_amm.try_swap(&unknown, &500i128, &symbol_short!("XLM_USDC"));
-    assert!(
-        inner_result.is_err(),
-        "inner AMM must reject same unknown wallet"
-    );
+    assert!(inner_result.is_err(), "inner AMM must reject same unknown wallet");
 }
 
 // ── #716-2: Authorization holds across nested invocation hops ────────────────

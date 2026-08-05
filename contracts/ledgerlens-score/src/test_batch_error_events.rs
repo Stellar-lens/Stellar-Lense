@@ -224,10 +224,7 @@ fn test_batch_rejection_deterministic_across_wallets() {
     let (env, client, _admin, _service) = setup();
 
     // Submit same invalid data for different wallets
-    let wallets: Vec<Address> = (0..3)
-        .map(|_| Address::generate(&env))
-        .collect::<Vec<_>>()
-        .into();
+    let wallets: Vec<Address> = (0..3).map(|_| Address::generate(&env)).collect::<Vec<_>>().into();
     let pair = symbol_short!("XLM_USDC");
 
     let mut batch = Vec::new(&env);

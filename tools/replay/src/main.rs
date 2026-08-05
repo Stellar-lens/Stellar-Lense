@@ -222,7 +222,10 @@ fn process_snapshot(
     if let Some(ver) = schema_version {
         println!("Processed {} entries with schema version {}", count, ver);
     } else {
-        println!("Processed {} entries (no explicit schema version found - using implicit v1)", count);
+        println!(
+            "Processed {} entries (no explicit schema version found - using implicit v1)",
+            count
+        );
     }
 
     Ok(count)
@@ -398,19 +401,27 @@ mod tests {
         }];
         let issue_refs = vec!["ISSUE-2".to_string(), "ISSUE-1".to_string()];
 
-        let bundle = build_evidence_bundle(transactions.clone(), events.clone(), sample_config(), &issue_refs);
+        let bundle = build_evidence_bundle(
+            transactions.clone(),
+            events.clone(),
+            sample_config(),
+            &issue_refs,
+        );
 
         assert_eq!(bundle.bundle_version, 1);
         assert_eq!(bundle.issue_references, vec!["ISSUE-1", "ISSUE-2"]);
         assert_eq!(bundle.hashes.transactions_hash, hash_json(&transactions));
         assert_eq!(bundle.hashes.events_hash, hash_json(&events));
-        assert_eq!(bundle.hashes.bundle_hash, hash_json(&json!({
-            "bundle_version": 1u32,
-            "transactions": transactions,
-            "events": events,
-            "config_snapshot": sample_config(),
-            "issue_references": vec!["ISSUE-1", "ISSUE-2"]
-        })));
+        assert_eq!(
+            bundle.hashes.bundle_hash,
+            hash_json(&json!({
+                "bundle_version": 1u32,
+                "transactions": transactions,
+                "events": events,
+                "config_snapshot": sample_config(),
+                "issue_references": vec!["ISSUE-1", "ISSUE-2"]
+            }))
+        );
     }
 
     #[test]

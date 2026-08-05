@@ -176,17 +176,14 @@ fn orphaned_index_entry_removed_when_score_absent() {
         // but it does NOT explicitly remove orphans.  We model the migration
         // cleanup step: remove entries from the index that have no live score.
         let raw_index = storage::get_score_entry_index(&env);
-        let mut cleaned: soroban_sdk::Vec<(Address, Symbol)> =
-            soroban_sdk::Vec::new(&env);
+        let mut cleaned: soroban_sdk::Vec<(Address, Symbol)> = soroban_sdk::Vec::new(&env);
         for i in 0..raw_index.len() {
             let (w, p) = raw_index.get(i).unwrap();
             if storage::peek_score(&env, &w, &p).is_some() {
                 cleaned.push_back((w, p));
             }
         }
-        env.storage()
-            .persistent()
-            .set(&crate::types::DataKeyB::ScoreEntryIndex, &cleaned);
+        env.storage().persistent().set(&crate::types::DataKeyB::ScoreEntryIndex, &cleaned);
 
         let final_index = storage::get_score_entry_index(&env);
         assert_eq!(final_index.len(), 2, "orphaned entry must be removed");
@@ -216,10 +213,7 @@ fn double_replay_produces_no_duplicates() {
         reindex_all(&env, &wallets, &pair);
         let after_second = storage::get_score_entry_index(&env).len();
 
-        assert_eq!(
-            after_first, after_second,
-            "second replay must not add duplicate entries"
-        );
+        assert_eq!(after_first, after_second, "second replay must not add duplicate entries");
         assert_eq!(after_second, 4);
         assert!(invariants::score_index_is_consistent(&env));
     });
@@ -283,10 +277,7 @@ fn migration_respects_index_capacity_cap() {
         reindex_all(&env, &wallets, &pair);
 
         let index_len = storage::get_score_entry_index(&env).len();
-        assert_eq!(
-            index_len, cap,
-            "index must cap at MAX_TRACKED_SCORE_ENTRIES={cap}"
-        );
+        assert_eq!(index_len, cap, "index must cap at MAX_TRACKED_SCORE_ENTRIES={cap}");
 
         // All indexed entries must have live scores (no orphans within cap).
         assert!(invariants::score_index_is_consistent(&env));

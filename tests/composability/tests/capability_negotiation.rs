@@ -200,8 +200,7 @@ fn score_shard_does_not_masquerade_as_aggregator_for_all_capabilities() {
 
     // "batch_attested" is a score-contract feature; aggregator need not have it.
     // This assertion documents the difference — do NOT assume they are equal.
-    let score_has_batch_attested =
-        score.supports_interface(&Symbol::new(&env, "batch_attested"));
+    let score_has_batch_attested = score.supports_interface(&Symbol::new(&env, "batch_attested"));
     let agg_has_batch_attested = agg.supports_interface(&Symbol::new(&env, "batch_attested"));
     // At least the score contract must support it.
     assert!(score_has_batch_attested);
@@ -219,10 +218,7 @@ fn score_shard_does_not_masquerade_as_aggregator_for_all_capabilities() {
 /// In production code this would be called once during an upgrade/migration
 /// check, not on every swap — `supports_interface` is a read-only, side-effect
 /// free function safe to cache.
-fn consumer_probe_confidence_gate(
-    env: &Env,
-    contract: &LedgerLensScoreContractClient,
-) -> bool {
+fn consumer_probe_confidence_gate(env: &Env, contract: &LedgerLensScoreContractClient) -> bool {
     contract.supports_interface(&symbol_short!("cgate"))
 }
 

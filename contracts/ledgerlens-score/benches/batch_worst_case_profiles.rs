@@ -123,7 +123,9 @@ fn merkle_internal(env: &Env, l: &[u8; 32], r: &[u8; 32]) -> [u8; 32] {
 
 fn next_pow2(n: u32) -> u32 {
     let mut p = 1u32;
-    while p < n { p *= 2; }
+    while p < n {
+        p *= 2;
+    }
     p
 }
 
@@ -141,14 +143,20 @@ fn build_merkle_root(env: &Env, leaves: &[[u8; 32]]) -> [u8; 32] {
     level[0]
 }
 
-fn build_merkle_proof(env: &Env, leaves: &[[u8; 32]], index: u32) -> (std::vec::Vec<[u8; 32]>, u32) {
+fn build_merkle_proof(
+    env: &Env,
+    leaves: &[[u8; 32]],
+    index: u32,
+) -> (std::vec::Vec<[u8; 32]>, u32) {
     let mut level: std::vec::Vec<[u8; 32]> = leaves.to_vec();
     let mut proof = std::vec::Vec::new();
     let mut flags: u32 = 0;
     let mut idx = index as usize;
     while level.len() > 1 {
         let sib = idx ^ 1;
-        if (idx & 1) == 1 { flags |= 1 << proof.len(); }
+        if (idx & 1) == 1 {
+            flags |= 1 << proof.len();
+        }
         proof.push(level[sib]);
         let mut next = std::vec::Vec::new();
         let mut i = 0;
@@ -286,7 +294,9 @@ fn build_attested_batch(
     for (i, sub) in subs.into_iter().enumerate() {
         let (proof_bytes, flags) = build_merkle_proof(env, &leaves, i as u32);
         let mut proof: Vec<BytesN<32>> = Vec::new(env);
-        for p in proof_bytes { proof.push_back(BytesN::from_array(env, &p)); }
+        for p in proof_bytes {
+            proof.push_back(BytesN::from_array(env, &p));
+        }
         result.push_back(ScoreSubmissionWithProof { submission: sub, proof, proof_flags: flags });
     }
     (result, attestation)
@@ -333,7 +343,9 @@ fn build_attested_mixed(
     for (i, sub) in subs.into_iter().enumerate() {
         let (proof_bytes, flags) = build_merkle_proof(env, &leaves, i as u32);
         let mut proof: Vec<BytesN<32>> = Vec::new(env);
-        for p in proof_bytes { proof.push_back(BytesN::from_array(env, &p)); }
+        for p in proof_bytes {
+            proof.push_back(BytesN::from_array(env, &p));
+        }
         result.push_back(ScoreSubmissionWithProof { submission: sub, proof, proof_flags: flags });
     }
     (result, attestation)

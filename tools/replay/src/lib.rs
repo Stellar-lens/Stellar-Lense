@@ -25,12 +25,10 @@ fn known_fields() -> BTreeSet<&'static str> {
 }
 
 pub fn compare_config_manifests(approved: &Value, observed: &Value) -> Result<DriftReport> {
-    let approved = approved
-        .as_object()
-        .ok_or_else(|| anyhow!("approved manifest must be a JSON object"))?;
-    let observed = observed
-        .as_object()
-        .ok_or_else(|| anyhow!("observed manifest must be a JSON object"))?;
+    let approved =
+        approved.as_object().ok_or_else(|| anyhow!("approved manifest must be a JSON object"))?;
+    let observed =
+        observed.as_object().ok_or_else(|| anyhow!("observed manifest must be a JSON object"))?;
 
     let known = known_fields();
     let mut diffs = Vec::new();
@@ -86,10 +84,7 @@ pub fn compare_config_manifests(approved: &Value, observed: &Value) -> Result<Dr
 
     diffs.sort_by(|left, right| left.field.cmp(&right.field).then(left.status.cmp(&right.status)));
 
-    Ok(DriftReport {
-        status: if diffs.is_empty() { "ok".into() } else { "drifted".into() },
-        diffs,
-    })
+    Ok(DriftReport { status: if diffs.is_empty() { "ok".into() } else { "drifted".into() }, diffs })
 }
 
 pub fn parse_manifest_json(raw: &str) -> Result<Value> {

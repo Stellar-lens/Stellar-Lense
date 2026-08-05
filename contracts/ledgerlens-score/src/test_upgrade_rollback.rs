@@ -11,8 +11,8 @@ use soroban_sdk::{
 };
 
 use crate::{
-    constants::DEFAULT_UPGRADE_DELAY_SECS,
-    storage, Error, LedgerLensScoreContract, LedgerLensScoreContractClient,
+    constants::DEFAULT_UPGRADE_DELAY_SECS, storage, Error, LedgerLensScoreContract,
+    LedgerLensScoreContractClient,
 };
 
 const START_TS: u64 = 1_700_000_000;
@@ -115,7 +115,8 @@ fn test_veto_enables_new_proposal() {
     let hash2 = BytesN::from_array(&env, &[8u8; 32]);
     client.propose_upgrade(&Vec::new(&env), &hash2);
     assert_eq!(
-        client.get_pending_upgrade().new_wasm_hash, hash2,
+        client.get_pending_upgrade().new_wasm_hash,
+        hash2,
         "New proposal should be possible after veto"
     );
 
@@ -169,11 +170,7 @@ fn test_expired_proposal_preserves_code_and_state() {
         88,
         "Scores must survive after expiry"
     );
-    assert_eq!(
-        client.get_cooldown(),
-        cooldown_before,
-        "Configuration must survive after expiry"
-    );
+    assert_eq!(client.get_cooldown(), cooldown_before, "Configuration must survive after expiry");
 }
 
 // ── Replacement scenarios ─────────────────────────────────────────────────────────
@@ -236,7 +233,8 @@ fn test_replacement_after_failed_upgrade() {
 
     // Verify the new proposal is in place and governance state persists
     assert_eq!(
-        client.get_pending_upgrade().new_wasm_hash, hash2,
+        client.get_pending_upgrade().new_wasm_hash,
+        hash2,
         "Replacement upgrade should be in place"
     );
     assert_eq!(
@@ -311,10 +309,7 @@ fn test_recovery_after_failed_upgrade_and_new_submissions() {
 
     // Verify both submissions are recorded (system recovered)
     let latest = client.get_score(&wallet, &pair).expect("recovery submission");
-    assert_eq!(
-        latest.score, 55,
-        "New submissions must work after failed upgrade recovery"
-    );
+    assert_eq!(latest.score, 55, "New submissions must work after failed upgrade recovery");
 }
 
 #[test]
@@ -347,11 +342,7 @@ fn test_double_veto_does_not_corrupt_state() {
 
     // Attempting to veto again should fail gracefully
     let result = client.try_veto_upgrade(&Vec::new(&env));
-    assert_eq!(
-        result,
-        Err(Ok(Error::NoPendingUpgrade)),
-        "Veto without pending should error"
-    );
+    assert_eq!(result, Err(Ok(Error::NoPendingUpgrade)), "Veto without pending should error");
 
     // Verify score is untouched
     assert_eq!(

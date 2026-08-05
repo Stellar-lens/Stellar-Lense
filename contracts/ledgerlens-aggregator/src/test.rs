@@ -1,6 +1,6 @@
 use crate::{Error, LedgerLensAggregator, LedgerLensAggregatorClient};
-use ledgerlens_test_support::{generate_score_roles, test_env};
 use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+use ledgerlens_test_support::{generate_score_roles, test_env};
 use soroban_sdk::{symbol_short, testutils::Address as _, Address, Env, Symbol, Vec};
 
 /// A shard whose interface has fully drifted: it advertises no capability the
@@ -251,11 +251,25 @@ fn test_oversized_asset_pair_fails_closed_before_shard_fanout() {
 
     let wallet = Address::generate(&env);
     let valid_pair = symbol_short!("XLM_USDC");
-    shard.submit_score(&Vec::new(&env), &wallet, &valid_pair, &10, &false, &false, &1, &100, &1, &None);
+    shard.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &valid_pair,
+        &10,
+        &false,
+        &false,
+        &1,
+        &100,
+        &1,
+        &None,
+    );
 
     let oversized_pair = Symbol::new(&env, "PAIR123456");
     assert!(!client.query_risk_gate(&wallet, &oversized_pair, &75));
-    assert_eq!(client.try_get_score(&wallet, &oversized_pair), Err(Ok(ledgerlens_score::Error::InvalidAttestation)));
+    assert_eq!(
+        client.try_get_score(&wallet, &oversized_pair),
+        Err(Ok(ledgerlens_score::Error::InvalidAttestation))
+    );
     assert_eq!(client.get_score_across_shards(&wallet, &oversized_pair).len(), 0);
     assert_eq!(client.contagion_depth_across_shards(&wallet, &oversized_pair), 0);
     assert_eq!(client.get_last_shard_failure(), None);
@@ -894,9 +908,7 @@ fn test_shard_capabilities_downgraded_detects_post_registration_downgrade() {
     // Simulate a bad upgrade: write the downgrade flag directly into the
     // shard's storage (same as calling downgrade() would do).
     env.as_contract(&shard_id, || {
-        env.storage()
-            .instance()
-            .set(&soroban_sdk::Symbol::new(&env, "dg"), &true);
+        env.storage().instance().set(&soroban_sdk::Symbol::new(&env, "dg"), &true);
     });
 
     // Downgrade detected.

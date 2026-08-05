@@ -164,13 +164,31 @@ enum Commands {
 fn main() -> Result<()> {
     let cli = Cli::parse();
     match cli.command {
-        Commands::Snapshot { output, score_root, config_root, auth_root, entry_count, ledger_seq, timestamp } => {
-            cmd_snapshot(&output, &score_root, &config_root, &auth_root, entry_count, ledger_seq, timestamp)
-        }
+        Commands::Snapshot {
+            output,
+            score_root,
+            config_root,
+            auth_root,
+            entry_count,
+            ledger_seq,
+            timestamp,
+        } => cmd_snapshot(
+            &output,
+            &score_root,
+            &config_root,
+            &auth_root,
+            entry_count,
+            ledger_seq,
+            timestamp,
+        ),
         Commands::Export { output, input } => cmd_export(&output, input.as_deref()),
-        Commands::Reconcile { snapshot_a, snapshot_b, output } => cmd_reconcile(&snapshot_a, &snapshot_b, &output),
+        Commands::Reconcile { snapshot_a, snapshot_b, output } => {
+            cmd_reconcile(&snapshot_a, &snapshot_b, &output)
+        }
         Commands::Verify { snapshot, export } => cmd_verify(&snapshot, export.as_deref()),
-        Commands::Report { snapshot, action, description, output } => cmd_report(&snapshot, &action, &description, &output),
+        Commands::Report { snapshot, action, description, output } => {
+            cmd_report(&snapshot, &action, &description, &output)
+        }
     }
 }
 
@@ -193,8 +211,7 @@ fn cmd_snapshot(
         ledger_seq,
         timestamp,
     };
-    let json = serde_json::to_string_pretty(&snapshot)
-        .context("Failed to serialize snapshot")?;
+    let json = serde_json::to_string_pretty(&snapshot).context("Failed to serialize snapshot")?;
     fs::write(output, &json)
         .with_context(|| format!("Failed to write snapshot to {}", output.display()))?;
     eprintln!("Snapshot saved to {}", output.display());
@@ -276,8 +293,9 @@ fn cmd_reconcile(snapshot_a: &PathBuf, snapshot_b: &PathBuf, output: &PathBuf) -
     };
 
     let json = serde_json::to_string_pretty(&report)?;
-    fs::write(output, &json)
-        .with_context(|| format!("Failed to write reconciliation report to {}", output.display()))?;
+    fs::write(output, &json).with_context(|| {
+        format!("Failed to write reconciliation report to {}", output.display())
+    })?;
 
     if all_match {
         eprintln!("✅ Snapshots MATCH — state is consistent.");
@@ -312,7 +330,10 @@ fn cmd_verify(snapshot_path: &PathBuf, export_path: Option<&PathBuf>) -> Result<
 
     // Validate hex strings
     if snapshot.score_root.len() != 64 {
-        eprintln!("  ⚠ WARNING: score_root is not 64 hex chars ({} chars)", snapshot.score_root.len());
+        eprintln!(
+            "  ⚠ WARNING: score_root is not 64 hex chars ({} chars)",
+            snapshot.score_root.len()
+        );
     }
     if snapshot.config_root.len() != 64 {
         eprintln!("  ⚠ WARNING: config_root is not 64 hex chars", snapshot.config_root.len());
@@ -324,8 +345,8 @@ fn cmd_verify(snapshot_path: &PathBuf, export_path: Option<&PathBuf>) -> Result<
     if let Some(export_path) = export_path {
         let content = fs::read_to_string(export_path)
             .with_context(|| format!("Failed to read export {}", export_path.display()))?;
-        let entries: Vec<ExportableScoreEntry> = serde_json::from_str(&content)
-            .context("Export is not a valid JSON array")?;
+        let entries: Vec<ExportableScoreEntry> =
+            serde_json::from_str(&content).context("Export is not a valid JSON array")?;
         if entries.len() as u32 != snapshot.entry_count {
             eprintln!(
                 "  ⚠ Entry count mismatch: export has {} entries, snapshot says {}",
@@ -385,9 +406,8 @@ fn load_snapshot(path: &PathBuf) -> Result<StateSnapshot> {
 
 /// Returns an ISO-8601-like timestamp string. Uses system time via std::time.
 fn chrono_now() -> String {
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default();
+    let now =
+        std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default();
     let secs = now.as_secs();
     // Format as ISO-8601 approximate
     let days = secs / 86400;
@@ -395,5 +415,12 @@ fn chrono_now() -> String {
     let hours = time_secs / 3600;
     let minutes = (time_secs % 3600) / 60;
     let seconds = time_secs % 60;
-    format!("2026-{:02}-{:02}T{:02}:{:02}:{:02}Z", days / 30 + 1, days % 30 + 1, hours, minutes, seconds)
+    format!(
+        "2026-{:02}-{:02}T{:02}:{:02}:{:02}Z",
+        days / 30 + 1,
+        days % 30 + 1,
+        hours,
+        minutes,
+        seconds
+    )
 }

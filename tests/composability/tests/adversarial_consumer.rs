@@ -90,8 +90,10 @@ fn repeated_query_risk_gate_calls_return_identical_results() {
     let first = ledgerlens.query_risk_gate(&wallet, &symbol_short!("XLM_USDC"), &75);
     for _ in 0..19 {
         let result = ledgerlens.query_risk_gate(&wallet, &symbol_short!("XLM_USDC"), &75);
-        assert_eq!(result, first,
-            "query_risk_gate must be idempotent: repeated calls must return the same result");
+        assert_eq!(
+            result, first,
+            "query_risk_gate must be idempotent: repeated calls must return the same result"
+        );
     }
     // The wallet score was safe — the gate must have passed on every call.
     assert!(first);
@@ -138,18 +140,28 @@ fn querying_gate_does_not_alter_stored_risk_score() {
     // Issue a flurry of gate queries.
     for _ in 0..10 {
         let _ = ledgerlens.query_risk_gate(&wallet, &symbol_short!("XLM_USDC"), &75);
-        let _ = ledgerlens
-            .query_risk_gate_with_confidence(&wallet, &symbol_short!("XLM_USDC"), &75, &50);
+        let _ = ledgerlens.query_risk_gate_with_confidence(
+            &wallet,
+            &symbol_short!("XLM_USDC"),
+            &75,
+            &50,
+        );
     }
 
     let score_after = ledgerlens.get_score(&wallet, &symbol_short!("XLM_USDC")).unwrap();
 
-    assert_eq!(score_before.score, score_after.score,
-        "score value must not change after read-only gate queries");
-    assert_eq!(score_before.confidence, score_after.confidence,
-        "confidence must not change after read-only gate queries");
-    assert_eq!(score_before.timestamp, score_after.timestamp,
-        "timestamp must not change after read-only gate queries");
+    assert_eq!(
+        score_before.score, score_after.score,
+        "score value must not change after read-only gate queries"
+    );
+    assert_eq!(
+        score_before.confidence, score_after.confidence,
+        "confidence must not change after read-only gate queries"
+    );
+    assert_eq!(
+        score_before.timestamp, score_after.timestamp,
+        "timestamp must not change after read-only gate queries"
+    );
 }
 
 // ── Threat 3: Embargo bypass — embargoed wallets must never pass the gate ─────
@@ -165,22 +177,29 @@ fn query_risk_gate_returns_false_for_embargoed_wallet_regardless_of_raw_score() 
 
     // Score that would trivially pass the gate.
     submit_score(&env, &ledgerlens, &wallet, 1, 99);
-    assert!(ledgerlens.query_risk_gate(&wallet, &symbol_short!("XLM_USDC"), &75),
-        "pre-embargo: gate should pass for low-risk wallet");
+    assert!(
+        ledgerlens.query_risk_gate(&wallet, &symbol_short!("XLM_USDC"), &75),
+        "pre-embargo: gate should pass for low-risk wallet"
+    );
 
     // Embargo the wallet.
     ledgerlens.set_score_embargo(&wallet, &None);
     assert!(ledgerlens.is_embargoed(&wallet));
 
     // Gate must return false regardless of the stored score value.
-    assert!(!ledgerlens.query_risk_gate(&wallet, &symbol_short!("XLM_USDC"), &75),
-        "embargoed wallet must be blocked by query_risk_gate");
-    assert!(!ledgerlens.query_risk_gate_with_confidence(
-        &wallet,
-        &symbol_short!("XLM_USDC"),
-        &75,
-        &0, // even with min_confidence = 0 the embargo must win
-    ), "embargoed wallet must be blocked by query_risk_gate_with_confidence");
+    assert!(
+        !ledgerlens.query_risk_gate(&wallet, &symbol_short!("XLM_USDC"), &75),
+        "embargoed wallet must be blocked by query_risk_gate"
+    );
+    assert!(
+        !ledgerlens.query_risk_gate_with_confidence(
+            &wallet,
+            &symbol_short!("XLM_USDC"),
+            &75,
+            &0, // even with min_confidence = 0 the embargo must win
+        ),
+        "embargoed wallet must be blocked by query_risk_gate_with_confidence"
+    );
 }
 
 #[test]
@@ -197,8 +216,10 @@ fn embargo_cannot_be_bypassed_by_querying_different_asset_pairs() {
 
     // Embargo is wallet-global; querying any asset pair must still return false.
     for pair in [symbol_short!("XLM_USDC"), symbol_short!("BTC_USD"), symbol_short!("ETH_XLM")] {
-        assert!(!ledgerlens.query_risk_gate(&wallet, &pair, &75),
-            "embargo bypass via different asset pair must not be possible");
+        assert!(
+            !ledgerlens.query_risk_gate(&wallet, &pair, &75),
+            "embargo bypass via different asset pair must not be possible"
+        );
     }
 }
 
@@ -215,14 +236,19 @@ fn query_risk_gate_returns_false_for_never_scored_wallet() {
     // Generate 10 wallets that have never been scored.
     for _ in 0..10 {
         let wallet = Address::generate(&env);
-        assert!(!ledgerlens.query_risk_gate(&wallet, &symbol_short!("XLM_USDC"), &75),
-            "unscored wallet must fail closed");
-        assert!(!ledgerlens.query_risk_gate_with_confidence(
-            &wallet,
-            &symbol_short!("XLM_USDC"),
-            &75,
-            &0,
-        ), "unscored wallet must fail closed even with min_confidence = 0");
+        assert!(
+            !ledgerlens.query_risk_gate(&wallet, &symbol_short!("XLM_USDC"), &75),
+            "unscored wallet must fail closed"
+        );
+        assert!(
+            !ledgerlens.query_risk_gate_with_confidence(
+                &wallet,
+                &symbol_short!("XLM_USDC"),
+                &75,
+                &0,
+            ),
+            "unscored wallet must fail closed even with min_confidence = 0"
+        );
     }
 }
 
@@ -248,10 +274,10 @@ fn submit_score_without_authorization_is_rejected() {
 
     // Try to submit a score with an empty signers list (no authorization).
     let result = ledgerlens.try_submit_score(
-        &Vec::new(&env),   // no service signers
+        &Vec::new(&env), // no service signers
         &attacker_wallet,
         &symbol_short!("XLM_USDC"),
-        &1,                // score that would pass any gate
+        &1, // score that would pass any gate
         &false,
         &false,
         &env.ledger().timestamp(),
@@ -261,8 +287,7 @@ fn submit_score_without_authorization_is_rejected() {
     );
 
     // Must be rejected — an unauthorized write must not silently succeed.
-    assert!(result.is_err(),
-        "submit_score without service-signer authorization must be rejected");
+    assert!(result.is_err(), "submit_score without service-signer authorization must be rejected");
 }
 
 // ── Threat 6: Re-entrancy simulation via failover path ───────────────────────
@@ -302,7 +327,9 @@ fn gate_result_from_failover_is_determined_by_score_value_only() {
     // error or return Ok, but it must not contain the secondary's value as if
     // it were a primary record.  We assert that the primary reports it was never
     // directly scored by checking the raw existence flag.
-    assert!(!primary.get_score_exists(&wallet, &symbol_short!("XLM_USDC")),
-        "failover read must not create a score record on the primary");
+    assert!(
+        !primary.get_score_exists(&wallet, &symbol_short!("XLM_USDC")),
+        "failover read must not create a score record on the primary"
+    );
     let _ = primary_score; // used above indirectly via get_score_exists
 }

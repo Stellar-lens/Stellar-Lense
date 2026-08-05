@@ -15,9 +15,7 @@ use soroban_sdk::{
     Address, BytesN, Env, Symbol, Vec,
 };
 
-use crate::{
-    Error, LedgerLensScoreContract, LedgerLensScoreContractClient,
-};
+use crate::{Error, LedgerLensScoreContract, LedgerLensScoreContractClient};
 
 fn setup() -> (Env, LedgerLensScoreContractClient<'static>, Address, Address) {
     let env = Env::default();
@@ -46,18 +44,7 @@ fn submit_dummy_score(
     wallet: &Address,
     pair: &soroban_sdk::Symbol,
 ) {
-    client.submit_score(
-        &Vec::new(env),
-        wallet,
-        pair,
-        &42,
-        &true,
-        &false,
-        &1,
-        &90,
-        &1,
-        &None,
-    );
+    client.submit_score(&Vec::new(env), wallet, pair, &42, &true, &false, &1, &90, &1, &None);
 }
 
 // ── Freeze / Unfreeze ───────────────────────────────────────────────────────
@@ -149,10 +136,7 @@ fn test_compute_state_checksum() {
         l.timestamp = 200_000;
     });
 
-    let snapshot = client
-        .try_compute_state_checksum(&Vec::new(&env))
-        .unwrap()
-        .unwrap();
+    let snapshot = client.try_compute_state_checksum(&Vec::new(&env)).unwrap().unwrap();
 
     assert!(snapshot.entry_count > 0, "Entry count should be > 0");
     assert_eq!(snapshot.ledger_seq, 1000);
@@ -181,17 +165,11 @@ fn test_snapshot_count_increments() {
     submit_dummy_score(&env, &client, &wallet, &pair);
 
     // Take a snapshot
-    let _snap1 = client
-        .try_compute_state_checksum(&Vec::new(&env))
-        .unwrap()
-        .unwrap();
+    let _snap1 = client.try_compute_state_checksum(&Vec::new(&env)).unwrap().unwrap();
     assert_eq!(client.get_state_snapshot_count(), 1);
 
     // Take another
-    let _snap2 = client
-        .try_compute_state_checksum(&Vec::new(&env))
-        .unwrap()
-        .unwrap();
+    let _snap2 = client.try_compute_state_checksum(&Vec::new(&env)).unwrap().unwrap();
     assert_eq!(client.get_state_snapshot_count(), 2);
 }
 
@@ -203,10 +181,7 @@ fn test_snapshot_history() {
     submit_dummy_score(&env, &client, &wallet, &pair);
 
     // Take a snapshot
-    let _snap = client
-        .try_compute_state_checksum(&Vec::new(&env))
-        .unwrap()
-        .unwrap();
+    let _snap = client.try_compute_state_checksum(&Vec::new(&env)).unwrap().unwrap();
 
     // Check history
     let history = client.get_snapshot_history();
@@ -265,10 +240,7 @@ fn test_verify_state_checksum_matches() {
     let pair = symbol_short!("XLM_USDC");
     submit_dummy_score(&env, &client, &wallet, &pair);
 
-    let snapshot = client
-        .try_compute_state_checksum(&Vec::new(&env))
-        .unwrap()
-        .unwrap();
+    let snapshot = client.try_compute_state_checksum(&Vec::new(&env)).unwrap().unwrap();
 
     // Verify the checksum matches
     let verified = client.verify_state_checksum(&snapshot);
@@ -282,10 +254,7 @@ fn test_verify_state_checksum_diverges_after_mutation() {
     let pair = symbol_short!("XLM_USDC");
     submit_dummy_score(&env, &client, &wallet, &pair);
 
-    let snapshot = client
-        .try_compute_state_checksum(&Vec::new(&env))
-        .unwrap()
-        .unwrap();
+    let snapshot = client.try_compute_state_checksum(&Vec::new(&env)).unwrap().unwrap();
 
     // Submit another score — this changes the state
     let wallet2 = Address::generate(&env);
@@ -305,19 +274,10 @@ fn test_reconcile_identical_snapshots() {
     let pair = symbol_short!("XLM_USDC");
     submit_dummy_score(&env, &client, &wallet, &pair);
 
-    let snap_a = client
-        .try_compute_state_checksum(&Vec::new(&env))
-        .unwrap()
-        .unwrap();
-    let snap_b = client
-        .try_compute_state_checksum(&Vec::new(&env))
-        .unwrap()
-        .unwrap();
+    let snap_a = client.try_compute_state_checksum(&Vec::new(&env)).unwrap().unwrap();
+    let snap_b = client.try_compute_state_checksum(&Vec::new(&env)).unwrap().unwrap();
 
-    let report = client
-        .try_reconcile_state(&Vec::new(&env), &snap_a, &snap_b)
-        .unwrap()
-        .unwrap();
+    let report = client.try_reconcile_state(&Vec::new(&env), &snap_a, &snap_b).unwrap().unwrap();
 
     assert!(report.config_matches);
     assert!(report.auth_matches);
@@ -330,20 +290,14 @@ fn test_reconcile_divergent_snapshots() {
     let (env, client, admin, _service) = initialized();
 
     // Take snapshot before any scores
-    let snap_empty = client
-        .try_compute_state_checksum(&Vec::new(&env))
-        .unwrap()
-        .unwrap();
+    let snap_empty = client.try_compute_state_checksum(&Vec::new(&env)).unwrap().unwrap();
 
     // Add a score and take another snapshot
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
     submit_dummy_score(&env, &client, &wallet, &pair);
 
-    let snap_with_score = client
-        .try_compute_state_checksum(&Vec::new(&env))
-        .unwrap()
-        .unwrap();
+    let snap_with_score = client.try_compute_state_checksum(&Vec::new(&env)).unwrap().unwrap();
 
     let report = client
         .try_reconcile_state(&Vec::new(&env), &snap_empty, &snap_with_score)
@@ -367,10 +321,7 @@ fn test_reconcile_requires_admin() {
     let pair = symbol_short!("XLM_USDC");
     submit_dummy_score(&env, &client, &wallet, &pair);
 
-    let snap = client
-        .try_compute_state_checksum(&Vec::new(&env))
-        .unwrap()
-        .unwrap();
+    let snap = client.try_compute_state_checksum(&Vec::new(&env)).unwrap().unwrap();
 
     // Reconcile with itself should succeed
     let result = client.try_reconcile_state(&Vec::new(&env), &snap, &snap);
@@ -417,8 +368,6 @@ fn test_freeze_blocks_batch_submit() {
 
     client.freeze_contract(&Vec::new(&env));
 
-    let result = client.try_submit_scores_batch(
-        &Vec::new(&env),
-    );
+    let result = client.try_submit_scores_batch(&Vec::new(&env));
     assert_eq!(result, Err(Ok(Error::EmptyBatch)));
 }

@@ -134,15 +134,6 @@ impl ContractStateBuilder {
             );
         }
 
-        BuiltState {
-            env,
-            client,
-            admin,
-            service,
-            wallet,
-            pair,
-            service_signers,
-            admin_signers,
-        }
+        BuiltState { env, client, admin, service, wallet, pair, service_signers, admin_signers }
     }
 }

@@ -313,9 +313,10 @@ fn test_signer_churn_during_pending_proposal() {
 
     // Verify proposal remains valid and signer changes don't affect it
     let proposal = client.get_parameter_proposal(&proposal_id);
-    assert!(proposal.status
-        == crate::types::ParameterProposalStatus::Pending
-        || proposal.status == crate::types::ParameterProposalStatus::Pending);
+    assert!(
+        proposal.status == crate::types::ParameterProposalStatus::Pending
+            || proposal.status == crate::types::ParameterProposalStatus::Pending
+    );
 }
 
 #[test]

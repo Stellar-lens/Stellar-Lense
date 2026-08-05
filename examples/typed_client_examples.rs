@@ -71,13 +71,13 @@ pub mod score_flow {
                 &Vec::new(&env), // signers (empty → single-service mode)
                 &wallet,
                 &pair,
-                &72,    // score: 0-100, higher = more suspicious
-                &true,  // benford_flag: Benford's Law anomaly detected
-                &false, // ml_flag: ML classifier did not flag
+                &72,            // score: 0-100, higher = more suspicious
+                &true,          // benford_flag: Benford's Law anomaly detected
+                &false,         // ml_flag: ML classifier did not flag
                 &1_700_000_000, // timestamp: ledger seconds
-                &88,    // confidence: 0-100
-                &1,     // model_version
-                &None,  // attestation_input (optional)
+                &88,            // confidence: 0-100
+                &1,             // model_version
+                &None,          // attestation_input (optional)
             );
 
             let score = client.get_score(&wallet, &pair);
@@ -195,7 +195,13 @@ pub mod gate_flow {
         client
     }
 
-    fn submit(env: &Env, client: &LedgerLensScoreContractClient, wallet: &Address, score: u32, confidence: u32) {
+    fn submit(
+        env: &Env,
+        client: &LedgerLensScoreContractClient,
+        wallet: &Address,
+        score: u32,
+        confidence: u32,
+    ) {
         client.submit_score(
             &Vec::new(env),
             wallet,
@@ -252,8 +258,7 @@ pub mod gate_flow {
             let client = setup(&env);
             let unknown = Address::generate(&env);
 
-            let is_safe =
-                client.query_risk_gate(&unknown, &symbol_short!("XLM_USDC"), &THRESHOLD);
+            let is_safe = client.query_risk_gate(&unknown, &symbol_short!("XLM_USDC"), &THRESHOLD);
             assert!(!is_safe, "unknown wallet should fail closed");
         }
 

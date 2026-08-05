@@ -33,7 +33,18 @@ fn test_is_score_risky_below_threshold() {
     env.ledger().with_mut(|l| l.timestamp = 1_000_000);
 
     // Submit score below default threshold (75)
-    client.submit_score(&Vec::new(&env), &wallet, &pair, &50, &false, &false, &1_700_000_000, &90, &1, &None);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &50,
+        &false,
+        &false,
+        &1_700_000_000,
+        &90,
+        &1,
+        &None,
+    );
 
     assert!(!client.is_score_risky(&wallet, &pair));
 }
@@ -48,7 +59,18 @@ fn test_is_score_risky_above_threshold() {
 
     // Set threshold and submit score above it
     client.set_threshold(&admin, &70);
-    client.submit_score(&Vec::new(&env), &wallet, &pair, &75, &false, &false, &1_700_000_000, &90, &1, &None);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &75,
+        &false,
+        &false,
+        &1_700_000_000,
+        &90,
+        &1,
+        &None,
+    );
 
     assert!(client.is_score_risky(&wallet, &pair));
 }
@@ -72,7 +94,18 @@ fn test_is_score_risky_embargoed_wallet() {
     env.ledger().with_mut(|l| l.timestamp = 1_000_000);
 
     // Submit a safe score
-    client.submit_score(&Vec::new(&env), &wallet, &pair, &30, &false, &false, &1_700_000_000, &90, &1, &None);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &30,
+        &false,
+        &false,
+        &1_700_000_000,
+        &90,
+        &1,
+        &None,
+    );
     assert!(!client.is_score_risky(&wallet, &pair));
 
     // Embargo the wallet — should now be risky (fail-closed)
@@ -99,7 +132,18 @@ fn test_is_score_risky_with_confidence_below_threshold() {
 
     env.ledger().with_mut(|l| l.timestamp = 1_000_000);
 
-    client.submit_score(&Vec::new(&env), &wallet, &pair, &40, &false, &false, &1_700_000_000, &85, &1, &None);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &40,
+        &false,
+        &false,
+        &1_700_000_000,
+        &85,
+        &1,
+        &None,
+    );
 
     let (breached, confidence) = client.is_score_risky_with_confidence(&wallet, &pair);
     assert!(!breached);
@@ -115,7 +159,18 @@ fn test_is_score_risky_with_confidence_above_threshold() {
     env.ledger().with_mut(|l| l.timestamp = 1_000_000);
 
     client.set_threshold(&admin, &65);
-    client.submit_score(&Vec::new(&env), &wallet, &pair, &78, &false, &false, &1_700_000_000, &92, &1, &None);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &78,
+        &false,
+        &false,
+        &1_700_000_000,
+        &92,
+        &1,
+        &None,
+    );
 
     let (breached, confidence) = client.is_score_risky_with_confidence(&wallet, &pair);
     assert!(breached);
@@ -130,7 +185,18 @@ fn test_is_score_risky_with_confidence_embargoed() {
 
     env.ledger().with_mut(|l| l.timestamp = 1_000_000);
 
-    client.submit_score(&Vec::new(&env), &wallet, &pair, &20, &false, &false, &1_700_000_000, &90, &1, &None);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &20,
+        &false,
+        &false,
+        &1_700_000_000,
+        &90,
+        &1,
+        &None,
+    );
 
     // Embargo
     client.set_score_embargo(&admin, &wallet, &Some(2_000_000));
@@ -148,7 +214,18 @@ fn test_is_wallet_safe_passes_gate() {
 
     env.ledger().with_mut(|l| l.timestamp = 1_000_000);
 
-    client.submit_score(&Vec::new(&env), &wallet, &pair, &50, &false, &false, &1_700_000_000, &90, &1, &None);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &50,
+        &false,
+        &false,
+        &1_700_000_000,
+        &90,
+        &1,
+        &None,
+    );
 
     assert!(client.is_wallet_safe(&wallet, &pair));
 }
@@ -162,7 +239,18 @@ fn test_is_wallet_safe_fails_gate() {
     env.ledger().with_mut(|l| l.timestamp = 1_000_000);
 
     client.set_threshold(&admin, &60);
-    client.submit_score(&Vec::new(&env), &wallet, &pair, &80, &false, &false, &1_700_000_000, &90, &1, &None);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &80,
+        &false,
+        &false,
+        &1_700_000_000,
+        &90,
+        &1,
+        &None,
+    );
 
     assert!(!client.is_wallet_safe(&wallet, &pair));
 }
@@ -193,8 +281,30 @@ fn test_is_aggregate_risky_all_safe() {
 
     env.ledger().with_mut(|l| l.timestamp = 1_000_000);
 
-    client.submit_score(&Vec::new(&env), &wallet, &pair1, &40, &false, &false, &1_700_000_000, &90, &1, &None);
-    client.submit_score(&Vec::new(&env), &wallet, &pair2, &50, &false, &false, &1_700_000_000, &90, &1, &None);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair1,
+        &40,
+        &false,
+        &false,
+        &1_700_000_000,
+        &90,
+        &1,
+        &None,
+    );
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair2,
+        &50,
+        &false,
+        &false,
+        &1_700_000_000,
+        &90,
+        &1,
+        &None,
+    );
 
     assert!(!client.is_aggregate_risky(&wallet));
 }
@@ -210,8 +320,30 @@ fn test_is_aggregate_risky_one_risky() {
 
     client.set_threshold(&admin, &60);
 
-    client.submit_score(&Vec::new(&env), &wallet, &pair1, &50, &false, &false, &1_700_000_000, &90, &1, &None);
-    client.submit_score(&Vec::new(&env), &wallet, &pair2, &85, &false, &false, &1_700_000_000, &90, &1, &None);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair1,
+        &50,
+        &false,
+        &false,
+        &1_700_000_000,
+        &90,
+        &1,
+        &None,
+    );
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair2,
+        &85,
+        &false,
+        &false,
+        &1_700_000_000,
+        &90,
+        &1,
+        &None,
+    );
 
     // One risky pair means aggregate is risky
     assert!(client.is_aggregate_risky(&wallet));
@@ -225,7 +357,18 @@ fn test_is_aggregate_risky_embargoed() {
 
     env.ledger().with_mut(|l| l.timestamp = 1_000_000);
 
-    client.submit_score(&Vec::new(&env), &wallet, &pair1, &30, &false, &false, &1_700_000_000, &90, &1, &None);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair1,
+        &30,
+        &false,
+        &false,
+        &1_700_000_000,
+        &90,
+        &1,
+        &None,
+    );
 
     // All safe initially
     assert!(!client.is_aggregate_risky(&wallet));
@@ -246,7 +389,18 @@ fn test_minimal_disclosure_no_field_leakage() {
     env.ledger().with_mut(|l| l.timestamp = 1_000_000);
 
     client.set_threshold(&admin, &70);
-    client.submit_score(&Vec::new(&env), &wallet, &pair, &75, &true, &true, &1_700_000_000, &88, &2, &None);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &75,
+        &true,
+        &true,
+        &1_700_000_000,
+        &88,
+        &2,
+        &None,
+    );
 
     // Minimal disclosure queries should NOT expose:
     // - benford_flag, ml_flag
@@ -274,7 +428,18 @@ fn test_minimal_disclosure_deterministic_across_calls() {
 
     env.ledger().with_mut(|l| l.timestamp = 1_000_000);
 
-    client.submit_score(&Vec::new(&env), &wallet, &pair, &65, &false, &false, &1_700_000_000, &90, &1, &None);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &65,
+        &false,
+        &false,
+        &1_700_000_000,
+        &90,
+        &1,
+        &None,
+    );
 
     // Verify deterministic results
     let result1 = client.is_score_risky(&wallet, &pair);

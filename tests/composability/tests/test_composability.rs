@@ -159,10 +159,7 @@ fn amm_swap_rejected_while_safe_score_is_still_pending_finality() {
 
     fixture.env.ledger().with_mut(|l| l.timestamp += 301);
     fixture.ledgerlens.commit_pending_score(&wallet, &symbol_short!("XLM_USDC"));
-    assert_eq!(
-        fixture.amm.try_swap(&wallet, &symbol_short!("XLM_USDC"), &1_000),
-        Ok(Ok(()))
-    );
+    assert_eq!(fixture.amm.try_swap(&wallet, &symbol_short!("XLM_USDC"), &1_000), Ok(Ok(())));
 }
 
 // ── AMM gated liquidity provision (issue #214) ───────────────────────────────
@@ -370,10 +367,7 @@ fn lending_borrow_rejected_while_safe_score_is_still_pending_finality() {
 
     fixture.env.ledger().with_mut(|l| l.timestamp += 301);
     fixture.ledgerlens.commit_pending_score(&wallet, &symbol_short!("XLM_USDC"));
-    assert_eq!(
-        fixture.lending.try_borrow(&wallet, &symbol_short!("XLM_USDC"), &1_000),
-        Ok(Ok(()))
-    );
+    assert_eq!(fixture.lending.try_borrow(&wallet, &symbol_short!("XLM_USDC"), &1_000), Ok(Ok(())));
 }
 
 // ── Acceptance criterion: embargoed wallet → gate false regardless of score ─

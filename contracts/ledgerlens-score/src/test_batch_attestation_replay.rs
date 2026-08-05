@@ -265,7 +265,11 @@ fn run_batch(
         for p in &proof_bytes {
             proof.push_back(BytesN::from_array(env, p));
         }
-        subs.push_back(ScoreSubmissionWithProof { submission: sub.clone(), proof, proof_flags: flags });
+        subs.push_back(ScoreSubmissionWithProof {
+            submission: sub.clone(),
+            proof,
+            proof_flags: flags,
+        });
     }
     client.submit_scores_batch_attested(&Vec::new(env), &subs, attestation)
 }
@@ -482,8 +486,5 @@ fn test_leaf_from_other_batch_root_rejected() {
     let result = client.submit_scores_batch_attested(&Vec::new(&env), &subs, &attestation_b);
     assert_eq!(result.accepted_count, 0);
     assert_eq!(result.rejected_count, 1);
-    assert_eq!(
-        result.results.get(0).unwrap().rejection_code,
-        Error::InvalidAttestation as u32,
-    );
+    assert_eq!(result.results.get(0).unwrap().rejection_code, Error::InvalidAttestation as u32,);
 }

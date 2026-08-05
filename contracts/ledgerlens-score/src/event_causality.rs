@@ -38,7 +38,6 @@
 /// - Logged in event data for recovery
 /// - Computed deterministically from stable inputs
 /// - Documented in event sequences for human auditors
-
 use soroban_sdk::{crypto::Hash, Address, Bytes, Env, Symbol};
 
 /// Correlation ID uniquely identifying a causal workflow
@@ -473,24 +472,21 @@ mod test_event_causality {
     #[test]
     fn test_score_submission_workflow_has_required_event() {
         let workflow = WorkflowTracker::score_submission_workflow();
-        let has_submitted = workflow
-            .steps
-            .iter()
-            .any(|s| s.event == "score_submitted" && !s.optional);
-        assert!(has_submitted, "Score submission workflow must have required score_submitted event");
+        let has_submitted =
+            workflow.steps.iter().any(|s| s.event == "score_submitted" && !s.optional);
+        assert!(
+            has_submitted,
+            "Score submission workflow must have required score_submitted event"
+        );
     }
 
     #[test]
     fn test_upgrade_workflow_has_required_events() {
         let workflow = WorkflowTracker::upgrade_workflow();
-        let has_proposed = workflow
-            .steps
-            .iter()
-            .any(|s| s.event == "upgrade_proposed" && !s.optional);
-        let has_approval = workflow
-            .steps
-            .iter()
-            .any(|s| s.event == "upgrade_approval_added" && !s.optional);
+        let has_proposed =
+            workflow.steps.iter().any(|s| s.event == "upgrade_proposed" && !s.optional);
+        let has_approval =
+            workflow.steps.iter().any(|s| s.event == "upgrade_approval_added" && !s.optional);
         assert!(has_proposed, "Upgrade workflow must have required upgrade_proposed event");
         assert!(has_approval, "Upgrade workflow must have required upgrade_approval_added event");
     }

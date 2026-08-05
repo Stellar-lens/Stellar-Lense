@@ -7,9 +7,9 @@ mod constants;
 #[cfg(test)]
 extern crate std;
 mod errors;
-mod events;
 mod event_causality;
 mod event_stability;
+mod events;
 #[cfg(any(test, feature = "testutils"))]
 mod invariants;
 mod parameter_governance;
@@ -198,15 +198,15 @@ mod test_malformed_proof_corpus;
 mod test_replay_audit;
 
 #[cfg(test)]
-mod test_gdpr_accumulator;
-#[cfg(test)]
-mod test_fail_closed_invariants;
+mod test_aggregate_key_rotation;
 #[cfg(test)]
 mod test_capability_partitioning;
 #[cfg(test)]
-mod test_aggregate_key_rotation;
-#[cfg(test)]
 mod test_dual_key_pubkey;
+#[cfg(test)]
+mod test_fail_closed_invariants;
+#[cfg(test)]
+mod test_gdpr_accumulator;
 
 #[cfg(test)]
 mod test_memory_exhaustion;
@@ -2235,7 +2235,7 @@ impl LedgerLensScoreContract {
         let score = match Self::lookup_score(&env, &wallet, &asset_pair) {
             Ok(score) => score,
             Err(Error::ScoreEmbargoed) => return true, // Fail-closed: embargoed = risky
-            Err(_) => return false,                     // No score = safe default
+            Err(_) => return false,                    // No score = safe default
         };
         let risk_threshold = storage::get_risk_threshold(&env);
         score.score >= risk_threshold
@@ -2259,7 +2259,11 @@ impl LedgerLensScoreContract {
     ///     // Low-confidence risk: allow with monitoring
     /// }
     /// ```
-    pub fn is_score_risky_with_confidence(env: Env, wallet: Address, asset_pair: Symbol) -> (bool, u32) {
+    pub fn is_score_risky_with_confidence(
+        env: Env,
+        wallet: Address,
+        asset_pair: Symbol,
+    ) -> (bool, u32) {
         Self::check_service_silence(&env);
         let score = match Self::lookup_score(&env, &wallet, &asset_pair) {
             Ok(score) => score,
@@ -3080,8 +3084,7 @@ impl LedgerLensScoreContract {
         wallet: Address,
         asset_pair: Symbol,
     ) -> Result<SubmissionProvenance, Error> {
-        storage::get_submission_provenance(&env, &wallet, &asset_pair)
-            .ok_or(Error::ScoreNotFound)
+        storage::get_submission_provenance(&env, &wallet, &asset_pair).ok_or(Error::ScoreNotFound)
     }
 
     /// Returns the total number of successful score submissions ever recorded
@@ -4894,7 +4897,11 @@ impl LedgerLensScoreContract {
         // #299: governance audit chain — stable discriminant from governance_actions registry
         let mut data = [0u8; 32];
         data[0] = governance_actions::GOV_ACTION_ADD_SERVICE_SIGNER;
-        Self::append_governance_action(&env, governance_actions::GOV_ACTION_ADD_SERVICE_SIGNER, &data);
+        Self::append_governance_action(
+            &env,
+            governance_actions::GOV_ACTION_ADD_SERVICE_SIGNER,
+            &data,
+        );
         Ok(())
     }
 
@@ -6563,7 +6570,13 @@ impl LedgerLensScoreContract {
     ) -> Result<types::ParameterSimulation, Error> {
         let now = env.ledger().timestamp();
         let time_lock_secs = storage::get_upgrade_delay(&env);
-        parameter_governance::simulate_parameter_change(&env, &param_key, &new_value, now, time_lock_secs)
+        parameter_governance::simulate_parameter_change(
+            &env,
+            &param_key,
+            &new_value,
+            now,
+            time_lock_secs,
+        )
     }
 
     /// Simulate the effect of an existing proposal without applying it.
@@ -8480,7 +8493,14 @@ impl LedgerLensScoreContract {
     ) -> Result<(), Error> {
         let reason = Bytes::from_slice(&env, b"unspecified");
         let category = Bytes::from_slice(&env, b"history-clear");
-        Self::clear_score_history_with_audit(env, admin_signers, wallet, asset_pair, reason, category)
+        Self::clear_score_history_with_audit(
+            env,
+            admin_signers,
+            wallet,
+            asset_pair,
+            reason,
+            category,
+        )
     }
 
     /// Same as `clear_score_history`, but lets operators attach explicit
@@ -9411,7 +9431,11 @@ impl LedgerLensScoreContract {
         let mut data = [0u8; 32];
         data[0] = governance_actions::GOV_ACTION_SET_ADMIN_THRESHOLD;
         data[28..32].copy_from_slice(&threshold.to_be_bytes());
-        Self::append_governance_action(&env, governance_actions::GOV_ACTION_SET_ADMIN_THRESHOLD, &data);
+        Self::append_governance_action(
+            &env,
+            governance_actions::GOV_ACTION_SET_ADMIN_THRESHOLD,
+            &data,
+        );
         Ok(())
     }
 
@@ -10994,12 +11018,7 @@ impl LedgerLensScoreContract {
             .instance()
             .get::<_, BytesN<32>>(&types::DataKeyC::AdminAuditRoot)
             .unwrap_or_else(|| BytesN::from_array(env, &[0u8; 32]));
-        events::gov_action(
-            env,
-            action_id,
-            governance_actions::action_name(action_id),
-            &new_head,
-        );
+        events::gov_action(env, action_id, governance_actions::action_name(action_id), &new_head);
     }
 
     pub fn get_admin_audit_root(env: Env) -> BytesN<32> {
@@ -11114,7 +11133,11 @@ impl LedgerLensScoreContract {
     /// satisfy a different policy's gate: the wrong approver simply never
     /// calls `require_auth()`, so the call fails closed with the same
     /// `Error::Unauthorized` as any other denied privileged call.
-    fn require_policy_auth(env: &Env, policy: Policy, admin_signers: &Vec<Address>) -> Result<(), Error> {
+    fn require_policy_auth(
+        env: &Env,
+        policy: Policy,
+        admin_signers: &Vec<Address>,
+    ) -> Result<(), Error> {
         Self::require_admin_auth(env, admin_signers)?;
         let approval = storage::get_policy_approval(env, policy);
         if !approval.enabled {
@@ -11289,10 +11312,8 @@ impl LedgerLensScoreContract {
 
     fn collect_active_config_entries(env: &Env) -> Vec<ConfigExportEntry> {
         let mut entries = Vec::new(env);
-        let (consensus_k, consensus_epsilon) = (
-            storage::get_consensus_threshold_k(env),
-            storage::get_consensus_epsilon(env),
-        );
+        let (consensus_k, consensus_epsilon) =
+            (storage::get_consensus_threshold_k(env), storage::get_consensus_epsilon(env));
         let (adaptive_bounds_enabled, adaptive_min, adaptive_max) = (
             storage::get_adaptive_epsilon_enabled(env),
             storage::get_adaptive_epsilon_min(env),
@@ -11401,11 +11422,7 @@ impl LedgerLensScoreContract {
             Self::encode_u32(env, storage::get_privacy_epsilon(env)),
         ));
         entries.push_back(Self::config_entry(env, symbol_short!("cons_cfg"), consensus_bytes));
-        entries.push_back(Self::config_entry(
-            env,
-            symbol_short!("adp_eps"),
-            adaptive_bounds_bytes,
-        ));
+        entries.push_back(Self::config_entry(env, symbol_short!("adp_eps"), adaptive_bounds_bytes));
         entries.push_back(Self::config_entry(
             env,
             symbol_short!("adp_rate"),
@@ -12210,69 +12227,63 @@ impl LedgerLensScoreContract {
         storage::get_oracle_staleness_threshold(&env)
     }
 
-// ── Architecture Ownership & Reviewer Routing ─────────────────────────────
+    // ── Architecture Ownership & Reviewer Routing ─────────────────────────────
 
-pub fn set_arch_owner(env: Env, new_owner: Address) -> Result<(), Error> {
-    // Requires authorization from current admin or existing arch owner
-    if let Some(current_owner) = storage::get_arch_owner(&env) {
-        current_owner.require_auth();
-    } else {
-        storage::get_admin(&env).require_auth();
+    pub fn set_arch_owner(env: Env, new_owner: Address) -> Result<(), Error> {
+        // Requires authorization from current admin or existing arch owner
+        if let Some(current_owner) = storage::get_arch_owner(&env) {
+            current_owner.require_auth();
+        } else {
+            storage::get_admin(&env).require_auth();
+        }
+
+        storage::set_arch_owner(&env, &new_owner);
+
+        // Emit event for architecture ownership change
+        env.events().publish((Symbol::new(&env, "arch_owner_updated"),), new_owner);
+
+        Ok(())
     }
 
-    storage::set_arch_owner(&env, &new_owner);
-
-    // Emit event for architecture ownership change
-    env.events().publish(
-        (Symbol::new(&env, "arch_owner_updated"),),
-        new_owner,
-    );
-
-    Ok(())
-}
-
-pub fn get_arch_owner(env: Env) -> Option<Address> {
-    storage::get_arch_owner(&env)
-}
-
-pub fn set_mandatory_reviewers(env: Env, reviewers: Vec<Address>) -> Result<(), Error> {
-    // Ensure caller is authorized (arch owner or contract admin)
-    if let Some(owner) = storage::get_arch_owner(&env) {
-        owner.require_auth();
-    } else {
-        storage::get_admin(&env).require_auth();
+    pub fn get_arch_owner(env: Env) -> Option<Address> {
+        storage::get_arch_owner(&env)
     }
 
-    // Bound check against MAX_MANDATORY_REVIEWERS
-    if reviewers.len() > storage::MAX_MANDATORY_REVIEWERS {
-        return Err(Error::MaxReviewersExceeded);
-    }
+    pub fn set_mandatory_reviewers(env: Env, reviewers: Vec<Address>) -> Result<(), Error> {
+        // Ensure caller is authorized (arch owner or contract admin)
+        if let Some(owner) = storage::get_arch_owner(&env) {
+            owner.require_auth();
+        } else {
+            storage::get_admin(&env).require_auth();
+        }
 
-    // Check for duplicate reviewers in vector
-    for i in 0..reviewers.len() {
-        let rev_i = reviewers.get(i).unwrap();
-        for j in (i + 1)..reviewers.len() {
-            let rev_j = reviewers.get(j).unwrap();
-            if rev_i == rev_j {
-                return Err(Error::ReviewerAlreadyExists);
+        // Bound check against MAX_MANDATORY_REVIEWERS
+        if reviewers.len() > storage::MAX_MANDATORY_REVIEWERS {
+            return Err(Error::MaxReviewersExceeded);
+        }
+
+        // Check for duplicate reviewers in vector
+        for i in 0..reviewers.len() {
+            let rev_i = reviewers.get(i).unwrap();
+            for j in (i + 1)..reviewers.len() {
+                let rev_j = reviewers.get(j).unwrap();
+                if rev_i == rev_j {
+                    return Err(Error::ReviewerAlreadyExists);
+                }
             }
         }
+
+        storage::set_mandatory_reviewers(&env, &reviewers);
+
+        // Emit event for reviewer set update
+        env.events().publish((Symbol::new(&env, "mandatory_reviewers_updated"),), reviewers.len());
+
+        Ok(())
     }
 
-    storage::set_mandatory_reviewers(&env, &reviewers);
-
-    // Emit event for reviewer set update
-    env.events().publish(
-        (Symbol::new(&env, "mandatory_reviewers_updated"),),
-        reviewers.len(),
-    );
-
-    Ok(())
-}
-
-pub fn get_mandatory_reviewers(env: Env) -> Vec<Address> {
-    storage::get_mandatory_reviewers(&env)
-}
+    pub fn get_mandatory_reviewers(env: Env) -> Vec<Address> {
+        storage::get_mandatory_reviewers(&env)
+    }
 
     // ── #631: Post-incident state checksum & reconciliation ───────────────────
 
@@ -12311,15 +12322,15 @@ pub fn get_mandatory_reviewers(env: Env) -> Vec<Address> {
         };
 
         storage::push_snapshot_history(&env, &snapshot, &admin);
-        events::state_snapshot_created(&env, &snapshot.score_root, entry_count, snapshot.ledger_seq);
+        events::state_snapshot_created(
+            &env,
+            &snapshot.score_root,
+            entry_count,
+            snapshot.ledger_seq,
+        );
 
         let action_bytes = Bytes::new(&env);
-        Self::update_audit_root(
-            &env,
-            symbol_short!("snapshot"),
-            admin,
-            action_bytes,
-        );
+        Self::update_audit_root(&env, symbol_short!("snapshot"), admin, action_bytes);
         Ok(snapshot)
     }
 
@@ -12401,8 +12412,7 @@ pub fn get_mandatory_reviewers(env: Env) -> Vec<Address> {
         }
         Self::require_admin_auth(&env, &admin_signers)?;
 
-        let entries_matched =
-            if snapshot_a.entry_count == snapshot_b.entry_count { 1 } else { 0 };
+        let entries_matched = if snapshot_a.entry_count == snapshot_b.entry_count { 1 } else { 0 };
         // For a real match count we would need to compare individual score
         // entries — the root-level comparison is a strong signal.
         let entries_diverged = if snapshot_a.score_root == snapshot_b.score_root {
@@ -12558,7 +12568,6 @@ pub fn get_mandatory_reviewers(env: Env) -> Vec<Address> {
         storage::get_alert_acknowledgement(&env, &alert_type)
     }
 }
-
 
 /// Integer square root (floor) for use in volatility std-dev computation.
 fn isqrt_u64(n: u64) -> u64 {

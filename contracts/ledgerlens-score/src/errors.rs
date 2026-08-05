@@ -128,7 +128,7 @@ impl Error {
     /// lead to failed or subtly incorrect cross-contract calls.
     pub const IncompatibleInterface: Error = Error::InvalidAttestation;
 
-// ── Architecture Governance & Reviewer Routing ─────────────────────────
+    // ── Architecture Governance & Reviewer Routing ─────────────────────────
     /// Returned when an architecture owner or reviewer address is invalid.
     pub const InvalidArchOwner: Error = Error::Unauthorized;
     /// Returned when trying to set more mandatory reviewers than MAX_MANDATORY_REVIEWERS (10).

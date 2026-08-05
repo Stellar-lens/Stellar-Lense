@@ -34,16 +34,11 @@ mod test_audit_replay {
         let all_events = env.events().all();
 
         // Verify events carry enough information to reconstruct workflow
-        let contract_events: Vec<_> = all_events
-            .iter()
-            .filter(|(addr, _, _)| addr == &contract_id)
-            .collect();
+        let contract_events: Vec<_> =
+            all_events.iter().filter(|(addr, _, _)| addr == &contract_id).collect();
 
         // Assert: We should have initialization and watchlist events
-        assert!(
-            contract_events.len() >= 2,
-            "Should have at least initialize and watchlist events"
-        );
+        assert!(contract_events.len() >= 2, "Should have at least initialize and watchlist events");
 
         // For each event, verify it can be used for audit trail
         for (addr, topics, data) in contract_events.iter() {
@@ -68,10 +63,7 @@ mod test_audit_replay {
         // Verify correlation ID is deterministic
         let correlation_id_2 =
             EventCausality::score_submission_correlation_id(&wallet, &asset_pair, timestamp);
-        assert_eq!(
-            correlation_id, correlation_id_2,
-            "Correlation IDs must be deterministic"
-        );
+        assert_eq!(correlation_id, correlation_id_2, "Correlation IDs must be deterministic");
 
         // Verify different parameters produce different IDs
         let wallet2 = Address::generate(&env);
@@ -102,10 +94,8 @@ mod test_audit_replay {
 
         // Collect events
         let all_events = env.events().all();
-        let contract_events: Vec<_> = all_events
-            .iter()
-            .filter(|(addr, _, _)| addr == &contract_id)
-            .collect();
+        let contract_events: Vec<_> =
+            all_events.iter().filter(|(addr, _, _)| addr == &contract_id).collect();
 
         // Should have initialization and admin_transfer_initiated events
         assert!(
@@ -174,15 +164,18 @@ mod test_audit_replay {
         let asset_pair = Symbol::new(&env, "stellar:usdc");
         let timestamp = 9000u64;
 
-        let correlation_id = EventCausality::escalation_correlation_id(&wallet, &asset_pair, timestamp);
+        let correlation_id =
+            EventCausality::escalation_correlation_id(&wallet, &asset_pair, timestamp);
 
         // Verify determinism
-        let correlation_id_2 = EventCausality::escalation_correlation_id(&wallet, &asset_pair, timestamp);
+        let correlation_id_2 =
+            EventCausality::escalation_correlation_id(&wallet, &asset_pair, timestamp);
         assert_eq!(correlation_id, correlation_id_2);
 
         // Verify different parameters produce different IDs
         let wallet2 = Address::generate(&env);
-        let correlation_id_3 = EventCausality::escalation_correlation_id(&wallet2, &asset_pair, timestamp);
+        let correlation_id_3 =
+            EventCausality::escalation_correlation_id(&wallet2, &asset_pair, timestamp);
         assert_ne!(correlation_id, correlation_id_3);
     }
 
@@ -194,14 +187,17 @@ mod test_audit_replay {
         let action_index = 5u64;
         let timestamp = 11000u64;
 
-        let correlation_id = EventCausality::governance_chain_correlation_id(action_index, timestamp);
+        let correlation_id =
+            EventCausality::governance_chain_correlation_id(action_index, timestamp);
 
         // Verify determinism
-        let correlation_id_2 = EventCausality::governance_chain_correlation_id(action_index, timestamp);
+        let correlation_id_2 =
+            EventCausality::governance_chain_correlation_id(action_index, timestamp);
         assert_eq!(correlation_id, correlation_id_2);
 
         // Different action indices produce different IDs
-        let correlation_id_3 = EventCausality::governance_chain_correlation_id(action_index + 1, timestamp);
+        let correlation_id_3 =
+            EventCausality::governance_chain_correlation_id(action_index + 1, timestamp);
         assert_ne!(correlation_id, correlation_id_3);
     }
 
@@ -266,11 +262,7 @@ mod test_audit_replay {
                 EventCausality::score_submission_correlation_id(&wallet, &asset_pair, timestamp);
 
             // Verify the ID is actually 32 bytes
-            assert_eq!(
-                correlation_id.len(),
-                32,
-                "Correlation ID must be exactly 32 bytes"
-            );
+            assert_eq!(correlation_id.len(), 32, "Correlation ID must be exactly 32 bytes");
 
             // Verify determinism
             let correlation_id_2 =
@@ -356,23 +348,21 @@ mod test_audit_replay {
 
         // Collect all events
         let all_events = env.events().all();
-        let contract_events: Vec<_> = all_events
-            .iter()
-            .filter(|(addr, _, _)| addr == &contract_id)
-            .collect();
+        let contract_events: Vec<_> =
+            all_events.iter().filter(|(addr, _, _)| addr == &contract_id).collect();
 
         // Verify we have events from multiple operations
-        assert!(contract_events.len() >= 3, "Should have multiple events from different operations");
+        assert!(
+            contract_events.len() >= 3,
+            "Should have multiple events from different operations"
+        );
 
         // Each event should be independently verifiable
         for (addr, topics, _data) in contract_events.iter() {
             assert_eq!(addr, &contract_id, "All events must be from the contract");
             assert!(!topics.is_empty(), "All events must have topic information");
             // All events should have the event name as first topic
-            assert!(
-                topics.get(0).is_ok(),
-                "All events must have at least one topic"
-            );
+            assert!(topics.get(0).is_ok(), "All events must have at least one topic");
         }
     }
 }

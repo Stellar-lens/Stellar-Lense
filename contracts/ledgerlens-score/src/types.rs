@@ -679,6 +679,10 @@ pub enum DataKey {
     HistoricalMaxScore(Address, Symbol),
     HysteresisMargin,
     RiskBandState(Address, Symbol),
+    /// Designated primary architecture owner.
+    ArchOwner,
+    /// Mandatory reviewers for administrative changes.
+    MandatoryReviewers,
 }
 
 #[contracttype]
@@ -922,7 +926,6 @@ pub struct TierBounds {
     pub min_score: u32,
     pub max_score: u32,
 }
-
 
 /// Histogram of all score submissions across 101 buckets (0–100).
 #[contracttype]

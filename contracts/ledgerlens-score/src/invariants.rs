@@ -61,10 +61,7 @@ pub fn invariant_check(env: &Env) {
 fn check_config_invariants(env: &Env) {
     // 1. Global min confidence must be in [0, 100].
     let min_conf = storage::get_global_min_confidence(env);
-    assert!(
-        min_conf <= 100,
-        "INVARIANT #1 VIOLATED: global_min_confidence={min_conf} exceeds 100"
-    );
+    assert!(min_conf <= 100, "INVARIANT #1 VIOLATED: global_min_confidence={min_conf} exceeds 100");
 
     // 2. Service threshold ≤ service signer set size.
     let svc_set = storage::get_service_set(env);

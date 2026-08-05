@@ -17,7 +17,6 @@
 /// 2. Document the breaking change in CHANGELOG.md
 /// 3. Add migration notes in the PR and event documentation
 /// 4. Update off-chain indexers to handle both versions during the transition window
-
 use soroban_sdk::Symbol;
 
 /// Stability level for event topics
@@ -137,7 +136,7 @@ impl EventStabilityRegistry {
             "orc_rem" => EventStability::OperatorDiagnostic, // Oracle removed
             "orc_stale" => EventStability::OperatorDiagnostic, // Oracle stale fallback
             "orc_sthr" => EventStability::OperatorDiagnostic, // Oracle staleness threshold updated
-            "sw_upd" => EventStability::OperatorDiagnostic, // Staleness window updated
+            "sw_upd" => EventStability::OperatorDiagnostic,  // Staleness window updated
 
             // Consensus configuration
             "cons_cfg" => EventStability::OperatorDiagnostic,
@@ -154,12 +153,12 @@ impl EventStabilityRegistry {
 
             // Scoring analytics
             "mom_cross" => EventStability::OperatorDiagnostic, // Momentum threshold crossed
-            "esc_trg" => EventStability::OperatorDiagnostic,  // Escalation triggered
-            "esc_res" => EventStability::OperatorDiagnostic,  // Escalation resolved
-            "esc_thr" => EventStability::OperatorDiagnostic,  // Escalation threshold updated
-            "clb_upd" => EventStability::OperatorDiagnostic,  // Cluster boundaries updated
-            "clr_hist" => EventStability::OperatorDiagnostic, // Score history cleared
-            "clr_scr" => EventStability::OperatorDiagnostic,  // Score cleared
+            "esc_trg" => EventStability::OperatorDiagnostic,   // Escalation triggered
+            "esc_res" => EventStability::OperatorDiagnostic,   // Escalation resolved
+            "esc_thr" => EventStability::OperatorDiagnostic,   // Escalation threshold updated
+            "clb_upd" => EventStability::OperatorDiagnostic,   // Cluster boundaries updated
+            "clr_hist" => EventStability::OperatorDiagnostic,  // Score history cleared
+            "clr_scr" => EventStability::OperatorDiagnostic,   // Score cleared
 
             // Delegation and counterparty
             "dlg_set" => EventStability::OperatorDiagnostic,
@@ -169,11 +168,11 @@ impl EventStabilityRegistry {
             "cntag" => EventStability::OperatorDiagnostic,   // Contagion propagated
 
             // Risk bands and policies
-            "band_in" => EventStability::OperatorDiagnostic,  // Risk band entered
+            "band_in" => EventStability::OperatorDiagnostic, // Risk band entered
             "band_out" => EventStability::OperatorDiagnostic, // Risk band cleared
-            "sf_upd" => EventStability::OperatorDiagnostic,   // Score floor policy
-            "sf_ovrd" => EventStability::OperatorDiagnostic,  // Score floor overridden
-            "at_upd" => EventStability::OperatorDiagnostic,   // Adaptive threshold updated
+            "sf_upd" => EventStability::OperatorDiagnostic,  // Score floor policy
+            "sf_ovrd" => EventStability::OperatorDiagnostic, // Score floor overridden
+            "at_upd" => EventStability::OperatorDiagnostic,  // Adaptive threshold updated
 
             // Key rotation
             "pk_upd" => EventStability::OperatorDiagnostic,
@@ -187,10 +186,10 @@ impl EventStabilityRegistry {
 
             // Failover and protection
             "failover" => EventStability::OperatorDiagnostic,
-            "fp_upd" => EventStability::OperatorDiagnostic,   // Flash protection mode updated
-            "jt_upd" => EventStability::OperatorDiagnostic,   // Jump threshold updated
-            "jump" => EventStability::OperatorDiagnostic,     // Score jump anomaly
-            "fb_upd" => EventStability::OperatorDiagnostic,   // Finality buffer updated
+            "fp_upd" => EventStability::OperatorDiagnostic, // Flash protection mode updated
+            "jt_upd" => EventStability::OperatorDiagnostic, // Jump threshold updated
+            "jump" => EventStability::OperatorDiagnostic,   // Score jump anomaly
+            "fb_upd" => EventStability::OperatorDiagnostic, // Finality buffer updated
             "susp_gate" => EventStability::OperatorDiagnostic, // Suspicious same-ledger submission
 
             // Heartbeat and maintenance
@@ -199,8 +198,8 @@ impl EventStabilityRegistry {
             "gov_app" => EventStability::OperatorDiagnostic,
 
             // Pending scores and commit workflow
-            "scr_pend" => EventStability::OperatorDiagnostic,   // Score pending
-            "scr_canc" => EventStability::OperatorDiagnostic,   // Score pending cancelled
+            "scr_pend" => EventStability::OperatorDiagnostic, // Score pending
+            "scr_canc" => EventStability::OperatorDiagnostic, // Score pending cancelled
 
             // Model lifecycle
             "mv_prop" => EventStability::OperatorDiagnostic,
@@ -290,27 +289,18 @@ mod test_event_stability {
 
     #[test]
     fn test_score_submitted_is_public_api() {
-        assert_eq!(
-            EventStabilityRegistry::stability("score"),
-            EventStability::PublicApi
-        );
+        assert_eq!(EventStabilityRegistry::stability("score"), EventStability::PublicApi);
         assert!(EventStabilityRegistry::is_public_api("score"));
     }
 
     #[test]
     fn test_watchlist_is_public_api() {
-        assert_eq!(
-            EventStabilityRegistry::stability("watch"),
-            EventStability::PublicApi
-        );
+        assert_eq!(EventStabilityRegistry::stability("watch"), EventStability::PublicApi);
     }
 
     #[test]
     fn test_breach_threshold_is_public_api() {
-        assert_eq!(
-            EventStabilityRegistry::stability("breach"),
-            EventStability::PublicApi
-        );
+        assert_eq!(EventStabilityRegistry::stability("breach"), EventStability::PublicApi);
     }
 
     #[test]
@@ -334,30 +324,21 @@ mod test_event_stability {
     #[test]
     fn test_upgrade_events_are_public_api() {
         for event in &["upg_prop", "upg_exec", "upg_veto"] {
-            assert_eq!(
-                EventStabilityRegistry::stability(event),
-                EventStability::PublicApi
-            );
+            assert_eq!(EventStabilityRegistry::stability(event), EventStability::PublicApi);
         }
     }
 
     #[test]
     fn test_admin_transfer_events_are_public_api() {
         for event in &["adm_init", "adm_done", "adm_canc"] {
-            assert_eq!(
-                EventStabilityRegistry::stability(event),
-                EventStability::PublicApi
-            );
+            assert_eq!(EventStabilityRegistry::stability(event), EventStability::PublicApi);
         }
     }
 
     #[test]
     fn test_dispute_events_are_public_api() {
         for event in &["disp_open", "disp_res", "disp_to"] {
-            assert_eq!(
-                EventStabilityRegistry::stability(event),
-                EventStability::PublicApi
-            );
+            assert_eq!(EventStabilityRegistry::stability(event), EventStability::PublicApi);
         }
     }
 
@@ -371,9 +352,6 @@ mod test_event_stability {
 
     #[test]
     fn test_consensus_rejection_is_internal() {
-        assert_eq!(
-            EventStabilityRegistry::stability("iqr_rej"),
-            EventStability::InternalTestOnly
-        );
+        assert_eq!(EventStabilityRegistry::stability("iqr_rej"), EventStability::InternalTestOnly);
     }
 }

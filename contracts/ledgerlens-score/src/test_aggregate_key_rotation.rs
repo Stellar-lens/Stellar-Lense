@@ -199,7 +199,11 @@ fn test_get_pending_aggregate_service_pubkey_during_overlap() {
     let overlap = 3600u64;
 
     client.set_aggregate_service_pubkey(&Vec::new(&env), &pubkey_bytes(&env, &old_key));
-    client.rotate_aggregate_service_pubkey(&Vec::new(&env), &pubkey_bytes(&env, &new_key), &overlap);
+    client.rotate_aggregate_service_pubkey(
+        &Vec::new(&env),
+        &pubkey_bytes(&env, &new_key),
+        &overlap,
+    );
 
     let pending = client.get_pending_aggregate_service_pubkey();
     assert!(pending.is_some());
@@ -222,7 +226,11 @@ fn test_old_aggregate_key_rejected_after_overlap_expires() {
     let version = client.get_contract_version();
 
     client.set_aggregate_service_pubkey(&Vec::new(&env), &pubkey_bytes(&env, &old_key));
-    client.rotate_aggregate_service_pubkey(&Vec::new(&env), &pubkey_bytes(&env, &new_key), &overlap);
+    client.rotate_aggregate_service_pubkey(
+        &Vec::new(&env),
+        &pubkey_bytes(&env, &new_key),
+        &overlap,
+    );
 
     // Advance time past the overlap window — the pending key must now be
     // the only one that verifies; the retired key is fully expired.
@@ -244,7 +252,11 @@ fn test_new_aggregate_key_accepted_after_overlap_expires() {
     let version = client.get_contract_version();
 
     client.set_aggregate_service_pubkey(&Vec::new(&env), &pubkey_bytes(&env, &old_key));
-    client.rotate_aggregate_service_pubkey(&Vec::new(&env), &pubkey_bytes(&env, &new_key), &overlap);
+    client.rotate_aggregate_service_pubkey(
+        &Vec::new(&env),
+        &pubkey_bytes(&env, &new_key),
+        &overlap,
+    );
 
     env.ledger().with_mut(|l| l.timestamp = START_TS + overlap + 1);
 
@@ -260,7 +272,11 @@ fn test_aggregate_pending_key_auto_promoted_after_expiry() {
     let overlap = 1000u64;
 
     client.set_aggregate_service_pubkey(&Vec::new(&env), &pubkey_bytes(&env, &old_key));
-    client.rotate_aggregate_service_pubkey(&Vec::new(&env), &pubkey_bytes(&env, &new_key), &overlap);
+    client.rotate_aggregate_service_pubkey(
+        &Vec::new(&env),
+        &pubkey_bytes(&env, &new_key),
+        &overlap,
+    );
 
     env.ledger().with_mut(|l| l.timestamp = START_TS + overlap + 1);
 

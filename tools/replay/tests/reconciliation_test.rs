@@ -101,10 +101,7 @@ mod reconciliation_tests {
 
         // No submission made for this wallet/pair.
         let result = client.try_get_score(&wallet, &pair);
-        assert!(
-            result.is_err(),
-            "expected ScoreNotFound for unsubmitted wallet/pair"
-        );
+        assert!(result.is_err(), "expected ScoreNotFound for unsubmitted wallet/pair");
         // Status classification: pipeline_only — on-chain has no entry.
     }
 
@@ -173,8 +170,7 @@ mod reconciliation_tests {
         // Each on-chain score must match its pipeline record.
         for (i, wallet) in wallets.iter().enumerate() {
             let on_chain = client.get_score(wallet, &pair);
-            let delta =
-                (pipeline_scores[i] as i64 - on_chain.score as i64).unsigned_abs() as u32;
+            let delta = (pipeline_scores[i] as i64 - on_chain.score as i64).unsigned_abs() as u32;
             assert_eq!(
                 delta, 0,
                 "wallet[{}]: on_chain={}, pipeline={}",

@@ -73,10 +73,7 @@ fn submit_score(
 }
 
 /// Deploy mock-amm wired to the given LedgerLens instance.
-fn deploy_amm<'a>(
-    env: &'a Env,
-    ledgerlens_id: &Address,
-) -> MockAmmClient<'a> {
+fn deploy_amm<'a>(env: &'a Env, ledgerlens_id: &Address) -> MockAmmClient<'a> {
     let amm_id = env.register_contract(None, MockAmm);
     let amm = MockAmmClient::new(env, &amm_id);
     amm.initialize(ledgerlens_id, &GATE_THRESHOLD);
@@ -85,10 +82,7 @@ fn deploy_amm<'a>(
 }
 
 /// Deploy mock-lending wired to the given LedgerLens instance.
-fn deploy_lending<'a>(
-    env: &'a Env,
-    ledgerlens_id: &Address,
-) -> MockLendingClient<'a> {
+fn deploy_lending<'a>(env: &'a Env, ledgerlens_id: &Address) -> MockLendingClient<'a> {
     let lending_id = env.register_contract(None, MockLending);
     let lending = MockLendingClient::new(env, &lending_id);
     lending.initialize(ledgerlens_id, &GATE_THRESHOLD, &MIN_CONFIDENCE);
@@ -317,8 +311,5 @@ fn amm_swap_resumes_after_primary_unpaused() {
     );
 
     primary.unpause(&Vec::new(&env));
-    assert_eq!(
-        amm.try_swap(&wallet, &symbol_short!("XLM_USDC"), &1_000),
-        Ok(Ok(()))
-    );
+    assert_eq!(amm.try_swap(&wallet, &symbol_short!("XLM_USDC"), &1_000), Ok(Ok(())));
 }

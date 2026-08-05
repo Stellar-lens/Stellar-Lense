@@ -213,11 +213,14 @@ pub fn deletion_policy_updated(env: &Env, enabled: bool, approver: &Option<Addre
 
 /// Emitted by `set_policy_approval` (issue #695). `policy` identifies which
 /// of the four non-`DataDeletion` named capabilities was reconfigured.
-pub fn policy_approval_updated(env: &Env, policy: Policy, enabled: bool, approver: &Option<Address>) {
-    env.events().publish(
-        (symbol_short!("pol_appr"), EVENT_VERSION, policy),
-        (enabled, approver.clone()),
-    );
+pub fn policy_approval_updated(
+    env: &Env,
+    policy: Policy,
+    enabled: bool,
+    approver: &Option<Address>,
+) {
+    env.events()
+        .publish((symbol_short!("pol_appr"), EVENT_VERSION, policy), (enabled, approver.clone()));
 }
 
 pub fn cooldown_updated(env: &Env, cooldown_secs: u64) {
@@ -310,45 +313,39 @@ pub enum BatchRejectionCategory {
 /// Emitted when a batch entry is rejected due to contract pause.
 /// Topics: ("bat_rej_pause",)  Data: (count)
 pub fn batch_rejected_contract_paused(env: &Env, count: u32) {
-    env.events()
-        .publish((symbol_short!("bat_rej_pa"),), count);
+    env.events().publish((symbol_short!("bat_rej_pa"),), count);
 }
 
 /// Emitted when batch entries are rejected due to data quality issues.
 /// Topics: ("bat_rej_data",)  Data: (reason_code, count)
 /// reason_code: 1 = invalid_score, 2 = invalid_confidence, 3 = invalid_timestamp
 pub fn batch_rejected_data_quality(env: &Env, reason_code: u32, count: u32) {
-    env.events()
-        .publish((symbol_short!("bat_rej_dq"),), (reason_code, count));
+    env.events().publish((symbol_short!("bat_rej_dq"),), (reason_code, count));
 }
 
 /// Emitted when batch entries are rejected due to model version issues.
 /// Topics: ("bat_rej_model",)  Data: (reason_code, count)
 /// reason_code: 1 = not_registered, 2 = deprecated
 pub fn batch_rejected_model_version(env: &Env, reason_code: u32, count: u32) {
-    env.events()
-        .publish((symbol_short!("bat_rej_mv"),), (reason_code, count));
+    env.events().publish((symbol_short!("bat_rej_mv"),), (reason_code, count));
 }
 
 /// Emitted when batch entries exceed rate limits.
 /// Topics: ("bat_rej_ratelimit",)  Data: (count)
 pub fn batch_rejected_rate_limit(env: &Env, count: u32) {
-    env.events()
-        .publish((symbol_short!("bat_rej_rl"),), count);
+    env.events().publish((symbol_short!("bat_rej_rl"),), count);
 }
 
 /// Emitted when batch entries fail attestation validation.
 /// Topics: ("bat_rej_attest",)  Data: (count)
 pub fn batch_rejected_attestation(env: &Env, count: u32) {
-    env.events()
-        .publish((symbol_short!("bat_rej_at"),), count);
+    env.events().publish((symbol_short!("bat_rej_at"),), count);
 }
 
 /// Emitted when batch entries fail gate enforcement.
 /// Topics: ("bat_rej_gate",)  Data: (count)
 pub fn batch_rejected_gate_failure(env: &Env, count: u32) {
-    env.events()
-        .publish((symbol_short!("bat_rej_gt"),), count);
+    env.events().publish((symbol_short!("bat_rej_gt"),), count);
 }
 
 /// Summary event emitted after batch processing completes.
@@ -746,19 +743,10 @@ pub fn governance_action_appended(env: &Env, new_head: &soroban_sdk::BytesN<32>)
 ///
 /// Topic: `("gov_action", EVENT_VERSION)`
 /// Data:  `(action_id: u32, action_name: Symbol, new_head: BytesN<32>)`
-pub fn gov_action(
-    env: &Env,
-    action_id: u8,
-    action_name: &str,
-    new_head: &soroban_sdk::BytesN<32>,
-) {
+pub fn gov_action(env: &Env, action_id: u8, action_name: &str, new_head: &soroban_sdk::BytesN<32>) {
     env.events().publish(
         (symbol_short!("gov_action"), EVENT_VERSION),
-        (
-            action_id as u32,
-            soroban_sdk::Symbol::new(env, action_name),
-            new_head.clone(),
-        ),
+        (action_id as u32, soroban_sdk::Symbol::new(env, action_name), new_head.clone()),
     );
 }
 
@@ -967,8 +955,6 @@ pub fn escalation_resolved(
     );
 }
 
-
-
 pub fn escalation_threshold_updated(env: &Env, old_threshold: u32, new_threshold: u32) {
     env.events().publish((symbol_short!("esc_thr"),), (old_threshold, new_threshold));
 }
@@ -984,8 +970,7 @@ pub fn state_snapshot_created(
     entry_count: u32,
     ledger_seq: u32,
 ) {
-    env.events()
-        .publish((symbol_short!("snap"),), (score_root.clone(), entry_count, ledger_seq));
+    env.events().publish((symbol_short!("snap"),), (score_root.clone(), entry_count, ledger_seq));
 }
 
 /// Emitted when an admin freezes the contract via `freeze_contract`.

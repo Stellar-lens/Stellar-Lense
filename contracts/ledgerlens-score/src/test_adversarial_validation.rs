@@ -142,18 +142,7 @@ fn test_min_score_with_benford_flag() {
 #[test]
 fn test_mid_score_mixed_flags() {
     let (env, client, _admin, _service, wallet, pair) = setup();
-    client.submit_score(
-        &Vec::new(&env),
-        &wallet,
-        &pair,
-        &50,
-        &true,
-        &false,
-        &1,
-        &75,
-        &1,
-        &None,
-    );
+    client.submit_score(&Vec::new(&env), &wallet, &pair, &50, &true, &false, &1, &75, &1, &None);
     let s = client.get_score(&wallet, &pair);
     assert_eq!(s.score, 50);
     assert!(s.benford_flag);
@@ -176,18 +165,7 @@ fn test_all_minimums() {
 #[test]
 fn test_all_maximums() {
     let (env, client, _admin, _service, wallet, pair) = setup();
-    client.submit_score(
-        &Vec::new(&env),
-        &wallet,
-        &pair,
-        &100,
-        &true,
-        &true,
-        &1,
-        &100,
-        &1,
-        &None,
-    );
+    client.submit_score(&Vec::new(&env), &wallet, &pair, &100, &true, &true, &1, &100, &1, &None);
     let s = client.get_score(&wallet, &pair);
     assert_eq!(s.score, 100);
     assert_eq!(s.confidence, 100);

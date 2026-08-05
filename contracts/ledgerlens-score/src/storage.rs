@@ -6,8 +6,7 @@ use crate::constants::{
 };
 use crate::errors::Error;
 use crate::types::{
- \
-  AdaptiveRateLimit, AggregateRiskScore, AlertAckRecord, AlertType, DataKey, DataKeyB, DataKeyC,
+    AdaptiveRateLimit, AggregateRiskScore, AlertAckRecord, AlertType, DataKey, DataKeyB, DataKeyC,
     DataKeyD, DecayCurve, EmbargoExpiry, FlashProtectionMode, GateDataKey, HllSketch,
     InterpolationMethod, JumpStats, ModelVersionStats, ModelVersionStatus, PairVolatilityState,
     ParamChangeProposal, ParameterProposalRecord, ParameterProposalStatus, PendingScoreEntry,
@@ -18,15 +17,6 @@ use crate::types::{
 use soroban_sdk::{Address, Bytes, BytesN, Env, Symbol, Vec};
 
 pub const MAX_MANDATORY_REVIEWERS: u32 = 10;
-#[contracttype]
-#[derive(Clone)]
-pub enum DataKey {
-
-    /// Storage key for the designated primary Architecture Owner address
-    ArchOwner,
-    /// Storage key for the list of mandatory off-chain/on-chain reviewer addresses
-    MandatoryReviewers,
-}
 
 // ── Admin / Service ─────────────────────────────────────────────────────────
 
@@ -669,7 +659,8 @@ pub fn register_pair_for_wallet(env: &Env, wallet: &Address, asset_pair: &Symbol
 /// scores that still exist on chain. No-op if the pair is not present.
 pub fn remove_pair_for_wallet(env: &Env, wallet: &Address, asset_pair: &Symbol) {
     let key = DataKey::AssetPairs(wallet.clone());
-    let mut pairs: Vec<Symbol> = env.storage().persistent().get(&key).unwrap_or_else(|| Vec::new(env));
+    let mut pairs: Vec<Symbol> =
+        env.storage().persistent().get(&key).unwrap_or_else(|| Vec::new(env));
     if let Some(pos) = pairs.first_index_of(asset_pair) {
         pairs.remove(pos);
         if pairs.is_empty() {
@@ -896,7 +887,8 @@ pub fn cleanup_expired_parameter_proposals(env: &Env) -> (u32, u64) {
     let mut count = 0;
     let mut oldest_kept = u64::MAX;
 
-    let next_id = env.storage()
+    let next_id = env
+        .storage()
         .instance()
         .get::<DataKeyB, u64>(&DataKeyB::ParameterProposalNextId)
         .unwrap_or(1);
@@ -904,7 +896,9 @@ pub fn cleanup_expired_parameter_proposals(env: &Env) -> (u32, u64) {
     for id in 1..next_id {
         if let Some(record) = get_parameter_proposal_record(env, id) {
             if record.status == ParameterProposalStatus::Expired {
-                let expiry = record.proposal.proposed_at
+                let expiry = record
+                    .proposal
+                    .proposed_at
                     .saturating_add(record.proposal.time_lock_secs.saturating_mul(2));
                 if now > expiry.saturating_add(ttl_buffer_secs) {
                     env.storage().persistent().remove(&DataKeyB::ParameterProposal(id));
@@ -1157,10 +1151,7 @@ pub fn get_deletion_approval_policy(env: &Env) -> DeletionApprovalPolicy {
     DeletionApprovalPolicy { enabled, approver }
 }
 
-pub fn set_deletion_approval_policy(
-    env: &Env,
-    policy: &DeletionApprovalPolicy,
-) {
+pub fn set_deletion_approval_policy(env: &Env, policy: &DeletionApprovalPolicy) {
     env.storage().instance().set(&DataKeyD::DeletionPolicyEnabled, &policy.enabled);
     match &policy.approver {
         Some(approver) => env.storage().instance().set(&DataKeyD::DeletionApprover, approver),
@@ -3088,7 +3079,7 @@ pub fn get_accumulated_fees(env: &Env) -> i128 {
     env.storage().instance().get(&GateDataKey::AccumulatedFees).unwrap_or(0)
 }
 
- pub fn set_arch_owner(env: &Env, owner: &Address) {
+pub fn set_arch_owner(env: &Env, owner: &Address) {
     env.storage().instance().set(&DataKey::ArchOwner, owner);
 }
 
@@ -3101,10 +3092,7 @@ pub fn set_mandatory_reviewers(env: &Env, reviewers: &Vec<Address>) {
 }
 
 pub fn get_mandatory_reviewers(env: &Env) -> Vec<Address> {
-    env.storage()
-        .instance()
-        .get(&DataKey::MandatoryReviewers)
-        .unwrap_or_else(|| Vec::new(env))
+    env.storage().instance().get(&DataKey::MandatoryReviewers).unwrap_or_else(|| Vec::new(env))
 }
 
 // ── #631: Emergency freeze / thaw ──────────────────────────────────────────
@@ -3225,8 +3213,7 @@ pub fn export_entries_page(
     page_size: u32,
 ) -> soroban_sdk::Vec<crate::types::ExportableScoreEntry> {
     let index: soroban_sdk::Vec<(Address, Symbol)> = get_score_entry_index(env);
-    let mut out: soroban_sdk::Vec<crate::types::ExportableScoreEntry> =
-        soroban_sdk::Vec::new(env);
+    let mut out: soroban_sdk::Vec<crate::types::ExportableScoreEntry> = soroban_sdk::Vec::new(env);
     let end = core::cmp::min(offset.saturating_add(page_size), index.len());
     let start = core::cmp::min(offset, end);
     for i in start..end {
@@ -3283,7 +3270,8 @@ pub fn compute_config_root(env: &Env) -> soroban_sdk::BytesN<32> {
     preimage.extend_from_array(&get_contract_version(env).to_le_bytes());
 
     // Dormancy config (may be unset)
-    let dorm_fraction: Option<u32> = env.storage().instance().get(&DataKeyB::DormancyDecayFractionBps);
+    let dorm_fraction: Option<u32> =
+        env.storage().instance().get(&DataKeyB::DormancyDecayFractionBps);
     if let Some(bps) = dorm_fraction {
         preimage.extend_from_array(&bps.to_le_bytes());
     }

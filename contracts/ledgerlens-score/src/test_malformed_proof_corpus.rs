@@ -25,7 +25,7 @@ use soroban_sdk::{Bytes, BytesN, Env};
 
 use crate::verkle::{
     bytes48_to_commitment, commitment_to_bytes48, compute_membership_witness,
-    compute_nonmembership_witness, encode_proof, decode_proof, verify_proof, NON_MEMBER_SENTINEL,
+    compute_nonmembership_witness, decode_proof, encode_proof, verify_proof, NON_MEMBER_SENTINEL,
 };
 use crate::zk_range_proof::{
     compress_pt, decompress_pt_32, g, prove_range_proof, Bulletproof, Sc, SeededPrng,
@@ -119,14 +119,22 @@ fn test_bulletproof_from_bytes_malformed_corpus() {
     // oversized cases.
     corpus.push(("empty".into(), Bytes::new(&env), Reject::BadLength));
     corpus.push(("one_short".into(), Bytes::from_slice(&env, &valid[..799]), Reject::BadLength));
-    corpus.push(("one_long".into(), {
-        let mut v = valid.to_vec();
-        v.push(0);
-        Bytes::from_slice(&env, &v)
-    }, Reject::BadLength));
+    corpus.push((
+        "one_long".into(),
+        {
+            let mut v = valid.to_vec();
+            v.push(0);
+            Bytes::from_slice(&env, &v)
+        },
+        Reject::BadLength,
+    ));
     // Oversized: must be rejected in O(1) by the length gate, not by per-byte
     // work — this is the bounded-resource guarantee.
-    corpus.push(("oversized_100k".into(), Bytes::from_slice(&env, &std::vec::from_elem(0u8, 100_000)), Reject::BadLength));
+    corpus.push((
+        "oversized_100k".into(),
+        Bytes::from_slice(&env, &std::vec::from_elem(0u8, 100_000)),
+        Reject::BadLength,
+    ));
 
     // Off-curve rejections — correct length, but one point slot corrupted to
     // (0, 0) which is off-curve. Earlier slots stay valid so parsing actually
@@ -238,14 +246,15 @@ fn test_decode_proof_malformed_corpus() {
 
     // Discriminant rejections — correct 97-byte length, invalid type byte.
     for t in [0x00u8, 0x03, 0x7f, 0xff] {
-        corpus.push((std::format!("type_0x{t:02x}"), proof_bytes(&env, t), Reject::BadDiscriminant));
+        corpus.push((
+            std::format!("type_0x{t:02x}"),
+            proof_bytes(&env, t),
+            Reject::BadDiscriminant,
+        ));
     }
 
     for (name, bytes, class) in &corpus {
-        assert!(
-            decode_proof(bytes).is_none(),
-            "malformed proof `{name}` ({class:?}) was accepted",
-        );
+        assert!(decode_proof(bytes).is_none(), "malformed proof `{name}` ({class:?}) was accepted",);
     }
 }
 
@@ -336,7 +345,10 @@ fn test_verify_proof_nonmembership_semantics() {
     let witness = compute_nonmembership_witness(&env, &commitment, &z);
 
     // Success path.
-    assert!(verify_proof(&env, &commitment, &z, &v, &witness), "valid non-membership proof rejected");
+    assert!(
+        verify_proof(&env, &commitment, &z, &v, &witness),
+        "valid non-membership proof rejected"
+    );
 
     // Adversarial: wrong witness rejected.
     let mut bad_witness = witness;

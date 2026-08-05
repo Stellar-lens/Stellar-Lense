@@ -23,13 +23,8 @@ use soroban_sdk::{
 use crate::{Error, LedgerLensScoreContract, ScoreSubmission};
 
 #[cfg(test)]
-fn setup() -> (
-    Env,
-    crate::LedgerLensScoreContractClient<'static>,
-    Address,
-    Address,
-    soroban_sdk::Symbol,
-) {
+fn setup(
+) -> (Env, crate::LedgerLensScoreContractClient<'static>, Address, Address, soroban_sdk::Symbol) {
     let env = Env::default();
     env.mock_all_auths();
     let contract_id = env.register_contract(None, LedgerLensScoreContract);
@@ -115,7 +110,7 @@ fn test_invalid_score_beats_invalid_confidence() {
     batch.push_back(ScoreSubmission {
         wallet,
         asset_pair: pair.clone(),
-        score: 101,  // invalid score
+        score: 101, // invalid score
         benford_flag: false,
         ml_flag: false,
         timestamp: 1,
@@ -176,7 +171,7 @@ fn test_invalid_confidence_beats_invalid_timestamp() {
         score: 50, // valid score
         benford_flag: false,
         ml_flag: false,
-        timestamp: 0,   // invalid timestamp
+        timestamp: 0,    // invalid timestamp
         confidence: 200, // invalid confidence — checked before timestamp
         model_version: 1,
     });
@@ -272,18 +267,7 @@ fn test_rate_limit_does_not_override_invalid_score() {
 
     // Submit once to trigger cooldown
     let wallet = Address::generate(&env);
-    client.submit_score(
-        &Vec::new(&env),
-        &wallet,
-        &pair,
-        &50,
-        &false,
-        &false,
-        &1,
-        &80,
-        &1,
-        &None,
-    );
+    client.submit_score(&Vec::new(&env), &wallet, &pair, &50, &false, &false, &1, &80, &1, &None);
 
     // Immediately (cooldown not elapsed) try to submit with score > 100
     let mut batch: Vec<ScoreSubmission> = Vec::new(&env);

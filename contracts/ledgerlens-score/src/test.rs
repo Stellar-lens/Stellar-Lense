@@ -4,12 +4,14 @@ use soroban_sdk::{
     Address, Bytes, BytesN, Env, IntoVal, Symbol, Vec,
 };
 
-use ledgerlens_test_support::{generate_score_roles, set_ledger_timestamp, test_env_with_unlimited_budget};
+use crate::storage;
 use crate::{
     BatchResult, DeletionAuditWarning, Error, LedgerLensScoreContract,
     LedgerLensScoreContractClient, ScoreQuery, ScoreSubmission,
 };
-use crate::storage;
+use ledgerlens_test_support::{
+    generate_score_roles, set_ledger_timestamp, test_env_with_unlimited_budget,
+};
 
 // ── Test helpers ──────────────────────────────────────────────────────────────
 
@@ -189,7 +191,10 @@ fn test_submit_scores_batch_rejects_oversized_pair_per_entry() {
     assert!(result.results.get(0).unwrap().accepted);
     assert_eq!(result.results.get(1).unwrap().rejection_code, Error::InvalidAttestation as u32);
     assert_eq!(client.get_score(&valid_wallet, &valid_pair).score, 11);
-    assert_eq!(client.try_get_score(&invalid_wallet, &oversized_pair), Err(Ok(Error::InvalidAttestation)));
+    assert_eq!(
+        client.try_get_score(&invalid_wallet, &oversized_pair),
+        Err(Ok(Error::InvalidAttestation))
+    );
     assert_eq!(client.get_wallet_pair_list(&invalid_wallet).len(), 0);
 }
 
@@ -2691,7 +2696,8 @@ fn test_clear_score_emits_audited_event_with_default_hashes() {
             multisig_enabled,
             signer_count,
             threshold,
-        ): (Symbol, Address, bool, u32, BytesN<32>, BytesN<32>, bool, u32, u32) = data.into_val(&env);
+        ): (Symbol, Address, bool, u32, BytesN<32>, BytesN<32>, bool, u32, u32) =
+            data.into_val(&env);
         event_pair == pair
             && by == admin
             && latest_score_present
@@ -2747,7 +2753,8 @@ fn test_clear_score_history_with_audit_emits_custom_hashes_and_multisig_context(
             multisig_enabled,
             signer_count,
             threshold,
-        ): (Symbol, Address, bool, u32, BytesN<32>, BytesN<32>, bool, u32, u32) = data.into_val(&env);
+        ): (Symbol, Address, bool, u32, BytesN<32>, BytesN<32>, bool, u32, u32) =
+            data.into_val(&env);
         event_pair == pair
             && latest_score_present
             && history_count == 2

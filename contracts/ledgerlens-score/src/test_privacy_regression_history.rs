@@ -105,8 +105,30 @@ fn test_history_cleared_empty_result() {
     env.ledger().with_mut(|l| l.timestamp = 1_000_000);
 
     // Submit some scores
-    client.submit_score(&Vec::new(&env), &wallet, &pair, &50, &false, &false, &1_700_000_000, &90, &1, &None);
-    client.submit_score(&Vec::new(&env), &wallet, &pair, &60, &false, &false, &1_700_000_000, &90, &1, &None);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &50,
+        &false,
+        &false,
+        &1_700_000_000,
+        &90,
+        &1,
+        &None,
+    );
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &60,
+        &false,
+        &false,
+        &1_700_000_000,
+        &90,
+        &1,
+        &None,
+    );
 
     let history_before = client.get_score_history(&wallet, &pair);
     assert_eq!(history_before.len(), 2);
@@ -128,16 +150,60 @@ fn test_history_after_clear_can_reaccumulate() {
     env.ledger().with_mut(|l| l.timestamp = 1_000_000);
 
     // Submit initial scores
-    client.submit_score(&Vec::new(&env), &wallet, &pair, &50, &false, &false, &1_700_000_000, &90, &1, &None);
-    client.submit_score(&Vec::new(&env), &wallet, &pair, &60, &false, &false, &1_700_000_000, &90, &1, &None);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &50,
+        &false,
+        &false,
+        &1_700_000_000,
+        &90,
+        &1,
+        &None,
+    );
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &60,
+        &false,
+        &false,
+        &1_700_000_000,
+        &90,
+        &1,
+        &None,
+    );
 
     // Clear
     client.clear_score_history(&admin, &wallet, &pair);
 
     // Submit new scores
     env.ledger().with_mut(|l| l.timestamp = 1_000_000 + 1000);
-    client.submit_score(&Vec::new(&env), &wallet, &pair, &70, &false, &false, &1_700_000_000, &90, &1, &None);
-    client.submit_score(&Vec::new(&env), &wallet, &pair, &80, &false, &false, &1_700_000_000, &90, &1, &None);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &70,
+        &false,
+        &false,
+        &1_700_000_000,
+        &90,
+        &1,
+        &None,
+    );
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &80,
+        &false,
+        &false,
+        &1_700_000_000,
+        &90,
+        &1,
+        &None,
+    );
 
     // History should contain only new scores
     let history = client.get_score_history(&wallet, &pair);
@@ -177,7 +243,18 @@ fn test_history_cleared_but_score_remains() {
     env.ledger().with_mut(|l| l.timestamp = 1_000_000);
 
     // Submit and then clear history
-    client.submit_score(&Vec::new(&env), &wallet, &pair, &75, &false, &false, &1_700_000_000, &90, &1, &None);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair,
+        &75,
+        &false,
+        &false,
+        &1_700_000_000,
+        &90,
+        &1,
+        &None,
+    );
     client.clear_score_history(&admin, &wallet, &pair);
 
     // History is empty
@@ -199,8 +276,30 @@ fn test_history_different_pairs_independent() {
     env.ledger().with_mut(|l| l.timestamp = 1_000_000);
 
     // Submit different scores to different pairs
-    client.submit_score(&Vec::new(&env), &wallet, &pair1, &50, &false, &false, &1_700_000_000, &90, &1, &None);
-    client.submit_score(&Vec::new(&env), &wallet, &pair2, &60, &false, &false, &1_700_000_000, &90, &1, &None);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair1,
+        &50,
+        &false,
+        &false,
+        &1_700_000_000,
+        &90,
+        &1,
+        &None,
+    );
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair2,
+        &60,
+        &false,
+        &false,
+        &1_700_000_000,
+        &90,
+        &1,
+        &None,
+    );
 
     // Each pair has independent history
     let history1 = client.get_score_history(&wallet, &pair1);
@@ -338,7 +437,7 @@ fn test_history_no_metadata_leakage() {
     // Does NOT contain: buffer position, evicted count, capacity, etc.
     for entry in &history {
         assert!(entry.score > 0); // Score field is present
-        // Other required fields are present (accessed via entry.field)
+                                  // Other required fields are present (accessed via entry.field)
     }
 }
 
@@ -352,9 +451,42 @@ fn test_history_cleared_different_pairs_unaffected() {
     env.ledger().with_mut(|l| l.timestamp = 1_000_000);
 
     // Submit to both pairs
-    client.submit_score(&Vec::new(&env), &wallet, &pair1, &50, &false, &false, &1_700_000_000, &90, &1, &None);
-    client.submit_score(&Vec::new(&env), &wallet, &pair1, &55, &false, &false, &1_700_000_000, &90, &1, &None);
-    client.submit_score(&Vec::new(&env), &wallet, &pair2, &60, &false, &false, &1_700_000_000, &90, &1, &None);
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair1,
+        &50,
+        &false,
+        &false,
+        &1_700_000_000,
+        &90,
+        &1,
+        &None,
+    );
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair1,
+        &55,
+        &false,
+        &false,
+        &1_700_000_000,
+        &90,
+        &1,
+        &None,
+    );
+    client.submit_score(
+        &Vec::new(&env),
+        &wallet,
+        &pair2,
+        &60,
+        &false,
+        &false,
+        &1_700_000_000,
+        &90,
+        &1,
+        &None,
+    );
 
     // Clear history for pair1 only
     client.clear_score_history(&admin, &wallet, &pair1);

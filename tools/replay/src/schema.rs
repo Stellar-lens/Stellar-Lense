@@ -1,6 +1,5 @@
 /// Canonical replay input schema with version negotiation.
 /// Ensures replay files are self-describing and remain parseable as the contract evolves.
-
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -17,10 +16,7 @@ pub type SchemaResult<T> = Result<T, SchemaError>;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SchemaError {
     /// Unknown schema version
-    UnsupportedVersion {
-        version: u32,
-        supported_versions: Vec<u32>,
-    },
+    UnsupportedVersion { version: u32, supported_versions: Vec<u32> },
     /// Invalid schema structure
     InvalidSchema { reason: String },
     /// Missing required field
@@ -37,11 +33,7 @@ impl std::fmt::Display for SchemaError {
                     f,
                     "Unsupported schema version {}: supported versions are {}",
                     version,
-                    supported_versions
-                        .iter()
-                        .map(|v| v.to_string())
-                        .collect::<Vec<_>>()
-                        .join(", ")
+                    supported_versions.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(", ")
                 )
             }
             SchemaError::InvalidSchema { reason } => write!(f, "Invalid schema: {}", reason),

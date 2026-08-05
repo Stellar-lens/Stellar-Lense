@@ -44,7 +44,13 @@ fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>) {
     (env, client)
 }
 
-fn submit(env: &Env, client: &LedgerLensScoreContractClient, wallet: &Address, score: u32, confidence: u32) {
+fn submit(
+    env: &Env,
+    client: &LedgerLensScoreContractClient,
+    wallet: &Address,
+    score: u32,
+    confidence: u32,
+) {
     env.ledger().with_mut(|l| l.timestamp += COOLDOWN);
     client.submit_score(
         &Vec::new(env),
@@ -106,7 +112,7 @@ fn test_confidence_gate_false_when_confidence_below_floor() {
     let (env, client) = setup();
     let wallet = Address::generate(&env);
     submit(&env, &client, &wallet, 50, 30); // low confidence
-    // score < threshold but confidence < min_confidence → false
+                                            // score < threshold but confidence < min_confidence → false
     let result = client.query_risk_gate_with_confidence(
         &wallet,
         &symbol_short!("XLM_USDC"),
@@ -122,12 +128,8 @@ fn test_confidence_gate_false_when_confidence_below_floor() {
 fn test_confidence_gate_false_when_no_score_exists() {
     let (env, client) = setup();
     let unknown = Address::generate(&env);
-    let result = client.query_risk_gate_with_confidence(
-        &unknown,
-        &symbol_short!("XLM_USDC"),
-        &75u32,
-        &0u32,
-    );
+    let result =
+        client.query_risk_gate_with_confidence(&unknown, &symbol_short!("XLM_USDC"), &75u32, &0u32);
     assert!(!result, "missing score must fail closed for confidence gate");
 }
 
@@ -189,12 +191,8 @@ fn test_global_confidence_floor_overrides_caller_param() {
     client.set_global_min_confidence(&60u32);
 
     // Caller passes min_confidence=0 but global floor (60) applies.
-    let result = client.query_risk_gate_with_confidence(
-        &wallet,
-        &symbol_short!("XLM_USDC"),
-        &75u32,
-        &0u32,
-    );
+    let result =
+        client.query_risk_gate_with_confidence(&wallet, &symbol_short!("XLM_USDC"), &75u32, &0u32);
     assert!(!result, "global confidence floor must override caller's zero floor");
 }
 
@@ -231,12 +229,8 @@ fn test_score_below_global_floor_treated_as_no_data() {
 
     // Gate must return false (treated same as no data).
     assert!(
-        !client.query_risk_gate_with_confidence(
-            &wallet,
-            &symbol_short!("XLM_USDC"),
-            &75u32,
-            &0u32,
-        ),
+        !client
+            .query_risk_gate_with_confidence(&wallet, &symbol_short!("XLM_USDC"), &75u32, &0u32,),
         "score with confidence below global floor must fail closed"
     );
 }

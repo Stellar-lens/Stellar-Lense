@@ -83,6 +83,7 @@ RPC_URL=""
 REQUIRE_MAINNET_CONFIRMATION=""
 CLI_BIN=""
 CLI_LABEL=""
+CARGO_BIN="cargo"
 WASM_PATH="target/wasm32-unknown-unknown/release/ledgerlens_score.wasm"
 OPTIMIZED_WASM_PATH="target/wasm32-unknown-unknown/release/ledgerlens_score.optimized.wasm"
 

@@ -175,18 +175,7 @@ fn test_provenance_independent_per_wallet_pair() {
         &1,
         &None,
     );
-    client.submit_score(
-        &Vec::new(&env),
-        &wallet_b,
-        &pair_b,
-        &90,
-        &true,
-        &true,
-        &1,
-        &95,
-        &2,
-        &None,
-    );
+    client.submit_score(&Vec::new(&env), &wallet_b, &pair_b, &90, &true, &true, &1, &95, &2, &None);
 
     let prov_a = client.get_submission_provenance(&wallet_a, &pair_a).unwrap();
     let prov_b = client.get_submission_provenance(&wallet_b, &pair_b).unwrap();

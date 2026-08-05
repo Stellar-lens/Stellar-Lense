@@ -38,9 +38,7 @@
 //!   extend_entry_ttls (size 1 / size 20)
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use ledgerlens_score::{
-    LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreSubmission,
-};
+use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreSubmission};
 use soroban_sdk::{
     symbol_short,
     testutils::{Address as _, Ledger as _},
@@ -263,9 +261,7 @@ fn bench_query_risk_gate_with_confidence(c: &mut Criterion) {
             );
             black_box(measure(&env, || {
                 // min_confidence=50 > actual confidence=40 → blocked
-                black_box(client.query_risk_gate_with_confidence(
-                    &wallet, &asset_pair, &75, &50,
-                ));
+                black_box(client.query_risk_gate_with_confidence(&wallet, &asset_pair, &75, &50));
             }))
         });
     });
@@ -545,12 +541,7 @@ fn bench_set_score_floor_policy(c: &mut Criterion) {
             let env = Env::default();
             let (client, _, _, _) = setup(&env);
             black_box(measure(&env, || {
-                client.set_score_floor_policy(
-                    &Vec::new(&env),
-                    &true,
-                    &80u32,
-                    &20u32,
-                );
+                client.set_score_floor_policy(&Vec::new(&env), &true, &80u32, &20u32);
             }))
         });
     });

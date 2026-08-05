@@ -135,9 +135,7 @@ fn reference_preimage(env: &Env, contract: &Address, v: &Vector) -> std::vec::Ve
 
     let mut contract_str = [0u8; 56];
     env.as_contract(contract, || {
-        env.current_contract_address()
-            .to_string()
-            .copy_into_slice(&mut contract_str);
+        env.current_contract_address().to_string().copy_into_slice(&mut contract_str);
     });
 
     serialize_preimage(
@@ -157,10 +155,7 @@ fn reference_preimage(env: &Env, contract: &Address, v: &Vector) -> std::vec::Ve
 }
 
 fn sha256(env: &Env, bytes: &[u8]) -> [u8; 32] {
-    env.crypto()
-        .sha256(&Bytes::from_slice(env, bytes))
-        .to_bytes()
-        .to_array()
+    env.crypto().sha256(&Bytes::from_slice(env, bytes)).to_bytes().to_array()
 }
 
 fn reference_digest(env: &Env, contract: &Address, v: &Vector) -> [u8; 32] {

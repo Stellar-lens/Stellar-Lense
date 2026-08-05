@@ -161,10 +161,7 @@ pub fn apply_parameter_change(
 }
 
 /// Returns the current value of a parameter without modification.
-pub fn get_current_parameter_value(
-    env: &Env,
-    param_key: &Symbol,
-) -> Result<Bytes, Error> {
+pub fn get_current_parameter_value(env: &Env, param_key: &Symbol) -> Result<Bytes, Error> {
     if param_key == &param_key_cooldown() {
         let secs = storage::get_cooldown_secs(env);
         return Ok(Bytes::from_array(env, &secs.to_be_bytes()));

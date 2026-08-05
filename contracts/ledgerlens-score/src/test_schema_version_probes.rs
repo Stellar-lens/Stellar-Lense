@@ -154,40 +154,22 @@ fn test_supports_interface_schema_capabilities() {
 
     // Test known capabilities that should be supported
     let cap_score = Symbol::new(&env, "score");
-    assert!(
-        client.supports_interface(&cap_score),
-        "Should support 'score' capability"
-    );
+    assert!(client.supports_interface(&cap_score), "Should support 'score' capability");
 
     let cap_gate = Symbol::new(&env, "gate");
-    assert!(
-        client.supports_interface(&cap_gate),
-        "Should support 'gate' capability"
-    );
+    assert!(client.supports_interface(&cap_gate), "Should support 'gate' capability");
 
     let cap_batch = Symbol::new(&env, "batch");
-    assert!(
-        client.supports_interface(&cap_batch),
-        "Should support 'batch' capability"
-    );
+    assert!(client.supports_interface(&cap_batch), "Should support 'batch' capability");
 
     let cap_history = Symbol::new(&env, "history");
-    assert!(
-        client.supports_interface(&cap_history),
-        "Should support 'history' capability"
-    );
+    assert!(client.supports_interface(&cap_history), "Should support 'history' capability");
 
     let cap_aggr = Symbol::new(&env, "aggr");
-    assert!(
-        client.supports_interface(&cap_aggr),
-        "Should support 'aggr' (aggregate) capability"
-    );
+    assert!(client.supports_interface(&cap_aggr), "Should support 'aggr' (aggregate) capability");
 
     let cap_count = Symbol::new(&env, "count");
-    assert!(
-        client.supports_interface(&cap_count),
-        "Should support 'count' capability"
-    );
+    assert!(client.supports_interface(&cap_count), "Should support 'count' capability");
 
     let cap_cgate = Symbol::new(&env, "cgate");
     assert!(
@@ -196,10 +178,7 @@ fn test_supports_interface_schema_capabilities() {
     );
 
     let cap_pr_rd = Symbol::new(&env, "pr_rd");
-    assert!(
-        client.supports_interface(&cap_pr_rd),
-        "Should support 'pr_rd' (pair read) capability"
-    );
+    assert!(client.supports_interface(&cap_pr_rd), "Should support 'pr_rd' (pair read) capability");
 }
 
 /// Test that unknown capabilities are safely rejected.
@@ -249,10 +228,7 @@ fn test_schema_version_available_before_init() {
 
     // Capabilities should also be queryable
     let cap_score = Symbol::new(&env, "score");
-    assert!(
-        client.supports_interface(&cap_score),
-        "Should support 'score' before init"
-    );
+    assert!(client.supports_interface(&cap_score), "Should support 'score' before init");
 }
 
 /// Test that multiple schema probes don't interfere with contract operation.

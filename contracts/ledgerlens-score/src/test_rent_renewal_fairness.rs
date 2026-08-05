@@ -17,11 +17,9 @@ use soroban_sdk::{
 };
 
 use crate::{
-    storage::{
-        extend_entry_ttls, get_expiring_entries, set_score, track_score_entry, peek_score,
-    },
-    types::{RiskScore, DataKey},
     constants::SCORE_TTL_THRESHOLD,
+    storage::{extend_entry_ttls, get_expiring_entries, peek_score, set_score, track_score_entry},
+    types::{DataKey, RiskScore},
 };
 
 fn setup_env() -> Env {
@@ -91,9 +89,7 @@ fn test_renewal_fairness_batch_smaller_than_backlog() {
     let env = setup_env();
     env.mock_all_auths();
 
-    let wallets: Vec<Address> = (0..10)
-        .map(|_| Address::generate(&env))
-        .collect::<Vec<_>>();
+    let wallets: Vec<Address> = (0..10).map(|_| Address::generate(&env)).collect::<Vec<_>>();
     let pair = symbol_short!("PAIR");
 
     // Write entries at staggered ledgers: 100, 120, 140, ..., 280
@@ -104,8 +100,7 @@ fn test_renewal_fairness_batch_smaller_than_backlog() {
     }
 
     // Advance time such that all are due
-    env.ledger()
-        .with_mut(|l| l.sequence = 280 + SCORE_TTL_THRESHOLD as u32);
+    env.ledger().with_mut(|l| l.sequence = 280 + SCORE_TTL_THRESHOLD as u32);
 
     // Batch size of 3 — we'll need multiple calls to service all 10 entries
     let batch_size = 3u32;
@@ -166,8 +161,7 @@ fn test_renewal_fairness_no_starvation() {
     }
 
     // Advance time such that all are due
-    env.ledger()
-        .with_mut(|l| l.sequence = 100 + SCORE_TTL_THRESHOLD as u32 + 10);
+    env.ledger().with_mut(|l| l.sequence = 100 + SCORE_TTL_THRESHOLD as u32 + 10);
 
     // Batch size of 2: will require multiple calls to renew all 5
     let batch_size = 2u32;
@@ -235,8 +229,7 @@ fn test_renewal_fairness_mixed_ages() {
     set_score(&env, &wallet4, &pair, &sample_risk_score());
 
     // Advance time such that all are due
-    env.ledger()
-        .with_mut(|l| l.sequence = 150 + SCORE_TTL_THRESHOLD as u32 + 20);
+    env.ledger().with_mut(|l| l.sequence = 150 + SCORE_TTL_THRESHOLD as u32 + 20);
 
     // Get all expiring entries
     let expiring = get_expiring_entries(&env, 100);
@@ -271,8 +264,7 @@ fn test_renewal_fairness_queue_rotation() {
     set_score(&env, &wallet3, &pair, &sample_risk_score());
 
     // Advance time such that all are due
-    env.ledger()
-        .with_mut(|l| l.sequence = 102 + SCORE_TTL_THRESHOLD as u32 + 5);
+    env.ledger().with_mut(|l| l.sequence = 102 + SCORE_TTL_THRESHOLD as u32 + 5);
 
     // First call: get first 1 (wallet1, oldest)
     let batch1 = get_expiring_entries(&env, 1u32);
@@ -310,9 +302,7 @@ fn test_renewal_fairness_batch_order_preservation() {
     let env = setup_env();
     env.mock_all_auths();
 
-    let wallets: Vec<Address> = (0..6)
-        .map(|_| Address::generate(&env))
-        .collect::<Vec<_>>();
+    let wallets: Vec<Address> = (0..6).map(|_| Address::generate(&env)).collect::<Vec<_>>();
     let pair = symbol_short!("PAIR");
 
     // Write all 6 entries at staggered times
@@ -322,8 +312,7 @@ fn test_renewal_fairness_batch_order_preservation() {
     }
 
     // Advance time such that all are due
-    env.ledger()
-        .with_mut(|l| l.sequence = 100 + 50 + SCORE_TTL_THRESHOLD as u32 + 10);
+    env.ledger().with_mut(|l| l.sequence = 100 + 50 + SCORE_TTL_THRESHOLD as u32 + 10);
 
     // Get all 6 entries in one batch
     let all_expiring = get_expiring_entries(&env, 100);

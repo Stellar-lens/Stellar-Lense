@@ -44,18 +44,9 @@ fn test_data_key_variants_distinct() {
     assert_eq!(env.storage().instance().get::<_, u32>(&admin_key), Some(1));
     assert_eq!(env.storage().instance().get::<_, u32>(&service_key), Some(2));
     assert_eq!(env.storage().instance().get::<_, u32>(&paused_key), Some(3));
-    assert_eq!(
-        env.storage().instance().get::<_, u32>(&pending_admin_key),
-        Some(4)
-    );
-    assert_eq!(
-        env.storage().instance().get::<_, u32>(&risk_threshold_key),
-        Some(5)
-    );
-    assert_eq!(
-        env.storage().instance().get::<_, u32>(&jump_threshold_key),
-        Some(6)
-    );
+    assert_eq!(env.storage().instance().get::<_, u32>(&pending_admin_key), Some(4));
+    assert_eq!(env.storage().instance().get::<_, u32>(&risk_threshold_key), Some(5));
+    assert_eq!(env.storage().instance().get::<_, u32>(&jump_threshold_key), Some(6));
 }
 
 /// Test that parametrized DataKey variants (with Address/Symbol) are distinct.
@@ -78,24 +69,12 @@ fn test_data_key_parametrized_distinct() {
     let jump_w2_p2 = DataKey::JumpStats(wallet2.clone(), pair2.clone());
 
     // Store distinct values at each key
-    env.storage()
-        .persistent()
-        .set(&score_w1_p1, &"score_w1_p1");
-    env.storage()
-        .persistent()
-        .set(&score_w1_p2, &"score_w1_p2");
-    env.storage()
-        .persistent()
-        .set(&score_w2_p1, &"score_w2_p1");
-    env.storage()
-        .persistent()
-        .set(&score_w2_p2, &"score_w2_p2");
-    env.storage()
-        .persistent()
-        .set(&jump_w1_p1, &"jump_w1_p1");
-    env.storage()
-        .persistent()
-        .set(&jump_w2_p2, &"jump_w2_p2");
+    env.storage().persistent().set(&score_w1_p1, &"score_w1_p1");
+    env.storage().persistent().set(&score_w1_p2, &"score_w1_p2");
+    env.storage().persistent().set(&score_w2_p1, &"score_w2_p1");
+    env.storage().persistent().set(&score_w2_p2, &"score_w2_p2");
+    env.storage().persistent().set(&jump_w1_p1, &"jump_w1_p1");
+    env.storage().persistent().set(&jump_w2_p2, &"jump_w2_p2");
 
     // Verify each retrieval is distinct
     assert_eq!(
@@ -114,14 +93,8 @@ fn test_data_key_parametrized_distinct() {
         env.storage().persistent().get::<_, String>(&score_w2_p2),
         Some("score_w2_p2".into())
     );
-    assert_eq!(
-        env.storage().persistent().get::<_, String>(&jump_w1_p1),
-        Some("jump_w1_p1".into())
-    );
-    assert_eq!(
-        env.storage().persistent().get::<_, String>(&jump_w2_p2),
-        Some("jump_w2_p2".into())
-    );
+    assert_eq!(env.storage().persistent().get::<_, String>(&jump_w1_p1), Some("jump_w1_p1".into()));
+    assert_eq!(env.storage().persistent().get::<_, String>(&jump_w2_p2), Some("jump_w2_p2".into()));
 }
 
 /// Test that DataKeyB variants encode distinctly.
@@ -147,26 +120,11 @@ fn test_data_key_b_variants_distinct() {
     env.storage().persistent().set(&model_versions, &200u32);
 
     // Verify distinct retrieval
-    assert_eq!(
-        env.storage().persistent().get::<_, u32>(&consensus_k),
-        Some(42)
-    );
-    assert_eq!(
-        env.storage().persistent().get::<_, u32>(&consensus_eps),
-        Some(50)
-    );
-    assert_eq!(
-        env.storage().persistent().get::<_, bool>(&adaptive_eps_enabled),
-        Some(true)
-    );
-    assert_eq!(
-        env.storage().persistent().get::<_, u32>(&score_embargo),
-        Some(100)
-    );
-    assert_eq!(
-        env.storage().persistent().get::<_, u32>(&model_versions),
-        Some(200)
-    );
+    assert_eq!(env.storage().persistent().get::<_, u32>(&consensus_k), Some(42));
+    assert_eq!(env.storage().persistent().get::<_, u32>(&consensus_eps), Some(50));
+    assert_eq!(env.storage().persistent().get::<_, bool>(&adaptive_eps_enabled), Some(true));
+    assert_eq!(env.storage().persistent().get::<_, u32>(&score_embargo), Some(100));
+    assert_eq!(env.storage().persistent().get::<_, u32>(&model_versions), Some(200));
 }
 
 /// Test that DataKeyC variants encode distinctly.
@@ -191,30 +149,12 @@ fn test_data_key_c_variants_distinct() {
     env.storage().persistent().set(&sig_rotation_ttl, &3600u32);
 
     // Verify distinct retrieval
-    assert_eq!(
-        env.storage().persistent().get::<_, u32>(&model_weight_1),
-        Some(11)
-    );
-    assert_eq!(
-        env.storage().persistent().get::<_, u32>(&model_weight_2),
-        Some(12)
-    );
-    assert_eq!(
-        env.storage().persistent().get::<_, u32>(&score_histogram_bucket_0),
-        Some(101)
-    );
-    assert_eq!(
-        env.storage().persistent().get::<_, u32>(&score_histogram_bucket_100),
-        Some(102)
-    );
-    assert_eq!(
-        env.storage().persistent().get::<_, u32>(&hist_total),
-        Some(1000)
-    );
-    assert_eq!(
-        env.storage().persistent().get::<_, u32>(&sig_rotation_ttl),
-        Some(3600)
-    );
+    assert_eq!(env.storage().persistent().get::<_, u32>(&model_weight_1), Some(11));
+    assert_eq!(env.storage().persistent().get::<_, u32>(&model_weight_2), Some(12));
+    assert_eq!(env.storage().persistent().get::<_, u32>(&score_histogram_bucket_0), Some(101));
+    assert_eq!(env.storage().persistent().get::<_, u32>(&score_histogram_bucket_100), Some(102));
+    assert_eq!(env.storage().persistent().get::<_, u32>(&hist_total), Some(1000));
+    assert_eq!(env.storage().persistent().get::<_, u32>(&sig_rotation_ttl), Some(3600));
 }
 
 /// Test that DataKeyD variants encode distinctly.
@@ -232,32 +172,16 @@ fn test_data_key_d_variants_distinct() {
 
     env.storage().persistent().set(&epoch_open, &1u32);
     env.storage().persistent().set(&current_epoch, &2u32);
-    env.storage()
-        .persistent()
-        .set(&oracle_staleness_threshold, &3u32);
-    env.storage()
-        .persistent()
-        .set(&flash_protection, &4u32);
+    env.storage().persistent().set(&oracle_staleness_threshold, &3u32);
+    env.storage().persistent().set(&flash_protection, &4u32);
     env.storage().persistent().set(&burst_capacity, &5u32);
 
     // Verify distinct retrieval
     assert_eq!(env.storage().persistent().get::<_, u32>(&epoch_open), Some(1));
-    assert_eq!(
-        env.storage().persistent().get::<_, u32>(&current_epoch),
-        Some(2)
-    );
-    assert_eq!(
-        env.storage().persistent().get::<_, u32>(&oracle_staleness_threshold),
-        Some(3)
-    );
-    assert_eq!(
-        env.storage().persistent().get::<_, u32>(&flash_protection),
-        Some(4)
-    );
-    assert_eq!(
-        env.storage().persistent().get::<_, u32>(&burst_capacity),
-        Some(5)
-    );
+    assert_eq!(env.storage().persistent().get::<_, u32>(&current_epoch), Some(2));
+    assert_eq!(env.storage().persistent().get::<_, u32>(&oracle_staleness_threshold), Some(3));
+    assert_eq!(env.storage().persistent().get::<_, u32>(&flash_protection), Some(4));
+    assert_eq!(env.storage().persistent().get::<_, u32>(&burst_capacity), Some(5));
 }
 
 /// Test that keys from different families (DataKey, DataKeyB, DataKeyC, DataKeyD) don't collide.
@@ -293,38 +217,14 @@ fn test_cross_family_key_distinctness() {
     env.storage().persistent().set(&key_d_current_epoch, &600u32);
 
     // Verify each retrieval is correct and distinct
-    assert_eq!(
-        env.storage().instance().get::<_, String>(&key_a_admin),
-        Some("admin".into())
-    );
-    assert_eq!(
-        env.storage().instance().get::<_, String>(&key_a_service),
-        Some("service".into())
-    );
-    assert_eq!(
-        env.storage().persistent().get::<_, u32>(&key_b_consensus_k),
-        Some(100)
-    );
-    assert_eq!(
-        env.storage().persistent().get::<_, u32>(&key_b_all_models),
-        Some(200)
-    );
-    assert_eq!(
-        env.storage().persistent().get::<_, u32>(&key_c_hist_total),
-        Some(300)
-    );
-    assert_eq!(
-        env.storage().persistent().get::<_, u32>(&key_c_sig_rotation_ttl),
-        Some(400)
-    );
-    assert_eq!(
-        env.storage().persistent().get::<_, u32>(&key_d_epoch_open),
-        Some(500)
-    );
-    assert_eq!(
-        env.storage().persistent().get::<_, u32>(&key_d_current_epoch),
-        Some(600)
-    );
+    assert_eq!(env.storage().instance().get::<_, String>(&key_a_admin), Some("admin".into()));
+    assert_eq!(env.storage().instance().get::<_, String>(&key_a_service), Some("service".into()));
+    assert_eq!(env.storage().persistent().get::<_, u32>(&key_b_consensus_k), Some(100));
+    assert_eq!(env.storage().persistent().get::<_, u32>(&key_b_all_models), Some(200));
+    assert_eq!(env.storage().persistent().get::<_, u32>(&key_c_hist_total), Some(300));
+    assert_eq!(env.storage().persistent().get::<_, u32>(&key_c_sig_rotation_ttl), Some(400));
+    assert_eq!(env.storage().persistent().get::<_, u32>(&key_d_epoch_open), Some(500));
+    assert_eq!(env.storage().persistent().get::<_, u32>(&key_d_current_epoch), Some(600));
 }
 
 /// Test boundary parameter values don't cause collisions.
@@ -343,36 +243,16 @@ fn test_boundary_parameters_distinct() {
     let key_score_max_a = DataKey::Score(wallet_max.clone(), pair_a.clone());
     let key_score_max_z = DataKey::Score(wallet_max.clone(), pair_z.clone());
 
-    env.storage()
-        .persistent()
-        .set(&key_score_min_a, &"min_a");
-    env.storage()
-        .persistent()
-        .set(&key_score_min_z, &"min_z");
-    env.storage()
-        .persistent()
-        .set(&key_score_max_a, &"max_a");
-    env.storage()
-        .persistent()
-        .set(&key_score_max_z, &"max_z");
+    env.storage().persistent().set(&key_score_min_a, &"min_a");
+    env.storage().persistent().set(&key_score_min_z, &"min_z");
+    env.storage().persistent().set(&key_score_max_a, &"max_a");
+    env.storage().persistent().set(&key_score_max_z, &"max_z");
 
     // All should retrieve correctly with no collisions
-    assert_eq!(
-        env.storage().persistent().get::<_, String>(&key_score_min_a),
-        Some("min_a".into())
-    );
-    assert_eq!(
-        env.storage().persistent().get::<_, String>(&key_score_min_z),
-        Some("min_z".into())
-    );
-    assert_eq!(
-        env.storage().persistent().get::<_, String>(&key_score_max_a),
-        Some("max_a".into())
-    );
-    assert_eq!(
-        env.storage().persistent().get::<_, String>(&key_score_max_z),
-        Some("max_z".into())
-    );
+    assert_eq!(env.storage().persistent().get::<_, String>(&key_score_min_a), Some("min_a".into()));
+    assert_eq!(env.storage().persistent().get::<_, String>(&key_score_min_z), Some("min_z".into()));
+    assert_eq!(env.storage().persistent().get::<_, String>(&key_score_max_a), Some("max_a".into()));
+    assert_eq!(env.storage().persistent().get::<_, String>(&key_score_max_z), Some("max_z".into()));
 }
 
 /// Test numeric parameter variations (u32 variants across different DataKey families).
@@ -391,32 +271,19 @@ fn test_numeric_parameter_collisions() {
 
     env.storage().persistent().set(&key_model_0, &"model_0");
     env.storage().persistent().set(&key_model_1, &"model_1");
-    env.storage()
-        .persistent()
-        .set(&key_model_max, &"model_max");
+    env.storage().persistent().set(&key_model_max, &"model_max");
     env.storage().persistent().set(&key_bucket_0, &"bucket_0");
     env.storage().persistent().set(&key_bucket_50, &"bucket_50");
-    env.storage()
-        .persistent()
-        .set(&key_bucket_100, &"bucket_100");
+    env.storage().persistent().set(&key_bucket_100, &"bucket_100");
 
     // All should be distinct
-    assert_eq!(
-        env.storage().persistent().get::<_, String>(&key_model_0),
-        Some("model_0".into())
-    );
-    assert_eq!(
-        env.storage().persistent().get::<_, String>(&key_model_1),
-        Some("model_1".into())
-    );
+    assert_eq!(env.storage().persistent().get::<_, String>(&key_model_0), Some("model_0".into()));
+    assert_eq!(env.storage().persistent().get::<_, String>(&key_model_1), Some("model_1".into()));
     assert_eq!(
         env.storage().persistent().get::<_, String>(&key_model_max),
         Some("model_max".into())
     );
-    assert_eq!(
-        env.storage().persistent().get::<_, String>(&key_bucket_0),
-        Some("bucket_0".into())
-    );
+    assert_eq!(env.storage().persistent().get::<_, String>(&key_bucket_0), Some("bucket_0".into()));
     assert_eq!(
         env.storage().persistent().get::<_, String>(&key_bucket_50),
         Some("bucket_50".into())
@@ -438,65 +305,40 @@ fn test_compound_parameter_distinctness() {
     let pair2 = symbol_short!("P2");
 
     // DataKeyB variants with compound parameters
-    let key_b_dispute_w1_p1 =
-        DataKeyB::ScoreDispute(wallet1.clone(), pair1.clone());
-    let key_b_dispute_w1_p2 =
-        DataKeyB::ScoreDispute(wallet1.clone(), pair2.clone());
-    let key_b_dispute_w2_p1 =
-        DataKeyB::ScoreDispute(wallet2.clone(), pair1.clone());
+    let key_b_dispute_w1_p1 = DataKeyB::ScoreDispute(wallet1.clone(), pair1.clone());
+    let key_b_dispute_w1_p2 = DataKeyB::ScoreDispute(wallet1.clone(), pair2.clone());
+    let key_b_dispute_w2_p1 = DataKeyB::ScoreDispute(wallet2.clone(), pair1.clone());
 
     // DataKeyC variants with compound parameters
-    let key_c_decay_w1_p1 =
-        DataKeyC::DecayCheckpoint(wallet1.clone(), pair1.clone());
-    let key_c_decay_w2_p2 =
-        DataKeyC::DecayCheckpoint(wallet2.clone(), pair2.clone());
+    let key_c_decay_w1_p1 = DataKeyC::DecayCheckpoint(wallet1.clone(), pair1.clone());
+    let key_c_decay_w2_p2 = DataKeyC::DecayCheckpoint(wallet2.clone(), pair2.clone());
 
     // Store distinct values
-    env.storage()
-        .persistent()
-        .set(&key_b_dispute_w1_p1, &"dispute_w1_p1");
-    env.storage()
-        .persistent()
-        .set(&key_b_dispute_w1_p2, &"dispute_w1_p2");
-    env.storage()
-        .persistent()
-        .set(&key_b_dispute_w2_p1, &"dispute_w2_p1");
-    env.storage()
-        .persistent()
-        .set(&key_c_decay_w1_p1, &"decay_w1_p1");
-    env.storage()
-        .persistent()
-        .set(&key_c_decay_w2_p2, &"decay_w2_p2");
+    env.storage().persistent().set(&key_b_dispute_w1_p1, &"dispute_w1_p1");
+    env.storage().persistent().set(&key_b_dispute_w1_p2, &"dispute_w1_p2");
+    env.storage().persistent().set(&key_b_dispute_w2_p1, &"dispute_w2_p1");
+    env.storage().persistent().set(&key_c_decay_w1_p1, &"decay_w1_p1");
+    env.storage().persistent().set(&key_c_decay_w2_p2, &"decay_w2_p2");
 
     // Verify all are distinct
     assert_eq!(
-        env.storage()
-            .persistent()
-            .get::<_, String>(&key_b_dispute_w1_p1),
+        env.storage().persistent().get::<_, String>(&key_b_dispute_w1_p1),
         Some("dispute_w1_p1".into())
     );
     assert_eq!(
-        env.storage()
-            .persistent()
-            .get::<_, String>(&key_b_dispute_w1_p2),
+        env.storage().persistent().get::<_, String>(&key_b_dispute_w1_p2),
         Some("dispute_w1_p2".into())
     );
     assert_eq!(
-        env.storage()
-            .persistent()
-            .get::<_, String>(&key_b_dispute_w2_p1),
+        env.storage().persistent().get::<_, String>(&key_b_dispute_w2_p1),
         Some("dispute_w2_p1".into())
     );
     assert_eq!(
-        env.storage()
-            .persistent()
-            .get::<_, String>(&key_c_decay_w1_p1),
+        env.storage().persistent().get::<_, String>(&key_c_decay_w1_p1),
         Some("decay_w1_p1".into())
     );
     assert_eq!(
-        env.storage()
-            .persistent()
-            .get::<_, String>(&key_c_decay_w2_p2),
+        env.storage().persistent().get::<_, String>(&key_c_decay_w2_p2),
         Some("decay_w2_p2".into())
     );
 }

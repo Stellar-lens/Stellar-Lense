@@ -114,7 +114,7 @@ const MAX_ASSET_PAIR_BYTES: u32 = 9;
 /// treated as incompatible.
 fn shard_supports_required_interface(env: &Env, shard: &Address) -> bool {
     let client = ledgerlens_score::LedgerLensScoreContractClient::new(env, shard);
-    
+
     // 1. Verify standard capability flags
     for capability in REQUIRED_SHARD_CAPABILITIES {
         match client.try_supports_interface(&Symbol::new(env, capability)) {
