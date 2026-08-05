@@ -298,7 +298,7 @@ fn test_signer_churn_during_pending_proposal() {
     client.add_service_signer(&admin_signers(&env, &admin), &signer2);
 
     // Create governance proposal (using parameter change as example)
-    let value = crate::constants::MIN_COOLDOWN_SECS.to_le_bytes();
+    let value = crate::constants::MIN_COOLDOWN_SECS.to_be_bytes();
     let bytes = soroban_sdk::Bytes::from_array(&env, &value);
 
     let proposal_id = client.propose_parameter_change(
@@ -315,10 +315,7 @@ fn test_signer_churn_during_pending_proposal() {
 
     // Verify proposal remains valid and signer changes don't affect it
     let proposal = client.get_parameter_proposal(&proposal_id);
-    assert!(
-        proposal.status == crate::types::ParameterProposalStatus::Pending
-            || proposal.status == crate::types::ParameterProposalStatus::Pending
-    );
+    assert_eq!(proposal.status, crate::types::ParameterProposalStatus::Pending);
 }
 
 #[test]
@@ -333,7 +330,7 @@ fn test_remove_signer_during_pending_proposal() {
     client.set_service_threshold(&admin_signers(&env, &admin), &2);
 
     // Create proposal
-    let value = crate::constants::MIN_COOLDOWN_SECS.to_le_bytes();
+    let value = crate::constants::MIN_COOLDOWN_SECS.to_be_bytes();
     let bytes = soroban_sdk::Bytes::from_array(&env, &value);
 
     let proposal_id = client.propose_parameter_change(
@@ -367,7 +364,7 @@ fn test_pending_decision_attribution_under_churn() {
     let signer_count_at_proposal = signers_at_proposal.len();
 
     // Create proposal
-    let value = crate::constants::MIN_COOLDOWN_SECS.to_le_bytes();
+    let value = crate::constants::MIN_COOLDOWN_SECS.to_be_bytes();
     let bytes = soroban_sdk::Bytes::from_array(&env, &value);
 
     let proposal_id = client.propose_parameter_change(
