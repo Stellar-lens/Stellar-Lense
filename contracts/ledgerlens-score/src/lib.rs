@@ -222,6 +222,9 @@ mod test_storage_key_collisions;
 #[cfg(test)]
 mod test_schema_version_probes;
 
+#[cfg(test)]
+mod test_dos_read_patterns;
+
 use soroban_sdk::{
     contract, contractimpl, crypto::Hash, symbol_short, token, Address, Bytes, BytesN, Env,
     IntoVal, Symbol, SymbolStr, TryFromVal, Vec,
