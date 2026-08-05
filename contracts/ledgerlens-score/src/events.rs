@@ -29,7 +29,7 @@ pub fn pair_weight_updated(env: &Env, asset_pair: &Symbol, weight: u32) {
 }
 
 pub fn pair_weight_reset(env: &Env, asset_pair: &Symbol) {
-    env.events().publish((symbol_short!("pw_rst"), asset_pair.clone()), ());
+    env.events().publish((symbol_short!("pw_rst"), EVENT_VERSION, asset_pair.clone()), ());
 }
 
 /// Emitted when the admin assigns an asset pair to a policy class via
