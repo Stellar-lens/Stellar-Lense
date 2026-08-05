@@ -7,7 +7,11 @@
 
 use soroban_sdk::{symbol_short, testutils::Address as _, Address, Env};
 
-use crate::{invariants, storage, types::RiskScore, LedgerLensScoreContract};
+use crate::{
+    invariants, storage,
+    types::{DataKey, RiskScore},
+    LedgerLensScoreContract,
+};
 
 fn make_env() -> Env {
     let env = Env::default();
@@ -115,7 +119,7 @@ fn inv7_fails_when_index_entry_has_no_live_score() {
         // that erased the Score key but left the index entry intact.
         storage::set_score(&env, &wallet, &pair, &sample_score(42));
         storage::track_score_entry(&env, &wallet, &pair);
-        storage::clear_score(&env, &wallet, &pair);
+        env.storage().persistent().remove(&DataKey::Score(wallet.clone(), pair.clone()));
         // Index still contains the entry; invariant must fire.
         invariants::invariant_check(&env);
     });
