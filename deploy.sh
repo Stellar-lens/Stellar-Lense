@@ -27,6 +27,7 @@ source "$SCRIPT_DIR/deploy/validate_manifest.sh"
 DRY_RUN=false
 CHECK_TOOLCHAIN_ONLY=false
 MANIFEST_OVERRIDE=""
+CANARY=false
 CANARY_KEYS=false
 POSITIONAL=()
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
@@ -333,7 +334,7 @@ if [ "$DRY_RUN" = false ]; then
   log "Contract version: $CONTRACT_VERSION"
 
   # ── Canary checks (testnet only) ──────────────────────────────────────────
-  if [ "$CANARY" = true ] && [ "$NETWORK" = "testnet" ]; then
+  if [ "$CANARY" = true ] && [ "$NETWORK_SELECTOR" = "testnet" ]; then
     log "Running canary checks for post-incident reconciliation (#631)..."
 
     # Check supported interfaces
