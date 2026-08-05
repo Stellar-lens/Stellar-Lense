@@ -42,6 +42,7 @@ fn advance_to(env: &Env, ts: u64) {
 #[test]
 fn test_high_cardinality_wallet_pair_stress() {
     let (env, client, admin, _service) = setup();
+    env.budget().reset_unlimited();
     let num_wallets = 100;
     let num_pairs = 50;
 
