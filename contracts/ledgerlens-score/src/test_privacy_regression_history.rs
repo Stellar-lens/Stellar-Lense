@@ -4,7 +4,10 @@ use soroban_sdk::{
     Address, Env, Vec,
 };
 
-use crate::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+use crate::{
+    constants::DEFAULT_PARAM_CHANGE_DELAY_SECS, LedgerLensScoreContract,
+    LedgerLensScoreContractClient,
+};
 use std::vec;
 
 fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
@@ -35,10 +38,14 @@ fn test_history_max_depth_no_overflow() {
 
     // Set max history depth to 5
     client.set_history_max_depth(&Vec::new(&env), &5);
+    env.ledger().with_mut(|l| l.timestamp += DEFAULT_PARAM_CHANGE_DELAY_SECS);
+    client.apply_param_change(&symbol_short!("hist_dep"));
 
     // Submit 10 scores
     for i in 0..10 {
-        env.ledger().with_mut(|l| l.timestamp = 1_000_000 + (i as u64 * 3_601));
+        env.ledger().with_mut(|l| {
+            l.timestamp = 1_000_000 + DEFAULT_PARAM_CHANGE_DELAY_SECS + (i as u64 * 3_601)
+        });
         client.submit_score(
             &Vec::new(&env),
             &wallet,
@@ -76,9 +83,13 @@ fn test_history_respects_max_depth_boundary() {
 
     // Exact boundary: max_depth = 3, submit 3 scores
     client.set_history_max_depth(&Vec::new(&env), &3);
+    env.ledger().with_mut(|l| l.timestamp += DEFAULT_PARAM_CHANGE_DELAY_SECS);
+    client.apply_param_change(&symbol_short!("hist_dep"));
 
     for i in 0..3 {
-        env.ledger().with_mut(|l| l.timestamp = 1_000_000 + (i as u64 * 3_601));
+        env.ledger().with_mut(|l| {
+            l.timestamp = 1_000_000 + DEFAULT_PARAM_CHANGE_DELAY_SECS + (i as u64 * 3_601)
+        });
         client.submit_score(
             &Vec::new(&env),
             &wallet,
@@ -326,8 +337,12 @@ fn test_history_max_depth_change_takes_effect() {
 
     // Submit 5 scores with max_depth = 10
     client.set_history_max_depth(&Vec::new(&env), &10);
+    env.ledger().with_mut(|l| l.timestamp += DEFAULT_PARAM_CHANGE_DELAY_SECS);
+    client.apply_param_change(&symbol_short!("hist_dep"));
     for i in 0..5 {
-        env.ledger().with_mut(|l| l.timestamp = 1_000_000 + (i as u64 * 3_601));
+        env.ledger().with_mut(|l| {
+            l.timestamp = 1_000_000 + DEFAULT_PARAM_CHANGE_DELAY_SECS + (i as u64 * 3_601)
+        });
         client.submit_score(
             &Vec::new(&env),
             &wallet,
@@ -347,8 +362,10 @@ fn test_history_max_depth_change_takes_effect() {
 
     // Reduce max_depth to 3 and submit 2 more scores
     client.set_history_max_depth(&Vec::new(&env), &3);
+    env.ledger().with_mut(|l| l.timestamp += DEFAULT_PARAM_CHANGE_DELAY_SECS);
+    client.apply_param_change(&symbol_short!("hist_dep"));
     for i in 5..7 {
-        env.ledger().with_mut(|l| l.timestamp = 1_000_000 + (i as u64 * 3_601));
+        env.ledger().with_mut(|l| l.timestamp += 3_601);
         client.submit_score(
             &Vec::new(&env),
             &wallet,
@@ -419,9 +436,13 @@ fn test_history_no_metadata_leakage() {
     env.ledger().with_mut(|l| l.timestamp = 1_000_000);
 
     client.set_history_max_depth(&Vec::new(&env), &5);
+    env.ledger().with_mut(|l| l.timestamp += DEFAULT_PARAM_CHANGE_DELAY_SECS);
+    client.apply_param_change(&symbol_short!("hist_dep"));
 
     for i in 0..7 {
-        env.ledger().with_mut(|l| l.timestamp = 1_000_000 + (i as u64 * 3_601));
+        env.ledger().with_mut(|l| {
+            l.timestamp = 1_000_000 + DEFAULT_PARAM_CHANGE_DELAY_SECS + (i as u64 * 3_601)
+        });
         client.submit_score(
             &Vec::new(&env),
             &wallet,
