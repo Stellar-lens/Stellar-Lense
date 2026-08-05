@@ -22,7 +22,7 @@
 //! a real AMM or lending contract must replicate.
 
 use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
-use mock_amm::{MockAmm, MockAmmClient, MockAmmError};
+use mock_amm::{FailPolicy as AmmFailPolicy, MockAmm, MockAmmClient, MockAmmError};
 use mock_lending::{MockLending, MockLendingClient, MockLendingError};
 use soroban_sdk::{
     symbol_short,
@@ -76,8 +76,16 @@ fn submit_score(
 fn deploy_amm<'a>(env: &'a Env, ledgerlens_id: &Address) -> MockAmmClient<'a> {
     let amm_id = env.register_contract(None, MockAmm);
     let amm = MockAmmClient::new(env, &amm_id);
-    amm.initialize(ledgerlens_id, &GATE_THRESHOLD);
-    amm.set_liquidity_gate_config(&GATE_THRESHOLD, &MIN_CONFIDENCE);
+    let admin = Address::generate(env);
+    amm.initialize(&admin, ledgerlens_id, &GATE_THRESHOLD);
+    amm.set_liquidity_gate_config(
+        &admin,
+        &GATE_THRESHOLD,
+        &MIN_CONFIDENCE,
+        &AmmFailPolicy::FailClosed,
+        &604_800,
+        &0,
+    );
     amm
 }
 
@@ -85,7 +93,7 @@ fn deploy_amm<'a>(env: &'a Env, ledgerlens_id: &Address) -> MockAmmClient<'a> {
 fn deploy_lending<'a>(env: &'a Env, ledgerlens_id: &Address) -> MockLendingClient<'a> {
     let lending_id = env.register_contract(None, MockLending);
     let lending = MockLendingClient::new(env, &lending_id);
-    lending.initialize(ledgerlens_id, &GATE_THRESHOLD, &MIN_CONFIDENCE);
+    lending.initialize(&Address::generate(env), ledgerlens_id, &GATE_THRESHOLD, &MIN_CONFIDENCE);
     lending
 }
 
