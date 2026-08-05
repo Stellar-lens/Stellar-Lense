@@ -25,7 +25,7 @@
 //! the authorization and gate checks survive the additional hop.
 
 use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
-use mock_amm::{MockAmm, MockAmmClient, MockAmmError};
+use mock_amm::{FailPolicy as AmmFailPolicy, MockAmm, MockAmmClient, MockAmmError};
 use mock_lending::{MockLending, MockLendingClient, MockLendingError};
 use soroban_sdk::{
     symbol_short,
@@ -63,16 +63,30 @@ fn setup_nested_amm<'a>() -> NestedAmmFixture<'a> {
     // Outer AMM — represents the intermediate-protocol layer.
     let outer_amm_id = env.register_contract(None, MockAmm);
     let outer_amm = MockAmmClient::new(&env, &outer_amm_id);
-    outer_amm.initialize(&ledgerlens_id, &GATE_THRESHOLD);
-    outer_amm.set_liquidity_gate_config(&GATE_THRESHOLD, &MIN_CONFIDENCE);
+    outer_amm.initialize(&admin, &ledgerlens_id, &GATE_THRESHOLD);
+    outer_amm.set_liquidity_gate_config(
+        &admin,
+        &GATE_THRESHOLD,
+        &MIN_CONFIDENCE,
+        &AmmFailPolicy::FailClosed,
+        &604_800,
+        &0,
+    );
 
     // Inner AMM — represents the downstream protocol that the outer AMM
     // delegates into. Both consult the same LedgerLens instance so
     // any state written by one is visible to the other.
     let inner_amm_id = env.register_contract(None, MockAmm);
     let inner_amm = MockAmmClient::new(&env, &inner_amm_id);
-    inner_amm.initialize(&ledgerlens_id, &GATE_THRESHOLD);
-    inner_amm.set_liquidity_gate_config(&GATE_THRESHOLD, &MIN_CONFIDENCE);
+    inner_amm.initialize(&admin, &ledgerlens_id, &GATE_THRESHOLD);
+    inner_amm.set_liquidity_gate_config(
+        &admin,
+        &GATE_THRESHOLD,
+        &MIN_CONFIDENCE,
+        &AmmFailPolicy::FailClosed,
+        &604_800,
+        &0,
+    );
 
     NestedAmmFixture { env, ledgerlens, outer_amm, inner_amm }
 }
@@ -108,17 +122,17 @@ fn nested_amm_both_hops_reject_high_risk_wallet() {
     // Score well above the gate threshold → both AMMs should reject.
     submit(&f, &wallet, 90, 80);
 
-    let outer_result = f.outer_amm.try_swap(&wallet, &1000i128, &symbol_short!("XLM_USDC"));
+    let outer_result = f.outer_amm.try_swap(&wallet, &symbol_short!("XLM_USDC"), &1000i128);
     assert_eq!(
         outer_result,
-        Err(Ok(MockAmmError::WalletNotPermitted)),
+        Err(Ok(MockAmmError::HighRiskWallet)),
         "outer AMM must reject high-risk wallet"
     );
 
-    let inner_result = f.inner_amm.try_swap(&wallet, &1000i128, &symbol_short!("XLM_USDC"));
+    let inner_result = f.inner_amm.try_swap(&wallet, &symbol_short!("XLM_USDC"), &1000i128);
     assert_eq!(
         inner_result,
-        Err(Ok(MockAmmError::WalletNotPermitted)),
+        Err(Ok(MockAmmError::HighRiskWallet)),
         "inner AMM must independently reject the same high-risk wallet"
     );
 }
@@ -131,10 +145,10 @@ fn nested_amm_both_hops_reject_unknown_wallet() {
     let f = setup_nested_amm();
     let unknown = Address::generate(&f.env);
 
-    let outer_result = f.outer_amm.try_swap(&unknown, &500i128, &symbol_short!("XLM_USDC"));
+    let outer_result = f.outer_amm.try_swap(&unknown, &symbol_short!("XLM_USDC"), &500i128);
     assert!(outer_result.is_err(), "outer AMM must reject wallet with no LedgerLens score");
 
-    let inner_result = f.inner_amm.try_swap(&unknown, &500i128, &symbol_short!("XLM_USDC"));
+    let inner_result = f.inner_amm.try_swap(&unknown, &symbol_short!("XLM_USDC"), &500i128);
     assert!(inner_result.is_err(), "inner AMM must reject same unknown wallet");
 }
 
@@ -154,8 +168,8 @@ fn nested_amm_both_hops_permit_low_risk_wallet() {
     submit(&f, &wallet, 10, 90);
 
     // Both hops must allow the wallet through.
-    f.outer_amm.swap(&wallet, &100i128, &symbol_short!("XLM_USDC"));
-    f.inner_amm.swap(&wallet, &100i128, &symbol_short!("XLM_USDC"));
+    f.outer_amm.swap(&wallet, &symbol_short!("XLM_USDC"), &100i128);
+    f.inner_amm.swap(&wallet, &symbol_short!("XLM_USDC"), &100i128);
 }
 
 // ── #716-3: Read-only behavior — no cross-hop state mutation ────────────────
@@ -174,7 +188,7 @@ fn nested_amm_swap_does_not_mutate_ledgerlens_score_state() {
     let score_before = f.ledgerlens.get_score(&wallet, &symbol_short!("XLM_USDC"));
 
     // A successful swap through the outer AMM must not change the score.
-    f.outer_amm.swap(&wallet, &50i128, &symbol_short!("XLM_USDC"));
+    f.outer_amm.swap(&wallet, &symbol_short!("XLM_USDC"), &50i128);
 
     let score_after = f.ledgerlens.get_score(&wallet, &symbol_short!("XLM_USDC"));
     assert_eq!(
@@ -197,16 +211,24 @@ fn nested_amm_and_lending_both_permit_low_risk_wallet() {
 
     let ledgerlens_id = env.register_contract(None, LedgerLensScoreContract);
     let ledgerlens = LedgerLensScoreContractClient::new(&env, &ledgerlens_id);
-    ledgerlens.initialize(&Address::generate(&env), &Address::generate(&env));
+    let admin = Address::generate(&env);
+    ledgerlens.initialize(&admin, &Address::generate(&env));
 
     let amm_id = env.register_contract(None, MockAmm);
     let amm = MockAmmClient::new(&env, &amm_id);
-    amm.initialize(&ledgerlens_id, &GATE_THRESHOLD);
-    amm.set_liquidity_gate_config(&GATE_THRESHOLD, &MIN_CONFIDENCE);
+    amm.initialize(&admin, &ledgerlens_id, &GATE_THRESHOLD);
+    amm.set_liquidity_gate_config(
+        &admin,
+        &GATE_THRESHOLD,
+        &MIN_CONFIDENCE,
+        &AmmFailPolicy::FailClosed,
+        &604_800,
+        &0,
+    );
 
     let lending_id = env.register_contract(None, MockLending);
     let lending = MockLendingClient::new(&env, &lending_id);
-    lending.initialize(&ledgerlens_id, &GATE_THRESHOLD, &MIN_CONFIDENCE);
+    lending.initialize(&admin, &ledgerlens_id, &GATE_THRESHOLD, &MIN_CONFIDENCE);
 
     let wallet = Address::generate(&env);
     env.ledger().with_mut(|l| l.timestamp += 3_601);
@@ -224,8 +246,8 @@ fn nested_amm_and_lending_both_permit_low_risk_wallet() {
     );
 
     // Both downstream protocols must accept the low-risk wallet without error.
-    amm.swap(&wallet, &200i128, &symbol_short!("XLM_USDC"));
-    lending.borrow(&wallet, &100i128);
+    amm.swap(&wallet, &symbol_short!("XLM_USDC"), &200i128);
+    lending.borrow(&wallet, &symbol_short!("XLM_USDC"), &100i128);
 }
 
 /// A high-risk wallet must be rejected by both an AMM and a lending protocol
@@ -238,16 +260,24 @@ fn nested_amm_and_lending_both_reject_high_risk_wallet() {
 
     let ledgerlens_id = env.register_contract(None, LedgerLensScoreContract);
     let ledgerlens = LedgerLensScoreContractClient::new(&env, &ledgerlens_id);
-    ledgerlens.initialize(&Address::generate(&env), &Address::generate(&env));
+    let admin = Address::generate(&env);
+    ledgerlens.initialize(&admin, &Address::generate(&env));
 
     let amm_id = env.register_contract(None, MockAmm);
     let amm = MockAmmClient::new(&env, &amm_id);
-    amm.initialize(&ledgerlens_id, &GATE_THRESHOLD);
-    amm.set_liquidity_gate_config(&GATE_THRESHOLD, &MIN_CONFIDENCE);
+    amm.initialize(&admin, &ledgerlens_id, &GATE_THRESHOLD);
+    amm.set_liquidity_gate_config(
+        &admin,
+        &GATE_THRESHOLD,
+        &MIN_CONFIDENCE,
+        &AmmFailPolicy::FailClosed,
+        &604_800,
+        &0,
+    );
 
     let lending_id = env.register_contract(None, MockLending);
     let lending = MockLendingClient::new(&env, &lending_id);
-    lending.initialize(&ledgerlens_id, &GATE_THRESHOLD, &MIN_CONFIDENCE);
+    lending.initialize(&admin, &ledgerlens_id, &GATE_THRESHOLD, &MIN_CONFIDENCE);
 
     let wallet = Address::generate(&env);
     env.ledger().with_mut(|l| l.timestamp += 3_601);
@@ -265,13 +295,13 @@ fn nested_amm_and_lending_both_reject_high_risk_wallet() {
     );
 
     assert_eq!(
-        amm.try_swap(&wallet, &200i128, &symbol_short!("XLM_USDC")),
-        Err(Ok(MockAmmError::WalletNotPermitted)),
+        amm.try_swap(&wallet, &symbol_short!("XLM_USDC"), &200i128),
+        Err(Ok(MockAmmError::HighRiskWallet)),
         "AMM must reject high-risk wallet"
     );
     assert_eq!(
-        lending.try_borrow(&wallet, &100i128),
-        Err(Ok(MockLendingError::WalletNotPermitted)),
+        lending.try_borrow(&wallet, &symbol_short!("XLM_USDC"), &100i128),
+        Err(Ok(MockLendingError::RiskGateRejected)),
         "lending must reject same high-risk wallet"
     );
 }
