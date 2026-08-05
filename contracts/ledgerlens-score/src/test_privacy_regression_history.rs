@@ -38,7 +38,7 @@ fn test_history_max_depth_no_overflow() {
 
     // Submit 10 scores
     for i in 0..10 {
-        env.ledger().with_mut(|l| l.timestamp = 1_000_000 + (i as u64 * 100));
+        env.ledger().with_mut(|l| l.timestamp = 1_000_000 + (i as u64 * 3_601));
         client.submit_score(
             &Vec::new(&env),
             &wallet,
@@ -46,7 +46,7 @@ fn test_history_max_depth_no_overflow() {
             &(50 + i as u32),
             &false,
             &false,
-            &(1_700_000_000 + i as u64 * 100),
+            &(1_700_000_000 + i as u64 * 3_601),
             &90,
             &1,
             &None,
@@ -78,7 +78,7 @@ fn test_history_respects_max_depth_boundary() {
     client.set_history_max_depth(&Vec::new(&env), &3);
 
     for i in 0..3 {
-        env.ledger().with_mut(|l| l.timestamp = 1_000_000 + (i as u64 * 100));
+        env.ledger().with_mut(|l| l.timestamp = 1_000_000 + (i as u64 * 3_601));
         client.submit_score(
             &Vec::new(&env),
             &wallet,
@@ -86,7 +86,7 @@ fn test_history_respects_max_depth_boundary() {
             &(60 + i as u32),
             &false,
             &false,
-            &(1_700_000_000 + i as u64 * 100),
+            &(1_700_000_000 + i as u64 * 3_601),
             &90,
             &1,
             &None,
@@ -118,6 +118,7 @@ fn test_history_cleared_empty_result() {
         &1,
         &None,
     );
+    env.ledger().with_mut(|l| l.timestamp += 3_601);
     client.submit_score(
         &Vec::new(&env),
         &wallet,
@@ -163,6 +164,7 @@ fn test_history_after_clear_can_reaccumulate() {
         &1,
         &None,
     );
+    env.ledger().with_mut(|l| l.timestamp += 3_601);
     client.submit_score(
         &Vec::new(&env),
         &wallet,
@@ -180,7 +182,7 @@ fn test_history_after_clear_can_reaccumulate() {
     client.clear_score_history(&Vec::new(&env), &wallet, &pair);
 
     // Submit new scores
-    env.ledger().with_mut(|l| l.timestamp = 1_000_000 + 1000);
+    env.ledger().with_mut(|l| l.timestamp += 3_601);
     client.submit_score(
         &Vec::new(&env),
         &wallet,
@@ -193,6 +195,7 @@ fn test_history_after_clear_can_reaccumulate() {
         &1,
         &None,
     );
+    env.ledger().with_mut(|l| l.timestamp += 3_601);
     client.submit_score(
         &Vec::new(&env),
         &wallet,
@@ -324,7 +327,7 @@ fn test_history_max_depth_change_takes_effect() {
     // Submit 5 scores with max_depth = 10
     client.set_history_max_depth(&Vec::new(&env), &10);
     for i in 0..5 {
-        env.ledger().with_mut(|l| l.timestamp = 1_000_000 + (i as u64 * 100));
+        env.ledger().with_mut(|l| l.timestamp = 1_000_000 + (i as u64 * 3_601));
         client.submit_score(
             &Vec::new(&env),
             &wallet,
@@ -332,7 +335,7 @@ fn test_history_max_depth_change_takes_effect() {
             &(50 + i as u32),
             &false,
             &false,
-            &(1_700_000_000 + i as u64 * 100),
+            &(1_700_000_000 + i as u64 * 3_601),
             &90,
             &1,
             &None,
@@ -345,7 +348,7 @@ fn test_history_max_depth_change_takes_effect() {
     // Reduce max_depth to 3 and submit 2 more scores
     client.set_history_max_depth(&Vec::new(&env), &3);
     for i in 5..7 {
-        env.ledger().with_mut(|l| l.timestamp = 1_000_000 + (i as u64 * 100));
+        env.ledger().with_mut(|l| l.timestamp = 1_000_000 + (i as u64 * 3_601));
         client.submit_score(
             &Vec::new(&env),
             &wallet,
@@ -353,7 +356,7 @@ fn test_history_max_depth_change_takes_effect() {
             &(50 + i as u32),
             &false,
             &false,
-            &(1_700_000_000 + i as u64 * 100),
+            &(1_700_000_000 + i as u64 * 3_601),
             &90,
             &1,
             &None,
@@ -380,7 +383,7 @@ fn test_history_pagination_not_exposed() {
 
     // Submit multiple scores
     for i in 0..5 {
-        env.ledger().with_mut(|l| l.timestamp = 1_000_000 + (i as u64 * 100));
+        env.ledger().with_mut(|l| l.timestamp = 1_000_000 + (i as u64 * 3_601));
         client.submit_score(
             &Vec::new(&env),
             &wallet,
@@ -388,7 +391,7 @@ fn test_history_pagination_not_exposed() {
             &(50 + i as u32),
             &false,
             &false,
-            &(1_700_000_000 + i as u64 * 100),
+            &(1_700_000_000 + i as u64 * 3_601),
             &90,
             &1,
             &None,
@@ -418,7 +421,7 @@ fn test_history_no_metadata_leakage() {
     client.set_history_max_depth(&Vec::new(&env), &5);
 
     for i in 0..7 {
-        env.ledger().with_mut(|l| l.timestamp = 1_000_000 + (i as u64 * 100));
+        env.ledger().with_mut(|l| l.timestamp = 1_000_000 + (i as u64 * 3_601));
         client.submit_score(
             &Vec::new(&env),
             &wallet,
@@ -426,7 +429,7 @@ fn test_history_no_metadata_leakage() {
             &(50 + i as u32),
             &false,
             &false,
-            &(1_700_000_000 + i as u64 * 100),
+            &(1_700_000_000 + i as u64 * 3_601),
             &90,
             &1,
             &None,
@@ -464,6 +467,7 @@ fn test_history_cleared_different_pairs_unaffected() {
         &1,
         &None,
     );
+    env.ledger().with_mut(|l| l.timestamp += 3_601);
     client.submit_score(
         &Vec::new(&env),
         &wallet,
@@ -514,7 +518,7 @@ fn test_history_order_preserved() {
     // Submit scores in specific order
     let scores = vec![30, 45, 60, 50, 75];
     for (idx, &score) in scores.iter().enumerate() {
-        env.ledger().with_mut(|l| l.timestamp = 1_000_000 + (idx as u64 * 100));
+        env.ledger().with_mut(|l| l.timestamp = 1_000_000 + (idx as u64 * 3_601));
         client.submit_score(
             &Vec::new(&env),
             &wallet,
@@ -522,7 +526,7 @@ fn test_history_order_preserved() {
             &score,
             &false,
             &false,
-            &(1_700_000_000 + idx as u64 * 100),
+            &(1_700_000_000 + idx as u64 * 3_601),
             &90,
             &1,
             &None,
