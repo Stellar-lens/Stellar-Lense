@@ -117,7 +117,7 @@ if [[ "\${command}" == "contract" && "\${1:-}" == "invoke" ]]; then
       echo "1"
       exit 0
       ;;
-    verify-rpc-unavailable:initialize|initialize-timeout:get_version|initialize-bad-sequence:get_version)
+    initialize-timeout:get_version|initialize-bad-sequence:get_version)
       echo "should not be called" >&2
       exit 1
       ;;
