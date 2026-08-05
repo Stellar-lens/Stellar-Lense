@@ -424,8 +424,9 @@ mod test_event_causality {
 
     #[test]
     fn test_score_submission_correlation_id_is_deterministic() {
-        let wallet = Address::generate(&Env::default());
-        let asset_pair = Symbol::new(&Env::default(), "stellar_usdc");
+        let env = Env::default();
+        let wallet = Address::generate(&env);
+        let asset_pair = Symbol::new(&env, "stellar_usdc");
         let timestamp = 1000;
 
         let id1 = EventCausality::score_submission_correlation_id(&wallet, &asset_pair, timestamp);
@@ -436,9 +437,10 @@ mod test_event_causality {
 
     #[test]
     fn test_score_submission_correlation_id_differs_by_wallet() {
-        let wallet1 = Address::generate(&Env::default());
-        let wallet2 = Address::generate(&Env::default());
-        let asset_pair = Symbol::new(&Env::default(), "stellar_usdc");
+        let env = Env::default();
+        let wallet1 = Address::generate(&env);
+        let wallet2 = Address::generate(&env);
+        let asset_pair = Symbol::new(&env, "stellar_usdc");
         let timestamp = 1000;
 
         let id1 = EventCausality::score_submission_correlation_id(&wallet1, &asset_pair, timestamp);
@@ -449,8 +451,9 @@ mod test_event_causality {
 
     #[test]
     fn test_score_submission_correlation_id_differs_by_timestamp() {
-        let wallet = Address::generate(&Env::default());
-        let asset_pair = Symbol::new(&Env::default(), "stellar_usdc");
+        let env = Env::default();
+        let wallet = Address::generate(&env);
+        let asset_pair = Symbol::new(&env, "stellar_usdc");
 
         let id1 = EventCausality::score_submission_correlation_id(&wallet, &asset_pair, 1000);
         let id2 = EventCausality::score_submission_correlation_id(&wallet, &asset_pair, 2000);
@@ -460,8 +463,9 @@ mod test_event_causality {
 
     #[test]
     fn test_admin_transfer_correlation_id_is_deterministic() {
-        let from = Address::generate(&Env::default());
-        let to = Address::generate(&Env::default());
+        let env = Env::default();
+        let from = Address::generate(&env);
+        let to = Address::generate(&env);
         let timestamp = 5000;
 
         let id1 = EventCausality::admin_transfer_correlation_id(&from, &to, timestamp);
@@ -483,8 +487,9 @@ mod test_event_causality {
 
     #[test]
     fn test_dispute_correlation_id_is_deterministic() {
-        let challenger = Address::generate(&Env::default());
-        let asset_pair = Symbol::new(&Env::default(), "xlm_usdc");
+        let env = Env::default();
+        let challenger = Address::generate(&env);
+        let asset_pair = Symbol::new(&env, "xlm_usdc");
         let timestamp = 7000;
 
         let id1 = EventCausality::dispute_correlation_id(&challenger, &asset_pair, timestamp);
