@@ -11,7 +11,7 @@
 //! changed by this suite.
 
 use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient, RiskScore};
-use mock_amm::{MockAmm, MockAmmClient, MockAmmError};
+use mock_amm::{FailPolicy as AmmFailPolicy, MockAmm, MockAmmClient, MockAmmError};
 use mock_lending::{MockLending, MockLendingClient, MockLendingError};
 use sha2::{Digest, Sha256};
 use soroban_sdk::{
@@ -228,12 +228,19 @@ fn setup_historical<'a>() -> HistoricalFixture<'a> {
 
     let amm_id = env.register_contract(None, MockAmm);
     let amm = MockAmmClient::new(&env, &amm_id);
-    amm.initialize(&score_id, &GATE_THRESHOLD);
-    amm.set_liquidity_gate_config(&GATE_THRESHOLD, &MIN_CONFIDENCE);
+    amm.initialize(&admin, &score_id, &GATE_THRESHOLD);
+    amm.set_liquidity_gate_config(
+        &admin,
+        &GATE_THRESHOLD,
+        &MIN_CONFIDENCE,
+        &AmmFailPolicy::FailClosed,
+        &604_800,
+        &0,
+    );
 
     let lending_id = env.register_contract(None, MockLending);
     let lending = MockLendingClient::new(&env, &lending_id);
-    lending.initialize(&score_id, &GATE_THRESHOLD, &MIN_CONFIDENCE);
+    lending.initialize(&admin, &score_id, &GATE_THRESHOLD, &MIN_CONFIDENCE);
 
     HistoricalFixture { env, score, amm, lending }
 }
