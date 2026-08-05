@@ -1,7 +1,14 @@
-use crate::{Error, LedgerLensAggregator, LedgerLensAggregatorClient};
+use crate::{
+    AggregatorConfigFingerprint, Error, LedgerLensAggregator, LedgerLensAggregatorClient,
+    MaybeAggregatorConfigFingerprint, ShardProbeStatus, SplitBrainStatus,
+};
 use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
 use ledgerlens_test_support::{generate_score_roles, test_env};
-use soroban_sdk::{symbol_short, testutils::Address as _, Address, Env, Symbol, Vec};
+use soroban_sdk::{
+    symbol_short,
+    testutils::{Address as _, Ledger as _},
+    Address, Env, Symbol, Vec,
+};
 
 /// A shard whose interface has fully drifted: it advertises no capability the
 /// aggregator depends on.
@@ -828,8 +835,6 @@ mod downgraded_shard {
         }
     }
 }
-
-use crate::{LedgerLensAggregator, LedgerLensAggregatorClient};
 
 /// After registration the capability snapshot is stored and readable.
 #[test]

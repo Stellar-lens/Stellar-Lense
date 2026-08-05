@@ -3,7 +3,6 @@ mod tests {
     use ledgerlens_score::{
         LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreSubmission,
     };
-    use replay::{compare_config_manifests, parse_manifest_json, recommended_manifest_template};
     use soroban_sdk::testutils::Address as _;
     use soroban_sdk::{Address, Env, Symbol, Vec as SVec};
 
