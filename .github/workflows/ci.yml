@@ -27,6 +27,7 @@ jobs:
           pip install ruff black nbconvert nbformat jupyter-client ipykernel
 
       - name: Lint
+        if: matrix.python-version == '3.12'
         run: |
           ruff check .
           black --check .
