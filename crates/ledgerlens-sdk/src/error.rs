@@ -6,10 +6,7 @@ pub enum LedgerLensError {
     /// HTTP request failed (network error, DNS resolution failure, etc.)
     HttpError(String),
     /// The API returned an error response.
-    Api {
-        status_code: u16,
-        message: String,
-    },
+    Api { status_code: u16, message: String },
     /// The request was unauthorized (401).
     Unauthorized(String),
     /// The requested resource was not found (404).
@@ -31,7 +28,10 @@ impl fmt::Display for LedgerLensError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             LedgerLensError::HttpError(msg) => write!(f, "HTTP error: {}", msg),
-            LedgerLensError::Api { status_code, message } => {
+            LedgerLensError::Api {
+                status_code,
+                message,
+            } => {
                 write!(f, "API error ({}): {}", status_code, message)
             }
             LedgerLensError::Unauthorized(msg) => write!(f, "Unauthorized (401): {}", msg),

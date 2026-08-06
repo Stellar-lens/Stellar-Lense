@@ -42,9 +42,7 @@ pub mod zk;
 // Re-exports for convenience.
 pub use client::LedgerLensClient;
 pub use error::LedgerLensError;
-pub use models::{
-    CrossChainLink, HealthStatus, Ring, RiskScore, WalletScoresResponse,
-};
+pub use models::{CrossChainLink, HealthStatus, Ring, RiskScore, WalletScoresResponse};
 
 #[cfg(feature = "zk-verify")]
 pub use zk::verify_threshold_proof;

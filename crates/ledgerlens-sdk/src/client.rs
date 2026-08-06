@@ -137,8 +137,7 @@ impl LedgerLensClient {
     ///
     /// `GET /v1/scores/{wallet}`
     pub async fn get_score(&self, wallet: &str) -> Result<WalletScoresResponse, LedgerLensError> {
-        self.get_json(&format!("/v1/scores/{}", wallet))
-            .await
+        self.get_json(&format!("/v1/scores/{}", wallet)).await
     }
 
     /// Fetch all scores, optionally filtered by asset pair.

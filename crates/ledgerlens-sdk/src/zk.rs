@@ -34,7 +34,8 @@ use ark_ff::{BigInt, BigInteger, PrimeField};
 use sha2::{Digest, Sha256};
 
 /// The BN254 (alt_bn128) curve order / scalar field modulus.
-const CURVE_ORDER: &str = "21888242871839275222246405745257275088548364400416034343698204186575808495617";
+const CURVE_ORDER: &str =
+    "21888242871839275222246405745257275088548364400416034343698204186575808495617";
 
 /// Maximum score value (matches `detection/zk_prover.py::MAX_SCORE`).
 const MAX_SCORE: u32 = 100;
@@ -48,19 +49,24 @@ fn parse_scalar(s: &str) -> Result<<Bn254 as Pairing>::ScalarField, ZkVerifyErro
     // Parse the string as a big-endian byte representation, then convert to field element.
     // This matches the `int.from_bytes(x.to_bytes(32, "big"), "big")` convention in the Python prover.
     let bytes = parse_decimal_string_to_bytes(s)?;
-    Ok(<Bn254 as Pairing>::ScalarField::from_le_bytes_mod_order(&bytes))
+    Ok(<Bn254 as Pairing>::ScalarField::from_le_bytes_mod_order(
+        &bytes,
+    ))
 }
 
 /// Parse a decimal string into a base field element (for point coordinates).
 fn parse_base(s: &str) -> Result<<Bn254 as Pairing>::BaseField, ZkVerifyError> {
     let bytes = parse_decimal_string_to_bytes(s)?;
-    Ok(<Bn254 as Pairing>::BaseField::from_le_bytes_mod_order(&bytes))
+    Ok(<Bn254 as Pairing>::BaseField::from_le_bytes_mod_order(
+        &bytes,
+    ))
 }
 
 /// Convert a decimal string to 32 big-endian bytes.
 fn parse_decimal_string_to_bytes(s: &str) -> Result<Vec<u8>, ZkVerifyError> {
     // Use num-bigint's BigUint to parse the decimal string and convert to bytes.
-    let val: num_bigint::BigUint = s.parse()
+    let val: num_bigint::BigUint = s
+        .parse()
         .map_err(|_| ZkVerifyError::InvalidFormat(format!("invalid field element: {}", s)))?;
     let bytes = val.to_bytes_be();
     // Pad to 32 bytes
@@ -88,15 +94,15 @@ fn neg_point(p: &ark_bn254::G1Affine) -> ark_bn254::G1Affine {
 }
 
 /// Add two G1 points.
-fn add_points(
-    a: &ark_bn254::G1Affine,
-    b: &ark_bn254::G1Affine,
-) -> ark_bn254::G1Affine {
+fn add_points(a: &ark_bn254::G1Affine, b: &ark_bn254::G1Affine) -> ark_bn254::G1Affine {
     ((*a).into_group() + *b).into_affine()
 }
 
 /// Multiply a G1 point by a scalar.
-fn mul_point(p: &ark_bn254::G1Affine, scalar: &<Bn254 as Pairing>::ScalarField) -> ark_bn254::G1Affine {
+fn mul_point(
+    p: &ark_bn254::G1Affine,
+    scalar: &<Bn254 as Pairing>::ScalarField,
+) -> ark_bn254::G1Affine {
     ((*p).into_group() * scalar).into_affine()
 }
 
@@ -130,11 +136,7 @@ fn fiat_shamir(
 }
 
 /// Build the context hash: `SHA256(wallet || threshold_byte || score_commit_x_bytes || score_commit_y_bytes)`.
-fn build_context(
-    wallet: &str,
-    threshold: u32,
-    score_commit: &ark_bn254::G1Affine,
-) -> Vec<u8> {
+fn build_context(wallet: &str, threshold: u32, score_commit: &ark_bn254::G1Affine) -> Vec<u8> {
     let mut hasher = Sha256::new();
     hasher.update(wallet.as_bytes());
     hasher.update([threshold as u8]);
@@ -202,19 +204,13 @@ pub fn verify_threshold_proof(
         let s1 = parse_scalar(&bp.s1)?;
 
         // R0 = s0 * H - c0 * B
-        let r0 = add_points(
-            &mul_point(&h, &s0),
-            &neg_point(&mul_point(&b, &c0)),
-        );
+        let r0 = add_points(&mul_point(&h, &s0), &neg_point(&mul_point(&b, &c0)));
 
         // B_minus_G = B - G
         let b_minus_g = add_points(&b, &neg_point(&g1));
 
         // R1 = s1 * H - c1 * (B - G)
-        let r1 = add_points(
-            &mul_point(&h, &s1),
-            &neg_point(&mul_point(&b_minus_g, &c1)),
-        );
+        let r1 = add_points(&mul_point(&h, &s1), &neg_point(&mul_point(&b_minus_g, &c1)));
 
         let expected_c = fiat_shamir(&r0, &r1, &b, &context);
 
@@ -226,7 +222,13 @@ pub fn verify_threshold_proof(
     }
 
     // 2. Verify bit sum: Σ 2^i * B_i == P - T * G
-    let p_minus_t_g = add_points(&p, &neg_point(&mul_point(&g1, &<Bn254 as Pairing>::ScalarField::from(threshold as u64))));
+    let p_minus_t_g = add_points(
+        &p,
+        &neg_point(&mul_point(
+            &g1,
+            &<Bn254 as Pairing>::ScalarField::from(threshold as u64),
+        )),
+    );
 
     let mut accumulated = ark_bn254::G1Affine::identity();
     for (i, bp) in bits.iter().enumerate() {

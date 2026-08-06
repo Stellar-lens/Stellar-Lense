@@ -211,6 +211,9 @@ async fn test_429_error() {
 async fn test_debug_redacts_api_key() {
     let client = LedgerLensClient::new("http://localhost", Some("sk_secret123".into()));
     let debug_str = format!("{:?}", client);
-    assert!(!debug_str.contains("sk_secret123"), "API key leaked in Debug output");
+    assert!(
+        !debug_str.contains("sk_secret123"),
+        "API key leaked in Debug output"
+    );
     assert!(debug_str.contains("***"), "Debug should show redacted key");
 }
