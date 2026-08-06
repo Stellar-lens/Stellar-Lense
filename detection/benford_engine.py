@@ -242,6 +242,10 @@ def leading_digits(amounts: pd.Series) -> pd.Series:
 
     magnitudes = np.floor(np.log10(amounts)).astype(int)
     normalized = amounts / (10.0**magnitudes)
+    # Scaling by powers of ten can leave an exact decimal boundary one ULP
+    # below its mathematical value (for example 0.7 * 10 -> 6.999999...).
+    # Nudging toward +inf preserves Benford's required scale invariance.
+    normalized = np.nextafter(normalized, np.inf)
     return np.floor(normalized).astype(int).clip(1, 9)
 
 

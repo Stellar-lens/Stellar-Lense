@@ -62,7 +62,15 @@ def _load_results(cache_path: Path) -> tuple[int, int, list[dict]]:
     """
     conn = sqlite3.connect(str(cache_path))
     try:
-        cursor = conn.execute("SELECT id, line, status, filename FROM mutant")
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(mutant)")}
+        if "filename" in columns:
+            cursor = conn.execute("SELECT id, line, status, filename FROM mutant")
+        else:
+            # mutmut 2.x stores locations in normalized tables.
+            cursor = conn.execute("""SELECT m.id, l.line_number, m.status, sf.filename
+                   FROM Mutant AS m
+                   JOIN Line AS l ON l.id = m.line
+                   JOIN SourceFile AS sf ON sf.id = l.sourcefile""")
         rows = cursor.fetchall()
     except sqlite3.OperationalError as exc:
         print(f"ERROR: Could not read mutmut cache — {exc}", file=sys.stderr)
@@ -79,9 +87,16 @@ def _load_results(cache_path: Path) -> tuple[int, int, list[dict]]:
     surviving: list[dict] = []
 
     for mut_id, line, status, filename in rows:
-        if status in ("ok", "suspicious", "timeout"):
+        if status in (
+            "ok",
+            "suspicious",
+            "timeout",
+            "ok_killed",
+            "ok_suspicious",
+            "bad_timeout",
+        ):
             killed += 1
-        elif status == "survived":
+        elif status in ("survived", "bad_survived"):
             survived += 1
             surviving.append(
                 {

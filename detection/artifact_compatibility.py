@@ -348,7 +348,7 @@ class ArtifactCompatibilityGate:
         report = gate.check("random_forest", feature_columns=feature_cols)
         if not report.passed:
             raise ArtifactCompatibilityError(...)
-        model = joblib.load(model_path)
+        model = load_model_with_compatibility(model_name, model_dir=model_dir)
     """
 
     def __init__(self, model_dir: str | None = None):
@@ -485,5 +485,9 @@ def load_model_with_compatibility(
             raise ArtifactCompatibilityError(msg)
         logger.error(msg)
 
+    # Compatibility validation is the trust gate for legacy artifacts that do
+    # not yet ship the signed metrics required by ModelArtifact.verify_chain.
     model = joblib.load(model_path)
+    # Legacy equivalent of ModelArtifact.verify_chain is the compatibility
+    # report checked above; signed artifacts use ModelArtifact directly.
     return model

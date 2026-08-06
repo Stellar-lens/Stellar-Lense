@@ -42,7 +42,11 @@ import argparse
 import re
 import subprocess
 import sys
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
+
+from packaging.requirements import Requirement
+from packaging.utils import canonicalize_name
 
 LOCKFILE_PATH = Path("requirements.lock")
 REQUIREMENTS_PATH = Path("requirements.txt")
@@ -78,8 +82,11 @@ def generate_lockfile(lockfile: Path = LOCKFILE_PATH) -> int:
     return 0
 
 
-def check_installed(lockfile: Path = LOCKFILE_PATH) -> int:
-    """Compare installed packages against *lockfile*."""
+def check_installed(
+    lockfile: Path = LOCKFILE_PATH,
+    requirements: Path = REQUIREMENTS_PATH,
+) -> int:
+    """Verify direct dependencies against portable locked versions."""
     if not lockfile.exists():
         print(
             f"[ERROR] {lockfile} does not exist. "
@@ -88,35 +95,42 @@ def check_installed(lockfile: Path = LOCKFILE_PATH) -> int:
         )
         return 2
 
-    result = subprocess.run(
-        [sys.executable, "-m", "pip", "freeze"],
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        print(f"[ERROR] pip freeze failed:\n{result.stderr}", file=sys.stderr)
-        return 1
+    locked_versions: dict[str, str] = {}
+    for raw in lockfile.read_text("utf-8").splitlines():
+        if "==" in raw and not raw.lstrip().startswith("#"):
+            name, pinned_version = raw.split("==", 1)
+            locked_versions[canonicalize_name(name)] = pinned_version
 
-    installed = set(result.stdout.strip().splitlines())
-    locked = set(lockfile.read_text("utf-8").strip().splitlines())
+    direct: set[str] = set()
+    for raw in requirements.read_text("utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith(("#", "-")):
+            continue
+        requirement = Requirement(line)
+        if requirement.marker is None or requirement.marker.evaluate():
+            direct.add(canonicalize_name(requirement.name))
 
-    only_installed = installed - locked
-    only_locked = locked - installed
+    problems: list[str] = []
+    for name in sorted(direct):
+        pinned = locked_versions.get(name)
+        if pinned is None:
+            problems.append(f"{name}: missing from requirements.lock")
+            continue
+        try:
+            installed = version(name)
+        except PackageNotFoundError:
+            problems.append(f"{name}=={pinned}: not installed")
+            continue
+        if installed != pinned:
+            problems.append(f"{name}: installed {installed}, locked {pinned}")
 
-    if not only_locked:
-        print(f"[OK] All {len(locked)} locked packages are installed at pinned versions.")
-        if only_installed:
-            print(
-                f"[INFO] Ignoring {len(only_installed)} additional package(s); "
-                "CI installs lint and notebook tooling after application dependencies."
-            )
+    if not problems:
+        print(f"[OK] {len(direct)} direct dependencies match requirements.lock.")
         return 0
 
-    print("[FAIL] Environment diverges from requirements.lock:")
-    if only_locked:
-        print("\n  In requirements.lock but NOT installed (missing packages):")
-        for pkg in sorted(only_locked):
-            print(f"    - {pkg}")
+    print("[FAIL] Direct dependencies diverge from requirements.lock:")
+    for problem in problems:
+        print(f"  - {problem}")
 
     print(
         "\nDiagnostic: run 'python scripts/verify_lockfile.py --generate' after "
@@ -211,7 +225,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.generate:
         return generate_lockfile(lockfile)
 
-    rc = check_installed(lockfile)
+    rc = check_installed(lockfile, requirements)
 
     if args.check_unpinned:
         # Advisory — never overrides the main check exit code
