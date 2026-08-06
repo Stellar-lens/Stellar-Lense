@@ -181,9 +181,11 @@ packages = [
 testpaths = ["tests"]
 pythonpath = ["."]
 asyncio_mode = "auto"
-addopts = "--continue-on-collection-errors -m 'not cross_repo_e2e'"
+addopts = "--continue-on-collection-errors -m 'not cross_repo_e2e and not e2e and not chaos and not slow and not benchmark'"
 markers = [
     "benchmark: performance benchmarks (excluded from standard CI; run with -m benchmark)",
+    "chaos: chaos-engineering resilience tests (requires Toxiproxy)",
+    "e2e: end-to-end tests that require a fully initialized local stack",
     "slow: long-running tests (excluded from standard CI; run with -m slow)",
     "cross_repo_e2e: requires Docker + sibling repo checkouts; excluded from default pytest run",
 ]

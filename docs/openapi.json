@@ -12,7 +12,7 @@
           "analyst"
         ],
         "summary": "Analyst Wallet View",
-        "description": "Return combined analyst view for ``wallet``.\n\nResponse sections:\n1. current_score      — latest RiskScore record\n2. shap_top_10        — top-10 SHAP feature contributions\n3. trade_timeline     — last 30 days of scoring events\n4. ring_membership    — wash-trading rings containing this wallet\n5. score_trend        — historical score values (last 30 days)\n6. open_alerts        — typed manipulation alerts for this wallet",
+        "description": "Return combined analyst view for ``wallet``.\n\nResponse sections:\n1. current_score      \u2014 latest RiskScore record\n2. shap_top_10        \u2014 top-10 SHAP feature contributions\n3. trade_timeline     \u2014 last 30 days of scoring events\n4. ring_membership    \u2014 wash-trading rings containing this wallet\n5. score_trend        \u2014 historical score values (last 30 days)\n6. open_alerts        \u2014 typed manipulation alerts for this wallet",
         "operationId": "analyst_wallet_view_analyst_wallet__wallet__get",
         "parameters": [
           {
@@ -373,7 +373,7 @@
           "analyst"
         ],
         "summary": "Analyst Stats",
-        "description": "Return aggregate analyst review statistics.\n\nResponse fields:\n- cases_reviewed_today: int\n- false_positive_rate_30d: float (0.0–1.0)\n- avg_review_time_seconds: float | None",
+        "description": "Return aggregate analyst review statistics.\n\nResponse fields:\n- cases_reviewed_today: int\n- false_positive_rate_30d: float (0.0\u20131.0)\n- avg_review_time_seconds: float | None",
         "operationId": "analyst_stats_analyst_stats_get",
         "parameters": [
           {
@@ -922,6 +922,71 @@
         }
       }
     },
+    "/admin/api-keys/{key_id}/rotate": {
+      "post": {
+        "tags": [
+          "API Keys"
+        ],
+        "summary": "Rotate API key",
+        "description": "Rotate an active API key with an overlapping validity window.",
+        "operationId": "rotate_key_endpoint_admin_api_keys__key_id__rotate_post",
+        "parameters": [
+          {
+            "name": "key_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key Id"
+            }
+          },
+          {
+            "name": "grace_period_seconds",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 604800,
+              "title": "Grace Period Seconds"
+            }
+          },
+          {
+            "name": "x-ledgerlens-admin-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "X-Ledgerlens-Admin-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Rotate Key Endpoint Admin Api Keys  Key Id  Rotate Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/scores/batch": {
       "post": {
         "tags": [
@@ -1215,8 +1280,8 @@
             "required": false,
             "schema": {
               "type": "number",
-              "maximum": 1,
-              "minimum": 0,
+              "maximum": 1.0,
+              "minimum": 0.0,
               "default": 0.7,
               "title": "Min Confidence"
             }
@@ -1370,7 +1435,7 @@
           "GNN Ring Detection"
         ],
         "summary": "GNN detector health status",
-        "description": "Return GNN detector status — whether model is loaded and its config.",
+        "description": "Return GNN detector status \u2014 whether model is loaded and its config.",
         "operationId": "gnn_health_gnn_health_get",
         "responses": {
           "200": {
@@ -1835,8 +1900,8 @@
             "required": false,
             "schema": {
               "type": "number",
-              "maximum": 1,
-              "minimum": 0,
+              "maximum": 1.0,
+              "minimum": 0.0,
               "default": 0.6,
               "title": "Min Score"
             }
@@ -1901,7 +1966,7 @@
     "/admin/namespaces": {
       "get": {
         "summary": "Admin Namespaces",
-        "description": "Return every namespace with per-table record counts.\n\nAdmin-only (requires the ``LEDGERLENS_ADMIN_API_KEY`` header).\nGated by `require_admin_key` — the admin wildcard API key is\nrequired to see cross-namespace data.",
+        "description": "Return every namespace with per-table record counts.\n\nAdmin-only (requires the ``LEDGERLENS_ADMIN_API_KEY`` header).\nGated by `require_admin_key` \u2014 the admin wildcard API key is\nrequired to see cross-namespace data.",
         "operationId": "admin_namespaces_admin_namespaces_get",
         "parameters": [
           {
@@ -1927,6 +1992,68 @@
                     "additionalProperties": true
                   },
                   "title": "Response Admin Namespaces Admin Namespaces Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/namespaces/{namespace_id}/rotate-key": {
+      "post": {
+        "summary": "Admin Rotate Namespace Key",
+        "description": "Rotate the namespace key. Marks the old one rotating, creates a new one.\n\nAdmin-only (requires the ``LEDGERLENS_ADMIN_API_KEY`` header).",
+        "operationId": "admin_rotate_namespace_key_admin_namespaces__namespace_id__rotate_key_post",
+        "parameters": [
+          {
+            "name": "namespace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Namespace Id"
+            }
+          },
+          {
+            "name": "grace_period_seconds",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 604800,
+              "title": "Grace Period Seconds"
+            }
+          },
+          {
+            "name": "x-ledgerlens-admin-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "X-Ledgerlens-Admin-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Admin Rotate Namespace Key Admin Namespaces  Namespace Id  Rotate Key Post"
                 }
               }
             }
@@ -1974,8 +2101,8 @@
             "required": false,
             "schema": {
               "type": "number",
-              "maximum": 1,
-              "minimum": 0,
+              "maximum": 1.0,
+              "minimum": 0.0,
               "description": "Minimum sandwich confidence",
               "default": 0.7,
               "title": "Min Confidence"
@@ -2070,7 +2197,7 @@
     "/scores/{wallet}/causal-explanation": {
       "get": {
         "summary": "Causal Explanation",
-        "description": "Return a causal explanation of the risk score for ``wallet``.\n\nUnlike SHAP, which conflates causal and correlational contributions, this\nendpoint returns *causal* average treatment effects (ATEs) estimated via\ndo-calculus interventions on the fitted structural causal model.\n\nResponse fields\n---------------\n- ``feature_ate_table``: ATE of each feature on risk_score — the expected\n  change in score if that feature alone is moved from 0 to 1.\n- ``top_causal_features``: top-3 features by absolute ATE.\n- ``counterfactual_score``: predicted score if ``feature_override`` were\n  applied (only present when ``feature_override`` is supplied).\n- ``coverage_note``: advisory note about sample size and estimate quality.\n\nSecurity\n--------\n- ``feature_override`` is strictly validated: feature must be a known\n  observable feature name; value must be a finite float in [-1000, 1000].\n- Rate-limited to 10 requests per minute per IP.\n- ``counterfactual_score`` is not cached publicly to prevent fingerprinting\n  the model's sensitivity surface.\n\nErrors\n------\n- **400** — invalid Stellar wallet address format.\n- **404** — no scores found for the wallet.\n- **422** — invalid ``feature_override`` format or value.\n- **429** — rate limit exceeded (10 req/min per IP).\n- **503** — causal model not available (insufficient training data, DoWhy\n  not installed, or refutation gate triggered).",
+        "description": "Return a causal explanation of the risk score for ``wallet``.\n\nUnlike SHAP, which conflates causal and correlational contributions, this\nendpoint returns *causal* average treatment effects (ATEs) estimated via\ndo-calculus interventions on the fitted structural causal model.\n\nResponse fields\n---------------\n- ``feature_ate_table``: ATE of each feature on risk_score \u2014 the expected\n  change in score if that feature alone is moved from 0 to 1.\n- ``top_causal_features``: top-3 features by absolute ATE.\n- ``counterfactual_score``: predicted score if ``feature_override`` were\n  applied (only present when ``feature_override`` is supplied).\n- ``coverage_note``: advisory note about sample size and estimate quality.\n- ``estimation_method``: per-feature ``\"causal\"`` (genuine DoWhy-identified\n  estimate) or ``\"correlational_fallback\"`` (OLS coefficient substituted\n  because DoWhy could not identify or estimate the effect). Consumers\n  must not treat these two as interchangeable.\n- ``estimation_notes``: reason for each fallback entry in\n  ``estimation_method`` (e.g. non-identifiable, DoWhy not installed).\n- ``refutation_coverage``: features that actually underwent DoWhy\n  refutation testing this request \u2014 i.e. the ``\"causal\"`` subset of\n  ``estimation_method``. See docs/causal_inference.md for the refutation\n  gate's coverage scope and rejection threshold.\n\nSecurity\n--------\n- ``feature_override`` is strictly validated: feature must be a known\n  observable feature name; value must be a finite float in [-1000, 1000].\n- Rate-limited to 10 requests per minute per IP.\n- ``counterfactual_score`` is not cached publicly to prevent fingerprinting\n  the model's sensitivity surface.\n\nErrors\n------\n- **400** \u2014 invalid Stellar wallet address format.\n- **404** \u2014 no scores found for the wallet.\n- **422** \u2014 invalid ``feature_override`` format or value.\n- **429** \u2014 rate limit exceeded (10 req/min per IP).\n- **503** \u2014 causal model not available (insufficient training data, DoWhy\n  not installed, or refutation gate triggered).",
         "operationId": "causal_explanation_scores__wallet__causal_explanation_get",
         "parameters": [
           {
@@ -2131,8 +2258,28 @@
           "System"
         ],
         "summary": "Health check",
-        "description": "Returns 200 (ok/degraded) or 503. Checks DB, model files, and circuit breakers.",
+        "description": "Returns 200 (ok/degraded) or 503. Checks DB, model files, circuit breakers, and governed config version.",
         "operationId": "health_v1_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/health/drift": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Streaming drift-detector health",
+        "description": "Returns per-feature ADWIN / Page-Hinkley detector state (Issue-385): whether drift was recently detected, per-feature detector internals, and whether conformal recalibration is currently gated active. Complements the slower, batch PSI mechanism (see `detection/drift_monitor.py` and `cli.py retrain-check`), which is not real-time.",
+        "operationId": "health_drift_v1_health_drift_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -2147,12 +2294,9 @@
     },
     "/v1/feedback": {
       "post": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "Submit scoring feedback",
-        "description": "Record ground-truth feedback (confirmed wash / confirmed clean) for a previously scored wallet.",
-        "operationId": "submit_feedback_v1_feedback_post",
+        "summary": "Submit Analyst Feedback",
+        "description": "Submit an analyst label correction. Admin-key required.",
+        "operationId": "submit_analyst_feedback_v1_feedback_post",
         "parameters": [
           {
             "name": "x-ledgerlens-admin-key",
@@ -2170,20 +2314,18 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/FeedbackRequest"
+                "$ref": "#/components/schemas/FeedbackSubmission"
               }
             }
           }
         },
         "responses": {
-          "200": {
+          "201": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Submit Feedback V1 Feedback Post"
+                  "$ref": "#/components/schemas/FeedbackRecordOut"
                 }
               }
             }
@@ -2383,7 +2525,7 @@
     "/v1/scores/{wallet}/explain": {
       "get": {
         "summary": "Explain Wallet Score",
-        "description": "Return a waterfall-style SHAP explanation for ``wallet`` on ``asset_pair``.\n\nProduces ranked per-feature SHAP contributions, the SHAP base value\n(expected model output), and a human-readable summary sentence.\n\nRequires ``X-LedgerLens-Admin-Key`` header for authentication.\n\n- **200** — waterfall explanation returned.\n- **404** — no feature vector or scores found for the given wallet.\n- **422** — unknown ``model`` name.\n- **503** — models were not loaded at startup.",
+        "description": "Return a waterfall-style SHAP explanation for ``wallet`` on ``asset_pair``.\n\nProduces ranked per-feature SHAP contributions, the SHAP base value\n(expected model output), and a human-readable summary sentence.\n\nRequires ``X-LedgerLens-Admin-Key`` header for authentication.\n\n- **200** \u2014 waterfall explanation returned.\n- **404** \u2014 no feature vector or scores found for the given wallet.\n- **422** \u2014 unknown ``model`` name.\n- **503** \u2014 models were not loaded at startup.",
         "operationId": "explain_wallet_score_v1_scores__wallet__explain_get",
         "parameters": [
           {
@@ -2629,10 +2771,10 @@
             "required": false,
             "schema": {
               "type": "number",
-              "maximum": 1,
-              "minimum": 0,
+              "maximum": 1.0,
+              "minimum": 0.0,
               "description": "Minimum similarity score",
-              "default": 0,
+              "default": 0.0,
               "title": "Min Score"
             },
             "description": "Minimum similarity score"
@@ -2870,8 +3012,8 @@
             "required": false,
             "schema": {
               "type": "number",
-              "maximum": 1,
-              "minimum": 0,
+              "maximum": 1.0,
+              "minimum": 0.0,
               "default": 0.5,
               "title": "Min Score"
             }
@@ -3015,6 +3157,62 @@
                     "additionalProperties": true
                   },
                   "title": "Response Circular Path Payments V1 Path Payments Circular Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/feedback/ground-truth": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Submit ground-truth scoring feedback",
+        "description": "Record ground-truth feedback (confirmed wash / confirmed clean) for a previously scored wallet.",
+        "operationId": "submit_feedback_v1_feedback_ground_truth_post",
+        "parameters": [
+          {
+            "name": "x-ledgerlens-admin-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "X-Ledgerlens-Admin-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Submit Feedback V1 Feedback Ground Truth Post"
                 }
               }
             }
@@ -3838,72 +4036,22 @@
         }
       }
     },
-    "/graphql": {
-      "get": {
-        "summary": "Handle Http Get",
-        "operationId": "handle_http_get_graphql_get",
-        "responses": {
-          "200": {
-            "description": "The GraphiQL integrated development environment.",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "404": {
-            "description": "Not found if GraphiQL or query via GET are not enabled."
-          }
-        }
-      },
-      "post": {
-        "summary": "Handle Http Post",
-        "operationId": "handle_http_post_graphql_post",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          }
-        }
-      }
-    },
-    "/admin/api-keys/{key_id}/rotate": {
+    "/v1/governance/proposals/{proposal_id}/execute": {
       "post": {
         "tags": [
-          "admin",
-          "api-keys"
+          "Governance"
         ],
-        "summary": "Rotate API key",
-        "description": "Rotates an active API key, transitioning the old key to rotating status and returning the new key.",
-        "operationId": "rotate_key_admin_api_keys__key_id__rotate_post",
+        "summary": "Execute proposal",
+        "description": "Execute a passed governance proposal (admin only): applies the change and propagates it to every process. See docs/governance_protocol.md for the consistency model and propagation latency.",
+        "operationId": "execute_proposal_endpoint_v1_governance_proposals__proposal_id__execute_post",
         "parameters": [
           {
-            "name": "key_id",
+            "name": "proposal_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Key Id"
-            }
-          },
-          {
-            "name": "grace_period_seconds",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Grace Period Seconds"
+              "title": "Proposal Id"
             }
           },
           {
@@ -3911,14 +4059,8 @@
             "in": "header",
             "required": false,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
+              "type": "string",
+              "default": "",
               "title": "X-Ledgerlens-Admin-Key"
             }
           }
@@ -3928,89 +4070,7 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Rotate Key Admin Api Keys  Key Id  Rotate Post"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/admin/namespaces/{namespace_id}/rotate-key": {
-      "post": {
-        "tags": [
-          "admin",
-          "namespaces"
-        ],
-        "summary": "Rotate namespace key",
-        "description": "Rotates the API key of a namespace with a transition grace period.",
-        "operationId": "rotate_ns_key_admin_namespaces__namespace_id__rotate_key_post",
-        "parameters": [
-          {
-            "name": "namespace_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Namespace Id"
-            }
-          },
-          {
-            "name": "grace_period_seconds",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Grace Period Seconds"
-            }
-          },
-          {
-            "name": "x-ledgerlens-admin-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Ledgerlens-Admin-Key"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Rotate Ns Key Admin Namespaces  Namespace Id  Rotate Key Post"
-                }
+                "schema": {}
               }
             }
           },
@@ -4291,6 +4351,27 @@
           "coverage_note": {
             "type": "string",
             "title": "Coverage Note"
+          },
+          "estimation_method": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Estimation Method"
+          },
+          "estimation_notes": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Estimation Notes"
+          },
+          "refutation_coverage": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Refutation Coverage"
           }
         },
         "type": "object",
@@ -4485,7 +4566,7 @@
           "confidence": {
             "type": "number",
             "title": "Confidence",
-            "default": 1
+            "default": 1.0
           }
         },
         "type": "object",
@@ -4752,8 +4833,8 @@
           },
           "score": {
             "type": "integer",
-            "maximum": 100,
-            "minimum": 0,
+            "maximum": 100.0,
+            "minimum": 0.0,
             "title": "Score",
             "description": "0-100; higher = more suspicious"
           },
@@ -4767,8 +4848,8 @@
           },
           "confidence": {
             "type": "integer",
-            "maximum": 100,
-            "minimum": 0,
+            "maximum": 100.0,
+            "minimum": 0.0,
             "title": "Confidence"
           },
           "disputed": {
@@ -4797,8 +4878,8 @@
             "anyOf": [
               {
                 "type": "number",
-                "maximum": 100,
-                "minimum": 0
+                "maximum": 100.0,
+                "minimum": 0.0
               },
               {
                 "type": "null"
@@ -4811,8 +4892,8 @@
             "anyOf": [
               {
                 "type": "number",
-                "maximum": 100,
-                "minimum": 0
+                "maximum": 100.0,
+                "minimum": 0.0
               },
               {
                 "type": "null"
@@ -4840,8 +4921,8 @@
             "anyOf": [
               {
                 "type": "number",
-                "maximum": 1,
-                "minimum": 0
+                "maximum": 1.0,
+                "minimum": 0.0
               },
               {
                 "type": "null"

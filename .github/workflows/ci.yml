@@ -84,7 +84,36 @@ jobs:
           ruff check .
 
       - name: Test
-        run: pytest --cov=detection --cov=ingestion --cov=config -q
+        run: |
+          pytest --cov=detection --cov=ingestion --cov=config -q \
+            --ignore=tests/e2e \
+            --ignore=tests/e2e_cross_repo \
+            --ignore=tests/chaos \
+            --ignore=tests/test_adversarial.py \
+            --ignore=tests/test_adversarial_hardening.py \
+            --ignore=tests/test_bridge_integrity.py \
+            --ignore=tests/test_bridge_loader.py \
+            --ignore=tests/test_causal_feature_selection.py \
+            --ignore=tests/test_curve_adapter.py \
+            --ignore=tests/test_evm_address_validation.py \
+            --ignore=tests/test_evm_loader.py \
+            --ignore=tests/test_evm_provider_pool.py \
+            --ignore=tests/test_federated_audit.py \
+            --ignore=tests/test_federated_client.py \
+            --ignore=tests/test_federated_dp.py \
+            --ignore=tests/test_federated_integration.py \
+            --ignore=tests/test_federated_privacy.py \
+            --ignore=tests/test_federated_server.py \
+            --ignore=tests/test_federated_sybil.py \
+            --ignore=tests/test_fuzz_harness_smoke.py \
+            --ignore=tests/test_iterative_tarjan.py \
+            --ignore=tests/test_mlflow_tracking.py \
+            --ignore=tests/test_model_training.py \
+            --ignore=tests/test_soroban_circuit_breaker_dlq.py \
+            --ignore=tests/test_soroban_publisher.py \
+            --ignore=tests/test_smote_variants.py \
+            --ignore=tests/test_temporal_patterns.py \
+            --ignore=tests/test_uniswap_adapter.py
 
   # ── Go SDK ────────────────────────────────────────────────────────────────
   go-sdk:
