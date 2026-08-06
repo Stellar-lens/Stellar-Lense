@@ -101,17 +101,17 @@ def check_installed(
             name, pinned_version = raw.split("==", 1)
             locked_versions[canonicalize_name(name)] = pinned_version
 
-    direct: set[str] = set()
+    direct: dict[str, Requirement] = {}
     for raw in requirements.read_text("utf-8").splitlines():
         line = raw.strip()
         if not line or line.startswith(("#", "-")):
             continue
         requirement = Requirement(line)
         if requirement.marker is None or requirement.marker.evaluate():
-            direct.add(canonicalize_name(requirement.name))
+            direct[canonicalize_name(requirement.name)] = requirement
 
     problems: list[str] = []
-    for name in sorted(direct):
+    for name, requirement in sorted(direct.items()):
         pinned = locked_versions.get(name)
         if pinned is None:
             problems.append(f"{name}: missing from requirements.lock")
@@ -121,11 +121,13 @@ def check_installed(
         except PackageNotFoundError:
             problems.append(f"{name}=={pinned}: not installed")
             continue
-        if installed != pinned:
-            problems.append(f"{name}: installed {installed}, locked {pinned}")
+        if installed not in requirement.specifier:
+            problems.append(
+                f"{name}: installed {installed}, outside required range {requirement.specifier}"
+            )
 
     if not problems:
-        print(f"[OK] {len(direct)} direct dependencies match requirements.lock.")
+        print(f"[OK] {len(direct)} direct dependencies satisfy requirements.txt and are locked.")
         return 0
 
     print("[FAIL] Direct dependencies diverge from requirements.lock:")

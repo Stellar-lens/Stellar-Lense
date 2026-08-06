@@ -1444,6 +1444,18 @@ def build_feature_matrix(
     if trades_df.empty:
         return pd.DataFrame()
 
+    # Feature calculations are statistical and use NumPy/pandas division.
+    # Normalize Decimal ledger amounts once so behavior is consistent across
+    # pandas versions (older releases reject Decimal / float operations).
+    trades_df = trades_df.copy()
+    if "amount" in trades_df:
+        trades_df["amount"] = pd.to_numeric(trades_df["amount"], errors="coerce").astype(float)
+    if all_pairs_df is None or all_pairs_df is trades_df:
+        all_pairs_df = trades_df
+    elif "amount" in all_pairs_df:
+        all_pairs_df = all_pairs_df.copy()
+        all_pairs_df["amount"] = pd.to_numeric(all_pairs_df["amount"], errors="coerce").astype(float)
+
     if funding_graph is not None and community_map is None:
         community_map = detect_wash_trading_rings(funding_graph)
         ring_stats = build_ring_statistics(community_map, funding_graph)
@@ -1458,7 +1470,7 @@ def build_feature_matrix(
             trades_df[mask],
             orderbook_events=orderbook_events,
             funding_graph=funding_graph,
-            all_pairs_df=all_pairs_df if all_pairs_df is not None else trades_df,
+            all_pairs_df=all_pairs_df,
             amm_trades=amm_trades,
             community_map=community_map,
             ring_stats=ring_stats,

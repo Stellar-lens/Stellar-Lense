@@ -1,8 +1,8 @@
 {
   "alpha": 0.1,
   "q_hat": 0.5,
-  "n_cal": 1,
-  "random_state": 42,
+  "n_cal": 4,
+  "random_state": 2,
   "mode": "classification",
   "feature_columns": [
     "benford_chi_square_1h",
@@ -88,5 +88,5 @@
     0,
     1
   ],
-  "sha256": "13e7933d6d6433d16a723d4503258ab6e66d57e8021e6b08aa1bfdade5a8ae56"
+  "sha256": "9c2c4a30a751fba036c34389f0c32c5e9f2805338fa7a98c2010f6b78e7e846b"
 }
