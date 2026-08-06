@@ -27,11 +27,9 @@ from __future__ import annotations
 
 import fnmatch
 import json
-import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
-
 
 # ── Subsystem definitions ────────────────────────────────────────────────────
 
@@ -228,7 +226,7 @@ class OwnershipRegistry:
         multi-owner lines.
         """
         entries: list[CodeOwnersEntry] = []
-        with open(path, "r", encoding="utf-8") as fh:
+        with open(path, encoding="utf-8") as fh:
             for line_num, raw_line in enumerate(fh, start=1):
                 line = raw_line.strip()
                 if not line or line.startswith("#"):

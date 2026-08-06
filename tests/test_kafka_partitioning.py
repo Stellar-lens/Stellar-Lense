@@ -46,8 +46,12 @@ class TestAssetValidation:
     def test_invalid_issuer(self):
         """Reject invalid issuer formats."""
         assert not _validate_issuer("")
-        assert not _validate_issuer("GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF46Q6")  # 57 chars
-        assert not _validate_issuer("GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF46Q6")  # 55 chars
+        assert not _validate_issuer(
+            "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF46Q6"
+        )  # 57 chars
+        assert not _validate_issuer(
+            "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF46Q6"
+        )  # 55 chars
         assert not _validate_issuer("invalid")
 
 

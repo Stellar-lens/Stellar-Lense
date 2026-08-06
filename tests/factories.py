@@ -16,7 +16,7 @@ from typing import Any
 
 import numpy as np
 from factory import Factory, LazyAttribute, Sequence, SubFactory
-from factory.fuzzy import FuzzyFloat
+from factory.fuzzy import FuzzyDecimal
 
 from ingestion.data_models import Asset, Trade
 
@@ -31,13 +31,13 @@ def generate_stellar_account_id(seed: str = "") -> str:
         h = hashlib.sha256(seed.encode()).digest()
     else:
         h = hashlib.sha256(str(uuid.uuid4()).encode()).digest()
-    
+
     # Stellar base32 alphabet (RFC4648 with no padding, but we'll use a simple one)
     ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
     encoded = ""
     for byte in h:
         encoded += ALPHABET[byte % 32]
-    
+
     return "G" + encoded[:56]
 
 
@@ -48,9 +48,7 @@ class AssetFactory(Factory):
         model = Asset
 
     code = Sequence(lambda n: ["USDC", "XLM", "BTC", "ETH", "CUSTOM"][n % 5])
-    issuer = Sequence(
-        lambda n: [None, generate_stellar_account_id(f"issuer-{n}")] [n % 2]
-    )
+    issuer = Sequence(lambda n: [None, generate_stellar_account_id(f"issuer-{n}")][n % 2])
 
 
 class CleanTradeFactory(Factory):
@@ -80,10 +78,10 @@ class CleanTradeFactory(Factory):
         """Log-uniform amount (Benford-conforming)."""
         rng = np.random.default_rng(seed=random.randint(0, 2**31 - 1))
         # Log-uniform in [10^2, 10^8] = [100, 100M]
-        return float(10 ** rng.uniform(2, 8))
+        return round(float(10 ** rng.uniform(2, 8)), 7)
 
-    counter_amount = FuzzyFloat(10, 10000)
-    price = FuzzyFloat(0.01, 100)
+    counter_amount = FuzzyDecimal(10, 10000, precision=7)
+    price = FuzzyDecimal(0.01, 100, precision=7)
 
 
 class WashTradeFactory(Factory):
@@ -108,12 +106,8 @@ class WashTradeFactory(Factory):
         interval_seconds = 5
         return base_time - timedelta(seconds=offset + interval_seconds)
 
-    base_account = LazyAttribute(
-        lambda o: generate_stellar_account_id("wash-bot-primary")
-    )
-    counter_account = LazyAttribute(
-        lambda o: generate_stellar_account_id("wash-bot-sock-puppet")
-    )
+    base_account = LazyAttribute(lambda o: generate_stellar_account_id("wash-bot-primary"))
+    counter_account = LazyAttribute(lambda o: generate_stellar_account_id("wash-bot-sock-puppet"))
     base_asset = SubFactory(AssetFactory)
     counter_asset = SubFactory(AssetFactory)
 
@@ -124,8 +118,8 @@ class WashTradeFactory(Factory):
         choices = [500, 1000, 5000, 10000, 50000]
         return float(random.choice(choices))
 
-    counter_amount = FuzzyFloat(10, 100)
-    price = FuzzyFloat(0.01, 10)
+    counter_amount = FuzzyDecimal(10, 100, precision=7)
+    price = FuzzyDecimal(0.01, 10, precision=7)
 
 
 class RingTradeFactory(Factory):
@@ -151,9 +145,7 @@ class RingTradeFactory(Factory):
         lambda o: generate_stellar_account_id(f"ring-member-{hash(o.trade_id) % 5}")
     )
     counter_account = LazyAttribute(
-        lambda o: generate_stellar_account_id(
-            f"ring-member-{(hash(o.trade_id) + 1) % 5}"
-        )
+        lambda o: generate_stellar_account_id(f"ring-member-{(hash(o.trade_id) + 1) % 5}")
     )
     base_asset = SubFactory(AssetFactory)
     counter_asset = SubFactory(AssetFactory)
@@ -164,10 +156,10 @@ class RingTradeFactory(Factory):
         base = random.choice([1000, 2000, 5000, 10000])
         # Add small jitter: ±10%
         jitter = base * random.uniform(0.9, 1.1)
-        return jitter
+        return round(jitter, 7)
 
-    counter_amount = FuzzyFloat(50, 500)
-    price = FuzzyFloat(0.1, 10)
+    counter_amount = FuzzyDecimal(50, 500, precision=7)
+    price = FuzzyDecimal(0.1, 10, precision=7)
 
 
 # Pytest fixtures for quick test usage
@@ -175,16 +167,12 @@ class RingTradeFactory(Factory):
 
 def make_clean_trades(n: int = 100) -> list[dict[str, Any]]:
     """Generate a list of clean (Benford-conforming) trade dicts."""
-    return [
-        CleanTradeFactory.build().__dict__ for _ in range(n)
-    ]
+    return [CleanTradeFactory.build().__dict__ for _ in range(n)]
 
 
 def make_wash_trades(n: int = 50) -> list[dict[str, Any]]:
     """Generate a list of wash trades (non-Benford-conforming)."""
-    return [
-        WashTradeFactory.build().__dict__ for _ in range(n)
-    ]
+    return [WashTradeFactory.build().__dict__ for _ in range(n)]
 
 
 def make_ring_trades(n: int = 30, ring_size: int = 5) -> list[dict[str, Any]]:

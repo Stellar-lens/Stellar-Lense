@@ -38,11 +38,11 @@ import tempfile
 import time
 import uuid
 from dataclasses import asdict, dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class ArtifactStage(str, Enum):
+class ArtifactStage(StrEnum):
     """Legal lifecycle stages for a registered model artifact."""
 
     STAGED = "staged"
@@ -78,9 +78,7 @@ class ArtifactNotFoundError(ArtifactLifecycleError):
                 f"Check models/artifact_manifest.json or call registry.list_versions({name!r})."
             )
         else:
-            super().__init__(
-                f"No artifact family named {name!r} in the registry manifest."
-            )
+            super().__init__(f"No artifact family named {name!r} in the registry manifest.")
 
 
 class InvalidTransitionError(ArtifactLifecycleError):
@@ -131,7 +129,7 @@ class ArtifactRecord:
         return d
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "ArtifactRecord":
+    def from_dict(cls, d: dict[str, Any]) -> ArtifactRecord:
         d = dict(d)
         d["stage"] = ArtifactStage(d["stage"])
         return cls(**d)
@@ -231,7 +229,9 @@ class ModelArtifactRegistry:
         except KeyError as exc:
             raise ArtifactNotFoundError(name, version) from exc
 
-    def _transition(self, name: str, version: str, target: ArtifactStage, **extra: Any) -> ArtifactRecord:
+    def _transition(
+        self, name: str, version: str, target: ArtifactStage, **extra: Any
+    ) -> ArtifactRecord:
         record = self._get(name, version)
         if target not in _LEGAL_TRANSITIONS[record.stage]:
             raise InvalidTransitionError(name, version, record.stage, target)
@@ -254,13 +254,21 @@ class ModelArtifactRegistry:
         for other_version, other in self._data.get(name, {}).items():
             if other.stage == ArtifactStage.PROMOTED and other_version != version:
                 other.stage = ArtifactStage.DEPRECATED
-                other.history.append({"stage": ArtifactStage.DEPRECATED.value, "at": time.time(), "reason": "superseded"})
+                other.history.append(
+                    {
+                        "stage": ArtifactStage.DEPRECATED.value,
+                        "at": time.time(),
+                        "reason": "superseded",
+                    }
+                )
         return self._transition(name, version, ArtifactStage.PROMOTED)
 
     def deprecate(self, name: str, version: str, reason: str | None = None) -> ArtifactRecord:
         return self._transition(name, version, ArtifactStage.DEPRECATED, reason=reason)
 
-    def rollback(self, name: str, version: str | None = None, reason: str | None = None) -> ArtifactRecord:
+    def rollback(
+        self, name: str, version: str | None = None, reason: str | None = None
+    ) -> ArtifactRecord:
         """Roll back the active (or given) version and re-activate its parent.
 
         Diagnostics: raises ArtifactNotFoundError if there is no promoted
@@ -268,14 +276,22 @@ class ModelArtifactRegistry:
         version is not currently PROMOTED.
         """
         record = self._get(name, version) if version else self.get_active(name)
-        rolled_back = self._transition(name, record.version, ArtifactStage.ROLLED_BACK, reason=reason)
+        rolled_back = self._transition(
+            name, record.version, ArtifactStage.ROLLED_BACK, reason=reason
+        )
         rolled_back.rollback_reason = reason
 
         if rolled_back.parent_version:
             parent = self._get(name, rolled_back.parent_version)
             if parent.stage in (ArtifactStage.DEPRECATED, ArtifactStage.VALIDATED):
                 parent.stage = ArtifactStage.PROMOTED
-                parent.history.append({"stage": ArtifactStage.PROMOTED.value, "at": time.time(), "reason": "rollback_reactivation"})
+                parent.history.append(
+                    {
+                        "stage": ArtifactStage.PROMOTED.value,
+                        "at": time.time(),
+                        "reason": "rollback_reactivation",
+                    }
+                )
         self._save()
         return rolled_back
 

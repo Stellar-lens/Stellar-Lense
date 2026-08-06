@@ -79,9 +79,9 @@ class TestFeatureSpaceFgsm:
         ]
         for col in perturbed.index:
             if any(k in col.lower() for k in non_neg_keywords):
-                assert float(perturbed[col]) >= 0.0, (
-                    f"Feature '{col}' must be >= 0 after FGSM, got {perturbed[col]}"
-                )
+                assert (
+                    float(perturbed[col]) >= 0.0
+                ), f"Feature '{col}' must be >= 0 after FGSM, got {perturbed[col]}"
 
     def test_account_age_is_immutable(self, scorer_and_data):
         """account_age_days must not be modified by feature_space_fgsm."""
@@ -89,13 +89,15 @@ class TestFeatureSpaceFgsm:
         row = _wash_row(df)
         feature_scale = feature_scale_from_matrix(df.drop(columns=["label"]))
 
-        perturbed = feature_space_fgsm(row, epsilon=10.0, scorer=scorer, feature_scale=feature_scale)
+        perturbed = feature_space_fgsm(
+            row, epsilon=10.0, scorer=scorer, feature_scale=feature_scale
+        )
 
         age_cols = [c for c in row.index if "account_age" in c.lower()]
         for col in age_cols:
-            assert float(perturbed[col]) == pytest.approx(float(row[col])), (
-                f"account_age column '{col}' must be immutable"
-            )
+            assert float(perturbed[col]) == pytest.approx(
+                float(row[col])
+            ), f"account_age column '{col}' must be immutable"
 
     def test_linf_budget_respected_per_feature(self, scorer_and_data):
         """Each feature's perturbation must not exceed epsilon * scale."""
@@ -104,16 +106,18 @@ class TestFeatureSpaceFgsm:
         feature_scale = feature_scale_from_matrix(df.drop(columns=["label"]))
         epsilon = 0.3
 
-        perturbed = feature_space_fgsm(row, epsilon=epsilon, scorer=scorer, feature_scale=feature_scale)
+        perturbed = feature_space_fgsm(
+            row, epsilon=epsilon, scorer=scorer, feature_scale=feature_scale
+        )
 
         feature_cols = [c for c in row.index if c not in {"wallet", "label"}]
         for col in feature_cols:
             scale = feature_scale.get(col, 1.0) or 1.0
             budget = epsilon * scale
             delta = abs(float(perturbed[col]) - float(row[col]))
-            assert delta <= budget + 1e-9, (
-                f"Feature '{col}': |delta|={delta:.6f} exceeds budget {budget:.6f}"
-            )
+            assert (
+                delta <= budget + 1e-9
+            ), f"Feature '{col}': |delta|={delta:.6f} exceeds budget {budget:.6f}"
 
     def test_non_feature_columns_unchanged(self, scorer_and_data):
         """wallet column must pass through untouched."""
@@ -164,17 +168,13 @@ class TestAdversarialTrainingStep:
         # The appended adversarial rows must all have label=1
         n_orig = len(X)
         adv_labels = y_aug.iloc[n_orig:].tolist()
-        assert all(lbl == 1 for lbl in adv_labels), (
-            "All adversarial copies must have label=1"
-        )
+        assert all(lbl == 1 for lbl in adv_labels), "All adversarial copies must have label=1"
 
     def test_adv_ratio_zero_returns_original(self, scorer_and_data):
         """adv_ratio=0 should return the original batch unchanged."""
         scorer, df = scorer_and_data
         X, y = split_features_labels(df)
-        X_aug, y_aug = adversarial_training_step(
-            X, y, scorer, epsilon=0.1, adv_ratio=0.0
-        )
+        X_aug, y_aug = adversarial_training_step(X, y, scorer, epsilon=0.1, adv_ratio=0.0)
         assert len(X_aug) == len(X)
 
     def test_invalid_adv_ratio_raises(self, scorer_and_data):
@@ -224,7 +224,7 @@ class TestRunAdversarialTraining:
         report = run_adversarial_training(
             df,
             epochs=3,
-            epsilon=0.1,      # small epsilon to minimise clean degradation
+            epsilon=0.1,  # small epsilon to minimise clean degradation
             adv_ratio=0.3,
             test_size=0.25,
             random_state=13,
@@ -262,6 +262,6 @@ class TestRunAdversarialTraining:
             "adversarial_accuracy_improvement",
             "clean_degradation_within_tolerance",
         }
-        assert expected_keys.issubset(set(report.keys())), (
-            f"Missing keys: {expected_keys - set(report.keys())}"
-        )
+        assert expected_keys.issubset(
+            set(report.keys())
+        ), f"Missing keys: {expected_keys - set(report.keys())}"

@@ -63,7 +63,10 @@ REPORTS_DIR = Path("reports/triage")
 _CATEGORY_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("import_error", re.compile(r"(ImportError|ModuleNotFoundError|cannot import)", re.I)),
     ("timeout", re.compile(r"(TimeoutError|timed out|timeout)", re.I)),
-    ("fixture_error", re.compile(r"(fixture '.*' not found|ScopeMismatch|FixtureLookupError)", re.I)),
+    (
+        "fixture_error",
+        re.compile(r"(fixture '.*' not found|ScopeMismatch|FixtureLookupError)", re.I),
+    ),
     ("attribute_error", re.compile(r"AttributeError", re.I)),
     ("type_error", re.compile(r"TypeError", re.I)),
     ("value_error", re.compile(r"ValueError", re.I)),
@@ -311,31 +314,38 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         epilog=__doc__,
     )
     p.add_argument(
-        "--input", "-i", required=True,
+        "--input",
+        "-i",
+        required=True,
         help="Path to the test report file, or '-' to read from stdin.",
     )
     p.add_argument(
-        "--format", "-f",
+        "--format",
+        "-f",
         choices=["pytest-json", "junit-xml", "raw-log"],
         default="junit-xml",
         help="Format of the input report (default: junit-xml).",
     )
     p.add_argument(
-        "--output-dir", "-o",
+        "--output-dir",
+        "-o",
         default=str(REPORTS_DIR),
         help=f"Directory to write triage reports (default: {REPORTS_DIR}).",
     )
     p.add_argument(
-        "--baseline", "-b",
+        "--baseline",
+        "-b",
         default=None,
         help="Path to a previous triage JSON report to compare against.",
     )
     p.add_argument(
-        "--compare", action="store_true",
+        "--compare",
+        action="store_true",
         help="Print a comparison summary when --baseline is provided.",
     )
     p.add_argument(
-        "--no-markdown", action="store_true",
+        "--no-markdown",
+        action="store_true",
         help="Skip generating the Markdown summary file.",
     )
     return p.parse_args(argv)

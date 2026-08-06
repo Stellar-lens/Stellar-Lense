@@ -46,7 +46,7 @@ from ingestion.data_models import AccountActivity, Asset, BotFingerprint, OrderB
 
 def _fuzz_horizon_parsing(data: bytes) -> None:
     """Fuzz target: feed random bytes (parsed as JSON) to Pydantic models.
-    
+
     The fuzzer explores the input space of malformed JSON and invalid objects
     to ensure the parser fails gracefully without raising unhandled exceptions.
     """
@@ -56,11 +56,11 @@ def _fuzz_horizon_parsing(data: bytes) -> None:
     except (json.JSONDecodeError, UnicodeDecodeError, ValueError):
         # Malformed JSON — this is expected and ok
         return
-    
+
     if not isinstance(obj, dict):
         # Not a dict, so it can't be a valid record
         return
-    
+
     # Try to parse with each model
     models_to_test = [
         ("Trade", Trade),
@@ -69,15 +69,15 @@ def _fuzz_horizon_parsing(data: bytes) -> None:
         ("Asset", Asset),
         ("BotFingerprint", BotFingerprint),
     ]
-    
+
     for model_name, model_class in models_to_test:
         try:
             # Try to instantiate the model with random data
             instance = model_class(**obj)
             # If it succeeds, validate the result is of expected type
-            assert isinstance(instance, model_class), (
-                f"{model_name} instantiation did not return correct type"
-            )
+            assert isinstance(
+                instance, model_class
+            ), f"{model_name} instantiation did not return correct type"
         except ValidationError:
             # Expected — pydantic validation failed
             pass
@@ -99,7 +99,7 @@ def main():
     if atheris is None:
         print("Error: atheris not installed. Install with: pip install atheris", file=sys.stderr)
         sys.exit(1)
-    
+
     atheris.Setup(sys.argv, _fuzz_horizon_parsing)
     atheris.Fuzz()
 

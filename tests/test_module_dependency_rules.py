@@ -15,7 +15,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 import check_module_dependencies as cmd  # noqa: E402
 
-
 BASE_CONFIG = {
     "layers": [
         {"name": "foundation", "packages": ["utils"]},

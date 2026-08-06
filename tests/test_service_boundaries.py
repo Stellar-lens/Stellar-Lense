@@ -5,9 +5,9 @@ from __future__ import annotations
 import pytest
 
 from utils.boundaries import (
+    PROTOCOLS,
     CircuitBreakerPort,
     FieldEncryptionPort,
-    PROTOCOLS,
     RetryPolicyPort,
     ServiceBoundaryError,
     ServiceRegistry,

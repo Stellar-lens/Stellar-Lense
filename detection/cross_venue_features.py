@@ -185,9 +185,7 @@ class CrossVenueAggregator:
             }
 
         trades_df = pd.DataFrame(trades)
-        n_wallets = pd.unique(
-            trades_df[["base_account", "counter_account"]].values.ravel()
-        ).size
+        n_wallets = pd.unique(trades_df[["base_account", "counter_account"]].values.ravel()).size
 
         # Self-trading: same account as both base and counter
         self_trades = (trades_df["base_account"] == trades_df["counter_account"]).sum()
@@ -246,10 +244,14 @@ def compute_cross_pair_features(
         }
 
     # Compute features
-    n_pairs = wallet_trades["base_asset"].combine(
-        wallet_trades["counter_asset"],
-        lambda x, y: f"{x}/{y}",
-    ).nunique()
+    n_pairs = (
+        wallet_trades["base_asset"]
+        .combine(
+            wallet_trades["counter_asset"],
+            lambda x, y: f"{x}/{y}",
+        )
+        .nunique()
+    )
 
     total_volume = wallet_trades["amount"].sum()
 

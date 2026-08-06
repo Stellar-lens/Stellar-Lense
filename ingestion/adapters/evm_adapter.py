@@ -12,7 +12,7 @@ RPC calls, keeping the adapter itself free of network/transport concerns.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from ingestion.adapters.base import (
@@ -23,7 +23,15 @@ from ingestion.adapters.base import (
     NormalizedEvent,
 )
 
-_REQUIRED_TRANSFER_FIELDS = ("tx_hash", "log_index", "from", "to", "token_address", "value", "block_time")
+_REQUIRED_TRANSFER_FIELDS = (
+    "tx_hash",
+    "log_index",
+    "from",
+    "to",
+    "token_address",
+    "value",
+    "block_time",
+)
 
 #: ERC-20 tokens are typically transferred in atomic units; without on-chain
 #: decimals metadata we assume 18 (the ERC-20 default) unless the raw event
@@ -66,8 +74,8 @@ class EvmAdapter(ChainAdapter):
 
         try:
             decimals = int(raw_event.get("decimals", _DEFAULT_DECIMALS))
-            amount = float(raw_event["value"]) / (10 ** decimals)
-            occurred_at = datetime.fromtimestamp(int(raw_event["block_time"]), tz=timezone.utc)
+            amount = float(raw_event["value"]) / (10**decimals)
+            occurred_at = datetime.fromtimestamp(int(raw_event["block_time"]), tz=UTC)
             symbol = str(raw_event.get("token_symbol") or raw_event["token_address"][:10])
 
             return NormalizedEvent(
@@ -77,7 +85,9 @@ class EvmAdapter(ChainAdapter):
                 occurred_at=occurred_at,
                 account=raw_event["from"],
                 counterparty=raw_event["to"],
-                asset=NormalizedAsset(symbol=symbol, issuer=raw_event["token_address"], native=False),
+                asset=NormalizedAsset(
+                    symbol=symbol, issuer=raw_event["token_address"], native=False
+                ),
                 amount=amount,
                 raw=raw_event,
             )

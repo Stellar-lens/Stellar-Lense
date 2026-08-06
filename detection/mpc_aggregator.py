@@ -151,9 +151,9 @@ async def _compute_aggregate_mpc(
     sec_count = mpc_runtime.input(secfxp(local_count), senders=list(range(n_parties)))
 
     # ---- Step 2: Aggregate across all parties ----
-    total_sum = sum(sec_sum)      # type: ignore[arg-type]
+    total_sum = sum(sec_sum)  # type: ignore[arg-type]
     total_sum_sq = sum(sec_sum_sq)  # type: ignore[arg-type]
-    total_count = sum(sec_count)   # type: ignore[arg-type]
+    total_count = sum(sec_count)  # type: ignore[arg-type]
 
     # ---- Step 3: Derive mean and variance ----
     # mean = total_sum / total_count
@@ -207,9 +207,7 @@ async def mpc_aggregate_scores_local(
     AggregateResult with ``mean``, ``variance``, ``n_total``, ``n_parties``.
     """
     if not _MPYC_AVAILABLE:
-        raise RuntimeError(
-            "mpyc is not installed. Run: pip install mpyc"
-        )
+        raise RuntimeError("mpyc is not installed. Run: pip install mpyc")
 
     n_parties = len(party_scores)
     if n_parties < 2:
@@ -293,22 +291,14 @@ async def mpc_aggregate_scores(
     from mpyc.runtime import Mpc, Party
 
     if peers is not None:
-        parties = [
-            Party(pid=i, host=peers[i][0], port=peers[i][1])
-            for i in range(n_parties)
-        ]
+        parties = [Party(pid=i, host=peers[i][0], port=peers[i][1]) for i in range(n_parties)]
     else:
         # Default: all localhost, ports 11000..11000+n-1
-        parties = [
-            Party(pid=i, host="localhost", port=11000 + i)
-            for i in range(n_parties)
-        ]
+        parties = [Party(pid=i, host="localhost", port=11000 + i) for i in range(n_parties)]
 
     runtime = Mpc(pid=party_index, parties=parties, threshold=threshold)
     async with runtime:
-        return await _compute_aggregate_mpc(
-            runtime, local_scores, n_parties, party_index
-        )
+        return await _compute_aggregate_mpc(runtime, local_scores, n_parties, party_index)
 
 
 # ---------------------------------------------------------------------------

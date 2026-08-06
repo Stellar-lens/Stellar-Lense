@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -17,7 +16,6 @@ from validation.reconciliation import (
     reconcile_wallet_scores,
 )
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -26,18 +24,26 @@ from validation.reconciliation import (
 def _raw_trades(wallets: list[str], n_trades_each: int = 5) -> pd.DataFrame:
     rows = []
     for w in wallets:
-        for i in range(n_trades_each):
-            rows.append({"base_account": w, "counter_account": "GCOUNTERPARTY123456789012345678901234567890", "amount": 100.0})
+        for _i in range(n_trades_each):
+            rows.append(
+                {
+                    "base_account": w,
+                    "counter_account": "GCOUNTERPARTY123456789012345678901234567890",
+                    "amount": 100.0,
+                }
+            )
     return pd.DataFrame(rows)
 
 
 def _feature_matrix(wallets: list[str]) -> pd.DataFrame:
-    return pd.DataFrame({
-        "wallet_id": wallets,
-        "benford_chi_square_1h": [1.0] * len(wallets),
-        "trade_count": [10] * len(wallets),
-        "label": [0] * len(wallets),
-    })
+    return pd.DataFrame(
+        {
+            "wallet_id": wallets,
+            "benford_chi_square_1h": [1.0] * len(wallets),
+            "trade_count": [10] * len(wallets),
+            "label": [0] * len(wallets),
+        }
+    )
 
 
 def _scored_wallets(wallets: list[str], scores: list[float] | None = None) -> pd.DataFrame:
@@ -115,10 +121,12 @@ class TestReconcileTradeCounts:
 
     def test_flags_wallet_missing_from_raw(self):
         raw = _raw_trades(["GAAAAAABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"])
-        features = _feature_matrix([
-            "GAAAAAABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890",
-            "GMISSINGWALLET1234567890ABCDEFGHIJKLMNOPQR",
-        ])
+        features = _feature_matrix(
+            [
+                "GAAAAAABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890",
+                "GMISSINGWALLET1234567890ABCDEFGHIJKLMNOPQR",
+            ]
+        )
         r = reconcile_trade_counts(raw, features)
         assert not r.ok
         missing_entities = {e.entity for e in r.errors if e.severity == "error"}
@@ -182,16 +190,16 @@ class TestReconcileFeatures:
         assert "all_nan_col" in error_entities
 
     def test_range_check_warns_out_of_range(self, tmp_path):
-        ranges = {
-            "benford_chi_square_1h": {"min": 0.0, "max": 50.0, "mean": 5.0, "std": 2.0}
-        }
+        ranges = {"benford_chi_square_1h": {"min": 0.0, "max": 50.0, "mean": 5.0, "std": 2.0}}
         ranges_path = tmp_path / "feature_ranges.json"
         ranges_path.write_text(json.dumps(ranges), encoding="utf-8")
 
-        df = pd.DataFrame({
-            "wallet_id": ["GAAAAAABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"],
-            "benford_chi_square_1h": [999.0],  # way above max
-        })
+        df = pd.DataFrame(
+            {
+                "wallet_id": ["GAAAAAABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"],
+                "benford_chi_square_1h": [999.0],  # way above max
+            }
+        )
         r = reconcile_features(df, feature_ranges_path=ranges_path)
         warning_entities = {e.entity for e in r.errors if e.severity == "warning"}
         assert "benford_chi_square_1h" in warning_entities

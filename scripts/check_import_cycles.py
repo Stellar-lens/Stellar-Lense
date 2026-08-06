@@ -48,14 +48,14 @@ import json
 import pathlib
 import sys
 from collections import defaultdict
-from typing import Dict, Generator, List, Optional, Set, Tuple
+from collections.abc import Generator
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 
 # Top-level Python packages that live inside this repo.
-REPO_PACKAGES: List[str] = [
+REPO_PACKAGES: list[str] = [
     "detection",
     "ingestion",
     "streaming",
@@ -83,9 +83,9 @@ REPO_ROOT = pathlib.Path(__file__).parent.parent.resolve()
 # ---------------------------------------------------------------------------
 
 
-def _find_python_files(root: pathlib.Path, packages: List[str]) -> List[pathlib.Path]:
+def _find_python_files(root: pathlib.Path, packages: list[str]) -> list[pathlib.Path]:
     """Return all .py files that belong to the requested packages."""
-    files: List[pathlib.Path] = []
+    files: list[pathlib.Path] = []
     for pkg in packages:
         pkg_dir = root / pkg
         if pkg_dir.is_dir():
@@ -113,9 +113,7 @@ def _path_to_module(path: pathlib.Path, root: pathlib.Path) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _extract_imports(
-    source: str, module_name: str
-) -> Generator[str, None, None]:
+def _extract_imports(source: str, module_name: str) -> Generator[str, None, None]:
     """
     Yield the dotted names of every intra-repo module imported by *source*.
 
@@ -130,7 +128,7 @@ def _extract_imports(
     except SyntaxError:
         return
 
-    package_prefix = ".".join(module_name.split(".")[:-1])  # parent package
+    ".".join(module_name.split(".")[:-1])  # parent package
 
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
@@ -161,16 +159,14 @@ def _extract_imports(
 # ---------------------------------------------------------------------------
 
 
-def build_dependency_graph(
-    files: List[pathlib.Path], root: pathlib.Path
-) -> Dict[str, Set[str]]:
+def build_dependency_graph(files: list[pathlib.Path], root: pathlib.Path) -> dict[str, set[str]]:
     """
     Return a ``{module: {imported_modules}}`` adjacency dict for *files*.
 
     Modules that are imported but not present as source files still appear
     as nodes with an empty adjacency set (they cannot introduce new cycles).
     """
-    graph: Dict[str, Set[str]] = defaultdict(set)
+    graph: dict[str, set[str]] = defaultdict(set)
 
     for path in files:
         module = _path_to_module(path, root)
@@ -196,16 +192,16 @@ def build_dependency_graph(
 class _TarjanSCC:
     """Iterative Tarjan strongly-connected components."""
 
-    def __init__(self, graph: Dict[str, Set[str]]) -> None:
+    def __init__(self, graph: dict[str, set[str]]) -> None:
         self.graph = graph
         self.index_counter = [0]
-        self.index: Dict[str, int] = {}
-        self.lowlink: Dict[str, int] = {}
-        self.on_stack: Dict[str, bool] = {}
-        self.stack: List[str] = []
-        self.sccs: List[List[str]] = []
+        self.index: dict[str, int] = {}
+        self.lowlink: dict[str, int] = {}
+        self.on_stack: dict[str, bool] = {}
+        self.stack: list[str] = []
+        self.sccs: list[list[str]] = []
 
-    def run(self) -> List[List[str]]:
+    def run(self) -> list[list[str]]:
         for node in self.graph:
             if node not in self.index:
                 self._strongconnect(node)
@@ -213,8 +209,8 @@ class _TarjanSCC:
 
     def _strongconnect(self, start: str) -> None:
         # Iterative DFS to avoid Python recursion limit on large graphs
-        call_stack: List[Tuple[str, Optional[str]]] = [(start, None)]
-        iter_map: Dict[str, iter] = {}  # type: ignore[type-arg]
+        call_stack: list[tuple[str, str | None]] = [(start, None)]
+        iter_map: dict[str, iter] = {}  # type: ignore[type-arg]
 
         while call_stack:
             node, parent = call_stack[-1]
@@ -235,21 +231,17 @@ class _TarjanSCC:
                     advanced = True
                     break
                 elif self.on_stack.get(neighbour, False):
-                    self.lowlink[node] = min(
-                        self.lowlink[node], self.index[neighbour]
-                    )
+                    self.lowlink[node] = min(self.lowlink[node], self.index[neighbour])
 
             if not advanced:
                 # Pop — update parent's lowlink
                 call_stack.pop()
                 if call_stack:
                     parent_node = call_stack[-1][0]
-                    self.lowlink[parent_node] = min(
-                        self.lowlink[parent_node], self.lowlink[node]
-                    )
+                    self.lowlink[parent_node] = min(self.lowlink[parent_node], self.lowlink[node])
                 # Emit SCC if this is a root
                 if self.lowlink[node] == self.index[node]:
-                    scc: List[str] = []
+                    scc: list[str] = []
                     while True:
                         w = self.stack.pop()
                         self.on_stack[w] = False
@@ -260,9 +252,9 @@ class _TarjanSCC:
 
 
 def find_cycles(
-    graph: Dict[str, Set[str]],
+    graph: dict[str, set[str]],
     cross_package_only: bool = False,
-) -> List[List[str]]:
+) -> list[list[str]]:
     """
     Return a list of cycles.  Each cycle is a list of module names forming
     a strongly-connected component of size > 1 (or a self-loop).
@@ -271,7 +263,7 @@ def find_cycles(
     omitted — only cycles that span two or more top-level packages are kept.
     """
     sccs = _TarjanSCC(graph).run()
-    cycles: List[List[str]] = []
+    cycles: list[list[str]] = []
 
     for scc in sccs:
         if len(scc) > 1:
@@ -297,14 +289,14 @@ def find_cycles(
 # ---------------------------------------------------------------------------
 
 
-def _format_cycle(cycle: List[str]) -> str:
+def _format_cycle(cycle: list[str]) -> str:
     """Return a human-readable one-line description of a cycle."""
     return " → ".join(cycle) + " → " + cycle[0]
 
 
 def _write_json_report(
-    cycles: List[List[str]],
-    packages_checked: List[str],
+    cycles: list[list[str]],
+    packages_checked: list[str],
     elapsed_ms: float,
     report_path: pathlib.Path,
 ) -> None:
@@ -331,7 +323,7 @@ def _write_json_report(
 # ---------------------------------------------------------------------------
 
 
-def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
+def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Detect circular imports in the LedgerLens Python codebase.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -373,7 +365,7 @@ def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def main(argv: Optional[List[str]] = None) -> int:  # noqa: C901
+def main(argv: list[str] | None = None) -> int:  # noqa: C901
     import time
 
     args = _parse_args(argv)
@@ -404,9 +396,7 @@ def main(argv: Optional[List[str]] = None) -> int:  # noqa: C901
 
     # ── JSON report ──────────────────────────────────────────────────────────
     ts = datetime.datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
-    report_path: pathlib.Path = args.report_path or (
-        root / f"import_cycle_report_{ts}.json"
-    )
+    report_path: pathlib.Path = args.report_path or (root / f"import_cycle_report_{ts}.json")
     _write_json_report(cycles, args.packages, elapsed_ms, report_path)
 
     # ── Console output ───────────────────────────────────────────────────────
@@ -415,12 +405,12 @@ def main(argv: Optional[List[str]] = None) -> int:  # noqa: C901
             print(f"\n[check_import_cycles] ✗ {len(cycles)} import cycle(s) detected:\n")
             for i, cycle in enumerate(cycles, 1):
                 packages_in_cycle = sorted({m.split(".")[0] for m in cycle})
-                print(f"  Cycle {i} ({len(cycle)} modules, "
-                      f"packages: {', '.join(packages_in_cycle)}):")
+                print(
+                    f"  Cycle {i} ({len(cycle)} modules, "
+                    f"packages: {', '.join(packages_in_cycle)}):"
+                )
                 for mod in cycle:
-                    deps_in_cycle = sorted(
-                        graph.get(mod, set()) & set(cycle)
-                    )
+                    deps_in_cycle = sorted(graph.get(mod, set()) & set(cycle))
                     print(f"    {mod}  →  {', '.join(deps_in_cycle) or '(self)'}")
                 print(f"    ↻ {_format_cycle(cycle)}\n")
         else:

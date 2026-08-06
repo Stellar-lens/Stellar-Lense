@@ -47,7 +47,7 @@ class TestTokenBucket:
 
     def test_consume_returns_positive_delay_when_empty(self):
         bucket = TokenBucket(rate=10.0, burst=1.0)
-        bucket.consume(1)          # drain the single token
+        bucket.consume(1)  # drain the single token
         delay = bucket.consume(1)  # now empty
         assert delay > 0.0
         assert delay == pytest.approx(1.0 / 10.0, rel=0.01)
@@ -94,9 +94,9 @@ class TestTokenBucket:
                 time.sleep(delay)
         elapsed = time.perf_counter() - start
         theoretical = n_events / 500.0
-        assert elapsed < theoretical * 2.5, (
-            f"Rate limiter is too slow: {elapsed:.3f}s > 2.5 × {theoretical:.3f}s"
-        )
+        assert (
+            elapsed < theoretical * 2.5
+        ), f"Rate limiter is too slow: {elapsed:.3f}s > 2.5 × {theoretical:.3f}s"
 
     def test_async_wait_and_consume(self):
         """Async variant must behave equivalently to synchronous consume."""
@@ -118,9 +118,7 @@ class TestSyntheticTradeGeneration:
         """All synthetic wallets must start with GLOAD (never real accounts)."""
         for idx in range(100):
             addr = _synthetic_wallet(idx)
-            assert addr.startswith("GLOAD"), (
-                f"Synthetic wallet {addr!r} does not start with GLOAD"
-            )
+            assert addr.startswith("GLOAD"), f"Synthetic wallet {addr!r} does not start with GLOAD"
 
     def test_wallet_length_is_56_chars(self):
         for idx in range(20):
@@ -139,9 +137,15 @@ class TestSyntheticTradeGeneration:
         record = make_synthetic_trade(0, rng, ts)
 
         required_fields = {
-            "trade_id", "base_account", "counter_account",
-            "base_amount", "counter_amount", "price",
-            "asset_pair", "ledger_close_time", "ingestion_timestamp_ms",
+            "trade_id",
+            "base_account",
+            "counter_account",
+            "base_amount",
+            "counter_amount",
+            "price",
+            "asset_pair",
+            "ledger_close_time",
+            "ingestion_timestamp_ms",
         }
         assert required_fields.issubset(set(record.keys()))
 
@@ -175,9 +179,9 @@ class TestSyntheticTradeGeneration:
             record = make_synthetic_trade(seq, rng, ts)
             for field in ("base_account", "counter_account"):
                 addr = record[field]
-                assert addr.startswith("GLOAD"), (
-                    f"Non-synthetic address found: {addr!r} (field={field})"
-                )
+                assert addr.startswith(
+                    "GLOAD"
+                ), f"Non-synthetic address found: {addr!r} (field={field})"
 
 
 # ---------------------------------------------------------------------------
@@ -222,7 +226,7 @@ class TestPassFailEvaluation:
 
     def test_fails_when_memory_exceeds_1gb(self):
         m = self._metrics_with_latency([0.1] * 10)
-        threshold_mb = MEMORY_THRESHOLD_BYTES / (1024 ** 2)
+        threshold_mb = MEMORY_THRESHOLD_BYTES / (1024**2)
         m.memory_samples_mb = [threshold_mb + 100]  # over limit
         pf = evaluate_pass_fail(m, rate=500.0)
         mem_check = next(c for c in pf.checks if "memory" in c["name"])
@@ -301,13 +305,16 @@ class TestInProcessDriver:
                 record = make_synthetic_trade(seq, rng, ts)
                 # Manually call process_trade with patched internals
                 from ingestion.data_models import Asset, Trade
+
                 trade = Trade(
                     trade_id=record["trade_id"],
                     ledger_close_time=ts,
                     base_account=record["base_account"],
                     counter_account=record["counter_account"],
-                    base_asset=Asset(code="USDC",
-                                     issuer="GA5ZSEJYBY3RJRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN"),
+                    base_asset=Asset(
+                        code="USDC",
+                        issuer="GA5ZSEJYBY3RJRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
+                    ),
                     counter_asset=Asset(code="XLM", issuer=None),
                     base_amount=record["base_amount"],
                     counter_amount=record["counter_amount"],

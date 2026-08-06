@@ -70,6 +70,7 @@ def _parse_edge_timestamp(ts) -> datetime:
             pass
     return datetime.min.replace(tzinfo=UTC)
 
+
 try:  # python-louvain — preferred community detector
     import community as _community_louvain
 except ImportError:  # pragma: no cover - fallback path exercised only without the dep
@@ -550,10 +551,12 @@ def build_hetero_graph(
                         for right in records[li + 1 :]:
                             if right["ledger_close_time"] - left_time > window:
                                 break
-                            active.update((
-                                _hash_wallet(str(right["base_account"])),
-                                _hash_wallet(str(right["counter_account"])),
-                            ))
+                            active.update(
+                                (
+                                    _hash_wallet(str(right["base_account"])),
+                                    _hash_wallet(str(right["counter_account"])),
+                                )
+                            )
                         for a, b in combinations(sorted(active), 2):
                             co_traded_edges.append((a, b))
                             co_traded_edges.append((b, a))
@@ -563,8 +566,8 @@ def build_hetero_graph(
     pool_idx = {p: i for i, p in enumerate(sorted(pool_set))}
 
     _WALLET_FEAT_DIM = 37
-    _ASSET_FEAT_DIM = 3   # total_volume_30d, unique_traders_30d, benford_mad_30d
-    _POOL_FEAT_DIM = 3    # tvl, fee_rate, volume_24h
+    _ASSET_FEAT_DIM = 3  # total_volume_30d, unique_traders_30d, benford_mad_30d
+    _POOL_FEAT_DIM = 3  # tvl, fee_rate, volume_24h
 
     data = HeteroData()
 
@@ -596,9 +599,7 @@ def build_hetero_graph(
             return torch.empty((2, 0), dtype=torch.long)
         return torch.tensor(valid, dtype=torch.long).t().contiguous()
 
-    data["wallet", "traded", "asset"].edge_index = _edge_index(
-        traded_edges, wallet_idx, asset_idx
-    )
+    data["wallet", "traded", "asset"].edge_index = _edge_index(traded_edges, wallet_idx, asset_idx)
     data["wallet", "provided_liquidity", "amm_pool"].edge_index = _edge_index(
         liquidity_edges, wallet_idx, pool_idx
     )

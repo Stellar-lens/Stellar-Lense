@@ -17,9 +17,7 @@ def _make_trades(n: int, trade_ids: list[str] | None = None) -> pd.DataFrame:
         {
             "trade_id": trade_ids,
             "amount": [float(i + 1) * 10.0 for i in range(n)],
-            "ledger_close_time": [
-                now - datetime.timedelta(minutes=10 * (n - i)) for i in range(n)
-            ],
+            "ledger_close_time": [now - datetime.timedelta(minutes=10 * (n - i)) for i in range(n)],
         }
     )
 
@@ -55,9 +53,7 @@ def test_provenance_records_known_trade_ids():
     compute_benford_features(trades, decompose=False, provenance=tracker)
 
     recorded = tracker.get("benford_chi_square_24h")
-    assert set(recorded) == set(trade_ids), (
-        f"Expected {set(trade_ids)}, got {set(recorded)}"
-    )
+    assert set(recorded) == set(trade_ids), f"Expected {set(trade_ids)}, got {set(recorded)}"
 
 
 def test_provenance_json_round_trips():

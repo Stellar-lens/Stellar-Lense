@@ -72,7 +72,7 @@ class CIRunRecord:
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, object]) -> "CIRunRecord":
+    def from_dict(cls, data: dict[str, object]) -> CIRunRecord:
         """Deserialise from a plain dict produced by :meth:`as_dict`."""
         metrics = [
             MetricSnapshot(

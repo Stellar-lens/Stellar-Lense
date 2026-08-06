@@ -84,7 +84,7 @@ def feature_sensitivity(sensitivities: dict, feature: str, default: float | None
 
 def laplace_scale(sensitivity: float, epsilon: float) -> float:
     """Scale parameter for Laplace mechanism: Δ / ε.
-    
+
     Laplace noise N(0, scale) with this scale is (ε, 0)-DP.
     """
     if epsilon <= 0:
@@ -96,12 +96,12 @@ def laplace_scale(sensitivity: float, epsilon: float) -> float:
 
 def add_laplace_noise(value: float, scale: float, rng: np.random.Generator | None = None) -> float:
     """Add Laplace noise to a value for output perturbation.
-    
+
     Args:
         value: The score to perturb
         scale: Laplace scale parameter (Δ / ε)
         rng: numpy random generator (uses default if None)
-    
+
     Returns:
         Perturbed score
     """

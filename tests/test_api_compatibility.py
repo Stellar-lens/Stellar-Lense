@@ -49,7 +49,11 @@ class TestExtraction:
 
     def test_extracts_function_imported_from_submodule(self, fake_repo, tmp_path):
         _write(tmp_path, "widgets/__init__.py", "from .core import score\n\n__all__ = ['score']\n")
-        _write(tmp_path, "widgets/core.py", "def score(x, *, threshold=0.5):\n    return x > threshold\n")
+        _write(
+            tmp_path,
+            "widgets/core.py",
+            "def score(x, *, threshold=0.5):\n    return x > threshold\n",
+        )
         api = api_check.extract_public_api("widgets")
         assert api == {"score": {"kind": "function", "signature": "(x, *, threshold = 0.5)"}}
 
@@ -88,7 +92,9 @@ class TestExtraction:
         }
 
     def test_unresolvable_export_is_reported_not_crashed(self, fake_repo, tmp_path):
-        _write(tmp_path, "widgets/__init__.py", "from .core import UNKNOWN\n\n__all__ = ['UNKNOWN']\n")
+        _write(
+            tmp_path, "widgets/__init__.py", "from .core import UNKNOWN\n\n__all__ = ['UNKNOWN']\n"
+        )
         _write(tmp_path, "widgets/core.py", "x = 1\n")
         api = api_check.extract_public_api("widgets")
         assert api["UNKNOWN"]["kind"] == "unresolved"
@@ -119,7 +125,12 @@ class TestCompare:
 
     def test_new_symbol_addition_is_not_flagged(self):
         baseline = {"pkg": {"f": {"kind": "function", "signature": "(x)"}}}
-        current = {"pkg": {"f": {"kind": "function", "signature": "(x)"}, "g": {"kind": "function", "signature": "()"}}}
+        current = {
+            "pkg": {
+                "f": {"kind": "function", "signature": "(x)"},
+                "g": {"kind": "function", "signature": "()"},
+            }
+        }
         assert api_check.compare(baseline, current) == []
 
 
@@ -138,9 +149,9 @@ class TestRealBaselineFixture:
     def test_checked_in_baseline_is_internally_consistent(self):
         baseline = json.loads(api_check.DEFAULT_BASELINE.read_text())
         assert set(baseline) <= set(api_check.PUBLIC_PACKAGES)
-        for package, symbols in baseline.items():
+        for _package, symbols in baseline.items():
             assert isinstance(symbols, dict)
-            for name, desc in symbols.items():
+            for _name, desc in symbols.items():
                 assert desc["kind"] in {"function", "class", "unresolved", "unknown"}
 
     def test_current_source_tree_matches_baseline(self):

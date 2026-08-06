@@ -52,9 +52,7 @@ class CheckpointError(Exception):
         self.workflow_id = workflow_id
         self.path = path
         super().__init__(
-            f"{message} (workflow_id={workflow_id!r}"
-            + (f", path={path!r}" if path else "")
-            + ")"
+            f"{message} (workflow_id={workflow_id!r}" + (f", path={path!r}" if path else "") + ")"
         )
 
 
@@ -177,7 +175,7 @@ class CheckpointStore:
 class StepCheckpoint:
     """Tracks item-level progress within a single workflow step."""
 
-    def __init__(self, workflow: "CheckpointedWorkflow", step_name: str):
+    def __init__(self, workflow: CheckpointedWorkflow, step_name: str):
         self._workflow = workflow
         self.step_name = step_name
         self._done: set[str] = set(workflow._record.step_progress.get(step_name, []))
@@ -242,7 +240,7 @@ class CheckpointedWorkflow:
             yield step_name
 
     class _StepContext:
-        def __init__(self, workflow: "CheckpointedWorkflow", step_name: str):
+        def __init__(self, workflow: CheckpointedWorkflow, step_name: str):
             self.workflow = workflow
             self.step_name = step_name
             self.checkpoint = StepCheckpoint(workflow, step_name)
@@ -266,7 +264,7 @@ class CheckpointedWorkflow:
                 self.workflow._flush()
             return False
 
-    def step(self, step_name: str) -> "CheckpointedWorkflow._StepContext":
+    def step(self, step_name: str) -> CheckpointedWorkflow._StepContext:
         return CheckpointedWorkflow._StepContext(self, step_name)
 
     def clear(self) -> None:

@@ -44,13 +44,11 @@ logger = logging.getLogger("ledgerlens.negative_miner")
 # Configuration
 # ---------------------------------------------------------------------------
 
-CONTRASTIVE_CURRICULUM_EPOCHS: int = int(
-    os.getenv("CONTRASTIVE_CURRICULUM_EPOCHS", "5")
-)
+CONTRASTIVE_CURRICULUM_EPOCHS: int = int(os.getenv("CONTRASTIVE_CURRICULUM_EPOCHS", "5"))
 EVENT_HMAC_SECRET: str = os.getenv("EVENT_HMAC_SECRET", "ledgerlens-event-hmac-default")
 
 # FAISS HNSW build parameters
-_HNSW_M: int = 32          # number of bi-directional links per node
+_HNSW_M: int = 32  # number of bi-directional links per node
 _HNSW_EF_CONSTRUCTION: int = 200
 _HNSW_EF_SEARCH: int = 64
 
@@ -87,6 +85,7 @@ class _ANN:
 
         try:
             import faiss  # noqa: F401
+
             self._faiss_available = True
         except ImportError:
             logger.warning(
@@ -245,7 +244,9 @@ class HardNegativeMiner:
             return
         self._ann.build(np.asarray(clean_embeddings, dtype=np.float32))
         self._n_clean = len(clean_embeddings)
-        logger.debug("Built clean-wallet ANN index: %d vectors, dim=%d", self._n_clean, self.embedding_dim)
+        logger.debug(
+            "Built clean-wallet ANN index: %d vectors, dim=%d", self._n_clean, self.embedding_dim
+        )
 
     def set_ring_registry(self, registry: RingRegistry) -> None:
         """Attach a RingRegistry for positive-pair construction."""

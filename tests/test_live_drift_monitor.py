@@ -64,5 +64,3 @@ def test_live_drift_monitor_shifted_psi_above_0_2(tmp_path: Path):
         drifted = monitor.update(pd.Series({"feat_x": float(v)}))
 
     assert "feat_x" in drifted
-
-

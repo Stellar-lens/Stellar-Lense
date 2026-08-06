@@ -106,9 +106,7 @@ class TestRedactPatternTransform:
         assert "matched=True" in entry.detail
 
     def test_raises_when_configured(self):
-        t = RedactPatternTransform(
-            field_name="note", pattern=r"SECRET", raise_on_match=True
-        )
+        t = RedactPatternTransform(field_name="note", pattern=r"SECRET", raise_on_match=True)
         with pytest.raises(PrivacyTransformError):
             t.apply({"note": "this is SECRET"})
 

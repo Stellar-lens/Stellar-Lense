@@ -298,7 +298,11 @@ def compute_benford_features(
         )
         if id_col is not None:
             ts_col = next(
-                (c for c in ("ledger_close_time", "timestamp", "time") if c in wallet_trades.columns),
+                (
+                    c
+                    for c in ("ledger_close_time", "timestamp", "time")
+                    if c in wallet_trades.columns
+                ),
                 None,
             )
             for hours in per_window:
@@ -335,7 +339,9 @@ def compute_benford_features(
     if config.BENFORD_CI_ENABLED and not wallet_trades.empty:
         from detection.benford_engine import compute_benford_confidence_intervals
 
-        amounts = wallet_trades["amount"] if "amount" in wallet_trades.columns else pd.Series(dtype=float)
+        amounts = (
+            wallet_trades["amount"] if "amount" in wallet_trades.columns else pd.Series(dtype=float)
+        )
         ci = compute_benford_confidence_intervals(amounts)
         features["benford_ci_width"] = ci["chi_square_ci_width"]
     else:
@@ -523,7 +529,7 @@ def compute_trade_pattern_features(
     if len(volume_by_counterparty) >= 2:
         mean_vol = float(volume_by_counterparty.mean())
         var_vol = float(volume_by_counterparty.var(ddof=0))
-        counterparty_variance = (var_vol / (mean_vol ** 2)) if mean_vol > 0 else 0.0
+        counterparty_variance = (var_vol / (mean_vol**2)) if mean_vol > 0 else 0.0
         counterparty_variance = max(0.0, min(1.0, counterparty_variance))
     else:
         counterparty_variance = 0.0
@@ -1128,9 +1134,7 @@ def compute_bot_fingerprint_features(
             "bot_trust_line_latency": float(
                 bot_fingerprint.trust_line_creation_latency_seconds or 0.0
             ),
-            "bot_interval_regularity": float(
-                bot_fingerprint.inter_trade_interval_cv or 0.0
-            ),
+            "bot_interval_regularity": float(bot_fingerprint.inter_trade_interval_cv or 0.0),
             "bot_op_entropy": float(bot_fingerprint.account_management_cluster_score),
         }
 
@@ -1256,10 +1260,23 @@ def build_feature_vector(
         span.set_attribute("wallet.id", hash_span_id(wallet))
         span.set_attribute("trade.count", len(wallet_trades))
         return _build_feature_vector_inner(
-            wallet, wallet_trades, activity, orderbook_events, funding_graph,
-            all_pairs_df, amm_trades, gnn_encoder, benford_metrics,
-            pair_benford_sketches, community_map, ring_stats, path_flows,
-            kge_encoder, wallet_counterparties, seq_model, pair_vocab,
+            wallet,
+            wallet_trades,
+            activity,
+            orderbook_events,
+            funding_graph,
+            all_pairs_df,
+            amm_trades,
+            gnn_encoder,
+            benford_metrics,
+            pair_benford_sketches,
+            community_map,
+            ring_stats,
+            path_flows,
+            kge_encoder,
+            wallet_counterparties,
+            seq_model,
+            pair_vocab,
         )
 
 
@@ -1526,7 +1543,10 @@ _FEATURE_ANCHORS: dict[str, str] = {
     **{f"benford_chi_square_{h}h": "#11--benford_chi_square_hh" for h in [1, 4, 24, 168, 720]},
     **{f"benford_mad_{h}h": "#12--benford_mad_hh" for h in [1, 4, 24, 168, 720]},
     **{f"benford_z_max_{h}h": "#13--benford_z_max_hh" for h in [1, 4, 24, 168, 720]},
-    **{f"benford_residual_chi_square_{h}h": "#14--benford_residual_chi_square_hh" for h in [1, 4, 24, 168, 720]},
+    **{
+        f"benford_residual_chi_square_{h}h": "#14--benford_residual_chi_square_hh"
+        for h in [1, 4, 24, 168, 720]
+    },
     **{f"benford_residual_mad_{h}h": "#15--benford_residual_mad_hh" for h in [1, 4, 24, 168, 720]},
     "benford_ci_width": "#16--benford_ci_width",
     "counterparty_concentration_ratio": "#21--counterparty_concentration_ratio",

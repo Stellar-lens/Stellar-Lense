@@ -1,16 +1,13 @@
 """Unit and integration tests for contract-driven test fixtures (Issue #465)."""
 
 import json
-from pathlib import Path
 
 import pandas as pd
 import pytest
 
 from detection.feature_engineering import compute_benford_features, compute_trade_pattern_features
 from tests.contract_fixtures import (
-    AccountRole,
     AccountSpec,
-    InvariantExpectationSpec,
     LedgerScenarioBuilder,
     OperationType,
     ScenarioContract,

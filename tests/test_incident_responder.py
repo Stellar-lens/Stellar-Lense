@@ -175,7 +175,15 @@ def test_incident_record_has_expected_fields():
     incident = responder.handle_alert(WALLET, HIGH_RISK_ALERT)
     assert incident is not None
     d = incident.to_dict()
-    for field in ("incident_id", "wallet_hash", "alert_fingerprint", "alert_type", "risk_score", "created_at", "status"):
+    for field in (
+        "incident_id",
+        "wallet_hash",
+        "alert_fingerprint",
+        "alert_type",
+        "risk_score",
+        "created_at",
+        "status",
+    ):
         assert field in d, f"Missing field: {field}"
     assert d["wallet_hash"] == _hash_wallet(WALLET)
     assert WALLET not in str(d)

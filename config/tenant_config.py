@@ -54,7 +54,9 @@ def build_threshold_strategy(tenant_id: str) -> Any:
     Returns the appropriate strategy based on the tenant's
     ``threshold_strategy`` and ``threshold_config`` settings.
     """
-    from detection.threshold_strategy import build_strategy
+    from importlib import import_module
+
+    build_strategy = import_module("detection.threshold_strategy").build_strategy
 
     tc = get_tenant_config(tenant_id)
     kwargs: dict[str, Any] = dict(tc.threshold_config)
@@ -75,4 +77,3 @@ class TenantContext:
 
     def prometheus_labels(self, labels: dict[str, Any]) -> dict[str, Any]:
         return {"tenant": self.tenant_id, **labels}
-

@@ -33,6 +33,7 @@ _LATENT_DIM = 32
 # Pure-numpy MLP helpers (no PyTorch dependency at import time)
 # ---------------------------------------------------------------------------
 
+
 def _relu(x: np.ndarray) -> np.ndarray:
     return np.maximum(0.0, x)
 
@@ -112,7 +113,10 @@ class NeuralProcess:
             return np.zeros(_LATENT_DIM, dtype=np.float32)
 
         encodings = np.stack(
-            [self._encode_one(f, l) for f, l in zip(context_features, context_labels, strict=True)]
+            [
+                self._encode_one(feature, label)
+                for feature, label in zip(context_features, context_labels, strict=True)
+            ]
         )
         return encodings.mean(axis=0)
 
@@ -182,6 +186,7 @@ class NeuralProcess:
 # ---------------------------------------------------------------------------
 # Cold-start blending helpers
 # ---------------------------------------------------------------------------
+
 
 def cold_start_blend_weight(trade_count: int, threshold: int = NP_COLD_START_THRESHOLD) -> float:
     """Linear blend weight for the NP score.

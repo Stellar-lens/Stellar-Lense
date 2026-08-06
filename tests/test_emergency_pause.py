@@ -47,9 +47,7 @@ def test_pause_proposed_above_anomaly_rate():
     for i in range(5):
         watchdog.record_score(f"hash_lo{i}", 10)
 
-    with patch(
-        "integrations.contract_client.LedgerLensContractClient"
-    ) as MockClient:
+    with patch("integrations.contract_client.LedgerLensContractClient") as MockClient:
         instance = MockClient.return_value
         instance.initiate_emergency_pause.return_value = 42
 
@@ -74,9 +72,7 @@ def test_pause_proposed_latency_budget_breached():
     for i in range(5):
         watchdog.record_score(f"hash_lo{i}", 50, e2e_latency_ms=100)
 
-    with patch(
-        "integrations.contract_client.LedgerLensContractClient"
-    ) as MockClient:
+    with patch("integrations.contract_client.LedgerLensContractClient") as MockClient:
         instance = MockClient.return_value
         instance.initiate_emergency_pause.return_value = 84
 

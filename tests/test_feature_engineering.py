@@ -33,8 +33,7 @@ def _sample_trades() -> pd.DataFrame:
     strings (as real ingestion produces) and a unified "amount" column.
     """
     trades = [
-        CleanTradeFactory.build(base_account="A", counter_account="B").__dict__
-        for _ in range(2)
+        CleanTradeFactory.build(base_account="A", counter_account="B").__dict__ for _ in range(2)
     ]
     df = pd.DataFrame(trades)
     df["base_asset"] = df["base_asset"].apply(lambda a: f"{a.code}:{a.issuer or 'native'}")

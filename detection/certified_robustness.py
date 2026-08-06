@@ -60,9 +60,7 @@ def _ibp_linear(
     return new_lo, new_hi
 
 
-def _ibp_relu(
-    lo: np.ndarray, hi: np.ndarray
-) -> tuple[np.ndarray, np.ndarray]:
+def _ibp_relu(lo: np.ndarray, hi: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """Propagate [lo, hi] through ReLU."""
     return np.maximum(lo, 0.0), np.maximum(hi, 0.0)
 
@@ -90,9 +88,7 @@ def _ibp_batchnorm(
     return new_lo, new_hi
 
 
-def _propagate(
-    x: np.ndarray, epsilon: float, layers: list[Layer]
-) -> tuple[np.ndarray, np.ndarray]:
+def _propagate(x: np.ndarray, epsilon: float, layers: list[Layer]) -> tuple[np.ndarray, np.ndarray]:
     """Propagate the L∞ ball [x-ε, x+ε] through *layers*.
 
     Returns (lo, hi) — the certified output interval.
@@ -108,9 +104,12 @@ def _propagate(
             lo, hi = _ibp_relu(lo, hi)
         elif ltype == "batchnorm":
             lo, hi = _ibp_batchnorm(
-                lo, hi,
-                layer["gamma"], layer["beta"],
-                layer["mean"], layer["var"],
+                lo,
+                hi,
+                layer["gamma"],
+                layer["beta"],
+                layer["mean"],
+                layer["var"],
                 layer.get("eps", 1e-5),
             )
         else:

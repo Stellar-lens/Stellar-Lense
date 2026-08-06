@@ -115,13 +115,13 @@ class TradeEvent(NamedTuple):
 # Sinusoidal positional encoding
 # ---------------------------------------------------------------------------
 
+
 def _sinusoidal_pe(max_len: int, embed_dim: int) -> torch.Tensor:
     """Build a (max_len, embed_dim) sinusoidal positional encoding matrix."""
     pe = torch.zeros(max_len, embed_dim)
     position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
     div_term = torch.exp(
-        torch.arange(0, embed_dim, 2, dtype=torch.float)
-        * (-math.log(10000.0) / embed_dim)
+        torch.arange(0, embed_dim, 2, dtype=torch.float) * (-math.log(10000.0) / embed_dim)
     )
     pe[:, 0::2] = torch.sin(position * div_term)
     pe[:, 1::2] = torch.cos(position * div_term)
@@ -131,6 +131,7 @@ def _sinusoidal_pe(max_len: int, embed_dim: int) -> torch.Tensor:
 # ---------------------------------------------------------------------------
 # Model
 # ---------------------------------------------------------------------------
+
 
 class TradeSequenceTransformer(nn.Module if _TORCH_AVAILABLE else object):  # type: ignore[misc]
     """Lightweight transformer encoder over wallet trade sequences.
@@ -203,7 +204,7 @@ class TradeSequenceTransformer(nn.Module if _TORCH_AVAILABLE else object):  # ty
             dim_feedforward=self.ffn_dim,
             dropout=self.dropout_p,
             batch_first=True,  # (batch, seq, embed_dim)
-            norm_first=True,   # Pre-LN: better gradient flow for small models
+            norm_first=True,  # Pre-LN: better gradient flow for small models
         )
         self.transformer = nn.TransformerEncoder(
             encoder_layer,
@@ -284,17 +285,11 @@ class TradeSequenceTransformer(nn.Module if _TORCH_AVAILABLE else object):  # ty
             )
         for i, ev in enumerate(events):
             if not math.isfinite(ev.log_amount):
-                raise ValueError(
-                    f"Event {i}: log_amount={ev.log_amount!r} is not finite."
-                )
+                raise ValueError(f"Event {i}: log_amount={ev.log_amount!r} is not finite.")
             if not math.isfinite(ev.time_delta_s):
-                raise ValueError(
-                    f"Event {i}: time_delta_s={ev.time_delta_s!r} is not finite."
-                )
+                raise ValueError(f"Event {i}: time_delta_s={ev.time_delta_s!r} is not finite.")
             if not math.isfinite(ev.direction):
-                raise ValueError(
-                    f"Event {i}: direction={ev.direction!r} is not finite."
-                )
+                raise ValueError(f"Event {i}: direction={ev.direction!r} is not finite.")
 
     def events_to_tensor(
         self,
@@ -397,9 +392,7 @@ class TradeSequenceTransformer(nn.Module if _TORCH_AVAILABLE else object):  # ty
         with open(metrics_path, "w") as f:
             json.dump(metrics, f, indent=2)
 
-        logger.info(
-            "TradeSequenceTransformer saved to %s (sha256=%s…)", artifact_path, sha256[:12]
-        )
+        logger.info("TradeSequenceTransformer saved to %s (sha256=%s…)", artifact_path, sha256[:12])
         return artifact_path
 
     @classmethod
@@ -431,9 +424,7 @@ class TradeSequenceTransformer(nn.Module if _TORCH_AVAILABLE else object):  # ty
             if os.path.exists(metrics_path):
                 with open(metrics_path) as f:
                     metrics = json.load(f)
-                expected_sha = (
-                    metrics.get("sequence_transformer", {}).get("artifact_sha256")
-                )
+                expected_sha = metrics.get("sequence_transformer", {}).get("artifact_sha256")
                 if expected_sha:
                     actual_sha = _sha256_file(artifact_path)
                     if actual_sha != expected_sha:
@@ -506,8 +497,7 @@ class TradeSequenceTransformer(nn.Module if _TORCH_AVAILABLE else object):  # ty
             "seq_len": seq_len,
         }
         logger.info(
-            "Latency benchmark — mean=%.1f ms, median=%.1f ms, p95=%.1f ms "
-            "(batch=%d, seq=%d)",
+            "Latency benchmark — mean=%.1f ms, median=%.1f ms, p95=%.1f ms " "(batch=%d, seq=%d)",
             result["mean_ms"],
             result["median_ms"],
             result["p95_ms"],
@@ -521,6 +511,7 @@ class TradeSequenceTransformer(nn.Module if _TORCH_AVAILABLE else object):  # ty
 # Helper: SHA-256 of a file
 # ---------------------------------------------------------------------------
 
+
 def _sha256_file(path: str) -> str:
     h = hashlib.sha256()
     with open(path, "rb") as f:
@@ -532,6 +523,7 @@ def _sha256_file(path: str) -> str:
 # ---------------------------------------------------------------------------
 # Public helper: build a sequence embedding for one wallet's trades
 # ---------------------------------------------------------------------------
+
 
 def build_sequence_embedding(
     trades_df: pd.DataFrame,  # type: ignore[name-defined]  # noqa: F821
@@ -571,13 +563,12 @@ def build_sequence_embedding(
     if trades_df is None or len(trades_df) == 0:
         return np.zeros(embed_dim, dtype=np.float32)
 
-
     # ---- Build TradeEvent list ----
     df = trades_df.sort_values("ledger_close_time").reset_index(drop=True)
 
     # Truncate to max_length silently (defensive truncation before validation)
     if len(df) > model.max_length:
-        df = df.iloc[-model.max_length:]
+        df = df.iloc[-model.max_length :]
 
     events: list[TradeEvent] = []
     prev_ts: float | None = None
@@ -618,12 +609,14 @@ def build_sequence_embedding(
             wallet = row.get("wallet", "")
             direction = 1.0 if row["base_account"] == wallet else -1.0
 
-        events.append(TradeEvent(
-            log_amount=log_amt,
-            time_delta_s=delta,
-            pair_index=pair_idx,
-            direction=direction,
-        ))
+        events.append(
+            TradeEvent(
+                log_amount=log_amt,
+                time_delta_s=delta,
+                pair_index=pair_idx,
+                direction=direction,
+            )
+        )
 
     if not events:
         return np.zeros(embed_dim, dtype=np.float32)

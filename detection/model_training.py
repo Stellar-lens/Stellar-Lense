@@ -26,6 +26,7 @@ import struct
 import sys
 import threading
 from datetime import UTC, datetime
+from importlib import import_module
 
 import joblib
 import lightgbm as lgb
@@ -40,11 +41,14 @@ from xgboost import XGBClassifier
 
 from config import config
 from config.contracts import validate_mode
+from detection.artifact_compatibility import write_artifact_manifest
 from detection.conformal import ConformalCalibrator
 from detection.model_compatibility import (
     FEATURE_CONTRACT_VERSION,
     compute_feature_contract_hash,
 )
+from detection.model_contracts import FEATURE_COLUMNS_EXCLUDE
+from detection.model_contracts import compute_feature_schema_hash as _compute_feature_schema_hash
 from utils.logging import get_logger
 from utils.version_stamp import get_version as _get_ledgerlens_version
 
@@ -56,11 +60,12 @@ MODEL_REGISTRY = {
     "lightgbm": LGBMClassifier,
 }
 
-FEATURE_COLUMNS_EXCLUDE = {"wallet", "label", "profile"}
 PSI_N_BINS = 10
 PSI_EPSILON = 1e-4
 
-LABEL_DISTRIBUTION_BASELINE_PATH = os.path.join(config.MODEL_DIR, "label_distribution_baseline.json")
+LABEL_DISTRIBUTION_BASELINE_PATH = os.path.join(
+    config.MODEL_DIR, "label_distribution_baseline.json"
+)
 
 # ---------------------------------------------------------------------------
 # Feature schema validation helpers for incremental training
@@ -141,9 +146,7 @@ def validate_incremental_samples(
     nan_mask = X_valid.isnull().any(axis=1)
     n_nan = int(nan_mask.sum())
     if n_nan:
-        logger.warning(
-            "incremental validation: dropping %d row(s) with NaN values", n_nan
-        )
+        logger.warning("incremental validation: dropping %d row(s) with NaN values", n_nan)
         X_valid = X_valid[~nan_mask]
 
     # Drop rows with out-of-range values
@@ -322,8 +325,16 @@ def incremental_train_lightgbm(
     new_clf.fitted_ = True  # noqa: SLF001
 
     # Copy metadata attributes scikit-learn sets during fit()
-    for attr in ("feature_name_", "n_features_in_", "classes_", "_n_classes", "_le",
-                 "_class_map", "_n_features", "_objective"):
+    for attr in (
+        "feature_name_",
+        "n_features_in_",
+        "classes_",
+        "_n_classes",
+        "_le",
+        "_class_map",
+        "_n_features",
+        "_objective",
+    ):
         if hasattr(existing_model, attr):
             setattr(new_clf, attr, getattr(existing_model, attr))
 
@@ -331,9 +342,7 @@ def incremental_train_lightgbm(
     assert new_clf.booster_ is not None, "Booster attachment failed"
 
     total_trees = new_booster.num_trees()
-    logger.info(
-        "incremental_train_lightgbm: done — total trees after update: %d", total_trees
-    )
+    logger.info("incremental_train_lightgbm: done — total trees after update: %d", total_trees)
 
     return new_clf
 
@@ -378,6 +387,7 @@ class IncrementalTrainingStalenessDetector:
     ) -> None:
         try:
             from config import config as _cfg  # late import to allow unit-test mocking
+
             self._max_rounds: int = (
                 max_rounds
                 if max_rounds is not None
@@ -659,10 +669,15 @@ def train_models(
     # rounds) a fixed 10% calibration split can be smaller than n_classes,
     # which sklearn rejects outright — fall back to an unstratified split
     # rather than crashing model training.
-    stratify_cal = y_train if cal_size >= n_classes and (len(X_train) - cal_size) >= n_classes else None
+    stratify_cal = (
+        y_train if cal_size >= n_classes and (len(X_train) - cal_size) >= n_classes else None
+    )
     X_cal, X_train, y_cal, y_train = train_test_split(
-        X_train, y_train, test_size=len(X_train) - cal_size,
-        random_state=random_state, stratify=stratify_cal,
+        X_train,
+        y_train,
+        test_size=len(X_train) - cal_size,
+        random_state=random_state,
+        stratify=stratify_cal,
     )
     logger.info(
         "Reserved calibration split: %d rows (indices 0..%d) — stratified by label",
@@ -670,16 +685,21 @@ def train_models(
         cal_size - 1,
     )
 
-    # SMOTE can't handle NaN features (e.g. sparse synthetic wallets with too
-    # little trade history for a window-based feature to be computed).
-    nan_mask = X_train.isnull().any(axis=1)
-    if nan_mask.any():
+    # SMOTE and several estimators cannot handle NaN features (e.g. sparse
+    # synthetic wallets with too little history for a windowed feature). Keep
+    # those samples and impute from the training split so filtering cannot
+    # accidentally erase an entire class. A wholly-missing feature falls back
+    # to zero, and the same training-derived values are applied to test/cal.
+    missing_values = int(X_train.isnull().sum().sum())
+    if missing_values:
         logger.warning(
-            "train_models: dropping %d training row(s) with NaN features before SMOTE",
-            int(nan_mask.sum()),
+            "train_models: imputing %d missing training feature value(s) before SMOTE",
+            missing_values,
         )
-        X_train = X_train[~nan_mask]
-        y_train = y_train[~nan_mask]
+    fill_values = X_train.median(numeric_only=True).fillna(0.0)
+    X_train = X_train.fillna(fill_values).fillna(0.0)
+    X_test = X_test.fillna(fill_values).fillna(0.0)
+    X_cal = X_cal.fillna(fill_values).fillna(0.0)
 
     # SMOTE's default k_neighbors=5 requires at least 6 samples in the
     # minority class; cap it for small training sets (e.g. early
@@ -756,7 +776,9 @@ def train_models(
         )
         empirical_coverage = cal_covered / len(y_cal) if len(y_cal) > 0 else 0.0
         metrics["conformal_empirical_coverage"] = float(round(empirical_coverage, 4))
-        metrics["conformal_q_hat"] = float(round(calibrator.q_hat, 6)) if calibrator.q_hat is not None else 0.0
+        metrics["conformal_q_hat"] = (
+            float(round(calibrator.q_hat, 6)) if calibrator.q_hat is not None else 0.0
+        )
         metrics["calibration_split_size"] = len(X_cal)
         metrics["calibration_split_index_range"] = f"0..{len(X_cal) - 1}"
 
@@ -813,9 +835,7 @@ def _get_watermark_key() -> bytes:
         raise RuntimeError("MODEL_WATERMARK_KEY is not set")
     key = raw.encode() if isinstance(raw, str) else raw
     if len(key) != 32:
-        raise ValueError(
-            f"MODEL_WATERMARK_KEY must be exactly 32 bytes; got {len(key)}"
-        )
+        raise ValueError(f"MODEL_WATERMARK_KEY must be exactly 32 bytes; got {len(key)}")
     return key
 
 
@@ -947,8 +967,7 @@ def save_training_artifacts(
         test_features = training_output.get("X_test")
         if isinstance(test_features, pd.DataFrame):
             feature_dtypes = {
-                column: str(test_features[column].dtype)
-                for column in feature_columns
+                column: str(test_features[column].dtype) for column in feature_columns
             }
         else:
             # Backward compatibility for callers constructing the historical
@@ -1048,7 +1067,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--raw-trades-path",
         default="data/raw_trades.parquet",
-        help="Path to raw trades Parquet file for Benford window optimization"
+        help="Path to raw trades Parquet file for Benford window optimization",
     )
     parser.add_argument(
         "--adv-training",
@@ -1088,6 +1107,7 @@ def main() -> None:
                 get_candidate_grid,
                 optimize_windows_for_asset,
             )
+
             trades_df = pd.read_parquet(raw_trades_path)
             assets = set()
             if "base_asset" in trades_df.columns:
@@ -1097,10 +1117,18 @@ def main() -> None:
 
             os.makedirs(model_dir, exist_ok=True)
             for asset in sorted(list(assets)):
-                asset_mask = (trades_df["base_asset"] == asset) | (trades_df["counter_asset"] == asset)
+                asset_mask = (trades_df["base_asset"] == asset) | (
+                    trades_df["counter_asset"] == asset
+                )
                 asset_trades = trades_df[asset_mask]
-                wallets_with_trades = set(pd.unique(asset_trades[["base_account", "counter_account"]].values.ravel()))
-                asset_labelled_df = df[df["wallet"].isin(wallets_with_trades)] if "wallet" in df.columns else pd.DataFrame()
+                wallets_with_trades = set(
+                    pd.unique(asset_trades[["base_account", "counter_account"]].values.ravel())
+                )
+                asset_labelled_df = (
+                    df[df["wallet"].isin(wallets_with_trades)]
+                    if "wallet" in df.columns
+                    else pd.DataFrame()
+                )
 
                 if len(asset_labelled_df) < 5:
                     tph = estimate_trades_per_hour(asset_trades)
@@ -1113,16 +1141,17 @@ def main() -> None:
                         res.add(fallback)
                     final_windows = sorted(list(res))[:5]
                 else:
-                    final_windows = optimize_windows_for_asset(asset, asset_trades, asset_labelled_df)
+                    final_windows = optimize_windows_for_asset(
+                        asset, asset_trades, asset_labelled_df
+                    )
 
                 clean_name = asset.replace(":", "_").replace("/", "_")
                 output_path = os.path.join(model_dir, f"{clean_name}_benford_windows.json")
                 with open(output_path, "w") as f:
-                    json.dump({
-                        "asset": asset,
-                        "windows": final_windows
-                    }, f, indent=2)
-                logger.info("Optimized Benford window schedule for asset %s: %s", asset, final_windows)
+                    json.dump({"asset": asset, "windows": final_windows}, f, indent=2)
+                logger.info(
+                    "Optimized Benford window schedule for asset %s: %s", asset, final_windows
+                )
             config.load_asset_benford_windows()
         except Exception as e:
             logger.error("Failed to run Benford window optimization: %s", e)
@@ -1276,9 +1305,7 @@ def main() -> None:
                     logger.info("TemporalGNNEncoder state saved to %s", output_path)
 
         except ImportError as exc:
-            logger.error(
-                "--with-temporal-gnn requested but torch not available: %s", exc
-            )
+            logger.error("--with-temporal-gnn requested but torch not available: %s", exc)
 
     training_output = train_models(
         df,
@@ -1308,7 +1335,9 @@ def main() -> None:
     adv_training_enabled = config.ADV_TRAINING_ENABLED or args.adv_training
     if adv_training_enabled:
         try:
-            from detection.adversarial.robustness import run_adversarial_training
+            run_adversarial_training = import_module(
+                "detection.adversarial.robustness"
+            ).run_adversarial_training
 
             logger.info(
                 "ADV_TRAINING_ENABLED=true — starting FGSM adversarial training loop "

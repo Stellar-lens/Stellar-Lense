@@ -79,7 +79,7 @@ class BaseCursorStore(ABC):
         """Return all persisted cursor records."""
         ...
 
-    def close(self) -> None:
+    def close(self) -> None:  # noqa: B027 - optional no-op hook for in-memory stores
         """Release underlying storage resources."""
         pass
 
@@ -103,7 +103,7 @@ class FileCursorStore(BaseCursorStore):
         if not os.path.exists(self.file_path):
             return
         try:
-            with open(self.file_path, "r", encoding="utf-8") as f:
+            with open(self.file_path, encoding="utf-8") as f:
                 self._data = json.load(f)
         except Exception as exc:
             logger.error("Failed to load cursor store from %s: %s", self.file_path, exc)
@@ -182,16 +182,14 @@ class SQLiteCursorStore(BaseCursorStore):
     def _init_db(self) -> None:
         with self._lock:
             with self._get_conn() as conn:
-                conn.execute(
-                    """
+                conn.execute("""
                     CREATE TABLE IF NOT EXISTS streaming_cursors (
                         stream_id TEXT PRIMARY KEY,
                         cursor TEXT NOT NULL,
                         metadata TEXT,
                         updated_at REAL NOT NULL
                     )
-                    """
-                )
+                    """)
                 conn.commit()
 
     def get_cursor(self, stream_id: str, default: str = "now") -> str:
@@ -235,7 +233,9 @@ class SQLiteCursorStore(BaseCursorStore):
     def list_cursors(self) -> dict[str, dict[str, Any]]:
         with self._lock:
             with self._get_conn() as conn:
-                cur = conn.execute("SELECT stream_id, cursor, metadata, updated_at FROM streaming_cursors")
+                cur = conn.execute(
+                    "SELECT stream_id, cursor, metadata, updated_at FROM streaming_cursors"
+                )
                 result = {}
                 for row in cur.fetchall():
                     s_id, cursor_val, meta_str, updated_at = row

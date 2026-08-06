@@ -35,11 +35,13 @@ def cosine_distance(a, b):
         return 1.0
     return 1.0 - (np.dot(a, b) / (norm_a * norm_b))
 
+
 class PrototypeDetector:
     """Zero-shot detection module that classifies unlabeled wallets by measuring
     cosine distance to prototype embeddings derived from a small set of confirmed
     wash-trade examples.
     """
+
     def __init__(self):
         self.wash_prototype = None
         self.legit_prototype = None
@@ -50,15 +52,15 @@ class PrototypeDetector:
         """
         labeled_embeddings = np.asarray(labeled_embeddings)
         labels = np.asarray(labels)
-        
+
         wash_mask = labels == 1
         legit_mask = labels == 0
-        
+
         if np.any(wash_mask):
             self.wash_prototype = labeled_embeddings[wash_mask].mean(axis=0)
         else:
             self.wash_prototype = np.zeros(labeled_embeddings.shape[1])
-            
+
         if np.any(legit_mask):
             self.legit_prototype = labeled_embeddings[legit_mask].mean(axis=0)
         else:
@@ -69,24 +71,25 @@ class PrototypeDetector:
         Returns a score between 0.0 and 1.0. Higher means more likely wash trade.
         """
         embedding = np.asarray(embedding)
-        
+
         # In case prototypes are not fitted properly
         if self.wash_prototype is None or self.legit_prototype is None:
             return 0.5
-            
+
         d_wash = cosine_distance(embedding, self.wash_prototype)
         d_legit = cosine_distance(embedding, self.legit_prototype)
-        
+
         # Handle case where both distances are 0
         if d_wash + d_legit == 0:
             return 0.5
-            
+
         return d_legit / (d_wash + d_legit)
 
 
 # ---------------------------------------------------------------------------
 # Zero-shot pattern detector (Issue #274)
 # ---------------------------------------------------------------------------
+
 
 def _patterns_hash(patterns_data: dict) -> str:
     """SHA-256 of the canonical JSON representation of patterns data."""

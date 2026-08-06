@@ -14,17 +14,13 @@ from __future__ import annotations
 import json
 from unittest import mock
 
-import pytest
-
 from scripts.diagnose import main
 from utils.diagnostics import CheckCategory, CheckStatus, DiagnosticReport, DiagnosticResult
 
 
 def _make_pass_report() -> DiagnosticReport:
     return DiagnosticReport(
-        results=[
-            DiagnosticResult("check1", CheckCategory.ENVIRONMENT, CheckStatus.PASS, "OK")
-        ],
+        results=[DiagnosticResult("check1", CheckCategory.ENVIRONMENT, CheckStatus.PASS, "OK")],
         overall_status=CheckStatus.PASS,
         categories_checked={CheckCategory.ENVIRONMENT},
         total_duration_ms=50.0,
@@ -33,9 +29,7 @@ def _make_pass_report() -> DiagnosticReport:
 
 def _make_fail_report() -> DiagnosticReport:
     return DiagnosticReport(
-        results=[
-            DiagnosticResult("check1", CheckCategory.CODE_HEALTH, CheckStatus.FAIL, "Failed")
-        ],
+        results=[DiagnosticResult("check1", CheckCategory.CODE_HEALTH, CheckStatus.FAIL, "Failed")],
         overall_status=CheckStatus.FAIL,
         categories_checked={CheckCategory.CODE_HEALTH},
         total_duration_ms=50.0,
@@ -45,9 +39,7 @@ def _make_fail_report() -> DiagnosticReport:
 def _make_warn_report() -> DiagnosticReport:
     return DiagnosticReport(
         results=[
-            DiagnosticResult(
-                "check1", CheckCategory.DEPENDENCIES, CheckStatus.WARN, "Warning"
-            )
+            DiagnosticResult("check1", CheckCategory.DEPENDENCIES, CheckStatus.WARN, "Warning")
         ],
         overall_status=CheckStatus.WARN,
         categories_checked={CheckCategory.DEPENDENCIES},
@@ -124,7 +116,9 @@ def test_main_json_output_contains_all_fields(capsys):
 
 def test_main_category_filtering():
     """--categories flag is forwarded to run_diagnostics."""
-    with mock.patch("scripts.diagnose.run_diagnostics", return_value=_make_pass_report()) as mock_run:
+    with mock.patch(
+        "scripts.diagnose.run_diagnostics", return_value=_make_pass_report()
+    ) as mock_run:
         main(["--categories", "environment", "dependencies"])
 
         mock_run.assert_called_once()
@@ -134,7 +128,9 @@ def test_main_category_filtering():
 
 def test_main_fail_fast_mode():
     """--fail-fast flag is forwarded to run_diagnostics."""
-    with mock.patch("scripts.diagnose.run_diagnostics", return_value=_make_pass_report()) as mock_run:
+    with mock.patch(
+        "scripts.diagnose.run_diagnostics", return_value=_make_pass_report()
+    ) as mock_run:
         main(["--fail-fast"])
 
         mock_run.assert_called_once()
@@ -183,7 +179,9 @@ def test_main_handles_import_error_for_checks(capsys):
 
 def test_main_no_arguments_runs_all_categories():
     """Running with no arguments runs checks in all categories."""
-    with mock.patch("scripts.diagnose.run_diagnostics", return_value=_make_pass_report()) as mock_run:
+    with mock.patch(
+        "scripts.diagnose.run_diagnostics", return_value=_make_pass_report()
+    ) as mock_run:
         main([])
 
         mock_run.assert_called_once()

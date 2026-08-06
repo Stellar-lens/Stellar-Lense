@@ -12,8 +12,7 @@ from sqlalchemy import create_engine, inspect, text
 
 from migrations import MigrationRunner
 from migrations.registry import REGISTRY
-from migrations.runner import MigrationStatus, _load_all_migrations
-
+from migrations.runner import _load_all_migrations
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -33,9 +32,7 @@ def populated_engine(sqlite_engine):
     """Engine with the risk_scores table already created (simulates an
     existing database that needs to be migrated)."""
     with sqlite_engine.begin() as conn:
-        conn.execute(
-            text(
-                """
+        conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS risk_scores (
                     id          INTEGER PRIMARY KEY AUTOINCREMENT,
                     wallet      VARCHAR NOT NULL,
@@ -46,9 +43,7 @@ def populated_engine(sqlite_engine):
                     confidence  INTEGER NOT NULL DEFAULT 0,
                     updated_at  TIMESTAMP NOT NULL
                 )
-                """
-            )
-        )
+                """))
     return sqlite_engine
 
 
@@ -151,9 +146,7 @@ class TestMigrationRunnerDryRun:
         # Tracking table may have been created by _ensure_tracking_tables, but
         # no migrations should be recorded as applied.
         with populated_engine.begin() as conn:
-            rows = conn.execute(
-                text("SELECT migration_id FROM schema_migrations")
-            ).fetchall()
+            rows = conn.execute(text("SELECT migration_id FROM schema_migrations")).fetchall()
         assert rows == [], "Dry-run should not record any applied migrations"
 
     def test_dry_run_columns_not_added(self, populated_engine):
@@ -200,5 +193,6 @@ class TestMigrationDiscovery:
     def test_migration_ids_are_four_digits(self):
         migrations = _load_all_migrations()
         import re
+
         for m in migrations:
             assert re.fullmatch(r"\d{4}", m.id), f"Migration ID {m.id!r} is not 4 digits"

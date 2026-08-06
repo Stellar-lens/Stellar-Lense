@@ -6,8 +6,6 @@ import sys
 import textwrap
 from pathlib import Path
 
-import pytest
-
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 import check_cli_contracts as cli_check  # noqa: E402
@@ -60,7 +58,9 @@ class TestExtraction:
 
 class TestCheckContract:
     def _contract(self, *arguments: CliArgument) -> CliContract:
-        return CliContract(script="s.py", command="python s.py", description="test", arguments=arguments)
+        return CliContract(
+            script="s.py", command="python s.py", description="test", arguments=arguments
+        )
 
     def test_matching_contract_produces_no_diagnostics(self, tmp_path):
         path = _write_script(tmp_path, "s.py", 'parser.add_argument("--pair", required=True)\n')
@@ -109,7 +109,7 @@ class TestRealContracts:
         diff if a contracted script's flags no longer match
         scripts/cli_contracts.py."""
         all_diagnostics = []
-        for name, contract in CONTRACTS.items():
+        for _name, contract in CONTRACTS.items():
             actual = cli_check._extract_actual_arguments(cli_check.SCRIPTS_DIR / contract.script)
             all_diagnostics.extend(cli_check.check_contract(contract, actual))
         assert all_diagnostics == [], "\n".join(all_diagnostics)

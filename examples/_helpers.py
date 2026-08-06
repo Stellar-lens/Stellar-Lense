@@ -8,11 +8,9 @@ from __future__ import annotations
 
 import os
 import sys
-import tempfile
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Any
 
-import numpy as np
 import pandas as pd
 
 # ---------------------------------------------------------------------------
@@ -104,7 +102,11 @@ def run_detection(
     features: dict[str, float] = {}
     try:
         feature_df = build_feature_matrix(trades_df)
-        wallet_row = feature_df[feature_df["wallet"] == wallet] if "wallet" in feature_df.columns else feature_df
+        wallet_row = (
+            feature_df[feature_df["wallet"] == wallet]
+            if "wallet" in feature_df.columns
+            else feature_df
+        )
         if not wallet_row.empty:
             features = wallet_row.iloc[0].to_dict()
     except Exception as exc:
@@ -165,7 +167,6 @@ def _benford_to_feature_row(benford_result: dict[str, Any]) -> pd.Series:
         row[f"benford_z_max_{w}"] = float(benford_result.get("z_max", 0.0))
 
     # Zero-fill all other expected features so the model doesn't error
-    from detection.model_training import FEATURE_COLUMNS_EXCLUDE
 
     try:
         import joblib

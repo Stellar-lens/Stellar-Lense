@@ -183,13 +183,17 @@ def evaluate_defence(
     logger.info(f"  Queries per Attack: {report['n_queries_per_attack']}")
     logger.info("\nResults:")
     logger.info(f"  Test Samples: {report['n_test_samples']}")
-    logger.info(f"  Successful Reconstructions: {report['successful_inversions']}/{report['n_test_samples']}")
+    logger.info(
+        f"  Successful Reconstructions: {report['successful_inversions']}/{report['n_test_samples']}"
+    )
     logger.info(f"  Success Rate: {report['inversion_success_rate'] * 100:.1f}%")
     logger.info("\nReconstruction Error Statistics:")
     logger.info(f"  Mean: {report['mean_reconstruction_error']:.2f} points")
     logger.info(f"  Median: {report['median_reconstruction_error']:.2f} points")
     logger.info(f"  Std Dev: {report['std_reconstruction_error']:.2f} points")
-    logger.info(f"  Range: [{report['min_reconstruction_error']:.2f}, {report['max_reconstruction_error']:.2f}]")
+    logger.info(
+        f"  Range: [{report['min_reconstruction_error']:.2f}, {report['max_reconstruction_error']:.2f}]"
+    )
     logger.info("\nInterpretation:")
     if report["inversion_success_rate"] < 0.2:
         logger.info(

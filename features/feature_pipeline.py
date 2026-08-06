@@ -44,13 +44,10 @@ def build_extended_feature_vector(
         now = datetime.now(UTC)
 
     features = build_feature_vector(wallet, wallet_trades, **kwargs)
-    features.update(
-        compute_lifecycle_features(wallet, wallet_trades, account_created_at, now=now)
-    )
+    features.update(compute_lifecycle_features(wallet, wallet_trades, account_created_at, now=now))
     features.update(compute_token_velocity(wallet_trades, asset_supply, now=now))
 
     # OHLCV-derived candle features (pair-level microstructure signals)
     features.update(compute_ohlcv_features(wallet_trades))
 
     return features
-

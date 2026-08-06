@@ -1,11 +1,12 @@
 """Tests for package-boundary contracts."""
 
-import sys
 import os
+import sys
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-import pytest
-from typing import Any, Iterator
+from collections.abc import Iterator
+from typing import Any
 
 from contracts import (
     AlertChannel,
@@ -55,9 +56,15 @@ class TestRiskScore:
         assert rs["replay_model_version"] == "v2.1"
 
     def test_risk_score_type(self):
-        rs: RiskScore = {"wallet": "x", "asset_pair": "y", "score": 0,
-                         "benford_flag": False, "ml_flag": False,
-                         "confidence": 0, "timestamp": 0}
+        rs: RiskScore = {
+            "wallet": "x",
+            "asset_pair": "y",
+            "score": 0,
+            "benford_flag": False,
+            "ml_flag": False,
+            "confidence": 0,
+            "timestamp": 0,
+        }
         assert isinstance(rs, dict)
         assert rs["wallet"] == "x"
 

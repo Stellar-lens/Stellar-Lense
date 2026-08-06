@@ -76,7 +76,7 @@ import pathlib
 import re
 import sys
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any
 
 REPO_ROOT = pathlib.Path(__file__).parent.parent.resolve()
 NOTEBOOKS_DIR = REPO_ROOT / "notebooks"
@@ -94,10 +94,10 @@ MARKER_PATTERN = re.compile(r"\b(TODO|FIXME|HACK|XXX)\b", re.IGNORECASE)
 class NotebookFinding:
     """A single validation finding for a notebook."""
 
-    level: str          # "error" | "warning"
-    notebook: str       # relative path
-    cell_index: Optional[int]   # 1-based, None for notebook-level findings
-    check: str          # short check name
+    level: str  # "error" | "warning"
+    notebook: str  # relative path
+    cell_index: int | None  # 1-based, None for notebook-level findings
+    check: str  # short check name
     message: str
 
     def __str__(self) -> str:
@@ -132,7 +132,7 @@ class NotebookValidator:
         check_outputs: bool = False,
         check_execution_count: bool = False,
         strict: bool = False,
-        requirements_pkgs: Optional[Set[str]] = None,
+        requirements_pkgs: set[str] | None = None,
     ) -> None:
         self.path = path
         self.root = root
@@ -142,8 +142,8 @@ class NotebookValidator:
         self.strict = strict
         self.requirements_pkgs = requirements_pkgs or set()
 
-    def validate(self) -> List[NotebookFinding]:
-        findings: List[NotebookFinding] = []
+    def validate(self) -> list[NotebookFinding]:
+        findings: list[NotebookFinding] = []
 
         # ── Load JSON ─────────────────────────────────────────────────────
         try:
@@ -161,7 +161,7 @@ class NotebookValidator:
             return findings
 
         try:
-            nb: Dict[str, Any] = json.loads(raw)
+            nb: dict[str, Any] = json.loads(raw)
         except json.JSONDecodeError as exc:
             findings.append(
                 NotebookFinding(
@@ -180,20 +180,16 @@ class NotebookValidator:
             # If structure is broken, cell-level checks are unreliable
             return findings
 
-        cells: List[Dict[str, Any]] = nb.get("cells", [])
-        nb_metadata: Dict[str, Any] = nb.get("metadata", {})
+        cells: list[dict[str, Any]] = nb.get("cells", [])
+        nb_metadata: dict[str, Any] = nb.get("metadata", {})
         keep_outputs: bool = bool(nb_metadata.get("keep_outputs", False))
 
-        execution_counts: List[int] = []
+        execution_counts: list[int] = []
 
         for i, cell in enumerate(cells, 1):
             cell_type: str = cell.get("cell_type", "")
-            source_lines: List[str] = cell.get("source", [])
-            source: str = (
-                "".join(source_lines)
-                if isinstance(source_lines, list)
-                else source_lines
-            )
+            source_lines: list[str] = cell.get("source", [])
+            source: str = "".join(source_lines) if isinstance(source_lines, list) else source_lines
 
             if cell_type == "code":
                 findings.extend(self._check_code_cell(i, cell, source, keep_outputs))
@@ -205,17 +201,13 @@ class NotebookValidator:
 
         # ── Execution count check ─────────────────────────────────────────
         if self.check_execution_count and execution_counts:
-            findings.extend(
-                self._check_execution_counts(execution_counts)
-            )
+            findings.extend(self._check_execution_counts(execution_counts))
 
         return findings
 
     # ── Structural ────────────────────────────────────────────────────────
 
-    def _check_structure(
-        self, nb: Dict[str, Any]
-    ) -> List[NotebookFinding]:
+    def _check_structure(self, nb: dict[str, Any]) -> list[NotebookFinding]:
         findings = []
 
         # nbformat
@@ -281,10 +273,10 @@ class NotebookValidator:
     def _check_code_cell(
         self,
         idx: int,
-        cell: Dict[str, Any],
+        cell: dict[str, Any],
         source: str,
         keep_outputs: bool,
-    ) -> List[NotebookFinding]:
+    ) -> list[NotebookFinding]:
         findings = []
 
         # Empty cell
@@ -360,15 +352,11 @@ class NotebookValidator:
 
         # Undeclared imports
         if self.requirements_pkgs:
-            findings.extend(
-                self._check_undeclared_imports(idx, source)
-            )
+            findings.extend(self._check_undeclared_imports(idx, source))
 
         return findings
 
-    def _check_undeclared_imports(
-        self, idx: int, source: str
-    ) -> List[NotebookFinding]:
+    def _check_undeclared_imports(self, idx: int, source: str) -> list[NotebookFinding]:
         findings = []
         try:
             tree = ast.parse(source)
@@ -413,17 +401,73 @@ class NotebookValidator:
     def _is_stdlib_or_known(self, name: str) -> bool:
         """Return True for stdlib modules and known repo/requirements packages."""
         _STDLIB = {
-            "sys", "os", "re", "json", "math", "time", "datetime", "pathlib",
-            "collections", "itertools", "functools", "typing", "dataclasses",
-            "abc", "io", "copy", "random", "string", "struct", "hashlib",
-            "hmac", "logging", "warnings", "traceback", "inspect", "importlib",
-            "contextlib", "threading", "multiprocessing", "subprocess",
-            "argparse", "csv", "textwrap", "enum", "uuid", "base64",
-            "urllib", "http", "html", "xml", "ast", "dis", "gc", "operator",
-            "pprint", "queue", "shutil", "tempfile", "glob", "fnmatch",
-            "pickle", "shelve", "heapq", "bisect", "decimal", "fractions",
-            "statistics", "cmath", "array", "weakref", "signal", "platform",
-            "socket", "ssl", "ipaddress", "email", "mimetypes",
+            "sys",
+            "os",
+            "re",
+            "json",
+            "math",
+            "time",
+            "datetime",
+            "pathlib",
+            "collections",
+            "itertools",
+            "functools",
+            "typing",
+            "dataclasses",
+            "abc",
+            "io",
+            "copy",
+            "random",
+            "string",
+            "struct",
+            "hashlib",
+            "hmac",
+            "logging",
+            "warnings",
+            "traceback",
+            "inspect",
+            "importlib",
+            "contextlib",
+            "threading",
+            "multiprocessing",
+            "subprocess",
+            "argparse",
+            "csv",
+            "textwrap",
+            "enum",
+            "uuid",
+            "base64",
+            "urllib",
+            "http",
+            "html",
+            "xml",
+            "ast",
+            "dis",
+            "gc",
+            "operator",
+            "pprint",
+            "queue",
+            "shutil",
+            "tempfile",
+            "glob",
+            "fnmatch",
+            "pickle",
+            "shelve",
+            "heapq",
+            "bisect",
+            "decimal",
+            "fractions",
+            "statistics",
+            "cmath",
+            "array",
+            "weakref",
+            "signal",
+            "platform",
+            "socket",
+            "ssl",
+            "ipaddress",
+            "email",
+            "mimetypes",
         }
         if name in _STDLIB:
             return True
@@ -431,17 +475,28 @@ class NotebookValidator:
             return True
         # Repo-internal packages
         _REPO_PKGS = {
-            "detection", "ingestion", "streaming", "utils", "scripts",
-            "integrations", "monitoring", "reporting", "training", "evaluation",
-            "privacy", "features", "alerts", "config", "api", "analysis",
+            "detection",
+            "ingestion",
+            "streaming",
+            "utils",
+            "scripts",
+            "integrations",
+            "monitoring",
+            "reporting",
+            "training",
+            "evaluation",
+            "privacy",
+            "features",
+            "alerts",
+            "config",
+            "api",
+            "analysis",
         }
         return name in _REPO_PKGS
 
     # ── Markdown cell ─────────────────────────────────────────────────────
 
-    def _check_markdown_cell(
-        self, idx: int, source: str
-    ) -> List[NotebookFinding]:
+    def _check_markdown_cell(self, idx: int, source: str) -> list[NotebookFinding]:
         findings = []
         if not source.strip():
             findings.append(
@@ -457,9 +512,7 @@ class NotebookValidator:
 
     # ── Execution counts ──────────────────────────────────────────────────
 
-    def _check_execution_counts(
-        self, counts: List[int]
-    ) -> List[NotebookFinding]:
+    def _check_execution_counts(self, counts: list[int]) -> list[NotebookFinding]:
         findings = []
         expected = list(range(1, len(counts) + 1))
         if counts != expected:
@@ -486,7 +539,7 @@ class NotebookValidator:
 # ---------------------------------------------------------------------------
 
 
-def parse_requirements_pkgs(root: pathlib.Path) -> Set[str]:
+def parse_requirements_pkgs(root: pathlib.Path) -> set[str]:
     """
     Return the set of top-level import names inferred from requirements.txt.
 
@@ -497,7 +550,7 @@ def parse_requirements_pkgs(root: pathlib.Path) -> Set[str]:
     if not req_file.is_file():
         return set()
 
-    _PIP_TO_IMPORT: Dict[str, str] = {
+    _PIP_TO_IMPORT: dict[str, str] = {
         "scikit-learn": "sklearn",
         "python-louvain": "community",
         "stellar-sdk": "stellar_sdk",
@@ -514,7 +567,7 @@ def parse_requirements_pkgs(root: pathlib.Path) -> Set[str]:
         "factory-boy": "factory",
     }
 
-    pkgs: Set[str] = set()
+    pkgs: set[str] = set()
     for line in req_file.read_text(encoding="utf-8", errors="replace").splitlines():
         line = line.strip()
         if not line or line.startswith("#"):
@@ -535,23 +588,21 @@ def parse_requirements_pkgs(root: pathlib.Path) -> Set[str]:
 class AggregatedReport:
     """Aggregated findings across all validated notebooks."""
 
-    notebook_results: Dict[str, List[NotebookFinding]] = field(
-        default_factory=dict
-    )
+    notebook_results: dict[str, list[NotebookFinding]] = field(default_factory=dict)
 
     @property
-    def all_findings(self) -> List[NotebookFinding]:
+    def all_findings(self) -> list[NotebookFinding]:
         findings = []
         for ff in self.notebook_results.values():
             findings.extend(ff)
         return findings
 
     @property
-    def errors(self) -> List[NotebookFinding]:
+    def errors(self) -> list[NotebookFinding]:
         return [f for f in self.all_findings if f.level == "error"]
 
     @property
-    def warnings(self) -> List[NotebookFinding]:
+    def warnings(self) -> list[NotebookFinding]:
         return [f for f in self.all_findings if f.level == "warning"]
 
     def summary(self) -> str:
@@ -595,7 +646,7 @@ class AggregatedReport:
 # ---------------------------------------------------------------------------
 
 
-def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
+def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Validate Jupyter notebooks and research artefacts.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -642,9 +693,7 @@ def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def _collect_notebooks(
-    paths: Optional[List[str]], root: pathlib.Path
-) -> List[pathlib.Path]:
+def _collect_notebooks(paths: list[str] | None, root: pathlib.Path) -> list[pathlib.Path]:
     if paths is None:
         nb_dir = root / "notebooks"
         if nb_dir.is_dir():
@@ -662,7 +711,7 @@ def _collect_notebooks(
     return result
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
     root: pathlib.Path = args.root.resolve()
 
@@ -710,9 +759,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             "Review the report above."
         )
 
-    print(
-        f"[validate_notebooks] ✓ All {len(notebooks)} notebook(s) passed."
-    )
+    print(f"[validate_notebooks] ✓ All {len(notebooks)} notebook(s) passed.")
     return 0
 
 

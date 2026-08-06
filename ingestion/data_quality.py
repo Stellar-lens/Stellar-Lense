@@ -9,14 +9,14 @@ from __future__ import annotations
 import datetime
 import re
 from dataclasses import asdict, dataclass, field
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Union
+from enum import StrEnum
+from typing import Any
 
 import numpy as np
 import pandas as pd
 
 
-class QualityDimension(str, Enum):
+class QualityDimension(StrEnum):
     COMPLETENESS = "COMPLETENESS"
     VALIDITY = "VALIDITY"
     TIMELINESS = "TIMELINESS"
@@ -25,7 +25,7 @@ class QualityDimension(str, Enum):
     ANOMALY = "ANOMALY"
 
 
-class ReadinessStatus(str, Enum):
+class ReadinessStatus(StrEnum):
     READY = "READY"
     WARNING = "WARNING"
     QUARANTINE_REJECTED = "QUARANTINE_REJECTED"
@@ -45,12 +45,14 @@ class QualityRuleResult:
     score: float  # 0.0 to 1.0
     weight: float = 1.0
     message: str = ""
-    details: Dict[str, Any] = field(default_factory=dict)
+    details: dict[str, Any] = field(default_factory=dict)
     failed_records_count: int = 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
-        d["dimension"] = self.dimension.value if isinstance(self.dimension, QualityDimension) else self.dimension
+        d["dimension"] = (
+            self.dimension.value if isinstance(self.dimension, QualityDimension) else self.dimension
+        )
         return d
 
 
@@ -60,18 +62,20 @@ class QualityReport:
 
     overall_score: float  # 0.0 to 100.0
     status: ReadinessStatus
-    dimension_scores: Dict[str, float]
-    rule_results: List[QualityRuleResult]
+    dimension_scores: dict[str, float]
+    rule_results: list[QualityRuleResult]
     total_records: int
     evaluated_at: str = field(
-        default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc).isoformat()
+        default_factory=lambda: datetime.datetime.now(tz=datetime.UTC).isoformat()
     )
-    diagnostics: List[str] = field(default_factory=list)
+    diagnostics: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "overall_score": round(self.overall_score, 2),
-            "status": self.status.value if isinstance(self.status, ReadinessStatus) else self.status,
+            "status": (
+                self.status.value if isinstance(self.status, ReadinessStatus) else self.status
+            ),
             "dimension_scores": {k: round(v, 2) for k, v in self.dimension_scores.items()},
             "rule_results": [r.to_dict() for r in self.rule_results],
             "total_records": self.total_records,
@@ -102,7 +106,7 @@ class CompletenessRule(QualityRule):
 
     def __init__(
         self,
-        required_columns: List[str],
+        required_columns: list[str],
         max_null_ratio: float = 0.05,
         weight: float = 1.0,
     ) -> None:
@@ -150,10 +154,18 @@ class CompletenessRule(QualityRule):
         passed = max_observed_ratio <= self.max_null_ratio
 
         # Linear score penalty based on null ratio vs threshold
-        score = max(0.0, 1.0 - (max_observed_ratio / max(self.max_null_ratio, 0.01))) if not passed else 1.0
+        score = (
+            max(0.0, 1.0 - (max_observed_ratio / max(self.max_null_ratio, 0.01)))
+            if not passed
+            else 1.0
+        )
 
-        msg = "All required columns meet completeness thresholds." if passed else (
-            f"Exceeded max null ratio threshold ({self.max_null_ratio:.1%}). Highest null ratio: {max_observed_ratio:.1%}"
+        msg = (
+            "All required columns meet completeness thresholds."
+            if passed
+            else (
+                f"Exceeded max null ratio threshold ({self.max_null_ratio:.1%}). Highest null ratio: {max_observed_ratio:.1%}"
+            )
         )
 
         return QualityRuleResult(
@@ -173,11 +185,17 @@ class StellarAddressValidityRule(QualityRule):
 
     def __init__(
         self,
-        address_columns: Optional[List[str]] = None,
+        address_columns: list[str] | None = None,
         weight: float = 1.0,
     ) -> None:
         super().__init__("stellar_address_validity", QualityDimension.VALIDITY, weight)
-        self.address_columns = address_columns or ["account", "source_account", "destination_account", "seller", "buyer"]
+        self.address_columns = address_columns or [
+            "account",
+            "source_account",
+            "destination_account",
+            "seller",
+            "buyer",
+        ]
 
     def evaluate(self, df: pd.DataFrame) -> QualityRuleResult:
         target_cols = [c for c in self.address_columns if c in df.columns]
@@ -199,14 +217,18 @@ class StellarAddressValidityRule(QualityRule):
             valid_mask = df[col].astype(str).str.match(STELLAR_ACCOUNT_REGEX, na=False)
             inv_cnt = int((~valid_mask).sum())
             invalid_counts[col] = inv_cnt
-            invalid_rows_mask |= (~valid_mask)
+            invalid_rows_mask |= ~valid_mask
 
         failed_count = int(invalid_rows_mask.sum())
         score = max(0.0, 1.0 - (failed_count / total_rows))
         passed = failed_count == 0
 
-        msg = "All address fields contain valid Stellar account keys." if passed else (
-            f"Found {failed_count} records ({failed_count/total_rows:.1%}) with invalid Stellar account keys."
+        msg = (
+            "All address fields contain valid Stellar account keys."
+            if passed
+            else (
+                f"Found {failed_count} records ({failed_count/total_rows:.1%}) with invalid Stellar account keys."
+            )
         )
 
         return QualityRuleResult(
@@ -256,8 +278,12 @@ class AmountValidityRule(QualityRule):
         score = max(0.0, 1.0 - (failed_count / total_rows))
         passed = failed_count == 0
 
-        msg = f"All '{self.amount_column}' values are valid non-negative numbers." if passed else (
-            f"Found {failed_count} records with invalid/negative/non-numeric '{self.amount_column}'."
+        msg = (
+            f"All '{self.amount_column}' values are valid non-negative numbers."
+            if passed
+            else (
+                f"Found {failed_count} records with invalid/negative/non-numeric '{self.amount_column}'."
+            )
         )
 
         return QualityRuleResult(
@@ -312,8 +338,12 @@ class TimelinessRule(QualityRule):
         score = max(0.0, 1.0 - (failed_count / total_rows))
         passed = failed_count == 0
 
-        msg = "All timestamps are parseable, fresh, and within valid window." if passed else (
-            f"Timeliness failures: {unparseable_cnt} unparseable, {future_cnt} in future, {stale_cnt} older than {self.max_age_days} days."
+        msg = (
+            "All timestamps are parseable, fresh, and within valid window."
+            if passed
+            else (
+                f"Timeliness failures: {unparseable_cnt} unparseable, {future_cnt} in future, {stale_cnt} older than {self.max_age_days} days."
+            )
         )
 
         return QualityRuleResult(
@@ -337,7 +367,7 @@ class UniquenessRule(QualityRule):
 
     def __init__(
         self,
-        id_columns: Optional[List[str]] = None,
+        id_columns: list[str] | None = None,
         max_duplicate_ratio: float = 0.01,
         weight: float = 1.0,
     ) -> None:
@@ -364,10 +394,16 @@ class UniquenessRule(QualityRule):
         dup_ratio = dup_count / total_rows if total_rows > 0 else 0.0
 
         passed = dup_ratio <= self.max_duplicate_ratio
-        score = max(0.0, 1.0 - (dup_ratio / max(self.max_duplicate_ratio, 0.01))) if not passed else 1.0
+        score = (
+            max(0.0, 1.0 - (dup_ratio / max(self.max_duplicate_ratio, 0.01))) if not passed else 1.0
+        )
 
-        msg = f"Uniqueness check passed for column '{col}' (dup ratio {dup_ratio:.2%})." if passed else (
-            f"Duplicate ratio on '{col}' ({dup_ratio:.2%}) exceeded maximum threshold ({self.max_duplicate_ratio:.2%})."
+        msg = (
+            f"Uniqueness check passed for column '{col}' (dup ratio {dup_ratio:.2%})."
+            if passed
+            else (
+                f"Duplicate ratio on '{col}' ({dup_ratio:.2%}) exceeded maximum threshold ({self.max_duplicate_ratio:.2%})."
+            )
         )
 
         return QualityRuleResult(
@@ -408,8 +444,10 @@ class OrderbookSpreadConsistencyRule(QualityRule):
         score = max(0.0, 1.0 - (failed_count / total_rows))
         passed = failed_count == 0
 
-        msg = "Orderbook spreads consistent (no crossed markets)." if passed else (
-            f"Found {failed_count} crossed orderbook snapshots (best_bid > best_ask)."
+        msg = (
+            "Orderbook spreads consistent (no crossed markets)."
+            if passed
+            else (f"Found {failed_count} crossed orderbook snapshots (best_bid > best_ask).")
         )
 
         return QualityRuleResult(
@@ -428,10 +466,10 @@ class LedgerQualityScorer:
 
     def __init__(
         self,
-        rules: Optional[List[QualityRule]] = None,
+        rules: list[QualityRule] | None = None,
         pass_threshold: float = 85.0,
         warning_threshold: float = 65.0,
-        dimension_weights: Optional[Dict[QualityDimension, float]] = None,
+        dimension_weights: dict[QualityDimension, float] | None = None,
     ) -> None:
         self.pass_threshold = pass_threshold
         self.warning_threshold = warning_threshold
@@ -444,7 +482,7 @@ class LedgerQualityScorer:
         }
         self.rules = rules if rules is not None else self._default_trade_rules()
 
-    def _default_trade_rules(self) -> List[QualityRule]:
+    def _default_trade_rules(self) -> list[QualityRule]:
         return [
             CompletenessRule(required_columns=["amount"], max_null_ratio=0.02),
             StellarAddressValidityRule(),
@@ -458,7 +496,7 @@ class LedgerQualityScorer:
         """Add a custom quality rule to the scorer."""
         self.rules.append(rule)
 
-    def evaluate_import_readiness(self, data: Union[pd.DataFrame, List[Dict[str, Any]]]) -> QualityReport:
+    def evaluate_import_readiness(self, data: pd.DataFrame | list[dict[str, Any]]) -> QualityReport:
         """Evaluate dataset against all rules and compute readiness score & status."""
         if isinstance(data, list):
             df = pd.DataFrame(data)
@@ -477,11 +515,11 @@ class LedgerQualityScorer:
             )
             return report
 
-        results: List[QualityRuleResult] = []
-        dim_scores_sum: Dict[QualityDimension, float] = {d: 0.0 for d in QualityDimension}
-        dim_weights_sum: Dict[QualityDimension, float] = {d: 0.0 for d in QualityDimension}
+        results: list[QualityRuleResult] = []
+        dim_scores_sum: dict[QualityDimension, float] = {d: 0.0 for d in QualityDimension}
+        dim_weights_sum: dict[QualityDimension, float] = {d: 0.0 for d in QualityDimension}
 
-        diagnostics: List[str] = []
+        diagnostics: list[str] = []
 
         for rule in self.rules:
             res = rule.evaluate(df)
@@ -494,7 +532,7 @@ class LedgerQualityScorer:
                     f"[{res.dimension.value}] Rule '{res.rule_name}' FAILED (score={res.score:.2f}, failed_records={res.failed_records_count}): {res.message}"
                 )
 
-        dim_final_scores: Dict[str, float] = {}
+        dim_final_scores: dict[str, float] = {}
         for dim, total_w in dim_weights_sum.items():
             if total_w > 0:
                 dim_final_scores[dim.value] = (dim_scores_sum[dim] / total_w) * 100.0
@@ -509,7 +547,9 @@ class LedgerQualityScorer:
             overall_weighted_sum += dim_score * weight
             overall_weight_total += weight
 
-        overall_score = (overall_weighted_sum / overall_weight_total) if overall_weight_total > 0 else 0.0
+        overall_score = (
+            (overall_weighted_sum / overall_weight_total) if overall_weight_total > 0 else 0.0
+        )
 
         if overall_score >= self.pass_threshold:
             status = ReadinessStatus.READY

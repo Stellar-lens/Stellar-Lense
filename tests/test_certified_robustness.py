@@ -16,6 +16,7 @@ from detection.certified_robustness import (
 # Helper: build a trivial all-class-0 model (always outputs score < threshold)
 # ---------------------------------------------------------------------------
 
+
 def _constant_model(output: float, feature_dim: int = 4) -> list[Layer]:
     """One Linear layer that maps any input to a constant scalar."""
     W = np.zeros((1, feature_dim))  # zero weights
@@ -146,9 +147,10 @@ def test_misclassified_input_returns_zero():
 
 def test_layers_from_neural_process():
     from detection.neural_process import NeuralProcess
+
     model = NeuralProcess(feature_dim=8, seed=0)
     layers = layers_from_neural_process(model)
     assert len(layers) > 0
-    types = {l["type"] for l in layers}
+    types = {layer["type"] for layer in layers}
     assert "linear" in types
     assert "relu" in types

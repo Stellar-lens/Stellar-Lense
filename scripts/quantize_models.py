@@ -185,7 +185,9 @@ def _quantise_xgb_leaves(model: Any) -> int:
         total += _walk_xgb_tree(tree)
         quantised_trees.append(json.dumps(tree))
     # XGBoost doesn't support loading from modified dump directly; record count only
-    logger.debug("XGBoost: counted %d leaf nodes (in-memory float16 cast not supported via dump)", total)
+    logger.debug(
+        "XGBoost: counted %d leaf nodes (in-memory float16 cast not supported via dump)", total
+    )
     return total
 
 
@@ -215,7 +217,7 @@ def _quantise_lgbm_leaves(model: Any) -> int:
     total = 0
     for line in lines:
         if line.startswith("leaf_value="):
-            vals = line[len("leaf_value="):].split(" ")
+            vals = line[len("leaf_value=") :].split(" ")
             q_vals = [str(float(np.float16(float(v)))) if v else v for v in vals]
             quantised_lines.append("leaf_value=" + " ".join(q_vals))
             total += len([v for v in vals if v])
@@ -264,7 +266,9 @@ def quantise_tree_models(
         if dry_run:
             logger.info(
                 "[dry-run] Would save %s_leafq.joblib (leaf_count=%d, %.1f ms)",
-                name, leaf_count, elapsed * 1000,
+                name,
+                leaf_count,
+                elapsed * 1000,
             )
             results[name] = {
                 "original_size_kb": orig_size,
@@ -296,7 +300,10 @@ def quantise_tree_models(
         }
         logger.info(
             "Saved %s → %.1f KB (was %.1f KB, leaf_count=%d)",
-            dst, q_size, orig_size, leaf_count,
+            dst,
+            q_size,
+            orig_size,
+            leaf_count,
         )
 
     if not dry_run:
@@ -304,6 +311,7 @@ def quantise_tree_models(
         _sign_metrics(model_dir, private_key_path)
 
     return results
+
 
 # ---------------------------------------------------------------------------
 # PyTorch INT8 static quantisation
@@ -331,9 +339,7 @@ def _make_calibration_inputs_gnn(
     rng = np.random.default_rng(42)
     calibration = []
     for _ in range(n_samples):
-        x = torch.tensor(
-            rng.standard_normal((n_nodes, node_feat_dim)).astype(np.float32)
-        )
+        x = torch.tensor(rng.standard_normal((n_nodes, node_feat_dim)).astype(np.float32))
         # Random sparse edge set
         n_edges = n_nodes * 2
         src = rng.integers(0, n_nodes, size=n_edges)
@@ -458,14 +464,20 @@ def quantise_dann_int8(
 
     if dry_run:
         logger.info("[dry-run] Would save dann_encoder_int8.pt (%.1f ms)", elapsed_ms)
-        return {"original_size_kb": orig_size, "quantised_size_kb": None, "elapsed_ms": round(elapsed_ms, 1)}
+        return {
+            "original_size_kb": orig_size,
+            "quantised_size_kb": None,
+            "elapsed_ms": round(elapsed_ms, 1),
+        }
 
     torch.save(wrapper.state_dict(), dst)
     q_size = os.path.getsize(dst) / 1024
 
     metrics = _load_metrics(model_dir)
     _register_artifact(
-        metrics, "dann_encoder_int8", dst,
+        metrics,
+        "dann_encoder_int8",
+        dst,
         {"compression": "int8_static_ptq", "source_model": "dann_encoder"},
     )
     _save_metrics(metrics, model_dir)
@@ -528,14 +540,20 @@ def quantise_gnn_int8(
 
     if dry_run:
         logger.info("[dry-run] Would save gnn_encoder_int8.pt (%.1f ms)", elapsed_ms)
-        return {"original_size_kb": orig_size, "quantised_size_kb": None, "elapsed_ms": round(elapsed_ms, 1)}
+        return {
+            "original_size_kb": orig_size,
+            "quantised_size_kb": None,
+            "elapsed_ms": round(elapsed_ms, 1),
+        }
 
     torch.save(quantised.state_dict(), dst)
     q_size = os.path.getsize(dst) / 1024
 
     metrics = _load_metrics(model_dir)
     _register_artifact(
-        metrics, "gnn_encoder_int8", dst,
+        metrics,
+        "gnn_encoder_int8",
+        dst,
         {"compression": "int8_dynamic_ptq", "source_model": "gnn_encoder"},
     )
     _save_metrics(metrics, model_dir)
@@ -658,7 +676,11 @@ def _prune_and_save(
     if dry_run:
         logger.info(
             "[dry-run] Would save %s (sparsity=%.0f%%, nonzero %d→%d, %.1f ms)",
-            dst_name, sparsity * 100, nz_before, nz_after, elapsed_ms,
+            dst_name,
+            sparsity * 100,
+            nz_before,
+            nz_after,
+            elapsed_ms,
         )
         return {
             "sparsity_requested": sparsity,
@@ -677,7 +699,9 @@ def _prune_and_save(
 
     metrics = _load_metrics(model_dir)
     _register_artifact(
-        metrics, artifact_key, dst,
+        metrics,
+        artifact_key,
+        dst,
         {
             "compression": "magnitude_unstructured_prune",
             "source_model": model_name,
@@ -704,7 +728,11 @@ def _prune_and_save(
     }
     logger.info(
         "Saved %s → %.1f KB (sparsity=%.0f%%, nonzero %d→%d)",
-        dst, q_size, sparsity * 100, nz_before, nz_after,
+        dst,
+        q_size,
+        sparsity * 100,
+        nz_before,
+        nz_after,
     )
     return result
 
@@ -741,9 +769,7 @@ def prune_dann_encoder(
         m.load_state_dict(state)
         return m
 
-    return _prune_and_save(
-        "dann_encoder", _load, model_dir, sparsity, dry_run, private_key_path
-    )
+    return _prune_and_save("dann_encoder", _load, model_dir, sparsity, dry_run, private_key_path)
 
 
 def prune_gnn_encoder(
@@ -771,9 +797,8 @@ def prune_gnn_encoder(
             logger.warning("GNN load error (%s) — using fresh weights", exc)
         return enc._model  # type: ignore[return-value]
 
-    return _prune_and_save(
-        "gnn_encoder", _load, model_dir, sparsity, dry_run, private_key_path
-    )
+    return _prune_and_save("gnn_encoder", _load, model_dir, sparsity, dry_run, private_key_path)
+
 
 # ---------------------------------------------------------------------------
 # Benchmark: inference speedup measurement

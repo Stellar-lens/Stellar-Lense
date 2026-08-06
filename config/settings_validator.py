@@ -32,8 +32,9 @@ from __future__ import annotations
 
 import re
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Any
 from urllib.parse import urlparse
 
 _URL_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9+.-]*://")
@@ -88,7 +89,9 @@ class ValidationReport:
     def render(self) -> str:
         if not self.issues:
             return "settings validation: OK (no issues found)"
-        lines = [f"settings validation: {len(self.errors)} error(s), {len(self.warnings)} warning(s)"]
+        lines = [
+            f"settings validation: {len(self.errors)} error(s), {len(self.warnings)} warning(s)"
+        ]
         lines.extend(f"  - {issue}" for issue in self.issues)
         return "\n".join(lines)
 
@@ -155,13 +158,21 @@ class SettingSpec:
                 )
                 return issues  # further checks assume the right type
 
-        if self.min_value is not None and isinstance(value, (int, float)) and value < self.min_value:
+        if (
+            self.min_value is not None
+            and isinstance(value, (int, float))
+            and value < self.min_value
+        ):
             issues.append(
                 SettingsIssue(
                     self.name, f"value {value!r} is below minimum {self.min_value!r}{hint}", "error"
                 )
             )
-        if self.max_value is not None and isinstance(value, (int, float)) and value > self.max_value:
+        if (
+            self.max_value is not None
+            and isinstance(value, (int, float))
+            and value > self.max_value
+        ):
             issues.append(
                 SettingsIssue(
                     self.name, f"value {value!r} is above maximum {self.max_value!r}{hint}", "error"

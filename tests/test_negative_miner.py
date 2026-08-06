@@ -33,6 +33,7 @@ from detection.contrastive.negative_miner import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _unit_vecs(n: int, dim: int, seed: int = 0) -> np.ndarray:
     rng = np.random.default_rng(seed)
     v = rng.standard_normal((n, dim)).astype(np.float32)
@@ -47,6 +48,7 @@ def _expected_hash(w: str) -> str:
 # ---------------------------------------------------------------------------
 # 1. Hard negatives are closer to the anchor than random negatives
 # ---------------------------------------------------------------------------
+
 
 class TestHardVsEasyNegatives:
     """Core requirement: hard negatives must be closer (higher cosine sim) than easy."""
@@ -100,6 +102,7 @@ class TestHardVsEasyNegatives:
 # ---------------------------------------------------------------------------
 # 2. Curriculum schedule
 # ---------------------------------------------------------------------------
+
 
 class TestCurriculumSchedule:
     def test_zero_at_epoch_zero(self):
@@ -161,6 +164,7 @@ class TestCurriculumSchedule:
 # 3. Ring registry
 # ---------------------------------------------------------------------------
 
+
 class TestRingRegistry:
     RINGS = [
         ["GWASH1", "GWASH2", "GWASH3"],
@@ -204,6 +208,7 @@ class TestRingRegistry:
 # 4. Privacy: _hash_wallet
 # ---------------------------------------------------------------------------
 
+
 class TestHashWallet:
     def test_deterministic(self):
         assert _hash_wallet("GWALLET") == _hash_wallet("GWALLET")
@@ -226,6 +231,7 @@ class TestHashWallet:
 # ---------------------------------------------------------------------------
 # 5. ANN brute-force fallback consistency
 # ---------------------------------------------------------------------------
+
 
 class TestANNFallback:
     def test_brute_force_finds_nearest_neighbour(self):
@@ -254,6 +260,7 @@ class TestANNFallback:
 # ---------------------------------------------------------------------------
 # 6. get_ring_positives via HardNegativeMiner
 # ---------------------------------------------------------------------------
+
 
 class TestGetRingPositives:
     def test_ring_pairs_found_in_batch(self):
@@ -286,6 +293,7 @@ class TestGetRingPositives:
 # ---------------------------------------------------------------------------
 # 7. LabeledFeatureDataset hashes wallet IDs
 # ---------------------------------------------------------------------------
+
 
 class TestLabeledFeatureDataset:
     def test_hashed_ids_not_raw(self):
@@ -325,6 +333,7 @@ class TestLabeledFeatureDataset:
 # 8. Regression: domain-aware AUC ≥ random-augmentation AUC
 # ---------------------------------------------------------------------------
 
+
 class TestAUCRegression:
     """Domain-aware pre-training must achieve AUC ≥ random-augmentation baseline.
 
@@ -355,7 +364,8 @@ class TestAUCRegression:
         from detection.contrastive.pretrain import benchmark_auc
 
         results = benchmark_auc(
-            X, y,
+            X,
+            y,
             epochs=3,
             batch_size=32,
             device="cpu",

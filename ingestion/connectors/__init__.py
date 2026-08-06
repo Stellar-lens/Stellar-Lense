@@ -15,6 +15,9 @@ Typical usage::
     df = connector.to_dataframe(trades)
 """
 
+# Imported for registration side effects: each built-in connector class
+# registers itself with `registry` at import time via @register_connector.
+from ingestion.connectors import builtin  # noqa: E402, F401
 from ingestion.connectors.base import (
     ConnectorConfigError,
     ConnectorError,
@@ -25,10 +28,6 @@ from ingestion.connectors.base import (
     DuplicateConnectorError,
 )
 from ingestion.connectors.registry import ConnectorRegistry, register_connector, registry
-
-# Imported for registration side effects: each built-in connector class
-# registers itself with `registry` at import time via @register_connector.
-from ingestion.connectors import builtin  # noqa: E402, F401
 
 __all__ = [
     "ConnectorConfigError",

@@ -10,20 +10,20 @@ It validates:
 4. Rollback and reconciliation (disabling latency and resuming).
 """
 
-import time
 import logging
-import sys
-from unittest.mock import patch, MagicMock
 
 # Adjust path to allow imports if run directly
 import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+import sys
+from unittest.mock import patch
 
-from config import config
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from monitoring.emergency_watchdog import EmergencyWatchdog
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("rehearsal")
+
 
 def run_drill():
     logger.info("Starting Rehearsal Drill: Latency Budget & Emergency Pause")
@@ -46,25 +46,27 @@ def run_drill():
         logger.info("Phase 1: Healthy Operation - processing events within budget.")
         for i in range(15):
             watchdog.record_score(f"wallet_healthy_{i}", score=50, e2e_latency_ms=100)
-        
+
         assert not watchdog.check(), "Watchdog should NOT propose pause during healthy operation"
 
         # Phase 2: Partial Failure (Latency Degradation)
         logger.info("Phase 2: Partial Failure - injecting latency > 2000ms.")
         for i in range(95):
             watchdog.record_score(f"wallet_slow_{i}", score=50, e2e_latency_ms=2500)
-            
+
         # Verify the watchdog detects the latency budget breach
         paused = watchdog.check()
         assert paused, "Watchdog MUST propose pause when latency budget is breached."
-        
+
         # 3. Simulate Signer loss (verify proposal exists on-chain for recovery)
         instance.initiate_emergency_pause.assert_called_once()
-        logger.info("Phase 3: Signer Loss / Recovery - pause proposal successfully recorded on-chain (ID=101).")
-        
+        logger.info(
+            "Phase 3: Signer Loss / Recovery - pause proposal successfully recorded on-chain (ID=101)."
+        )
+
         # 4. Reconciliation
         logger.info("Phase 4: Reconciliation - pipeline restarted, stale data flushed.")
-        
+
         # In a real scenario, the pipeline would fetch the current ledger and drop stale data
         # We simulate the flush by allowing the window to expire or resetting the watchdog
         logger.info("Rehearsal Drill completed successfully.")

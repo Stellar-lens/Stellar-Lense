@@ -22,7 +22,6 @@ from examples._helpers import (
     PAIR_ID,
     build_trades_df,
     make_trade,
-    print_result,
     run_detection,
 )
 
@@ -53,7 +52,7 @@ def main() -> dict:
         make_trade(amount=a, timestamp=now - timedelta(minutes=i))
         for i, a in enumerate(clean_amounts)
     ]
-    clean_df = build_trades_df(clean_trades)
+    build_trades_df(clean_trades)
 
     engine = BenfordEngine()
     clean_benford = engine.compute_all(clean_amounts)
@@ -86,7 +85,9 @@ def main() -> dict:
         pair_id=PAIR_ID,
         print_summary=True,
     )
-    print(f"[benford-anomaly] Benford flag = {result['benford_flag']}  MAD = {suspicious_benford['mad']:.4f}")
+    print(
+        f"[benford-anomaly] Benford flag = {result['benford_flag']}  MAD = {suspicious_benford['mad']:.4f}"
+    )
     return result
 
 

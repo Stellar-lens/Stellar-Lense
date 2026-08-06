@@ -50,7 +50,9 @@ def _normalize_benford(benford: Any) -> dict[str, float | None] | None:
     if any(k in benford for k in ("chi_square", "chi2", "p_value", "p")):
         candidate = benford
     else:
-        flagged = [m for m in benford.values() if isinstance(m, dict) and m.get("mad_nonconforming")]
+        flagged = [
+            m for m in benford.values() if isinstance(m, dict) and m.get("mad_nonconforming")
+        ]
         if not flagged:
             return None
         candidate = flagged[0]

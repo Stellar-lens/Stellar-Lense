@@ -128,9 +128,7 @@ def validate_traceability(
             if test is None:
                 errors.append(f"{issue_id}: test node does not exist: {selector}")
             elif issue_id not in test.issue_ids:
-                errors.append(
-                    f"{issue_id}: {selector} is missing @pytest.mark.issue({issue_id!r})"
-                )
+                errors.append(f"{issue_id}: {selector} is missing @pytest.mark.issue({issue_id!r})")
 
     for node_id, test in collected.items():
         for issue_id in test.issue_ids:

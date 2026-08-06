@@ -20,24 +20,19 @@ Usage::
 from __future__ import annotations
 
 import importlib
-import json
 import os
-import platform
 import shutil
-import subprocess
 import sys
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
-from typing import Callable, Sequence
-
 
 # ---------------------------------------------------------------------------
 # Result types
 # ---------------------------------------------------------------------------
 
 
-class CheckLevel(str, Enum):
+class CheckLevel(StrEnum):
     OK = "OK"
     WARNING = "WARNING"
     ERROR = "ERROR"
@@ -180,6 +175,7 @@ def _error(name: str, msg: str, fix_hint: str = "") -> CheckResult:
 
 # ── Python version ──────────────────────────────────────────────────────────
 
+
 def check_python_version() -> CheckResult:
     v = sys.version_info[:2]
     if v >= _MIN_PYTHON:
@@ -244,6 +240,7 @@ def check_optional_packages() -> list[CheckResult]:
 
 # ── Files and directories ───────────────────────────────────────────────────
 
+
 def check_required_files(repo_root: Path, fix: bool = False) -> list[CheckResult]:
     results = []
     for fname in _REQUIRED_FILES:
@@ -307,6 +304,7 @@ def check_env_file_loaded(repo_root: Path) -> CheckResult:
     # Attempt to load it
     try:
         from dotenv import dotenv_values
+
         values = dotenv_values(env_path)
         return _ok("env-file", f".env loaded ({len(values)} variables)")
     except Exception as exc:
@@ -315,10 +313,12 @@ def check_env_file_loaded(repo_root: Path) -> CheckResult:
 
 # ── Environment variables ───────────────────────────────────────────────────
 
+
 def check_env_vars() -> list[CheckResult]:
     # Make sure .env is loaded before checking
     try:
         from dotenv import load_dotenv
+
         load_dotenv(override=False)
     except ImportError:
         pass
@@ -353,13 +353,16 @@ def check_env_vars() -> list[CheckResult]:
 
 # ── Database ─────────────────────────────────────────────────────────────────
 
+
 def check_database() -> list[CheckResult]:
     results = []
     db_url = os.getenv("RISK_SCORE_DB_URL", "sqlite:///./risk_scores.db")
     try:
         from sqlalchemy import create_engine, text
 
-        engine = create_engine(db_url, connect_args={"check_same_thread": False} if "sqlite" in db_url else {})
+        engine = create_engine(
+            db_url, connect_args={"check_same_thread": False} if "sqlite" in db_url else {}
+        )
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
         results.append(_ok("database-connection", f"Database reachable: {db_url}"))
@@ -381,7 +384,9 @@ def check_database() -> list[CheckResult]:
         runner = MigrationRunner(get_engine(db_url))
         status = runner.status()
         if status.is_up_to_date:
-            results.append(_ok("database-migrations", f"All {len(status.applied)} migrations applied"))
+            results.append(
+                _ok("database-migrations", f"All {len(status.applied)} migrations applied")
+            )
         else:
             results.append(
                 _warn(
@@ -403,6 +408,7 @@ def check_database() -> list[CheckResult]:
 
 
 # ── Optional tools ──────────────────────────────────────────────────────────
+
 
 def check_optional_tools() -> list[CheckResult]:
     tools = [
@@ -428,6 +434,7 @@ def check_optional_tools() -> list[CheckResult]:
 
 # ── Synthetic dataset ────────────────────────────────────────────────────────
 
+
 def check_synthetic_dataset(repo_root: Path) -> CheckResult:
     path = repo_root / "data" / "synthetic_dataset.parquet"
     if path.exists():
@@ -444,6 +451,7 @@ def check_synthetic_dataset(repo_root: Path) -> CheckResult:
 
 
 # ── Model artifacts ──────────────────────────────────────────────────────────
+
 
 def check_model_artifacts(repo_root: Path) -> CheckResult:
     models_dir = repo_root / "models"

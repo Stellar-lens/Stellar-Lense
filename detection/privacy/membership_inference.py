@@ -264,7 +264,7 @@ class DefenceResult:
     pre_defence_success_rate: float
     post_defence_success_rate: float
     defence_advantage_reduction: float  # pre - post
-    target_met: bool                    # post < 0.55 (< 5 pp above 0.50)
+    target_met: bool  # post < 0.55 (< 5 pp above 0.50)
 
 
 class MembershipInferenceDefender:
@@ -296,7 +296,9 @@ class MembershipInferenceDefender:
         self.smoother = PredictionSmoother(sigma=smoother_sigma)
         self.advantage_target = advantage_target
 
-    def perturb_scores(self, scores: np.ndarray, rng: np.random.Generator | None = None) -> np.ndarray:
+    def perturb_scores(
+        self, scores: np.ndarray, rng: np.random.Generator | None = None
+    ) -> np.ndarray:
         """Apply output perturbation to a batch of scores."""
         return apply_output_perturbation(
             scores,

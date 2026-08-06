@@ -25,13 +25,13 @@ Usage
 Basic decimal amounts::
 
     from utils.decimal_guards import DecimalAmount, validate_amount
-    
+
     # Create validated amount
     amount = DecimalAmount("123.4567890")
-    
+
     # Arithmetic operations
     total = amount + DecimalAmount("10.5")
-    
+
     # Stellar stroops conversion
     stroops = amount.to_stroops()  # 1234567890 (integer)
     recovered = DecimalAmount.from_stroops(stroops)
@@ -40,7 +40,7 @@ Validation::
 
     # Validate at ingestion boundary
     validate_amount("123.45", min_value="0", max_value="1000000")
-    
+
     # Custom precision
     with decimal_context(precision=28):
         result = DecimalAmount("0.1") + DecimalAmount("0.2")
@@ -59,12 +59,10 @@ import decimal
 import warnings
 from contextlib import contextmanager
 from decimal import Decimal, InvalidOperation
-from typing import Union
 
 from utils.logging import get_logger
 
 logger = get_logger(__name__)
-
 
 
 # ---------------------------------------------------------------------------
@@ -162,16 +160,15 @@ def decimal_context(
         decimal.setcontext(old_context)
 
 
-
 # ---------------------------------------------------------------------------
 # Validation
 # ---------------------------------------------------------------------------
 
 
 def validate_amount(
-    value: Union[str, int, float, Decimal],
-    min_value: Union[str, Decimal, None] = None,
-    max_value: Union[str, Decimal, None] = None,
+    value: str | int | float | Decimal,
+    min_value: str | Decimal | None = None,
+    max_value: str | Decimal | None = None,
     allow_negative: bool = False,
     name: str = "amount",
 ) -> Decimal:
@@ -194,7 +191,7 @@ def validate_amount(
 
         # Validate positive amount
         amount = validate_amount("123.45", min_value="0", max_value="1000000")
-        
+
         # Allow negative (for deltas)
         delta = validate_amount("-50.00", allow_negative=True)
     """
@@ -224,29 +221,23 @@ def validate_amount(
 
     # Check sign
     if not allow_negative and decimal_value < 0:
-        raise AmountValidationError(
-            f"Invalid {name}: {decimal_value} is negative (not allowed)"
-        )
+        raise AmountValidationError(f"Invalid {name}: {decimal_value} is negative (not allowed)")
 
     # Check bounds
     if min_value is not None:
         min_decimal = Decimal(min_value)
         if decimal_value < min_decimal:
-            raise AmountValidationError(
-                f"Invalid {name}: {decimal_value} < minimum {min_decimal}"
-            )
+            raise AmountValidationError(f"Invalid {name}: {decimal_value} < minimum {min_decimal}")
 
     if max_value is not None:
         max_decimal = Decimal(max_value)
         if decimal_value > max_decimal:
-            raise AmountValidationError(
-                f"Invalid {name}: {decimal_value} > maximum {max_decimal}"
-            )
+            raise AmountValidationError(f"Invalid {name}: {decimal_value} > maximum {max_decimal}")
 
     return decimal_value
 
 
-def validate_stellar_amount(value: Union[str, int, float, Decimal]) -> Decimal:
+def validate_stellar_amount(value: str | int | float | Decimal) -> Decimal:
     """Validate an amount for Stellar blockchain.
 
     Stellar amounts must be within [-922337203685.4775807, 922337203685.4775807]
@@ -279,7 +270,6 @@ def validate_stellar_amount(value: Union[str, int, float, Decimal]) -> Decimal:
     return decimal_value
 
 
-
 # ---------------------------------------------------------------------------
 # DecimalAmount Class
 # ---------------------------------------------------------------------------
@@ -302,10 +292,10 @@ class DecimalAmount:
 
         amount1 = DecimalAmount("100.50")
         amount2 = DecimalAmount("25.25")
-        
+
         total = amount1 + amount2  # DecimalAmount("125.75")
         ratio = amount1 / amount2  # DecimalAmount("3.9801980198...")
-        
+
         # Stellar conversion
         stroops = amount1.to_stroops()  # 1005000000
         recovered = DecimalAmount.from_stroops(stroops)  # "100.5000000"
@@ -313,7 +303,7 @@ class DecimalAmount:
 
     __slots__ = ("_value",)
 
-    def __init__(self, value: Union[str, int, Decimal, "DecimalAmount"]):
+    def __init__(self, value: str | int | Decimal | DecimalAmount):
         """Initialize DecimalAmount.
 
         Args:
@@ -333,7 +323,9 @@ class DecimalAmount:
             )
             self._value = Decimal(str(value))
         else:
-            self._value = validate_amount(value, name="amount")
+            # DecimalAmount is also used for deltas, balances, and
+            # counterfactual differences, so signed values are valid here.
+            self._value = validate_amount(value, allow_negative=True, name="amount")
 
     @property
     def value(self) -> Decimal:
@@ -344,82 +336,81 @@ class DecimalAmount:
     # Arithmetic Operations
     # -----------------------------------------------------------------------
 
-    def __add__(self, other: Union["DecimalAmount", str, int, Decimal]) -> "DecimalAmount":
+    def __add__(self, other: DecimalAmount | str | int | Decimal) -> DecimalAmount:
         """Add two amounts."""
         other_value = self._to_decimal(other)
         return DecimalAmount(self._value + other_value)
 
-    def __radd__(self, other: Union[str, int, Decimal]) -> "DecimalAmount":
+    def __radd__(self, other: str | int | Decimal) -> DecimalAmount:
         """Reverse add."""
         return self.__add__(other)
 
-    def __sub__(self, other: Union["DecimalAmount", str, int, Decimal]) -> "DecimalAmount":
+    def __sub__(self, other: DecimalAmount | str | int | Decimal) -> DecimalAmount:
         """Subtract two amounts."""
         other_value = self._to_decimal(other)
         return DecimalAmount(self._value - other_value)
 
-    def __rsub__(self, other: Union[str, int, Decimal]) -> "DecimalAmount":
+    def __rsub__(self, other: str | int | Decimal) -> DecimalAmount:
         """Reverse subtract."""
         other_value = self._to_decimal(other)
         return DecimalAmount(other_value - self._value)
 
-    def __mul__(self, other: Union["DecimalAmount", str, int, Decimal]) -> "DecimalAmount":
+    def __mul__(self, other: DecimalAmount | str | int | Decimal) -> DecimalAmount:
         """Multiply two amounts."""
         other_value = self._to_decimal(other)
         return DecimalAmount(self._value * other_value)
 
-    def __rmul__(self, other: Union[str, int, Decimal]) -> "DecimalAmount":
+    def __rmul__(self, other: str | int | Decimal) -> DecimalAmount:
         """Reverse multiply."""
         return self.__mul__(other)
 
-    def __truediv__(self, other: Union["DecimalAmount", str, int, Decimal]) -> "DecimalAmount":
+    def __truediv__(self, other: DecimalAmount | str | int | Decimal) -> DecimalAmount:
         """Divide two amounts."""
         other_value = self._to_decimal(other)
         if other_value == 0:
             raise ZeroDivisionError("Cannot divide by zero")
         return DecimalAmount(self._value / other_value)
 
-    def __rtruediv__(self, other: Union[str, int, Decimal]) -> "DecimalAmount":
+    def __rtruediv__(self, other: str | int | Decimal) -> DecimalAmount:
         """Reverse divide."""
         other_value = self._to_decimal(other)
         if self._value == 0:
             raise ZeroDivisionError("Cannot divide by zero")
         return DecimalAmount(other_value / self._value)
 
-    def __floordiv__(self, other: Union["DecimalAmount", str, int, Decimal]) -> "DecimalAmount":
+    def __floordiv__(self, other: DecimalAmount | str | int | Decimal) -> DecimalAmount:
         """Floor division."""
         other_value = self._to_decimal(other)
         if other_value == 0:
             raise ZeroDivisionError("Cannot divide by zero")
         return DecimalAmount(self._value // other_value)
 
-    def __mod__(self, other: Union["DecimalAmount", str, int, Decimal]) -> "DecimalAmount":
+    def __mod__(self, other: DecimalAmount | str | int | Decimal) -> DecimalAmount:
         """Modulo operation."""
         other_value = self._to_decimal(other)
         if other_value == 0:
             raise ZeroDivisionError("Cannot modulo by zero")
         return DecimalAmount(self._value % other_value)
 
-    def __pow__(self, exponent: Union[int, Decimal]) -> "DecimalAmount":
+    def __pow__(self, exponent: int | Decimal) -> DecimalAmount:
         """Power operation."""
         if isinstance(exponent, DecimalAmount):
             exponent = exponent._value
         elif not isinstance(exponent, (int, Decimal)):
             exponent = Decimal(exponent)
-        return DecimalAmount(self._value ** exponent)
+        return DecimalAmount(self._value**exponent)
 
-    def __neg__(self) -> "DecimalAmount":
+    def __neg__(self) -> DecimalAmount:
         """Negation."""
         return DecimalAmount(-self._value)
 
-    def __pos__(self) -> "DecimalAmount":
+    def __pos__(self) -> DecimalAmount:
         """Positive (no-op)."""
         return DecimalAmount(self._value)
 
-    def __abs__(self) -> "DecimalAmount":
+    def __abs__(self) -> DecimalAmount:
         """Absolute value."""
         return DecimalAmount(abs(self._value))
-
 
     # -----------------------------------------------------------------------
     # Comparison Operations
@@ -436,22 +427,22 @@ class DecimalAmount:
         """Inequality comparison."""
         return not self.__eq__(other)
 
-    def __lt__(self, other: Union["DecimalAmount", str, int, Decimal]) -> bool:
+    def __lt__(self, other: DecimalAmount | str | int | Decimal) -> bool:
         """Less than."""
         other_value = self._to_decimal(other)
         return self._value < other_value
 
-    def __le__(self, other: Union["DecimalAmount", str, int, Decimal]) -> bool:
+    def __le__(self, other: DecimalAmount | str | int | Decimal) -> bool:
         """Less than or equal."""
         other_value = self._to_decimal(other)
         return self._value <= other_value
 
-    def __gt__(self, other: Union["DecimalAmount", str, int, Decimal]) -> bool:
+    def __gt__(self, other: DecimalAmount | str | int | Decimal) -> bool:
         """Greater than."""
         other_value = self._to_decimal(other)
         return self._value > other_value
 
-    def __ge__(self, other: Union["DecimalAmount", str, int, Decimal]) -> bool:
+    def __ge__(self, other: DecimalAmount | str | int | Decimal) -> bool:
         """Greater than or equal."""
         other_value = self._to_decimal(other)
         return self._value >= other_value
@@ -482,9 +473,11 @@ class DecimalAmount:
         try:
             validate_stellar_amount(self._value)
         except AmountValidationError as e:
-            raise StroopsConversionError(
-                f"Cannot convert {self._value} to stroops: {e}"
-            ) from e
+            if self._value.as_tuple().exponent < -STELLAR_PRECISION:
+                raise StroopsConversionError(
+                    f"Cannot convert {self._value} to stroops: fractional stroops are not allowed"
+                ) from e
+            raise StroopsConversionError(f"Cannot convert {self._value} to stroops: {e}") from e
 
         # Convert to stroops
         stroops_decimal = self._value * STROOPS_MULTIPLIER
@@ -493,14 +486,13 @@ class DecimalAmount:
         # Verify no precision loss
         if Decimal(stroops_int) != stroops_decimal:
             raise StroopsConversionError(
-                f"Precision loss in stroops conversion: {self._value} "
-                f"has fractional stroops"
+                f"Precision loss in stroops conversion: {self._value} " f"has fractional stroops"
             )
 
         return stroops_int
 
     @classmethod
-    def from_stroops(cls, stroops: int) -> "DecimalAmount":
+    def from_stroops(cls, stroops: int) -> DecimalAmount:
         """Create DecimalAmount from Stellar stroops.
 
         Args:
@@ -528,9 +520,7 @@ class DecimalAmount:
         try:
             validate_stellar_amount(decimal_value)
         except AmountValidationError as e:
-            raise StroopsConversionError(
-                f"Invalid stroops value {stroops}: {e}"
-            ) from e
+            raise StroopsConversionError(f"Invalid stroops value {stroops}: {e}") from e
 
         return cls(decimal_value)
 
@@ -538,7 +528,7 @@ class DecimalAmount:
     # Utility Methods
     # -----------------------------------------------------------------------
 
-    def round(self, decimal_places: int = STELLAR_PRECISION) -> "DecimalAmount":
+    def round(self, decimal_places: int = STELLAR_PRECISION) -> DecimalAmount:
         """Round to specified decimal places.
 
         Args:
@@ -581,7 +571,7 @@ class DecimalAmount:
         return self._value < 0
 
     @staticmethod
-    def _to_decimal(value: Union["DecimalAmount", str, int, Decimal]) -> Decimal:
+    def _to_decimal(value: DecimalAmount | str | int | Decimal) -> Decimal:
         """Convert value to Decimal."""
         if isinstance(value, DecimalAmount):
             return value._value
@@ -607,16 +597,15 @@ class DecimalAmount:
         return format(self._value, format_spec)
 
 
-
 # ---------------------------------------------------------------------------
 # Convenience Functions
 # ---------------------------------------------------------------------------
 
 
 def safe_divide(
-    numerator: Union[DecimalAmount, str, int, Decimal],
-    denominator: Union[DecimalAmount, str, int, Decimal],
-    default: Union[DecimalAmount, str, int, Decimal, None] = None,
+    numerator: DecimalAmount | str | int | Decimal,
+    denominator: DecimalAmount | str | int | Decimal,
+    default: DecimalAmount | str | int | Decimal | None = None,
 ) -> DecimalAmount:
     """Safe division with zero handling.
 
@@ -632,7 +621,7 @@ def safe_divide(
 
         # Safe division
         result = safe_divide("100", "0", default="0")  # Returns DecimalAmount("0")
-        
+
         # Normal division
         result = safe_divide("100", "5")  # Returns DecimalAmount("20")
     """
@@ -650,7 +639,7 @@ def safe_divide(
     return numerator / denominator
 
 
-def sum_amounts(amounts: list[Union[DecimalAmount, str, int, Decimal]]) -> DecimalAmount:
+def sum_amounts(amounts: list[DecimalAmount | str | int | Decimal]) -> DecimalAmount:
     """Sum a list of amounts with precision.
 
     Args:
@@ -695,7 +684,7 @@ def safe_float_to_decimal(value: float, precision: int = STELLAR_PRECISION) -> D
 
         # Float precision issue
         value = 0.1 + 0.2  # 0.30000000000000004
-        
+
         # Safe conversion
         decimal_value = safe_float_to_decimal(value, precision=2)  # Decimal("0.30")
     """
@@ -720,7 +709,7 @@ def safe_float_to_decimal(value: float, precision: int = STELLAR_PRECISION) -> D
 
 
 def check_precision_loss(
-    original: Union[float, Decimal],
+    original: float | Decimal,
     converted: Decimal,
     tolerance: Decimal = Decimal("1e-10"),
 ) -> bool:

@@ -55,13 +55,10 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
-
 
 # ---------------------------------------------------------------------------
 # Data types
@@ -71,9 +68,9 @@ from typing import Any
 @dataclass
 class DimensionScore:
     name: str
-    score: float          # 0–100
-    max_score: float      # always 100
-    weight: float         # fraction of composite (0–1)
+    score: float  # 0–100
+    max_score: float  # always 100
+    weight: float  # fraction of composite (0–1)
     details: list[str] = field(default_factory=list)
     deductions: list[str] = field(default_factory=list)
 
@@ -138,10 +135,9 @@ def _exists(root: Path, *parts: str) -> bool:
 
 def _python_modules(root: Path) -> list[Path]:
     return [
-        p for p in root.rglob("*.py")
-        if ".venv" not in p.parts
-        and "venv" not in p.parts
-        and "__pycache__" not in p.parts
+        p
+        for p in root.rglob("*.py")
+        if ".venv" not in p.parts and "venv" not in p.parts and "__pycache__" not in p.parts
     ]
 
 
@@ -252,10 +248,14 @@ def _score_docs(root: Path) -> DimensionScore:
             ds.details.append(f"  ✓ {pct:.0f}% of detection+ingestion modules have docstrings")
         elif pct >= 50:
             ds.score -= 5
-            ds.deductions.append(f"  Only {pct:.0f}% of detection+ingestion modules have docstrings (–5)")
+            ds.deductions.append(
+                f"  Only {pct:.0f}% of detection+ingestion modules have docstrings (–5)"
+            )
         else:
             ds.score -= 15
-            ds.deductions.append(f"  Only {pct:.0f}% of detection+ingestion modules have docstrings (–15)")
+            ds.deductions.append(
+                f"  Only {pct:.0f}% of detection+ingestion modules have docstrings (–15)"
+            )
 
     ds.score = max(0.0, ds.score)
     return ds
@@ -349,6 +349,7 @@ def _score_data_quality(root: Path) -> DimensionScore:
     if events_path.exists():
         try:
             import csv
+
             with open(events_path, encoding="utf-8") as fh:
                 n_rows = sum(1 for _ in csv.DictReader(fh))
             ds.details.append(f"  ✓ {events_path.name}: {n_rows} manipulation events")
@@ -541,10 +542,7 @@ def main(argv: list[str] | None = None) -> int:
         for dim in report.dimensions:
             bar_filled = int(dim.score / 5)
             bar = "█" * bar_filled + "░" * (20 - bar_filled)
-            print(
-                f"  {dim.name:<14} [{bar}] {dim.score:5.1f}/100  "
-                f"(weight {dim.weight:.0%})"
-            )
+            print(f"  {dim.name:<14} [{bar}] {dim.score:5.1f}/100  " f"(weight {dim.weight:.0%})")
             for deduction in dim.deductions:
                 print(f"           {deduction}")
             if args.verbose:

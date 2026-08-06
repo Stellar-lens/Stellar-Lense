@@ -1,11 +1,13 @@
 """Tests for the ingestion contracts (modular source framework)."""
 
-import sys
 import os
+import sys
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-import pytest
 from datetime import datetime
+
+import pytest
 
 # Import contracts directly to avoid pulling in ingestion.__init__ which
 # eagerly registers adapters with heavy dependencies (stellar_sdk, confluent_kafka).
@@ -147,8 +149,10 @@ class TestSourceRegistry:
         class MockSource(DataSource[str]):
             def __init__(self, config):
                 super().__init__(config)
+
             def connect(self):
                 self._state = SourceState.CONNECTED
+
             def close(self):
                 self._state = SourceState.CLOSED
 
@@ -169,12 +173,18 @@ class TestSourceRegistry:
         SourceRegistry.clear()
 
         class A(DataSource):
-            def connect(self): pass
-            def close(self): pass
+            def connect(self):
+                pass
+
+            def close(self):
+                pass
 
         class B(DataSource):
-            def connect(self): pass
-            def close(self): pass
+            def connect(self):
+                pass
+
+            def close(self):
+                pass
 
         SourceRegistry.register("a", A)
         SourceRegistry.register("b", B)
@@ -182,8 +192,11 @@ class TestSourceRegistry:
 
     def test_clear(self):
         class A(DataSource):
-            def connect(self): pass
-            def close(self): pass
+            def connect(self):
+                pass
+
+            def close(self):
+                pass
 
         SourceRegistry.register("a", A)
         SourceRegistry.clear()
@@ -195,8 +208,10 @@ class TestTradeContracts:
         class MockTradeStream(TradeStreamSource):
             def connect(self):
                 self._state = SourceState.CONNECTED
+
             def close(self):
                 self._state = SourceState.CLOSED
+
             def stream(self):
                 yield from ()
 
@@ -209,8 +224,10 @@ class TestTradeContracts:
         class MockTradeBatch(TradeBatchSource):
             def connect(self):
                 self._state = SourceState.CONNECTED
+
             def close(self):
                 self._state = SourceState.CLOSED
+
             def fetch(self):
                 yield from ()
 

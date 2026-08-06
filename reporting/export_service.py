@@ -32,7 +32,7 @@ import csv
 import hashlib
 import io
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any, Protocol
 
@@ -108,7 +108,9 @@ class ExportResult:
             fh.write(self.content)
 
 
-def _make_result(content: str | bytes, content_type: str, filename: str, record_count: int) -> ExportResult:
+def _make_result(
+    content: str | bytes, content_type: str, filename: str, record_count: int
+) -> ExportResult:
     payload = content.encode("utf-8") if isinstance(content, str) else content
     checksum = hashlib.sha256(payload).hexdigest()
     return ExportResult(
@@ -132,8 +134,9 @@ class ReportExporter(Protocol):
     format_name: str
     content_type: str
 
-    def export(self, records: list[dict[str, Any]], schema: ReportSchema | None = None) -> ExportResult:
-        ...
+    def export(
+        self, records: list[dict[str, Any]], schema: ReportSchema | None = None
+    ) -> ExportResult: ...
 
 
 class JSONExporter:
@@ -142,7 +145,9 @@ class JSONExporter:
     format_name = "json"
     content_type = "application/json"
 
-    def export(self, records: list[dict[str, Any]], schema: ReportSchema | None = None) -> ExportResult:
+    def export(
+        self, records: list[dict[str, Any]], schema: ReportSchema | None = None
+    ) -> ExportResult:
         if schema is not None:
             schema.validate_batch(records)
         body = json.dumps(records, indent=2, default=_json_default, sort_keys=True)
@@ -159,7 +164,9 @@ class NDJSONExporter:
     format_name = "ndjson"
     content_type = "application/x-ndjson"
 
-    def export(self, records: list[dict[str, Any]], schema: ReportSchema | None = None) -> ExportResult:
+    def export(
+        self, records: list[dict[str, Any]], schema: ReportSchema | None = None
+    ) -> ExportResult:
         if schema is not None:
             schema.validate_batch(records)
         lines = [json.dumps(r, default=_json_default, sort_keys=True) for r in records]
@@ -178,7 +185,9 @@ class CSVExporter:
     format_name = "csv"
     content_type = "text/csv"
 
-    def export(self, records: list[dict[str, Any]], schema: ReportSchema | None = None) -> ExportResult:
+    def export(
+        self, records: list[dict[str, Any]], schema: ReportSchema | None = None
+    ) -> ExportResult:
         if schema is not None:
             schema.validate_batch(records)
             columns = schema.field_names()
@@ -216,7 +225,9 @@ def export_report(
     exporter = EXPORT_REGISTRY.get(fmt)
     if exporter is None:
         available = ", ".join(sorted(EXPORT_REGISTRY))
-        raise UnsupportedFormatError(f"unknown export format {fmt!r}; available formats: {available}")
+        raise UnsupportedFormatError(
+            f"unknown export format {fmt!r}; available formats: {available}"
+        )
     return exporter.export(records, schema=schema)
 
 

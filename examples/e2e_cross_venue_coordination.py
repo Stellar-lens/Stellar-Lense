@@ -87,7 +87,7 @@ def main() -> dict:
 
     print("\n=== Cross-Venue Coordination Example ===")
     print(f"  Pairs traded        : {len(PAIRS)}")
-    print(f"  Total trade bursts  : 40")
+    print("  Total trade bursts  : 40")
     print(f"  Synchrony window    : {synchrony_window_secs}s")
     print(f"  Cross-pair synchrony: {synchrony_score:.3f}  (> 0.7 → suspicious)")
 
@@ -95,8 +95,9 @@ def main() -> dict:
     pair_df = df[df["pair_id"] == PAIRS[0]]
     try:
         from examples._helpers import run_detection
+
         result = run_detection(pair_df, wallet=EXAMPLE_WALLET, pair_id=PAIRS[0], print_summary=True)
-    except Exception as exc:
+    except Exception:
         # Graceful fallback when models not trained
         result = {
             "wallet": EXAMPLE_WALLET,

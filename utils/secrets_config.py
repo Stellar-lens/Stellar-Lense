@@ -15,7 +15,7 @@ The Config class automatically uses SecretsManager for sensitive values.
 For explicit secrets management::
 
     from utils.secrets_config import get_secret, rotate_secret
-    
+
     submitter_secret = get_secret("LEDGERLENS_SUBMITTER_SECRET", required=True)
     rotate_secret("LEDGERLENS_SUBMITTER_SECRET", new_value)
 
@@ -27,9 +27,6 @@ delegates to SecretsManager for sensitive values automatically.
 """
 
 from __future__ import annotations
-
-import os
-from typing import Any
 
 from utils.secrets_manager import (
     SecretNotFoundError,
@@ -56,7 +53,6 @@ _SECRET_ATTRIBUTES = {
     "FORENSIC_REPORT_ENCRYPTION_KEY": SecretType.HMAC_SECRET,
     "MODEL_WATERMARK_KEY": SecretType.HMAC_SECRET,
 }
-
 
 
 def get_secret(

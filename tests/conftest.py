@@ -21,14 +21,14 @@ from hypothesis import HealthCheck, settings
 # Configure Hypothesis for CI environment
 settings.register_profile(
     "ci",
-    max_examples=500,           # Reasonable number for CI
-    deadline=5000,              # 5 seconds per example
+    max_examples=500,  # Reasonable number for CI
+    deadline=5000,  # 5 seconds per example
     suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much],
 )
 
 settings.register_profile(
     "dev",
-    max_examples=50,            # Faster for local development
+    max_examples=50,  # Faster for local development
     deadline=2000,
 )
 

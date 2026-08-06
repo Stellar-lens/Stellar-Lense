@@ -62,9 +62,7 @@ def _load_results(cache_path: Path) -> tuple[int, int, list[dict]]:
     """
     conn = sqlite3.connect(str(cache_path))
     try:
-        cursor = conn.execute(
-            "SELECT id, line, status, filename FROM mutant"
-        )
+        cursor = conn.execute("SELECT id, line, status, filename FROM mutant")
         rows = cursor.fetchall()
     except sqlite3.OperationalError as exc:
         print(f"ERROR: Could not read mutmut cache — {exc}", file=sys.stderr)
@@ -138,7 +136,7 @@ def main() -> None:
         print(f"  {'ID':<6} {'File':<45} {'Line':<6} Status")
         print(f"  {'-'*6} {'-'*45} {'-'*6} {'-'*10}")
         for m in sorted(surviving, key=lambda x: (x["filename"] or "", x["line"] or 0)):
-            fname = (m["filename"] or "unknown")
+            fname = m["filename"] or "unknown"
             # Trim long paths for readability
             if len(fname) > 44:
                 fname = "..." + fname[-41:]

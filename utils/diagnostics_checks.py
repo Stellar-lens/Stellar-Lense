@@ -9,18 +9,14 @@ from __future__ import annotations
 import importlib.util
 import os
 import subprocess
-import sys
 from pathlib import Path
-from typing import Any
 
 from utils.diagnostics import (
     CheckCategory,
     CheckStatus,
-    DiagnosticCheck,
     DiagnosticResult,
     register_check,
 )
-
 
 # =============================================================================
 # ENVIRONMENT CHECKS
@@ -307,9 +303,7 @@ class PackageIntegrityCheck:
                 check_source_package_integrity,
             )
 
-            report = check_source_package_integrity(
-                root=".", packages=DEFAULT_SOURCE_PACKAGES
-            )
+            report = check_source_package_integrity(root=".", packages=DEFAULT_SOURCE_PACKAGES)
 
             if report.ok:
                 return DiagnosticResult(
@@ -329,7 +323,7 @@ class PackageIntegrityCheck:
                 check_name=self.name,
                 category=self.category,
                 status=CheckStatus.FAIL,
-                message=f"Package integrity issues found",
+                message="Package integrity issues found",
                 details={"issues": issue_summary[:10]},  # Limit to first 10
                 remediation="Run: python scripts/check_package_integrity.py",
             )
@@ -352,13 +346,13 @@ class ImportCyclesCheck:
 
     def run(self) -> DiagnosticResult:
         try:
+            from importlib import import_module
             from pathlib import Path
 
-            from scripts.check_import_cycles import (
-                _find_python_files,
-                build_dependency_graph,
-                find_cycles,
-            )
+            cycle_checker = import_module("scripts.check_import_cycles")
+            _find_python_files = cycle_checker._find_python_files
+            build_dependency_graph = cycle_checker.build_dependency_graph
+            find_cycles = cycle_checker.find_cycles
 
             root = Path.cwd()
             packages = ["detection", "ingestion", "streaming"]
@@ -715,6 +709,7 @@ class HorizonAPICheck:
 # =============================================================================
 # AUTO-REGISTER ALL CHECKS
 # =============================================================================
+
 
 def _register_all_checks() -> None:
     """Automatically register all check classes defined in this module."""

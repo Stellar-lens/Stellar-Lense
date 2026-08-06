@@ -148,9 +148,7 @@ def test_register_rejects_non_connector_class(clean_registry):
 
 def test_register_rejects_abstract_subclass(clean_registry):
     class IncompleteConnector(DataConnector[_Widget]):
-        metadata = ConnectorMetadata(
-            connector_id="incomplete", record_type=_Widget, source="test"
-        )
+        metadata = ConnectorMetadata(connector_id="incomplete", record_type=_Widget, source="test")
         # load() intentionally not implemented
 
     with pytest.raises(TypeError, match="unimplemented abstract methods"):
@@ -254,7 +252,9 @@ def test_default_to_dataframe_uses_model_dump(clean_registry):
     clean_registry.register(cls)
     instance = clean_registry.create("widget-source")
 
-    df = instance.to_dataframe([_Widget(widget_id="a", value=2.0), _Widget(widget_id="b", value=3.0)])
+    df = instance.to_dataframe(
+        [_Widget(widget_id="a", value=2.0), _Widget(widget_id="b", value=3.0)]
+    )
     assert isinstance(df, pd.DataFrame)
     assert df["widget_id"].tolist() == ["a", "b"]
 
@@ -372,7 +372,11 @@ def test_amm_connector_requires_pool_ids(monkeypatch):
     connector = AmmPoolTradeConnector()
 
     with pytest.raises(ConnectorError, match="pool_ids"):
-        list(connector.load(since=datetime(2024, 1, 1, tzinfo=UTC), until=datetime(2024, 1, 2, tzinfo=UTC)))
+        list(
+            connector.load(
+                since=datetime(2024, 1, 1, tzinfo=UTC), until=datetime(2024, 1, 2, tzinfo=UTC)
+            )
+        )
 
 
 def test_amm_connector_delegates_to_iter_amm_pool_trades():

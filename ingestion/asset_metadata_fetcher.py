@@ -92,5 +92,7 @@ def _fetch_from_horizon(
             supply = float(raw)
             return supply if supply > 0 else None
     except Exception as exc:
-        logger.warning("Failed to fetch supply for %s:%s from Horizon: %s", asset_code, asset_issuer, exc)
+        logger.warning(
+            "Failed to fetch supply for %s:%s from Horizon: %s", asset_code, asset_issuer, exc
+        )
     return None

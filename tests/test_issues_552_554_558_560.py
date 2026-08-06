@@ -7,7 +7,6 @@ from pathlib import Path
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # validate.py — Issue #558
 # ---------------------------------------------------------------------------
@@ -21,7 +20,7 @@ class TestValidateScript:
         assert isinstance(rc, int)
 
     def test_parsing_suite_runs(self):
-        from scripts.validate import SUITES, run_suites
+        from scripts.validate import run_suites
 
         results = run_suites(["parsing"], quiet=True)
         assert len(results) == 1
@@ -174,6 +173,7 @@ class TestRepoMaturity:
         assert config_path.exists(), "config/repo_maturity.yaml is missing"
         try:
             import yaml  # type: ignore
+
             data = yaml.safe_load(config_path.read_text(encoding="utf-8"))
         except ImportError:
             # yaml not installed — parse manually to check it's not empty

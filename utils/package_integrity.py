@@ -187,9 +187,7 @@ def check_source_package_integrity(
 
         # Also check every nested directory that itself contains .py files
         # but skip __pycache__ and similar generated dirs.
-        nested_dirs = {
-            p.parent for p in py_files if p.parent != package_dir
-        }
+        nested_dirs = {p.parent for p in py_files if p.parent != package_dir}
         for nested in sorted(nested_dirs):
             if nested.name == "__pycache__":
                 continue

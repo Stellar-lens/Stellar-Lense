@@ -39,11 +39,11 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from contextlib import contextmanager
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class ErrorCategory(str, Enum):
+class ErrorCategory(StrEnum):
     INGESTION = "ingestion"
     VALIDATION = "validation"
     TRANSFORM = "transform"

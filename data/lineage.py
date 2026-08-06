@@ -9,14 +9,13 @@ from __future__ import annotations
 import datetime
 import hashlib
 import json
-import os
 from dataclasses import asdict, dataclass, field
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 
-class LineageNodeType(str, Enum):
+class LineageNodeType(StrEnum):
     SOURCE_DATASET = "SOURCE_DATASET"
     DERIVED_DATASET = "DERIVED_DATASET"
     FEATURE_STORE = "FEATURE_STORE"
@@ -24,7 +23,7 @@ class LineageNodeType(str, Enum):
     MODEL_OUTPUT = "MODEL_OUTPUT"
 
 
-def compute_file_sha256(filepath: Union[str, Path]) -> str:
+def compute_file_sha256(filepath: str | Path) -> str:
     """Compute SHA-256 digest of a file in chunks."""
     path = Path(filepath)
     if not path.exists():
@@ -43,22 +42,22 @@ class DataArtifactMetadata:
     path: str
     sha256: str
     file_size_bytes: int
-    row_count: Optional[int] = None
-    column_count: Optional[int] = None
+    row_count: int | None = None
+    column_count: int | None = None
     format: str = "unknown"
     created_at: str = field(
-        default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc).isoformat()
+        default_factory=lambda: datetime.datetime.now(tz=datetime.UTC).isoformat()
     )
-    schema_hash: Optional[str] = None
-    columns: Optional[List[str]] = None
+    schema_hash: str | None = None
+    columns: list[str] | None = None
 
     @classmethod
     def from_file(
         cls,
-        filepath: Union[str, Path],
-        row_count: Optional[int] = None,
-        column_count: Optional[int] = None,
-        columns: Optional[List[str]] = None,
+        filepath: str | Path,
+        row_count: int | None = None,
+        column_count: int | None = None,
+        columns: list[str] | None = None,
     ) -> DataArtifactMetadata:
         """Construct DataArtifactMetadata by inspecting the file on disk."""
         path = Path(filepath)
@@ -113,11 +112,11 @@ class TransformationStep:
 
     step_name: str
     transform_type: str
-    parameters: Dict[str, Any] = field(default_factory=dict)
-    execution_time_seconds: Optional[float] = None
-    commit_hash: Optional[str] = None
+    parameters: dict[str, Any] = field(default_factory=dict)
+    execution_time_seconds: float | None = None
+    commit_hash: str | None = None
     timestamp: str = field(
-        default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc).isoformat()
+        default_factory=lambda: datetime.datetime.now(tz=datetime.UTC).isoformat()
     )
 
 
@@ -128,22 +127,24 @@ class LineageNode:
     node_id: str
     name: str
     node_type: LineageNodeType
-    artifact: Optional[DataArtifactMetadata] = None
-    parents: List[str] = field(default_factory=list)
-    steps: List[TransformationStep] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    artifact: DataArtifactMetadata | None = None
+    parents: list[str] = field(default_factory=list)
+    steps: list[TransformationStep] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
     created_at: str = field(
-        default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc).isoformat()
+        default_factory=lambda: datetime.datetime.now(tz=datetime.UTC).isoformat()
     )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert LineageNode to a JSON-serializable dictionary."""
         data = asdict(self)
-        data["node_type"] = self.node_type.value if isinstance(self.node_type, LineageNodeType) else self.node_type
+        data["node_type"] = (
+            self.node_type.value if isinstance(self.node_type, LineageNodeType) else self.node_type
+        )
         return data
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> LineageNode:
+    def from_dict(cls, data: dict[str, Any]) -> LineageNode:
         """Construct LineageNode from dictionary representation."""
         node_data = dict(data)
         node_data["node_type"] = LineageNodeType(node_data["node_type"])
@@ -159,19 +160,19 @@ class LineageTracker:
 
     def __init__(self, graph_name: str = "ledgerlens_lineage") -> None:
         self.graph_name = graph_name
-        self.nodes: Dict[str, LineageNode] = {}
-        self.created_at: str = datetime.datetime.now(tz=datetime.timezone.utc).isoformat()
+        self.nodes: dict[str, LineageNode] = {}
+        self.created_at: str = datetime.datetime.now(tz=datetime.UTC).isoformat()
 
     def register_dataset(
         self,
         name: str,
-        filepath: Optional[Union[str, Path]] = None,
-        node_type: Union[LineageNodeType, str] = LineageNodeType.DERIVED_DATASET,
-        parent_ids: Optional[List[str]] = None,
-        node_id: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-        row_count: Optional[int] = None,
-        columns: Optional[List[str]] = None,
+        filepath: str | Path | None = None,
+        node_type: LineageNodeType | str = LineageNodeType.DERIVED_DATASET,
+        parent_ids: list[str] | None = None,
+        node_id: str | None = None,
+        metadata: dict[str, Any] | None = None,
+        row_count: int | None = None,
+        columns: list[str] | None = None,
     ) -> LineageNode:
         """Register a dataset in the lineage DAG.
 
@@ -213,9 +214,9 @@ class LineageTracker:
         self,
         model_name: str,
         dataset_node_id: str,
-        feature_columns: Optional[List[str]] = None,
-        hyperparams: Optional[Dict[str, Any]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        feature_columns: list[str] | None = None,
+        hyperparams: dict[str, Any] | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> LineageNode:
         """Register a model training input tied to a dataset node."""
         if dataset_node_id not in self.nodes:
@@ -245,9 +246,9 @@ class LineageTracker:
         node_id: str,
         step_name: str,
         transform_type: str,
-        parameters: Optional[Dict[str, Any]] = None,
-        execution_time_seconds: Optional[float] = None,
-        commit_hash: Optional[str] = None,
+        parameters: dict[str, Any] | None = None,
+        execution_time_seconds: float | None = None,
+        commit_hash: str | None = None,
     ) -> TransformationStep:
         """Record a transformation step on an existing node."""
         if node_id not in self.nodes:
@@ -268,13 +269,13 @@ class LineageTracker:
             raise KeyError(f"Node ID '{node_id}' not found.")
         return self.nodes[node_id]
 
-    def get_ancestors(self, node_id: str) -> List[LineageNode]:
+    def get_ancestors(self, node_id: str) -> list[LineageNode]:
         """Get all ancestor nodes in topological order."""
         if node_id not in self.nodes:
             raise KeyError(f"Node ID '{node_id}' not found.")
 
         visited: set[str] = set()
-        ancestors: List[LineageNode] = []
+        ancestors: list[LineageNode] = []
 
         def _dfs(nid: str) -> None:
             curr = self.nodes[nid]
@@ -287,49 +288,53 @@ class LineageTracker:
         _dfs(node_id)
         return ancestors
 
-    def get_descendants(self, node_id: str) -> List[LineageNode]:
+    def get_descendants(self, node_id: str) -> list[LineageNode]:
         """Get all descendant nodes."""
         if node_id not in self.nodes:
             raise KeyError(f"Node ID '{node_id}' not found.")
 
-        descendants: List[LineageNode] = []
+        descendants: list[LineageNode] = []
         for nid, node in self.nodes.items():
             if node_id in node.parents:
                 descendants.append(node)
                 descendants.extend(self.get_descendants(nid))
         return descendants
 
-    def validate_integrity(self, node_id: Optional[str] = None) -> Dict[str, Any]:
+    def validate_integrity(self, node_id: str | None = None) -> dict[str, Any]:
         """Validate artifact existence and SHA-256 checksums across graph or for specific node.
 
         Returns diagnostics detailing valid artifacts, tampered artifacts, and missing files.
         """
         targets = [self.nodes[node_id]] if node_id else list(self.nodes.values())
 
-        valid_nodes: List[str] = []
-        missing_files: List[Dict[str, str]] = []
-        checksum_mismatches: List[Dict[str, str]] = []
+        valid_nodes: list[str] = []
+        missing_files: list[dict[str, str]] = []
+        checksum_mismatches: list[dict[str, str]] = []
 
         for node in targets:
             if node.artifact is None:
                 continue
             art_path = Path(node.artifact.path)
             if not art_path.exists():
-                missing_files.append({
-                    "node_id": node.node_id,
-                    "name": node.name,
-                    "expected_path": node.artifact.path,
-                })
+                missing_files.append(
+                    {
+                        "node_id": node.node_id,
+                        "name": node.name,
+                        "expected_path": node.artifact.path,
+                    }
+                )
             else:
                 curr_hash = compute_file_sha256(art_path)
                 if curr_hash != node.artifact.sha256:
-                    checksum_mismatches.append({
-                        "node_id": node.node_id,
-                        "name": node.name,
-                        "expected_sha256": node.artifact.sha256,
-                        "actual_sha256": curr_hash,
-                        "path": node.artifact.path,
-                    })
+                    checksum_mismatches.append(
+                        {
+                            "node_id": node.node_id,
+                            "name": node.name,
+                            "expected_sha256": node.artifact.sha256,
+                            "actual_sha256": curr_hash,
+                            "path": node.artifact.path,
+                        }
+                    )
                 else:
                     valid_nodes.append(node.node_id)
 
@@ -340,10 +345,10 @@ class LineageTracker:
             "valid_artifacts_count": len(valid_nodes),
             "missing_files": missing_files,
             "checksum_mismatches": checksum_mismatches,
-            "validated_at": datetime.datetime.now(tz=datetime.timezone.utc).isoformat(),
+            "validated_at": datetime.datetime.now(tz=datetime.UTC).isoformat(),
         }
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize complete graph to dict."""
         return {
             "graph_name": self.graph_name,
@@ -352,7 +357,7 @@ class LineageTracker:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> LineageTracker:
+    def from_dict(cls, data: dict[str, Any]) -> LineageTracker:
         """Deserialize LineageTracker from dict."""
         tracker = cls(graph_name=data.get("graph_name", "ledgerlens_lineage"))
         tracker.created_at = data.get("created_at", tracker.created_at)
@@ -361,7 +366,7 @@ class LineageTracker:
             tracker.nodes[nid] = LineageNode.from_dict(n_data)
         return tracker
 
-    def export_json(self, filepath: Optional[Union[str, Path]] = None) -> str:
+    def export_json(self, filepath: str | Path | None = None) -> str:
         """Export lineage graph to JSON string or file."""
         json_str = json.dumps(self.to_dict(), indent=2)
         if filepath is not None:
@@ -369,7 +374,7 @@ class LineageTracker:
         return json_str
 
     @classmethod
-    def from_json(cls, filepath_or_str: Union[str, Path]) -> LineageTracker:
+    def from_json(cls, filepath_or_str: str | Path) -> LineageTracker:
         """Load LineageTracker from JSON string or file."""
         path = Path(str(filepath_or_str))
         if path.exists() and path.is_file():
@@ -379,7 +384,7 @@ class LineageTracker:
         data = json.loads(content)
         return cls.from_dict(data)
 
-    def save_sidecar(self, artifact_path: Union[str, Path]) -> Path:
+    def save_sidecar(self, artifact_path: str | Path) -> Path:
         """Write `.lineage.json` sidecar alongside specified artifact file."""
         art_path = Path(artifact_path)
         sidecar_path = art_path.with_name(f"{art_path.name}.lineage.json")

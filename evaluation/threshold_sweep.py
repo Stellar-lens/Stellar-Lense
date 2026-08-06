@@ -2,26 +2,23 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from typing import Any
 
 import numpy as np
-from sklearn.metrics import precision_score, recall_score, f1_score, confusion_matrix
+from sklearn.metrics import confusion_matrix, f1_score, precision_score, recall_score
 
 from utils.logging import get_logger
 
 logger = get_logger(__name__)
 
-__all__ = [
-    "SweepPoint",
-    "ImpactReport",
-    "ThresholdSweep",
-    "run_sweep"
-]
+__all__ = ["SweepPoint", "ImpactReport", "ThresholdSweep", "run_sweep"]
+
 
 @dataclass
 class SweepPoint:
     """Dataclass representing metrics at a specific threshold."""
+
     threshold: float
     precision: float
     recall: float
@@ -34,6 +31,7 @@ class SweepPoint:
 @dataclass
 class ImpactReport:
     """Dataclass representing the impact of changing from one threshold to another."""
+
     current_threshold: float
     proposed_threshold: float
     precision_delta: float
@@ -47,7 +45,9 @@ class ImpactReport:
 class ThresholdSweep:
     """Threshold sweep diagnostics engine."""
 
-    def __init__(self, y_true: np.ndarray, y_score: np.ndarray, grid: list[float] | None = None) -> None:
+    def __init__(
+        self, y_true: np.ndarray, y_score: np.ndarray, grid: list[float] | None = None
+    ) -> None:
         """Initialize ThresholdSweep.
 
         Args:
@@ -97,7 +97,7 @@ class ThresholdSweep:
             f1=f1,
             alert_count=alert_count,
             false_positive_rate=fpr,
-            false_negative_rate=fnr
+            false_negative_rate=fnr,
         )
 
     def sweep(self) -> list[SweepPoint]:
@@ -113,7 +113,9 @@ class ThresholdSweep:
         self._results = [self._compute_metrics(t) for t in self.grid]
         return self._results
 
-    def find_optimal_threshold(self, metric: str = "f1", recall_floor: float | None = None) -> SweepPoint:
+    def find_optimal_threshold(
+        self, metric: str = "f1", recall_floor: float | None = None
+    ) -> SweepPoint:
         """Find the optimal threshold based on a given metric, optionally constrained by recall.
 
         Args:
@@ -132,7 +134,9 @@ class ThresholdSweep:
         if recall_floor is not None:
             constrained_points = [p for p in points if p.recall >= recall_floor]
             if not constrained_points:
-                logger.warning(f"No threshold satisfies recall_floor >= {recall_floor}. Falling back to highest recall.")
+                logger.warning(
+                    f"No threshold satisfies recall_floor >= {recall_floor}. Falling back to highest recall."
+                )
                 return max(points, key=lambda p: p.recall)
             points = constrained_points
 
@@ -159,7 +163,7 @@ class ThresholdSweep:
             f1_delta=proposed_metrics.f1 - current_metrics.f1,
             alert_count_delta=proposed_metrics.alert_count - current_metrics.alert_count,
             current_metrics=current_metrics,
-            proposed_metrics=proposed_metrics
+            proposed_metrics=proposed_metrics,
         )
 
     def export_sweep_json(self, path: str) -> None:
@@ -175,7 +179,7 @@ class ThresholdSweep:
         data = {
             "sweep": [asdict(p) for p in points],
             "optimal_f1": asdict(optimal_f1),
-            "optimal_f1_recall_85": asdict(optimal_f1_recall_85)
+            "optimal_f1_recall_85": asdict(optimal_f1_recall_85),
         }
 
         os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -184,7 +188,12 @@ class ThresholdSweep:
         logger.info(f"Exported sweep results to {path}")
 
 
-def run_sweep(y_true: np.ndarray, y_score: np.ndarray, grid: list[float] | None = None, output_path: str | None = None) -> dict[str, Any]:
+def run_sweep(
+    y_true: np.ndarray,
+    y_score: np.ndarray,
+    grid: list[float] | None = None,
+    output_path: str | None = None,
+) -> dict[str, Any]:
     """Convenience function to run a threshold sweep, find optimal points, and optionally export.
 
     Args:
@@ -207,5 +216,5 @@ def run_sweep(y_true: np.ndarray, y_score: np.ndarray, grid: list[float] | None 
     return {
         "sweep_points": sweep_points,
         "optimal": optimal,
-        "optimal_constrained": optimal_constrained
+        "optimal_constrained": optimal_constrained,
     }

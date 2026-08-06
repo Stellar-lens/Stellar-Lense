@@ -9,13 +9,8 @@ Tests cover:
 - Integration with SecretsManager
 """
 
-import hashlib
-import hmac
 import json
-import os
-import tempfile
 from datetime import datetime
-from pathlib import Path
 
 import pytest
 
@@ -27,15 +22,14 @@ from utils.secrets_manager import (
     SecretError,
     SecretNotFoundError,
     SecretRotationError,
-    SecretType,
-    SecretValidator,
-    SecretValidationError,
     SecretsManager,
+    SecretType,
+    SecretValidationError,
+    SecretValidator,
     configure_secrets_manager,
     get_secrets_manager,
     register_ledgerlens_secrets,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -60,7 +54,6 @@ def temp_audit_log(tmp_path):
 def hmac_key():
     """Provide a test HMAC key."""
     return "test_hmac_key_for_audit_trail_integrity_checking"
-
 
 
 @pytest.fixture
@@ -128,7 +121,6 @@ class TestSecretValidator:
         """HMAC secret with non-hex chars raises ValidationError."""
         with pytest.raises(SecretValidationError, match="Invalid HMAC secret"):
             SecretValidator.validate("x" * 32, SecretType.HMAC_SECRET)
-
 
     def test_validate_api_key_valid(self):
         """Valid API key passes validation."""
@@ -224,7 +216,6 @@ class TestEnvironmentSecretProvider:
         assert provider.list_versions("NONEXISTENT_SECRET") == []
 
 
-
 # ---------------------------------------------------------------------------
 # FileSecretProvider Tests
 # ---------------------------------------------------------------------------
@@ -247,7 +238,7 @@ class TestFileSecretProvider:
         """Secret files have restrictive permissions (0o600)."""
         file_provider.set("TEST_SECRET", "test_value")
         secret_file = temp_secrets_dir / "TEST_SECRET"
-        
+
         # Check permissions (owner read/write only)
         stat_info = secret_file.stat()
         assert stat_info.st_mode & 0o777 == 0o600
@@ -341,7 +332,6 @@ class TestSecretAuditLogger:
             assert "hmac_sha256" in entry
             assert len(entry["hmac_sha256"]) == 64  # SHA-256 hex
 
-
     def test_verify_log_integrity_valid(self, audit_logger, temp_audit_log):
         """Verify integrity of valid log entries."""
         from utils.secrets_manager import SecretMetadata
@@ -377,11 +367,11 @@ class TestSecretAuditLogger:
         audit_logger.log_access(metadata)
 
         # Tamper with the log
-        with open(temp_audit_log, "r") as f:
+        with open(temp_audit_log) as f:
             entry = json.loads(f.read())
-        
+
         entry["secret_name"] = "TAMPERED_SECRET"
-        
+
         with open(temp_audit_log, "w") as f:
             f.write(json.dumps(entry) + "\n")
 
@@ -393,8 +383,9 @@ class TestSecretAuditLogger:
     def test_log_without_hmac_key(self, temp_audit_log):
         """Logger without HMAC key logs without signature."""
         logger = SecretAuditLogger(temp_audit_log, hmac_key=None)
-        
+
         from utils.secrets_manager import SecretMetadata
+
         metadata = SecretMetadata(
             secret_name="TEST_SECRET",
             secret_type=SecretType.RAW,
@@ -413,7 +404,7 @@ class TestSecretAuditLogger:
     def test_verify_without_hmac_key_raises(self, temp_audit_log):
         """Verify raises without HMAC key."""
         logger = SecretAuditLogger(temp_audit_log, hmac_key=None)
-        
+
         with pytest.raises(SecretError, match="verify log integrity without HMAC"):
             logger.verify_log_integrity()
 
@@ -430,26 +421,23 @@ class TestSecretsManager:
         """Get secret retrieves from provider."""
         file_provider.set("TEST_SECRET", "test_value")
         manager = SecretsManager(file_provider, audit_logger=None, enable_validation=False)
-        
+
         value = manager.get_secret("TEST_SECRET", secret_type=SecretType.RAW, required=False)
         assert value == "test_value"
 
     def test_get_secret_required_missing_raises(self, file_provider):
         """Get required secret that's missing raises SecretNotFoundError."""
         manager = SecretsManager(file_provider, audit_logger=None)
-        
+
         with pytest.raises(SecretNotFoundError, match="Required secret"):
             manager.get_secret("NONEXISTENT", secret_type=SecretType.RAW, required=True)
 
     def test_get_secret_not_required_returns_default(self, file_provider):
         """Get non-required missing secret returns default."""
         manager = SecretsManager(file_provider, audit_logger=None)
-        
+
         value = manager.get_secret(
-            "NONEXISTENT",
-            secret_type=SecretType.RAW,
-            required=False,
-            default="default_value"
+            "NONEXISTENT", secret_type=SecretType.RAW, required=False, default="default_value"
         )
         assert value == "default_value"
 
@@ -457,16 +445,15 @@ class TestSecretsManager:
         """Get secret validates format when validation enabled."""
         file_provider.set("TEST_SECRET", "invalid_stellar_secret")
         manager = SecretsManager(file_provider, audit_logger=None, enable_validation=True)
-        
+
         with pytest.raises(SecretValidationError, match="Invalid Stellar"):
             manager.get_secret("TEST_SECRET", secret_type=SecretType.STELLAR_SECRET)
-
 
     def test_get_secret_skips_validation_when_disabled(self, file_provider):
         """Get secret skips validation when disabled."""
         file_provider.set("TEST_SECRET", "invalid_stellar_secret")
         manager = SecretsManager(file_provider, audit_logger=None, enable_validation=False)
-        
+
         # Should not raise
         value = manager.get_secret("TEST_SECRET", secret_type=SecretType.STELLAR_SECRET)
         assert value == "invalid_stellar_secret"
@@ -475,9 +462,9 @@ class TestSecretsManager:
         """Get secret logs access event."""
         file_provider.set("TEST_SECRET", "test_value")
         manager = SecretsManager(file_provider, audit_logger, enable_validation=False)
-        
+
         manager.get_secret("TEST_SECRET", secret_type=SecretType.RAW)
-        
+
         # Verify audit log was written
         assert temp_audit_log.exists()
         with open(temp_audit_log) as f:
@@ -491,9 +478,9 @@ class TestSecretsManager:
             name="MY_SECRET",
             secret_type=SecretType.API_KEY,
             required=True,
-            description="Test secret"
+            description="Test secret",
         )
-        
+
         secrets_manager.register_secret(definition)
         assert "MY_SECRET" in secrets_manager._definitions
 
@@ -501,14 +488,14 @@ class TestSecretsManager:
         """Get secret uses registered definition for type and requirements."""
         file_provider.set("MY_SECRET", "a" * 32)
         manager = SecretsManager(file_provider, audit_logger=None, enable_validation=True)
-        
+
         definition = SecretDefinition(
             name="MY_SECRET",
             secret_type=SecretType.API_KEY,
             required=True,
         )
         manager.register_secret(definition)
-        
+
         # Should use definition's secret_type
         value = manager.get_secret("MY_SECRET")
         assert value == "a" * 32
@@ -517,16 +504,16 @@ class TestSecretsManager:
         """Rotate a secret to new value and version."""
         file_provider.set("TEST_SECRET", "v1_value", version=1)
         manager = SecretsManager(file_provider, audit_logger=None, enable_validation=False)
-        
+
         definition = SecretDefinition(
             name="TEST_SECRET",
             secret_type=SecretType.RAW,
             allow_rotation=True,
         )
         manager.register_secret(definition)
-        
+
         manager.rotate_secret("TEST_SECRET", "v2_value")
-        
+
         # Should have new version
         assert file_provider.get("TEST_SECRET") == "v2_value"
         assert 2 in file_provider.list_versions("TEST_SECRET")
@@ -535,14 +522,14 @@ class TestSecretsManager:
         """Rotate validates new secret value."""
         file_provider.set("TEST_SECRET", "a" * 32, version=1)
         manager = SecretsManager(file_provider, audit_logger=None, enable_validation=True)
-        
+
         definition = SecretDefinition(
             name="TEST_SECRET",
             secret_type=SecretType.API_KEY,
             allow_rotation=True,
         )
         manager.register_secret(definition)
-        
+
         # Try to rotate to invalid value
         with pytest.raises(SecretValidationError):
             manager.rotate_secret("TEST_SECRET", "invalid!")
@@ -551,14 +538,14 @@ class TestSecretsManager:
         """Rotate raises when rotation not allowed."""
         file_provider.set("TEST_SECRET", "value", version=1)
         manager = SecretsManager(file_provider, audit_logger=None)
-        
+
         definition = SecretDefinition(
             name="TEST_SECRET",
             secret_type=SecretType.RAW,
             allow_rotation=False,
         )
         manager.register_secret(definition)
-        
+
         with pytest.raises(SecretRotationError, match="not configured to allow rotation"):
             manager.rotate_secret("TEST_SECRET", "new_value")
 
@@ -567,43 +554,48 @@ class TestSecretsManager:
         monkeypatch.setenv("TEST_SECRET", "value")
         provider = EnvironmentSecretProvider()
         manager = SecretsManager(provider, audit_logger=None)
-        
+
         with pytest.raises(SecretRotationError, match="does not support rotation"):
             manager.rotate_secret("TEST_SECRET", "new_value")
-
 
     def test_verify_all_secrets(self, file_provider):
         """Verify all registered secrets."""
         file_provider.set("VALID_SECRET", "a" * 32)
         file_provider.set("INVALID_SECRET", "short")
-        
+
         manager = SecretsManager(file_provider, audit_logger=None, enable_validation=True)
-        
+
         # Register secrets
-        manager.register_secret(SecretDefinition(
-            name="VALID_SECRET",
-            secret_type=SecretType.API_KEY,
-            required=True,
-        ))
-        manager.register_secret(SecretDefinition(
-            name="INVALID_SECRET",
-            secret_type=SecretType.API_KEY,
-            required=True,
-        ))
-        manager.register_secret(SecretDefinition(
-            name="MISSING_SECRET",
-            secret_type=SecretType.API_KEY,
-            required=True,
-        ))
-        
+        manager.register_secret(
+            SecretDefinition(
+                name="VALID_SECRET",
+                secret_type=SecretType.API_KEY,
+                required=True,
+            )
+        )
+        manager.register_secret(
+            SecretDefinition(
+                name="INVALID_SECRET",
+                secret_type=SecretType.API_KEY,
+                required=True,
+            )
+        )
+        manager.register_secret(
+            SecretDefinition(
+                name="MISSING_SECRET",
+                secret_type=SecretType.API_KEY,
+                required=True,
+            )
+        )
+
         results = manager.verify_all_secrets()
-        
+
         # VALID_SECRET should pass
         assert results["VALID_SECRET"] is None
-        
+
         # INVALID_SECRET should fail validation
         assert "too short" in results["INVALID_SECRET"]
-        
+
         # MISSING_SECRET should not be found
         assert "not found" in results["MISSING_SECRET"]
 
@@ -622,7 +614,7 @@ class TestSecretsManagerIntegration:
         provider = FileSecretProvider(temp_secrets_dir)
         audit_logger = SecretAuditLogger(temp_audit_log, hmac_key)
         manager = SecretsManager(provider, audit_logger, enable_validation=True)
-        
+
         # Register secret
         definition = SecretDefinition(
             name="TEST_SECRET",
@@ -631,21 +623,21 @@ class TestSecretsManagerIntegration:
             allow_rotation=True,
         )
         manager.register_secret(definition)
-        
+
         # Set initial value
         provider.set("TEST_SECRET", "a" * 64, version=1)
-        
+
         # Access secret (should log)
         value = manager.get_secret("TEST_SECRET")
         assert value == "a" * 64
-        
+
         # Rotate secret
         manager.rotate_secret("TEST_SECRET", "b" * 64, new_version=2)
-        
+
         # Access again
         new_value = manager.get_secret("TEST_SECRET")
         assert new_value == "b" * 64
-        
+
         # Verify audit trail
         valid, invalid = audit_logger.verify_log_integrity()
         assert valid == 2  # Two access events
@@ -654,7 +646,7 @@ class TestSecretsManagerIntegration:
     def test_register_ledgerlens_secrets(self, secrets_manager):
         """Register all LedgerLens secrets."""
         register_ledgerlens_secrets(secrets_manager)
-        
+
         # Verify all expected secrets are registered
         expected_secrets = [
             "LEDGERLENS_SUBMITTER_SECRET",
@@ -667,7 +659,7 @@ class TestSecretsManagerIntegration:
             "FEDERATED_CA_KEY_PEM",
             "EVENT_HMAC_SECRET",
         ]
-        
+
         for secret_name in expected_secrets:
             assert secret_name in secrets_manager._definitions
 
@@ -695,22 +687,21 @@ class TestEdgeCases:
         """Empty secret value is handled correctly."""
         file_provider.set("TEST_SECRET", "")
         manager = SecretsManager(file_provider, audit_logger=None)
-        
+
         # Should raise when required
         with pytest.raises(SecretNotFoundError):
             manager.get_secret("TEST_SECRET", required=True)
-        
+
         # Should return default when not required
         value = manager.get_secret("TEST_SECRET", required=False, default="default")
         assert value == "default"
-
 
     def test_secret_with_newlines(self, file_provider):
         """Secret with embedded newlines is preserved."""
         secret_with_newlines = "line1\nline2\nline3"
         file_provider.set("TEST_SECRET", secret_with_newlines)
         manager = SecretsManager(file_provider, audit_logger=None, enable_validation=False)
-        
+
         value = manager.get_secret("TEST_SECRET", secret_type=SecretType.RAW)
         assert value == secret_with_newlines
 
@@ -719,33 +710,33 @@ class TestEdgeCases:
         unicode_secret = "secret_with_émojis_🔐_and_special_chars_漢字"
         file_provider.set("TEST_SECRET", unicode_secret)
         manager = SecretsManager(file_provider, audit_logger=None, enable_validation=False)
-        
+
         value = manager.get_secret("TEST_SECRET", secret_type=SecretType.RAW)
         assert value == unicode_secret
 
     def test_concurrent_access(self, file_provider):
         """Multiple threads can access secrets safely."""
         import threading
-        
+
         file_provider.set("TEST_SECRET", "test_value")
         manager = SecretsManager(file_provider, audit_logger=None, enable_validation=False)
-        
+
         results = []
         errors = []
-        
+
         def access_secret():
             try:
                 value = manager.get_secret("TEST_SECRET", secret_type=SecretType.RAW)
                 results.append(value)
             except Exception as e:
                 errors.append(e)
-        
+
         threads = [threading.Thread(target=access_secret) for _ in range(10)]
         for t in threads:
             t.start()
         for t in threads:
             t.join()
-        
+
         assert len(results) == 10
         assert all(v == "test_value" for v in results)
         assert len(errors) == 0
@@ -756,9 +747,9 @@ class TestEdgeCases:
         file_provider.set("TEST_SECRET", "v1", version=1)
         file_provider.set("TEST_SECRET", "v2_bad", version=2)
         file_provider.set("TEST_SECRET", "v1", version=3)  # Rollback to v1 value
-        
+
         manager = SecretsManager(file_provider, audit_logger=None, enable_validation=False)
-        
+
         # Latest version should be v3 with v1's value
         value = manager.get_secret("TEST_SECRET", secret_type=SecretType.RAW)
         assert value == "v1"
@@ -767,8 +758,9 @@ class TestEdgeCases:
         """Audit logger creates parent directories if needed."""
         nested_log = tmp_path / "nested" / "dir" / "audit.ndjson"
         audit_logger = SecretAuditLogger(nested_log, "test_key")
-        
+
         from utils.secrets_manager import SecretMetadata
+
         metadata = SecretMetadata(
             secret_name="TEST",
             secret_type=SecretType.RAW,
@@ -776,7 +768,7 @@ class TestEdgeCases:
             caller_module="test",
             caller_function="test",
         )
-        
+
         audit_logger.log_access(metadata)
         assert nested_log.exists()
 
@@ -793,16 +785,16 @@ class TestSecurity:
         """Audit log contains hash of secret value, not plaintext."""
         file_provider.set("TEST_SECRET", "sensitive_value")
         manager = SecretsManager(file_provider, audit_logger, enable_validation=False)
-        
+
         manager.get_secret("TEST_SECRET", secret_type=SecretType.RAW)
-        
+
         # Check audit log
         with open(temp_audit_log) as f:
             entry = json.loads(f.read())
-            
+
             # Should have redacted hash
             assert "redacted_value_hash" in entry
-            
+
             # Should NOT contain actual secret value
             log_content = temp_audit_log.read_text()
             assert "sensitive_value" not in log_content
@@ -810,7 +802,7 @@ class TestSecurity:
     def test_hmac_prevents_tampering(self, audit_logger, temp_audit_log):
         """HMAC signature prevents undetected log tampering."""
         from utils.secrets_manager import SecretMetadata
-        
+
         # Log original entry
         metadata = SecretMetadata(
             secret_name="ORIGINAL_NAME",
@@ -820,17 +812,17 @@ class TestSecurity:
             caller_function="test",
         )
         audit_logger.log_access(metadata)
-        
+
         # Tamper with secret name
-        with open(temp_audit_log, "r") as f:
+        with open(temp_audit_log) as f:
             entry = json.loads(f.read())
-        
-        original_hmac = entry["hmac_sha256"]
+
+        entry["hmac_sha256"]
         entry["secret_name"] = "TAMPERED_NAME"
-        
+
         with open(temp_audit_log, "w") as f:
             f.write(json.dumps(entry) + "\n")
-        
+
         # Verify should detect tampering
         valid, invalid = audit_logger.verify_log_integrity()
         assert valid == 0
@@ -839,10 +831,10 @@ class TestSecurity:
     def test_file_permissions_secure(self, file_provider, temp_secrets_dir):
         """Secret files are created with secure permissions."""
         file_provider.set("SECURE_SECRET", "sensitive_data")
-        
+
         secret_file = temp_secrets_dir / "SECURE_SECRET"
         stat_info = secret_file.stat()
-        
+
         # Should be 0o600 (owner read/write only)
         perms = stat_info.st_mode & 0o777
         assert perms == 0o600

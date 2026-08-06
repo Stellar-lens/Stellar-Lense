@@ -27,7 +27,7 @@ to keep the attacks cheap enough for per-wallet sweeps.
 import numpy as np
 import pandas as pd
 
-from detection.model_training import FEATURE_COLUMNS_EXCLUDE
+from detection.model_contracts import FEATURE_COLUMNS_EXCLUDE
 
 DEFAULT_TARGET_SCORE = 40
 
@@ -270,10 +270,7 @@ def feature_space_fgsm(
         scale = np.ones(len(feature_cols))
     elif isinstance(feature_scale, dict):
         scale = np.array(
-            [
-                (0.0 if "account_age" in c else feature_scale.get(c, 1.0))
-                for c in feature_cols
-            ],
+            [(0.0 if "account_age" in c else feature_scale.get(c, 1.0)) for c in feature_cols],
             dtype=float,
         )
     else:
@@ -288,7 +285,7 @@ def feature_space_fgsm(
         scorer,
         epsilon=epsilon,
         feature_scale=scale,
-        clip_min=None,   # we apply per-feature clips manually below
+        clip_min=None,  # we apply per-feature clips manually below
         clip_max=None,
         probe_fraction=probe_fraction,
     )

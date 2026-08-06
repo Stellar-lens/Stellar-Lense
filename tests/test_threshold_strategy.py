@@ -7,19 +7,20 @@ Acceptance criteria covered:
   - build_strategy factory resolves valid names and rejects unknown ones.
   - Property: alert_count is monotonically non-increasing as threshold increases.
 """
+
 from __future__ import annotations
+
+from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
-from hypothesis import given, settings, strategies as st
-from unittest.mock import MagicMock
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from detection.threshold_strategy import (
+    AdaptiveStrategy,
     StaticStrategy,
     StatisticalStrategy,
-    AdaptiveStrategy,
-    ThresholdResult,
-    ThresholdDiagnostics,
     build_strategy,
 )
 
@@ -29,10 +30,7 @@ from detection.threshold_strategy import (
 
 # Clean separator at ~0.5: negatives in [0.10, 0.49], positives in [0.51, 0.90]
 Y_TRUE = np.array([0] * 50 + [1] * 50)
-Y_SCORE = np.array(
-    [0.10 + 0.008 * i for i in range(50)]
-    + [0.51 + 0.008 * i for i in range(50)]
-)
+Y_SCORE = np.array([0.10 + 0.008 * i for i in range(50)] + [0.51 + 0.008 * i for i in range(50)])
 
 
 # ---------------------------------------------------------------------------

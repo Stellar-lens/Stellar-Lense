@@ -152,7 +152,9 @@ def run_audit(
     audit_idx = idx[int(0.7 * n) :]
 
     if target_model is None:
-        logger.info("Training shadow model on %d samples for %d epochs …", len(train_idx), shadow_epochs)
+        logger.info(
+            "Training shadow model on %d samples for %d epochs …", len(train_idx), shadow_epochs
+        )
         model = _train_shadow_model(X[train_idx], y[train_idx], epochs=shadow_epochs)
     else:
         model = target_model
@@ -160,7 +162,9 @@ def run_audit(
     member_loader, non_member_loader = _build_loaders(X[audit_idx], y[audit_idx])
 
     logger.info("Measuring undefended attack success rate …")
-    pre_rate = membership_inference_success_rate(model, member_loader, non_member_loader, _default_loss_fn)
+    pre_rate = membership_inference_success_rate(
+        model, member_loader, non_member_loader, _default_loss_fn
+    )
     logger.info("Pre-defence success rate: %.4f", pre_rate)
 
     logger.info("Applying defences and re-measuring …")
@@ -171,7 +175,11 @@ def run_audit(
         advantage_target=ADVANTAGE_TARGET,
     )
     result = defender.audit(model, member_loader, non_member_loader, _default_loss_fn)
-    logger.info("Post-defence success rate: %.4f (target met: %s)", result.post_defence_success_rate, result.target_met)
+    logger.info(
+        "Post-defence success rate: %.4f (target met: %s)",
+        result.post_defence_success_rate,
+        result.target_met,
+    )
 
     return {
         "pre_defence_success_rate": round(result.pre_defence_success_rate, 4),
@@ -190,13 +198,35 @@ def run_audit(
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Membership inference auditor for LedgerLens models")
-    parser.add_argument("--model-path", default=None, help="Path to a saved PyTorch model (.pt).  A shadow model is trained if omitted.")
-    parser.add_argument("--data-path", default="data/synthetic_dataset.parquet", help="Parquet feature dataset")
-    parser.add_argument("--epsilon", type=float, default=2.0, help="DP epsilon budget for output perturbation (default: 2.0)")
-    parser.add_argument("--sensitivity", type=float, default=1.0, help="Prediction sensitivity (default: 1.0)")
-    parser.add_argument("--smoother-sigma", type=float, default=0.3, help="Prediction smoother Gaussian sigma (default: 0.3)")
-    parser.add_argument("--shadow-epochs", type=int, default=10, help="Shadow model training epochs (default: 10)")
+    parser = argparse.ArgumentParser(
+        description="Membership inference auditor for LedgerLens models"
+    )
+    parser.add_argument(
+        "--model-path",
+        default=None,
+        help="Path to a saved PyTorch model (.pt).  A shadow model is trained if omitted.",
+    )
+    parser.add_argument(
+        "--data-path", default="data/synthetic_dataset.parquet", help="Parquet feature dataset"
+    )
+    parser.add_argument(
+        "--epsilon",
+        type=float,
+        default=2.0,
+        help="DP epsilon budget for output perturbation (default: 2.0)",
+    )
+    parser.add_argument(
+        "--sensitivity", type=float, default=1.0, help="Prediction sensitivity (default: 1.0)"
+    )
+    parser.add_argument(
+        "--smoother-sigma",
+        type=float,
+        default=0.3,
+        help="Prediction smoother Gaussian sigma (default: 0.3)",
+    )
+    parser.add_argument(
+        "--shadow-epochs", type=int, default=10, help="Shadow model training epochs (default: 10)"
+    )
     parser.add_argument("--output", default=None, help="Write audit report to this JSON file")
     return parser.parse_args()
 

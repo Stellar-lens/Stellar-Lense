@@ -42,6 +42,7 @@ from streaming.feature_store import (
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture()
 def fake_redis_client():
     """A fakeredis server + client pair."""
@@ -66,6 +67,7 @@ def store(fake_redis_client):
 # ---------------------------------------------------------------------------
 # 1. Round-trip fidelity
 # ---------------------------------------------------------------------------
+
 
 class TestRoundTrip:
     def test_float_features(self, store):
@@ -124,6 +126,7 @@ class TestRoundTrip:
 # 2. TTL expiry triggers cache miss
 # ---------------------------------------------------------------------------
 
+
 class TestTTLExpiry:
     def test_ttl_expiry_causes_miss(self, fake_redis_client):
         """After a key expires its TTL, get() must return None."""
@@ -178,6 +181,7 @@ class TestTTLExpiry:
 # 3. Fallback on Redis error
 # ---------------------------------------------------------------------------
 
+
 class TestFallback:
     def test_get_returns_none_on_redis_error(self):
         s = RedisFeatureStore(fallback_enabled=True)
@@ -215,6 +219,7 @@ class TestFallback:
 # 4. Serialisation safety — only msgpack, never pickle
 # ---------------------------------------------------------------------------
 
+
 class TestSerialisation:
     def test_rejects_bytes_value(self, store):
         with pytest.raises(TypeError, match="bytes"):
@@ -223,6 +228,7 @@ class TestSerialisation:
     def test_rejects_custom_object(self, store):
         class _Foo:
             pass
+
         with pytest.raises(TypeError):
             _validate_features({"obj": _Foo()})
 
@@ -265,16 +271,19 @@ class TestSerialisation:
 # 5. Pipeline batch GET
 # ---------------------------------------------------------------------------
 
+
 class TestPipelineBatchGet:
     def test_hits_and_misses_mixed(self, store):
         store.put("GWALLET_A", "XLM/USDC", {"score": 10.0})
         store.put("GWALLET_B", "XLM/USDC", {"score": 20.0})
 
-        result = store.pipeline_get([
-            ("GWALLET_A", "XLM/USDC"),
-            ("GWALLET_B", "XLM/USDC"),
-            ("GWALLET_MISSING", "XLM/USDC"),
-        ])
+        result = store.pipeline_get(
+            [
+                ("GWALLET_A", "XLM/USDC"),
+                ("GWALLET_B", "XLM/USDC"),
+                ("GWALLET_MISSING", "XLM/USDC"),
+            ]
+        )
 
         assert result[("GWALLET_A", "XLM/USDC")]["score"] == pytest.approx(10.0)
         assert result[("GWALLET_B", "XLM/USDC")]["score"] == pytest.approx(20.0)
@@ -288,6 +297,7 @@ class TestPipelineBatchGet:
 # 6. get_or_compute
 # ---------------------------------------------------------------------------
 
+
 class TestGetOrCompute:
     def test_miss_calls_compute_once(self, store):
         call_count = {"n": 0}
@@ -299,7 +309,9 @@ class TestGetOrCompute:
         result1 = store.get_or_compute("GWALLET_GC", "XLM/USDC", _compute)
         result2 = store.get_or_compute("GWALLET_GC", "XLM/USDC", _compute)
 
-        assert call_count["n"] == 1, "Compute function must only be called once (cache hit on second call)"
+        assert (
+            call_count["n"] == 1
+        ), "Compute function must only be called once (cache hit on second call)"
         assert result1["score"] == pytest.approx(88.0)
         assert result2["score"] == pytest.approx(88.0)
 
@@ -320,6 +332,7 @@ class TestGetOrCompute:
 # 7. Key uniqueness
 # ---------------------------------------------------------------------------
 
+
 class TestKeyUniqueness:
     def test_different_wallets_different_keys(self):
         k1 = _make_key("GWALLET_AAAA", "XLM/USDC")
@@ -338,6 +351,7 @@ class TestKeyUniqueness:
 # ---------------------------------------------------------------------------
 # 8. delete
 # ---------------------------------------------------------------------------
+
 
 class TestDelete:
     def test_delete_removes_entry(self, store):

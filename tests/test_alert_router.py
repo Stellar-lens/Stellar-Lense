@@ -114,7 +114,11 @@ def test_stop_on_match_short_circuits_and_owns_alert():
 
 def test_no_matching_rule_falls_back_to_defaults():
     router = AlertRouter(
-        rules=[RoutingRule(name="high", destinations=[RouteDestination("pagerduty", "x")], min_risk_score=90)],
+        rules=[
+            RoutingRule(
+                name="high", destinations=[RouteDestination("pagerduty", "x")], min_risk_score=90
+            )
+        ],
         default_destinations=[RouteDestination("webhook", "default-url")],
     )
     destinations = router.route(_alert(risk_score=10))
@@ -127,7 +131,9 @@ def test_no_matching_rule_and_no_defaults_returns_empty():
 
 
 def test_set_rules_hot_reload_replaces_active_rules():
-    router = AlertRouter(rules=[RoutingRule(name="old", destinations=[RouteDestination("webhook", "old")])])
+    router = AlertRouter(
+        rules=[RoutingRule(name="old", destinations=[RouteDestination("webhook", "old")])]
+    )
     router.set_rules([RoutingRule(name="new", destinations=[RouteDestination("webhook", "new")])])
     destinations = router.route(_alert())
     assert [d.key() for d in destinations] == [("webhook", "new")]

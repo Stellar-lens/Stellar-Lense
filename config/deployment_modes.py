@@ -26,13 +26,15 @@ picks it up automatically.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Iterator
+from enum import StrEnum
+from importlib import import_module
+from typing import Any
 
 
-class DeploymentMode(str, Enum):
+class DeploymentMode(StrEnum):
     """Closed set of deployment modes LedgerLens ships fixtures for."""
 
     LOCAL = "local"
@@ -47,8 +49,7 @@ class UnknownDeploymentModeError(ValueError):
         self.requested = requested
         self.known = known
         super().__init__(
-            f"Unknown deployment mode {requested!r}. "
-            f"Known modes: {', '.join(sorted(known))}."
+            f"Unknown deployment mode {requested!r}. " f"Known modes: {', '.join(sorted(known))}."
         )
 
 
@@ -60,12 +61,11 @@ class DeploymentModeValidationError(RuntimeError):
     surfacing as an opaque ``OSError`` deep in application startup.
     """
 
-    def __init__(self, mode: "DeploymentMode", cause: Exception):
+    def __init__(self, mode: DeploymentMode, cause: Exception):
         self.mode = mode
         self.__cause__ = cause
         super().__init__(
-            f"Deployment mode fixture {mode.value!r} produced an invalid "
-            f"configuration: {cause}"
+            f"Deployment mode fixture {mode.value!r} produced an invalid " f"configuration: {cause}"
         )
 
 
@@ -210,7 +210,7 @@ def apply_deployment_mode(
             resulting configuration fails ``Config.validate()``.
     """
     if config_cls is None:
-        from config import Config as config_cls  # noqa: N813
+        config_cls = import_module("config").Config
 
     fixture = get_deployment_mode_fixture(mode)
 

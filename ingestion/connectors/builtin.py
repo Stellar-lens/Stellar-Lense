@@ -127,7 +127,9 @@ class OrderBookConnector(DataConnector[OrderBookEvent]):
         description="Manage-offer operation history for a set of accounts.",
     )
 
-    def load(self, *, account_ids: list[str] | None = None, **_: object) -> Iterator[OrderBookEvent]:
+    def load(
+        self, *, account_ids: list[str] | None = None, **_: object
+    ) -> Iterator[OrderBookEvent]:
         """Yield order-book events for the given accounts.
 
         Raises:

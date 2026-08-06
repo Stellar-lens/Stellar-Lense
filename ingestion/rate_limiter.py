@@ -65,9 +65,7 @@ class TokenBucketLimiter:
 
     def _warn(self, reason: str) -> None:
         if not self._warned:
-            logger.warning(
-                "%s — proceeding without a distributed Horizon rate limit", reason
-            )
+            logger.warning("%s — proceeding without a distributed Horizon rate limit", reason)
             self._warned = True
 
     def try_acquire(self, tokens: float = 1.0) -> bool:

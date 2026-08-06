@@ -196,14 +196,21 @@ def validate_path_schema(path_payment_op: dict) -> bool:
         return False
 
     # Validate account IDs format (Stellar accounts start with 'G' and are 56 chars)
-    for account_id in [path_payment_op.get("source_account"), path_payment_op.get("destination_account")]:
-        if not (isinstance(account_id, str) and account_id.startswith("G") and len(account_id) == 56):
+    for account_id in [
+        path_payment_op.get("source_account"),
+        path_payment_op.get("destination_account"),
+    ]:
+        if not (
+            isinstance(account_id, str) and account_id.startswith("G") and len(account_id) == 56
+        ):
             return False
 
     return True
 
 
-def merge_path_flows(flows1: list[ReconstructedPathFlow], flows2: list[ReconstructedPathFlow]) -> list[ReconstructedPathFlow]:
+def merge_path_flows(
+    flows1: list[ReconstructedPathFlow], flows2: list[ReconstructedPathFlow]
+) -> list[ReconstructedPathFlow]:
     """Merge two lists of path flows, consolidating duplicate routes.
 
     Args:

@@ -207,7 +207,12 @@ class TestReplayScoreStorage:
 
                     replayer._store_replay_score(
                         wallet="GA111",
-                        risk_score={"score": 75, "benford_flag": False, "ml_flag": True, "confidence": 80},
+                        risk_score={
+                            "score": 75,
+                            "benford_flag": False,
+                            "ml_flag": True,
+                            "confidence": 80,
+                        },
                         pair_id="USDC:native/XLM:native",
                     )
 
@@ -216,7 +221,7 @@ class TestReplayScoreStorage:
                     call_args = mock_store.upsert.call_args
                     assert call_args[0][0] == "GA111"
                     assert call_args[0][1] == "USDC:native/XLM:native"
-                    
+
                     # Check that replay_model_version tag was added
                     score_dict = call_args[0][2]
                     assert "replay_model_version" in score_dict

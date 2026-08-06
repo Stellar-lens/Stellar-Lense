@@ -69,9 +69,7 @@ def _run_pipeline(argv, load_side_effect, two_pairs, scorer=None):
             )
         )
         stack.enter_context(patch("detection.model_inference.RiskScorer", return_value=scorer))
-        stack.enter_context(
-            patch.object(run_pipeline.config, "WATCHED_ASSET_PAIRS", two_pairs)
-        )
+        stack.enter_context(patch.object(run_pipeline.config, "WATCHED_ASSET_PAIRS", two_pairs))
         run_pipeline.main()
 
 
@@ -149,16 +147,30 @@ def test_mismatched_since_argument_raises_actionable_error(tmp_path, two_pairs):
     ckpt_file = tmp_path / "ckpt.json"
 
     _run_pipeline(
-        ["--no-orderbook", "--no-graph", "--no-persist", "--checkpoint-file", str(ckpt_file),
-         "--since", "2024-01-01"],
+        [
+            "--no-orderbook",
+            "--no-graph",
+            "--no-persist",
+            "--checkpoint-file",
+            str(ckpt_file),
+            "--since",
+            "2024-01-01",
+        ],
         lambda asset, xlm, start_time=None: _trades("GA", "GB"),
         two_pairs,
     )
 
     with pytest.raises(CheckpointMismatchError, match="since"):
         _run_pipeline(
-            ["--no-orderbook", "--no-graph", "--no-persist", "--checkpoint-file",
-             str(ckpt_file), "--since", "2024-06-01"],
+            [
+                "--no-orderbook",
+                "--no-graph",
+                "--no-persist",
+                "--checkpoint-file",
+                str(ckpt_file),
+                "--since",
+                "2024-06-01",
+            ],
             lambda asset, xlm, start_time=None: _trades("GA", "GB"),
             two_pairs,
         )
@@ -198,9 +210,7 @@ def test_no_checkpoint_file_preserves_prior_all_or_nothing_behavior(tmp_path, tw
         raise ConnectionError("horizon unreachable")
 
     with pytest.raises(ConnectionError):
-        _run_pipeline(
-            ["--no-orderbook", "--no-graph", "--no-persist"], failing_load, two_pairs
-        )
+        _run_pipeline(["--no-orderbook", "--no-graph", "--no-persist"], failing_load, two_pairs)
 
 
 def test_dry_run_ignores_checkpoint_file(tmp_path, two_pairs, caplog):

@@ -45,16 +45,16 @@ try:
     from prometheus_client import REGISTRY as _PROM_REGISTRY
     from prometheus_client import Gauge
 
-    _batch_size_gauge: Gauge | None = (
-        _PROM_REGISTRY._names_to_collectors.get("ledgerlens_adaptive_batch_size")  # type: ignore[attr-defined]
-        or Gauge("ledgerlens_adaptive_batch_size", "Current adaptive micro-batch size")
+    _batch_size_gauge: Gauge | None = _PROM_REGISTRY._names_to_collectors.get(
+        "ledgerlens_adaptive_batch_size"
+    ) or Gauge(  # type: ignore[attr-defined]
+        "ledgerlens_adaptive_batch_size", "Current adaptive micro-batch size"
     )
-    _target_latency_gauge: Gauge | None = (
-        _PROM_REGISTRY._names_to_collectors.get("ledgerlens_batch_target_latency_seconds")  # type: ignore[attr-defined]
-        or Gauge(
-            "ledgerlens_batch_target_latency_seconds",
-            "Target p95 latency for adaptive batch controller (seconds)",
-        )
+    _target_latency_gauge: Gauge | None = _PROM_REGISTRY._names_to_collectors.get(
+        "ledgerlens_batch_target_latency_seconds"
+    ) or Gauge(  # type: ignore[attr-defined]
+        "ledgerlens_batch_target_latency_seconds",
+        "Target p95 latency for adaptive batch controller (seconds)",
     )
 except Exception:  # pragma: no cover
     _batch_size_gauge = None
@@ -273,6 +273,7 @@ class StreamingScorer:
 
         try:
             import time
+
             t0 = time.time()
 
             # Use score_with_uncertainty when calibration artifacts are available;
@@ -283,20 +284,31 @@ class StreamingScorer:
                 res = self._risk_scorer.score(feature_row)
 
             latency_ms = (time.time() - t0) * 1000
-            model_version = self._risk_scorer.metadata.get("model_version", "unknown") if self._risk_scorer.metadata else "unknown"
-            
-            logger.info("Wallet scored", extra={
-                "wallet": wallet,
-                "score": res["score"],
-                "latency_ms": latency_ms,
-                "model_version": model_version,
-                "asset_pair": "unknown"
-            })
+            model_version = (
+                self._risk_scorer.metadata.get("model_version", "unknown")
+                if self._risk_scorer.metadata
+                else "unknown"
+            )
+
+            logger.info(
+                "Wallet scored",
+                extra={
+                    "wallet": wallet,
+                    "score": res["score"],
+                    "latency_ms": latency_ms,
+                    "model_version": model_version,
+                    "asset_pair": "unknown",
+                },
+            )
             return res
         except Exception as exc:
-            logger.warning("Scoring failed", exc_info=True, extra={
-                "wallet": wallet,
-                "error_type": type(exc).__name__,
-                "error_message": str(exc)
-            })
+            logger.warning(
+                "Scoring failed",
+                exc_info=True,
+                extra={
+                    "wallet": wallet,
+                    "error_type": type(exc).__name__,
+                    "error_message": str(exc),
+                },
+            )
             return None

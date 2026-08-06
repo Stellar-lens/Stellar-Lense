@@ -56,8 +56,7 @@ def compute_ranges(df: pd.DataFrame) -> dict[str, dict[str, float]]:
     that table when the dataset changes.
     """
     numeric_cols = [
-        col for col in df.select_dtypes(include="number").columns
-        if col not in _NON_FEATURE_COLS
+        col for col in df.select_dtypes(include="number").columns if col not in _NON_FEATURE_COLS
     ]
 
     ranges: dict[str, dict[str, float]] = {}
@@ -66,13 +65,13 @@ def compute_ranges(df: pd.DataFrame) -> dict[str, dict[str, float]]:
         if series.empty:
             continue
         ranges[col] = {
-            "min":  round(float(series.min()), 8),
-            "max":  round(float(series.max()), 8),
-            "p1":   round(float(series.quantile(0.01)), 8),
-            "p99":  round(float(series.quantile(0.99)), 8),
+            "min": round(float(series.min()), 8),
+            "max": round(float(series.max()), 8),
+            "p1": round(float(series.quantile(0.01)), 8),
+            "p99": round(float(series.quantile(0.99)), 8),
             "mean": round(float(series.mean()), 8),
-            "std":  round(float(series.std()), 8),
-            "n":    int(series.count()),
+            "std": round(float(series.std()), 8),
+            "n": int(series.count()),
         }
 
     return ranges

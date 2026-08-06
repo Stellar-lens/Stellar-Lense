@@ -128,7 +128,7 @@ class Watermark:
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "Watermark":
+    def from_dict(cls, data: dict[str, Any]) -> Watermark:
         """Deserialise from a JSON dictionary."""
         lct_raw = data.get("ledger_close_time")
         lct = datetime.fromisoformat(lct_raw) if lct_raw else None
@@ -184,9 +184,7 @@ class WatermarkTracker:
         flush_every_n: int | None = None,
     ) -> None:
         self._path = Path(store_path or _STORE_PATH)
-        self._flush_every_n: int = (
-            flush_every_n if flush_every_n is not None else _FLUSH_EVERY_N
-        )
+        self._flush_every_n: int = flush_every_n if flush_every_n is not None else _FLUSH_EVERY_N
         self._lock = threading.Lock()
         self._watermarks: dict[str, Watermark] = {}
         self._update_counter: int = 0
@@ -420,7 +418,7 @@ class WatermarkTracker:
     # Context manager support
     # ------------------------------------------------------------------
 
-    def __enter__(self) -> "WatermarkTracker":
+    def __enter__(self) -> WatermarkTracker:
         return self
 
     def __exit__(self, *_: object) -> None:

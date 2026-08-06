@@ -68,7 +68,9 @@ CONTRACTS: dict[str, CliContract] = {
         description="Score one wallet, or many, on demand.",
         arguments=(
             CliArgument("--wallet", description="Stellar wallet public key (G...)"),
-            CliArgument("--wallets-file", description="Path to a file of newline-delimited wallets"),
+            CliArgument(
+                "--wallets-file", description="Path to a file of newline-delimited wallets"
+            ),
             CliArgument("--workers", description="Parallel worker count"),
             CliArgument("--pair", required=True, description="Trading pair to score against"),
             CliArgument("--since", description="Only consider trades since this timestamp"),
@@ -76,7 +78,9 @@ CONTRACTS: dict[str, CliContract] = {
             CliArgument("--json", description="Emit machine-readable JSON output"),
             CliArgument("--quiet", description="Suppress progress output"),
             CliArgument("--causal", description="Include causal attribution in the result"),
-            CliArgument("--what-if-remove", description="Counterfactual: rescore without this wallet"),
+            CliArgument(
+                "--what-if-remove", description="Counterfactual: rescore without this wallet"
+            ),
             CliArgument("--log-level", description="Logging verbosity"),
         ),
     ),
@@ -157,7 +161,9 @@ CONTRACTS: dict[str, CliContract] = {
             CliArgument("--asset-pair", description="Restrict selection to one asset pair"),
             CliArgument("--update", description="Update the pool in place after selection"),
             CliArgument("--historical", description="Include historical wallets in the pool"),
-            CliArgument("--force-continue", description="Continue past non-fatal validation warnings"),
+            CliArgument(
+                "--force-continue", description="Continue past non-fatal validation warnings"
+            ),
         ),
     ),
 }

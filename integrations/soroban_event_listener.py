@@ -313,8 +313,10 @@ class ScoreOracleEventListener:
 
             persist_event(event, self._session_factory)
             parsed_events.append(event)
-            max_ledger = event.ledger_sequence if max_ledger is None else max(
-                max_ledger, event.ledger_sequence
+            max_ledger = (
+                event.ledger_sequence
+                if max_ledger is None
+                else max(max_ledger, event.ledger_sequence)
             )
 
             if (
@@ -349,6 +351,7 @@ class ScoreOracleEventListener:
             except Exception:
                 logger.exception("ScoreOracleEventListener: poll error")
             self._stop_event.wait(self.poll_interval)
+
 
 _DEFAULT_POLL_INTERVAL = 5  # seconds (≈1 Stellar ledger close)
 
@@ -515,9 +518,7 @@ class SorobanEventListener:
 
     @staticmethod
     def _default_pause_handler(reason: str) -> None:
-        logger.critical(
-            "Scoring pipeline HALTED by emergency pause: %s", reason
-        )
+        logger.critical("Scoring pipeline HALTED by emergency pause: %s", reason)
 
     @staticmethod
     def _default_unpause_handler() -> None:

@@ -28,8 +28,12 @@ def _parse_range(spec: str) -> RangeRule:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", required=True, help="Path to a JSON-lines file")
-    parser.add_argument("--required", action="append", default=[], help="Field that must be present (repeatable)")
-    parser.add_argument("--range", action="append", default=[], dest="ranges", help="field:min:max (repeatable)")
+    parser.add_argument(
+        "--required", action="append", default=[], help="Field that must be present (repeatable)"
+    )
+    parser.add_argument(
+        "--range", action="append", default=[], dest="ranges", help="field:min:max (repeatable)"
+    )
     parser.add_argument("--feature-ranges", default="data/feature_ranges.json")
     parser.add_argument("--fail-fast", action="store_true")
     args = parser.parse_args()

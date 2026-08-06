@@ -39,6 +39,7 @@ with open(FIXTURES_PATH) as _f:
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture()
 def db(tmp_path):
     """In-memory SQLite session factory."""
@@ -46,14 +47,13 @@ def db(tmp_path):
 
 
 def _expected_hash(address: str) -> str:
-    return hmac.new(
-        EVENT_HMAC_SECRET.encode(), address.encode(), hashlib.sha256
-    ).hexdigest()
+    return hmac.new(EVENT_HMAC_SECRET.encode(), address.encode(), hashlib.sha256).hexdigest()
 
 
 # ---------------------------------------------------------------------------
 # 1. Parsing: score_read
 # ---------------------------------------------------------------------------
+
 
 class TestParseScoreRead:
     def test_returns_contract_event(self):
@@ -111,6 +111,7 @@ class TestParseScoreRead:
 # 2. Parsing: score_updated
 # ---------------------------------------------------------------------------
 
+
 class TestParseScoreUpdated:
     def test_event_type(self):
         event = parse_contract_event(FIXTURES["score_updated"])
@@ -133,6 +134,7 @@ class TestParseScoreUpdated:
 # 3. Parsing: threshold_updated
 # ---------------------------------------------------------------------------
 
+
 class TestParseThresholdUpdated:
     def test_event_type(self):
         event = parse_contract_event(FIXTURES["threshold_updated"])
@@ -152,6 +154,7 @@ class TestParseThresholdUpdated:
 # 4. Unknown event returns None
 # ---------------------------------------------------------------------------
 
+
 class TestParseUnknownEvent:
     def test_returns_none(self):
         result = parse_contract_event(FIXTURES["unknown_event"])
@@ -167,6 +170,7 @@ class TestParseUnknownEvent:
 # ---------------------------------------------------------------------------
 # 5. Horizon effects shape (fallback backend)
 # ---------------------------------------------------------------------------
+
 
 class TestParseHorizonShape:
     def test_horizon_score_read_parsed(self):
@@ -184,6 +188,7 @@ class TestParseHorizonShape:
 # ---------------------------------------------------------------------------
 # 6. Privacy: _hash_address
 # ---------------------------------------------------------------------------
+
 
 class TestHashAddress:
     def test_deterministic(self):
@@ -203,6 +208,7 @@ class TestHashAddress:
 # ---------------------------------------------------------------------------
 # 7. Persistence
 # ---------------------------------------------------------------------------
+
 
 class TestPersistEvent:
     def test_persist_stores_record(self, db):
@@ -236,6 +242,7 @@ class TestPersistEvent:
 # 8. Watermark
 # ---------------------------------------------------------------------------
 
+
 class TestWatermark:
     def test_default_watermark_is_zero(self, db):
         assert get_watermark("CTEST", db) == 0
@@ -260,6 +267,7 @@ class TestWatermark:
 # 9. Stale score alert
 # ---------------------------------------------------------------------------
 
+
 class TestStaleScoreAlert:
     def _make_score_read_event(self, score: int) -> ContractEvent:
         raw = copy.deepcopy(FIXTURES["score_read"])
@@ -270,33 +278,43 @@ class TestStaleScoreAlert:
     def test_alert_fires_when_delta_exceeds_threshold(self):
         event = self._make_score_read_event(50)
         dispatcher = MagicMock()
-        fired = check_stale_score_alert(event, current_score=80, dispatcher=dispatcher, threshold=20)
+        fired = check_stale_score_alert(
+            event, current_score=80, dispatcher=dispatcher, threshold=20
+        )
         assert fired is True
         dispatcher.dispatch.assert_called_once()
 
     def test_alert_does_not_fire_below_threshold(self):
         event = self._make_score_read_event(65)
         dispatcher = MagicMock()
-        fired = check_stale_score_alert(event, current_score=80, dispatcher=dispatcher, threshold=20)
+        fired = check_stale_score_alert(
+            event, current_score=80, dispatcher=dispatcher, threshold=20
+        )
         assert fired is False
         dispatcher.dispatch.assert_not_called()
 
     def test_alert_does_not_fire_at_exact_threshold(self):
         event = self._make_score_read_event(60)
         dispatcher = MagicMock()
-        fired = check_stale_score_alert(event, current_score=80, dispatcher=dispatcher, threshold=20)
+        fired = check_stale_score_alert(
+            event, current_score=80, dispatcher=dispatcher, threshold=20
+        )
         assert fired is False
 
     def test_alert_fires_above_threshold(self):
         event = self._make_score_read_event(30)
         dispatcher = MagicMock()
-        fired = check_stale_score_alert(event, current_score=80, dispatcher=dispatcher, threshold=20)
+        fired = check_stale_score_alert(
+            event, current_score=80, dispatcher=dispatcher, threshold=20
+        )
         assert fired is True
 
     def test_no_alert_for_non_score_read_event(self):
         event = parse_contract_event(FIXTURES["score_updated"])
         dispatcher = MagicMock()
-        fired = check_stale_score_alert(event, current_score=80, dispatcher=dispatcher, threshold=20)
+        fired = check_stale_score_alert(
+            event, current_score=80, dispatcher=dispatcher, threshold=20
+        )
         assert fired is False
         dispatcher.dispatch.assert_not_called()
 
@@ -312,25 +330,31 @@ class TestStaleScoreAlert:
     def test_no_alert_when_current_score_is_none(self):
         event = self._make_score_read_event(50)
         dispatcher = MagicMock()
-        fired = check_stale_score_alert(event, current_score=None, dispatcher=dispatcher, threshold=20)
+        fired = check_stale_score_alert(
+            event, current_score=None, dispatcher=dispatcher, threshold=20
+        )
         assert fired is False
 
     def test_default_threshold_is_20(self):
         """Verify the configured default alert threshold is 20 points."""
         from integrations.soroban_event_listener import STALE_SCORE_ALERT_THRESHOLD
+
         assert STALE_SCORE_ALERT_THRESHOLD == 20
 
     def test_alert_uses_absolute_delta(self):
         """Score going down should also trigger an alert."""
         event = self._make_score_read_event(80)
         dispatcher = MagicMock()
-        fired = check_stale_score_alert(event, current_score=50, dispatcher=dispatcher, threshold=20)
+        fired = check_stale_score_alert(
+            event, current_score=50, dispatcher=dispatcher, threshold=20
+        )
         assert fired is True
 
 
 # ---------------------------------------------------------------------------
 # 10. ScoreOracleEventListener.process_batch integration
 # ---------------------------------------------------------------------------
+
 
 class TestProcessBatch:
     def test_process_batch_persists_and_returns_events(self, db, tmp_path):
@@ -388,6 +412,7 @@ class TestProcessBatch:
 # ---------------------------------------------------------------------------
 # 11. Listener stop / background thread
 # ---------------------------------------------------------------------------
+
 
 class TestListenerLifecycle:
     def test_stop_halts_loop(self, tmp_path):

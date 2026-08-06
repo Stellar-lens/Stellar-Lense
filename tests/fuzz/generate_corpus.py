@@ -54,9 +54,7 @@ def _serialize(record: dict, schema: dict) -> bytes:
 def _load_schema() -> dict:
     """Load Avro schema from JSON file."""
     schema_path = os.path.join(
-        Path(__file__).parent.parent.parent, 
-        "data", 
-        "trade_avro_schema.json"
+        Path(__file__).parent.parent.parent, "data", "trade_avro_schema.json"
     )
     with open(schema_path, encoding="utf-8") as fh:
         raw = json.load(fh)
@@ -67,14 +65,14 @@ def _generate_avro_seeds() -> list[tuple[str, bytes]]:
     """Generate valid Avro-serialized trade records for the corpus."""
     schema = _load_schema()
     seeds = []
-    
+
     # Generate diverse trade patterns
     factories = [
         ("clean", CleanTradeFactory),
         ("wash_same_amount", WashTradeFactory),
         ("ring_trades", RingTradeFactory),
     ]
-    
+
     for pattern_name, factory in factories:
         # Generate 3 trades from each pattern
         trades = factory.create_batch(3)
@@ -83,14 +81,14 @@ def _generate_avro_seeds() -> list[tuple[str, bytes]]:
             avro_bytes = _serialize(record, schema)
             seed_name = f"avro_{pattern_name}_{i}.bin"
             seeds.append((seed_name, avro_bytes))
-    
+
     return seeds
 
 
 def _generate_json_seeds() -> list[tuple[str, bytes]]:
     """Generate valid JSON API responses for the Pydantic fuzz target."""
     seeds = []
-    
+
     # Generate valid Trade JSON
     trades = CleanTradeFactory.create_batch(3)
     for i, trade in enumerate(trades):
@@ -112,7 +110,7 @@ def _generate_json_seeds() -> list[tuple[str, bytes]]:
             "price": trade.price,
         }
         seeds.append((f"json_trade_{i}.json", json.dumps(trade_json).encode("utf-8")))
-    
+
     # Generate valid OrderBookEvent JSON
     now = datetime.now(UTC)
     for i in range(3):
@@ -133,7 +131,7 @@ def _generate_json_seeds() -> list[tuple[str, bytes]]:
             "action": "created",
         }
         seeds.append((f"json_orderbook_{i}.json", json.dumps(event_json).encode("utf-8")))
-    
+
     # Generate valid AccountActivity JSON
     for i in range(3):
         activity_json = {
@@ -143,7 +141,7 @@ def _generate_json_seeds() -> list[tuple[str, bytes]]:
             "home_domain": f"example{i}.com",
         }
         seeds.append((f"json_activity_{i}.json", json.dumps(activity_json).encode("utf-8")))
-    
+
     # Generate valid Asset JSON
     for i in range(2):
         asset_json = {
@@ -151,7 +149,7 @@ def _generate_json_seeds() -> list[tuple[str, bytes]]:
             "issuer": f"GISSUER{i:08d}000000000000000000000000",
         }
         seeds.append((f"json_asset_{i}.json", json.dumps(asset_json).encode("utf-8")))
-    
+
     return seeds
 
 
@@ -159,23 +157,23 @@ def main():
     """Generate and write all corpus seeds to disk."""
     corpus_dir = Path(__file__).parent / "corpus"
     corpus_dir.mkdir(parents=True, exist_ok=True)
-    
+
     print(f"Generating corpus seeds in {corpus_dir}...")
-    
+
     # Generate Avro seeds
     avro_seeds = _generate_avro_seeds()
     for seed_name, data in avro_seeds:
         path = corpus_dir / seed_name
         path.write_bytes(data)
         print(f"  ✓ {seed_name} ({len(data)} bytes)")
-    
+
     # Generate JSON seeds
     json_seeds = _generate_json_seeds()
     for seed_name, data in json_seeds:
         path = corpus_dir / seed_name
         path.write_bytes(data)
         print(f"  ✓ {seed_name} ({len(data)} bytes)")
-    
+
     total = len(avro_seeds) + len(json_seeds)
     print(f"\nGenerated {total} seed inputs.")
 

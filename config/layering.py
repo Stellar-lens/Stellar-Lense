@@ -40,7 +40,7 @@ Usage:
 from __future__ import annotations
 
 import os
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
@@ -49,7 +49,7 @@ import yaml
 from utils.errors import ConfigurationError
 
 
-class ConfigSource(str, Enum):
+class ConfigSource(StrEnum):
     DEFAULT = "default"
     BASE_FILE = "base_file"
     ENV_FILE = "env_file"

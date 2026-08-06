@@ -61,13 +61,19 @@ def _extract_actual_arguments(path: Path) -> list[ActualArgument]:
         if node.func.attr != "add_argument":
             continue
 
-        aliases = tuple(a.value for a in node.args if isinstance(a, ast.Constant) and isinstance(a.value, str))
+        aliases = tuple(
+            a.value for a in node.args if isinstance(a, ast.Constant) and isinstance(a.value, str)
+        )
         if not aliases:
             continue
 
         required = False
         for kw in node.keywords:
-            if kw.arg == "required" and isinstance(kw.value, ast.Constant) and kw.value.value is True:
+            if (
+                kw.arg == "required"
+                and isinstance(kw.value, ast.Constant)
+                and kw.value.value is True
+            ):
                 required = True
 
         actual.append(ActualArgument(aliases=aliases, required=required, lineno=node.lineno))

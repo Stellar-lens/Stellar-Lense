@@ -200,9 +200,9 @@ class TestCausalPriorConstraintsGraphEnforcement:
             warnings.simplefilter("always")
             priors.apply(dag)
 
-        assert any("forbidden" in str(w.message).lower() for w in caught), (
-            "A UserWarning mentioning 'forbidden' must be emitted"
-        )
+        assert any(
+            "forbidden" in str(w.message).lower() for w in caught
+        ), "A UserWarning mentioning 'forbidden' must be emitted"
 
     # Required edge tests
     def test_required_edge_inserted_when_absent(self):
@@ -280,7 +280,9 @@ class TestWashTradeCausalDiscoveryWithPriors:
         df = _make_simple_df(n=300, seed=1)
         # Inject a strong spurious correlation so PC would naturally learn the edge
         # trading_volume → account_age_days (which we declare forbidden)
-        df["account_age_days"] = df["trading_volume"] * 0.8 + np.random.default_rng(1).normal(0, 5, len(df))
+        df["account_age_days"] = df["trading_volume"] * 0.8 + np.random.default_rng(1).normal(
+            0, 5, len(df)
+        )
 
         priors = _priors_from_dict(
             {
@@ -296,9 +298,9 @@ class TestWashTradeCausalDiscoveryWithPriors:
             warnings.simplefilter("always")
             dag = discoverer.fit(df, alpha=0.05, priors=priors)
 
-        assert not dag.has_edge("trading_volume", "account_age_days"), (
-            "Forbidden edge trading_volume→account_age_days must not exist in learned DAG"
-        )
+        assert not dag.has_edge(
+            "trading_volume", "account_age_days"
+        ), "Forbidden edge trading_volume→account_age_days must not exist in learned DAG"
 
     def test_required_edge_present_after_fit(self):
         """After fit() with a required constraint, the edge must appear in the DAG."""
@@ -329,7 +331,11 @@ class TestWashTradeCausalDiscoveryWithPriors:
         """Validation must happen before PC, so an unknown variable raises ValueError."""
         df = _make_simple_df(n=100, seed=3)
         priors = _priors_from_dict(
-            {"constraints": [{"cause": "NONEXISTENT_FEATURE", "effect": "label", "kind": "required"}]}
+            {
+                "constraints": [
+                    {"cause": "NONEXISTENT_FEATURE", "effect": "label", "kind": "required"}
+                ]
+            }
         )
         discoverer = WashTradeCausalDiscovery()
         with pytest.raises(ValueError, match="NONEXISTENT_FEATURE"):
@@ -351,9 +357,8 @@ class TestWashTradeCausalDiscoveryWithPriors:
 class TestCausalPriorsYaml:
     def test_yaml_file_exists(self):
         import os
-        assert os.path.exists("data/causal_priors.yaml"), (
-            "data/causal_priors.yaml must exist"
-        )
+
+        assert os.path.exists("data/causal_priors.yaml"), "data/causal_priors.yaml must exist"
 
     def test_yaml_file_loads_without_error(self):
         priors = CausalPriorConstraints.load("data/causal_priors.yaml")
@@ -367,6 +372,7 @@ class TestCausalPriorsYaml:
     def test_yaml_features_exist_in_synthetic_dataset(self):
         """All variables in causal_priors.yaml must be column names in the synthetic dataset."""
         from scripts.generate_synthetic_dataset import generate_synthetic_dataset
+
         df = generate_synthetic_dataset(n_wallets=20, seed=0)
         feature_cols = [c for c in df.columns if c not in {"wallet", "label"}]
 
@@ -388,8 +394,7 @@ class TestCausalPriorsYaml:
         """A YAML file containing a Python-object tag must be rejected by safe_load."""
         bad_yaml = tmp_path / "bad_priors.yaml"
         bad_yaml.write_text(
-            "constraints:\n"
-            "  - !!python/object/apply:os.system ['echo hacked']\n"
+            "constraints:\n" "  - !!python/object/apply:os.system ['echo hacked']\n"
         )
         # yaml.safe_load raises on !!python/... tags
         with pytest.raises(Exception):

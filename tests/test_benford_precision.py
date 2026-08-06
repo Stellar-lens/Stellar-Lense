@@ -7,17 +7,17 @@ These tests verify that the Decimal-based digit extraction is:
 4. Produces correct Benford distributions
 """
 
+from decimal import Decimal
+
 import numpy as np
 import pandas as pd
 import pytest
-from decimal import Decimal
 
 from utils.benford_precision import (
     extract_leading_digit_safe,
     extract_second_digit_safe,
     leading_digits_safe,
     second_digits_safe,
-    verify_digit_extraction_accuracy,
 )
 from utils.decimal_guards import DecimalAmount
 
@@ -154,7 +154,7 @@ class TestSecondDigitExtraction:
             "76": 6,
             "87": 7,
             "98": 8,
-            "109": 9,
+            "19": 9,
         }
         for amount_str, expected_digit in expected.items():
             digit = extract_second_digit_safe(DecimalAmount(amount_str))
@@ -166,11 +166,13 @@ class TestSeriesOperations:
 
     def test_leading_digits_series(self):
         """Extract leading digits from Series."""
-        amounts = pd.Series([
-            DecimalAmount("123.45"),
-            DecimalAmount("456.78"),
-            DecimalAmount("789.01"),
-        ])
+        amounts = pd.Series(
+            [
+                DecimalAmount("123.45"),
+                DecimalAmount("456.78"),
+                DecimalAmount("789.01"),
+            ]
+        )
 
         digits = leading_digits_safe(amounts)
 
@@ -179,11 +181,13 @@ class TestSeriesOperations:
 
     def test_leading_digits_with_zeros(self):
         """Zero amounts are filtered out."""
-        amounts = pd.Series([
-            DecimalAmount("123.45"),
-            DecimalAmount("0"),
-            DecimalAmount("456.78"),
-        ])
+        amounts = pd.Series(
+            [
+                DecimalAmount("123.45"),
+                DecimalAmount("0"),
+                DecimalAmount("456.78"),
+            ]
+        )
 
         digits = leading_digits_safe(amounts)
 
@@ -192,11 +196,13 @@ class TestSeriesOperations:
 
     def test_leading_digits_with_negatives(self):
         """Negative amounts are filtered out."""
-        amounts = pd.Series([
-            DecimalAmount("123.45"),
-            DecimalAmount("-456.78"),
-            DecimalAmount("789.01"),
-        ])
+        amounts = pd.Series(
+            [
+                DecimalAmount("123.45"),
+                DecimalAmount("-456.78"),
+                DecimalAmount("789.01"),
+            ]
+        )
 
         digits = leading_digits_safe(amounts)
 
@@ -212,20 +218,24 @@ class TestSeriesOperations:
 
     def test_leading_digits_all_zeros(self):
         """All zeros returns empty."""
-        amounts = pd.Series([
-            DecimalAmount("0"),
-            DecimalAmount("0"),
-        ])
+        amounts = pd.Series(
+            [
+                DecimalAmount("0"),
+                DecimalAmount("0"),
+            ]
+        )
         digits = leading_digits_safe(amounts)
         assert len(digits) == 0
 
     def test_second_digits_series(self):
         """Extract second digits from Series."""
-        amounts = pd.Series([
-            DecimalAmount("123.45"),
-            DecimalAmount("456.78"),
-            DecimalAmount("789.01"),
-        ])
+        amounts = pd.Series(
+            [
+                DecimalAmount("123.45"),
+                DecimalAmount("456.78"),
+                DecimalAmount("789.01"),
+            ]
+        )
 
         digits = second_digits_safe(amounts)
 
@@ -234,11 +244,13 @@ class TestSeriesOperations:
 
     def test_mixed_amount_types(self):
         """Can handle mixed Decimal/DecimalAmount."""
-        amounts = pd.Series([
-            Decimal("123.45"),
-            DecimalAmount("456.78"),
-            Decimal("789.01"),
-        ])
+        amounts = pd.Series(
+            [
+                Decimal("123.45"),
+                DecimalAmount("456.78"),
+                Decimal("789.01"),
+            ]
+        )
 
         digits = leading_digits_safe(amounts)
 
@@ -256,7 +268,7 @@ class TestBenfordDistribution:
         n = 1000
         np.random.seed(42)
         log_amounts = np.random.uniform(0, 3, n)  # 10^0 to 10^3
-        amounts = 10 ** log_amounts
+        amounts = 10**log_amounts
 
         # Convert to DecimalAmount
         decimal_amounts = pd.Series([DecimalAmount(str(a)) for a in amounts])
@@ -287,9 +299,9 @@ class TestBenfordDistribution:
                 observed = counts[digit]
                 expected = benford_expected[digit]
                 # Allow 5% tolerance
-                assert abs(observed - expected) < 0.05, (
-                    f"Digit {digit}: observed {observed:.3f}, expected {expected:.3f}"
-                )
+                assert (
+                    abs(observed - expected) < 0.05
+                ), f"Digit {digit}: observed {observed:.3f}, expected {expected:.3f}"
 
     def test_uniform_distribution_rejects_benford(self):
         """Uniform distribution should NOT follow Benford."""
@@ -350,11 +362,13 @@ class TestAccuracyComparison:
     def test_float_vs_decimal_precision(self):
         """Decimal extraction is more accurate than float for edge cases."""
         # Case where float precision might cause issues
-        amounts = pd.Series([
-            DecimalAmount("1000000.0000001"),  # Large + tiny
-            DecimalAmount("0.0000001"),  # Very small
-            DecimalAmount("999.9999999"),  # Near boundary
-        ])
+        amounts = pd.Series(
+            [
+                DecimalAmount("1000000.0000001"),  # Large + tiny
+                DecimalAmount("0.0000001"),  # Very small
+                DecimalAmount("999.9999999"),  # Near boundary
+            ]
+        )
 
         # Extract with safe method
         safe_digits = leading_digits_safe(amounts)
@@ -380,13 +394,15 @@ class TestIntegration:
 
     def test_realistic_trade_amounts(self):
         """Test with realistic Stellar trade amounts."""
-        trades = pd.Series([
-            DecimalAmount("100.5000000"),
-            DecimalAmount("250.7500000"),
-            DecimalAmount("50.2500000"),
-            DecimalAmount("1000.0000000"),
-            DecimalAmount("0.1234567"),
-        ])
+        trades = pd.Series(
+            [
+                DecimalAmount("100.5000000"),
+                DecimalAmount("250.7500000"),
+                DecimalAmount("50.2500000"),
+                DecimalAmount("1000.0000000"),
+                DecimalAmount("0.1234567"),
+            ]
+        )
 
         digits = leading_digits_safe(trades)
 
@@ -403,6 +419,7 @@ class TestIntegration:
 
         # Should complete quickly (< 1 second for 10k)
         import time
+
         start = time.time()
         digits = leading_digits_safe(decimal_amounts)
         elapsed = time.time() - start

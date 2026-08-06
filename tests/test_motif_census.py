@@ -314,8 +314,13 @@ class TestEnrichCommunitiesWithMotifs:
         community_map = {"A": 0, "B": 0, "C": 0}
         features = enrich_communities_with_motifs(G, community_map)
         expected_keys = {
-            "triangle_density", "star_ratio", "cycle_4_per_node",
-            "reciprocity", "node_count", "was_sampled", "census_truncated",
+            "triangle_density",
+            "star_ratio",
+            "cycle_4_per_node",
+            "reciprocity",
+            "node_count",
+            "was_sampled",
+            "census_truncated",
         }
         assert expected_keys == set(features[0].keys())
 

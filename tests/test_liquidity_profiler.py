@@ -268,9 +268,9 @@ def test_thin_market_alert_fires_above_threshold():
         round_trip_frequency=0.9,
     )
     assert score is not None and not __import__("math").isnan(score)
-    assert score >= detector._cfg["alert_threshold"], (
-        f"Expected score >= {detector._cfg['alert_threshold']}, got {score}"
-    )
+    assert (
+        score >= detector._cfg["alert_threshold"]
+    ), f"Expected score >= {detector._cfg['alert_threshold']}, got {score}"
 
 
 def test_thin_market_invalid_config_raises_on_startup():
@@ -303,6 +303,7 @@ def test_thin_market_invalid_config_raises_on_startup():
                     _load_thin_market_config,
                     _validate_thin_market_config,
                 )
+
                 cfg = _load_thin_market_config()
                 # Manually trigger the load with the bad config
                 cfg["max_unique_traders_7d"] = -10

@@ -124,7 +124,7 @@ def record_risk_score(asset_pair: str, score: float) -> None:
 
 def record_confirmed_wash_trade(asset_pair: str) -> None:
     """Increment the confirmed wash trade counter for *asset_pair*.
-    
+
     Call this when a wallet on *asset_pair* is manually confirmed to be
     conducting wash trading (used to compute recall metrics for SLO dashboard).
     """
@@ -135,7 +135,7 @@ def record_confirmed_wash_trade(asset_pair: str) -> None:
 
 def record_confirmed_clean_wallet(asset_pair: str) -> None:
     """Increment the confirmed clean wallet counter for *asset_pair*.
-    
+
     Call this when a wallet on *asset_pair* is manually confirmed to be
     legitimate/non-fraudulent (used to compute false-positive rate metrics
     for SLO dashboard).

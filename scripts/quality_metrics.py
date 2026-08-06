@@ -72,7 +72,7 @@ import json
 import sqlite3
 import subprocess
 import sys
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from xml.etree import ElementTree
@@ -117,8 +117,8 @@ WORST_CYCLE_TIME_HOURS = 336.0  # 2 weeks
 class MetricReading:
     name: str
     raw_value: float | None  # None means not available
-    score: float             # normalised 0-100
-    source: str              # where the value came from
+    score: float  # normalised 0-100
+    source: str  # where the value came from
     notes: str = ""
 
 
@@ -231,8 +231,11 @@ def collect_drift_rate(
         if skip_missing:
             return MetricReading("drift_rate", None, 100.0, str(drift_report), "skipped")
         return MetricReading(
-            "drift_rate", None, 100.0, str(drift_report),
-            "No drift report found; assuming no drift (score 100)"
+            "drift_rate",
+            None,
+            100.0,
+            str(drift_report),
+            "No drift report found; assuming no drift (score 100)",
         )
 
     try:
@@ -247,8 +250,11 @@ def collect_drift_rate(
             raw_fraction = drifted / checked if checked > 0 else 0.0
         else:
             return MetricReading(
-                "drift_rate", None, 100.0, str(drift_report),
-                "drift_fraction key not found; assuming no drift"
+                "drift_rate",
+                None,
+                100.0,
+                str(drift_report),
+                "drift_fraction key not found; assuming no drift",
             )
         raw_pct = raw_fraction * 100.0
         # Invert: high drift → low quality score
@@ -290,14 +296,14 @@ def collect_cycle_time(
 
     if len(timestamps) < 2:
         return MetricReading(
-            "cycle_time", None, 100.0, "git log",
-            "Fewer than 2 merge commits found; defaulting to score 100"
+            "cycle_time",
+            None,
+            100.0,
+            "git log",
+            "Fewer than 2 merge commits found; defaulting to score 100",
         )
 
-    diffs_hours = [
-        (timestamps[i] - timestamps[i + 1]) / 3600.0
-        for i in range(len(timestamps) - 1)
-    ]
+    diffs_hours = [(timestamps[i] - timestamps[i + 1]) / 3600.0 for i in range(len(timestamps) - 1)]
     avg_hours = sum(diffs_hours) / len(diffs_hours)
     # Clamp
     avg_hours = max(0.0, avg_hours)

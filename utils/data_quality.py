@@ -110,7 +110,7 @@ class RangeRule:
         return None
 
     @classmethod
-    def from_feature_ranges(cls, path: str = "data/feature_ranges.json") -> list["RangeRule"]:
+    def from_feature_ranges(cls, path: str = "data/feature_ranges.json") -> list[RangeRule]:
         """Build RangeRule instances from the repo's feature_ranges.json,
         if present. Returns [] if the file is missing or malformed, so
         callers can use this as an optional enrichment without special-casing
@@ -209,7 +209,9 @@ class DataQualityValidator:
                 )
         return report
 
-    def validate_batch(self, records: list[dict[str, Any]], fail_fast: bool = False) -> ValidationReport:
+    def validate_batch(
+        self, records: list[dict[str, Any]], fail_fast: bool = False
+    ) -> ValidationReport:
         """Validate every record, aggregating issues with their record index.
 
         With ``fail_fast=True``, stops at the first record that has any

@@ -49,6 +49,7 @@ def test_wrong_key_raises_invalid_tag(monkeypatch):
     import importlib
 
     import utils.field_encryption as fe_module
+
     importlib.reload(fe_module)
 
     from cryptography.exceptions import InvalidTag
@@ -62,6 +63,7 @@ def test_short_key_raises_value_error(monkeypatch):
     import importlib
 
     import utils.field_encryption as fe_module
+
     importlib.reload(fe_module)
 
     with pytest.raises(ValueError, match="32 bytes"):
@@ -73,10 +75,12 @@ def test_no_key_warns_and_stores_plaintext(monkeypatch):
     import importlib
 
     import utils.field_encryption as fe_module
+
     importlib.reload(fe_module)
 
     wallet = "GBCFXNZQN2P7YBZFPKG4TMZQNHEFGQJZRSVSXFSEXAMPLEWALLET12345"
     import warnings
+
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter("always")
         blob = fe_module.encrypt_field(wallet)

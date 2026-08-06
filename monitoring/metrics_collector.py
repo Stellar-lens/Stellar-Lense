@@ -30,9 +30,7 @@ class MetricsCollector:
         cusum: CUSUMDetector | None = None,
         redis_client=None,
     ) -> None:
-        self._cusum = cusum or CUSUMDetector(
-            metric_name="risk_score", redis_client=redis_client
-        )
+        self._cusum = cusum or CUSUMDetector(metric_name="risk_score", redis_client=redis_client)
 
     def record_score(self, wallet: str, score: float) -> bool:
         """Record a scored wallet event; return True if CUSUM alarm fires.

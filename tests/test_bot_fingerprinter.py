@@ -25,16 +25,18 @@ def sample_bot_trades() -> pd.DataFrame:
     trades = []
     for i in range(10):
         timestamp = base_time + timedelta(seconds=5 * i)
-        trades.append({
-            "trade_id": f"bot-trade-{i}",
-            "ledger_close_time": timestamp.isoformat(),
-            "base_account": bot_account if i % 2 == 0 else counterparty,
-            "counter_account": counterparty if i % 2 == 0 else bot_account,
-            "base_asset": "USDC",
-            "counter_asset": "XLM",
-            "amount": 100.0,
-            "price": 0.1,
-        })
+        trades.append(
+            {
+                "trade_id": f"bot-trade-{i}",
+                "ledger_close_time": timestamp.isoformat(),
+                "base_account": bot_account if i % 2 == 0 else counterparty,
+                "counter_account": counterparty if i % 2 == 0 else bot_account,
+                "base_asset": "USDC",
+                "counter_asset": "XLM",
+                "amount": 100.0,
+                "price": 0.1,
+            }
+        )
 
     return pd.DataFrame(trades)
 
@@ -52,16 +54,18 @@ def sample_human_trades() -> pd.DataFrame:
 
     for i, interval in enumerate(intervals):
         current_time += timedelta(seconds=interval)
-        trades.append({
-            "trade_id": f"human-trade-{i}",
-            "ledger_close_time": current_time.isoformat(),
-            "base_account": human_account if i % 2 == 0 else counterparty,
-            "counter_account": counterparty if i % 2 == 0 else human_account,
-            "base_asset": "USDC",
-            "counter_asset": "XLM",
-            "amount": 100.0 + np.random.randn() * 30,
-            "price": 0.1,
-        })
+        trades.append(
+            {
+                "trade_id": f"human-trade-{i}",
+                "ledger_close_time": current_time.isoformat(),
+                "base_account": human_account if i % 2 == 0 else counterparty,
+                "counter_account": counterparty if i % 2 == 0 else human_account,
+                "base_asset": "USDC",
+                "counter_asset": "XLM",
+                "amount": 100.0 + np.random.randn() * 30,
+                "price": 0.1,
+            }
+        )
 
     return pd.DataFrame(trades)
 
@@ -187,54 +191,62 @@ class TestInterTradeIntervalCV:
 
     def test_insufficient_trades_returns_none(self):
         """Accounts with fewer than 5 trades return None."""
-        trades_df = pd.DataFrame([
-            {
-                "trade_id": "1",
-                "ledger_close_time": "2024-01-01T00:00:00Z",
-                "base_account": "GACC" + "A" * 52,
-                "counter_account": "GXXX" + "X" * 52,
-                "amount": 100.0,
-            },
-            {
-                "trade_id": "2",
-                "ledger_close_time": "2024-01-01T00:05:00Z",
-                "base_account": "GXXX" + "X" * 52,
-                "counter_account": "GACC" + "A" * 52,
-                "amount": 100.0,
-            },
-        ])
+        trades_df = pd.DataFrame(
+            [
+                {
+                    "trade_id": "1",
+                    "ledger_close_time": "2024-01-01T00:00:00Z",
+                    "base_account": "GACC" + "A" * 52,
+                    "counter_account": "GXXX" + "X" * 52,
+                    "amount": 100.0,
+                },
+                {
+                    "trade_id": "2",
+                    "ledger_close_time": "2024-01-01T00:05:00Z",
+                    "base_account": "GXXX" + "X" * 52,
+                    "counter_account": "GACC" + "A" * 52,
+                    "amount": 100.0,
+                },
+            ]
+        )
 
         cv = _compute_inter_trade_interval_cv("GACC" + "A" * 52, trades_df)
         assert cv is None
 
     def test_zero_intervals_returns_none(self):
         """All zero-interval trades return None."""
-        trades_df = pd.DataFrame([
-            {
-                "trade_id": f"{i}",
-                "ledger_close_time": "2024-01-01T00:00:00Z",  # All same time
-                "base_account": "GACC" + "A" * 52,
-                "counter_account": "GXXX" + "X" * 52,
-                "amount": 100.0,
-            }
-            for i in range(6)
-        ])
+        trades_df = pd.DataFrame(
+            [
+                {
+                    "trade_id": f"{i}",
+                    "ledger_close_time": "2024-01-01T00:00:00Z",  # All same time
+                    "base_account": "GACC" + "A" * 52,
+                    "counter_account": "GXXX" + "X" * 52,
+                    "amount": 100.0,
+                }
+                for i in range(6)
+            ]
+        )
 
         cv = _compute_inter_trade_interval_cv("GACC" + "A" * 52, trades_df)
         assert cv is None
 
     def test_uses_population_std(self):
         """CV uses population standard deviation (ddof=0)."""
-        trades_df = pd.DataFrame([
-            {
-                "trade_id": f"{i}",
-                "ledger_close_time": (datetime(2024, 1, 1, 0, 0, 0) + timedelta(seconds=10*i)).isoformat(),
-                "base_account": "GACC" + "A" * 52,
-                "counter_account": "GXXX" + "X" * 52,
-                "amount": 100.0,
-            }
-            for i in range(5)
-        ])
+        trades_df = pd.DataFrame(
+            [
+                {
+                    "trade_id": f"{i}",
+                    "ledger_close_time": (
+                        datetime(2024, 1, 1, 0, 0, 0) + timedelta(seconds=10 * i)
+                    ).isoformat(),
+                    "base_account": "GACC" + "A" * 52,
+                    "counter_account": "GXXX" + "X" * 52,
+                    "amount": 100.0,
+                }
+                for i in range(5)
+            ]
+        )
 
         cv = _compute_inter_trade_interval_cv("GACC" + "A" * 52, trades_df)
 
@@ -249,9 +261,7 @@ class TestAccountManagementEntropy:
 
     def test_clustered_operations_low_entropy(self):
         """Few operation types = low entropy (bot-like)."""
-        effects = [
-            {"type": "manage_offer"} for _ in range(8)
-        ] + [
+        effects = [{"type": "manage_offer"} for _ in range(8)] + [
             {"type": "trust_line_created"} for _ in range(2)
         ]
 

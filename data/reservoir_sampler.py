@@ -194,9 +194,7 @@ class DriftAwareReservoirSampler:
 
         _atomic_write_parquet(self.buffer_path, df)
         self._updates_since_flush = 0
-        logger.debug(
-            "Flushed reservoir (%d examples) to %s", len(self._buffer), self.buffer_path
-        )
+        logger.debug("Flushed reservoir (%d examples) to %s", len(self._buffer), self.buffer_path)
 
     def reset(self) -> None:
         """Clear the reservoir buffer (for manual reset)."""

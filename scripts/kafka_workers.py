@@ -107,6 +107,7 @@ def run_worker_pool(
     try:
         # Start health check server
         from streaming.health_check import start_health_server
+
         health_port = int(os.getenv("HEALTH_SERVER_PORT", "8080"))
         start_health_server(port=health_port)
 

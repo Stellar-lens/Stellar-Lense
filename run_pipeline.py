@@ -48,7 +48,6 @@ from ingestion.historical_loader import (
 from ingestion.orderbook_loader import load_accounts_orderbook_events
 from utils.correlation import PipelineStage, correlation_context, generate_correlation_id
 from utils.logging import get_logger
-from utils.pipeline_observability import PipelineRun
 
 logger = get_logger(__name__)
 
@@ -278,7 +277,9 @@ def main() -> None:
                     logger.info("No trades — skipping")
                     continue
 
-                wallets = list(pd.unique(trades_df[["base_account", "counter_account"]].values.ravel()))
+                wallets = list(
+                    pd.unique(trades_df[["base_account", "counter_account"]].values.ravel())
+                )
 
                 # --- Stage 2a: order-book events ---
                 orderbook_events = None
@@ -361,9 +362,7 @@ def main() -> None:
                     if args.dry_run:
                         logger.warning("[DRY RUN] Skipping on-chain submission")
                     elif "score" not in scored:
-                        logger.warning(
-                            "Skipping on-chain submission: no ML scores available"
-                        )
+                        logger.warning("Skipping on-chain submission: no ML scores available")
                     else:
                         with correlation_context(
                             pipeline_run_id,
@@ -372,7 +371,9 @@ def main() -> None:
                         ):
                             submit_flagged_onchain(flagged, pair_id)
 
-        combined_flagged = pd.concat(all_flagged, ignore_index=True) if all_flagged else pd.DataFrame()
+        combined_flagged = (
+            pd.concat(all_flagged, ignore_index=True) if all_flagged else pd.DataFrame()
+        )
         logger.info("Total flagged wallets across all pairs: %d", len(combined_flagged))
 
 

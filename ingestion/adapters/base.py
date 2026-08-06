@@ -32,13 +32,13 @@ from __future__ import annotations
 
 import abc
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
 
-class EventType(str, Enum):
+class EventType(StrEnum):
     """Chain-agnostic classification of a normalized ingestion event."""
 
     TRADE = "trade"
@@ -167,7 +167,9 @@ class ChainAdapter(abc.ABC):
         """
         raise NotImplementedError
 
-    def normalize_batch(self, raw_events: list[Any]) -> tuple[list[NormalizedEvent], list[AdapterValidationError]]:
+    def normalize_batch(
+        self, raw_events: list[Any]
+    ) -> tuple[list[NormalizedEvent], list[AdapterValidationError]]:
         """Normalize a batch, collecting per-record failures instead of
         aborting the whole batch on the first bad record.
 

@@ -56,7 +56,6 @@ With Decimal arithmetic, digit extraction is always exact.
 
 from decimal import Decimal
 
-import numpy as np
 import pandas as pd
 
 from utils.decimal_guards import DecimalAmount, validate_amount
@@ -369,7 +368,9 @@ def verify_digit_extraction_accuracy(
     report = {
         "total_compared": len(common_idx),
         "discrepancies": int(mismatches.sum()),
-        "discrepancy_rate": float(mismatches.sum() / len(common_idx)) if len(common_idx) > 0 else 0.0,
+        "discrepancy_rate": (
+            float(mismatches.sum() / len(common_idx)) if len(common_idx) > 0 else 0.0
+        ),
         "examples": examples,
     }
 

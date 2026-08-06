@@ -23,9 +23,7 @@ from examples._helpers import (
     run_detection,
 )
 
-RING_WALLETS = [
-    f"GRING{str(i).zfill(51)}"[:56] for i in range(1, 5)
-]
+RING_WALLETS = [f"GRING{str(i).zfill(51)}"[:56] for i in range(1, 5)]
 # Fixed lot sizes — non-Benford by design
 _LOT_SIZES = [1000.0, 2000.0, 5000.0, 10000.0]
 

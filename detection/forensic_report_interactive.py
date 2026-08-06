@@ -114,10 +114,14 @@ def _build_wallet_graph_html(wallet_hash: str, graph_edges: list[dict]) -> str:
         from pyvis.network import Network
 
         net = Network(height="400px", width="100%", directed=True, notebook=False)
-        net.set_options(json.dumps({
-            "interaction": {"zoomView": True, "dragView": True},
-            "physics": {"enabled": True},
-        }))
+        net.set_options(
+            json.dumps(
+                {
+                    "interaction": {"zoomView": True, "dragView": True},
+                    "physics": {"enabled": True},
+                }
+            )
+        )
 
         nodes_seen: set[str] = set()
 
@@ -181,27 +185,31 @@ def generate_interactive_report(
     # Build hashed trade evidence (no raw wallet addresses in output)
     trades_safe = []
     for t in trade_evidence[:100]:
-        trades_safe.append({
-            "trade_id": t.get("trade_id", ""),
-            "ledger": t.get("ledger", 0),
-            "base_account_hash": _hash_wallet(str(t.get("base_account", ""))),
-            "counter_account_hash": _hash_wallet(str(t.get("counter_account", ""))),
-            "base_amount": t.get("base_amount", 0),
-            "counter_amount": t.get("counter_amount", 0),
-            "asset_pair": t.get("asset_pair", ""),
-        })
+        trades_safe.append(
+            {
+                "trade_id": t.get("trade_id", ""),
+                "ledger": t.get("ledger", 0),
+                "base_account_hash": _hash_wallet(str(t.get("base_account", ""))),
+                "counter_account_hash": _hash_wallet(str(t.get("counter_account", ""))),
+                "base_amount": t.get("base_amount", 0),
+                "counter_amount": t.get("counter_amount", 0),
+                "asset_pair": t.get("asset_pair", ""),
+            }
+        )
 
     # Build graph edges from propagation_path if present
     prop_path = forensic_dict.get("propagation_path")
     graph_edges: list[dict] = []
     if prop_path and isinstance(prop_path, dict):
         for edge in prop_path.get("edges", [])[:50]:
-            graph_edges.append({
-                "source_hash": _hash_wallet(str(edge.get("source", ""))),
-                "target_hash": _hash_wallet(str(edge.get("target", ""))),
-                "weight": edge.get("weight", 1.0),
-                "risk_score": edge.get("risk_score", 0),
-            })
+            graph_edges.append(
+                {
+                    "source_hash": _hash_wallet(str(edge.get("source", ""))),
+                    "target_hash": _hash_wallet(str(edge.get("target", ""))),
+                    "weight": edge.get("weight", 1.0),
+                    "risk_score": edge.get("risk_score", 0),
+                }
+            )
 
     graph_section = _build_wallet_graph_html(wallet_hash, graph_edges)
     plotly_js = _get_plotly_js()

@@ -29,7 +29,13 @@ class StaticLookupAdapter(DataProviderAdapter):
     """Serves responses from an in-memory dict, simulating an external
     lookup provider (e.g. asset metadata by code)."""
 
-    def __init__(self, provider_name: str, table: dict[str, Any], api_key: str | None = None, simulate_latency_ms: float = 0.0):
+    def __init__(
+        self,
+        provider_name: str,
+        table: dict[str, Any],
+        api_key: str | None = None,
+        simulate_latency_ms: float = 0.0,
+    ):
         self.provider_name = provider_name
         self._table = table
         self._api_key = api_key

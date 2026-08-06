@@ -8,16 +8,13 @@ while enabling the modular framework.
 from __future__ import annotations
 
 from collections.abc import Iterator
-from datetime import datetime
 
 from stellar_sdk import Asset as SdkAsset
 
 from config import config
 from ingestion.contracts import (
-    SourceConfig,
     SourceState,
     TradeBatchSource,
-    TradeSourceConfig,
     TradeStreamSource,
 )
 from ingestion.data_models import Trade
@@ -101,7 +98,6 @@ class KafkaTradeSource(TradeStreamSource):
         logger.info("KafkaTradeSource[%s]: closed", self.name)
 
     def stream(self) -> Iterator[Trade]:
-        from ingestion.kafka_producer import trade_to_record
         from streaming.kafka_worker import KafkaWorker
 
         self._state = SourceState.STREAMING

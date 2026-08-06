@@ -181,9 +181,7 @@ def validate_hyperparams(model_name: str, params: dict[str, Any]) -> None:
     bounds = _HARD_BOUNDS[model_name]
     for key, value in params.items():
         if key not in bounds:
-            raise ValueError(
-                f"Unknown parameter {key!r} for model {model_name!r}"
-            )
+            raise ValueError(f"Unknown parameter {key!r} for model {model_name!r}")
         lo, hi = bounds[key]
         if not (lo <= value <= hi):
             raise ValueError(
@@ -208,9 +206,7 @@ def _suggest_params(trial: optuna.Trial, model_name: str) -> dict[str, Any]:
         elif param_type == "float":
             params[param_name] = trial.suggest_float(param_name, float(lo), float(hi))
         elif param_type == "float_log":
-            params[param_name] = trial.suggest_float(
-                param_name, float(lo), float(hi), log=True
-            )
+            params[param_name] = trial.suggest_float(param_name, float(lo), float(hi), log=True)
         else:
             raise ValueError(f"Unknown parameter type {param_type!r}")
     return params
@@ -267,9 +263,7 @@ class _NoImprovementCallback:
     def __call__(self, study: optuna.Study, trial: optuna.trial.FrozenTrial) -> None:
         if len(study.trials) < self._min_trials:
             return
-        completed = [
-            t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE
-        ]
+        completed = [t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE]
         if not completed:
             return
         current_best = study.best_value
@@ -369,9 +363,7 @@ def run_study(
             show_progress_bar=False,
         )
     except Exception as exc:
-        raise HyperparameterSearchError(
-            f"Study for {model_name!r} failed: {exc}"
-        ) from exc
+        raise HyperparameterSearchError(f"Study for {model_name!r} failed: {exc}") from exc
 
     best_params = study.best_params
     logger.info(
@@ -503,8 +495,7 @@ def select_pareto_point(
         The selected entry dict, or ``None`` if no point meets both constraints.
     """
     candidates = [
-        p for p in pareto_front
-        if p["auc"] >= min_auc and p["latency_ms"] <= max_latency_ms
+        p for p in pareto_front if p["auc"] >= min_auc and p["latency_ms"] <= max_latency_ms
     ]
     if not candidates:
         return None
@@ -524,9 +515,7 @@ def _persist_model_params(model_name: str, params: dict[str, Any]) -> None:
     logger.debug("Persisted best params for '%s' → %s", model_name, path)
 
 
-def _persist_pareto_front(
-    model_name: str, pareto_front: list[dict[str, Any]]
-) -> None:
+def _persist_pareto_front(model_name: str, pareto_front: list[dict[str, Any]]) -> None:
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
     path = MODEL_DIR / f"pareto_front_{model_name}.json"
     with open(path, "w") as fh:

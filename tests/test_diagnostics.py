@@ -15,12 +15,10 @@ import pytest
 from utils.diagnostics import (
     CheckCategory,
     CheckStatus,
-    DiagnosticCheck,
     DiagnosticRegistry,
     DiagnosticReport,
     DiagnosticResult,
 )
-
 
 # =============================================================================
 # Test Fixtures
@@ -193,12 +191,8 @@ def test_diagnostic_result_is_healthy_error():
 def test_diagnostic_report_overall_status_all_pass():
     """Overall status is PASS when all checks pass."""
     results = [
-        DiagnosticResult(
-            "check1", CheckCategory.ENVIRONMENT, CheckStatus.PASS, "OK"
-        ),
-        DiagnosticResult(
-            "check2", CheckCategory.DEPENDENCIES, CheckStatus.PASS, "OK"
-        ),
+        DiagnosticResult("check1", CheckCategory.ENVIRONMENT, CheckStatus.PASS, "OK"),
+        DiagnosticResult("check2", CheckCategory.DEPENDENCIES, CheckStatus.PASS, "OK"),
     ]
 
     report = DiagnosticReport(
@@ -215,12 +209,8 @@ def test_diagnostic_report_overall_status_all_pass():
 def test_diagnostic_report_overall_status_with_warnings():
     """Overall status is WARN when warnings present but no failures."""
     results = [
-        DiagnosticResult(
-            "check1", CheckCategory.ENVIRONMENT, CheckStatus.PASS, "OK"
-        ),
-        DiagnosticResult(
-            "check2", CheckCategory.DEPENDENCIES, CheckStatus.WARN, "Warning"
-        ),
+        DiagnosticResult("check1", CheckCategory.ENVIRONMENT, CheckStatus.PASS, "OK"),
+        DiagnosticResult("check2", CheckCategory.DEPENDENCIES, CheckStatus.WARN, "Warning"),
     ]
 
     report = DiagnosticReport(
@@ -237,12 +227,8 @@ def test_diagnostic_report_overall_status_with_warnings():
 def test_diagnostic_report_overall_status_with_failures():
     """Overall status is FAIL when any check fails."""
     results = [
-        DiagnosticResult(
-            "check1", CheckCategory.ENVIRONMENT, CheckStatus.PASS, "OK"
-        ),
-        DiagnosticResult(
-            "check2", CheckCategory.CODE_HEALTH, CheckStatus.FAIL, "Failed"
-        ),
+        DiagnosticResult("check1", CheckCategory.ENVIRONMENT, CheckStatus.PASS, "OK"),
+        DiagnosticResult("check2", CheckCategory.CODE_HEALTH, CheckStatus.FAIL, "Failed"),
     ]
 
     report = DiagnosticReport(
@@ -259,15 +245,9 @@ def test_diagnostic_report_overall_status_with_failures():
 def test_diagnostic_report_to_dict():
     """DiagnosticReport.to_dict() includes all summary fields."""
     results = [
-        DiagnosticResult(
-            "pass_check", CheckCategory.ENVIRONMENT, CheckStatus.PASS, "OK"
-        ),
-        DiagnosticResult(
-            "warn_check", CheckCategory.DEPENDENCIES, CheckStatus.WARN, "Warning"
-        ),
-        DiagnosticResult(
-            "fail_check", CheckCategory.CODE_HEALTH, CheckStatus.FAIL, "Failed"
-        ),
+        DiagnosticResult("pass_check", CheckCategory.ENVIRONMENT, CheckStatus.PASS, "OK"),
+        DiagnosticResult("warn_check", CheckCategory.DEPENDENCIES, CheckStatus.WARN, "Warning"),
+        DiagnosticResult("fail_check", CheckCategory.CODE_HEALTH, CheckStatus.FAIL, "Failed"),
     ]
 
     report = DiagnosticReport(
@@ -297,8 +277,7 @@ def test_diagnostic_report_summary():
     """DiagnosticReport.summary() produces human-readable output."""
     results = [
         DiagnosticResult(
-            "check1", CheckCategory.ENVIRONMENT, CheckStatus.FAIL, "Failed",
-            remediation="Fix it"
+            "check1", CheckCategory.ENVIRONMENT, CheckStatus.FAIL, "Failed", remediation="Fix it"
         ),
     ]
 

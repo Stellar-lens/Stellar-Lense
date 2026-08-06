@@ -1,17 +1,27 @@
 import re
-from typing import Any, Dict, Optional, Union
+from typing import Any
 from urllib.parse import urlparse, urlunparse
 
 SENSITIVE_PARAM_KEYS = {
-    "password", "passwd", "secret", "token", "api_key", "apikey",
-    "access_token", "auth", "sasl_password", "private_key", "key"
+    "password",
+    "passwd",
+    "secret",
+    "token",
+    "api_key",
+    "apikey",
+    "access_token",
+    "auth",
+    "sasl_password",
+    "private_key",
+    "key",
 }
 
-URL_CRED_REGEX = re.compile(r'([a-zA-Z0-9\+\-\.]+://)([^:]+):([^@]+)@')
-BEARER_REGEX = re.compile(r'(Bearer\s+)[A-Za-z0-9\-\._~\+\/]+=*', re.IGNORECASE)
+URL_CRED_REGEX = re.compile(r"([a-zA-Z0-9\+\-\.]+://)([^:]+):([^@]+)@")
+BEARER_REGEX = re.compile(r"(Bearer\s+)[A-Za-z0-9\-\._~\+\/]+=*", re.IGNORECASE)
 GENERIC_KEY_REGEX = re.compile(
     r'(?i)(api[_-]?key|secret|password|passwd|token|auth|sasl[_-]?password)\s*[:=]\s*["\']?([^"\'\s&]+)["\']?'
 )
+
 
 class SecretString:
     def __init__(self, value: str):
@@ -40,7 +50,7 @@ class SecretString:
         return bool(self._raw)
 
 
-def mask_secret(value: Optional[str], visible_chars: int = 4) -> str:
+def mask_secret(value: str | None, visible_chars: int = 4) -> str:
     if not value:
         return ""
     val_str = str(value)
@@ -50,7 +60,7 @@ def mask_secret(value: Optional[str], visible_chars: int = 4) -> str:
     return f"{'*' * (length - visible_chars)}{val_str[-visible_chars:]}"
 
 
-def sanitize_url(url_str: Optional[str]) -> str:
+def sanitize_url(url_str: str | None) -> str:
     if not url_str:
         return ""
     try:
@@ -67,17 +77,17 @@ def sanitize_url(url_str: Optional[str]) -> str:
         return sanitize_text(url_str)
 
 
-def sanitize_text(text: Optional[str]) -> str:
+def sanitize_text(text: str | None) -> str:
     if not text:
         return ""
-    s = URL_CRED_REGEX.sub(r'\1\2:****@', str(text))
-    s = BEARER_REGEX.sub(r'\1[REDACTED]', s)
-    s = GENERIC_KEY_REGEX.sub(r'\1=****', s)
+    s = URL_CRED_REGEX.sub(r"\1\2:****@", str(text))
+    s = BEARER_REGEX.sub(r"\1[REDACTED]", s)
+    s = GENERIC_KEY_REGEX.sub(r"\1=****", s)
     return s
 
 
-def sanitize_config(config_dict: Dict[str, Any]) -> Dict[str, Any]:
-    sanitized: Dict[str, Any] = {}
+def sanitize_config(config_dict: dict[str, Any]) -> dict[str, Any]:
+    sanitized: dict[str, Any] = {}
     for k, v in config_dict.items():
         k_lower = k.lower()
         if any(sens in k_lower for sens in SENSITIVE_PARAM_KEYS):

@@ -59,13 +59,9 @@ class DPAggregator:
     @staticmethod
     def _validate_params(epsilon: float, delta: float) -> None:
         if epsilon <= 0:
-            raise ConfigurationError(
-                f"epsilon must be > 0, got {epsilon}"
-            )
+            raise ConfigurationError(f"epsilon must be > 0, got {epsilon}")
         if not (0 < delta < 0.5):
-            raise ConfigurationError(
-                f"delta must be in (0, 0.5), got {delta}"
-            )
+            raise ConfigurationError(f"delta must be in (0, 0.5), got {delta}")
 
     # ------------------------------------------------------------------
     # Public API

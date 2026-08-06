@@ -19,9 +19,8 @@ from __future__ import annotations
 import threading
 import time
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
-
 
 # ---------------------------------------------------------------------------
 # Diagnostics
@@ -125,8 +124,7 @@ class StressRunner:
                         pass
 
         threads = [
-            threading.Thread(target=_worker, args=(tid,), daemon=True)
-            for tid in range(n_threads)
+            threading.Thread(target=_worker, args=(tid,), daemon=True) for tid in range(n_threads)
         ]
 
         for t in threads:
@@ -224,10 +222,14 @@ class ConcurrentReadWriteValidator:
                 try:
                     self._read_fn()
                     if self._invariant:
-                        assert self._invariant(), f"Invariant failed at reader {thread_id} iter {iteration}"
+                        assert (
+                            self._invariant()
+                        ), f"Invariant failed at reader {thread_id} iter {iteration}"
                 except Exception as exc:
                     with errors_lock:
-                        errors.append(ThreadError(thread_id=thread_id, iteration=iteration, exception=exc))
+                        errors.append(
+                            ThreadError(thread_id=thread_id, iteration=iteration, exception=exc)
+                        )
 
         def _writer(thread_id: int) -> None:
             writer_barrier.wait()
@@ -236,7 +238,9 @@ class ConcurrentReadWriteValidator:
                     self._write_fn(iteration)
                 except Exception as exc:
                     with errors_lock:
-                        errors.append(ThreadError(thread_id=thread_id, iteration=iteration, exception=exc))
+                        errors.append(
+                            ThreadError(thread_id=thread_id, iteration=iteration, exception=exc)
+                        )
 
         threads: list[threading.Thread] = []
         for tid in range(n_readers):
@@ -257,6 +261,7 @@ class ConcurrentReadWriteValidator:
 # ---------------------------------------------------------------------------
 # Thread-safe counter for verifying concurrent op counts
 # ---------------------------------------------------------------------------
+
 
 class AtomicCounter:
     """Simple thread-safe counter backed by a Lock."""

@@ -47,7 +47,8 @@ from config import config
 from ingestion.avro_codec import load_schema, serialize, trade_to_record
 from ingestion.data_models import Trade
 from ingestion.exceptions import InvalidInputError
-from utils.logging import get_logger
+from monitoring.ingestion_metrics import emit_ingestion_failure, emit_ingestion_success
+from utils.logging import get_logger, log_context
 from utils.retry import retry_with_backoff
 
 logger = get_logger(__name__)
@@ -206,6 +207,10 @@ class HorizonKafkaProducer:
                     record.get("trade_id"),
                     exc,
                 )
+                if ledgerlens_ingestion_trades_failed_total:
+                    ledgerlens_ingestion_trades_failed_total.labels(
+                        reason="serialisation_error"
+                    ).inc()
                 self._produce_to_dlq(record, reason=str(exc))
                 return
 
@@ -230,25 +235,7 @@ class HorizonKafkaProducer:
                 record_count=1,
                 duration_seconds=time.perf_counter() - started_at,
             )
-            if ledgerlens_ingestion_trades_failed_total:
-                ledgerlens_ingestion_trades_failed_total.labels(reason="serialisation_error").inc()
-            self._produce_to_dlq(record, reason=str(exc))
-            return
-
-        topic = self.topic_for_pair(record["asset_pair"])
-        # Partition key = wallet_id (base account) → per-wallet ordering.
-        key = record["base_account"].encode("utf-8")
-        # Schema version header: hex CRC-32 fingerprint of the encoding schema.
-        schema_fp = hex(_avro_crc32_fingerprint(self._schema) & 0xFFFFFFFF).encode("utf-8")
-        ingestion_ts = str(int(time.time() * 1000)).encode("utf-8")
-        
-        headers = [
-            ("avro-schema-version", schema_fp),
-            ("ingestion_timestamp_ms", ingestion_ts)
-        ]
-        
-        self._produce_with_headers(topic, value, key, headers)
-        self._producer.poll(0)
+            self._producer.poll(0)
 
     def begin_transaction(self) -> None:
         """Begin a Kafka transaction (requires transactional=True at construction)."""

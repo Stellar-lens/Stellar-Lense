@@ -23,6 +23,7 @@ from config.contracts import validate_mode
 from detection.persistence import RiskScoreRecord, get_session_factory
 from detection.risk_score_store import RiskScoreStore
 from detection.shap_explainer import ShapExplainer
+from streaming.health import HealthStatus, get_health_registry
 from utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -232,9 +233,7 @@ async def get_wallet_scores(
                 RiskScoreRecord.updated_at >= datetime.fromtimestamp(start_ts, tz=UTC)
             )
         if end_ts is not None:
-            stmt = stmt.where(
-                RiskScoreRecord.updated_at <= datetime.fromtimestamp(end_ts, tz=UTC)
-            )
+            stmt = stmt.where(RiskScoreRecord.updated_at <= datetime.fromtimestamp(end_ts, tz=UTC))
 
         rows = list(session.scalars(stmt.limit(limit + 1)))
 

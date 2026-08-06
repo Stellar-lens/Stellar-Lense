@@ -120,9 +120,7 @@ def _build_natural_person(account_ref: str | dict) -> dict:
 def _build_originator(account_ref: str | dict) -> dict:
     return {
         "accountNumber": [account_ref],
-        "originatorPersons": [
-            {"naturalPerson": _build_natural_person(account_ref)}
-        ],
+        "originatorPersons": [{"naturalPerson": _build_natural_person(account_ref)}],
     }
 
 
@@ -143,9 +141,7 @@ def _build_originating_vasp() -> dict:
     return {
         "originatingVASP": {
             "legalPerson": {
-                "name": {
-                    "nameIdentifier": [{"legalPersonName": _REPORTING_ENTITY}]
-                },
+                "name": {"nameIdentifier": [{"legalPersonName": _REPORTING_ENTITY}]},
                 "geographicAddress": _unavailable("geographicAddress"),
                 "nationalIdentification": _unavailable("nationalIdentification"),
                 "countryOfRegistration": _unavailable("countryOfRegistration"),
@@ -283,7 +279,9 @@ def export_ivms101(
     try:
         _validate(doc)
     except jsonschema.ValidationError as exc:
-        raise ExportValidationError(f"IVMS101 export failed schema validation: {exc.message}") from exc
+        raise ExportValidationError(
+            f"IVMS101 export failed schema validation: {exc.message}"
+        ) from exc
     return doc
 
 

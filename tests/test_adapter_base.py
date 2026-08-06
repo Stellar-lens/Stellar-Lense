@@ -65,7 +65,9 @@ def test_registry_falls_back_when_primary_unhealthy():
 
 
 def test_registry_falls_back_when_primary_fetch_raises():
-    primary = StaticLookupAdapter("primary", table={})  # will raise AdapterAuthError (missing key not in table)
+    primary = StaticLookupAdapter(
+        "primary", table={}
+    )  # will raise AdapterAuthError (missing key not in table)
     backup = StaticLookupAdapter("backup", table={"XLM": "backup-data"})
 
     registry = AdapterRegistry()

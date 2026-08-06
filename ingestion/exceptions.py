@@ -58,8 +58,9 @@ from __future__ import annotations
 
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
-from typing import Any
+from typing import Any, ClassVar
 
+from utils.decimal_guards import PrecisionError
 from utils.exceptions import LedgerLensError
 
 # Failure modes raised while turning an untrusted upstream record into a typed
@@ -69,6 +70,7 @@ RECORD_ERRORS: tuple[type[BaseException], ...] = (
     TypeError,
     ValueError,
     ZeroDivisionError,
+    PrecisionError,
 )
 
 
@@ -99,6 +101,9 @@ class IngestionError(LedgerLensError):
         raw: The offending record; scrubbed via :func:`safe_raw`.
     """
 
+    error_code: ClassVar[str] = "ingestion_error"
+    default_retryable: ClassVar[bool] = False
+
     def __init__(
         self,
         message: str,
@@ -106,10 +111,17 @@ class IngestionError(LedgerLensError):
         source: str | None = None,
         reason: str | None = None,
         raw: Mapping[str, Any] | None = None,
+        operation: str | None = None,
+        retryable: bool | None = None,
+        details: Mapping[str, Any] | None = None,
     ) -> None:
+        self.message = message
         self.source = source
         self.reason = reason
         self.raw = safe_raw(raw)
+        self.operation = operation
+        self.retryable = self.default_retryable if retryable is None else retryable
+        self.details = dict(details or {})
 
         context: dict[str, Any] = {}
         if source is not None:
@@ -121,6 +133,33 @@ class IngestionError(LedgerLensError):
 
         super().__init__(message, context=context)
 
+    def to_dict(self) -> dict[str, Any]:
+        """Return a stable machine-readable representation for logs and DLQs."""
+        payload: dict[str, Any] = {
+            "error_code": self.error_code,
+            "error_type": type(self).__name__,
+            "message": self.message,
+            "retryable": self.retryable,
+        }
+        if self.source is not None:
+            payload["source"] = self.source
+        if self.operation is not None:
+            payload["operation"] = self.operation
+        if self.details:
+            payload["details"] = dict(self.details)
+        return payload
+
+    @classmethod
+    def from_exception(
+        cls,
+        error: BaseException,
+        *,
+        source: str | None = None,
+        operation: str | None = None,
+        details: Mapping[str, Any] | None = None,
+    ) -> IngestionError:
+        return cls(str(error), source=source, operation=operation, details=details)
+
 
 class InvalidInputError(IngestionError, ValueError):
     """Caller-supplied input failed validation before any I/O was attempted.
@@ -129,6 +168,8 @@ class InvalidInputError(IngestionError, ValueError):
     continue to catch it.
     """
 
+    error_code = "ingestion_validation_error"
+
 
 class RecordValidationError(IngestionError):
     """An upstream record could not be turned into a typed model.
@@ -136,13 +177,40 @@ class RecordValidationError(IngestionError):
     Covers missing fields, wrong types, and pydantic validation failures.
     """
 
+    error_code = "ingestion_record_invalid"
+
 
 class SchemaValidationError(RecordValidationError):
     """A record failed schema validation (Avro wire format)."""
 
+    error_code = "ingestion_schema_invalid"
+
 
 class SourceUnavailableError(IngestionError):
     """An upstream data source was unavailable or exhausted its retry budget."""
+
+
+class IngestionTransportError(SourceUnavailableError, RuntimeError):
+    """A network or broker failure that is normally safe to retry."""
+
+    error_code = "ingestion_transport_error"
+    default_retryable = True
+
+
+class IngestionRateLimitError(IngestionTransportError):
+    error_code = "ingestion_rate_limit_exceeded"
+
+
+class IngestionNotFoundError(IngestionError):
+    error_code = "ingestion_resource_not_found"
+
+
+class IngestionValidationError(InvalidInputError):
+    """Compatibility base for caller-supplied validation failures."""
+
+
+class SchemaDecodeError(IngestionValidationError):
+    error_code = "ingestion_payload_decode_failed"
 
 
 @contextmanager

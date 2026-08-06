@@ -320,7 +320,7 @@ def parse_csv(
                     path=label,
                 )
 
-        for row_idx, raw_row in enumerate(reader, start=2):  # 1-indexed; row 1 = header
+        for _row_idx, raw_row in enumerate(reader, start=2):  # 1-indexed; row 1 = header
             if skip_blank_rows and all(v.strip() == "" for v in raw_row.values()):
                 continue
 
@@ -419,7 +419,9 @@ def parse_json(
 # ---------------------------------------------------------------------------
 
 
-def parse_trade_record(row: dict, *, row_index: int = 0) -> tuple[TradeRecord | None, list[FieldError]]:
+def parse_trade_record(
+    row: dict, *, row_index: int = 0
+) -> tuple[TradeRecord | None, list[FieldError]]:
     """Validate and coerce a single trade row dict into a :class:`TradeRecord`.
 
     Parameters
@@ -442,7 +444,9 @@ def parse_trade_record(row: dict, *, row_index: int = 0) -> tuple[TradeRecord | 
         try:
             return float(raw)
         except (TypeError, ValueError):
-            errors.append(FieldError(row=row_index, column=col, raw_value=raw, reason="not a valid float"))
+            errors.append(
+                FieldError(row=row_index, column=col, raw_value=raw, reason="not a valid float")
+            )
             return None
 
     base_amount = _float("base_amount")

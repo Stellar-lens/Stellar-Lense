@@ -66,8 +66,10 @@ def _make_overfit_model_and_loaders(
 
     # Over-parameterised model → overfits members
     model = nn.Sequential(
-        nn.Linear(input_dim, 64), nn.ReLU(),
-        nn.Linear(64, 32), nn.ReLU(),
+        nn.Linear(input_dim, 64),
+        nn.ReLU(),
+        nn.Linear(64, 32),
+        nn.ReLU(),
         nn.Linear(32, 1),
     )
     optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
@@ -102,7 +104,9 @@ def _default_loss_fn(model, batch):
 
 def test_undefended_attack_advantage_exceeds_baseline():
     model, member_loader, non_member_loader = _make_overfit_model_and_loaders()
-    rate = membership_inference_success_rate(model, member_loader, non_member_loader, _default_loss_fn)
+    rate = membership_inference_success_rate(
+        model, member_loader, non_member_loader, _default_loss_fn
+    )
     # The overfit model should give the attacker > 10 pp advantage
     assert rate > 0.60, f"Expected undefended success rate > 0.60, got {rate:.4f}"
 
@@ -129,9 +133,7 @@ def test_output_perturbation_reduces_attack_below_target():
     # Verify baseline attack succeeds (> 10 pp above random)
     all_pre = np.concatenate([member_losses, non_member_losses])
     labels = np.concatenate([np.ones(n), np.zeros(n)])
-    best_pre = max(
-        float(np.mean((all_pre < t) == labels)) for t in np.unique(all_pre)
-    )
+    best_pre = max(float(np.mean((all_pre < t) == labels)) for t in np.unique(all_pre))
     best_pre = max(best_pre, 1.0 - best_pre)
     assert best_pre > 0.60, f"Baseline rate {best_pre:.4f} too low to demonstrate defence"
 
@@ -141,26 +143,26 @@ def test_output_perturbation_reduces_attack_below_target():
     nm_p = non_member_losses + rng.laplace(0, scale, n)
 
     all_post = np.concatenate([m_p, nm_p])
-    best_post = max(
-        float(np.mean((all_post < t) == labels)) for t in np.unique(all_post)
-    )
+    best_post = max(float(np.mean((all_post < t) == labels)) for t in np.unique(all_post))
     best_post = max(best_post, 1.0 - best_post)
 
-    assert best_post < 0.55, (
-        f"Post-defence rate {best_post:.4f} must be < 0.55 with scale={scale}"
-    )
+    assert best_post < 0.55, f"Post-defence rate {best_post:.4f} must be < 0.55 with scale={scale}"
 
 
 def test_audit_reduces_advantage_vs_undefended():
     """MembershipInferenceDefender.audit() lowers attack success rate vs baseline."""
     model, member_loader, non_member_loader = _make_overfit_model_and_loaders()
-    pre_rate = membership_inference_success_rate(model, member_loader, non_member_loader, _default_loss_fn)
+    pre_rate = membership_inference_success_rate(
+        model, member_loader, non_member_loader, _default_loss_fn
+    )
 
     defender = MembershipInferenceDefender(epsilon=0.5, sensitivity=1.0)
     result = defender.audit(model, member_loader, non_member_loader, _default_loss_fn)
 
     assert result.pre_defence_success_rate == pytest.approx(pre_rate, abs=0.01)
-    assert result.post_defence_success_rate <= pre_rate, "Defence must not increase attack success rate"
+    assert (
+        result.post_defence_success_rate <= pre_rate
+    ), "Defence must not increase attack success rate"
 
 
 # ---------------------------------------------------------------------------
@@ -201,7 +203,9 @@ def test_prediction_smoother_negative_sigma_raises():
 
 def test_output_perturbation_changes_scores():
     scores = np.array([0.5, 0.7, 0.3])
-    perturbed = apply_output_perturbation(scores, sensitivity=1.0, epsilon=2.0, rng=np.random.default_rng(0))
+    perturbed = apply_output_perturbation(
+        scores, sensitivity=1.0, epsilon=2.0, rng=np.random.default_rng(0)
+    )
     assert not np.allclose(scores, perturbed)
 
 
@@ -228,7 +232,7 @@ def test_output_perturbation_with_scale():
 
 def test_suggest_early_stopping_returns_correct_epoch():
     train_losses = [0.5, 0.4, 0.3, 0.2, 0.1]
-    val_losses   = [0.5, 0.45, 0.4, 0.35, 0.25]
+    val_losses = [0.5, 0.45, 0.4, 0.35, 0.25]
     # Gap at epoch 0: 0.0; epoch 1: 0.05 → first exceeds 0.04 threshold
     rec = suggest_early_stopping_epochs(train_losses, val_losses, gap_threshold=0.04)
     assert isinstance(rec, EarlyStoppingRecommendation)
@@ -238,7 +242,7 @@ def test_suggest_early_stopping_returns_correct_epoch():
 
 def test_suggest_early_stopping_no_trigger_returns_last_epoch():
     train_losses = [0.5, 0.4, 0.3]
-    val_losses   = [0.5, 0.4, 0.3]  # perfect alignment, gap never exceeds threshold
+    val_losses = [0.5, 0.4, 0.3]  # perfect alignment, gap never exceeds threshold
     rec = suggest_early_stopping_epochs(train_losses, val_losses, gap_threshold=0.1)
     assert rec.recommended_epoch == 2  # last epoch
 

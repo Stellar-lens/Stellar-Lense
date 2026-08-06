@@ -1,5 +1,4 @@
 import json
-import os
 
 import pytest
 
@@ -25,7 +24,7 @@ def registry(tmp_path):
 
 
 def test_register_creates_staged_version(registry, artifact_file):
-    version = registry.register("rf", artifact_file, metrics={"auc": 0.9})
+    registry.register("rf", artifact_file, metrics={"auc": 0.9})
     versions = registry.list_versions("rf")
     assert len(versions) == 1
     assert versions[0].stage == ArtifactStage.STAGED

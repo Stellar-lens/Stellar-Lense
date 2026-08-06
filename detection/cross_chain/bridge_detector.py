@@ -300,18 +300,26 @@ def detect_bridge_wash_trade(
 
     window = timedelta(hours=window_hours)
     matched_out: set[int] = set()
+    matched_in: set[int] = set()
     round_trips = 0
 
     for i, out_tx in enumerate(outbound):
         if i in matched_out:
             continue
-        for in_tx in inbound:
-            if abs(in_tx["_ts"] - out_tx["_ts"]) <= window and in_tx["_anchor"] == out_tx["_anchor"]:
+        for j, in_tx in enumerate(inbound):
+            if j in matched_in:
+                continue
+            if (
+                abs(in_tx["_ts"] - out_tx["_ts"]) <= window
+                and in_tx["_anchor"] == out_tx["_anchor"]
+            ):
                 matched_out.add(i)
+                matched_in.add(j)
                 round_trips += 1
                 break
 
-    ratio = round_trips / total_bridge if total_bridge > 0 else 0.0
+    possible_round_trips = min(len(outbound), len(inbound))
+    ratio = round_trips / possible_round_trips if possible_round_trips else 0.0
     return {
         "bridge_round_trip_ratio": ratio,
         "bridge_round_trips": round_trips,

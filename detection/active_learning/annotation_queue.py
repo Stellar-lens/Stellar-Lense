@@ -52,6 +52,7 @@ import pandas as pd
 
 try:
     import krippendorff
+
     _KRIPPENDORFF_AVAILABLE = True
 except ImportError:  # pragma: no cover
     _KRIPPENDORFF_AVAILABLE = False
@@ -298,7 +299,11 @@ class AnnotationQueue:
                 item.setdefault("annotations", [])
                 # prevent duplicate from same annotator
                 if any(a["annotator_id"] == annotator_id for a in item["annotations"]):
-                    logger.warning("Annotator %s already labelled wallet %s — skipping duplicate", annotator_id, wallet)
+                    logger.warning(
+                        "Annotator %s already labelled wallet %s — skipping duplicate",
+                        annotator_id,
+                        wallet,
+                    )
                     return
                 item["annotations"].append(new_entry)
                 self._refresh_agreement_status(item)
@@ -361,7 +366,7 @@ class AnnotationQueue:
             # With one rater each: p_class = (a==c + b==c) / 2 for class c
             p0 = ((a == 0) + (b == 0)) / 2.0
             p1 = ((a == 1) + (b == 1)) / 2.0
-            p_e = p0 ** 2 + p1 ** 2
+            p_e = p0**2 + p1**2
             if p_e == 1.0:
                 return 1.0  # both raters always choose same class
             return (0.0 - p_e) / (1.0 - p_e)
@@ -375,7 +380,9 @@ class AnnotationQueue:
             # Build a 2-D array: rows = annotators, cols = items (1 item here)
             reliability = np.array([[float(lbl)] for lbl in labels]).T  # shape (1, n)
             try:
-                alpha = float(krippendorff.alpha(reliability_data=reliability, level_of_measurement="nominal"))
+                alpha = float(
+                    krippendorff.alpha(reliability_data=reliability, level_of_measurement="nominal")
+                )
             except Exception as exc:  # pragma: no cover
                 logger.warning("Krippendorff alpha failed: %s", exc)
 
@@ -427,7 +434,11 @@ class AnnotationQueue:
                 if hmac.compare_digest(expected, ann.get("annotation_hmac", "")):
                     verified.append(ann["label"])
                 else:
-                    logger.warning("Invalid HMAC for multi-annotation wallet=%s annotator=%s", wallet_id, ann.get("annotator_id"))
+                    logger.warning(
+                        "Invalid HMAC for multi-annotation wallet=%s annotator=%s",
+                        wallet_id,
+                        ann.get("annotator_id"),
+                    )
             return verified
         return []
 
@@ -436,7 +447,12 @@ class AnnotationQueue:
         verified = []
         wallet = item["wallet"]
         for ann in item.get("annotations", []):
-            expected = _compute_hmac(wallet, ann.get("label", -1), ann.get("annotator_id", ""), ann.get("annotated_at", ""))
+            expected = _compute_hmac(
+                wallet,
+                ann.get("label", -1),
+                ann.get("annotator_id", ""),
+                ann.get("annotated_at", ""),
+            )
             if hmac.compare_digest(expected, ann.get("annotation_hmac", "")):
                 verified.append(ann["label"])
         if len(verified) < 2:
@@ -450,12 +466,14 @@ class AnnotationQueue:
                 return 1.0
             p0 = ((a == 0) + (b == 0)) / 2.0
             p1 = ((a == 1) + (b == 1)) / 2.0
-            p_e = p0 ** 2 + p1 ** 2
+            p_e = p0**2 + p1**2
             if p_e == 1.0:
                 return 1.0
             return (0.0 - p_e) / (1.0 - p_e)
 
-        kappas = [_kappa_pair(verified[i], verified[j]) for i, j in combinations(range(len(verified)), 2)]
+        kappas = [
+            _kappa_pair(verified[i], verified[j]) for i, j in combinations(range(len(verified)), 2)
+        ]
         kappa = float(np.mean(kappas))
         item["status"] = "disputed" if kappa < DISPUTE_KAPPA_THRESHOLD else "multi_annotated"
         item["agreement_kappa"] = kappa
@@ -502,9 +520,7 @@ class AnnotationQueue:
         """Return all quarantined annotation records."""
         queue = _load_queue(self.queue_path)
         return [
-            item
-            for item in queue
-            if item.get("quarantine") and item.get("status") == "annotated"
+            item for item in queue if item.get("quarantine") and item.get("status") == "annotated"
         ]
 
     def dismiss_quarantine(self, wallet: str) -> None:
@@ -582,11 +598,15 @@ class StoppingCriterion:
         convergence_window: int | None = None,
         auc_improvement_threshold: float = 0.005,
     ) -> None:
-        self.eer_threshold: float = eer_threshold if eer_threshold is not None else float(
-            getattr(config, "ACTIVE_LEARNING_EER_THRESHOLD", 0.001)
+        self.eer_threshold: float = (
+            eer_threshold
+            if eer_threshold is not None
+            else float(getattr(config, "ACTIVE_LEARNING_EER_THRESHOLD", 0.001))
         )
-        self.convergence_window: int = convergence_window if convergence_window is not None else int(
-            getattr(config, "ACTIVE_LEARNING_CONVERGENCE_WINDOW", 5)
+        self.convergence_window: int = (
+            convergence_window
+            if convergence_window is not None
+            else int(getattr(config, "ACTIVE_LEARNING_CONVERGENCE_WINDOW", 5))
         )
         self.auc_improvement_threshold = auc_improvement_threshold
         # Rolling AUC history: deque of per-round AUC values
@@ -649,7 +669,9 @@ class StoppingCriterion:
             # compute round-over-round improvements for the last window rounds
             history = list(self._auc_history)
             improvements = [history[i] - history[i - 1] for i in range(1, len(history))]
-            mean_improvement = sum(improvements[-self.convergence_window:]) / self.convergence_window
+            mean_improvement = (
+                sum(improvements[-self.convergence_window :]) / self.convergence_window
+            )
             if mean_improvement < self.auc_improvement_threshold:
                 logger.info(
                     "StoppingCriterion: mean AUC improvement=%.6f < threshold=%.6f "

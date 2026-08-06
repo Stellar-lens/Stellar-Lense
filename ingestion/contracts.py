@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import abc
 import enum
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Generic, TypeVar
@@ -254,8 +254,7 @@ class SourceRegistry:
         source_cls = cls._registry.get(name)
         if source_cls is None:
             raise KeyError(
-                f"Unknown source '{name}'. "
-                f"Registered sources: {sorted(cls._registry)}"
+                f"Unknown source '{name}'. " f"Registered sources: {sorted(cls._registry)}"
             )
         return source_cls(config)
 

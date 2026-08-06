@@ -28,6 +28,7 @@ import pandas as pd
 
 try:
     from prometheus_client import Gauge
+
     adversarial_lowest_score: Any = Gauge(
         "ledgerlens_adversarial_lowest_score",
         "Best (lowest) risk score achieved by the adversarial genetic algorithm",
@@ -36,8 +37,14 @@ except Exception:
     adversarial_lowest_score = None
 
 TRADE_COLUMNS = [
-    "trade_id", "ledger_close_time", "base_account", "counter_account",
-    "base_asset", "counter_asset", "amount", "price",
+    "trade_id",
+    "ledger_close_time",
+    "base_account",
+    "counter_account",
+    "base_asset",
+    "counter_asset",
+    "amount",
+    "price",
 ]
 
 # Parameter bounds: (min, max)
@@ -56,9 +63,7 @@ def _clip(value: float, lo: float, hi: float) -> float:
 
 
 def _random_individual(rng: np.random.Generator) -> dict:
-    ind = {
-        k: rng.uniform(lo, hi) for k, (lo, hi) in _PARAM_BOUNDS.items()
-    }
+    ind = {k: rng.uniform(lo, hi) for k, (lo, hi) in _PARAM_BOUNDS.items()}
     ind["use_round_numbers"] = bool(rng.integers(0, 2))
     return ind
 
@@ -124,7 +129,9 @@ def _crossover(a: dict, b: dict, rng) -> dict:
     child = {}
     for key in _PARAM_BOUNDS:
         child[key] = a[key] if rng.random() < 0.5 else b[key]
-    child["use_round_numbers"] = a["use_round_numbers"] if rng.random() < 0.5 else b["use_round_numbers"]
+    child["use_round_numbers"] = (
+        a["use_round_numbers"] if rng.random() < 0.5 else b["use_round_numbers"]
+    )
     return child
 
 
@@ -153,6 +160,7 @@ def _build_scorer(model_dir: str):
     """Return a callable trades→score. Falls back to a heuristic if no models."""
     try:
         import os
+
         if not os.path.exists(os.path.join(model_dir, "random_forest.joblib")):
             return _heuristic_score
 
@@ -196,8 +204,7 @@ class AdversarialWashTradeSimulator:
 
         for gen in range(n_generations):
             fitnesses = [
-                1.0 / (_score_individual(ind, self._scorer, seed=gen) + 1.0)
-                for ind in population
+                1.0 / (_score_individual(ind, self._scorer, seed=gen) + 1.0) for ind in population
             ]
             scores = [1.0 / f - 1.0 for f in fitnesses]
 
@@ -208,11 +215,13 @@ class AdversarialWashTradeSimulator:
                 if adversarial_lowest_score is not None:
                     adversarial_lowest_score.set(self._best_score)
 
-            self._generation_history.append({
-                "generation": gen,
-                "best_score": min(scores),
-                "mean_score": float(np.mean(scores)),
-            })
+            self._generation_history.append(
+                {
+                    "generation": gen,
+                    "best_score": min(scores),
+                    "mean_score": float(np.mean(scores)),
+                }
+            )
 
             # Sort by fitness (descending) for elitism
             ranked = sorted(range(population_size), key=lambda i: fitnesses[i], reverse=True)

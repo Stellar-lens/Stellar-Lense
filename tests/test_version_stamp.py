@@ -14,9 +14,7 @@ Exercises:
 
 from __future__ import annotations
 
-import os
 import sys
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -24,14 +22,12 @@ import pytest
 from utils.version_stamp import (
     STAMP_KEY,
     VersionMismatchError,
-    _content_hash,
     build_stamp,
     get_version,
     read_stamp,
     stamp_artifact,
     verify_stamp,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -86,7 +82,7 @@ class TestGetVersion:
 
                 with patch("importlib.metadata.version", side_effect=PackageNotFoundError("x")):
                     # Force resolution through our patched path
-                    ver = vs.get_version()
+                    vs.get_version()
                     # In this edge case we'd get fallback
             except Exception:
                 pass
@@ -198,6 +194,7 @@ class TestVerifyStamp:
     def test_ok_when_version_matches_and_hash_intact(self, monkeypatch):
         monkeypatch.setenv("LEDGERLENS_VERSION", "1.2.3")
         from utils import version_stamp as vs
+
         vs.get_version.cache_clear()
 
         artifact = {"score": 50}
@@ -211,6 +208,7 @@ class TestVerifyStamp:
         # Stamp with one version, then check with another
         monkeypatch.setenv("LEDGERLENS_VERSION", "1.0.0")
         from utils import version_stamp as vs
+
         vs.get_version.cache_clear()
 
         artifact = {"score": 50}
@@ -229,6 +227,7 @@ class TestVerifyStamp:
     def test_strict_mode_raises_on_version_mismatch(self, monkeypatch):
         monkeypatch.setenv("LEDGERLENS_VERSION", "1.0.0")
         from utils import version_stamp as vs
+
         vs.get_version.cache_clear()
 
         artifact = {"score": 50}
@@ -243,6 +242,7 @@ class TestVerifyStamp:
     def test_content_hash_mismatch_detected(self, monkeypatch):
         monkeypatch.setenv("LEDGERLENS_VERSION", "1.0.0")
         from utils import version_stamp as vs
+
         vs.get_version.cache_clear()
 
         artifact = {"score": 50}
@@ -258,7 +258,10 @@ class TestVerifyStamp:
     def test_missing_stamp_returns_not_ok(self):
         result = verify_stamp({"score": 10})
         assert not result["ok"]
-        assert "no '_version_stamp' stamp" in result["errors"][0].lower() or "stamp" in result["errors"][0]
+        assert (
+            "no '_version_stamp' stamp" in result["errors"][0].lower()
+            or "stamp" in result["errors"][0]
+        )
 
     def test_missing_stamp_strict_raises(self):
         with pytest.raises(VersionMismatchError):
@@ -267,6 +270,7 @@ class TestVerifyStamp:
     def test_skip_content_hash_verification(self, monkeypatch):
         monkeypatch.setenv("LEDGERLENS_VERSION", "1.0.0")
         from utils import version_stamp as vs
+
         vs.get_version.cache_clear()
 
         artifact = {"score": 50}
@@ -289,13 +293,15 @@ class TestModelTrainingVersionStamp:
         monkeypatch.setenv("LEDGERLENS_VERSION", "5.5.5-test")
 
         from utils import version_stamp as vs
+
         vs.get_version.cache_clear()
 
         import json
+
         import numpy as np
-        import pandas as pd
-        from detection.model_training import save_training_artifacts
         from sklearn.ensemble import RandomForestClassifier
+
+        from detection.model_training import save_training_artifacts
 
         n = 30
         rng = np.random.default_rng(1)
@@ -320,6 +326,7 @@ class TestModelTrainingVersionStamp:
         }
 
         import joblib
+
         joblib.dump(rf, tmp_path / "random_forest.joblib")
 
         save_training_artifacts(training_output, "data/test.parquet", str(tmp_path))

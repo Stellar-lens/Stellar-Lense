@@ -34,14 +34,13 @@ def test_set_cpu_usage_updates_gauge():
         import prometheus_client  # noqa: F401
     except ImportError:
         import pytest
+
         pytest.skip("prometheus_client not installed")
 
     cm.set_cpu_usage("benford", 0.42)
     gauge = cm.CPU_USAGE_RATIO
     assert gauge is not None
-    sample = next(
-        s for s in gauge.collect()[0].samples if s.labels.get("component") == "benford"
-    )
+    sample = next(s for s in gauge.collect()[0].samples if s.labels.get("component") == "benford")
     assert abs(sample.value - 0.42) < 1e-9
 
 
@@ -52,6 +51,7 @@ def test_set_memory_usage_updates_gauge():
         import prometheus_client  # noqa: F401
     except ImportError:
         import pytest
+
         pytest.skip("prometheus_client not installed")
 
     cm.set_memory_usage(123_456_789)
@@ -68,12 +68,11 @@ def test_set_trades_per_second_updates_gauge():
         import prometheus_client  # noqa: F401
     except ImportError:
         import pytest
+
         pytest.skip("prometheus_client not installed")
 
     cm.set_trades_per_second("XLM/USDC", 17.5)
     gauge = cm.TRADES_PER_SECOND
     assert gauge is not None
-    sample = next(
-        s for s in gauge.collect()[0].samples if s.labels.get("asset_pair") == "XLM/USDC"
-    )
+    sample = next(s for s in gauge.collect()[0].samples if s.labels.get("asset_pair") == "XLM/USDC")
     assert abs(sample.value - 17.5) < 1e-9

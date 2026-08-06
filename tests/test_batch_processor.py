@@ -1,5 +1,4 @@
 import json
-import os
 
 import pytest
 
@@ -47,7 +46,9 @@ def test_chunk_failure_recorded_but_does_not_abort_job():
         if chunk[0] == 2:
             raise ValueError("bad row")
 
-    summary = processor.run([0, 1, 2, 3, 4, 5], always_fail_second_chunk, job_id="job-c", resume=False)
+    summary = processor.run(
+        [0, 1, 2, 3, 4, 5], always_fail_second_chunk, job_id="job-c", resume=False
+    )
 
     assert not summary.ok
     assert summary.chunks_failed == 1

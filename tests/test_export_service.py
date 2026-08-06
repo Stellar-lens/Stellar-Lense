@@ -9,8 +9,8 @@ import json
 import pytest
 
 from reporting.export_service import (
-    CSVExporter,
     EXPORT_REGISTRY,
+    CSVExporter,
     ExportResult,
     FieldSpec,
     JSONExporter,

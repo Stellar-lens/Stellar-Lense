@@ -103,15 +103,16 @@ def check_installed(lockfile: Path = LOCKFILE_PATH) -> int:
     only_installed = installed - locked
     only_locked = locked - installed
 
-    if not only_installed and not only_locked:
-        print(f"[OK] Installed environment matches requirements.lock " f"({len(locked)} packages).")
+    if not only_locked:
+        print(f"[OK] All {len(locked)} locked packages are installed at pinned versions.")
+        if only_installed:
+            print(
+                f"[INFO] Ignoring {len(only_installed)} additional package(s); "
+                "CI installs lint and notebook tooling after application dependencies."
+            )
         return 0
 
     print("[FAIL] Environment diverges from requirements.lock:")
-    if only_installed:
-        print("\n  Installed but NOT in requirements.lock (extra packages):")
-        for pkg in sorted(only_installed):
-            print(f"    + {pkg}")
     if only_locked:
         print("\n  In requirements.lock but NOT installed (missing packages):")
         for pkg in sorted(only_locked):

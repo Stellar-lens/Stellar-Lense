@@ -85,7 +85,7 @@ class QualityGate:
         if self.min_value is None and self.max_value is None:
             raise ValueError(f"QualityGate for {self.metric!r} needs min_value and/or max_value")
 
-    def evaluate(self, report: dict[str, Any]) -> "GateFailure | None":
+    def evaluate(self, report: dict[str, Any]) -> GateFailure | None:
         actual = report.get(self.metric)
         if actual is None:
             return GateFailure(
@@ -132,7 +132,7 @@ class DriftGate:
     max_psi: float = PSI_MODERATE_DRIFT_THRESHOLD
     feature: str | None = None
 
-    def evaluate(self, drift_report: dict[str, Any]) -> list["GateFailure"]:
+    def evaluate(self, drift_report: dict[str, Any]) -> list[GateFailure]:
         failures = []
         for entry in drift_report.get("features", []):
             if self.feature is not None and entry["feature"] != self.feature:
@@ -198,9 +198,7 @@ DEFAULT_DRIFT_GATES = (DriftGate(max_psi=PSI_MODERATE_DRIFT_THRESHOLD),)
 
 def _numeric_feature_columns(df: pd.DataFrame, exclude: set[str]) -> list[str]:
     return [
-        col
-        for col in df.columns
-        if col not in exclude and pd.api.types.is_numeric_dtype(df[col])
+        col for col in df.columns if col not in exclude and pd.api.types.is_numeric_dtype(df[col])
     ]
 
 
@@ -291,9 +289,7 @@ def run_evaluation_workflow(
     current_df = pd.read_parquet(current_dataset_path)
 
     if feature_columns is None:
-        feature_columns = _numeric_feature_columns(
-            reference_df, exclude={"label"}
-        )
+        feature_columns = _numeric_feature_columns(reference_df, exclude={"label"})
         feature_columns = [c for c in feature_columns if c in current_df.columns]
 
     reference_distribution = _build_reference_distribution(reference_df, feature_columns, n_bins)
@@ -331,10 +327,16 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Run a combined detection-quality and drift evaluation workflow"
     )
-    parser.add_argument("reference_dataset_path", help="Parquet dataset defining the reference distribution")
-    parser.add_argument("current_dataset_path", help="Labelled Parquet dataset to backtest and check for drift")
+    parser.add_argument(
+        "reference_dataset_path", help="Parquet dataset defining the reference distribution"
+    )
+    parser.add_argument(
+        "current_dataset_path", help="Labelled Parquet dataset to backtest and check for drift"
+    )
     parser.add_argument("output_dir", help="Directory to write evaluation_report.json into")
-    parser.add_argument("--threshold", type=float, default=None, help="Risk-probability cutoff in [0, 1]")
+    parser.add_argument(
+        "--threshold", type=float, default=None, help="Risk-probability cutoff in [0, 1]"
+    )
     parser.add_argument(
         "--min-roc-auc", type=float, default=0.6, help="Minimum acceptable ROC-AUC (default 0.6)"
     )

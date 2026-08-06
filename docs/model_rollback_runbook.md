@@ -54,7 +54,7 @@ Key fields: `version_id`, `candidate_dir`, `shadow_start`, `drift_rate`.
 
 ```bash
 ls reports/retrain_report_*.json | sort | tail -3
-cat reports/retrain_report_<latest>.json | python -m json.tool
+python -c 'import json, pathlib; print(json.dumps(json.loads(pathlib.Path("reports/retrain_report_<latest>.json").read_text()), indent=2))'
 ```
 
 Look at `drift_report.features_drifted` — which features triggered retraining?

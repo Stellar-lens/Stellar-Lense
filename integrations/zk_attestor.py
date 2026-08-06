@@ -69,9 +69,7 @@ except ImportError:
     _PY_ECC_AVAILABLE = False
 
 # Benford's law expected frequencies for leading digits 1-9
-_BENFORD_EXPECTED: dict[int, float] = {
-    d: math.log10(1 + 1 / d) for d in range(1, 10)
-}
+_BENFORD_EXPECTED: dict[int, float] = {d: math.log10(1 + 1 / d) for d in range(1, 10)}
 
 _ZK_PROOF_VERSION = "benford-zk-v1"
 _MAD_TOLERANCE = 0.001  # ±1e-3 tolerance for CKKS approximation error claim
@@ -260,10 +258,7 @@ def _merkle_root(leaves: list[bytes]) -> bytes:
     while len(nodes) > 1:
         if len(nodes) % 2 == 1:
             nodes.append(nodes[-1])  # duplicate last leaf
-        nodes = [
-            hashlib.sha256(nodes[i] + nodes[i + 1]).digest()
-            for i in range(0, len(nodes), 2)
-        ]
+        nodes = [hashlib.sha256(nodes[i] + nodes[i + 1]).digest() for i in range(0, len(nodes), 2)]
     return nodes[0]
 
 
@@ -282,9 +277,9 @@ def _pedersen_commit(value: int, blinding: int) -> tuple | None:
     p1 = multiply(G1, value % curve_order)
     # G2 is on the twisted curve and can't be added to a G1 point directly, so
     # the blinding factor is committed via a second G1 generator instead.
-    h_g1 = multiply(G1, int.from_bytes(
-        hashlib.sha256(b"benford-h-generator").digest(), "big"
-    ) % curve_order)
+    h_g1 = multiply(
+        G1, int.from_bytes(hashlib.sha256(b"benford-h-generator").digest(), "big") % curve_order
+    )
     return add(p1, multiply(h_g1, blinding % curve_order))
 
 
@@ -330,8 +325,9 @@ class BenfordZKProof:
 
     def to_bytes(self) -> bytes:
         """Serialise proof to bytes; size < 256 bytes for Soroban compatibility."""
-        payload = json.dumps(self.to_dict(), sort_keys=True, separators=(",", ":"),
-                             ensure_ascii=True)
+        payload = json.dumps(
+            self.to_dict(), sort_keys=True, separators=(",", ":"), ensure_ascii=True
+        )
         encoded = payload.encode("utf-8")
         if len(encoded) > 256:
             # Compact representation: drop optional fields that push past limit
@@ -385,9 +381,9 @@ class BenfordZKProver:
 
         # Pedersen commitment to MAD integer encoding (optional, requires py_ecc)
         mad_int = int(round(mad * 1_000_000))
-        nonce_int = int.from_bytes(hashlib.sha256(
-            json.dumps({"mr": merkle_root, "mad": mad}).encode()
-        ).digest(), "big")
+        nonce_int = int.from_bytes(
+            hashlib.sha256(json.dumps({"mr": merkle_root, "mad": mad}).encode()).digest(), "big"
+        )
 
         ped_hex: str | None = None
         commitment = _pedersen_commit(mad_int, nonce_int)
@@ -410,7 +406,9 @@ class BenfordZKProver:
         ).encode("utf-8")
         proof_hash = hashlib.sha256(proof_input).hexdigest()
 
-        logger.info("BenfordZKProver: generated proof hash=%s n_trades=%d", proof_hash[:16], len(amounts))
+        logger.info(
+            "BenfordZKProver: generated proof hash=%s n_trades=%d", proof_hash[:16], len(amounts)
+        )
 
         return BenfordZKProof(
             version=_ZK_PROOF_VERSION,

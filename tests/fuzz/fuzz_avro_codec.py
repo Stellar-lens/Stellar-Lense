@@ -44,7 +44,7 @@ def _get_schema():
         # Find the schema file in the data directory
         repo_root = Path(__file__).parent.parent.parent
         schema_path = repo_root / "data" / "trade_avro_schema.json"
-        
+
         with open(schema_path, encoding="utf-8") as fh:
             raw = json.load(fh)
         return fastavro.parse_schema(raw)
@@ -61,7 +61,7 @@ def _deserialize(value: bytes, schema: dict):
 
 def _test_avro_deserialiser(data: bytes) -> None:
     """Fuzz target: feed random bytes to deserialize() and assert no crashes.
-    
+
     This function is called repeatedly by atheris with increasingly complex
     byte sequences. It should handle malformed input gracefully without
     raising unhandled exceptions.
@@ -70,7 +70,7 @@ def _test_avro_deserialiser(data: bytes) -> None:
     if schema is None:
         # Schema loading failed; skip this test
         return
-    
+
     try:
         # Try to deserialize the random bytes
         result = _deserialize(data, schema)
@@ -101,7 +101,7 @@ def main():
     if atheris is None:
         print("Error: atheris not installed. Install with: pip install atheris", file=sys.stderr)
         sys.exit(1)
-    
+
     atheris.Setup(sys.argv, _test_avro_deserialiser)
     atheris.Fuzz()
 

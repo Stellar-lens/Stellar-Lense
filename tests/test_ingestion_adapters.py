@@ -1,6 +1,6 @@
 """Tests for ingestion.adapters (normalized blockchain event contract)."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -26,7 +26,7 @@ WALLET_B = "GBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBWHF"
 def _trade() -> Trade:
     return Trade(
         trade_id="t1",
-        ledger_close_time=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        ledger_close_time=datetime(2026, 1, 1, tzinfo=UTC),
         base_account=WALLET_A,
         counter_account=WALLET_B,
         base_asset=Asset(code="XLM", issuer=None),
@@ -57,7 +57,7 @@ def test_normalized_event_chain_lowercased():
         event_id="e1",
         chain="STELLAR",
         event_type=EventType.TRADE,
-        occurred_at=datetime.now(timezone.utc),
+        occurred_at=datetime.now(UTC),
         account=WALLET_A,
         asset=NormalizedAsset(symbol="XLM", native=True),
         amount=1.0,
@@ -71,7 +71,7 @@ def test_normalized_event_rejects_negative_amount():
             event_id="e1",
             chain="stellar",
             event_type=EventType.TRADE,
-            occurred_at=datetime.now(timezone.utc),
+            occurred_at=datetime.now(UTC),
             account=WALLET_A,
             asset=NormalizedAsset(symbol="XLM", native=True),
             amount=-1.0,
@@ -83,7 +83,7 @@ def test_dedup_key_combines_chain_and_event_id():
         event_id="e1",
         chain="stellar",
         event_type=EventType.TRADE,
-        occurred_at=datetime.now(timezone.utc),
+        occurred_at=datetime.now(UTC),
         account=WALLET_A,
         asset=NormalizedAsset(symbol="XLM", native=True),
         amount=1.0,
@@ -115,7 +115,7 @@ def test_stellar_adapter_normalizes_order_book_event():
     raw = OrderBookEvent(
         event_id="ob1",
         account=WALLET_A,
-        ledger_close_time=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        ledger_close_time=datetime(2026, 1, 1, tzinfo=UTC),
         selling=Asset(code="XLM", issuer=None),
         buying=Asset(code="USDC", issuer="GISSUER"),
         amount=50.0,
@@ -131,7 +131,7 @@ def test_stellar_adapter_normalizes_account_activity():
     adapter = StellarAdapter()
     raw = AccountActivity(
         account_id=WALLET_A,
-        account_created_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        account_created_at=datetime(2026, 1, 1, tzinfo=UTC),
         funding_account=WALLET_B,
     )
     event = adapter.normalize(raw)
@@ -151,7 +151,7 @@ def test_stellar_adapter_unknown_order_action_raises():
     raw = OrderBookEvent(
         event_id="ob1",
         account=WALLET_A,
-        ledger_close_time=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        ledger_close_time=datetime(2026, 1, 1, tzinfo=UTC),
         selling=Asset(code="XLM", issuer=None),
         buying=Asset(code="USDC", issuer="GISSUER"),
         amount=50.0,
@@ -197,7 +197,7 @@ def test_evm_adapter_normalizes_transfer():
 
 def test_evm_adapter_defaults_decimals_to_18():
     adapter = EvmAdapter()
-    raw = _evm_transfer(value=10 ** 18)
+    raw = _evm_transfer(value=10**18)
     del raw["decimals"]
     event = adapter.normalize(raw)
     assert event.amount == pytest.approx(1.0)
@@ -247,7 +247,7 @@ class _FakeAdapter(ChainAdapter):
             event_id="fake1",
             chain=self.chain,
             event_type=EventType.TRANSFER,
-            occurred_at=datetime.now(timezone.utc),
+            occurred_at=datetime.now(UTC),
             account="acct",
             asset=NormalizedAsset(symbol="FAKE", native=True),
             amount=1.0,

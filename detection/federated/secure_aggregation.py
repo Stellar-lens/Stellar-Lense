@@ -355,8 +355,7 @@ class SecureAggregator:
         sk_bytes = b"\x00" * len(sk_bytes)
 
         logger.info(
-            "Secure aggregation: decrypted aggregate of %d ciphertexts "
-            "using %d/%d key shares",
+            "Secure aggregation: decrypted aggregate of %d ciphertexts " "using %d/%d key shares",
             len(self._ciphertexts),
             len(self._key_shares),
             self._ctx.n_participants,

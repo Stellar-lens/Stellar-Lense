@@ -201,7 +201,12 @@ def _optimise_model(
     timeout_s = args.timeout_hours * 3600.0
     storage_url = args.storage_url or f"sqlite:///{model_dir / 'optuna_studies.db'}"
 
-    logger.info("── Optimising %s (%d trials, %.1f h timeout) ──", model_name, args.n_trials, args.timeout_hours)
+    logger.info(
+        "── Optimising %s (%d trials, %.1f h timeout) ──",
+        model_name,
+        args.n_trials,
+        args.timeout_hours,
+    )
 
     try:
         best_params = run_study(
@@ -305,9 +310,7 @@ def main(argv: list[str] | None = None) -> int:
 
     # Prepare shared validation data once.
     try:
-        validation_data = _prepare_validation_data(
-            args.data_path, args.val_size, args.random_state
-        )
+        validation_data = _prepare_validation_data(args.data_path, args.val_size, args.random_state)
     except Exception as exc:
         logger.error("Failed to load training data: %s", exc)
         return 1

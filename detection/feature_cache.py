@@ -174,7 +174,8 @@ class RecentDataBuffer:
             from config import config as _cfg  # late import for testability
 
             self._max_size: int = (
-                max_size if max_size is not None
+                max_size
+                if max_size is not None
                 else int(getattr(_cfg, "INCREMENTAL_BUFFER_SIZE", 10_000))
             )
         except Exception:  # pragma: no cover

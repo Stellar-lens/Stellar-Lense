@@ -68,7 +68,7 @@ if _PROM_AVAILABLE:
             E2E_LATENCY_SECONDS = Histogram(
                 "ledgerlens_e2e_latency_seconds",
                 "End-to-end latency from ingestion to consumer decision",
-                buckets=[0.1, 0.5, 1.0, 2.0, 5.0, 10.0]
+                buckets=[0.1, 0.5, 1.0, 2.0, 5.0, 10.0],
             )
         else:
             E2E_LATENCY_SECONDS = REGISTRY._names_to_collectors["ledgerlens_e2e_latency_seconds"]  # type: ignore[attr-defined]

@@ -83,9 +83,7 @@ class TestCounterfactualScoresBelowThreshold:
         )
 
         for cf in result.counterfactuals:
-            actual_score = scorer.score_continuous(
-                pd.Series(cf.feature_values)
-            )
+            actual_score = scorer.score_continuous(pd.Series(cf.feature_values))
             assert actual_score < explainer.flag_threshold, (
                 f"CF {cf.cf_index} scores {actual_score:.1f} which is above "
                 f"the flag threshold {explainer.flag_threshold}"
@@ -124,9 +122,7 @@ class TestFeatureConstraints:
         for cf in result.counterfactuals:
             for col, val in cf.feature_values.items():
                 if col in NON_NEGATIVE_FEATURES:
-                    assert val >= 0.0, (
-                        f"CF {cf.cf_index}: feature '{col}' = {val} must be >= 0"
-                    )
+                    assert val >= 0.0, f"CF {cf.cf_index}: feature '{col}' = {val} must be >= 0"
 
     def test_immutable_features_not_modified(self, scorer_and_data, explainer):
         """Immutable features must not appear in the action list of any CF."""
@@ -136,9 +132,9 @@ class TestFeatureConstraints:
 
         for cf in result.counterfactuals:
             for action in cf.actions:
-                assert action.feature not in IMMUTABLE_FEATURES, (
-                    f"CF {cf.cf_index} modifies immutable feature '{action.feature}'"
-                )
+                assert (
+                    action.feature not in IMMUTABLE_FEATURES
+                ), f"CF {cf.cf_index} modifies immutable feature '{action.feature}'"
 
     def test_immutable_features_values_unchanged(self, scorer_and_data, explainer):
         """Immutable feature values must be identical to the original row in every CF."""
@@ -165,9 +161,7 @@ class TestPerformance:
         result = explainer.explain(row)
         elapsed = time.monotonic() - t0
 
-        assert elapsed < 10.0, (
-            f"Counterfactual generation took {elapsed:.2f}s — exceeds 10s limit"
-        )
+        assert elapsed < 10.0, f"Counterfactual generation took {elapsed:.2f}s — exceeds 10s limit"
         assert result.generation_time_seconds < 10.0
 
 
@@ -233,9 +227,9 @@ class TestEdgeCases:
         row = _high_risk_row(scorer, df)
         result = explainer.explain(row)
         for cf in result.counterfactuals:
-            assert len(cf.actions) >= 1, (
-                f"CF {cf.cf_index} has no actions — must specify at least one change"
-            )
+            assert (
+                len(cf.actions) >= 1
+            ), f"CF {cf.cf_index} has no actions — must specify at least one change"
 
 
 # ---------------------------------------------------------------------------
@@ -280,9 +274,9 @@ class TestInterpretAction:
             "funding_source_similarity",
         ]:
             msg = _interpret_action(feature, 0.8, 0.3)
-            assert isinstance(msg, str) and len(msg) > 0, (
-                f"Empty interpretation for feature '{feature}'"
-            )
+            assert (
+                isinstance(msg, str) and len(msg) > 0
+            ), f"Empty interpretation for feature '{feature}'"
 
 
 # ---------------------------------------------------------------------------

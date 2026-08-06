@@ -1,11 +1,13 @@
-import unittest
-import os
 import json
-import tempfile
+import os
 import shutil
-from cli.main import main
-from cli.diagnostics import run_diagnostics
+import tempfile
+import unittest
+
 from cli.commands.validate_artifacts import validate_artifacts
+from cli.diagnostics import run_diagnostics
+from cli.main import main
+
 
 class TestCliOperations(unittest.TestCase):
 
@@ -41,11 +43,8 @@ class TestCliOperations(unittest.TestCase):
             os.makedirs(art_dir)
             meta_file = os.path.join(art_dir, "model_metadata.json")
             with open(meta_file, "w") as f:
-                json.dump({
-                    "model_version": "1.0.0",
-                    "feature_schema_hash": "abc123hash"
-                }, f)
-            
+                json.dump({"model_version": "1.0.0", "feature_schema_hash": "abc123hash"}, f)
+
             res = validate_artifacts(art_dir)
             self.assertEqual(res["status"], "PASS")
             self.assertEqual(res["version"], "1.0.0")
@@ -57,6 +56,7 @@ class TestCliOperations(unittest.TestCase):
         os.environ["HORIZON_URL"] = "https://horizon.stellar.org"
         exit_code = main(["healthcheck"])
         self.assertEqual(exit_code, 0)
+
 
 if __name__ == "__main__":
     unittest.main()

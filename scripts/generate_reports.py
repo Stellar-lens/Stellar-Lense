@@ -159,7 +159,11 @@ def _score_wallet(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Bulk forensic report generator")
-    parser.add_argument("--input", default=None, help="CSV file with wallet[,pair] rows (required unless --simulate)")
+    parser.add_argument(
+        "--input",
+        default=None,
+        help="CSV file with wallet[,pair] rows (required unless --simulate)",
+    )
     parser.add_argument("--pair", default="XLM:native", help="Default asset pair")
     parser.add_argument(
         "--since",
@@ -220,7 +224,10 @@ def _run_simulate(args: argparse.Namespace) -> None:
         alert_type="high_risk_wallet",
     )
     if incident is None:
-        print("Simulation produced no incident (duplicate suppressed or below threshold).", file=sys.stderr)
+        print(
+            "Simulation produced no incident (duplicate suppressed or below threshold).",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     output_dir = Path(args.output_dir)

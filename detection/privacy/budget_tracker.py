@@ -35,6 +35,7 @@ QueryKind = Literal["training", "inference"]
 # ORM
 # ---------------------------------------------------------------------------
 
+
 class _Base(DeclarativeBase):
     pass
 
@@ -46,7 +47,7 @@ class DPBudgetEvent(_Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
-    kind = Column(String(16), nullable=False)          # "training" | "inference"
+    kind = Column(String(16), nullable=False)  # "training" | "inference"
     model_version = Column(String(64), nullable=True)
     query_type = Column(String(64), nullable=True)
     epsilon = Column(Float, nullable=False)
@@ -60,14 +61,18 @@ def _get_engine():
     engine = create_engine(config.RISK_SCORE_DB_URL)
     _Base.metadata.create_all(engine, checkfirst=True)
     if str(engine.url).startswith("sqlite"):
+
         @event.listens_for(engine, "connect")
         def _set_sqlite_pragma(conn, _rec):
             conn.execute("PRAGMA journal_mode=WAL")
             conn.execute("PRAGMA foreign_keys=ON")
+
     return engine
 
 
-def _entry_hash(prev_hash: str, kind: str, epsilon: float, cumulative_epsilon: float, ts: str) -> str:
+def _entry_hash(
+    prev_hash: str, kind: str, epsilon: float, cumulative_epsilon: float, ts: str
+) -> str:
     material = json.dumps(
         {"prev": prev_hash, "kind": kind, "eps": epsilon, "cum": cumulative_epsilon, "ts": ts},
         sort_keys=True,
@@ -78,6 +83,7 @@ def _entry_hash(prev_hash: str, kind: str, epsilon: float, cumulative_epsilon: f
 # ---------------------------------------------------------------------------
 # RDP composition helper
 # ---------------------------------------------------------------------------
+
 
 def _rdp_compose(epsilons: list[float]) -> float:
     """Additive composition of RDP epsilons (tight for homogeneous mechanisms).
@@ -92,6 +98,7 @@ def _rdp_compose(epsilons: list[float]) -> float:
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 class DPBudgetTracker:
     """Track cumulative DP epsilon and alert when budget runs low.
@@ -136,11 +143,7 @@ class DPBudgetTracker:
 
     def _cumulative_epsilon(self, session: Session) -> tuple[float, str]:
         """Return (current cumulative epsilon, last log hash)."""
-        row = (
-            session.query(DPBudgetEvent)
-            .order_by(DPBudgetEvent.id.desc())
-            .first()
-        )
+        row = session.query(DPBudgetEvent).order_by(DPBudgetEvent.id.desc()).first()
         if row is None:
             return 0.0, "genesis"
         return row.cumulative_epsilon, row.log_hash
@@ -175,7 +178,9 @@ class DPBudgetTracker:
             session.refresh(evt)
             logger.info(
                 "DP budget event recorded: kind=%s eps=%.4f cumulative=%.4f",
-                kind, epsilon, new_cum,
+                kind,
+                epsilon,
+                new_cum,
             )
             remaining = self._total_epsilon - new_cum
             if remaining < self._alert_threshold:
@@ -187,6 +192,7 @@ class DPBudgetTracker:
             from streaming.alert_dispatcher import (
                 AlertDispatcher,  # local import avoids circular dep
             )
+
             dispatcher = AlertDispatcher(channel=getattr(config, "ALERT_CHANNEL", "stdout"))
             dispatcher.dispatch(
                 wallet="__system__",
@@ -239,11 +245,7 @@ class DPBudgetTracker:
         """Return current budget status as a plain dict."""
         with self._session_factory() as session:
             cum_eps, _ = self._cumulative_epsilon(session)
-            events = (
-                session.query(DPBudgetEvent)
-                .order_by(DPBudgetEvent.id.asc())
-                .all()
-            )
+            events = session.query(DPBudgetEvent).order_by(DPBudgetEvent.id.asc()).all()
             return {
                 "total_epsilon": self._total_epsilon,
                 "cumulative_epsilon": cum_eps,

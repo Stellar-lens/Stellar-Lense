@@ -84,6 +84,7 @@ def _invariance_f_test(
 @dataclass
 class CausalTransferResult:
     """Result of a causal transfer fit."""
+
     invariant_features: list[str]
     fallback_to_global: bool
     pair_models: dict[str, Any] = field(default_factory=dict)
@@ -181,6 +182,7 @@ class CausalTransfer:
                 len(envs),
             )
             from sklearn.linear_model import LogisticRegression
+
             global_model = LogisticRegression(max_iter=500, random_state=42)
             global_model.fit(X_all, y_all.astype(int))
             result = CausalTransferResult(
@@ -249,7 +251,12 @@ class CausalTransfer:
         else:
             for i, (_, row_env) in enumerate(df["_env"].items()):
                 model = result.pair_models.get(row_env, result.global_model)
-                x = df.iloc[i][result.invariant_features].fillna(0.0).values.astype(float).reshape(1, -1)
+                x = (
+                    df.iloc[i][result.invariant_features]
+                    .fillna(0.0)
+                    .values.astype(float)
+                    .reshape(1, -1)
+                )
                 probs[i] = model.predict_proba(x)[0, 1]
 
         return probs

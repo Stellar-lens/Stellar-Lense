@@ -19,8 +19,10 @@ def queue(tmp_path, monkeypatch):
     import importlib
 
     import config as cfg_module
+
     importlib.reload(cfg_module)
     from config import config as cfg
+
     monkeypatch.setattr(cfg, "ANNOTATION_HMAC_SECRET", "test-secret-key-265")
 
     return AnnotationQueue(queue_path=str(tmp_path / "queue.json"))
@@ -33,6 +35,7 @@ def _push_wallet(queue: AnnotationQueue, wallet: str) -> None:
 # ---------------------------------------------------------------------------
 # Test: perfect agreement → Kappa = 1.0
 # ---------------------------------------------------------------------------
+
 
 def test_kappa_perfect_agreement(queue):
     """Two annotators who always agree produce Kappa = 1.0."""
@@ -52,6 +55,7 @@ def test_kappa_perfect_agreement(queue):
 # Test: total disagreement → Kappa = -1.0
 # ---------------------------------------------------------------------------
 
+
 def test_kappa_total_disagreement(queue):
     """Two annotators who always disagree on a binary label produce Kappa = -1.0."""
     wallet = "GDISAGREE1111111111111111111111111111111111111111111111111"
@@ -69,6 +73,7 @@ def test_kappa_total_disagreement(queue):
 # ---------------------------------------------------------------------------
 # Test: disputed wallet appears in senior review queue
 # ---------------------------------------------------------------------------
+
 
 def test_disputed_wallet_in_senior_review_queue(queue):
     """A wallet with Kappa < 0.6 must appear in get_senior_review_queue()."""
@@ -94,6 +99,7 @@ def test_disputed_wallet_in_senior_review_queue(queue):
 # Test: fewer than 2 annotations raises ValueError
 # ---------------------------------------------------------------------------
 
+
 def test_agreement_requires_min_two_annotations(queue):
     wallet = "GSINGLE11111111111111111111111111111111111111111111111111"
     _push_wallet(queue, wallet)
@@ -106,6 +112,7 @@ def test_agreement_requires_min_two_annotations(queue):
 # ---------------------------------------------------------------------------
 # Test: duplicate annotator is rejected
 # ---------------------------------------------------------------------------
+
 
 def test_duplicate_annotator_rejected(queue):
     wallet = "GDUPLICATE111111111111111111111111111111111111111111111111"
@@ -121,6 +128,7 @@ def test_duplicate_annotator_rejected(queue):
 # ---------------------------------------------------------------------------
 # Test: DISPUTE_KAPPA_THRESHOLD constant is 0.6
 # ---------------------------------------------------------------------------
+
 
 def test_dispute_threshold_value():
     assert DISPUTE_KAPPA_THRESHOLD == 0.6

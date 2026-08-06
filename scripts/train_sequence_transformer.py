@@ -85,6 +85,7 @@ _SYNTH_MAX_LEN = 64
 # Dataset
 # ---------------------------------------------------------------------------
 
+
 class TradeSequenceDataset(Dataset if _TORCH_AVAILABLE else object):  # type: ignore[misc]
     """PyTorch dataset of (sequence_of_TradeEvents, label) pairs."""
 
@@ -137,6 +138,7 @@ def _collate_fn(
 # Synthetic sequence generation (from feature matrix)
 # ---------------------------------------------------------------------------
 
+
 def _synthetic_sequences_from_features(
     df: pd.DataFrame,
     rng: np.random.Generator,
@@ -182,12 +184,14 @@ def _synthetic_sequences_from_features(
             prev_amount = math.exp(log_amt)
             pair_idx = int(rng.integers(0, 3))  # small pair vocab for synthetic data
 
-            events.append(TradeEvent(
-                log_amount=log_amt,
-                time_delta_s=delta,
-                pair_index=pair_idx,
-                direction=direction,
-            ))
+            events.append(
+                TradeEvent(
+                    log_amount=log_amt,
+                    time_delta_s=delta,
+                    pair_index=pair_idx,
+                    direction=direction,
+                )
+            )
 
         sequences.append(events)
     return sequences
@@ -196,6 +200,7 @@ def _synthetic_sequences_from_features(
 # ---------------------------------------------------------------------------
 # Data loading
 # ---------------------------------------------------------------------------
+
 
 def load_dataset(
     data_path: str,
@@ -258,7 +263,7 @@ def _sequences_from_trade_log(
     sequences: list[list[TradeEvent]] = []
     labels: list[int] = []
 
-    for wallet, group in df.groupby(_WALLET_COL):
+    for _wallet, group in df.groupby(_WALLET_COL):
         group = group.sort_values("ledger_close_time")
         label = int(group[_LABEL_COL].iloc[0])
         chunk = group.head(max_length)
@@ -281,12 +286,14 @@ def _sequences_from_trade_log(
             delta = max((ts_f - prev_ts) if prev_ts is not None else 0.0, 0.0)
             prev_ts = ts_f
 
-            events.append(TradeEvent(
-                log_amount=log_amt,
-                time_delta_s=delta,
-                pair_index=0,
-                direction=0.0,
-            ))
+            events.append(
+                TradeEvent(
+                    log_amount=log_amt,
+                    time_delta_s=delta,
+                    pair_index=0,
+                    direction=0.0,
+                )
+            )
 
         if events:
             sequences.append(events)
@@ -298,6 +305,7 @@ def _sequences_from_trade_log(
 # ---------------------------------------------------------------------------
 # Training loop
 # ---------------------------------------------------------------------------
+
 
 class _SequenceClassifier(nn.Module):
     """Wraps the transformer encoder with a binary classification head.
@@ -383,7 +391,11 @@ def train(
 
     logger.info(
         "Starting training: epochs=%d, batch=%d, lr=%.4f, train=%d, val=%d",
-        epochs, batch_size, lr, len(train_seqs), len(val_seqs),
+        epochs,
+        batch_size,
+        lr,
+        len(train_seqs),
+        len(val_seqs),
     )
 
     for epoch in range(1, epochs + 1):
@@ -425,7 +437,11 @@ def train(
         elapsed = time.time() - t0
         logger.info(
             "Epoch %d/%d — train_loss=%.4f  val_loss=%.4f  (%.1fs)",
-            epoch, epochs, avg_train_loss, avg_val_loss, elapsed,
+            epoch,
+            epochs,
+            avg_train_loss,
+            avg_val_loss,
+            elapsed,
         )
         print(
             f"Epoch {epoch}/{epochs}  train_loss={avg_train_loss:.4f}  "
@@ -481,6 +497,7 @@ def train(
 # CLI entry point
 # ---------------------------------------------------------------------------
 
+
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=__doc__,
@@ -493,7 +510,9 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--epochs", type=int, default=2, help="Training epochs (default: 2).")
     parser.add_argument("--batch-size", type=int, default=32, help="Batch size (default: 32).")
-    parser.add_argument("--lr", type=float, default=1e-3, help="Peak learning rate (default: 1e-3).")
+    parser.add_argument(
+        "--lr", type=float, default=1e-3, help="Peak learning rate (default: 1e-3)."
+    )
     parser.add_argument(
         "--weight-decay", type=float, default=1e-2, help="AdamW weight decay (default: 0.01)."
     )

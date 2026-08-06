@@ -45,7 +45,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from config import config
 from streaming.cursor_store import BaseCursorStore, get_cursor_store
-from streaming.health import WorkerHealthMonitor, get_health_registry
+from streaming.health import HealthStatus, WorkerHealthMonitor, get_health_registry
 from utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -286,9 +286,7 @@ class AccountMetadataStream:
         max_failures = config.HORIZON_MAX_RETRIES
 
         while not self._stop_event.is_set():
-            self._health_monitor.record_heartbeat(
-                details={"watched_wallets": len(self._threads)}
-            )
+            self._health_monitor.record_heartbeat(details={"watched_wallets": len(self._threads)})
             try:
                 self._stream_effects(wallet, cursor, stream_key)
                 # Generator exhausted without error — reconnect from latest cursor.
@@ -298,10 +296,9 @@ class AccountMetadataStream:
                 if self._stop_event.is_set():
                     return
                 consecutive_failures += 1
-                backoff = min(2 ** consecutive_failures, 60)
+                backoff = min(2**consecutive_failures, 60)
                 logger.warning(
-                    "Effects stream for %s failed (attempt %d/%d): %s — "
-                    "reconnecting in %ds",
+                    "Effects stream for %s failed (attempt %d/%d): %s — " "reconnecting in %ds",
                     wallet,
                     consecutive_failures,
                     max_failures,
@@ -324,12 +321,7 @@ class AccountMetadataStream:
         from stellar_sdk import Server
 
         server = Server(horizon_url=config.HORIZON_URL)
-        call_builder = (
-            server.effects()
-            .for_account(wallet)
-            .cursor(cursor)
-            .order(asc=True)
-        )
+        call_builder = server.effects().for_account(wallet).cursor(cursor).order(asc=True)
 
         for record in call_builder.stream():
             if self._stop_event.is_set():

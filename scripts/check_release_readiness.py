@@ -24,7 +24,7 @@ import json
 import pathlib
 import re
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import NamedTuple
 
 
@@ -42,9 +42,7 @@ def check_changelog(root: pathlib.Path) -> CheckResult:
         return CheckResult("CHANGELOG.md exists", False, "CHANGELOG.md not found")
 
     content = changelog.read_text()
-    match = re.search(
-        r"## \[Unreleased\](.*?)(?=## \[|\Z)", content, re.DOTALL
-    )
+    match = re.search(r"## \[Unreleased\](.*?)(?=## \[|\Z)", content, re.DOTALL)
     if not match:
         return CheckResult(
             "CHANGELOG.md unreleased section",
@@ -190,9 +188,9 @@ def check_env_example(root: pathlib.Path) -> CheckResult:
     env_example = root / ".env.example"
     if not env_example.exists():
         return CheckResult(".env.example", False, ".env.example not found")
-    
+
     lines = env_example.read_text().splitlines()
-    key_count = sum(1 for l in lines if l.strip() and not l.startswith("#"))
+    key_count = sum(1 for line in lines if line.strip() and not line.startswith("#"))
     if key_count < 5:
         return CheckResult(
             ".env.example",
@@ -224,10 +222,10 @@ def render_report(results: list[CheckResult], strict: bool) -> tuple[str, int]:
     failed_warnings = [r for r in results if not r.passed and r.severity == "warning"]
 
     lines = [
-        f"# LedgerLens Release Readiness Report",
-        f"Generated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}",
+        "# LedgerLens Release Readiness Report",
+        f"Generated: {datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S UTC')}",
         "",
-        f"## Summary",
+        "## Summary",
         f"- ✅ Passed:  {len(passed)}",
         f"- ❌ Errors:  {len(failed_errors)}",
         f"- ⚠️  Warnings: {len(failed_warnings)}",

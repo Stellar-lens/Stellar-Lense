@@ -18,11 +18,15 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Query LedgerLens DP privacy budget status")
     parser.add_argument("--json", action="store_true", help="Output raw JSON")
     parser.add_argument(
-        "--total-epsilon", type=float, default=None,
+        "--total-epsilon",
+        type=float,
+        default=None,
         help="Override total epsilon budget (default: from config/env)",
     )
     parser.add_argument(
-        "--alert-threshold", type=float, default=None,
+        "--alert-threshold",
+        type=float,
+        default=None,
         help="Override alert threshold epsilon (default: from config/env)",
     )
     args = parser.parse_args(argv)
@@ -57,10 +61,14 @@ def main(argv: list[str] | None = None) -> int:
             )
 
     if status["budget_exhausted"]:
-        print("\nWARNING: Privacy budget is exhausted — training/inference will violate guarantees.")
+        print(
+            "\nWARNING: Privacy budget is exhausted — training/inference will violate guarantees."
+        )
         return 2
     if status["remaining_epsilon"] < status["alert_threshold"]:
-        print(f"\nWARNING: Remaining epsilon ({status['remaining_epsilon']:.4f}) is below alert threshold.")
+        print(
+            f"\nWARNING: Remaining epsilon ({status['remaining_epsilon']:.4f}) is below alert threshold."
+        )
         return 1
     return 0
 

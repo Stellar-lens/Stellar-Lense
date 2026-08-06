@@ -41,6 +41,7 @@ def _send_fp(controller, model_predictions, n=1, annotator="analyst1", audit="au
 # Test: high-FP model weight decreases
 # ---------------------------------------------------------------------------
 
+
 class TestWeightDecreasesForHighFPModel:
     """One model at 50% FP rate; two models at 5% FP rate.
     After enough feedback the high-FP model's weight must decrease.
@@ -55,9 +56,9 @@ class TestWeightDecreasesForHighFPModel:
         # xgb and lgbm have 5% FP rate: they predict >= 0.5 only 1 in 20 times
         n = 20  # enough to exceed _MIN_FP_FEEDBACK
         for i in range(n):
-            rf_pred = 0.9 if i % 2 == 0 else 0.1   # 50% FP rate
-            xgb_pred = 0.9 if i == 0 else 0.1       # 5% FP rate
-            lgbm_pred = 0.9 if i == 1 else 0.1      # 5% FP rate
+            rf_pred = 0.9 if i % 2 == 0 else 0.1  # 50% FP rate
+            xgb_pred = 0.9 if i == 0 else 0.1  # 5% FP rate
+            lgbm_pred = 0.9 if i == 1 else 0.1  # 5% FP rate
             ctrl.observe_false_positive(
                 wallet=f"GTEST{i:04d}",
                 model_predictions={"rf": rf_pred, "xgb": xgb_pred, "lgbm": lgbm_pred},
@@ -67,9 +68,9 @@ class TestWeightDecreasesForHighFPModel:
 
         updated = ctrl.current_weights()
         # The high-FP model (rf) should weigh less after adjustment
-        assert updated["rf"] < initial_rf, (
-            f"rf weight {updated['rf']:.4f} should be less than initial {initial_rf:.4f}"
-        )
+        assert (
+            updated["rf"] < initial_rf
+        ), f"rf weight {updated['rf']:.4f} should be less than initial {initial_rf:.4f}"
         # Low-FP models (xgb, lgbm) should weigh more
         assert updated["xgb"] > initial_weights["xgb"] or updated["lgbm"] > initial_weights["lgbm"]
 
@@ -83,6 +84,7 @@ class TestWeightDecreasesForHighFPModel:
 # ---------------------------------------------------------------------------
 # Test: weight bounds [0.05, 0.80]
 # ---------------------------------------------------------------------------
+
 
 class TestWeightBounds:
     """Even when one model has 100% FP rate, weights must stay in [0.05, 0.80]."""
@@ -100,9 +102,9 @@ class TestWeightBounds:
             )
         weights = ctrl.current_weights()
         for name, w in weights.items():
-            assert w >= _DYNAMIC_WEIGHT_MIN - 1e-9, (
-                f"Model {name} weight {w:.4f} below minimum {_DYNAMIC_WEIGHT_MIN}"
-            )
+            assert (
+                w >= _DYNAMIC_WEIGHT_MIN - 1e-9
+            ), f"Model {name} weight {w:.4f} below minimum {_DYNAMIC_WEIGHT_MIN}"
 
     def test_upper_bound_respected(self):
         ctrl = _make_controller(smoothing_alpha=1.0)
@@ -116,14 +118,15 @@ class TestWeightBounds:
             )
         weights = ctrl.current_weights()
         for name, w in weights.items():
-            assert w <= _DYNAMIC_WEIGHT_MAX + 1e-9, (
-                f"Model {name} weight {w:.4f} above maximum {_DYNAMIC_WEIGHT_MAX}"
-            )
+            assert (
+                w <= _DYNAMIC_WEIGHT_MAX + 1e-9
+            ), f"Model {name} weight {w:.4f} above maximum {_DYNAMIC_WEIGHT_MAX}"
 
 
 # ---------------------------------------------------------------------------
 # Test: systemic reset
 # ---------------------------------------------------------------------------
+
 
 class TestSystemicReset:
     """Systemic reset fires when ALL three models' FP rates exceed threshold."""
@@ -166,14 +169,15 @@ class TestSystemicReset:
 
         # Should NOT have reset — rf weight should be lower than initial
         weights = ctrl.current_weights()
-        assert weights["rf"] < training_weights["rf"], (
-            "rf should be penalised, not reset to training weight"
-        )
+        assert (
+            weights["rf"] < training_weights["rf"]
+        ), "rf should be penalised, not reset to training weight"
 
 
 # ---------------------------------------------------------------------------
 # Test: minimum feedback count gating
 # ---------------------------------------------------------------------------
+
 
 class TestMinimumFeedbackGating:
     def test_no_adjustment_below_minimum(self):
@@ -192,14 +196,15 @@ class TestMinimumFeedbackGating:
         # Weights should still be at training-time values
         current = ctrl.current_weights()
         for name in initial:
-            assert abs(current[name] - initial[name]) < 1e-9, (
-                f"Weight for {name} changed before minimum feedback count reached"
-            )
+            assert (
+                abs(current[name] - initial[name]) < 1e-9
+            ), f"Weight for {name} changed before minimum feedback count reached"
 
 
 # ---------------------------------------------------------------------------
 # Test: authentication enforcement
 # ---------------------------------------------------------------------------
+
 
 class TestAuthentication:
     def test_empty_annotator_id_rejected(self):

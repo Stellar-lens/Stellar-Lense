@@ -44,6 +44,7 @@ logger = get_logger(__name__)
 # Formatting helpers
 # ---------------------------------------------------------------------------
 
+
 def _truncate(value: str, width: int = 16) -> str:
     """Return the first *width* characters of *value* followed by '…'."""
     s = str(value)
@@ -120,6 +121,7 @@ def _print_ndjson(records: list[dict[str, Any]]) -> None:
 # Main
 # ---------------------------------------------------------------------------
 
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Query the LedgerLens federated learning audit trail.",
@@ -193,6 +195,7 @@ def main() -> int:
     # Initialise audit trail
     try:
         from detection.federated.coordinator import FederatedAuditTrail
+
         audit = FederatedAuditTrail(db_url=args.db_url)
     except Exception as exc:
         logger.error("Failed to initialise audit trail: %s", exc)

@@ -415,9 +415,7 @@ def _enrich_shap(
         if provenance is not None and i < 5:
             trade_ids = provenance.get(fname, [])
             horizon_base = config.HORIZON_URL.rstrip("/")
-            enriched["evidence_links"] = [
-                f"{horizon_base}/trades/{tid}" for tid in trade_ids
-            ]
+            enriched["evidence_links"] = [f"{horizon_base}/trades/{tid}" for tid in trade_ids]
         result.append(enriched)
     return result
 

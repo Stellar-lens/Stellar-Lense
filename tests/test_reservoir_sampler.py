@@ -89,9 +89,9 @@ def test_drift_mode_recency_bias(tmp_path):
 
     # With recency bias, recent examples should dominate
     # At least 50% of reservoir should be recent (very conservative threshold)
-    assert recent_count > reservoir_size * 0.5, (
-        f"Expected >50% recent examples in drift mode, got {recent_count}/{reservoir_size}"
-    )
+    assert (
+        recent_count > reservoir_size * 0.5
+    ), f"Expected >50% recent examples in drift mode, got {recent_count}/{reservoir_size}"
 
 
 def test_drift_mode_vs_stable_comparison(tmp_path):

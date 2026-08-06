@@ -1,6 +1,8 @@
 import os
-from utils.secrets import sanitize_url, mask_secret
-from utils.interfaces import ServiceHealth, HealthCheckable, default_registry
+
+from utils.interfaces import ServiceHealth
+from utils.secrets import mask_secret, sanitize_url
+
 
 class EnvironmentHealthCheck:
     def healthcheck(self) -> ServiceHealth:
@@ -27,10 +29,12 @@ class EnvironmentHealthCheck:
         status = "PASS" if not missing else "FAIL"
         return ServiceHealth(status=status, details=details, missing=missing)
 
+
 class StreamingHealthCheck:
     def healthcheck(self) -> ServiceHealth:
         backend = os.environ.get("STREAMING_BACKEND", "stdout")
         return ServiceHealth(status="PASS", details={"backend": backend})
+
 
 def run_diagnostics():
     env_service = EnvironmentHealthCheck()
@@ -39,7 +43,9 @@ def run_diagnostics():
     env_health = env_service.healthcheck()
     streaming_health = streaming_service.healthcheck()
 
-    overall = "PASS" if env_health.status == "PASS" and streaming_health.status == "PASS" else "FAIL"
+    overall = (
+        "PASS" if env_health.status == "PASS" and streaming_health.status == "PASS" else "FAIL"
+    )
 
     return {
         "overall_status": overall,
@@ -47,11 +53,11 @@ def run_diagnostics():
             "environment": {
                 "status": env_health.status,
                 "details": env_health.details,
-                "missing": env_health.missing
+                "missing": env_health.missing,
             },
             "streaming": {
                 "status": streaming_health.status,
-                "backend": streaming_health.details.get("backend", "stdout")
-            }
-        }
+                "backend": streaming_health.details.get("backend", "stdout"),
+            },
+        },
     }

@@ -40,9 +40,8 @@ from pathlib import Path
 from typing import Any
 
 from utils.logging import get_logger
-from utils.secrets_config import verify_secrets, is_secret_configured
+from utils.secrets_config import is_secret_configured
 from utils.secrets_manager import (
-    SecretType,
     get_secrets_manager,
     register_ledgerlens_secrets,
 )
@@ -52,6 +51,7 @@ logger = get_logger(__name__)
 
 class Colors:
     """ANSI color codes for terminal output."""
+
     GREEN = "\033[92m"
     YELLOW = "\033[93m"
     RED = "\033[91m"
@@ -65,7 +65,6 @@ def colorize(text: str, color: str) -> str:
     if sys.stdout.isatty():
         return f"{color}{text}{Colors.RESET}"
     return text
-
 
 
 def validate_all_secrets(secrets_filter: list[str] | None = None) -> tuple[int, int, int]:
@@ -131,6 +130,7 @@ def verify_audit_log() -> bool:
         True if audit log is valid, False otherwise
     """
     import os
+
     from utils.secrets_manager import SecretAuditLogger
 
     audit_log_path = Path(os.getenv("SECRETS_AUDIT_LOG", "data/secrets_audit.ndjson"))
@@ -167,7 +167,6 @@ def verify_audit_log() -> bool:
     except Exception as e:
         print(f"{colorize('✗', Colors.RED)} Verification failed: {e}")
         return False
-
 
 
 def generate_report(output_path: Path | None = None) -> dict[str, Any]:
@@ -276,7 +275,7 @@ def main() -> int:
         # Validate secrets
         valid, warnings, errors = validate_all_secrets(args.secrets)
 
-        print(colorize(f"\n=== Summary ===\n", Colors.BOLD))
+        print(colorize("\n=== Summary ===\n", Colors.BOLD))
         print(f"{colorize('✓', Colors.GREEN)} Valid: {valid}")
         print(f"{colorize('⚠', Colors.YELLOW)} Warnings: {warnings}")
         print(f"{colorize('✗', Colors.RED)} Errors: {errors}")

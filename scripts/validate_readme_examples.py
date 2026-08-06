@@ -49,13 +49,11 @@ Exit codes
 from __future__ import annotations
 
 import argparse
-import ast
 import json
 import pathlib
 import re
 import sys
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Set, Tuple
 
 REPO_ROOT = pathlib.Path(__file__).parent.parent.resolve()
 
@@ -70,14 +68,14 @@ _FENCE_RE = re.compile(
 )
 
 
-def extract_bash_blocks(text: str) -> List[str]:
+def extract_bash_blocks(text: str) -> list[str]:
     """Return a list of raw code-block contents (bash/sh/shell or plain)."""
     return [m.group(1) for m in _FENCE_RE.finditer(text)]
 
 
-def collect_markdown_files(paths: List[pathlib.Path]) -> List[pathlib.Path]:
+def collect_markdown_files(paths: list[pathlib.Path]) -> list[pathlib.Path]:
     """Expand directories to .md files; keep individual files as-is."""
-    result: List[pathlib.Path] = []
+    result: list[pathlib.Path] = []
     for p in paths:
         if p.is_dir():
             result.extend(sorted(p.rglob("*.md")))
@@ -91,15 +89,9 @@ def collect_markdown_files(paths: List[pathlib.Path]) -> List[pathlib.Path]:
 # ---------------------------------------------------------------------------
 
 # Patterns for lines we know how to validate
-_PYTHON_MODULE_RE = re.compile(
-    r"(?:python3?|python)\s+-m\s+([\w.]+)"
-)
-_PYTHON_FILE_RE = re.compile(
-    r"(?:python3?|python)\s+(?!-m\s)([\w./-]+\.py)"
-)
-_MAKE_RE = re.compile(
-    r"make\s+([\w-]+)"
-)
+_PYTHON_MODULE_RE = re.compile(r"(?:python3?|python)\s+-m\s+([\w.]+)")
+_PYTHON_FILE_RE = re.compile(r"(?:python3?|python)\s+(?!-m\s)([\w./-]+\.py)")
+_MAKE_RE = re.compile(r"make\s+([\w-]+)")
 # Lines we should skip (comments, variable assignments, env-var prefixes only)
 _SKIP_LINE_RE = re.compile(r"^\s*#|^\s*$|^[A-Z_]+=\S+\s*$")
 
@@ -113,8 +105,8 @@ class CodeLine:
     block_index: int
     line_number: int  # within the block, 1-based
 
-    kind: str = ""       # "python_module" | "python_file" | "make" | "unknown"
-    target: str = ""     # the module path, file path, or make target
+    kind: str = ""  # "python_module" | "python_file" | "make" | "unknown"
+    target: str = ""  # the module path, file path, or make target
 
 
 def classify_line(
@@ -158,7 +150,7 @@ def parse_code_block(
     block: str,
     source_file: str,
     block_index: int,
-) -> List[CodeLine]:
+) -> list[CodeLine]:
     """Parse all non-trivial lines in a code block."""
     lines = []
     for i, raw in enumerate(block.splitlines(), 1):
@@ -181,7 +173,7 @@ def parse_code_block(
 _MAKE_TARGET_RE = re.compile(r"^([\w-]+)\s*:", re.MULTILINE)
 
 
-def get_makefile_targets(root: pathlib.Path) -> Set[str]:
+def get_makefile_targets(root: pathlib.Path) -> set[str]:
     """Return the set of targets declared in the repo Makefile."""
     makefile = root / "Makefile"
     if not makefile.is_file():
@@ -231,7 +223,7 @@ def file_exists(path_str: str, root: pathlib.Path) -> bool:
 class Finding:
     """A single validation finding (error or warning)."""
 
-    level: str   # "error" | "warning"
+    level: str  # "error" | "warning"
     source_file: str
     block_index: int
     line_number: int
@@ -253,15 +245,15 @@ class Finding:
 class ValidationReport:
     """Aggregated validation results."""
 
-    findings: List[Finding] = field(default_factory=list)
+    findings: list[Finding] = field(default_factory=list)
     checked: int = 0
 
     @property
-    def errors(self) -> List[Finding]:
+    def errors(self) -> list[Finding]:
         return [f for f in self.findings if f.level == "error"]
 
     @property
-    def warnings(self) -> List[Finding]:
+    def warnings(self) -> list[Finding]:
         return [f for f in self.findings if f.level == "warning"]
 
     def summary(self) -> str:
@@ -321,15 +313,15 @@ class ReadmeExamplesValidator:
     ) -> None:
         self.root = root
         self.warn_only = warn_only
-        self._makefile_targets: Optional[Set[str]] = None
+        self._makefile_targets: set[str] | None = None
 
     @property
-    def makefile_targets(self) -> Set[str]:
+    def makefile_targets(self) -> set[str]:
         if self._makefile_targets is None:
             self._makefile_targets = get_makefile_targets(self.root)
         return self._makefile_targets
 
-    def validate_files(self, md_files: List[pathlib.Path]) -> ValidationReport:
+    def validate_files(self, md_files: list[pathlib.Path]) -> ValidationReport:
         report = ValidationReport()
         for md_file in md_files:
             try:
@@ -360,7 +352,7 @@ class ReadmeExamplesValidator:
                         report.findings.append(finding)
         return report
 
-    def _validate_line(self, cl: CodeLine) -> Optional[Finding]:
+    def _validate_line(self, cl: CodeLine) -> Finding | None:
         level = "warning" if self.warn_only else "error"
 
         if cl.kind == "python_module":
@@ -392,8 +384,7 @@ class ReadmeExamplesValidator:
                     kind=cl.kind,
                     target=cl.target,
                     message=(
-                        f"python {cl.target!r}: file not found at "
-                        f"'{self.root / cl.target}'."
+                        f"python {cl.target!r}: file not found at " f"'{self.root / cl.target}'."
                     ),
                 )
 
@@ -424,7 +415,7 @@ class ReadmeExamplesValidator:
 # ---------------------------------------------------------------------------
 
 
-def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
+def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Validate bash examples in README and Markdown docs.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -461,7 +452,7 @@ def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
     root: pathlib.Path = args.root.resolve()
 
@@ -503,9 +494,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             "Review the output above."
         )
 
-    print(
-        f"[validate_readme_examples] ✓ All {report.checked} example line(s) valid."
-    )
+    print(f"[validate_readme_examples] ✓ All {report.checked} example line(s) valid.")
     return 0
 
 

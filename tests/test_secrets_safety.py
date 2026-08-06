@@ -1,10 +1,12 @@
-import unittest
-import os
 import logging
+import os
+import unittest
 from io import StringIO
-from utils.secrets import SecretString, mask_secret, sanitize_url, sanitize_text, sanitize_config
-from utils.logging import setup_logger, SecretsRedactingFormatter
+
 from cli.diagnostics import run_diagnostics
+from utils.logging import SecretsRedactingFormatter
+from utils.secrets import SecretString, mask_secret, sanitize_config, sanitize_text, sanitize_url
+
 
 class TestSecretsSafety(unittest.TestCase):
 
@@ -36,7 +38,7 @@ class TestSecretsSafety(unittest.TestCase):
         cfg = {
             "HORIZON_URL": "https://horizon.stellar.org",
             "KAFKA_SASL_PASSWORD": "my_kafka_password",
-            "RISK_SCORE_DB_URL": "postgres://admin:secret123@localhost/db"
+            "RISK_SCORE_DB_URL": "postgres://admin:secret123@localhost/db",
         }
         clean = sanitize_config(cfg)
         self.assertNotIn("my_kafka_password", clean["KAFKA_SASL_PASSWORD"])
@@ -65,6 +67,7 @@ class TestSecretsSafety(unittest.TestCase):
         details = diag["checks"]["environment"]["details"]
         self.assertNotIn("dbpass123", details["RISK_SCORE_DB_URL"])
         self.assertNotIn("secret_sasl_pass", details["KAFKA_SASL_PASSWORD"])
+
 
 if __name__ == "__main__":
     unittest.main()

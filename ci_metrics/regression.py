@@ -24,7 +24,6 @@ Usage::
 from __future__ import annotations
 
 import logging
-import time
 from pathlib import Path
 
 from ci_metrics.contracts import CIRunRecord, MetricSnapshot, RegressionAlert

@@ -35,25 +35,29 @@ def _make_forensic_dict(
 ) -> dict:
     trades = []
     for i in range(n_trades):
-        trades.append({
-            "trade_id": f"trade-{i:04d}",
-            "ledger": 50000000 + i,
-            "base_account": WALLET,
-            "counter_account": f"GCOUNTER{i:040d}",
-            "base_amount": 100.0 + i,
-            "counter_amount": 99.0 + i,
-            "asset_pair": "XLM:native/USDC:GA5ZSE",
-            "horizon_url": "https://horizon.stellar.org/trades/trade-id",
-        })
+        trades.append(
+            {
+                "trade_id": f"trade-{i:04d}",
+                "ledger": 50000000 + i,
+                "base_account": WALLET,
+                "counter_account": f"GCOUNTER{i:040d}",
+                "base_amount": 100.0 + i,
+                "counter_amount": 99.0 + i,
+                "asset_pair": "XLM:native/USDC:GA5ZSE",
+                "horizon_url": "https://horizon.stellar.org/trades/trade-id",
+            }
+        )
 
     edges = []
     for i in range(min(n_graph_nodes, 49)):
-        edges.append({
-            "source": WALLET,
-            "target": f"GNODE{i:045d}",
-            "weight": 1.0,
-            "risk_score": 30 + i,
-        })
+        edges.append(
+            {
+                "source": WALLET,
+                "target": f"GNODE{i:045d}",
+                "weight": 1.0,
+                "risk_score": 30 + i,
+            }
+        )
 
     return {
         "report_id": "test-report-id-0001",
@@ -164,9 +168,9 @@ def test_report_file_size_under_5mb():
     try:
         generate_interactive_report(fd, out_path)
         size_bytes = os.path.getsize(out_path)
-        assert size_bytes < 5 * 1024 * 1024, (
-            f"HTML report is {size_bytes / 1024 / 1024:.2f} MB; must be < 5 MB"
-        )
+        assert (
+            size_bytes < 5 * 1024 * 1024
+        ), f"HTML report is {size_bytes / 1024 / 1024:.2f} MB; must be < 5 MB"
     finally:
         os.unlink(out_path)
 

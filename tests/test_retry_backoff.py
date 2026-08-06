@@ -7,8 +7,8 @@ import random
 import pytest
 
 from ingestion.retry_backoff import (
-    AttemptHistory,
     NETWORK_RETRY_POLICY,
+    AttemptHistory,
     RetryConfigurationError,
     RetryExhaustedError,
     RetryPolicy,
@@ -56,17 +56,23 @@ class TestDelayForAttempt:
         assert policy.delay_for_attempt(1) == 0.0
 
     def test_none_jitter_is_deterministic_exponential(self):
-        policy = RetryPolicy(base_delay_seconds=1.0, multiplier=2.0, max_delay_seconds=100, jitter="none")
+        policy = RetryPolicy(
+            base_delay_seconds=1.0, multiplier=2.0, max_delay_seconds=100, jitter="none"
+        )
         assert policy.delay_for_attempt(2) == 1.0
         assert policy.delay_for_attempt(3) == 2.0
         assert policy.delay_for_attempt(4) == 4.0
 
     def test_delay_is_capped_at_max_delay(self):
-        policy = RetryPolicy(base_delay_seconds=1.0, multiplier=10.0, max_delay_seconds=5.0, jitter="none")
+        policy = RetryPolicy(
+            base_delay_seconds=1.0, multiplier=10.0, max_delay_seconds=5.0, jitter="none"
+        )
         assert policy.delay_for_attempt(5) == 5.0
 
     def test_full_jitter_stays_within_bounds(self):
-        policy = RetryPolicy(base_delay_seconds=1.0, multiplier=2.0, max_delay_seconds=100, jitter="full")
+        policy = RetryPolicy(
+            base_delay_seconds=1.0, multiplier=2.0, max_delay_seconds=100, jitter="full"
+        )
         rng = random.Random(42)
         for attempt in range(2, 6):
             delay = policy.delay_for_attempt(attempt, rng=rng)
@@ -74,7 +80,9 @@ class TestDelayForAttempt:
             assert 0 <= delay <= raw_cap
 
     def test_equal_jitter_stays_within_bounds(self):
-        policy = RetryPolicy(base_delay_seconds=2.0, multiplier=2.0, max_delay_seconds=100, jitter="equal")
+        policy = RetryPolicy(
+            base_delay_seconds=2.0, multiplier=2.0, max_delay_seconds=100, jitter="equal"
+        )
         rng = random.Random(1)
         delay = policy.delay_for_attempt(2, rng=rng)
         assert 1.0 <= delay <= 2.0  # half..raw
@@ -98,19 +106,23 @@ class TestCallWithRetry:
         def flaky():
             attempts["count"] += 1
             if attempts["count"] < 3:
-                raise IOError("transient")
+                raise OSError("transient")
             return "recovered"
 
-        policy = RetryPolicy(max_attempts=5, base_delay_seconds=0.01, jitter="none", retryable_exceptions=(IOError,))
+        policy = RetryPolicy(
+            max_attempts=5, base_delay_seconds=0.01, jitter="none", retryable_exceptions=(IOError,)
+        )
         result = call_with_retry(flaky, policy=policy, sleep=_no_sleep)
         assert result == "recovered"
         assert attempts["count"] == 3
 
     def test_raises_retry_exhausted_after_max_attempts(self):
         def always_fails():
-            raise IOError("permanent")
+            raise OSError("permanent")
 
-        policy = RetryPolicy(max_attempts=3, base_delay_seconds=0.01, retryable_exceptions=(IOError,))
+        policy = RetryPolicy(
+            max_attempts=3, base_delay_seconds=0.01, retryable_exceptions=(IOError,)
+        )
         with pytest.raises(RetryExhaustedError) as exc:
             call_with_retry(always_fails, policy=policy, sleep=_no_sleep)
         assert exc.value.history.attempt_count == 3
@@ -134,11 +146,15 @@ class TestCallWithRetry:
 
         def flaky():
             if len(records) < 2:
-                raise IOError("retry me")
+                raise OSError("retry me")
             return "done"
 
-        policy = RetryPolicy(max_attempts=5, base_delay_seconds=0.01, retryable_exceptions=(IOError,))
-        call_with_retry(flaky, policy=policy, sleep=_no_sleep, on_attempt=lambda r: records.append(r))
+        policy = RetryPolicy(
+            max_attempts=5, base_delay_seconds=0.01, retryable_exceptions=(IOError,)
+        )
+        call_with_retry(
+            flaky, policy=policy, sleep=_no_sleep, on_attempt=lambda r: records.append(r)
+        )
         assert len(records) == 3
         assert records[-1].succeeded is True
 
@@ -154,7 +170,7 @@ class TestRetryWithBackoffDecorator:
         def fetch(cursor: str) -> str:
             attempts["count"] += 1
             if attempts["count"] < 2:
-                raise IOError("timeout")
+                raise OSError("timeout")
             return f"page-{cursor}"
 
         assert fetch("abc") == "page-abc"
@@ -181,7 +197,7 @@ def test_attempt_history_render_includes_each_attempt():
 
     def fails_once():
         if not history.records:
-            raise IOError("first failure")
+            raise OSError("first failure")
         return "ok"
 
     call_with_retry(fails_once, policy=policy, sleep=_no_sleep, on_attempt=history.add)

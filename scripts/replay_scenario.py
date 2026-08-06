@@ -141,9 +141,7 @@ def cmd_save(args: argparse.Namespace, store: ScenarioStore) -> int:
         features = _build_features_from_trades(args.wallet, args.pair, trades)
 
     if not features:
-        logger.error(
-            "No features available — provide --trades-file or --features-file"
-        )
+        logger.error("No features available — provide --trades-file or --features-file")
         return 2
 
     # Score
@@ -320,17 +318,14 @@ def cmd_regression(args: argparse.Namespace, store: ScenarioStore) -> int:
 
         status = "REGRESSION" if regression else "ok"
         print(
-            f"  {sid} | orig={orig_score.get('score')} new={new_score.get('score')} "
-            f"| {status}"
+            f"  {sid} | orig={orig_score.get('score')} new={new_score.get('score')} " f"| {status}"
         )
 
     report = {
         "generated_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "total_scenarios": len(results),
         "regressions": regression_count,
-        "pass_rate": round(
-            (len(results) - regression_count) / len(results), 4
-        ) if results else 1.0,
+        "pass_rate": round((len(results) - regression_count) / len(results), 4) if results else 1.0,
         "results": results,
     }
 
@@ -367,16 +362,24 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("save", help="Score a wallet/pair and save the result as a scenario.")
     s.add_argument("--wallet", required=True, help="Stellar wallet address.")
     s.add_argument("--pair", required=True, help="Asset pair identifier (CODE:ISSUER/CODE:ISSUER).")
-    s.add_argument("--label", type=int, choices=[0, 1], default=None,
-                   help="Ground-truth label (1=wash-trade, 0=clean).")
+    s.add_argument(
+        "--label",
+        type=int,
+        choices=[0, 1],
+        default=None,
+        help="Ground-truth label (1=wash-trade, 0=clean).",
+    )
     s.add_argument("--campaign-id", default=None, help="Campaign or event identifier.")
     s.add_argument("--notes", default="", help="Free-text notes.")
-    s.add_argument("--trades-file", default=None,
-                   help="Path to a JSON file containing the trade records.")
-    s.add_argument("--features-file", default=None,
-                   help="Path to a JSON file containing pre-computed features.")
-    s.add_argument("--scenario-id", default=None,
-                   help="Override the auto-generated scenario ID.")
+    s.add_argument(
+        "--trades-file", default=None, help="Path to a JSON file containing the trade records."
+    )
+    s.add_argument(
+        "--features-file",
+        default=None,
+        help="Path to a JSON file containing pre-computed features.",
+    )
+    s.add_argument("--scenario-id", default=None, help="Override the auto-generated scenario ID.")
 
     # --- replay ---
     r = sub.add_parser("replay", help="Replay a stored scenario through the current pipeline.")
@@ -386,13 +389,15 @@ def build_parser() -> argparse.ArgumentParser:
     # --- list ---
     ll = sub.add_parser("list", help="List all stored scenarios.")
     ll.add_argument("--campaign-id", default=None, help="Filter by campaign ID.")
-    ll.add_argument("--label", type=int, choices=[0, 1], default=None,
-                    help="Filter by label.")
+    ll.add_argument("--label", type=int, choices=[0, 1], default=None, help="Filter by label.")
 
     # --- regression ---
     rg = sub.add_parser("regression", help="Replay ALL scenarios and produce a regression report.")
-    rg.add_argument("--output", default=None,
-                    help="Path for the regression JSON report (default: reports/scenario_regression.json).")
+    rg.add_argument(
+        "--output",
+        default=None,
+        help="Path for the regression JSON report (default: reports/scenario_regression.json).",
+    )
 
     return p
 

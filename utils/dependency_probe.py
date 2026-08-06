@@ -91,8 +91,6 @@ import importlib.util
 import json
 import sys
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
-
 
 # ---------------------------------------------------------------------------
 # Dependency registry
@@ -102,9 +100,9 @@ from typing import Dict, List, Optional, Tuple
 # import_name  — the name passed to importlib.util.find_spec
 # pip_name     — the name used in pip install (may differ from import_name)
 
-DependencySpec = List[Tuple[str, str]]
+DependencySpec = list[tuple[str, str]]
 
-DEPENDENCY_GROUPS: Dict[str, DependencySpec] = {
+DEPENDENCY_GROUPS: dict[str, DependencySpec] = {
     "ml_core": [
         ("sklearn", "scikit-learn"),
         ("numpy", "numpy"),
@@ -194,8 +192,8 @@ class PackageStatus:
     import_name: str
     pip_name: str
     available: bool
-    version: Optional[str] = None
-    error: Optional[str] = None
+    version: str | None = None
+    error: str | None = None
 
 
 @dataclass
@@ -213,11 +211,11 @@ class ProbeResult:
 
     group: str
     available: bool
-    packages: List[PackageStatus] = field(default_factory=list)
+    packages: list[PackageStatus] = field(default_factory=list)
     install_hint: str = ""
 
     @property
-    def missing(self) -> List[PackageStatus]:
+    def missing(self) -> list[PackageStatus]:
         return [p for p in self.packages if not p.available]
 
     def __str__(self) -> str:
@@ -236,14 +234,14 @@ class ProbeResult:
 class ProbeReport:
     """Aggregated results across all probed groups."""
 
-    results: List[ProbeResult] = field(default_factory=list)
+    results: list[ProbeResult] = field(default_factory=list)
 
     @property
     def all_available(self) -> bool:
         return all(r.available for r in self.results)
 
     @property
-    def missing_groups(self) -> List[ProbeResult]:
+    def missing_groups(self) -> list[ProbeResult]:
         return [r for r in self.results if not r.available]
 
     def summary(self) -> str:
@@ -315,7 +313,7 @@ class MissingDependencyError(ImportError):
 # ---------------------------------------------------------------------------
 
 
-def _try_get_version(import_name: str) -> Optional[str]:
+def _try_get_version(import_name: str) -> str | None:
     """Return the package version string if available, else None."""
     try:
         import importlib.metadata
@@ -385,9 +383,7 @@ def probe(group: str) -> ProbeResult:
     statuses = [_probe_package(imp, pip) for imp, pip in specs]
     available = all(s.available for s in statuses)
     missing_pip = [s.pip_name for s in statuses if not s.available]
-    install_hint = (
-        f"pip install {' '.join(missing_pip)}" if missing_pip else ""
-    )
+    install_hint = f"pip install {' '.join(missing_pip)}" if missing_pip else ""
     return ProbeResult(
         group=group,
         available=available,
@@ -396,7 +392,7 @@ def probe(group: str) -> ProbeResult:
     )
 
 
-def probe_all(groups: Optional[List[str]] = None) -> ProbeReport:
+def probe_all(groups: list[str] | None = None) -> ProbeReport:
     """
     Probe all registered groups (or a subset).
 
@@ -445,7 +441,7 @@ def require(group: str) -> ProbeResult:
 # ---------------------------------------------------------------------------
 
 
-def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
+def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Probe optional LedgerLens dependency groups.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -480,16 +476,14 @@ def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def _cli_main(argv: Optional[List[str]] = None) -> int:
+def _cli_main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
 
     # Validate group names
-    all_unknown: List[str] = []
+    all_unknown: list[str] = []
     for name_list in [args.groups, args.require]:
         if name_list:
-            all_unknown.extend(
-                g for g in name_list if g not in DEPENDENCY_GROUPS
-            )
+            all_unknown.extend(g for g in name_list if g not in DEPENDENCY_GROUPS)
     if all_unknown:
         print(
             f"[dependency_probe] Unknown group(s): {', '.join(set(all_unknown))}.\n"
@@ -511,8 +505,7 @@ def _cli_main(argv: Optional[List[str]] = None) -> int:
         if not require_report.all_available:
             if not args.as_json:
                 print(
-                    "\n[dependency_probe] ✗ Required groups are missing.  "
-                    "Cannot continue.",
+                    "\n[dependency_probe] ✗ Required groups are missing.  " "Cannot continue.",
                     file=sys.stderr,
                 )
             return 2

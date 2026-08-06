@@ -1,6 +1,5 @@
 """Tests for idempotent trade ingestion with Redis deduplication."""
 
-
 import pytest
 
 from ingestion.trade_deduplicator import (
@@ -11,6 +10,7 @@ from ingestion.trade_deduplicator import (
 # Try to import fakeredis for testing
 try:
     import fakeredis
+
     _FAKEREDIS_AVAILABLE = True
 except ImportError:
     _FAKEREDIS_AVAILABLE = False

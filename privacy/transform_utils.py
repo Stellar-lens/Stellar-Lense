@@ -104,9 +104,7 @@ class PseudonymizeTransform:
 
     def __post_init__(self) -> None:
         if not self.secret_key:
-            raise PrivacyTransformError(
-                self._name, self.field_name, "secret_key must be non-empty"
-            )
+            raise PrivacyTransformError(self._name, self.field_name, "secret_key must be non-empty")
         if not (8 <= self.token_length <= 64):
             raise PrivacyTransformError(
                 self._name,
@@ -235,9 +233,7 @@ class MaskTransform:
 
     def __post_init__(self) -> None:
         if self.keep_suffix < 0:
-            raise PrivacyTransformError(
-                self._name, self.field_name, "keep_suffix must be >= 0"
-            )
+            raise PrivacyTransformError(self._name, self.field_name, "keep_suffix must be >= 0")
 
     def apply(self, record: dict[str, Any]) -> tuple[Any, TransformAuditEntry]:
         if self.field_name not in record:

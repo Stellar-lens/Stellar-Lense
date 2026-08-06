@@ -43,7 +43,7 @@ from __future__ import annotations
 import fnmatch
 import threading
 from collections.abc import Iterable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 import yaml

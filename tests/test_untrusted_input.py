@@ -9,7 +9,7 @@ pipeline trusts. These tests exercise the validators directly; loader-level
 """
 
 import math
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -31,7 +31,7 @@ VALID_ISSUER = "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN"
 def _trade(**overrides) -> Trade:
     fields = {
         "trade_id": "t1",
-        "ledger_close_time": datetime(2024, 1, 1, tzinfo=timezone.utc),
+        "ledger_close_time": datetime(2024, 1, 1, tzinfo=UTC),
         "base_account": VALID_BASE,
         "counter_account": VALID_COUNTER,
         "base_asset": Asset(code="USDC", issuer=VALID_ISSUER),
@@ -128,13 +128,13 @@ def test_validate_trade_accepts_xlm_native_code():
 
 
 def test_validate_trade_rejects_timestamp_before_stellar_genesis():
-    trade = _trade(ledger_close_time=datetime(2010, 1, 1, tzinfo=timezone.utc))
+    trade = _trade(ledger_close_time=datetime(2010, 1, 1, tzinfo=UTC))
     with pytest.raises(UntrustedInputError, match="ledger_close_time"):
         validate_trade(trade, source="test")
 
 
 def test_validate_trade_rejects_timestamp_far_in_future():
-    future = datetime.now(timezone.utc) + timedelta(days=1)
+    future = datetime.now(UTC) + timedelta(days=1)
     trade = _trade(ledger_close_time=future)
     with pytest.raises(UntrustedInputError, match="ledger_close_time"):
         validate_trade(trade, source="test")
@@ -155,7 +155,7 @@ def _orderbook_event(**overrides) -> OrderBookEvent:
     fields = {
         "event_id": "e1",
         "account": VALID_BASE,
-        "ledger_close_time": datetime(2024, 1, 1, tzinfo=timezone.utc),
+        "ledger_close_time": datetime(2024, 1, 1, tzinfo=UTC),
         "selling": Asset(code="USDC", issuer=VALID_ISSUER),
         "buying": Asset(code="XLM"),
         "amount": 10.0,
@@ -197,7 +197,7 @@ def test_validate_orderbook_event_rejects_unknown_action():
 def test_validate_account_activity_accepts_well_formed_activity():
     activity = AccountActivity(
         account_id=VALID_BASE,
-        account_created_at=datetime(2024, 1, 1, tzinfo=timezone.utc),
+        account_created_at=datetime(2024, 1, 1, tzinfo=UTC),
         funding_account=VALID_COUNTER,
     )
     assert validate_account_activity(activity, source="test") is activity
@@ -206,7 +206,7 @@ def test_validate_account_activity_accepts_well_formed_activity():
 def test_validate_account_activity_allows_none_funding_account():
     activity = AccountActivity(
         account_id=VALID_BASE,
-        account_created_at=datetime(2024, 1, 1, tzinfo=timezone.utc),
+        account_created_at=datetime(2024, 1, 1, tzinfo=UTC),
         funding_account=None,
     )
     validate_account_activity(activity, source="test")
@@ -215,7 +215,7 @@ def test_validate_account_activity_allows_none_funding_account():
 def test_validate_account_activity_rejects_bad_funding_account():
     activity = AccountActivity(
         account_id=VALID_BASE,
-        account_created_at=datetime(2024, 1, 1, tzinfo=timezone.utc),
+        account_created_at=datetime(2024, 1, 1, tzinfo=UTC),
         funding_account="bogus",
     )
     with pytest.raises(UntrustedInputError, match="funding_account"):

@@ -18,7 +18,6 @@ from __future__ import annotations
 import threading
 import time
 from collections import deque
-from collections.abc import Callable
 from typing import Any, TypeVar
 
 T = TypeVar("T")

@@ -153,12 +153,13 @@ def main() -> None:
         pool_for_check = load_pool(args.pool)
         if criterion.should_stop(model=primary_model, unlabelled_pool=pool_for_check):
             logger.info(
-                "Active learning stopping criterion fired. "
-                "Use --force-continue to override."
+                "Active learning stopping criterion fired. " "Use --force-continue to override."
             )
             criterion.emit_convergence_report(queue_path=args.queue)
-            print("Active learning has converged. No new wallets selected. "
-                  "Use --force-continue to override.")
+            print(
+                "Active learning has converged. No new wallets selected. "
+                "Use --force-continue to override."
+            )
             return
 
     selected = run_active_learning(

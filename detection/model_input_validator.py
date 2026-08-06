@@ -309,7 +309,7 @@ class ModelInputValidator:
         bounds_path: str | None = None,
         strictness: str | None = None,
         nan_strategy: str | None = None,
-    ) -> "ModelInputValidator":
+    ) -> ModelInputValidator:
         """Construct a validator from a ``model_metadata.json`` sidecar file.
 
         The ``feature_columns`` list in the metadata is used as the expected
@@ -424,8 +424,7 @@ class ModelInputValidator:
 
             if schema_issues and self._strictness == "raise":
                 raise ValueError(
-                    f"Model input schema errors:\n"
-                    + "\n".join(str(ci) for ci in schema_issues)
+                    "Model input schema errors:\n" + "\n".join(str(ci) for ci in schema_issues)
                 )
             if schema_issues and self._strictness == "warn":
                 for ci in schema_issues:
@@ -453,7 +452,7 @@ class ModelInputValidator:
         if range_violations:
             if self._strictness == "raise":
                 raise ValueError(
-                    f"Model input range violations:\n"
+                    "Model input range violations:\n"
                     + "\n".join(str(rv) for rv in range_violations)
                 )
             elif self._strictness == "warn":
@@ -467,9 +466,7 @@ class ModelInputValidator:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _check_schema(
-        self, X: pd.DataFrame, expected_columns: list[str]
-    ) -> list[ColumnIssue]:
+    def _check_schema(self, X: pd.DataFrame, expected_columns: list[str]) -> list[ColumnIssue]:
         """Check that all expected columns are present and numeric."""
         issues: list[ColumnIssue] = []
         for col in expected_columns:
@@ -482,9 +479,7 @@ class ModelInputValidator:
                 issues.append(ColumnIssue(column=col, issue="all_nan"))
         return issues
 
-    def _handle_nans(
-        self, X: pd.DataFrame
-    ) -> tuple[pd.DataFrame, int, int, int]:
+    def _handle_nans(self, X: pd.DataFrame) -> tuple[pd.DataFrame, int, int, int]:
         """Handle NaN and ±Inf values according to the configured strategy.
 
         Returns
@@ -519,9 +514,7 @@ class ModelInputValidator:
 
         return X, rows_dropped, nan_count, inf_count
 
-    def _check_ranges(
-        self, X: pd.DataFrame
-    ) -> tuple[pd.DataFrame, list[RangeViolation], int]:
+    def _check_ranges(self, X: pd.DataFrame) -> tuple[pd.DataFrame, list[RangeViolation], int]:
         """Validate per-feature ranges.  Returns the cleaned DF, violations, and
         number of rows dropped (``strictness='coerce'`` path drops violating rows).
         """

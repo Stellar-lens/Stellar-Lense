@@ -38,7 +38,9 @@ def list_quarantined(queue_path: str | None = None) -> None:
     for i, record in enumerate(quarantined, 1):
         print(f"{i}. Wallet: {record.get('wallet', 'N/A')}")
         print(f"   Asset Pair: {record.get('asset_pair', 'N/A')}")
-        print(f"   Label: {record.get('label', 'N/A')} ({'clean' if record.get('label') == 0 else 'wash trade'})")
+        print(
+            f"   Label: {record.get('label', 'N/A')} ({'clean' if record.get('label') == 0 else 'wash trade'})"
+        )
         print(f"   Annotator: {record.get('annotator_id', 'N/A')}")
         print(f"   Annotated: {record.get('annotated_at', 'N/A')}")
         print(f"   Quarantine Reason: {record.get('quarantine_reason', 'N/A')}")

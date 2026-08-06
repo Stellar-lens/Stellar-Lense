@@ -1,23 +1,18 @@
 """
 tests/test_validate_notebooks.py — Tests for scripts/validate_notebooks.py (#549)
 """
+
 from __future__ import annotations
 
 import json
 import pathlib
-import textwrap
-
-import pytest
 
 from scripts.validate_notebooks import (
-    AggregatedReport,
-    NotebookFinding,
     NotebookValidator,
     _collect_notebooks,
     main,
     parse_requirements_pkgs,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -67,10 +62,14 @@ def markdown_cell(source: str) -> dict:  # type: ignore[type-arg]
 
 
 def test_valid_notebook_no_findings(tmp_path):
-    nb = make_notebook(tmp_path, "valid.ipynb", [
-        markdown_cell("# Title"),
-        code_cell("import sys\nprint(sys.version)\n"),
-    ])
+    nb = make_notebook(
+        tmp_path,
+        "valid.ipynb",
+        [
+            markdown_cell("# Title"),
+            code_cell("import sys\nprint(sys.version)\n"),
+        ],
+    )
     v = NotebookValidator(nb, tmp_path)
     findings = v.validate()
     errors = [f for f in findings if f.level == "error"]
@@ -105,7 +104,7 @@ def test_missing_kernelspec_warning(tmp_path):
     nb_data = {
         "nbformat": 4,
         "nbformat_minor": 5,
-        "metadata": {},   # no kernelspec
+        "metadata": {},  # no kernelspec
         "cells": [],
     }
     p = tmp_path / "no_kernel.ipynb"
@@ -129,36 +128,52 @@ def test_unreadable_file(tmp_path):
 
 
 def test_empty_code_cell_warning(tmp_path):
-    nb = make_notebook(tmp_path, "empty_cell.ipynb", [
-        code_cell("   \n  "),  # whitespace only
-    ])
+    nb = make_notebook(
+        tmp_path,
+        "empty_cell.ipynb",
+        [
+            code_cell("   \n  "),  # whitespace only
+        ],
+    )
     v = NotebookValidator(nb, tmp_path)
     findings = v.validate()
     assert any(f.check == "empty_cell" and f.level == "warning" for f in findings)
 
 
 def test_empty_markdown_cell_warning(tmp_path):
-    nb = make_notebook(tmp_path, "empty_md.ipynb", [
-        markdown_cell(""),
-    ])
+    nb = make_notebook(
+        tmp_path,
+        "empty_md.ipynb",
+        [
+            markdown_cell(""),
+        ],
+    )
     v = NotebookValidator(nb, tmp_path)
     findings = v.validate()
     assert any(f.check == "empty_cell" and f.level == "warning" for f in findings)
 
 
 def test_todo_marker_warning(tmp_path):
-    nb = make_notebook(tmp_path, "todos.ipynb", [
-        code_cell("# TODO: fix this\nimport os\n"),
-    ])
+    nb = make_notebook(
+        tmp_path,
+        "todos.ipynb",
+        [
+            code_cell("# TODO: fix this\nimport os\n"),
+        ],
+    )
     v = NotebookValidator(nb, tmp_path)
     findings = v.validate()
     assert any(f.check == "todo_marker" for f in findings)
 
 
 def test_todo_marker_strict_is_error(tmp_path):
-    nb = make_notebook(tmp_path, "todos_strict.ipynb", [
-        code_cell("# TODO: fix this\nimport os\n"),
-    ])
+    nb = make_notebook(
+        tmp_path,
+        "todos_strict.ipynb",
+        [
+            code_cell("# TODO: fix this\nimport os\n"),
+        ],
+    )
     v = NotebookValidator(nb, tmp_path, strict=True)
     findings = v.validate()
     assert any(f.check == "todo_marker" and f.level == "error" for f in findings)
@@ -166,9 +181,13 @@ def test_todo_marker_strict_is_error(tmp_path):
 
 def test_cell_length_warning(tmp_path):
     long_source = "\n".join(f"x_{i} = {i}" for i in range(250))
-    nb = make_notebook(tmp_path, "long_cell.ipynb", [
-        code_cell(long_source),
-    ])
+    nb = make_notebook(
+        tmp_path,
+        "long_cell.ipynb",
+        [
+            code_cell(long_source),
+        ],
+    )
     v = NotebookValidator(nb, tmp_path)
     findings = v.validate()
     assert any(f.check == "cell_length" and f.level == "warning" for f in findings)
@@ -180,12 +199,16 @@ def test_cell_length_warning(tmp_path):
 
 
 def test_outputs_not_cleared_error(tmp_path):
-    nb = make_notebook(tmp_path, "with_outputs.ipynb", [
-        code_cell(
-            "print('hello')",
-            outputs=[{"output_type": "stream", "text": ["hello\n"]}],
-        ),
-    ])
+    nb = make_notebook(
+        tmp_path,
+        "with_outputs.ipynb",
+        [
+            code_cell(
+                "print('hello')",
+                outputs=[{"output_type": "stream", "text": ["hello\n"]}],
+            ),
+        ],
+    )
     v = NotebookValidator(nb, tmp_path, check_outputs=True)
     findings = v.validate()
     assert any(f.check == "outputs_not_cleared" and f.level == "error" for f in findings)
@@ -212,9 +235,13 @@ def test_outputs_allowed_with_keep_outputs_metadata(tmp_path):
 
 
 def test_cleared_outputs_no_error(tmp_path):
-    nb = make_notebook(tmp_path, "cleared.ipynb", [
-        code_cell("print('hello')", outputs=[]),
-    ])
+    nb = make_notebook(
+        tmp_path,
+        "cleared.ipynb",
+        [
+            code_cell("print('hello')", outputs=[]),
+        ],
+    )
     v = NotebookValidator(nb, tmp_path, check_outputs=True)
     findings = v.validate()
     assert not any(f.check == "outputs_not_cleared" for f in findings)
@@ -226,22 +253,30 @@ def test_cleared_outputs_no_error(tmp_path):
 
 
 def test_sequential_execution_counts_ok(tmp_path):
-    nb = make_notebook(tmp_path, "sequential.ipynb", [
-        code_cell("a = 1", execution_count=1),
-        code_cell("b = 2", execution_count=2),
-        code_cell("c = 3", execution_count=3),
-    ])
+    nb = make_notebook(
+        tmp_path,
+        "sequential.ipynb",
+        [
+            code_cell("a = 1", execution_count=1),
+            code_cell("b = 2", execution_count=2),
+            code_cell("c = 3", execution_count=3),
+        ],
+    )
     v = NotebookValidator(nb, tmp_path, check_execution_count=True)
     findings = v.validate()
     assert not any(f.check == "execution_count" for f in findings)
 
 
 def test_non_sequential_execution_counts_error(tmp_path):
-    nb = make_notebook(tmp_path, "non_sequential.ipynb", [
-        code_cell("a = 1", execution_count=1),
-        code_cell("b = 2", execution_count=5),  # gap!
-        code_cell("c = 3", execution_count=6),
-    ])
+    nb = make_notebook(
+        tmp_path,
+        "non_sequential.ipynb",
+        [
+            code_cell("a = 1", execution_count=1),
+            code_cell("b = 2", execution_count=5),  # gap!
+            code_cell("c = 3", execution_count=6),
+        ],
+    )
     v = NotebookValidator(nb, tmp_path, check_execution_count=True)
     findings = v.validate()
     assert any(f.check == "execution_count" and f.level == "error" for f in findings)
@@ -253,27 +288,39 @@ def test_non_sequential_execution_counts_error(tmp_path):
 
 
 def test_undeclared_import_warning(tmp_path):
-    nb = make_notebook(tmp_path, "undeclared.ipynb", [
-        code_cell("import totally_undeclared_pkg_xyz\n"),
-    ])
+    nb = make_notebook(
+        tmp_path,
+        "undeclared.ipynb",
+        [
+            code_cell("import totally_undeclared_pkg_xyz\n"),
+        ],
+    )
     v = NotebookValidator(nb, tmp_path, requirements_pkgs={"numpy", "pandas"})
     findings = v.validate()
     assert any(f.check == "undeclared_import" for f in findings)
 
 
 def test_declared_import_no_warning(tmp_path):
-    nb = make_notebook(tmp_path, "declared.ipynb", [
-        code_cell("import numpy as np\n"),
-    ])
+    nb = make_notebook(
+        tmp_path,
+        "declared.ipynb",
+        [
+            code_cell("import numpy as np\n"),
+        ],
+    )
     v = NotebookValidator(nb, tmp_path, requirements_pkgs={"numpy", "pandas"})
     findings = v.validate()
     assert not any(f.check == "undeclared_import" for f in findings)
 
 
 def test_stdlib_import_no_warning(tmp_path):
-    nb = make_notebook(tmp_path, "stdlib.ipynb", [
-        code_cell("import sys\nimport os\nimport json\n"),
-    ])
+    nb = make_notebook(
+        tmp_path,
+        "stdlib.ipynb",
+        [
+            code_cell("import sys\nimport os\nimport json\n"),
+        ],
+    )
     v = NotebookValidator(nb, tmp_path, requirements_pkgs=set())
     findings = v.validate()
     assert not any(f.check == "undeclared_import" for f in findings)
@@ -329,10 +376,14 @@ def test_collect_notebooks_explicit_file(tmp_path):
 def test_main_valid_notebook(tmp_path):
     nb_dir = tmp_path / "notebooks"
     nb_dir.mkdir()
-    make_notebook(nb_dir, "clean.ipynb", [
-        markdown_cell("# Title"),
-        code_cell("import sys\n"),
-    ])
+    make_notebook(
+        nb_dir,
+        "clean.ipynb",
+        [
+            markdown_cell("# Title"),
+            code_cell("import sys\n"),
+        ],
+    )
     ret = main(["--root", str(tmp_path)])
     assert ret == 0
 
@@ -364,12 +415,16 @@ def test_main_json_output(tmp_path, capsys):
 def test_main_check_outputs_flag(tmp_path):
     nb_dir = tmp_path / "notebooks"
     nb_dir.mkdir()
-    make_notebook(nb_dir, "with_out.ipynb", [
-        code_cell(
-            "print('hi')",
-            outputs=[{"output_type": "stream", "text": ["hi\n"]}],
-        )
-    ])
+    make_notebook(
+        nb_dir,
+        "with_out.ipynb",
+        [
+            code_cell(
+                "print('hi')",
+                outputs=[{"output_type": "stream", "text": ["hi\n"]}],
+            )
+        ],
+    )
     ret = main(["--root", str(tmp_path), "--check-outputs"])
     assert ret == 2
 
@@ -377,9 +432,13 @@ def test_main_check_outputs_flag(tmp_path):
 def test_main_strict_flag_todo(tmp_path):
     nb_dir = tmp_path / "notebooks"
     nb_dir.mkdir()
-    make_notebook(nb_dir, "todo.ipynb", [
-        code_cell("# TODO: remove this\nx = 1"),
-    ])
+    make_notebook(
+        nb_dir,
+        "todo.ipynb",
+        [
+            code_cell("# TODO: remove this\nx = 1"),
+        ],
+    )
     ret = main(["--root", str(tmp_path), "--strict"])
     assert ret == 2
 

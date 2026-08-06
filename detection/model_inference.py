@@ -49,10 +49,9 @@ from detection.artifact_compatibility import (
 from detection.conformal import ConformalCalibrator
 from detection.differential_privacy import add_laplace_noise, laplace_scale
 from detection.list_override import ListOverride
+from detection.model_contracts import FEATURE_COLUMNS_EXCLUDE, compute_feature_schema_hash
 from detection.model_training import (
-    FEATURE_COLUMNS_EXCLUDE,
     MODEL_REGISTRY,
-    compute_feature_schema_hash,
 )
 from utils.logging import get_logger
 from utils.tracing import get_tracer, hash_span_id
@@ -200,7 +199,10 @@ def _apply_output_perturbation(
     # Add noise and round
     perturbed = add_laplace_noise(float(score), scale, rng)
     perturbed = np.clip(perturbed, 0.0, 100.0)
-    rounded = int(round(perturbed / config.SCORE_ROUNDING_GRANULARITY)) * config.SCORE_ROUNDING_GRANULARITY
+    rounded = (
+        int(round(perturbed / config.SCORE_ROUNDING_GRANULARITY))
+        * config.SCORE_ROUNDING_GRANULARITY
+    )
     return rounded
 
 
@@ -336,11 +338,15 @@ class RiskScorer:
                 continue
 
             try:
-                gate.check(name, feature_columns=self.metadata.get("feature_columns") if self.metadata else None)
+                gate.check(
+                    name,
+                    feature_columns=self.metadata.get("feature_columns") if self.metadata else None,
+                )
             except Exception as exc:
                 logger.warning(
                     "Compatibility gate check failed for %s: %s — loading with best effort",
-                    name, exc,
+                    name,
+                    exc,
                 )
 
             try:
@@ -353,7 +359,8 @@ class RiskScorer:
             except ArtifactCompatibilityError as exc:
                 logger.warning(
                     "Compatibility gate blocked loading %s: %s — falling back to direct load",
-                    name, exc,
+                    name,
+                    exc,
                 )
                 model = joblib.load(path)
             except FileNotFoundError:
@@ -362,9 +369,7 @@ class RiskScorer:
             try:
                 artifact.verify_chain(name)
             except ModelIntegrityError as exc:
-                logger.warning(
-                    "Artifact integrity check skipped or failed for %s: %s", name, exc
-                )
+                logger.warning("Artifact integrity check skipped or failed for %s: %s", name, exc)
             models[name] = model
         return models
 
@@ -453,7 +458,11 @@ class RiskScorer:
             # keeps scoring robust when it isn't (or columns merely differ in
             # a way the model doesn't need).
             model_features = getattr(model, "feature_names_in_", None)
-            X_model = X.reindex(columns=model_features, fill_value=0.0) if model_features is not None else X
+            X_model = (
+                X.reindex(columns=model_features, fill_value=0.0)
+                if model_features is not None
+                else X
+            )
             probs.append(model.predict_proba(X_model)[0, 1])
         return probs
 
@@ -505,10 +514,7 @@ class RiskScorer:
             return override
 
         # Zero-shot routing for asset pairs with insufficient labelled data
-        if (
-            labelled_count is not None
-            and labelled_count < config.ZERO_SHOT_MIN_LABELLED_EXAMPLES
-        ):
+        if labelled_count is not None and labelled_count < config.ZERO_SHOT_MIN_LABELLED_EXAMPLES:
             zs = _zero_shot_score(feature_row)
             if zs is not None:
                 zs_score = int(round(zs["confidence"] * 100))
@@ -1043,9 +1049,7 @@ def verify_model_artifact_signature(model_dir: str, version_id: str) -> bool:
         )
         return False
     except Exception as exc:
-        logger.warning(
-            "Artifact integrity check error for version %s: %s", version_id, exc
-        )
+        logger.warning("Artifact integrity check error for version %s: %s", version_id, exc)
         return False
 
 

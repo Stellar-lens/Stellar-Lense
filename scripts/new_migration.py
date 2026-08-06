@@ -62,7 +62,7 @@ def _next_id(versions_dir: str) -> str:
             m = re.match(r"^(\d{4})_", fname)
             if m:
                 existing.append(int(m.group(1)))
-    return str((max(existing, default=0) + 1)).zfill(4)
+    return str(max(existing, default=0) + 1).zfill(4)
 
 
 def _slug(description: str) -> str:
@@ -86,7 +86,9 @@ def main(argv: list[str] | None = None) -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
-    parser.add_argument("description", help="Short description of the migration (used in filename and class)")
+    parser.add_argument(
+        "description", help="Short description of the migration (used in filename and class)"
+    )
     parser.add_argument(
         "--id",
         metavar="NNNN",
@@ -126,7 +128,7 @@ def main(argv: list[str] | None = None) -> int:
     print("Next steps:")
     print(f"  1. Implement the `up` method in {filename}")
     print(f"  2. Add '{migration_id}' to REGISTRY in migrations/registry.py")
-    print(f"  3. Run: python -m scripts.migrate --dry-run  to verify")
+    print("  3. Run: python -m scripts.migrate --dry-run  to verify")
     return 0
 
 

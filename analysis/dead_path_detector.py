@@ -128,9 +128,7 @@ class DeadPathReport:
     def to_dict(self) -> dict:
         return {
             "modules_checked": len(self.modules),
-            "candidates": [
-                {"module": m.module, "file": str(m.file)} for m in self.candidates
-            ],
+            "candidates": [{"module": m.module, "file": str(m.file)} for m in self.candidates],
             "all_modules": [
                 {
                     "module": m.module,
@@ -260,9 +258,7 @@ def detect_dead_paths(
     root_path = Path(root).resolve()
 
     referrer_dirs = tuple(dict.fromkeys((*candidate_packages, *REFERRER_ONLY_DIRS)))
-    referrer_files = [
-        root_path / f for f in REFERRER_ONLY_FILES if (root_path / f).is_file()
-    ]
+    referrer_files = [root_path / f for f in REFERRER_ONLY_FILES if (root_path / f).is_file()]
 
     all_files = _iter_py_files(root_path, referrer_dirs) + referrer_files
     refs = _collect_python_references(root_path, all_files)

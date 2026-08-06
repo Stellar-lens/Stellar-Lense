@@ -23,6 +23,8 @@ from stellar_sdk import Server
 from config import config
 from ingestion.data_models import Asset, OrderBookEvent
 from ingestion.exceptions import record_context
+from ingestion.untrusted_input import UntrustedInputError, validate_orderbook_event
+from utils.logging import get_logger
 from utils.retry import retry_with_backoff
 
 logger = get_logger(__name__)

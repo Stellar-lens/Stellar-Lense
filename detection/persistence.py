@@ -455,7 +455,9 @@ class TransparencyLog:
     def append(self, model_name: str, artifact_sha256: str) -> None:
         """Register a new known-good artifact hash (idempotent for same hash)."""
         if len(artifact_sha256) != 64 or not all(c in "0123456789abcdef" for c in artifact_sha256):
-            raise ValueError(f"artifact_sha256 must be a 64-char lowercase hex string, got: {artifact_sha256!r}")
+            raise ValueError(
+                f"artifact_sha256 must be a 64-char lowercase hex string, got: {artifact_sha256!r}"
+            )
         with self._session_factory() as session:
             existing = (
                 session.query(TransparencyLogRecord)
@@ -483,9 +485,11 @@ class TransparencyLog:
     def all_hashes(self) -> list[str]:
         """Return all registered hashes (for auditing)."""
         with self._session_factory() as session:
-            rows = session.query(TransparencyLogRecord).order_by(
-                TransparencyLogRecord.registered_at
-            ).all()
+            rows = (
+                session.query(TransparencyLogRecord)
+                .order_by(TransparencyLogRecord.registered_at)
+                .all()
+            )
             return [r.artifact_sha256 for r in rows]
 
 

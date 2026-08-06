@@ -277,9 +277,7 @@ class LocalDatasetStore:
         eff_fmt = (fmt or self._fmt).lower()
         path = self._path_for(name, eff_fmt)
         if not path.exists():
-            raise FileNotFoundError(
-                f"Dataset {name!r} not found at {path}"
-            )
+            raise FileNotFoundError(f"Dataset {name!r} not found at {path}")
         df = _read_bytes(path.read_bytes(), eff_fmt, columns)
         logger.debug("LocalDatasetStore.load: %s → %d rows", path, len(df))
         return df
@@ -519,9 +517,7 @@ def build_dataset_store(
     """
     eff_backend = (backend or _BACKEND).lower()
     if eff_backend not in _VALID_BACKENDS:
-        raise ValueError(
-            f"Unknown backend {eff_backend!r}. Choose from: {sorted(_VALID_BACKENDS)}"
-        )
+        raise ValueError(f"Unknown backend {eff_backend!r}. Choose from: {sorted(_VALID_BACKENDS)}")
 
     if eff_backend == "local":
         return LocalDatasetStore(base_path=base_path, fmt=fmt)

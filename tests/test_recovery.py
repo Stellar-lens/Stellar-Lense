@@ -15,7 +15,6 @@ import pytest
 from pipeline.idempotency import CheckpointStore
 from pipeline.recovery import RecoveryManager, StageResult, StageTracker, rollback_partial_writes
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------

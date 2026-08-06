@@ -78,9 +78,8 @@ class TuningResult:
             "strategy": self.strategy,
             "recommended_threshold": self.recommended_threshold,
             "parameters": self.parameters,
-            "generated_at": self.generated_at or datetime.now(UTC).isoformat().replace(
-                "+00:00", "Z"
-            ),
+            "generated_at": self.generated_at
+            or datetime.now(UTC).isoformat().replace("+00:00", "Z"),
             "eval_points": [
                 {
                     "threshold": p.threshold,
@@ -130,9 +129,16 @@ def _compute_metrics(
 
     return ThresholdEvalPoint(
         threshold=threshold,
-        tp=tp, fp=fp, tn=tn, fn=fn,
-        precision=precision, recall=recall,
-        f1=f1, f_beta=f_beta, fpr=fpr, cost=cost,
+        tp=tp,
+        fp=fp,
+        tn=tn,
+        fn=fn,
+        precision=precision,
+        recall=recall,
+        f1=f1,
+        f_beta=f_beta,
+        fpr=fpr,
+        cost=cost,
     )
 
 
@@ -184,8 +190,7 @@ class ThresholdTuner:
         beta>1 → recall-favoured (fewer missed wash trades)
         """
         eval_points = [
-            _compute_metrics(self._scores, self._labels, t, beta=beta)
-            for t in self._grid
+            _compute_metrics(self._scores, self._labels, t, beta=beta) for t in self._grid
         ]
         best = max(eval_points, key=lambda p: p.f_beta)
         return TuningResult(
@@ -207,10 +212,7 @@ class ThresholdTuner:
         that maximises recall is selected (i.e. we catch as many wash trades
         as possible without exceeding the FP budget).
         """
-        eval_points = [
-            _compute_metrics(self._scores, self._labels, t)
-            for t in self._grid
-        ]
+        eval_points = [_compute_metrics(self._scores, self._labels, t) for t in self._grid]
         feasible = [p for p in eval_points if p.fpr <= max_fpr]
         if not feasible:
             # Relax: return the threshold with the minimum FPR
@@ -234,9 +236,7 @@ class ThresholdTuner:
     # Strategy: cost_sensitive
     # ------------------------------------------------------------------
 
-    def tune_cost_sensitive(
-        self, fp_weight: float = 1.0, fn_weight: float = 5.0
-    ) -> TuningResult:
+    def tune_cost_sensitive(self, fp_weight: float = 1.0, fn_weight: float = 5.0) -> TuningResult:
         """Minimise a cost function ``FP_weight * FP + FN_weight * FN``.
 
         The asymmetric default (FN costs 5× more than FP) reflects the
@@ -245,8 +245,11 @@ class ThresholdTuner:
         """
         eval_points = [
             _compute_metrics(
-                self._scores, self._labels, t,
-                fp_weight=fp_weight, fn_weight=fn_weight,
+                self._scores,
+                self._labels,
+                t,
+                fp_weight=fp_weight,
+                fn_weight=fn_weight,
             )
             for t in self._grid
         ]
@@ -273,9 +276,7 @@ class ThresholdTuner:
         return {
             "precision_recall": self.tune_precision_recall(beta=beta),
             "false_positive_budget": self.tune_false_positive_budget(max_fpr=max_fpr),
-            "cost_sensitive": self.tune_cost_sensitive(
-                fp_weight=fp_weight, fn_weight=fn_weight
-            ),
+            "cost_sensitive": self.tune_cost_sensitive(fp_weight=fp_weight, fn_weight=fn_weight),
         }
 
 

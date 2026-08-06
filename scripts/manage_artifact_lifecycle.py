@@ -74,7 +74,9 @@ def main() -> None:
             print(f"{args.name}:{args.version} -> deprecated")
         elif args.command == "rollback":
             record = registry.rollback(args.name, args.version, reason=args.reason)
-            print(f"Rolled back {args.name}:{record.version}; reactivated parent={record.parent_version}")
+            print(
+                f"Rolled back {args.name}:{record.version}; reactivated parent={record.parent_version}"
+            )
         elif args.command == "verify":
             registry.verify_integrity(args.name, args.version)
             print(f"{args.name}:{args.version} integrity OK")

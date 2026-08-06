@@ -27,7 +27,7 @@ import hashlib
 import json
 import os
 import sys
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
@@ -114,36 +114,43 @@ def _get_dependency_versions() -> dict[str, str]:
     versions: dict[str, str] = {}
     try:
         import sklearn
+
         versions["scikit-learn"] = sklearn.__version__
     except Exception:
         pass
     try:
         import xgboost
+
         versions["xgboost"] = xgboost.__version__
     except Exception:
         pass
     try:
         import lightgbm
+
         versions["lightgbm"] = lightgbm.__version__
     except Exception:
         pass
     try:
         import torch
+
         versions["torch"] = torch.__version__
     except Exception:
         pass
     try:
         import numpy
+
         versions["numpy"] = numpy.__version__
     except Exception:
         pass
     try:
         import pandas
+
         versions["pandas"] = pandas.__version__
     except Exception:
         pass
     try:
         import joblib
+
         versions["joblib"] = joblib.__version__
     except Exception:
         pass
@@ -215,6 +222,7 @@ class CompatibilityReport:
         errors: List of hard errors (block loading).
         warnings: List of soft warnings (log only).
     """
+
     passed: bool = True
     errors: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)

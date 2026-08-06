@@ -7,6 +7,7 @@ Acceptance criteria covered:
   - JSON export conforms to expected schema.
   - Edge cases: all-positive, all-negative, empty, mismatched inputs.
 """
+
 from __future__ import annotations
 
 import json
@@ -26,10 +27,7 @@ from evaluation.threshold_sweep import (
 # ---------------------------------------------------------------------------
 
 Y_TRUE = np.array([0] * 50 + [1] * 50)
-Y_SCORE = np.array(
-    [0.10 + 0.008 * i for i in range(50)]
-    + [0.51 + 0.008 * i for i in range(50)]
-)
+Y_SCORE = np.array([0.10 + 0.008 * i for i in range(50)] + [0.51 + 0.008 * i for i in range(50)])
 
 
 # ---------------------------------------------------------------------------
@@ -99,9 +97,7 @@ def test_impact_report_deltas_correct():
     assert report.recall_delta == pytest.approx(
         report.proposed_metrics.recall - report.current_metrics.recall
     )
-    assert report.f1_delta == pytest.approx(
-        report.proposed_metrics.f1 - report.current_metrics.f1
-    )
+    assert report.f1_delta == pytest.approx(report.proposed_metrics.f1 - report.current_metrics.f1)
     assert report.alert_count_delta == (
         report.proposed_metrics.alert_count - report.current_metrics.alert_count
     )

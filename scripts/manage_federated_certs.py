@@ -199,7 +199,11 @@ def cmd_list(args: argparse.Namespace) -> None:
     print("-" * 100)
     for r in records:
         status = "REVOKED" if r.revoked else "active"
-        print(fmt.format(r.cn, status, r.allowed_models[:28], str(r.expires_at)[:25], str(r.issued_at)[:25]))
+        print(
+            fmt.format(
+                r.cn, status, r.allowed_models[:28], str(r.expires_at)[:25], str(r.issued_at)[:25]
+            )
+        )
 
 
 def cmd_check_expiry(args: argparse.Namespace) -> None:

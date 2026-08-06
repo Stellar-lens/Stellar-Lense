@@ -48,7 +48,6 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Any
 
 import numpy as np
 
@@ -166,16 +165,20 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         epilog=__doc__,
     )
     p.add_argument(
-        "--eval-data", "-d", default=None,
+        "--eval-data",
+        "-d",
+        default=None,
         help="Path to evaluation data (backtest JSON, Parquet, or CSV). "
-             "Auto-detects latest backtest report if not specified.",
+        "Auto-detects latest backtest report if not specified.",
     )
     p.add_argument(
-        "--score-col", default="risk_score",
+        "--score-col",
+        default="risk_score",
         help="Name of the score column when using tabular data (default: risk_score).",
     )
     p.add_argument(
-        "--label-col", default="label",
+        "--label-col",
+        default="label",
         help="Name of the label column when using tabular data (default: label).",
     )
     p.add_argument(
@@ -185,27 +188,37 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Tuning strategy to run (default: all).",
     )
     p.add_argument(
-        "--beta", type=float, default=1.0,
+        "--beta",
+        type=float,
+        default=1.0,
         help="Beta for F-beta score in precision_recall strategy (default: 1.0).",
     )
     p.add_argument(
-        "--max-fpr", type=float, default=0.05,
+        "--max-fpr",
+        type=float,
+        default=0.05,
         help="Max false-positive rate for false_positive_budget strategy (default: 0.05).",
     )
     p.add_argument(
-        "--fp-weight", type=float, default=1.0,
+        "--fp-weight",
+        type=float,
+        default=1.0,
         help="FP cost weight for cost_sensitive strategy (default: 1.0).",
     )
     p.add_argument(
-        "--fn-weight", type=float, default=5.0,
+        "--fn-weight",
+        type=float,
+        default=5.0,
         help="FN cost weight for cost_sensitive strategy (default: 5.0).",
     )
     p.add_argument(
-        "--output-dir", default=str(REPORTS_DIR),
+        "--output-dir",
+        default=str(REPORTS_DIR),
         help=f"Output directory for reports (default: {REPORTS_DIR}).",
     )
     p.add_argument(
-        "--no-markdown", action="store_true",
+        "--no-markdown",
+        action="store_true",
         help="Skip generating Markdown report files.",
     )
     return p.parse_args(argv)
@@ -228,9 +241,7 @@ def main(argv: list[str] | None = None) -> int:
                 scores, labels = _load_from_backtest_json(path)
             else:
                 scores, labels = _load_from_tabular(path, args.score_col, args.label_col)
-            logger.info(
-                "Loaded %d evaluation samples from %s", len(scores), path
-            )
+            logger.info("Loaded %d evaluation samples from %s", len(scores), path)
         except Exception as exc:  # noqa: BLE001
             logger.error("Failed to load eval data from %s: %s", path, exc)
             return 2
@@ -261,7 +272,9 @@ def main(argv: list[str] | None = None) -> int:
     pos = int(labels.sum())
     logger.info(
         "Evaluation set: %d samples, %d positives (%.1f%%)",
-        len(scores), pos, 100 * pos / len(scores),
+        len(scores),
+        pos,
+        100 * pos / len(scores),
     )
 
     # ------------------------------------------------------------------
@@ -297,9 +310,7 @@ def main(argv: list[str] | None = None) -> int:
 
         save_tuning_report(result, output_dir=output_dir, also_markdown=not args.no_markdown)
         recommendations[strategy] = result.recommended_threshold
-        print(
-            f"[tune] {strategy}: recommended threshold = {result.recommended_threshold}"
-        )
+        print(f"[tune] {strategy}: recommended threshold = {result.recommended_threshold}")
 
     # ------------------------------------------------------------------
     # Summary
@@ -318,8 +329,8 @@ def main(argv: list[str] | None = None) -> int:
             sign = "+" if delta >= 0 else ""
             print(f"  {strat}: {val} ({sign}{delta} vs current {DEFAULT_THRESHOLD})")
         print(
-            f"\n  To apply a recommendation, set RISK_SCORE_FLAG_THRESHOLD=<value> "
-            f"in your environment or config.py."
+            "\n  To apply a recommendation, set RISK_SCORE_FLAG_THRESHOLD=<value> "
+            "in your environment or config.py."
         )
         return 0
     else:

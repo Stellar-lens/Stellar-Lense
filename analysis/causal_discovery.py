@@ -186,7 +186,9 @@ def _extract_adjacency(cg, node_names: list[str]) -> dict[str, list[str]]:
     return adj
 
 
-def _persist(adj: dict[str, list[str]], node_names: list[str], dot_path: str, json_path: str) -> None:
+def _persist(
+    adj: dict[str, list[str]], node_names: list[str], dot_path: str, json_path: str
+) -> None:
     os.makedirs(os.path.dirname(dot_path), exist_ok=True)
     os.makedirs(os.path.dirname(json_path), exist_ok=True)
 

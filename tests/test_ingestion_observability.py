@@ -39,17 +39,26 @@ def test_ingestion_metrics_emit_throughput_and_typed_failures():
     emitter.emit_success("horizon", stage="fetch", record_count=20, duration_seconds=2.0)
     emitter.emit_failure("horizon", TimeoutError("late"), stage="fetch")
 
-    assert registry.get_sample_value(
-        "ledgerlens_ingestion_records_total", {"source": "horizon", "stage": "fetch"}
-    ) == 20
-    assert registry.get_sample_value(
-        "ledgerlens_ingestion_throughput_records_per_second",
-        {"source": "horizon", "stage": "fetch"},
-    ) == 10
-    assert registry.get_sample_value(
-        "ledgerlens_ingestion_failures_total",
-        {"source": "horizon", "stage": "fetch", "error_type": "TimeoutError"},
-    ) == 1
+    assert (
+        registry.get_sample_value(
+            "ledgerlens_ingestion_records_total", {"source": "horizon", "stage": "fetch"}
+        )
+        == 20
+    )
+    assert (
+        registry.get_sample_value(
+            "ledgerlens_ingestion_throughput_records_per_second",
+            {"source": "horizon", "stage": "fetch"},
+        )
+        == 10
+    )
+    assert (
+        registry.get_sample_value(
+            "ledgerlens_ingestion_failures_total",
+            {"source": "horizon", "stage": "fetch", "error_type": "TimeoutError"},
+        )
+        == 1
+    )
 
 
 @pytest.mark.issue("ADV-003")

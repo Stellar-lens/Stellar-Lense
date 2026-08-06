@@ -40,7 +40,7 @@ if os.getenv("LEDGERLENS_INTEGRATION_TESTS") == "1":
 
 @pytest.mark.skipif(
     os.getenv("LEDGERLENS_INTEGRATION_TESTS") != "1",
-    reason="Integration tests require LEDGERLENS_INTEGRATION_TESTS=1"
+    reason="Integration tests require LEDGERLENS_INTEGRATION_TESTS=1",
 )
 class TestFullPipelineE2E:
     """End-to-end pipeline test with Testnet trades flowing to risk scores."""
@@ -50,7 +50,7 @@ class TestFullPipelineE2E:
         """Setup test database and clean up after test."""
         # Create test database session
         engine = get_engine()
-        
+
         # Clean up any existing test risk scores
         with Session(engine) as session:
             # Delete any risk scores from the last hour to avoid contamination
@@ -59,9 +59,9 @@ class TestFullPipelineE2E:
             for record in session.execute(stmt).scalars():
                 session.delete(record)
             session.commit()
-        
+
         yield
-        
+
         # Teardown: clean up again
         with Session(engine) as session:
             cutoff = datetime.now(UTC) - timedelta(hours=1)
@@ -74,24 +74,23 @@ class TestFullPipelineE2E:
         """Poll the database for a risk score, up to timeout_seconds."""
         engine = get_engine()
         start = time.time()
-        
+
         while time.time() - start < timeout_seconds:
             with Session(engine) as session:
                 stmt = select(RiskScoreRecord).where(
-                    (RiskScoreRecord.wallet == wallet)
-                    & (RiskScoreRecord.pair_id == pair)
+                    (RiskScoreRecord.wallet == wallet) & (RiskScoreRecord.pair_id == pair)
                 )
                 record = session.execute(stmt).scalar_one_or_none()
                 if record:
                     return record.risk_score
-            
+
             time.sleep(2)  # Poll every 2 seconds
-        
+
         return None
 
     def _generate_trades_and_return_wallets(self, pattern_name: str, n_trades: int = 20):
         """Generate trades via factory and return wallet addresses.
-        
+
         Returns: (wallet_addresses, expected_score_range)
         """
         if pattern_name == "clean":
@@ -105,65 +104,67 @@ class TestFullPipelineE2E:
             expected_min, expected_max = 60, 100
         else:
             raise ValueError(f"Unknown pattern: {pattern_name}")
-        
+
         # Extract unique wallets from the trades
         wallets = set()
         for trade in trades:
             wallets.add(trade.base_account)
             wallets.add(trade.counter_account)
-        
+
         return list(wallets), (expected_min, expected_max)
 
     def test_clean_trades_have_low_risk(self):
         """Test that clean (legitimate) trades score low."""
         wallets, (expected_min, expected_max) = self._generate_trades_and_return_wallets("clean")
-        
+
         # Pick any wallet to check
         if not wallets:
             pytest.skip("No wallets generated")
-        
+
         wallet = wallets[0]
         pair = "USDC:native/XLM:native"  # Common test pair
-        
+
         # Score should appear within 60 seconds
         score = self._get_risk_score(wallet, pair, timeout_seconds=60)
-        
+
         assert score is not None, f"Risk score not found for {wallet} within 60 seconds"
         assert expected_min <= score <= expected_max, (
-            f"Score {score} out of range [{expected_min}, {expected_max}] "
-            f"for clean trades"
+            f"Score {score} out of range [{expected_min}, {expected_max}] " f"for clean trades"
         )
 
     def test_round_trip_trades_have_high_risk(self):
         """Test that round-trip wash trades score high."""
-        wallets, (expected_min, expected_max) = self._generate_trades_and_return_wallets("round_trip")
-        
+        wallets, (expected_min, expected_max) = self._generate_trades_and_return_wallets(
+            "round_trip"
+        )
+
         if not wallets:
             pytest.skip("No wallets generated")
-        
+
         wallet = wallets[0]
         pair = "USDC:native/XLM:native"
-        
+
         score = self._get_risk_score(wallet, pair, timeout_seconds=60)
-        
+
         assert score is not None, f"Risk score not found for {wallet} within 60 seconds"
         assert expected_min <= score <= expected_max, (
-            f"Score {score} out of range [{expected_min}, {expected_max}] "
-            f"for round-trip trades"
+            f"Score {score} out of range [{expected_min}, {expected_max}] " f"for round-trip trades"
         )
 
     def test_same_amount_trades_have_high_risk(self):
         """Test that same-amount repeated trades score high."""
-        wallets, (expected_min, expected_max) = self._generate_trades_and_return_wallets("same_amount")
-        
+        wallets, (expected_min, expected_max) = self._generate_trades_and_return_wallets(
+            "same_amount"
+        )
+
         if not wallets:
             pytest.skip("No wallets generated")
-        
+
         wallet = wallets[0]
         pair = "USDC:native/XLM:native"
-        
+
         score = self._get_risk_score(wallet, pair, timeout_seconds=60)
-        
+
         assert score is not None, f"Risk score not found for {wallet} within 60 seconds"
         assert expected_min <= score <= expected_max, (
             f"Score {score} out of range [{expected_min}, {expected_max}] "
@@ -175,11 +176,11 @@ class TestFullPipelineE2E:
         # Use a fake wallet that won't trade
         fake_wallet = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF"
         pair = "USDC:native/XLM:native"
-        
+
         # Should timeout and return None
         start = time.time()
         score = self._get_risk_score(fake_wallet, pair, timeout_seconds=5)
         elapsed = time.time() - start
-        
+
         assert score is None, "Should not find score for non-trading wallet"
         assert elapsed >= 5, "Timeout should be enforced"

@@ -23,7 +23,12 @@ import fastavro
 
 from config import config
 from ingestion.data_models import Asset, Trade
-from ingestion.exceptions import InvalidInputError, SchemaValidationError, record_context
+from ingestion.exceptions import (
+    InvalidInputError,
+    SchemaDecodeError,
+    SchemaValidationError,
+    record_context,
+)
 
 
 @lru_cache(maxsize=4)
@@ -151,6 +156,7 @@ def validate(record: dict, schema: dict) -> None:
 # Avro CRC32 canonical fingerprinting (#201)
 # ---------------------------------------------------------------------------
 
+
 def _avro_crc32_fingerprint(schema_dict: dict) -> int:
     """Compute the 64-bit Avro CRC-64-AVRO fingerprint of the canonical schema JSON.
 
@@ -171,6 +177,7 @@ def _avro_crc32_fingerprint(schema_dict: dict) -> int:
         pass
     # Fallback: CRC-32 packed as a signed 64-bit integer
     import zlib
+
     crc = zlib.crc32(data) & 0xFFFFFFFF
     return struct.unpack(">i", struct.pack(">I", crc)[:4])[0]
 
@@ -178,6 +185,7 @@ def _avro_crc32_fingerprint(schema_dict: dict) -> int:
 # ---------------------------------------------------------------------------
 # Schema compatibility checks (#201)
 # ---------------------------------------------------------------------------
+
 
 def _field_map(schema: dict) -> dict[str, dict]:
     """Return {field_name: field_def} for a parsed Avro record schema."""
@@ -224,9 +232,7 @@ def check_backward_compatibility(old_schema: dict, new_schema: dict) -> tuple[bo
     # Removed fields: readers skip them unless they were optional
     for name, field in old_fields.items():
         if name not in new_fields and not _field_is_optional(field):
-            violations.append(
-                f"Removed required field '{name}' — new reader cannot reconstruct it"
-            )
+            violations.append(f"Removed required field '{name}' — new reader cannot reconstruct it")
 
     return len(violations) == 0, violations
 
@@ -268,6 +274,7 @@ def check_forward_compatibility(old_schema: dict, new_schema: dict) -> tuple[boo
 # ---------------------------------------------------------------------------
 # SchemaRegistry (#201)
 # ---------------------------------------------------------------------------
+
 
 class SchemaRegistry:
     """In-process registry of Avro schema versions with fingerprint-based lookup.
@@ -317,9 +324,7 @@ class SchemaRegistry:
             return None
         return max(self._versions, key=lambda fp: self._versions[fp][0])
 
-    def check_backward_compatibility(
-        self, old_fp: int, new_fp: int
-    ) -> tuple[bool, list[str]]:
+    def check_backward_compatibility(self, old_fp: int, new_fp: int) -> tuple[bool, list[str]]:
         """Backward-compat check between two registered schemas by fingerprint."""
         old = self.get_schema(old_fp)
         new = self.get_schema(new_fp)
@@ -337,9 +342,7 @@ class SchemaRegistry:
             )
         return check_backward_compatibility(old, new)
 
-    def check_forward_compatibility(
-        self, old_fp: int, new_fp: int
-    ) -> tuple[bool, list[str]]:
+    def check_forward_compatibility(self, old_fp: int, new_fp: int) -> tuple[bool, list[str]]:
         """Forward-compat check between two registered schemas by fingerprint."""
         old = self.get_schema(old_fp)
         new = self.get_schema(new_fp)

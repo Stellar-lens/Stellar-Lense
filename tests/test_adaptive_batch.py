@@ -1,13 +1,10 @@
 """Unit tests for AdaptiveBatchController PID logic (Issue #243)."""
 
-
 from streaming.streaming_scorer import AdaptiveBatchController
 
 
 def test_initial_batch_size_within_bounds():
-    ctrl = AdaptiveBatchController(
-        target_p95_latency=2.0, min_batch=1, max_batch=500
-    )
+    ctrl = AdaptiveBatchController(target_p95_latency=2.0, min_batch=1, max_batch=500)
     assert ctrl.min_batch <= ctrl.batch_size <= ctrl.max_batch
 
 
@@ -40,9 +37,9 @@ def test_latency_below_target_increases_batch_size():
     for _ in range(20):
         ctrl.update(0.5)
 
-    assert ctrl.batch_size > low_batch, (
-        "Batch size should increase when latency is comfortably below target"
-    )
+    assert (
+        ctrl.batch_size > low_batch
+    ), "Batch size should increase when latency is comfortably below target"
 
 
 def test_batch_size_never_exceeds_max():

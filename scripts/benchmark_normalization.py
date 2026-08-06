@@ -39,7 +39,6 @@ import time
 from datetime import datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
-from typing import Any
 
 from ingestion.data_models import Asset
 from utils.currency_normalization import (
@@ -60,6 +59,7 @@ logger = get_logger(__name__)
 
 class Colors:
     """ANSI color codes."""
+
     GREEN = "\033[92m"
     YELLOW = "\033[93m"
     RED = "\033[91m"
@@ -163,7 +163,7 @@ def setup_test_assets():
         issuer="GCQTGZQQ5G4PTM2GL7CDIFKUBIPEC52BROAQIAPW53XBRJVN6ZJVTG6V",
     )
     btc = Asset(code="BTC", issuer="GTEST123")
-    
+
     return {"xlm": xlm, "usdc": usdc, "usdt": usdt, "btc": btc}
 
 
@@ -177,13 +177,13 @@ def benchmark_single_normalization() -> dict[str, BenchmarkResult]:
     results = {}
     iterations = 10000
     assets = setup_test_assets()
-    
+
     # Setup providers
     mock_provider = MockExchangeRateProvider()
     mock_provider.set_rate(assets["btc"], assets["xlm"], Decimal("600000"))
-    
+
     cached_provider = CachedRateProvider(mock_provider, ttl=timedelta(minutes=5))
-    
+
     # Benchmark: Same currency (no conversion)
     def same_currency():
         normalize_amount(
@@ -192,9 +192,9 @@ def benchmark_single_normalization() -> dict[str, BenchmarkResult]:
             assets["xlm"],
             mock_provider,
         )
-    
+
     results["same_currency"] = benchmark(same_currency, iterations)
-    
+
     # Benchmark: With conversion (uncached)
     def with_conversion_uncached():
         normalize_amount(
@@ -203,9 +203,9 @@ def benchmark_single_normalization() -> dict[str, BenchmarkResult]:
             assets["xlm"],
             mock_provider,
         )
-    
+
     results["with_conversion_uncached"] = benchmark(with_conversion_uncached, iterations)
-    
+
     # Benchmark: With conversion (cached)
     def with_conversion_cached():
         normalize_amount(
@@ -214,9 +214,9 @@ def benchmark_single_normalization() -> dict[str, BenchmarkResult]:
             assets["xlm"],
             cached_provider,
         )
-    
+
     results["with_conversion_cached"] = benchmark(with_conversion_cached, iterations)
-    
+
     return results
 
 
@@ -230,30 +230,30 @@ def benchmark_batch_normalization() -> dict[str, BenchmarkResult]:
     results = {}
     iterations = 1000
     assets = setup_test_assets()
-    
+
     provider = MockExchangeRateProvider()
     provider.set_rate(assets["btc"], assets["xlm"], Decimal("600000"))
-    
+
     # Benchmark: Aggregate 10 amounts
     amounts_10 = [
         (DecimalAmount("100"), assets["usdc"]),
         (DecimalAmount("100"), assets["usdt"]),
         (DecimalAmount("100"), assets["xlm"]),
     ] * 3 + [(DecimalAmount("1"), assets["btc"])]
-    
+
     def aggregate_10():
         aggregate_normalized(amounts_10, assets["xlm"], provider)
-    
+
     results["aggregate_10_amounts"] = benchmark(aggregate_10, iterations)
-    
+
     # Benchmark: Aggregate 100 amounts
     amounts_100 = amounts_10 * 10
-    
+
     def aggregate_100():
         aggregate_normalized(amounts_100, assets["xlm"], provider)
-    
+
     results["aggregate_100_amounts"] = benchmark(aggregate_100, iterations // 10)
-    
+
     return results
 
 
@@ -267,41 +267,41 @@ def benchmark_strategies() -> dict[str, BenchmarkResult]:
     results = {}
     iterations = 5000
     assets = setup_test_assets()
-    
+
     provider = MockExchangeRateProvider()
     provider.set_rate(assets["btc"], assets["xlm"], Decimal("600000"))
-    
+
     # Setup strategies
     xlm_strategy = XLMNormalization(provider)
     usd_strategy = USDNormalization(provider)
     multihop_strategy = MultiHopNormalization(provider, base_asset=assets["xlm"])
-    
+
     amount = DecimalAmount("100")
-    
+
     # Benchmark: XLM strategy
     def xlm_normalize():
         xlm_strategy.normalize(amount, assets["usdc"])
-    
+
     results["xlm_strategy"] = benchmark(xlm_normalize, iterations)
-    
+
     # Benchmark: USD strategy
     def usd_normalize():
         usd_strategy.normalize(amount, assets["xlm"])
-    
+
     results["usd_strategy"] = benchmark(usd_normalize, iterations)
-    
+
     # Benchmark: MultiHop strategy (direct path)
     def multihop_direct():
         multihop_strategy.normalize(amount, assets["usdc"])
-    
+
     results["multihop_direct"] = benchmark(multihop_direct, iterations)
-    
+
     # Benchmark: MultiHop strategy (needs hop)
     def multihop_hop():
         multihop_strategy.normalize(amount, assets["btc"])
-    
+
     results["multihop_hop"] = benchmark(multihop_hop, iterations)
-    
+
     return results
 
 
@@ -315,13 +315,13 @@ def benchmark_cache_effectiveness() -> dict[str, BenchmarkResult]:
     results = {}
     iterations = 10000
     assets = setup_test_assets()
-    
+
     mock_provider = MockExchangeRateProvider()
     cached_provider = CachedRateProvider(mock_provider, ttl=timedelta(minutes=5))
-    
+
     # Benchmark: Cache misses (different pairs each time)
     call_count = [0]
-    
+
     def cache_misses():
         # Simulate different timestamps
         timestamp = datetime.now() + timedelta(seconds=call_count[0])
@@ -333,9 +333,9 @@ def benchmark_cache_effectiveness() -> dict[str, BenchmarkResult]:
             cached_provider,
             timestamp=timestamp,
         )
-    
+
     results["cache_misses"] = benchmark(cache_misses, iterations)
-    
+
     # Benchmark: Cache hits (same pair)
     def cache_hits():
         normalize_amount(
@@ -344,17 +344,17 @@ def benchmark_cache_effectiveness() -> dict[str, BenchmarkResult]:
             assets["xlm"],
             cached_provider,
         )
-    
+
     results["cache_hits"] = benchmark(cache_hits, iterations)
-    
+
     # Calculate hit rate improvement
     miss_rate = results["cache_misses"].ops_per_second
     hit_rate = results["cache_hits"].ops_per_second
-    
+
     if miss_rate > 0:
         speedup = hit_rate / miss_rate
         logger.info(f"Cache speedup: {speedup:.1f}x")
-    
+
     return results
 
 
@@ -367,13 +367,13 @@ def benchmark_trade_integration() -> dict[str, BenchmarkResult]:
     """Benchmark Trade model integration."""
     results = {}
     iterations = 5000
-    
+
     from ingestion.data_models import Trade
-    
+
     assets = setup_test_assets()
     provider = MockExchangeRateProvider()
     strategy = XLMNormalization(provider)
-    
+
     # Create sample trade
     trade = Trade(
         trade_id="test123",
@@ -386,19 +386,19 @@ def benchmark_trade_integration() -> dict[str, BenchmarkResult]:
         counter_amount=Decimal("850"),
         price=Decimal("8.5"),
     )
-    
+
     # Benchmark: Normalize base amount
     def normalize_base():
         trade.normalize_base_amount(strategy)
-    
+
     results["trade_normalize_base"] = benchmark(normalize_base, iterations)
-    
+
     # Benchmark: Normalize both amounts
     def normalize_both():
         trade.normalize_both_amounts(strategy)
-    
+
     results["trade_normalize_both"] = benchmark(normalize_both, iterations)
-    
+
     return results
 
 
@@ -449,26 +449,24 @@ def print_benchmark_results(
                         color = Colors.YELLOW
                         symbol = "≈"
 
-                    print(
-                        f"  Baseline: {colorize(f'{symbol} {percent_change:+.1f}%', color)}"
-                    )
+                    print(f"  Baseline: {colorize(f'{symbol} {percent_change:+.1f}%', color)}")
 
     # Summary
     print(colorize("\n\nPERFORMANCE SUMMARY", Colors.BOLD))
     print("=" * 80)
-    
+
     print("\nKey Findings:")
     print("- Same currency normalization: No conversion overhead")
     print("- Cached normalization: ~10-100x faster than uncached")
     print("- Multi-hop: ~2-3x slower than direct conversion")
     print("- Batch aggregation: Linear scaling with amount count")
-    
+
     print("\nRecommendations:")
     print("- Use CachedRateProvider for repeated conversions")
     print("- Pre-normalize amounts in hot paths")
     print("- Batch operations when possible")
     print("- Monitor cache hit rate for optimization")
-    
+
     print("\n" + "=" * 80 + "\n")
 
 
@@ -479,9 +477,7 @@ def save_results(
     """Save benchmark results to JSON file."""
     output = {}
     for category, category_results in results.items():
-        output[category] = {
-            name: result.to_dict() for name, result in category_results.items()
-        }
+        output[category] = {name: result.to_dict() for name, result in category_results.items()}
 
     with open(filepath, "w") as f:
         json.dump(output, f, indent=2)
@@ -491,7 +487,7 @@ def save_results(
 
 def load_baseline(filepath: Path) -> dict:
     """Load baseline results from JSON file."""
-    with open(filepath, "r") as f:
+    with open(filepath) as f:
         return json.load(f)
 
 

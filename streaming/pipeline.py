@@ -262,9 +262,7 @@ class MetadataJoinState:
                 del self._last_trade_at[wallet]
                 evicted += 1
         if evicted:
-            logger.info(
-                "Metadata join: evicted %d inactive wallet(s) from join state", evicted
-            )
+            logger.info("Metadata join: evicted %d inactive wallet(s) from join state", evicted)
         return evicted
 
     # ------------------------------------------------------------------
@@ -540,9 +538,7 @@ class StreamingPipeline:
             try:
                 self._buffer.apply_metadata(wallet, metadata)
             except Exception as exc:
-                logger.warning(
-                    "apply_metadata failed for wallet %s: %s", wallet, exc
-                )
+                logger.warning("apply_metadata failed for wallet %s: %s", wallet, exc)
 
     def _trigger_rescore_from_metadata(self, pair_id: str) -> None:
         """Re-score wallets whose metadata changed since the last trade event.

@@ -49,6 +49,7 @@ logger = get_logger(__name__)
 
 class Colors:
     """ANSI color codes."""
+
     GREEN = "\033[92m"
     YELLOW = "\033[93m"
     RED = "\033[91m"
@@ -205,8 +206,7 @@ class NormalizationAnalyzer(ast.NodeVisitor):
                         severity="info",
                         issue_type="potential_aggregation",
                         description=(
-                            "Adding amounts - ensure same currency or use "
-                            "aggregate_normalized()"
+                            "Adding amounts - ensure same currency or use " "aggregate_normalized()"
                         ),
                         suggestion=(
                             "Import currency_normalization and use "
@@ -228,12 +228,8 @@ class NormalizationAnalyzer(ast.NodeVisitor):
                         line_number=node.lineno,
                         severity="warning",
                         issue_type="unnormalized_sum",
-                        description=(
-                            "Using sum() on amounts - may be mixing currencies"
-                        ),
-                        suggestion=(
-                            "Use aggregate_normalized() or normalize amounts first"
-                        ),
+                        description=("Using sum() on amounts - may be mixing currencies"),
+                        suggestion=("Use aggregate_normalized() or normalize amounts first"),
                     )
                 )
 
@@ -246,12 +242,9 @@ class NormalizationAnalyzer(ast.NodeVisitor):
                         line_number=node.lineno,
                         severity="info",
                         issue_type="pandas_aggregation",
-                        description=(
-                            "Pandas aggregation on amounts - verify currency consistency"
-                        ),
+                        description=("Pandas aggregation on amounts - verify currency consistency"),
                         suggestion=(
-                            "Use normalize_trade_amounts_to_series() or ensure "
-                            "single currency"
+                            "Use normalize_trade_amounts_to_series() or ensure " "single currency"
                         ),
                     )
                 )
@@ -273,9 +266,7 @@ class NormalizationAnalyzer(ast.NodeVisitor):
                             "Iterating over multiple pairs - consider normalization "
                             "for comparison"
                         ),
-                        suggestion=(
-                            "Use compare_cross_pair_volumes() for cross-pair analysis"
-                        ),
+                        suggestion=("Use compare_cross_pair_volumes() for cross-pair analysis"),
                     )
                 )
 
@@ -315,9 +306,8 @@ class NormalizationAnalyzer(ast.NodeVisitor):
             return any(keyword in attr_name for keyword in self.AMOUNT_KEYWORDS)
 
         if isinstance(node, ast.BinOp):
-            return (
-                self._involves_amount_variable(node.left)
-                or self._involves_amount_variable(node.right)
+            return self._involves_amount_variable(node.left) or self._involves_amount_variable(
+                node.right
             )
 
         return False
@@ -361,7 +351,7 @@ class NormalizationAnalyzer(ast.NodeVisitor):
 def scan_file(filepath: Path) -> list[NormalizationIssue]:
     """Scan a single Python file for normalization issues."""
     try:
-        with open(filepath, "r", encoding="utf-8") as f:
+        with open(filepath, encoding="utf-8") as f:
             source = f.read()
 
         tree = ast.parse(source, filename=str(filepath))
@@ -475,19 +465,13 @@ def check_dataset_normalization_opportunities(filepath: Path) -> list[Normalizat
         asset_columns = [
             col
             for col in df.columns
-            if any(
-                keyword in col.lower()
-                for keyword in ["asset", "currency", "pair", "code"]
-            )
+            if any(keyword in col.lower() for keyword in ["asset", "currency", "pair", "code"])
         ]
 
         amount_columns = [
             col
             for col in df.columns
-            if any(
-                keyword in col.lower()
-                for keyword in ["amount", "volume", "price", "value"]
-            )
+            if any(keyword in col.lower() for keyword in ["amount", "volume", "price", "value"])
         ]
 
         if asset_columns and amount_columns:
@@ -503,9 +487,7 @@ def check_dataset_normalization_opportunities(filepath: Path) -> list[Normalizat
                         f"and {len(amount_columns)} amount columns. "
                         "Consider normalizing for cross-asset analysis."
                     ),
-                    suggestion=(
-                        "Use create_normalized_dataframe() to add normalized columns"
-                    ),
+                    suggestion=("Use create_normalized_dataframe() to add normalized columns"),
                 )
             )
 
@@ -525,9 +507,7 @@ def check_dataset_normalization_opportunities(filepath: Path) -> list[Normalizat
                                     f"different assets. Amounts likely need normalization "
                                     "for fair comparison."
                                 ),
-                                suggestion=(
-                                    "Normalize amounts before aggregation or comparison"
-                                ),
+                                suggestion=("Normalize amounts before aggregation or comparison"),
                             )
                         )
 
@@ -578,12 +558,8 @@ def print_report(issues: list[NormalizationIssue], report: dict[str, Any]) -> No
     # Summary
     print(colorize("Summary", Colors.BOLD))
     print(f"  Total issues: {report['total']}")
-    print(
-        f"  Errors:   {colorize(str(report['by_severity']['error']), Colors.RED)}"
-    )
-    print(
-        f"  Warnings: {colorize(str(report['by_severity']['warning']), Colors.YELLOW)}"
-    )
+    print(f"  Errors:   {colorize(str(report['by_severity']['error']), Colors.RED)}")
+    print(f"  Warnings: {colorize(str(report['by_severity']['warning']), Colors.YELLOW)}")
     print(f"  Info:     {colorize(str(report['by_severity']['info']), Colors.BLUE)}")
     print()
 
@@ -599,9 +575,7 @@ def print_report(issues: list[NormalizationIssue], report: dict[str, Any]) -> No
     # Files with most issues
     if report["by_file"]:
         print(colorize("Files with Most Issues", Colors.BOLD))
-        sorted_files = sorted(
-            report["by_file"].items(), key=lambda x: x[1], reverse=True
-        )[:10]
+        sorted_files = sorted(report["by_file"].items(), key=lambda x: x[1], reverse=True)[:10]
         for filepath, count in sorted_files:
             print(f"  {count:3d} issues: {filepath}")
         print()

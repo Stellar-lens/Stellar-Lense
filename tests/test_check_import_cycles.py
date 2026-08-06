@@ -1,13 +1,12 @@
 """
 tests/test_check_import_cycles.py — Tests for scripts/check_import_cycles.py (#546)
 """
+
 from __future__ import annotations
 
 import json
 import pathlib
 import textwrap
-
-import pytest
 
 from scripts.check_import_cycles import (
     _extract_imports,
@@ -17,7 +16,6 @@ from scripts.check_import_cycles import (
     find_cycles,
     main,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -136,9 +134,7 @@ def test_find_cycles_simple():
     }
     cycles = find_cycles(graph)
     # The SCC {detection.a, detection.b} should be detected
-    assert any(
-        set(cycle) == {"detection.a", "detection.b"} for cycle in cycles
-    )
+    assert any(set(cycle) == {"detection.a", "detection.b"} for cycle in cycles)
 
 
 def test_find_cycles_no_cycle():
@@ -217,11 +213,16 @@ def test_main_writes_json_report(tmp_path):
     write_module(tmp_path, "detection/b.py", "import detection.a\n")
 
     report_path = tmp_path / "cycles.json"
-    main([
-        "--packages", "detection",
-        "--root", str(tmp_path),
-        "--report-path", str(report_path),
-    ])
+    main(
+        [
+            "--packages",
+            "detection",
+            "--root",
+            str(tmp_path),
+            "--report-path",
+            str(report_path),
+        ]
+    )
     assert report_path.is_file()
     data = json.loads(report_path.read_text())
     assert "cycle_count" in data

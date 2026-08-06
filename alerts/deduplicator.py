@@ -26,8 +26,16 @@ ledgerlens_alerts_deduplicated_total = Counter(
 
 
 class _Group:
-    __slots__ = ("wallet_address", "asset_pair", "detectors", "risk_score", "evidence",
-                  "detected_at", "last_seen", "raw_count")
+    __slots__ = (
+        "wallet_address",
+        "asset_pair",
+        "detectors",
+        "risk_score",
+        "evidence",
+        "detected_at",
+        "last_seen",
+        "raw_count",
+    )
 
     def __init__(self, alert: dict[str, Any]):
         self.wallet_address = alert["wallet_address"]

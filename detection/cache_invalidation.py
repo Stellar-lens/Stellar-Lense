@@ -127,9 +127,7 @@ class CacheInvalidationError(RuntimeError):
         self.cache_name = cache_name
         self.key = key
         self.original = original
-        super().__init__(
-            f"evictor for cache={cache_name!r} failed on key={key!r}: {original!r}"
-        )
+        super().__init__(f"evictor for cache={cache_name!r} failed on key={key!r}: {original!r}")
 
 
 @dataclass
@@ -401,9 +399,7 @@ class InvalidationRegistry:
                 errors.append(CacheInvalidationError(cache_name, derived_key, exc))
 
         self._audit[derived_key].append(
-            InvalidationEvent(
-                key=derived_key, source=source, reason=reason, cache_names=succeeded
-            )
+            InvalidationEvent(key=derived_key, source=source, reason=reason, cache_names=succeeded)
         )
         self._fingerprints.pop(derived_key, None)
         self._key_caches.pop(derived_key, None)

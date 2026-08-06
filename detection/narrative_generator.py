@@ -80,8 +80,7 @@ def _build_user_prompt(report_dict: dict) -> str:
         mad = first_window.get("mad", "n/a")
         nonconform = first_window.get("mad_nonconforming", False)
         benford_summary = (
-            f"chi-square={chi2}, MAD={mad}, "
-            f"non-conforming={'yes' if nonconform else 'no'}"
+            f"chi-square={chi2}, MAD={mad}, " f"non-conforming={'yes' if nonconform else 'no'}"
         )
 
     # Trade evidence count
@@ -159,8 +158,7 @@ class NarrativeGenerator:
             import openai  # type: ignore[import]
         except ImportError as exc:
             raise ImportError(
-                "openai package required for NARRATIVE_LLM_BACKEND=openai. "
-                "pip install openai"
+                "openai package required for NARRATIVE_LLM_BACKEND=openai. " "pip install openai"
             ) from exc
 
         api_key = os.getenv("OPENAI_API_KEY")
@@ -222,15 +220,14 @@ class NarrativeGenerator:
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
+
 def _cli() -> None:
     import argparse
 
     parser = argparse.ArgumentParser(
         description="Generate a regulatory narrative from a LedgerLens forensic report JSON."
     )
-    parser.add_argument(
-        "--report", required=True, help="Path to forensic report JSON file."
-    )
+    parser.add_argument("--report", required=True, help="Path to forensic report JSON file.")
     parser.add_argument(
         "--backend",
         default=None,
@@ -249,6 +246,7 @@ def _cli() -> None:
 
     if args.output:
         from detection.forensic_report import write_report_secure
+
         write_report_secure(args.output, narrative)
         print(f"Narrative written to {args.output}")
     else:

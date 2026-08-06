@@ -29,10 +29,11 @@ from __future__ import annotations
 
 import contextvars
 import functools
-import threading
+import logging
 import uuid
-from dataclasses import dataclass, field
-from typing import Any, Callable, TypeVar
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Any
 
 # ── Correlation context vars ─────────────────────────────────────────────────
 
@@ -303,7 +304,9 @@ class CorrelationFilter:
 # ── Thread-safe propagation helpers ─────────────────────────────────────────
 
 
-def propagate_to_thread(target_fn: Callable, correlation_id: str | None = None, **ctx: Any) -> Callable:
+def propagate_to_thread(
+    target_fn: Callable, correlation_id: str | None = None, **ctx: Any
+) -> Callable:
     """Wrap a thread target to inherit the caller's correlation context.
 
     When spawning a background thread that should carry the same correlation

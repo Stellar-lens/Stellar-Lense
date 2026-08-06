@@ -14,6 +14,7 @@ Usage:
 
 import argparse
 import sys
+from importlib import import_module
 from typing import TextIO
 
 import numpy as np
@@ -318,8 +319,9 @@ def main() -> None:
     args = parse_args()
 
     if args.gan_rounds > 0:
-        from scripts.adversarial_training_loop import run_adversarial_loop
-
+        run_adversarial_loop = import_module(
+            "scripts.adversarial_training_loop"
+        ).run_adversarial_loop
         run_adversarial_loop(
             gan_rounds=args.gan_rounds,
             n_wallets=args.n_wallets,
@@ -349,7 +351,11 @@ def main() -> None:
         node = tracker.register_dataset(
             name="synthetic_dataset",
             filepath=args.output,
-            node_type=LineageNodeType.GENERATED if hasattr(LineageNodeType, "GENERATED") else LineageNodeType.DERIVED_DATASET,
+            node_type=(
+                LineageNodeType.GENERATED
+                if hasattr(LineageNodeType, "GENERATED")
+                else LineageNodeType.DERIVED_DATASET
+            ),
             metadata={
                 "profile": args.profile,
                 "n_wallets": args.n_wallets,

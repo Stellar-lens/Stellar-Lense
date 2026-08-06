@@ -271,7 +271,9 @@ def compute_false_positive_rate(model_dir: str, test_data_path: str) -> float | 
         return None
 
 
-def evaluate_shadow_candidate(shadow_state: dict, model_dir: str, retrain_data_path: str | None) -> int:
+def evaluate_shadow_candidate(
+    shadow_state: dict, model_dir: str, retrain_data_path: str | None
+) -> int:
     """Check if the shadow candidate is ready for promotion or needs rollback.
 
     Returns the appropriate exit code (5 = promoted, 6 = rolled back, 4 = still waiting).
@@ -285,7 +287,9 @@ def evaluate_shadow_candidate(shadow_state: dict, model_dir: str, retrain_data_p
         clear_shadow_state(model_dir)
         return 1
 
-    shadow_start = datetime.fromisoformat(shadow_start_str) if shadow_start_str else datetime.now(UTC)
+    shadow_start = (
+        datetime.fromisoformat(shadow_start_str) if shadow_start_str else datetime.now(UTC)
+    )
     elapsed_hours = (datetime.now(UTC) - shadow_start).total_seconds() / 3600
 
     if elapsed_hours < config.SHADOW_PERIOD_HOURS:
@@ -509,7 +513,9 @@ def _evaluate_incremental_model(
         y_val = new_data.loc[X_val.index, "label"]
 
         if len(y_val.unique()) < 2:
-            logger.warning("_evaluate_incremental_model: only one class in validation — skipping AUC")
+            logger.warning(
+                "_evaluate_incremental_model: only one class in validation — skipping AUC"
+            )
             return None
 
         lgbm = joblib.load(lgbm_path)
@@ -637,8 +643,9 @@ def main(argv: list[str] | None = None) -> int:
                     len(buffer),
                     min_samples,
                 )
-                write_retrain_report(drift_dict, None, None, False,
-                                     "Buffer too small for incremental training", None)
+                write_retrain_report(
+                    drift_dict, None, None, False, "Buffer too small for incremental training", None
+                )
                 return 0
 
             buffered_data = buffer.flush()
@@ -666,7 +673,12 @@ def main(argv: list[str] | None = None) -> int:
 
             # Lightweight promotion check: only LightGBM AUC is available
             promote = True
-            if old_metrics and new_metrics and "lightgbm" in old_metrics and "lightgbm" in new_metrics:
+            if (
+                old_metrics
+                and new_metrics
+                and "lightgbm" in old_metrics
+                and "lightgbm" in new_metrics
+            ):
                 old_auc = old_metrics["lightgbm"].get("auc_roc", 0.0)
                 new_auc = new_metrics["lightgbm"].get("auc_roc", 0.0)
                 if new_auc < old_auc - PROMOTION_TOLERANCE:
@@ -677,7 +689,9 @@ def main(argv: list[str] | None = None) -> int:
                     )
                     logger.warning(reason)
 
-            write_retrain_report(drift_dict, old_metrics, new_metrics, promote, reason, archive_path)
+            write_retrain_report(
+                drift_dict, old_metrics, new_metrics, promote, reason, archive_path
+            )
 
             if staleness_detector.is_stale():
                 logger.warning(
@@ -734,9 +748,8 @@ def main(argv: list[str] | None = None) -> int:
                 )
                 if not compatibility.compatible:
                     promote = False
-                    reason = (
-                        "Feature compatibility gate failed: "
-                        + " ".join(compatibility.diagnostics)
+                    reason = "Feature compatibility gate failed: " + " ".join(
+                        compatibility.diagnostics
                     )
             except FeatureContractError as exc:
                 promote = False
@@ -815,7 +828,9 @@ def main(argv: list[str] | None = None) -> int:
         temp_model_dir,
         config.SHADOW_PERIOD_HOURS,
     )
-    write_retrain_report(drift_dict, old_metrics, new_metrics, False, "Shadow deployment started", None)
+    write_retrain_report(
+        drift_dict, old_metrics, new_metrics, False, "Shadow deployment started", None
+    )
     return 4
 
 

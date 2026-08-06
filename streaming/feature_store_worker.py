@@ -133,9 +133,7 @@ class FeatureStoreWorker:
 
         # Register with the pubsub router if provided
         if self._router is not None:
-            self._router.subscribe(
-                self._worker_id, [self.INTERNAL_TRADE_CHANNEL]
-            )
+            self._router.subscribe(self._worker_id, [self.INTERNAL_TRADE_CHANNEL])
 
         logger.info("FeatureStoreWorker started.")
 
@@ -289,14 +287,13 @@ class FeatureStoreWorker:
 
     @property
     def is_running(self) -> bool:
-        return self._running.is_set() and (
-            self._thread is not None and self._thread.is_alive()
-        )
+        return self._running.is_set() and (self._thread is not None and self._thread.is_alive())
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _series_to_safe_dict(series: pd.Series) -> dict[str, Any]:
     """Convert a pd.Series to a dict with msgpack-safe scalar types.

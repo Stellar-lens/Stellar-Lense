@@ -228,6 +228,7 @@ def commit_forensic_report(
 # Merkle-chain tamper detection (Issue #196)
 # ---------------------------------------------------------------------------
 
+
 class TamperDetectedError(Exception):
     """Raised when AuditMerkleChain.verify_chain detects a modified entry."""
 
@@ -276,9 +277,9 @@ class MerkleAuditEntry:
     """A single entry in the Merkle audit chain."""
 
     index: int
-    content_hash: str          # SHA-256 of entry content
-    prev_merkle_root: str      # root before this entry
-    merkle_root: str           # root after including this entry
+    content_hash: str  # SHA-256 of entry content
+    prev_merkle_root: str  # root before this entry
+    merkle_root: str  # root after including this entry
     created_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
 
@@ -299,9 +300,11 @@ class AuditMerkleChain:
             engine = create_engine(config.RISK_SCORE_DB_URL)
             _MerkleBase.metadata.create_all(engine, checkfirst=True)
             if str(engine.url).startswith("sqlite"):
+
                 @event.listens_for(engine, "connect")
                 def _wal(conn, _rec):
                     conn.execute("PRAGMA journal_mode=WAL")
+
             self._session_factory = sessionmaker(bind=engine, future=True)
         else:
             self._session_factory = session_factory
@@ -388,9 +391,7 @@ class AuditMerkleChain:
 
             stored_root = db_roots.get(i)
             if stored_root is None:
-                raise TamperDetectedError(
-                    f"No Merkle root found in separate table for index {i}"
-                )
+                raise TamperDetectedError(f"No Merkle root found in separate table for index {i}")
             if stored_root != recomputed:
                 raise TamperDetectedError(
                     f"Separate-table Merkle root mismatch at index {i}: "

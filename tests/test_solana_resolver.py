@@ -358,6 +358,8 @@ class TestSolanaLinkedFeature:
         """Should return 0 if cache is None."""
         from detection.feature_engineering import compute_solana_linked_features
 
-        features = compute_solana_linked_features("GBRPYHIL2CI3FD4BWXVYDPLG445T5Q5GPESUYVS33VRTGOEULIABLE336", None, None)
+        features = compute_solana_linked_features(
+            "GBRPYHIL2CI3FD4BWXVYDPLG445T5Q5GPESUYVS33VRTGOEULIABLE336", None, None
+        )
 
         assert features["solana_linked_wash_score"] == 0.0

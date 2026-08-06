@@ -51,11 +51,13 @@ from concurrent.futures import (
     Future,
     ProcessPoolExecutor,
     ThreadPoolExecutor,
-    TimeoutError as FutureTimeoutError,
     as_completed,
 )
+from concurrent.futures import (
+    TimeoutError as FutureTimeoutError,
+)
 from dataclasses import dataclass, field
-from typing import Any, Generic, TypeVar
+from typing import Any, TypeVar
 
 from config import config
 
@@ -76,9 +78,7 @@ _DEFAULT_MAX_WORKERS: int = getattr(
 )
 _DEFAULT_MAX_PENDING: int = getattr(config, "PARALLEL_EXECUTOR_MAX_PENDING", 64)
 _DEFAULT_CHUNK_SIZE: int = getattr(config, "PARALLEL_EXECUTOR_CHUNK_SIZE", 16)
-_DEFAULT_TIMEOUT: float = float(
-    getattr(config, "PARALLEL_EXECUTOR_TIMEOUT_SECONDS", 300)
-)
+_DEFAULT_TIMEOUT: float = float(getattr(config, "PARALLEL_EXECUTOR_TIMEOUT_SECONDS", 300))
 
 _VALID_BACKENDS = frozenset({"process", "thread"})
 _VALID_ERROR_MODES = frozenset({"raise", "collect", "ignore"})
@@ -178,8 +178,7 @@ class ParallelExecutor:
         self._backend = (backend or _DEFAULT_BACKEND).lower()
         if self._backend not in _VALID_BACKENDS:
             raise ValueError(
-                f"Unknown backend {self._backend!r}. "
-                f"Choose from: {sorted(_VALID_BACKENDS)}"
+                f"Unknown backend {self._backend!r}. " f"Choose from: {sorted(_VALID_BACKENDS)}"
             )
 
         self._max_workers: int = max_workers if max_workers is not None else _DEFAULT_MAX_WORKERS
@@ -191,9 +190,7 @@ class ParallelExecutor:
 
         # 0 / None → unlimited
         self._timeout: float | None = (
-            None
-            if (timeout_seconds is None or timeout_seconds <= 0)
-            else float(timeout_seconds)
+            None if (timeout_seconds is None or timeout_seconds <= 0) else float(timeout_seconds)
         )
         if timeout_seconds is None:
             self._timeout = None if _DEFAULT_TIMEOUT <= 0 else _DEFAULT_TIMEOUT
@@ -212,7 +209,7 @@ class ParallelExecutor:
     # Context-manager support
     # ------------------------------------------------------------------
 
-    def __enter__(self) -> "ParallelExecutor":
+    def __enter__(self) -> ParallelExecutor:
         self._start_pool()
         self._entered = True
         return self
@@ -302,11 +299,7 @@ class ParallelExecutor:
         assert self._pool is not None
 
         eff_error_mode = (error_mode or self._error_mode).lower()
-        eff_timeout = (
-            timeout_seconds
-            if timeout_seconds is not None
-            else self._timeout
-        )
+        eff_timeout = timeout_seconds if timeout_seconds is not None else self._timeout
 
         report = ExecutionReport(backend=self._backend, max_workers=self._max_workers)
         results: list[R] = []
@@ -338,9 +331,7 @@ class ParallelExecutor:
                         report.wall_seconds = time.monotonic() - start
                         raise
                     elif eff_error_mode == "collect":
-                        logger.warning(
-                            "ParallelExecutor task error for item %r: %s", item, exc
-                        )
+                        logger.warning("ParallelExecutor task error for item %r: %s", item, exc)
                         report.errors.append(err)
                     # else "ignore" — do nothing
 
@@ -350,9 +341,7 @@ class ParallelExecutor:
 
         while not exhausted or pending:
             # Fill up to max_pending
-            while not exhausted and (
-                self._max_pending <= 0 or len(pending) < self._max_pending
-            ):
+            while not exhausted and (self._max_pending <= 0 or len(pending) < self._max_pending):
                 try:
                     item = next(item_iter)
                 except StopIteration:
@@ -367,11 +356,9 @@ class ParallelExecutor:
 
             # Wait for at least one to finish (or timeout)
             if eff_timeout is not None:
-                finished = next(
-                    as_completed(pending, timeout=eff_timeout * len(pending)), None
-                )
+                next(as_completed(pending, timeout=eff_timeout * len(pending)), None)
             else:
-                finished = next(as_completed(pending), None)
+                next(as_completed(pending), None)
 
             _drain_completed()
 
@@ -405,15 +392,11 @@ class ParallelExecutor:
                     report.wall_seconds = time.monotonic() - start
                     raise
                 elif eff_error_mode == "collect":
-                    logger.warning(
-                        "ParallelExecutor task error for item %r: %s", item, exc
-                    )
+                    logger.warning("ParallelExecutor task error for item %r: %s", item, exc)
                     report.errors.append(err)
 
         report.wall_seconds = time.monotonic() - start
-        logger.info(
-            "ParallelExecutor.map complete: %s", report
-        )
+        logger.info("ParallelExecutor.map complete: %s", report)
         return report, results
 
     def map_chunks(
@@ -446,9 +429,7 @@ class ParallelExecutor:
         cs = chunk_size if chunk_size is not None else self._chunk_size
         items_list = list(items)
 
-        chunks: list[list[T]] = [
-            items_list[i : i + cs] for i in range(0, len(items_list), cs)
-        ]
+        chunks: list[list[T]] = [items_list[i : i + cs] for i in range(0, len(items_list), cs)]
 
         report, chunk_results = self.map(
             fn,

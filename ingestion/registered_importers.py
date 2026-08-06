@@ -8,7 +8,7 @@ module ensures all importers are discoverable:
 
     >>> from ingestion.registered_importers import *  # Registers all importers
     >>> from ingestion.importer_registry import get_registry
-    >>> 
+    >>>
     >>> registry = get_registry()
     >>> print(registry.list_all())
     ['account_activity_loader', 'amm_pool_loader', 'asset_metadata_fetcher', ...]
@@ -31,14 +31,6 @@ from datetime import datetime
 import pandas as pd
 from stellar_sdk import Asset as SdkAsset
 
-from ingestion.importer_registry import (
-    DataSource,
-    DataType,
-    ImporterCapability,
-    PerformanceCharacteristics,
-    register_importer,
-)
-
 # Import actual implementations
 from ingestion import (
     account_activity_loader,
@@ -54,6 +46,16 @@ from ingestion.data_models import (
     OrderBookEvent,
     Trade,
 )
+from ingestion.importer_registry import (
+    DataSource,
+    DataType,
+    ImporterCapability,
+    PerformanceCharacteristics,
+    register_importer,
+)
+from utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 __all__ = [
     "HorizonStreamerRegistry",
@@ -110,7 +112,7 @@ __all__ = [
 )
 class HorizonStreamerRegistry:
     """Registered wrapper for horizon_streamer module."""
-    
+
     @staticmethod
     def stream_trades(
         base_asset: SdkAsset,
@@ -119,7 +121,7 @@ class HorizonStreamerRegistry:
         max_reconnect_attempts: int = 5,
     ) -> Iterator[Trade]:
         """Stream trades in real-time via Horizon SSE.
-        
+
         See horizon_streamer.stream_trades() for full documentation.
         """
         return horizon_streamer.stream_trades(
@@ -128,11 +130,11 @@ class HorizonStreamerRegistry:
             cursor=cursor,
             max_reconnect_attempts=max_reconnect_attempts,
         )
-    
+
     @staticmethod
     def stream_all_watched_pairs() -> Iterator[Trade]:
         """Stream trades for all configured asset pairs.
-        
+
         See horizon_streamer.stream_all_watched_pairs() for full documentation.
         """
         return horizon_streamer.stream_all_watched_pairs()
@@ -184,7 +186,7 @@ class HorizonStreamerRegistry:
 )
 class HistoricalLoaderRegistry:
     """Registered wrapper for historical_loader module."""
-    
+
     @staticmethod
     def load_trades(
         base_asset: SdkAsset,
@@ -193,7 +195,7 @@ class HistoricalLoaderRegistry:
         limit_per_page: int = 200,
     ) -> Iterator[Trade]:
         """Load historical trades with pagination.
-        
+
         See historical_loader.load_trades() for full documentation.
         """
         return historical_loader.load_trades(
@@ -202,7 +204,7 @@ class HistoricalLoaderRegistry:
             start_time=start_time,
             limit_per_page=limit_per_page,
         )
-    
+
     @staticmethod
     def load_pair_to_dataframe(
         base_asset: SdkAsset,
@@ -210,7 +212,7 @@ class HistoricalLoaderRegistry:
         start_time: datetime | None = None,
     ) -> pd.DataFrame:
         """Load trades as DataFrame.
-        
+
         See historical_loader.load_pair_to_dataframe() for full documentation.
         """
         return historical_loader.load_pair_to_dataframe(
@@ -218,13 +220,13 @@ class HistoricalLoaderRegistry:
             counter_asset=counter_asset,
             start_time=start_time,
         )
-    
+
     @staticmethod
     def load_watched_pairs_to_dataframe(
         start_time: datetime | None = None,
     ) -> pd.DataFrame:
         """Load all configured pairs as DataFrame.
-        
+
         See historical_loader.load_watched_pairs_to_dataframe() for full documentation.
         """
         return historical_loader.load_watched_pairs_to_dataframe(start_time=start_time)
@@ -274,25 +276,25 @@ class HistoricalLoaderRegistry:
 )
 class OrderbookLoaderRegistry:
     """Registered wrapper for orderbook_loader module."""
-    
+
     @staticmethod
     def load_orderbook_events(
         account_id: str,
         limit_per_page: int = 200,
     ) -> Iterator[OrderBookEvent]:
         """Load order-book events for an account.
-        
+
         See orderbook_loader.load_orderbook_events() for full documentation.
         """
         return orderbook_loader.load_orderbook_events(
             account_id=account_id,
             limit_per_page=limit_per_page,
         )
-    
+
     @staticmethod
     def load_accounts_orderbook_events(account_ids: list[str]) -> pd.DataFrame:
         """Load order-book events for multiple accounts as DataFrame.
-        
+
         See orderbook_loader.load_accounts_orderbook_events() for full documentation.
         """
         return orderbook_loader.load_accounts_orderbook_events(account_ids=account_ids)
@@ -339,19 +341,19 @@ class OrderbookLoaderRegistry:
 )
 class AccountActivityLoaderRegistry:
     """Registered wrapper for account_activity_loader module."""
-    
+
     @staticmethod
     def load_account_activity(account_id: str) -> AccountActivity | None:
         """Load account creation/funding data for a single account.
-        
+
         See account_activity_loader.load_account_activity() for full documentation.
         """
         return account_activity_loader.load_account_activity(account_id=account_id)
-    
+
     @staticmethod
     def load_accounts_activity(account_ids: list[str]) -> list[AccountActivity]:
         """Load account activity for multiple accounts.
-        
+
         See account_activity_loader.load_accounts_activity() for full documentation.
         """
         return account_activity_loader.load_accounts_activity(account_ids=account_ids)
@@ -406,7 +408,7 @@ class AccountActivityLoaderRegistry:
 )
 class AMMPoolLoaderRegistry:
     """Registered wrapper for amm_pool_loader module."""
-    
+
     @staticmethod
     def load_amm_pool_trades(
         pool_id: str,
@@ -415,7 +417,7 @@ class AMMPoolLoaderRegistry:
         limit_per_page: int = 200,
     ) -> pd.DataFrame:
         """Load historical AMM pool trades as DataFrame.
-        
+
         See amm_pool_loader.load_amm_pool_trades() for full documentation.
         """
         return amm_pool_loader.load_amm_pool_trades(
@@ -424,19 +426,19 @@ class AMMPoolLoaderRegistry:
             until=until,
             limit_per_page=limit_per_page,
         )
-    
+
     @staticmethod
     def stream_amm_pool_trades(pool_id: str) -> Iterator[Trade]:
         """Stream real-time AMM pool trades.
-        
+
         See amm_pool_loader.stream_amm_pool_trades() for full documentation.
         """
         return amm_pool_loader.stream_amm_pool_trades(pool_id=pool_id)
-    
+
     @staticmethod
     def list_active_pools(asset_code: str, asset_issuer: str) -> list[str]:
         """Discover active liquidity pools for an asset.
-        
+
         See amm_pool_loader.list_active_pools() for full documentation.
         """
         return amm_pool_loader.list_active_pools(
@@ -484,7 +486,7 @@ class AMMPoolLoaderRegistry:
 )
 class AssetMetadataFetcherRegistry:
     """Registered wrapper for asset_metadata_fetcher module."""
-    
+
     @staticmethod
     def get_asset_supply(
         asset_code: str,
@@ -493,7 +495,7 @@ class AssetMetadataFetcherRegistry:
         redis_client=None,
     ) -> float | None:
         """Fetch circulating supply for an asset (cached).
-        
+
         See asset_metadata_fetcher.get_asset_supply() for full documentation.
         """
         return asset_metadata_fetcher.get_asset_supply(
@@ -545,21 +547,21 @@ class AssetMetadataFetcherRegistry:
 )
 class PaymentPathAnalyzerRegistry:
     """Registered wrapper for payment_path_analyzer module."""
-    
+
     @staticmethod
     def reconstruct_path_flow(
         path_payment_op: dict,
         all_operations: pd.DataFrame | None = None,
     ) -> payment_path_analyzer.ReconstructedPathFlow | None:
         """Reconstruct effective source/destination from a path payment operation.
-        
+
         See payment_path_analyzer.reconstruct_path_flow() for full documentation.
         """
         return payment_path_analyzer.reconstruct_path_flow(
             path_payment_op=path_payment_op,
             all_operations=all_operations,
         )
-    
+
     @staticmethod
     def compute_path_payment_round_trip_frequency(
         wallet: str,
@@ -567,7 +569,7 @@ class PaymentPathAnalyzerRegistry:
         time_window_hours: int = payment_path_analyzer.ROUND_TRIP_WINDOW_HOURS,
     ) -> float:
         """Compute fraction of wallet's volume returning within time window.
-        
+
         See payment_path_analyzer.compute_path_payment_round_trip_frequency()
         for full documentation.
         """
@@ -576,11 +578,11 @@ class PaymentPathAnalyzerRegistry:
             path_flows=path_flows,
             time_window_hours=time_window_hours,
         )
-    
+
     @staticmethod
     def validate_path_schema(path_payment_op: dict) -> bool:
         """Validate path payment operation against Stellar schema.
-        
+
         See payment_path_analyzer.validate_path_schema() for full documentation.
         """
         return payment_path_analyzer.validate_path_schema(path_payment_op=path_payment_op)
@@ -593,19 +595,19 @@ class PaymentPathAnalyzerRegistry:
 
 def verify_registration() -> dict[str, bool]:
     """Verify that all importers were registered successfully.
-    
+
     Returns
     -------
     dict[str, bool]
         Map of importer names to registration status
-    
+
     Examples
     --------
     >>> status = verify_registration()
     >>> assert all(status.values()), "Some importers failed to register"
     """
     from ingestion.importer_registry import get_registry
-    
+
     registry = get_registry()
     expected_importers = [
         "horizon_streamer",
@@ -616,7 +618,7 @@ def verify_registration() -> dict[str, bool]:
         "asset_metadata_fetcher",
         "payment_path_analyzer",
     ]
-    
+
     return {name: name in registry.list_all() for name in expected_importers}
 
 

@@ -1,6 +1,5 @@
 """Tests for reporting/fatf_exporter.py and reporting/fatf_risk_codes.py."""
 
-
 import pytest
 
 from reporting.fatf_exporter import (
@@ -58,9 +57,9 @@ _MINIMAL_REPORT = {
     "report_id": "aaaaaaaa-0000-0000-0000-000000000003",
     "generated_at": "2024-06-01T13:00:00+00:00",
     "wallet": "GMIN123456789STELLAR",
-    "asset_pair": "",       # intentionally absent/empty
+    "asset_pair": "",  # intentionally absent/empty
     "risk_score": 88,
-    "score_lower": None,    # intentionally missing confidence interval
+    "score_lower": None,  # intentionally missing confidence interval
     "score_upper": None,
     "verdict": "suspicious",
     "top_shap_features": [],
@@ -177,7 +176,7 @@ class TestMapToRiskCodes:
         assert all(rc.code != "VA-005" for rc in codes)
 
     def test_all_defined_codes_have_valid_severity(self):
-        for code_id, rc in RISK_CODES.items():
+        for _code_id, rc in RISK_CODES.items():
             assert isinstance(rc.severity, Severity)
 
     def test_sorted_by_severity(self):
@@ -309,6 +308,7 @@ class TestExportIvms101:
 
         def bad_validate(doc):
             import jsonschema
+
             raise jsonschema.ValidationError("injected failure")
 
         monkeypatch.setattr(exporter, "_validate", bad_validate)

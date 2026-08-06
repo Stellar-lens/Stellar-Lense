@@ -58,28 +58,29 @@ class Config:
     )
 
     ASSET_BENFORD_WINDOWS: dict[str, list[int]] = {}
-    
+
     # Adaptive Benford window selection (Issue #178)
     # Minimum number of trades required for a window to produce statistically valid metrics.
     # Must be >= 10 to prevent trivially small samples. Default 50 is recommended.
-    BENFORD_MIN_SAMPLE_SIZE: int = max(
-        10,
-        int(os.getenv("BENFORD_MIN_SAMPLE_SIZE", "50"))
-    )
-    
+    BENFORD_MIN_SAMPLE_SIZE: int = max(10, int(os.getenv("BENFORD_MIN_SAMPLE_SIZE", "50")))
+
     # Benford Drift Detection (Issue #180)
     # Enable Benford drift detection to trigger retraining when digit distributions shift.
-    BENFORD_DRIFT_DETECTION_ENABLED: bool = os.getenv("BENFORD_DRIFT_DETECTION_ENABLED", "true").lower() == "true"
+    BENFORD_DRIFT_DETECTION_ENABLED: bool = (
+        os.getenv("BENFORD_DRIFT_DETECTION_ENABLED", "true").lower() == "true"
+    )
     # Z-score threshold for flagging a shift in chi-square or MAD per-pair (default 3.0 = 0.27% tail probability).
     BENFORD_DRIFT_Z_THRESHOLD: float = float(os.getenv("BENFORD_DRIFT_Z_THRESHOLD", "3.0"))
     # Minimum pairs that must drift before firing a global retraining trigger (default 0 = any single pair can trigger).
     BENFORD_DRIFT_NUM_PAIRS_TRIGGER: int = int(os.getenv("BENFORD_DRIFT_NUM_PAIRS_TRIGGER", "0"))
-    
+
     # Conformal prediction (Issue #181)
     # Coverage level for conformal prediction intervals (e.g. 0.90 = 90% coverage guarantee).
     CONFORMAL_COVERAGE_LEVEL: float = float(os.getenv("CONFORMAL_COVERAGE_LEVEL", "0.90"))
     # Path to the calibration artifact (computed during training, loaded at inference startup).
-    CONFORMAL_CALIBRATION_PATH: str = os.getenv("CONFORMAL_CALIBRATION_PATH", "models/conformal_calibration.joblib")
+    CONFORMAL_CALIBRATION_PATH: str = os.getenv(
+        "CONFORMAL_CALIBRATION_PATH", "models/conformal_calibration.joblib"
+    )
     # Enable conformal prediction intervals in the API response (default true).
     CONFORMAL_ENABLED: bool = os.getenv("CONFORMAL_ENABLED", "true").lower() == "true"
 
@@ -113,9 +114,7 @@ class Config:
     LEDGERLENS_SUBMITTER_SECRET: str = os.getenv("LEDGERLENS_SUBMITTER_SECRET", "")
 
     # Solana RPC endpoint for cross-chain resolution
-    SOLANA_RPC_URL: str = os.getenv(
-        "SOLANA_RPC_URL", "https://api.mainnet-beta.solana.com"
-    )
+    SOLANA_RPC_URL: str = os.getenv("SOLANA_RPC_URL", "https://api.mainnet-beta.solana.com")
 
     MIN_TRADES_FOR_SCORING: int = int(os.getenv("MIN_TRADES_FOR_SCORING", "20"))
     LIST_RELOAD_INTERVAL_SECONDS: int = int(os.getenv("LIST_RELOAD_INTERVAL_SECONDS", "60"))
@@ -133,7 +132,9 @@ class Config:
     # Forensic reporting
     REPORT_CONCURRENCY: int = int(os.getenv("REPORT_CONCURRENCY", "4"))
     # SHAP interaction values are O(n * d^2) — disable by default.
-    SHAP_INTERACTIONS_ENABLED: bool = os.getenv("SHAP_INTERACTIONS_ENABLED", "false").lower() == "true"
+    SHAP_INTERACTIONS_ENABLED: bool = (
+        os.getenv("SHAP_INTERACTIONS_ENABLED", "false").lower() == "true"
+    )
 
     # Wallet funding graph — multi-hop traversal + wash-trading ring detection
     WALLET_GRAPH_MAX_DEPTH: int = int(os.getenv("WALLET_GRAPH_MAX_DEPTH", "4"))
@@ -169,10 +170,12 @@ class Config:
     KAFKA_LAG_ALERT_THRESHOLD: int = int(os.getenv("KAFKA_LAG_ALERT_THRESHOLD", "500"))
     KAFKA_METRICS_PORT: int = int(os.getenv("KAFKA_METRICS_PORT", "9100"))
     TRADE_AVRO_SCHEMA_PATH: str = os.getenv("TRADE_AVRO_SCHEMA_PATH", "data/trade_avro_schema.json")
-    
+
     # End-to-end latency budget (Issue #124)
     E2E_LATENCY_BUDGET_MS: int = int(os.getenv("E2E_LATENCY_BUDGET_MS", "2000"))
-    LATENCY_ANOMALY_RATE_THRESHOLD: float = float(os.getenv("LATENCY_ANOMALY_RATE_THRESHOLD", "0.90"))
+    LATENCY_ANOMALY_RATE_THRESHOLD: float = float(
+        os.getenv("LATENCY_ANOMALY_RATE_THRESHOLD", "0.90")
+    )
 
     # Account metadata streaming join (streaming/account_metadata_stream.py,
     # streaming/pipeline.py MetadataJoinState)
@@ -205,7 +208,9 @@ class Config:
     WS_RATE_LIMIT_MSGS_PER_SECOND: int = int(os.getenv("WS_RATE_LIMIT_MSGS_PER_SECOND", "100"))
 
     # WebSocket abuse detection (issue #223)
-    WS_ABUSE_MAX_REQUESTS_PER_MINUTE: int = int(os.getenv("WS_ABUSE_MAX_REQUESTS_PER_MINUTE", "300"))
+    WS_ABUSE_MAX_REQUESTS_PER_MINUTE: int = int(
+        os.getenv("WS_ABUSE_MAX_REQUESTS_PER_MINUTE", "300")
+    )
     WS_ABUSE_MAX_DISTINCT_WALLETS: int = int(os.getenv("WS_ABUSE_MAX_DISTINCT_WALLETS", "50"))
     WS_ABUSE_WALLET_WINDOW_SECONDS: int = int(os.getenv("WS_ABUSE_WALLET_WINDOW_SECONDS", "60"))
     WS_ABUSE_BLOCK_DURATION_SECONDS: int = int(os.getenv("WS_ABUSE_BLOCK_DURATION_SECONDS", "300"))
@@ -223,7 +228,9 @@ class Config:
     DP_BUDGET_ALERT_THRESHOLD: float = float(os.getenv("DP_BUDGET_ALERT_THRESHOLD", "10.0"))
 
     # OpenTelemetry distributed tracing (Issue #198)
-    OTEL_EXPORTER_OTLP_ENDPOINT: str = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317")
+    OTEL_EXPORTER_OTLP_ENDPOINT: str = os.getenv(
+        "OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317"
+    )
     OTEL_SAMPLING_RATE: float = float(os.getenv("OTEL_SAMPLING_RATE", "0.1"))
 
     # Adversarial training augmentation
@@ -267,8 +274,14 @@ class Config:
     GNN_HIDDEN_DIM: int = int(os.getenv("GNN_HIDDEN_DIM", "64"))
 
     # Feature selection
-    FEATURE_SELECTION_ENABLED: bool = os.getenv("FEATURE_SELECTION_ENABLED", "").lower() in ("1", "true", "yes")
-    FEATURE_SELECTION_PATH: str = os.getenv("FEATURE_SELECTION_PATH", "models/selected_features.json")
+    FEATURE_SELECTION_ENABLED: bool = os.getenv("FEATURE_SELECTION_ENABLED", "").lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+    FEATURE_SELECTION_PATH: str = os.getenv(
+        "FEATURE_SELECTION_PATH", "models/selected_features.json"
+    )
 
     # Annotation integrity
     ANNOTATION_HMAC_SECRET: str = os.getenv("ANNOTATION_HMAC_SECRET", "")
@@ -285,8 +298,12 @@ class Config:
     CORESET_MIN_DISTANCE: float = float(os.getenv("CORESET_MIN_DISTANCE", "0.1"))
 
     # Active learning stopping criterion (Issue #256)
-    ACTIVE_LEARNING_EER_THRESHOLD: float = float(os.getenv("ACTIVE_LEARNING_EER_THRESHOLD", "0.001"))
-    ACTIVE_LEARNING_CONVERGENCE_WINDOW: int = int(os.getenv("ACTIVE_LEARNING_CONVERGENCE_WINDOW", "5"))
+    ACTIVE_LEARNING_EER_THRESHOLD: float = float(
+        os.getenv("ACTIVE_LEARNING_EER_THRESHOLD", "0.001")
+    )
+    ACTIVE_LEARNING_CONVERGENCE_WINDOW: int = int(
+        os.getenv("ACTIVE_LEARNING_CONVERGENCE_WINDOW", "5")
+    )
 
     # Wash Trade Simulation Engine
     GAN_ROUNDS: int = int(os.getenv("GAN_ROUNDS", "5"))
@@ -301,8 +318,12 @@ class Config:
     GNN_NUM_LAYERS: int = int(os.getenv("GNN_NUM_LAYERS", "2"))
 
     # Dynamic ensemble weight adjustment (#268)
-    ENSEMBLE_WEIGHT_SMOOTHING_ALPHA: float = float(os.getenv("ENSEMBLE_WEIGHT_SMOOTHING_ALPHA", "0.1"))
-    ENSEMBLE_SYSTEMIC_FP_THRESHOLD: float = float(os.getenv("ENSEMBLE_SYSTEMIC_FP_THRESHOLD", "0.5"))
+    ENSEMBLE_WEIGHT_SMOOTHING_ALPHA: float = float(
+        os.getenv("ENSEMBLE_WEIGHT_SMOOTHING_ALPHA", "0.1")
+    )
+    ENSEMBLE_SYSTEMIC_FP_THRESHOLD: float = float(
+        os.getenv("ENSEMBLE_SYSTEMIC_FP_THRESHOLD", "0.5")
+    )
 
     # GNN DiffPool cluster scoring (#269)
     GNN_DIFFPOOL_CLUSTERS: int = int(os.getenv("GNN_DIFFPOOL_CLUSTERS", "10"))
@@ -331,7 +352,9 @@ class Config:
 
     # Label quality estimation (#271)
     LABEL_QUALITY_NOISE_THRESHOLD: float = float(os.getenv("LABEL_QUALITY_NOISE_THRESHOLD", "0.1"))
-    ANNOTATOR_NOISE_RATE_ALERT_THRESHOLD: float = float(os.getenv("ANNOTATOR_NOISE_RATE_ALERT_THRESHOLD", "0.2"))
+    ANNOTATOR_NOISE_RATE_ALERT_THRESHOLD: float = float(
+        os.getenv("ANNOTATOR_NOISE_RATE_ALERT_THRESHOLD", "0.2")
+    )
 
     # ---------------------------------------------------------------------------
     # Transformer sequence model (#182)
@@ -362,10 +385,16 @@ class Config:
     # Redis URL for the feature store.  Overrides the rate-limiter REDIS_URL when set.
     # Format: redis://[:password@]host[:port][/db] or
     #         rediss://[:password@]host[:port][/db]  (TLS)
-    FEATURE_STORE_REDIS_URL: str = os.getenv("FEATURE_STORE_REDIS_URL", os.getenv("REDIS_URL", "redis://localhost:6379/1"))
+    FEATURE_STORE_REDIS_URL: str = os.getenv(
+        "FEATURE_STORE_REDIS_URL", os.getenv("REDIS_URL", "redis://localhost:6379/1")
+    )
     # Enable TLS for the feature store Redis connection.
     # When FEATURE_STORE_REDIS_URL starts with rediss:// this is implied.
-    FEATURE_STORE_REDIS_TLS: bool = os.getenv("FEATURE_STORE_REDIS_TLS", "false").lower() in ("1", "true", "yes")
+    FEATURE_STORE_REDIS_TLS: bool = os.getenv("FEATURE_STORE_REDIS_TLS", "false").lower() in (
+        "1",
+        "true",
+        "yes",
+    )
     # Redis CA certificate path for TLS verification (optional).
     FEATURE_STORE_REDIS_TLS_CA_CERT: str = os.getenv("FEATURE_STORE_REDIS_TLS_CA_CERT", "")
     # Redis connection pool: maximum number of pooled connections.
@@ -377,7 +406,9 @@ class Config:
         "FEATURE_STORE_WINDOW_TTLS", "1:3600,4:14400,24:86400,168:604800,720:2592000"
     )
     # Fallback to direct feature computation when Redis is unavailable.
-    FEATURE_STORE_FALLBACK_ENABLED: bool = os.getenv("FEATURE_STORE_FALLBACK_ENABLED", "true").lower() in ("1", "true", "yes")
+    FEATURE_STORE_FALLBACK_ENABLED: bool = os.getenv(
+        "FEATURE_STORE_FALLBACK_ENABLED", "true"
+    ).lower() in ("1", "true", "yes")
 
     # ---------------------------------------------------------------------------
     # Restored config attributes (2026-07-10)
@@ -479,8 +510,7 @@ class Config:
     PARALLEL_EXECUTOR_BACKEND: str = os.getenv("PARALLEL_EXECUTOR_BACKEND", "process")
     # Maximum number of worker processes/threads.  Defaults to CPU count − 1 (≥ 1).
     PARALLEL_EXECUTOR_MAX_WORKERS: int = max(
-        1,
-        int(os.getenv("PARALLEL_EXECUTOR_MAX_WORKERS", str(max(1, (os.cpu_count() or 2) - 1))))
+        1, int(os.getenv("PARALLEL_EXECUTOR_MAX_WORKERS", str(max(1, (os.cpu_count() or 2) - 1))))
     )
     # Maximum number of futures that may be in-flight simultaneously (back-pressure).
     # 0 disables the limit.
@@ -516,9 +546,7 @@ class Config:
     #   "warn"    — log warnings and return cleaned data (default).
     #   "coerce"  — silently drop / fix violating rows, no logging.
     #   "ignore"  — pass data through unchanged (validation disabled).
-    MODEL_INPUT_VALIDATOR_STRICTNESS: str = os.getenv(
-        "MODEL_INPUT_VALIDATOR_STRICTNESS", "warn"
-    )
+    MODEL_INPUT_VALIDATOR_STRICTNESS: str = os.getenv("MODEL_INPUT_VALIDATOR_STRICTNESS", "warn")
     # Path to feature_ranges.json, which supplies per-feature [min, max] bounds.
     MODEL_INPUT_VALIDATOR_RANGES_PATH: str = os.getenv(
         "MODEL_INPUT_VALIDATOR_RANGES_PATH", "data/feature_ranges.json"
@@ -589,12 +617,13 @@ class Config:
     def load_asset_benford_windows(cls):
         import glob
         import json
+
         cls.ASSET_BENFORD_WINDOWS = {}
         model_dir = cls.MODEL_DIR or "./models"
         pattern = os.path.join(model_dir, "*_benford_windows.json")
         for filepath in glob.glob(pattern):
             filename = os.path.basename(filepath)
-            asset_key = filename[:-len("_benford_windows.json")]
+            asset_key = filename[: -len("_benford_windows.json")]
             try:
                 with open(filepath) as f:
                     data = json.load(f)
@@ -617,8 +646,14 @@ Config.load_asset_benford_windows()
 
 # Validate security parameters
 if config.MODEL_INVERSION_QUERY_LIMIT <= 0:
-    raise ValueError(f"MODEL_INVERSION_QUERY_LIMIT must be > 0, got {config.MODEL_INVERSION_QUERY_LIMIT}")
+    raise ValueError(
+        f"MODEL_INVERSION_QUERY_LIMIT must be > 0, got {config.MODEL_INVERSION_QUERY_LIMIT}"
+    )
 if config.MODEL_INVERSION_DP_EPSILON <= 0:
-    raise ValueError(f"MODEL_INVERSION_DP_EPSILON must be > 0, got {config.MODEL_INVERSION_DP_EPSILON}")
+    raise ValueError(
+        f"MODEL_INVERSION_DP_EPSILON must be > 0, got {config.MODEL_INVERSION_DP_EPSILON}"
+    )
 if config.SCORE_ROUNDING_GRANULARITY <= 0:
-    raise ValueError(f"SCORE_ROUNDING_GRANULARITY must be > 0, got {config.SCORE_ROUNDING_GRANULARITY}")
+    raise ValueError(
+        f"SCORE_ROUNDING_GRANULARITY must be > 0, got {config.SCORE_ROUNDING_GRANULARITY}"
+    )

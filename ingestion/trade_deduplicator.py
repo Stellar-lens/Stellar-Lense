@@ -89,7 +89,9 @@ class SeenEventCache:
             self._redis_available = True
             logger.info("Connected to Redis for trade deduplication")
         except Exception as e:
-            logger.warning(f"Failed to connect to Redis ({self.redis_url}): {e} — proceeding without deduplication")
+            logger.warning(
+                f"Failed to connect to Redis ({self.redis_url}): {e} — proceeding without deduplication"
+            )
             self._redis = None
             self._redis_available = False
 
@@ -143,7 +145,9 @@ class SeenEventCache:
             expiration_time = int(current_time + self.ttl_seconds)
             self._redis.expireat(cache_key, expiration_time)
 
-            logger.debug(f"Trade cached: {trade_id} ({trade_hash[:8]}…), expires at {expiration_time}")
+            logger.debug(
+                f"Trade cached: {trade_id} ({trade_hash[:8]}…), expires at {expiration_time}"
+            )
             return False
 
         except RedisError as e:

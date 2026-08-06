@@ -58,13 +58,12 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 import traceback
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Callable
 
 # ---------------------------------------------------------------------------
 # Suite result type
@@ -118,9 +117,7 @@ def _run_parsing_suite(verbose: bool = False) -> SuiteResult:
     try:
         pr = parse_known_manipulation_events(events_path)
         if pr.ok:
-            msg = (
-                f"  ✓ {events_path}: {pr.record_count} manipulation events parsed"
-            )
+            msg = f"  ✓ {events_path}: {pr.record_count} manipulation events parsed"
             result.messages.append(msg)
             if verbose:
                 print(msg)
@@ -160,14 +157,9 @@ def _run_parsing_suite(verbose: bool = False) -> SuiteResult:
             schema = parse_json(avro_path)
             if not isinstance(schema, dict) or "fields" not in schema:
                 result.passed = False
-                result.errors.append(
-                    f"  ✗ {avro_path}: schema missing 'fields' key"
-                )
+                result.errors.append(f"  ✗ {avro_path}: schema missing 'fields' key")
             else:
-                msg = (
-                    f"  ✓ {avro_path}: valid Avro schema "
-                    f"({len(schema['fields'])} fields)"
-                )
+                msg = f"  ✓ {avro_path}: valid Avro schema " f"({len(schema['fields'])} fields)"
                 result.messages.append(msg)
                 if verbose:
                     print(msg)
@@ -210,6 +202,7 @@ def _run_schema_suite(verbose: bool = False) -> SuiteResult:
                 check_backward_compatibility,
                 load_schema,
             )
+
             schema = load_schema(str(avro_path))
             ok, violations = check_backward_compatibility(schema, schema)
             if ok:
@@ -265,9 +258,7 @@ def _run_feature_ranges_suite(verbose: bool = False) -> SuiteResult:
     feature_count = 0
     for feature_name, bounds in raw.items():
         if not isinstance(bounds, dict):
-            result.errors.append(
-                f"  ✗ {feature_name}: expected dict, got {type(bounds).__name__}"
-            )
+            result.errors.append(f"  ✗ {feature_name}: expected dict, got {type(bounds).__name__}")
             result.passed = False
             continue
 
@@ -279,26 +270,18 @@ def _run_feature_ranges_suite(verbose: bool = False) -> SuiteResult:
         # min <= max
         if lo is not None and hi is not None and lo > hi:
             result.passed = False
-            result.errors.append(
-                f"  ✗ {feature_name}: min ({lo}) > max ({hi})"
-            )
+            result.errors.append(f"  ✗ {feature_name}: min ({lo}) > max ({hi})")
 
         # mean within [min, max]
         if lo is not None and mean is not None and mean < lo:
-            result.warnings.append(
-                f"  ⚠ {feature_name}: mean ({mean}) < min ({lo})"
-            )
+            result.warnings.append(f"  ⚠ {feature_name}: mean ({mean}) < min ({lo})")
         if hi is not None and mean is not None and mean > hi:
-            result.warnings.append(
-                f"  ⚠ {feature_name}: mean ({mean}) > max ({hi})"
-            )
+            result.warnings.append(f"  ⚠ {feature_name}: mean ({mean}) > max ({hi})")
 
         # std >= 0
         if std is not None and std < 0:
             result.passed = False
-            result.errors.append(
-                f"  ✗ {feature_name}: std ({std}) is negative"
-            )
+            result.errors.append(f"  ✗ {feature_name}: std ({std}) is negative")
 
         feature_count += 1
 

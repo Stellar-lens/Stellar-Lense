@@ -18,9 +18,8 @@ import logging
 import os
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Sequence
 
-from sqlalchemy import inspect, text
+from sqlalchemy import text
 from sqlalchemy.engine import Connection, Engine
 
 from migrations.base import Migration
@@ -40,26 +39,18 @@ _LOCK_TABLE = "migration_lock"
 
 def _ensure_tracking_tables(conn: Connection) -> None:
     """Create the migration bookkeeping tables if they do not exist yet."""
-    conn.execute(
-        text(
-            f"""
+    conn.execute(text(f"""
             CREATE TABLE IF NOT EXISTS {_TRACKING_TABLE} (
                 migration_id    VARCHAR NOT NULL PRIMARY KEY,
                 description     VARCHAR NOT NULL,
                 applied_at      TIMESTAMP WITH TIME ZONE NOT NULL
             )
-            """
-        )
-    )
-    conn.execute(
-        text(
-            f"""
+            """))
+    conn.execute(text(f"""
             CREATE TABLE IF NOT EXISTS {_LOCK_TABLE} (
                 lock_name VARCHAR NOT NULL PRIMARY KEY
             )
-            """
-        )
-    )
+            """))
 
 
 def _acquire_lock(conn: Connection) -> None:
@@ -72,11 +63,7 @@ def _acquire_lock(conn: Connection) -> None:
     extra canary.
     """
     try:
-        conn.execute(
-            text(
-                f"INSERT OR IGNORE INTO {_LOCK_TABLE} (lock_name) VALUES ('global')"
-            )
-        )
+        conn.execute(text(f"INSERT OR IGNORE INTO {_LOCK_TABLE} (lock_name) VALUES ('global')"))
     except Exception:  # pragma: no cover — dialect-specific fallback
         try:
             conn.execute(
@@ -125,13 +112,13 @@ def _load_all_migrations() -> list[Migration]:
         module_name = f"migrations.versions.{fname[:-3]}"
         mod = importlib.import_module(module_name)
         if not hasattr(mod, "migration"):
-            logger.warning("Migration module %s has no 'migration' attribute — skipping", module_name)
+            logger.warning(
+                "Migration module %s has no 'migration' attribute — skipping", module_name
+            )
             continue
         m = mod.migration
         if not isinstance(m, Migration):
-            raise TypeError(
-                f"{module_name}.migration must be a Migration instance, got {type(m)}"
-            )
+            raise TypeError(f"{module_name}.migration must be a Migration instance, got {type(m)}")
         migrations.append(m)
 
     # Sort by numeric id (the leading digits) for safety even if filenames are
@@ -243,7 +230,11 @@ class MigrationRunner:
 
             for migration in pending:
                 if self._dry_run:
-                    logger.info("[dry-run] Would apply migration %s: %s", migration.id, migration.description)
+                    logger.info(
+                        "[dry-run] Would apply migration %s: %s",
+                        migration.id,
+                        migration.description,
+                    )
                     continue
                 logger.info("Applying migration %s: %s", migration.id, migration.description)
                 migration.up(conn)

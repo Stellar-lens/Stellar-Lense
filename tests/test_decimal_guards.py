@@ -11,21 +11,19 @@ Tests cover:
 - Property-based tests for arithmetic properties
 """
 
-import warnings
-from decimal import Decimal, InvalidOperation, Overflow
+from decimal import Decimal
 
 import pytest
-from hypothesis import given, strategies as st
+from hypothesis import given
+from hypothesis import strategies as st
 
 from utils.decimal_guards import (
-    AmountValidationError,
-    DecimalAmount,
-    PrecisionOverflowError,
-    StroopsConversionError,
     STELLAR_MAX_AMOUNT,
     STELLAR_MIN_AMOUNT,
     STELLAR_PRECISION,
-    STROOPS_MULTIPLIER,
+    AmountValidationError,
+    DecimalAmount,
+    StroopsConversionError,
     check_precision_loss,
     decimal_context,
     safe_divide,
@@ -34,7 +32,6 @@ from utils.decimal_guards import (
     validate_amount,
     validate_stellar_amount,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -219,7 +216,7 @@ class TestDecimalAmountArithmetic:
     def test_power(self):
         """Power operation works correctly."""
         a = DecimalAmount("2")
-        result = a ** 3
+        result = a**3
         assert result == DecimalAmount("8")
 
     def test_negation(self):
@@ -308,7 +305,6 @@ class TestDecimalAmountComparison:
         """DecimalAmount can be used in sets."""
         amounts = {DecimalAmount("100"), DecimalAmount("200"), DecimalAmount("100")}
         assert len(amounts) == 2  # Duplicate removed
-
 
 
 # ---------------------------------------------------------------------------
@@ -494,17 +490,17 @@ class TestPrecisionContext:
         with decimal_context(precision=10):
             result = DecimalAmount("1") / DecimalAmount("3")
             # Check result has 10 significant digits
-            str_result = str(result.value)
-            assert len(str_result.replace(".", "")) == 10
+            assert len(result.value.as_tuple().digits) == 10
 
     def test_decimal_context_restores_original(self):
         """Context manager restores original context."""
         import decimal
+
         original_precision = decimal.getcontext().prec
-        
+
         with decimal_context(precision=10):
             pass  # Change context temporarily
-        
+
         # Context should be restored
         assert decimal.getcontext().prec == original_precision
 
@@ -602,7 +598,7 @@ class TestEdgeCases:
         """Operations with zero work correctly."""
         zero = DecimalAmount("0")
         amount = DecimalAmount("100")
-        
+
         assert zero + amount == amount
         assert amount + zero == amount
         assert amount - zero == amount
@@ -613,7 +609,7 @@ class TestEdgeCases:
         """Operations with negative values work."""
         pos = DecimalAmount("100")
         neg = DecimalAmount("-50")
-        
+
         assert pos + neg == DecimalAmount("50")
         assert pos - neg == DecimalAmount("150")
         assert pos * neg == DecimalAmount("-5000")
@@ -628,7 +624,9 @@ class TestEdgeCases:
 
     def test_chained_operations(self):
         """Chained operations work correctly."""
-        result = DecimalAmount("100") + DecimalAmount("50") - DecimalAmount("25") * DecimalAmount("2")
+        result = (
+            DecimalAmount("100") + DecimalAmount("50") - DecimalAmount("25") * DecimalAmount("2")
+        )
         assert result == DecimalAmount("100")  # 100 + 50 - 50
 
     def test_float_initialization_warns(self):
@@ -638,7 +636,6 @@ class TestEdgeCases:
             assert isinstance(amount.value, Decimal)
 
 
-
 # ---------------------------------------------------------------------------
 # Property-Based Tests (Hypothesis)
 # ---------------------------------------------------------------------------
@@ -646,7 +643,7 @@ class TestEdgeCases:
 
 class TestArithmeticProperties:
     """Property-based tests for arithmetic operations.
-    
+
     These tests verify mathematical properties that should hold for all inputs:
     - Commutativity: a + b = b + a
     - Associativity: (a + b) + c = a + (b + c)
@@ -704,7 +701,7 @@ class TestArithmeticProperties:
         amount_a = DecimalAmount(a)
         amount_b = DecimalAmount(b)
         amount_c = DecimalAmount(c)
-        
+
         left = (amount_a + amount_b) + amount_c
         right = amount_a + (amount_b + amount_c)
         assert left == right
@@ -806,16 +803,14 @@ class TestArithmeticProperties:
         """Division is the inverse of multiplication: (a * b) / b = a."""
         amount_a = DecimalAmount(a)
         amount_b = DecimalAmount("2")  # Safe divisor
-        
+
         product = amount_a * amount_b
         quotient = product / amount_b
-        
+
         # Should be equal within precision
         assert abs((quotient - amount_a).value) < Decimal("1e-10")
 
-    @given(
-        stroops=st.integers(min_value=-9223372036854775807, max_value=9223372036854775807)
-    )
+    @given(stroops=st.integers(min_value=-9223372036854775807, max_value=9223372036854775807))
     def test_stroops_roundtrip(self, stroops):
         """Stroops conversion roundtrips correctly."""
         amount = DecimalAmount.from_stroops(stroops)
@@ -859,16 +854,16 @@ class TestIntegration:
         # Trade: 100 USDC for 500 XLM
         usdc_amount = DecimalAmount("100.0000000")
         xlm_amount = DecimalAmount("500.0000000")
-        
+
         # Calculate price
         price = usdc_amount / xlm_amount
         assert price == DecimalAmount("0.2")
-        
+
         # Calculate fees (0.1%)
         fee_rate = DecimalAmount("0.001")
         usdc_fee = usdc_amount * fee_rate
         assert usdc_fee == DecimalAmount("0.1")
-        
+
         # Net amount
         net_usdc = usdc_amount - usdc_fee
         assert net_usdc == DecimalAmount("99.9")
@@ -880,10 +875,10 @@ class TestIntegration:
             DecimalAmount("250.75"),
             DecimalAmount("50.25"),
         ]
-        
+
         total = sum_amounts(trades)
         assert total == DecimalAmount("401.5")
-        
+
         average = total / DecimalAmount(str(len(trades)))
         assert average == DecimalAmount("133.8333333333333333333333333")
 
@@ -892,12 +887,12 @@ class TestIntegration:
         # Scenario: Detecting wash trading by comparing volumes
         volume1 = DecimalAmount("1000000.0000001")
         volume2 = DecimalAmount("1000000.0000002")
-        
+
         difference = volume2 - volume1
         assert difference == DecimalAmount("0.0000001")  # Exactly 1 stroop
-        
+
         # This difference would be lost with floats!
-        float_diff = float(volume2.value) - float(volume1.value)
+        float(volume2.value) - float(volume1.value)
         # Float may give 0.0 or incorrect value due to precision loss
 
     def test_benford_analysis_preparation(self):
@@ -907,7 +902,7 @@ class TestIntegration:
             DecimalAmount("456.78"),
             DecimalAmount("789.01"),
         ]
-        
+
         # Extract leading digits (for Benford analysis)
         leading_digits = []
         for amount in amounts:
@@ -915,7 +910,7 @@ class TestIntegration:
             str_amount = str(amount.value).replace(".", "").lstrip("0")
             if str_amount:
                 leading_digits.append(int(str_amount[0]))
-        
+
         assert leading_digits == [1, 4, 7]
 
 

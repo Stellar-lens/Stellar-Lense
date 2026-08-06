@@ -106,6 +106,7 @@ def _get_pool(url: str, pool_size: int, tls: bool, ca_cert: str) -> redis.Connec
 # TTL helpers
 # ---------------------------------------------------------------------------
 
+
 def _parse_window_ttls(raw: str) -> dict[int, int]:
     """Parse ``"1:3600,4:14400,24:86400"`` → ``{1: 3600, 4: 14400, 24: 86400}``."""
     ttls: dict[int, int] = {}
@@ -134,6 +135,7 @@ def _ttl_for_window(window_hours: int | None, window_ttls: dict[int, int]) -> in
 # Key construction
 # ---------------------------------------------------------------------------
 
+
 def _make_key(wallet_id: str, pair_id: str) -> str:
     """Build a Redis key for the (wallet, pair) feature entry."""
     wallet_hash = hashlib.sha256(wallet_id.encode()).hexdigest()[:16]
@@ -143,6 +145,7 @@ def _make_key(wallet_id: str, pair_id: str) -> str:
 # ---------------------------------------------------------------------------
 # Main class
 # ---------------------------------------------------------------------------
+
 
 class RedisFeatureStore:
     """Sub-millisecond feature lookup for the streaming pipeline.
@@ -178,11 +181,17 @@ class RedisFeatureStore:
         store_name: str = "default",
     ) -> None:
         self._url = redis_url or config.FEATURE_STORE_REDIS_URL
-        self._pool_size = pool_size if pool_size is not None else config.FEATURE_STORE_REDIS_POOL_SIZE
+        self._pool_size = (
+            pool_size if pool_size is not None else config.FEATURE_STORE_REDIS_POOL_SIZE
+        )
         self._tls = tls if tls is not None else config.FEATURE_STORE_REDIS_TLS
         self._ca_cert = ca_cert if ca_cert is not None else config.FEATURE_STORE_REDIS_TLS_CA_CERT
         self._window_ttls = window_ttls or _parse_window_ttls(config.FEATURE_STORE_WINDOW_TTLS)
-        self._fallback = fallback_enabled if fallback_enabled is not None else config.FEATURE_STORE_FALLBACK_ENABLED
+        self._fallback = (
+            fallback_enabled
+            if fallback_enabled is not None
+            else config.FEATURE_STORE_FALLBACK_ENABLED
+        )
         self._store_name = store_name
         self._client: redis.Redis | None = None
 
@@ -414,6 +423,7 @@ def _validate_features(features: dict[str, Any]) -> None:
 # ---------------------------------------------------------------------------
 # Prometheus helpers
 # ---------------------------------------------------------------------------
+
 
 def _inc(counter, label: str) -> None:
     if counter is not None:

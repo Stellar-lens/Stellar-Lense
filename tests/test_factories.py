@@ -142,7 +142,7 @@ class TestRingTradeFactory:
     def test_ring_structure_with_size(self):
         """Ring trades should form circular patterns."""
         trades = make_ring_trades(n=15, ring_size=5)
-        
+
         # Extract the ring member indices from generated trades
         members = {t["base_account"] for t in trades}
         # With ring_size=5, we should have ~5 unique base accounts
@@ -152,10 +152,10 @@ class TestRingTradeFactory:
         """Ring trade amounts should have slight variation."""
         trades = make_ring_trades(n=30, ring_size=5)
         amounts = [t["base_amount"] for t in trades]
-        
+
         # Should have variation due to jitter
         assert len(set(amounts)) > 1, "Ring amounts should vary"
-        
+
         # But still roughly in the 1000-10000 range
         for amt in amounts:
             assert 900 < amt < 11000, f"Amount {amt} outside expected range"
@@ -236,16 +236,16 @@ def test_synthetic_stellar_trades_fixture(synthetic_stellar_trades):
     """Verify the fixture works as expected."""
     clean = synthetic_stellar_trades(n=50, pattern="clean")
     assert len(clean) == 50
-    
+
     wash = synthetic_stellar_trades(n=30, pattern="wash")
     assert len(wash) == 30
-    
+
     # Verify Benford properties
     clean_amounts = pd.Series([t["base_amount"] for t in clean])
     wash_amounts = pd.Series([t["base_amount"] for t in wash])
-    
+
     clean_chi2 = chi_square_statistic(clean_amounts)
     wash_chi2 = chi_square_statistic(wash_amounts)
-    
+
     # Clean should have lower chi-square than wash
     assert clean_chi2 < wash_chi2

@@ -71,7 +71,7 @@ class AdapterUnavailableError(AdapterError):
         self.causes = causes
         super().__init__(
             "registry",
-            f"no adapter satisfied capability {capability!r}; tried {attempted} — {list(zip(attempted, causes))}",
+            f"no adapter satisfied capability {capability!r}; tried {attempted} — {list(zip(attempted, causes, strict=False))}",
         )
 
 
@@ -148,10 +148,14 @@ class AdapterRegistry:
     def get(self, capability: str) -> list[DataProviderAdapter]:
         return list(self._adapters.get(capability, []))
 
-    def fetch(self, capability: str, params: dict[str, Any], skip_unhealthy: bool = True) -> AdapterResponse:
+    def fetch(
+        self, capability: str, params: dict[str, Any], skip_unhealthy: bool = True
+    ) -> AdapterResponse:
         adapters = self._adapters.get(capability, [])
         if not adapters:
-            raise AdapterUnavailableError(capability, attempted=[], causes=["no adapters registered"])
+            raise AdapterUnavailableError(
+                capability, attempted=[], causes=["no adapters registered"]
+            )
 
         attempted: list[str] = []
         causes: list[str] = []

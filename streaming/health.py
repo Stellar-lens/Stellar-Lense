@@ -26,7 +26,8 @@ from __future__ import annotations
 import enum
 import threading
 import time
-from typing import Any, Callable, Protocol
+from collections.abc import Callable
+from typing import Any, Protocol
 
 from config import config
 from utils.logging import get_logger
@@ -34,7 +35,7 @@ from utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-class HealthStatus(str, enum.Enum):
+class HealthStatus(enum.StrEnum):
     """Standard health state classification for worker components."""
 
     HEALTHY = "healthy"
@@ -214,7 +215,9 @@ class WorkerHealthMonitor:
             status_msg = f"Heartbeat severely stale ({age:.1f}s > {self.stale_threshold_seconds * 2:.1f}s threshold)"
         elif age > self.stale_threshold_seconds:
             status = HealthStatus.DEGRADED
-            status_msg = f"Heartbeat stale ({age:.1f}s > {self.stale_threshold_seconds:.1f}s threshold)"
+            status_msg = (
+                f"Heartbeat stale ({age:.1f}s > {self.stale_threshold_seconds:.1f}s threshold)"
+            )
         else:
             status = HealthStatus.HEALTHY
             status_msg = None

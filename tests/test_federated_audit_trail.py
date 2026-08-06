@@ -140,9 +140,9 @@ class TestParticipantFingerprints:
             row = session.query(FederatedAuditRecord).filter_by(round_id=round_id).first()
 
         stored_fps = json.loads(row.participant_fingerprints)
-        assert set(stored_fps) == set(fingerprints), (
-            f"Stored fingerprints {stored_fps} do not match submitted {fingerprints}"
-        )
+        assert set(stored_fps) == set(
+            fingerprints
+        ), f"Stored fingerprints {stored_fps} do not match submitted {fingerprints}"
 
     def test_default_fingerprint_is_sha256_of_participant_id(self, audit):
         pid = "my_participant"
@@ -199,8 +199,7 @@ class TestGradientNorms:
         for pid, expected_norm in true_norms.items():
             assert pid in stored_norms, f"Missing norm for participant {pid}"
             assert abs(stored_norms[pid] - expected_norm) < 1e-9, (
-                f"Norm mismatch for {pid}: stored={stored_norms[pid]}, "
-                f"expected={expected_norm}"
+                f"Norm mismatch for {pid}: stored={stored_norms[pid]}, " f"expected={expected_norm}"
             )
 
 
@@ -242,13 +241,13 @@ class TestNoRawGradients:
 
         stored_norms = json.loads(row.gradient_norms)
         for pid, value in stored_norms.items():
-            assert isinstance(value, (int, float)), (
-                f"gradient_norms[{pid!r}] is {type(value).__name__}, expected scalar"
-            )
+            assert isinstance(
+                value, (int, float)
+            ), f"gradient_norms[{pid!r}] is {type(value).__name__}, expected scalar"
             # Ensure it is not an array or dict — must be a bare number.
-            assert not isinstance(value, (list, dict)), (
-                f"gradient_norms[{pid!r}] must be a scalar, not {type(value).__name__}"
-            )
+            assert not isinstance(
+                value, (list, dict)
+            ), f"gradient_norms[{pid!r}] must be a scalar, not {type(value).__name__}"
 
     def test_raw_gradient_not_in_db_column(self, audit, in_memory_session_factory):
         """Confirm the `gradient_norms` DB column only ever holds small JSON scalars."""
@@ -270,9 +269,9 @@ class TestNoRawGradients:
 
         # The gradient_norms column must NOT contain the raw vector
         raw_tensor_str = json.dumps(delta.tolist())
-        assert raw_tensor_str not in row.gradient_norms, (
-            "Raw gradient tensor found in audit DB column — security violation"
-        )
+        assert (
+            raw_tensor_str not in row.gradient_norms
+        ), "Raw gradient tensor found in audit DB column — security violation"
         # The column must contain only the scalar norm
         stored = json.loads(row.gradient_norms)
         assert abs(stored["participant_x"] - norm) < 1e-9
@@ -322,13 +321,9 @@ class TestAppendOnly:
     def test_federated_audit_trail_has_no_update_method(self):
         """FederatedAuditTrail must not expose any method that modifies records."""
         disallowed = {"update", "delete", "remove", "modify", "patch", "overwrite"}
-        public_methods = {
-            name for name in dir(FederatedAuditTrail) if not name.startswith("_")
-        }
+        public_methods = {name for name in dir(FederatedAuditTrail) if not name.startswith("_")}
         violations = disallowed & public_methods
-        assert not violations, (
-            f"FederatedAuditTrail exposes mutating method(s): {violations}"
-        )
+        assert not violations, f"FederatedAuditTrail exposes mutating method(s): {violations}"
 
     def test_direct_db_delete_would_break_chain(self, audit, in_memory_session_factory):
         """Verify that deleting a record leaves a gap in the prev_hash chain.
@@ -352,8 +347,8 @@ class TestAppendOnly:
         with in_memory_session_factory() as session:
             rows = session.query(FederatedAuditRecord).order_by(FederatedAuditRecord.id).all()
         assert len(rows) == 2
-        assert rows[0].prev_hash is None          # genesis
-        assert rows[1].prev_hash is not None       # chained
+        assert rows[0].prev_hash is None  # genesis
+        assert rows[1].prev_hash is not None  # chained
 
 
 # ---------------------------------------------------------------------------
@@ -419,9 +414,7 @@ class TestMerkleChain:
 
 
 class TestAsyncCoordinatorIntegration:
-    def test_coordinator_writes_audit_record_on_aggregation(
-        self, audit, in_memory_session_factory
-    ):
+    def test_coordinator_writes_audit_record_on_aggregation(self, audit, in_memory_session_factory):
         """A complete async federated round should write one audit record."""
         coord = AsyncFederatedCoordinator(weight_dim=4, trigger_n=3, max_staleness=10)
         coord._audit = audit
@@ -440,9 +433,7 @@ class TestAsyncCoordinatorIntegration:
         assert record.aggregation_algorithm == "staleness_weighted_fedavg"
         assert record.model_version == 1
 
-    def test_coordinator_fingerprints_in_audit_record(
-        self, audit, in_memory_session_factory
-    ):
+    def test_coordinator_fingerprints_in_audit_record(self, audit, in_memory_session_factory):
         """Participant fingerprints in the DB must match the coordinator's fingerprint map."""
         coord = AsyncFederatedCoordinator(weight_dim=4, trigger_n=2, max_staleness=10)
 
@@ -532,9 +523,9 @@ class TestQueryHelpers:
         assert len(result) >= 1
         # Every returned record must actually contain "fp_2" (not just a substring match)
         for rec in result:
-            assert any(fp == "fp_2" or fp.startswith("fp_2") for fp in rec["participant_fingerprints"]), (
-                f"Fingerprint 'fp_2' not found in {rec['participant_fingerprints']}"
-            )
+            assert any(
+                fp == "fp_2" or fp.startswith("fp_2") for fp in rec["participant_fingerprints"]
+            ), f"Fingerprint 'fp_2' not found in {rec['participant_fingerprints']}"
 
     def test_query_by_model_hash(self, audit):
         round_ids = self._write_records(audit)

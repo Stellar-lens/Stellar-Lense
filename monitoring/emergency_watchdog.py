@@ -89,7 +89,9 @@ class EmergencyWatchdog:
     # Public API
     # ------------------------------------------------------------------
 
-    def record_score(self, wallet_id_hash: str, score: int, e2e_latency_ms: float | None = None) -> None:
+    def record_score(
+        self, wallet_id_hash: str, score: int, e2e_latency_ms: float | None = None
+    ) -> None:
         """Record a new score observation from the pipeline."""
         self._window.append((time.monotonic(), score, e2e_latency_ms))
 
@@ -108,10 +110,12 @@ class EmergencyWatchdog:
 
         anomalous = sum(1 for _, s, _ in self._window if s > self._anomaly_score_threshold)
         rate = anomalous / len(self._window)
-        
+
         latency_records = sum(1 for _, _, lat in self._window if lat is not None)
         if latency_records > 0:
-            anomalous_latency = sum(1 for _, _, lat in self._window if lat is not None and lat > self._latency_budget_ms)
+            anomalous_latency = sum(
+                1 for _, _, lat in self._window if lat is not None and lat > self._latency_budget_ms
+            )
             latency_rate = anomalous_latency / latency_records
         else:
             latency_rate = 0.0
@@ -125,7 +129,7 @@ class EmergencyWatchdog:
             logger.warning("EmergencyWatchdog: %s — proposing pause", reason)
             self._propose_pause(reason)
             return True
-            
+
         if latency_rate > self._anomaly_rate_threshold:
             reason = (
                 f"Latency budget breached: {latency_rate:.0%} of events in the last "
@@ -135,7 +139,7 @@ class EmergencyWatchdog:
             logger.warning("EmergencyWatchdog: %s — proposing pause", reason)
             self._propose_pause(reason)
             return True
-            
+
         return False
 
     @property
@@ -162,7 +166,7 @@ class EmergencyWatchdog:
             from integrations.contract_client import LedgerLensContractClient
 
             client = LedgerLensContractClient(
-                contract_id="",   # not used for pause calls
+                contract_id="",  # not used for pause calls
                 rpc_url=self._rpc_url,
             )
             proposal_id = client.initiate_emergency_pause(

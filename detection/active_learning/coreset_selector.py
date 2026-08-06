@@ -17,6 +17,7 @@ import numpy as np
 
 try:
     import hnswlib  # type: ignore
+
     _HNSWLIB_AVAILABLE = True
 except ImportError:
     _HNSWLIB_AVAILABLE = False
@@ -53,7 +54,7 @@ def _nearest_distances_brute(
 ) -> np.ndarray:
     """Brute-force fallback when hnswlib is unavailable."""
     diff = query[:, np.newaxis, :] - reference[np.newaxis, :, :]
-    return np.sqrt((diff ** 2).sum(axis=2)).min(axis=1)
+    return np.sqrt((diff**2).sum(axis=2)).min(axis=1)
 
 
 class CoresetSelector:
@@ -134,7 +135,7 @@ class CoresetSelector:
             selected.append(chosen)
 
             # Update min distances relative to the newly chosen point
-            chosen_vec = candidate_embeddings[chosen: chosen + 1]
+            chosen_vec = candidate_embeddings[chosen : chosen + 1]
             if self._use_hnswlib:
                 # Add chosen point to the index for subsequent queries
                 new_idx = len(labelled_embeddings) + len(selected) - 1

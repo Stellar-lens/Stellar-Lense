@@ -7,8 +7,6 @@ tree.
 
 from __future__ import annotations
 
-import os
-import sys
 from pathlib import Path
 
 import pytest
@@ -29,7 +27,6 @@ from scripts.onboarding_checks import (
     run_all_checks,
 )
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -38,7 +35,9 @@ from scripts.onboarding_checks import (
 @pytest.fixture()
 def fake_repo(tmp_path: Path) -> Path:
     """Minimal repo-like directory with all required files and dirs present."""
-    (tmp_path / ".env").write_text("HORIZON_URL=https://horizon.stellar.org\nRISK_SCORE_DB_URL=sqlite:///./test.db\n")
+    (tmp_path / ".env").write_text(
+        "HORIZON_URL=https://horizon.stellar.org\nRISK_SCORE_DB_URL=sqlite:///./test.db\n"
+    )
     (tmp_path / "requirements.txt").write_text("# stub\n")
     (tmp_path / "pyproject.toml").write_text("[project]\nname = 'test'\n")
     for d in ["models", "data", "reports", "reports/forensic"]:
@@ -231,6 +230,7 @@ class TestCheckOptionalTools:
     def test_git_found(self):
         """git is almost certainly installed in a dev environment."""
         import shutil
+
         results = check_optional_tools()
         if shutil.which("git"):
             git_result = next((r for r in results if r.name == "tool:git"), None)
@@ -258,6 +258,7 @@ class TestRunAllChecks:
 
     def test_to_dict_is_serialisable(self, fake_repo, monkeypatch):
         import json
+
         monkeypatch.setenv("RISK_SCORE_DB_URL", "sqlite:///:memory:")
         report = run_all_checks(repo_root=fake_repo)
         d = report.to_dict()

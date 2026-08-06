@@ -132,6 +132,7 @@ class FederatedAuditTrail:
                 get_engine,
                 get_session_factory,
             )
+
             engine = get_engine(db_url)
             Base.metadata.create_all(engine, checkfirst=True)
             session_factory = get_session_factory(engine)
@@ -262,9 +263,7 @@ class FederatedAuditTrail:
 
         with self._session_factory() as session:
             latest = (
-                session.query(FederatedAuditRecord)
-                .order_by(FederatedAuditRecord.id.desc())
-                .first()
+                session.query(FederatedAuditRecord).order_by(FederatedAuditRecord.id.desc()).first()
             )
             if latest is None:
                 return None
@@ -310,9 +309,7 @@ class FederatedAuditTrail:
             # participant_fingerprints is stored as a JSON array string — use LIKE.
             rows = (
                 session.query(FederatedAuditRecord)
-                .filter(
-                    FederatedAuditRecord.participant_fingerprints.like(f"%{fingerprint}%")
-                )
+                .filter(FederatedAuditRecord.participant_fingerprints.like(f"%{fingerprint}%"))
                 .order_by(FederatedAuditRecord.id)
                 .all()
             )
@@ -360,6 +357,7 @@ class FederatedAuditTrail:
             "prev_hash": row.prev_hash,
             "recorded_at": row.recorded_at.isoformat() if row.recorded_at else None,
         }
+
 
 # ---------------------------------------------------------------------------
 # Configuration (mirrors the project's os.getenv pattern from config.py)
@@ -740,16 +738,12 @@ class AsyncFederatedCoordinator:
         max_staleness: int | None = None,
     ) -> None:
         self._lock = threading.Lock()
-        self._global_weights: np.ndarray | None = (
-            np.zeros(weight_dim) if weight_dim > 0 else None
-        )
+        self._global_weights: np.ndarray | None = np.zeros(weight_dim) if weight_dim > 0 else None
         self._model_version: int = 0
         self._pending: list[AsyncGradientUpdate] = []
         self._last_aggregation_time: float = time.monotonic()
 
-        self.trigger_n: int = (
-            trigger_n if trigger_n is not None else FEDERATED_ASYNC_TRIGGER_N
-        )
+        self.trigger_n: int = trigger_n if trigger_n is not None else FEDERATED_ASYNC_TRIGGER_N
         self.trigger_seconds: int = (
             trigger_seconds if trigger_seconds is not None else FEDERATED_ASYNC_TRIGGER_SECONDS
         )
@@ -827,8 +821,7 @@ class AsyncFederatedCoordinator:
             self._pending.append(update)
 
             logger.info(
-                "Async update received: participant=%s staleness=%d pending=%d "
-                "model_version=%d",
+                "Async update received: participant=%s staleness=%d pending=%d " "model_version=%d",
                 participant_id,
                 staleness,
                 len(self._pending),
@@ -861,14 +854,13 @@ class AsyncFederatedCoordinator:
     # ------------------------------------------------------------------
 
     def _maybe_aggregate(self) -> bool:
-        """Aggregate if N-update trigger or time-trigger fires.
+        """Aggregate when the N-update trigger fires.
 
+        Time-based aggregation is driven explicitly by :meth:`tick`, keeping
+        submission latency predictable and making scheduler ownership clear.
         Must be called while holding ``self._lock``.
         """
-        elapsed = time.monotonic() - self._last_aggregation_time
-        if len(self._pending) >= self.trigger_n or (
-            elapsed >= self.trigger_seconds and self._pending
-        ):
+        if len(self._pending) >= self.trigger_n:
             return self._aggregate()
         return False
 
@@ -888,10 +880,7 @@ class AsyncFederatedCoordinator:
 
         # Staleness-aware weights: w_i = 1 / (1 + staleness_i)
         weights = np.array(
-            [
-                1.0 / (1.0 + max(0, self._model_version - u.gradient_model_version))
-                for u in updates
-            ]
+            [1.0 / (1.0 + max(0, self._model_version - u.gradient_model_version)) for u in updates]
         )
         total_weight = weights.sum()
         norm_weights = weights / total_weight
@@ -917,9 +906,7 @@ class AsyncFederatedCoordinator:
         self._last_aggregation_time = time.monotonic()
 
         mean_staleness = float(
-            np.mean(
-                [max(0, self._model_version - 1 - u.gradient_model_version) for u in updates]
-            )
+            np.mean([max(0, self._model_version - 1 - u.gradient_model_version) for u in updates])
         )
 
         logger.info(
@@ -939,9 +926,7 @@ class AsyncFederatedCoordinator:
             # participant fingerprints: use participant_id as fingerprint when no
             # certificate is available (callers may inject real fingerprints via
             # FederatedAuditTrail.set_participant_fingerprints)
-            fingerprints = [
-                self._audit.get_fingerprint(u.participant_id) for u in updates
-            ]
+            fingerprints = [self._audit.get_fingerprint(u.participant_id) for u in updates]
             self._audit.record_round(
                 participant_fingerprints=fingerprints,
                 gradient_norms=gradient_norms,

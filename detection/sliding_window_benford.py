@@ -45,7 +45,7 @@ def _leading_digit(amount: float) -> int | None:
     if not math.isfinite(amount) or amount <= 0:
         return None
     mag = math.floor(math.log10(amount))
-    digit = int(amount / (10.0 ** mag))
+    digit = int(amount / (10.0**mag))
     return max(1, min(9, digit))
 
 
@@ -119,8 +119,7 @@ class SlidingWindowBenfordAggregator:
         if self._total == 0:
             return 0.0
         deviations = [
-            abs(self._digit_counts[d - 1] / self._total - BENFORD_EXPECTED[d])
-            for d in range(1, 10)
+            abs(self._digit_counts[d - 1] / self._total - BENFORD_EXPECTED[d]) for d in range(1, 10)
         ]
         return float(sum(deviations) / 9)
 

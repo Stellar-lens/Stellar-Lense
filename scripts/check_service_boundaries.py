@@ -21,8 +21,18 @@ contributor knows exactly where to fix the drift.
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 
-from utils.boundaries import describe_bindings, validate_service_boundaries
+# Direct script execution puts ``scripts/`` (not the repository root) first on
+# sys.path.  Match the other CI entry points so local packages remain importable.
+REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from utils.boundaries import (  # noqa: E402
+    describe_bindings,
+    validate_service_boundaries,
+)
 
 
 def main() -> int:

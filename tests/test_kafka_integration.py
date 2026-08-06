@@ -108,7 +108,7 @@ class TestWorkerProcessing:
         from streaming.streaming_scorer import StreamingScorer
 
         buffer = FeatureBuffer()
-        
+
         # Mock scorer to avoid issues with uninitialized _feature_cache
         scorer = Mock(spec=StreamingScorer)
         scorer.score_wallet = Mock(return_value=None)
@@ -146,7 +146,7 @@ class TestWorkerProcessing:
             count_ga111 = buffer.wallet_trade_count("GA111")
             count_ga222 = buffer.wallet_trade_count("GA222")
             assert count_ga111 > 0 or count_ga222 > 0
-            
+
             # Verify scorer was called
             assert scorer.score_wallet.call_count >= 1
 

@@ -63,7 +63,9 @@ class WalletFeatureStore:
             logger.warning(f"Redis cache write failed: {e}")
         return features
 
-    def prefetch(self, wallet_pairs: list[tuple[str, str]]) -> dict[tuple[str, str], dict[str, Any] | None]:
+    def prefetch(
+        self, wallet_pairs: list[tuple[str, str]]
+    ) -> dict[tuple[str, str], dict[str, Any] | None]:
         results: dict[tuple[str, str], dict[str, Any] | None] = {}
         pipe = self.redis.pipeline()
         keys = {self._get_key(w, p): (w, p) for w, p in wallet_pairs}

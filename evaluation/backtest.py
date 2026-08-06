@@ -187,9 +187,7 @@ def run_backtest(
         sweep_engine = ThresholdSweep(y_true, y_score, grid=sweep_grid)
         sweep_points = sweep_engine.sweep()
         optimal_f1 = sweep_engine.find_optimal_threshold(metric="f1")
-        optimal_constrained = sweep_engine.find_optimal_threshold(
-            metric="f1", recall_floor=0.85
-        )
+        optimal_constrained = sweep_engine.find_optimal_threshold(metric="f1", recall_floor=0.85)
         report["threshold_sweep"] = {
             "grid_size": len(sweep_points),
             "optimal_f1_threshold": optimal_f1.threshold,

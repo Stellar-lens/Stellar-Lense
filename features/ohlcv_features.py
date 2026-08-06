@@ -25,7 +25,8 @@ def _validate_resolutions(resolutions: Iterable[str]) -> list[str]:
     invalid = [r for r in res if r not in _RESOLUTION_ALLOWLIST]
     if invalid:
         raise ValueError(
-            "Invalid resolutions found: " + ", ".join(map(repr, invalid))
+            "Invalid resolutions found: "
+            + ", ".join(map(repr, invalid))
             + ". Allowed: "
             + ", ".join(map(repr, _RESOLUTION_ALLOWLIST))
         )
@@ -99,23 +100,20 @@ def compute_ohlcv_features(
         # DatetimeIndex, so this must use the same datetime-indexed frame as
         # resample() above, not the original RangeIndex-ed df.
         pv = df_indexed["price"] * df_indexed["amount"]
-        vwap_ = pv.groupby(pd.Grouper(freq=pandas_freq, level=0)).sum() / volume_.replace(0.0, np.nan)
+        vwap_ = pv.groupby(pd.Grouper(freq=pandas_freq, level=0)).sum() / volume_.replace(
+            0.0, np.nan
+        )
 
         # Features per candle.
         denom_range = (high_ - low_).replace(0.0, np.nan)
-        price_range_ratio = (denom_range / open_.replace(0.0, np.nan))
+        price_range_ratio = denom_range / open_.replace(0.0, np.nan)
         # candle_body_ratio ((close-open)/(high-low))
         candle_body_ratio = (close_ - open_) / denom_range
         # vwap_deviation (close - VWAP / VWAP)
         vwap_deviation = (close_ - vwap_) / vwap_.replace(0.0, np.nan)
 
         # volume_spike_ratio = candle volume / rolling(20)-avg volume (excluding current candle)
-        rolling_avg_excl = (
-            volume_
-            .rolling(window=20, min_periods=1)
-            .mean()
-            .shift(1)
-        )
+        rolling_avg_excl = volume_.rolling(window=20, min_periods=1).mean().shift(1)
         volume_spike_ratio = volume_ / rolling_avg_excl.replace(0.0, np.nan)
 
         # Sparse candle handling: fewer than 2 trades => NaN.
@@ -133,10 +131,14 @@ def compute_ohlcv_features(
         # The caller expects a single feature row; pick the latest candle.
         last_idx = volume_.last_valid_index()
         if last_idx is None:
-            out.update({f"price_range_ratio_{res}": nan,
-                        f"vwap_deviation_{res}": nan,
-                        f"candle_body_ratio_{res}": nan,
-                        f"volume_spike_ratio_{res}": nan})
+            out.update(
+                {
+                    f"price_range_ratio_{res}": nan,
+                    f"vwap_deviation_{res}": nan,
+                    f"candle_body_ratio_{res}": nan,
+                    f"volume_spike_ratio_{res}": nan,
+                }
+            )
             continue
 
         out[f"price_range_ratio_{res}"] = float(price_range_ratio.loc[last_idx])
@@ -159,4 +161,3 @@ def _feature_keys_for_resolutions(resolutions: list[str]) -> list[str]:
             ]
         )
     return keys
-

@@ -11,17 +11,15 @@ from __future__ import annotations
 import datetime
 import threading
 import time
-from collections import deque
-from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
-from tests.concurrent_validators import StressRunner, assert_eventually
 from streaming.pubsub_router import PubSubRouter
 from streaming.streaming_scorer import AdaptiveBatchController
 from streaming.ws_abuse_detector import AbuseDetector
 from streaming.ws_server import ReplayBuffer, SequenceCounter, TokenBucket
+from tests.concurrent_validators import StressRunner, assert_eventually
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -123,9 +121,9 @@ class TestFeatureBufferConcurrency:
         # IDs from the last max_trades entries should be present.
         expected_count = min(total_trades, 5000)
         actual = buf.wallet_trade_count(WALLET_A)
-        assert actual == expected_count, (
-            f"Expected ~{expected_count} trades for wallet A, got {actual}"
-        )
+        assert (
+            actual == expected_count
+        ), f"Expected ~{expected_count} trades for wallet A, got {actual}"
 
     def test_concurrent_writes_to_different_wallets_no_contention(self):
         """Separate wallets updated concurrently: all writes succeed."""
@@ -236,9 +234,7 @@ class TestFeatureBufferConcurrency:
             count = buf.wallet_trade_count(WALLET_A)
             assert count >= 0, f"Negative trade count: {count}"
 
-        errors = StressRunner(target=write_and_check).run(
-            n_threads=4, n_iters=50, timeout=15
-        )
+        errors = StressRunner(target=write_and_check).run(n_threads=4, n_iters=50, timeout=15)
         assert not errors, f"Errors during count checks: {errors}"
 
 
@@ -265,9 +261,7 @@ class TestFeatureCacheConcurrency:
             else:
                 cache.put(key, {"score": float(tid), "seq": it})
 
-        errors = StressRunner(target=access_cache).run(
-            n_threads=4, n_iters=100, timeout=15
-        )
+        errors = StressRunner(target=access_cache).run(n_threads=4, n_iters=100, timeout=15)
         assert not errors, f"FeatureCache concurrent access errors: {errors}"
 
     def test_cache_ttl_not_extended_by_concurrent_reads(self):
@@ -282,9 +276,7 @@ class TestFeatureCacheConcurrency:
         def read_key(tid: int, it: int) -> None:
             _ = cache.get(key)
 
-        errors = StressRunner(target=read_key).run(
-            n_threads=4, n_iters=30, timeout=15
-        )
+        errors = StressRunner(target=read_key).run(n_threads=4, n_iters=30, timeout=15)
         assert not errors
 
         # Wait for TTL to expire
@@ -336,15 +328,13 @@ class TestPubSubRouterConcurrency:
         def subscribe(tid: int, it: int) -> None:
             router.subscribe(f"client-{tid}", [channel])
 
-        errors = StressRunner(target=subscribe).run(
-            n_threads=n_clients, n_iters=1, timeout=15
-        )
+        errors = StressRunner(target=subscribe).run(n_threads=n_clients, n_iters=1, timeout=15)
         assert not errors
 
         subscribers = router.get_subscribers(channel)
-        assert len(subscribers) == n_clients, (
-            f"Expected {n_clients} subscribers, got {len(subscribers)}"
-        )
+        assert (
+            len(subscribers) == n_clients
+        ), f"Expected {n_clients} subscribers, got {len(subscribers)}"
 
     def test_concurrent_subscribe_and_disconnect(self):
         """Subscribe one client while another disconnects — no state leak."""
@@ -360,9 +350,7 @@ class TestPubSubRouterConcurrency:
             router.subscribe(cid, [channel])
             router.disconnect(cid)
 
-        errors = StressRunner(target=join_and_leave).run(
-            n_threads=8, n_iters=30, timeout=15
-        )
+        errors = StressRunner(target=join_and_leave).run(n_threads=8, n_iters=30, timeout=15)
         assert not errors
 
         # Persistent clients should still be subscribed
@@ -386,13 +374,11 @@ class TestPubSubRouterConcurrency:
             router.subscribe(cid, [wallet_channel, pair_channel])
             clients = router.get_clients_for_event(WALLET_A, f"USDC:{USDC_ISSUER}/XLM:native")
             client_list = list(clients)
-            assert len(client_list) == len(set(client_list)), (
-                f"Duplicate client IDs in event recipients: {client_list}"
-            )
+            assert len(client_list) == len(
+                set(client_list)
+            ), f"Duplicate client IDs in event recipients: {client_list}"
 
-        errors = StressRunner(target=sub_and_check).run(
-            n_threads=8, n_iters=15, timeout=15
-        )
+        errors = StressRunner(target=sub_and_check).run(n_threads=8, n_iters=15, timeout=15)
         assert not errors
 
 
@@ -420,6 +406,7 @@ class TestAlertDispatcherConcurrency:
         dispatch_lock = threading.Lock()
 
         original_deliver = dispatcher._deliver
+
         def counting_deliver(wallet, risk_score, pair_id):
             with dispatch_lock:
                 dispatch_count[0] += 1
@@ -430,15 +417,11 @@ class TestAlertDispatcherConcurrency:
         def dispatch(tid: int, it: int) -> None:
             dispatcher.dispatch(WALLET_A, risk_score, "USDC:XLM")
 
-        errors = StressRunner(target=dispatch).run(
-            n_threads=n_threads, n_iters=5, timeout=15
-        )
+        errors = StressRunner(target=dispatch).run(n_threads=n_threads, n_iters=5, timeout=15)
         assert not errors
 
         # Only the first delivery should go through due to cooldown
-        assert dispatch_count[0] == 1, (
-            f"Expected 1 dispatch (cooldown), got {dispatch_count[0]}"
-        )
+        assert dispatch_count[0] == 1, f"Expected 1 dispatch (cooldown), got {dispatch_count[0]}"
 
     def test_concurrent_dispatch_different_wallets(self):
         """Different wallets dispatched concurrently: all should deliver."""
@@ -468,16 +451,14 @@ class TestAlertDispatcherConcurrency:
             w = wallets[(tid * 5 + it) % len(wallets)]
             dispatcher.dispatch(w, risk_score, "USDC:XLM")
 
-        errors = StressRunner(target=dispatch).run(
-            n_threads=8, n_iters=20, timeout=15
-        )
+        errors = StressRunner(target=dispatch).run(n_threads=8, n_iters=20, timeout=15)
         assert not errors
 
         # Each wallet should have been dispatched once (first call per wallet)
         unique_dispatched = set(dispatched)
-        assert len(unique_dispatched) == len(wallets), (
-            f"Expected {len(wallets)} unique wallets dispatched, got {len(unique_dispatched)}"
-        )
+        assert len(unique_dispatched) == len(
+            wallets
+        ), f"Expected {len(wallets)} unique wallets dispatched, got {len(unique_dispatched)}"
 
     def test_concurrent_threshold_check(self):
         """threshold_controller is not corrupted by concurrent dispatch calls."""
@@ -508,9 +489,7 @@ class TestAlertDispatcherConcurrency:
             else:
                 dispatcher.dispatch(WALLET_A, risk_score_low, "USDC:XLM")
 
-        errors = StressRunner(target=dispatch_mixed).run(
-            n_threads=4, n_iters=20, timeout=15
-        )
+        errors = StressRunner(target=dispatch_mixed).run(n_threads=4, n_iters=20, timeout=15)
         assert not errors
 
 
@@ -535,9 +514,7 @@ class TestAbuseDetectorConcurrency:
             # Should not block within limits
             assert isinstance(verdict.blocked, bool)
 
-        errors = StressRunner(target=record_req).run(
-            n_threads=10, n_iters=30, timeout=15
-        )
+        errors = StressRunner(target=record_req).run(n_threads=10, n_iters=30, timeout=15)
         assert not errors
 
     def test_concurrent_record_and_reset(self):
@@ -554,9 +531,7 @@ class TestAbuseDetectorConcurrency:
             else:
                 detector.record(client_id, _wallet_channel(tid))
 
-        errors = StressRunner(target=record_and_reset).run(
-            n_threads=8, n_iters=60, timeout=15
-        )
+        errors = StressRunner(target=record_and_reset).run(n_threads=8, n_iters=60, timeout=15)
         assert not errors
 
     def test_abuse_blocks_after_threshold_concurrent(self):
@@ -575,15 +550,11 @@ class TestAbuseDetectorConcurrency:
             if verdict.blocked:
                 blocked_count[0] += 1
 
-        errors = StressRunner(target=trigger_block).run(
-            n_threads=4, n_iters=20, timeout=15
-        )
+        errors = StressRunner(target=trigger_block).run(n_threads=4, n_iters=20, timeout=15)
         assert not errors
 
         # At some point the client should have been blocked
-        assert blocked_count[0] >= 1, (
-            "Expected client to be blocked after exceeding wallet limit"
-        )
+        assert blocked_count[0] >= 1, "Expected client to be blocked after exceeding wallet limit"
 
 
 # ===================================================================
@@ -608,9 +579,7 @@ class TestMetadataJoinStateConcurrency:
             if meta is not None:
                 assert meta.account_id == wallet
 
-        errors = StressRunner(target=apply_and_get).run(
-            n_threads=8, n_iters=100, timeout=15
-        )
+        errors = StressRunner(target=apply_and_get).run(n_threads=8, n_iters=100, timeout=15)
         assert not errors
 
     def test_concurrent_evict_during_access(self):
@@ -632,9 +601,7 @@ class TestMetadataJoinStateConcurrency:
                 wallet = _valid_wallet(it % 20)
                 state.get_metadata(wallet)
 
-        errors = StressRunner(target=evict_and_access).run(
-            n_threads=8, n_iters=50, timeout=15
-        )
+        errors = StressRunner(target=evict_and_access).run(n_threads=8, n_iters=50, timeout=15)
         assert not errors
 
     def test_pending_promotion_under_concurrent_access(self):
@@ -653,9 +620,7 @@ class TestMetadataJoinStateConcurrency:
                 if meta is not None:
                     assert meta.account_id == wallet
 
-        errors = StressRunner(target=apply_and_promote).run(
-            n_threads=6, n_iters=80, timeout=15
-        )
+        errors = StressRunner(target=apply_and_promote).run(n_threads=6, n_iters=80, timeout=15)
         assert not errors
 
     def test_wallets_needing_rescore_after_concurrent_updates(self):
@@ -674,9 +639,7 @@ class TestMetadataJoinStateConcurrency:
             rescore = state.wallets_needing_rescore()
             assert isinstance(rescore, list)
 
-        errors = StressRunner(target=update_and_rescore).run(
-            n_threads=6, n_iters=40, timeout=15
-        )
+        errors = StressRunner(target=update_and_rescore).run(n_threads=6, n_iters=40, timeout=15)
         assert not errors
 
 
@@ -701,9 +664,7 @@ class TestAdaptiveBatchControllerConcurrency:
             batch = pid.update(latency)
             assert pid.min_batch <= batch <= pid.max_batch
 
-        errors = StressRunner(target=update_pid).run(
-            n_threads=8, n_iters=100, timeout=15
-        )
+        errors = StressRunner(target=update_pid).run(n_threads=8, n_iters=100, timeout=15)
         assert not errors
 
     def test_batch_size_within_bounds_under_concurrent_access(self):
@@ -719,9 +680,7 @@ class TestAdaptiveBatchControllerConcurrency:
             bs = pid.batch_size
             assert pid.min_batch <= bs <= pid.max_batch
 
-        errors = StressRunner(target=update_and_check).run(
-            n_threads=6, n_iters=80, timeout=15
-        )
+        errors = StressRunner(target=update_and_check).run(n_threads=6, n_iters=80, timeout=15)
         assert not errors
 
 
@@ -748,13 +707,11 @@ class TestSequenceCounterConcurrency:
                     raise AssertionError(f"Duplicate sequence number: {seq}")
                 seen.add(seq)
 
-        errors = StressRunner(target=get_seq).run(
-            n_threads=n_threads, n_iters=n_iters, timeout=30
-        )
+        errors = StressRunner(target=get_seq).run(n_threads=n_threads, n_iters=n_iters, timeout=30)
         assert not errors, f"Duplicate sequence numbers: {errors}"
-        assert len(seen) == n_threads * n_iters, (
-            f"Expected {n_threads * n_iters} unique sequences, got {len(seen)}"
-        )
+        assert (
+            len(seen) == n_threads * n_iters
+        ), f"Expected {n_threads * n_iters} unique sequences, got {len(seen)}"
 
     def test_monotonicity_per_thread(self):
         """Each thread sees monotonically increasing sequence numbers."""
@@ -772,9 +729,7 @@ class TestSequenceCounterConcurrency:
                     per_thread_seqs[tid] = []
                 per_thread_seqs[tid].append(seq)
 
-        errors = StressRunner(target=get_seqs).run(
-            n_threads=n_threads, n_iters=n_iters, timeout=30
-        )
+        errors = StressRunner(target=get_seqs).run(n_threads=n_threads, n_iters=n_iters, timeout=30)
         assert not errors
 
         for tid, seqs in per_thread_seqs.items():
@@ -803,9 +758,7 @@ class TestReplayBufferConcurrency:
             msgs = buf.get_since(channel, 0)
             assert isinstance(msgs, list)
 
-        errors = StressRunner(target=append_and_query).run(
-            n_threads=8, n_iters=80, timeout=15
-        )
+        errors = StressRunner(target=append_and_query).run(n_threads=8, n_iters=80, timeout=15)
         assert not errors
 
     def test_replay_buffer_size_bounded(self):
@@ -816,15 +769,11 @@ class TestReplayBufferConcurrency:
         def append(tid: int, it: int) -> None:
             buf.append(channel, tid * 100 + it, {"data": it})
 
-        errors = StressRunner(target=append).run(
-            n_threads=8, n_iters=30, timeout=15
-        )
+        errors = StressRunner(target=append).run(n_threads=8, n_iters=30, timeout=15)
         assert not errors
 
         msgs = buf.get_since(channel, 0)
-        assert len(msgs) <= 5, (
-            f"ReplayBuffer size exceeded max_size: {len(msgs)} > 5"
-        )
+        assert len(msgs) <= 5, f"ReplayBuffer size exceeded max_size: {len(msgs)} > 5"
 
 
 # ===================================================================
@@ -843,9 +792,7 @@ class TestTokenBucketConcurrency:
             allowed = bucket.is_allowed()
             assert isinstance(allowed, bool)
 
-        errors = StressRunner(target=check).run(
-            n_threads=10, n_iters=50, timeout=15
-        )
+        errors = StressRunner(target=check).run(n_threads=10, n_iters=50, timeout=15)
         assert not errors
 
 
@@ -875,9 +822,7 @@ class TestBackPressureControllerConcurrency:
         def check(tid: int, it: int) -> None:
             bp.check_and_apply(tp, queue_depth=it % 20)
 
-        errors = StressRunner(target=check).run(
-            n_threads=6, n_iters=100, timeout=15
-        )
+        errors = StressRunner(target=check).run(n_threads=6, n_iters=100, timeout=15)
         assert not errors
 
         # Paused set should be consistent
@@ -905,9 +850,7 @@ class TestBackPressureControllerConcurrency:
         def fail(tid: int, it: int) -> None:
             bp.record_failure(msg, f"error from thread {tid}")
 
-        errors = StressRunner(target=fail).run(
-            n_threads=6, n_iters=5, timeout=15
-        )
+        errors = StressRunner(target=fail).run(n_threads=6, n_iters=5, timeout=15)
         assert not errors
 
 
@@ -943,9 +886,7 @@ class TestFeatureStoreWorkerConcurrency:
                     pair_id=f"USDC:{USDC_ISSUER}/XLM:native",
                 )
 
-            errors = StressRunner(target=submit).run(
-                n_threads=8, n_iters=30, timeout=15
-            )
+            errors = StressRunner(target=submit).run(n_threads=8, n_iters=30, timeout=15)
             assert not errors
 
             # Give worker time to drain
@@ -1006,13 +947,12 @@ class TestAccountMetadataStreamConcurrency:
         )
 
         try:
+
             def add(tid: int, it: int) -> None:
                 wallet = _valid_wallet(tid * 100 + it)
                 stream.add_wallet(wallet)
 
-            errors = StressRunner(target=add).run(
-                n_threads=6, n_iters=10, timeout=15
-            )
+            errors = StressRunner(target=add).run(n_threads=6, n_iters=10, timeout=15)
             assert not errors
 
         finally:
@@ -1031,9 +971,7 @@ class TestAccountMetadataStreamConcurrency:
             wallet = _valid_wallet(tid * 100 + it)
             stream.add_wallet(wallet)
 
-        errors = StressRunner(target=add).run(
-            n_threads=4, n_iters=15, timeout=15
-        )
+        errors = StressRunner(target=add).run(n_threads=4, n_iters=15, timeout=15)
         stream.stop()
         assert not errors
 
@@ -1053,9 +991,7 @@ class TestScoreCacheConcurrency:
         buffer = MagicMock()
         scorer = MagicMock()
         dispatcher = MagicMock()
-        pipeline = StreamingPipeline(
-            buffer, scorer, dispatcher, pairs=[("USDC", USDC_ISSUER)]
-        )
+        pipeline = StreamingPipeline(buffer, scorer, dispatcher, pairs=[("USDC", USDC_ISSUER)])
 
         wallet_a = WALLET_A
         wallet_b = WALLET_B
@@ -1066,9 +1002,7 @@ class TestScoreCacheConcurrency:
             pair_id = "USDC:XLM"
             pipeline._dispatch_with_cb(wallet, score, pair_id)
 
-        errors = StressRunner(target=dispatch_with_cb).run(
-            n_threads=8, n_iters=50, timeout=15
-        )
+        errors = StressRunner(target=dispatch_with_cb).run(n_threads=8, n_iters=50, timeout=15)
         assert not errors
 
         # Both wallets should have cached scores
@@ -1086,27 +1020,23 @@ class TestStressRunner:
 
     def test_captures_exceptions(self):
         """Exceptions in threads are captured as ThreadError."""
+
         def failing(tid: int, it: int) -> None:
             if it == 3:
                 raise ValueError(f"intentional failure thread {tid}")
 
-        errors = StressRunner(target=failing).run(
-            n_threads=4, n_iters=10, timeout=15
-        )
-        assert len(errors) >= 4, (
-            f"Expected at least 4 thread errors, got {len(errors)}"
-        )
+        errors = StressRunner(target=failing).run(n_threads=4, n_iters=10, timeout=15)
+        assert len(errors) >= 4, f"Expected at least 4 thread errors, got {len(errors)}"
         for err in errors:
             assert isinstance(err.exception, ValueError)
 
     def test_no_errors_when_all_succeed(self):
         """Target that never raises produces no errors."""
+
         def succeed(tid: int, it: int) -> None:
             pass
 
-        errors = StressRunner(target=succeed).run(
-            n_threads=8, n_iters=200, timeout=15
-        )
+        errors = StressRunner(target=succeed).run(n_threads=8, n_iters=200, timeout=15)
         assert not errors
 
     def test_eventually_true(self):

@@ -27,15 +27,12 @@ Architecture:
 
 from __future__ import annotations
 
-import sys
-from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from enum import Enum
-from pathlib import Path
-from typing import Any, Callable, Protocol
+from enum import StrEnum
+from typing import Any, Protocol
 
 
-class CheckStatus(str, Enum):
+class CheckStatus(StrEnum):
     """Status of a diagnostic check."""
 
     PASS = "pass"
@@ -45,7 +42,7 @@ class CheckStatus(str, Enum):
     ERROR = "error"
 
 
-class CheckCategory(str, Enum):
+class CheckCategory(StrEnum):
     """Category of diagnostic check."""
 
     ENVIRONMENT = "environment"
@@ -187,9 +184,7 @@ class DiagnosticRegistry:
         """Get a check by name."""
         return self._checks.get(name)
 
-    def list_checks(
-        self, category: CheckCategory | None = None
-    ) -> list[tuple[str, CheckCategory]]:
+    def list_checks(self, category: CheckCategory | None = None) -> list[tuple[str, CheckCategory]]:
         """List all registered checks, optionally filtered by category."""
         checks = [
             (name, check.category)

@@ -1,6 +1,7 @@
 """
 tests/test_dependency_probe.py — Tests for utils/dependency_probe.py (#542)
 """
+
 from __future__ import annotations
 
 import json
@@ -19,7 +20,6 @@ from utils.dependency_probe import (
     probe_all,
     require,
 )
-
 
 # ---------------------------------------------------------------------------
 # _probe_package

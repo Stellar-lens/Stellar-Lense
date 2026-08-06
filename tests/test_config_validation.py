@@ -72,9 +72,7 @@ def test_dry_run_skips_submit_onchain():
     with (
         patch.object(Config, "LEDGERLENS_CONTRACT_ID", "contract-id"),
         patch.object(Config, "LEDGERLENS_SUBMITTER_SECRET", "secret"),
-        patch(
-            "integrations.contract_client.LedgerLensContractClient.submit_score"
-        ) as submit_score,
+        patch("integrations.contract_client.LedgerLensContractClient.submit_score") as submit_score,
     ):
         _run_dry_run(["--dry-run", "--submit-onchain", "--no-orderbook"])
     submit_score.assert_not_called()

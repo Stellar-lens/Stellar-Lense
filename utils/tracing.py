@@ -105,6 +105,7 @@ def extract_trace_context(headers: dict[str, str]) -> Any:
 # No-op fallback so callers work without opentelemetry-sdk installed
 # ---------------------------------------------------------------------------
 
+
 class _NoopSpan:
     def __enter__(self):
         return self

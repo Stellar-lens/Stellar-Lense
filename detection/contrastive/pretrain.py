@@ -109,9 +109,7 @@ class LabeledFeatureDataset(Dataset):
             if wallet_ids is not None
             else [str(i) for i in range(len(features))]
         )
-        self.ring_registry = (
-            RingRegistry.from_rings(rings) if rings else RingRegistry()
-        )
+        self.ring_registry = RingRegistry.from_rings(rings) if rings else RingRegistry()
         self.wash_mask = self.labels == 1
         self.clean_mask = self.labels == 0
 
@@ -182,9 +180,7 @@ def _domain_aware_loss(
         h_wash, _ = encoder(wash_batch)
         h_clean, _ = encoder(clean_pool)
 
-    neg_indices = miner.mine_negatives(
-        h_wash.cpu().numpy(), n_negatives=n_negatives, epoch=epoch
-    )
+    neg_indices = miner.mine_negatives(h_wash.cpu().numpy(), n_negatives=n_negatives, epoch=epoch)
 
     # Ring-positive auxiliary loss: pull ring partners together
     ring_pairs = miner.get_ring_positives(hashed_wash_ids)
@@ -281,7 +277,9 @@ def pretrain(
             loss.backward()
             optimizer.step()
             total_loss += loss.item()
-        logger.info("Epoch [%d/%d] Loss: %.4f", epoch + 1, epochs, total_loss / max(len(dataloader), 1))
+        logger.info(
+            "Epoch [%d/%d] Loss: %.4f", epoch + 1, epochs, total_loss / max(len(dataloader), 1)
+        )
 
     return encoder
 
@@ -309,13 +307,13 @@ def _pretrain_domain_aware(
     )
     miner.set_ring_registry(dataset.ring_registry)
 
-    dataloader = DataLoader(
-        dataset, batch_size=batch_size, shuffle=True, drop_last=True
-    )
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, drop_last=True)
 
     logger.info(
         "Starting domain-aware pre-training for %d epochs (curriculum_epochs=%d) on %s",
-        epochs, curriculum_epochs, device,
+        epochs,
+        curriculum_epochs,
+        device,
     )
 
     for epoch in range(epochs):
@@ -376,7 +374,10 @@ def _pretrain_domain_aware(
         hard_frac = miner.hard_fraction(epoch)
         logger.info(
             "Epoch [%d/%d] Loss: %.4f  hard_negative_fraction: %.2f",
-            epoch + 1, epochs, avg, hard_frac,
+            epoch + 1,
+            epochs,
+            avg,
+            hard_frac,
         )
 
     return encoder
@@ -455,9 +456,7 @@ def benchmark_auc(
     random_auc = _auc(rand_enc)
 
     # --- Domain-aware ---
-    labeled_ds = LabeledFeatureDataset(
-        X_train, y_train, wallet_ids=ids_train, rings=rings
-    )
+    labeled_ds = LabeledFeatureDataset(X_train, y_train, wallet_ids=ids_train, rings=rings)
     domain_enc = pretrain(
         labeled_ds,
         epochs=epochs,
@@ -469,7 +468,8 @@ def benchmark_auc(
 
     logger.info(
         "Benchmark — random SimCLR AUC: %.4f  domain-aware AUC: %.4f",
-        random_auc, domain_auc,
+        random_auc,
+        domain_auc,
     )
     return {"random_auc": random_auc, "domain_auc": domain_auc}
 
@@ -509,14 +509,20 @@ if __name__ == "__main__":
             if args.domain_sampling:
                 ds = LabeledFeatureDataset(X, y, wallet_ids=wallet_ids)
             else:
-                dummy = [_pd.DataFrame({"amount": np.random.rand(5), "timestamp": np.arange(5)}) for _ in range(len(X))]
+                dummy = [
+                    _pd.DataFrame({"amount": np.random.rand(5), "timestamp": np.arange(5)})
+                    for _ in range(len(X))
+                ]
                 ds = UnlabeledWalletDataset(dummy)
                 ds.__getitem__ = lambda idx: (X[idx], X[idx])  # type: ignore[method-assign]
                 ds.__len__ = lambda: len(X)  # type: ignore[method-assign]
 
             enc = pretrain(
-                ds, epochs=args.epochs, batch_size=args.batch_size,
-                learning_rate=args.lr, device=device,
+                ds,
+                epochs=args.epochs,
+                batch_size=args.batch_size,
+                learning_rate=args.lr,
+                device=device,
                 use_domain_sampling=args.domain_sampling,
                 curriculum_epochs=args.curriculum_epochs,
             )

@@ -106,7 +106,9 @@ def main() -> None:
         scorer = StreamingScorer()
         scorer.min_trades = args.min_trades
         if args.fixed_batch_size is not None:
-            logger.info("Adaptive batch sizing disabled; fixed batch size = %d", args.fixed_batch_size)
+            logger.info(
+                "Adaptive batch sizing disabled; fixed batch size = %d", args.fixed_batch_size
+            )
             scorer._fixed_batch_size = args.fixed_batch_size
 
         if not scorer._risk_scorer.models:
@@ -159,6 +161,7 @@ def main() -> None:
 
     # --- Start health check server ---
     from streaming.health_check import start_health_server
+
     health_port = int(os.getenv("HEALTH_SERVER_PORT", "8080"))
     start_health_server(port=health_port)
 

@@ -35,7 +35,6 @@ Exit Codes
 
 import argparse
 import ast
-import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -49,6 +48,7 @@ logger = get_logger(__name__)
 
 class Colors:
     """ANSI color codes for terminal output."""
+
     GREEN = "\033[92m"
     YELLOW = "\033[93m"
     RED = "\033[91m"
@@ -241,13 +241,11 @@ class PrecisionAnalyzer(ast.NodeVisitor):
             return any(keyword in attr_name for keyword in self.FINANCIAL_KEYWORDS)
 
         if isinstance(node, ast.BinOp):
-            return (
-                self._involves_financial_variable(node.left)
-                or self._involves_financial_variable(node.right)
-            )
+            return self._involves_financial_variable(
+                node.left
+            ) or self._involves_financial_variable(node.right)
 
         return False
-
 
 
 # ---------------------------------------------------------------------------
@@ -258,7 +256,7 @@ class PrecisionAnalyzer(ast.NodeVisitor):
 def scan_file(filepath: Path) -> list[PrecisionIssue]:
     """Scan a single Python file for precision issues."""
     try:
-        with open(filepath, "r", encoding="utf-8") as f:
+        with open(filepath, encoding="utf-8") as f:
             source = f.read()
 
         tree = ast.parse(source, filename=str(filepath))
@@ -398,8 +396,7 @@ def validate_dataset(filepath: Path) -> list[PrecisionIssue]:
                             f"but is stored as float64"
                         ),
                         suggestion=(
-                            "Consider using Decimal or storing as int64 "
-                            "(stroops for Stellar)"
+                            "Consider using Decimal or storing as int64 " "(stroops for Stellar)"
                         ),
                     )
                 )
@@ -493,12 +490,8 @@ def print_report(issues: list[PrecisionIssue], report: dict[str, Any]) -> None:
     # Summary
     print(colorize("Summary", Colors.BOLD))
     print(f"  Total issues: {report['total']}")
-    print(
-        f"  Errors:   {colorize(str(report['by_severity']['error']), Colors.RED)}"
-    )
-    print(
-        f"  Warnings: {colorize(str(report['by_severity']['warning']), Colors.YELLOW)}"
-    )
+    print(f"  Errors:   {colorize(str(report['by_severity']['error']), Colors.RED)}")
+    print(f"  Warnings: {colorize(str(report['by_severity']['warning']), Colors.YELLOW)}")
     print(f"  Info:     {colorize(str(report['by_severity']['info']), Colors.BLUE)}")
     print()
 
@@ -514,9 +507,7 @@ def print_report(issues: list[PrecisionIssue], report: dict[str, Any]) -> None:
     # Files with most issues
     if report["by_file"]:
         print(colorize("Files with Most Issues", Colors.BOLD))
-        sorted_files = sorted(
-            report["by_file"].items(), key=lambda x: x[1], reverse=True
-        )[:10]
+        sorted_files = sorted(report["by_file"].items(), key=lambda x: x[1], reverse=True)[:10]
         for filepath, count in sorted_files:
             print(f"  {count:3d} issues: {filepath}")
         print()

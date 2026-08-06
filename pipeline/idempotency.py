@@ -59,9 +59,8 @@ from __future__ import annotations
 import hashlib
 import json
 import threading
-from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
-from typing import Any, Generator
+from typing import Any
 
 from sqlalchemy import DateTime, Integer, String, Text, UniqueConstraint, create_engine, select
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
@@ -75,7 +74,9 @@ logger = get_logger(__name__)
 # Configuration
 # ---------------------------------------------------------------------------
 
-_IDEMPOTENCY_DB_URL: str = getattr(config, "IDEMPOTENCY_DB_URL", "sqlite:///pipeline_checkpoints.db")
+_IDEMPOTENCY_DB_URL: str = getattr(
+    config, "IDEMPOTENCY_DB_URL", "sqlite:///pipeline_checkpoints.db"
+)
 _IDEMPOTENCY_TTL_HOURS: int = int(getattr(config, "IDEMPOTENCY_TTL_HOURS", "48"))
 
 # Stage names recognised by the pipeline — ordered by execution position.
@@ -102,9 +103,7 @@ class CheckpointRecord(_Base):
     """One row per (run_id, pair_id, stage) triple."""
 
     __tablename__ = "pipeline_checkpoints"
-    __table_args__ = (
-        UniqueConstraint("run_id", "pair_id", "stage", name="uq_checkpoint"),
-    )
+    __table_args__ = (UniqueConstraint("run_id", "pair_id", "stage", name="uq_checkpoint"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     run_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
@@ -183,8 +182,7 @@ class CheckpointStore:
         # SQLite may store datetimes as naive; make them UTC-aware for comparison.
         completed_at = record.completed_at
         if completed_at.tzinfo is None:
-            from datetime import timezone
-            completed_at = completed_at.replace(tzinfo=timezone.utc)
+            completed_at = completed_at.replace(tzinfo=UTC)
         age = datetime.now(UTC) - completed_at
         if age > timedelta(hours=self._ttl_hours):
             logger.info(
@@ -261,7 +259,6 @@ class CheckpointStore:
 
         Returns None if all canonical stages are complete.
         """
-        from datetime import timezone as _tz
 
         now = datetime.now(UTC)
         completed = set()
@@ -270,7 +267,7 @@ class CheckpointStore:
                 continue
             ts = r.completed_at
             if ts.tzinfo is None:
-                ts = ts.replace(tzinfo=_tz.utc)
+                ts = ts.replace(tzinfo=UTC)
             if (now - ts) < timedelta(hours=self._ttl_hours):
                 completed.add(r.stage)
 

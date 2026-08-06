@@ -38,7 +38,9 @@ def test_ring_and_benford_violation_renders_both_templates():
 
 
 def test_missing_shap_values_still_produces_valid_paragraph():
-    report = _base_report(top_shap_features=[], benford_analysis={"chi_square": 12.0, "p_value": 0.02})
+    report = _base_report(
+        top_shap_features=[], benford_analysis={"chi_square": 12.0, "p_value": 0.02}
+    )
 
     narrative = build_narrative(report)
 

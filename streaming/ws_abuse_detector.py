@@ -57,9 +57,7 @@ class AbuseDetector:
         block_duration_seconds: int | None = None,
     ) -> None:
         self._max_rpm = max_requests_per_minute or config.WS_ABUSE_MAX_REQUESTS_PER_MINUTE
-        self._max_wallets = (
-            max_distinct_wallets_per_window or config.WS_ABUSE_MAX_DISTINCT_WALLETS
-        )
+        self._max_wallets = max_distinct_wallets_per_window or config.WS_ABUSE_MAX_DISTINCT_WALLETS
         self._wallet_window = wallet_window_seconds or config.WS_ABUSE_WALLET_WINDOW_SECONDS
         self._block_duration = block_duration_seconds or config.WS_ABUSE_BLOCK_DURATION_SECONDS
         self._states: dict[str, _ClientState] = defaultdict(_ClientState)

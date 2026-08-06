@@ -70,7 +70,6 @@ import json
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
 from xml.etree import ElementTree
 
 from utils.logging import get_logger
@@ -178,9 +177,7 @@ class TestCriticalityTaxonomy:
 
     def _load(self, path: Path) -> None:
         if not path.exists():
-            logger.warning(
-                "Criticality taxonomy not found at %s — all tests default to LOW", path
-            )
+            logger.warning("Criticality taxonomy not found at %s — all tests default to LOW", path)
             return
         with open(path) as fh:
             data = json.load(fh)
@@ -435,9 +432,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     taxonomy = TestCriticalityTaxonomy(taxonomy_path)
-    evaluator = ReleaseGateEvaluator(
-        taxonomy, allow_high_failures=args.allow_high_failures
-    )
+    evaluator = ReleaseGateEvaluator(taxonomy, allow_high_failures=args.allow_high_failures)
 
     try:
         results = parse_junit_xml(junit_path)

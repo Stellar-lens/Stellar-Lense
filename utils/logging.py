@@ -24,6 +24,10 @@ from __future__ import annotations
 import logging
 import os
 import sys
+import uuid
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
+from contextvars import ContextVar, Token
 from typing import Any
 
 from config import config
@@ -34,7 +38,7 @@ _CORRELATION_ID_HEADER = "x-correlation-id"
 _PIPELINE_STAGE_HEADER = "x-pipeline-stage"
 _correlation_id: ContextVar[str | None] = ContextVar("correlation_id", default=None)
 _pipeline_stage: ContextVar[str | None] = ContextVar("pipeline_stage", default=None)
-_context_fields: ContextVar[dict[str, Any]] = ContextVar("log_context_fields", default={})
+_context_fields: ContextVar[dict[str, Any] | None] = ContextVar("log_context_fields", default=None)
 
 
 def new_correlation_id() -> str:
@@ -44,7 +48,7 @@ def new_correlation_id() -> str:
 
 def get_log_context() -> dict[str, Any]:
     """Return a copy of the context currently attached to log records."""
-    context = dict(_context_fields.get())
+    context = dict(_context_fields.get() or {})
     correlation_id = _correlation_id.get()
     pipeline_stage = _pipeline_stage.get()
     if correlation_id is not None:
@@ -72,7 +76,7 @@ def log_context(
     stage_token: Token[str | None] | None = None
     if pipeline_stage is not None:
         stage_token = _pipeline_stage.set(pipeline_stage)
-    fields_token = _context_fields.set({**_context_fields.get(), **fields})
+    fields_token = _context_fields.set({**(_context_fields.get() or {}), **fields})
     try:
         yield active_correlation_id
     finally:
@@ -116,6 +120,7 @@ class _CorrelationFilter(logging.Filter):
             if not hasattr(record, key):
                 setattr(record, key, value)
         return True
+
 
 # ── Correlation-enriched JSON formatter ──────────────────────────────────────
 
@@ -249,7 +254,9 @@ def setup_logger(name: str = "ledgerlens", level: int = logging.INFO) -> logging
     logger.setLevel(level)
     if not logger.handlers:
         handler = logging.StreamHandler()
-        formatter = SecretsRedactingFormatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+        formatter = SecretsRedactingFormatter(
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        )
         handler.setFormatter(formatter)
         logger.addHandler(handler)
     return logger

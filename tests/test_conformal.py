@@ -138,9 +138,7 @@ def test_predict_set_coverage_guarantee():
 
 def test_save_load_round_trip():
     X, y = make_classification(n_samples=200, n_features=4, random_state=42)
-    X_train, X_test, y_train, _ = train_test_split(
-        X, y, test_size=0.4, random_state=42, stratify=y
-    )
+    X_train, X_test, y_train, _ = train_test_split(X, y, test_size=0.4, random_state=42, stratify=y)
     model = RandomForestClassifier(random_state=42, n_estimators=30)
     model.fit(X_train, y_train)
 
@@ -154,9 +152,9 @@ def test_save_load_round_trip():
         calibrator.save(tmp_path)
         loaded = ConformalCalibrator.load(tmp_path)
         assert loaded.q_hat is not None
-        assert round(original_q - loaded.q_hat, 8) == 0, (
-            f"q_hat mismatch: {original_q} vs {loaded.q_hat}"
-        )
+        assert (
+            round(original_q - loaded.q_hat, 8) == 0
+        ), f"q_hat mismatch: {original_q} vs {loaded.q_hat}"
     finally:
         os.unlink(tmp_path)
 
@@ -168,9 +166,7 @@ def test_save_load_round_trip():
 
 def test_sha256_mismatch_raises_integrity_error():
     X, y = make_classification(n_samples=200, n_features=4, random_state=42)
-    X_cal, _, y_cal, _ = train_test_split(
-        X, y, test_size=0.5, random_state=42, stratify=y
-    )
+    X_cal, _, y_cal, _ = train_test_split(X, y, test_size=0.5, random_state=42, stratify=y)
     model = RandomForestClassifier(random_state=42, n_estimators=30)
     model.fit(X_cal, y_cal)
 

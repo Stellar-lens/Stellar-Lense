@@ -22,13 +22,14 @@ import urllib.request
 from collections import deque
 from collections.abc import Iterator
 
-from pydantic import ValidationError
 from stellar_sdk import Asset as SdkAsset
 from stellar_sdk import Server
 
 from config import config
 from ingestion.data_models import Asset, Trade
 from ingestion.exceptions import InvalidInputError, RecordValidationError, record_context
+from streaming.cursor_store import BaseCursorStore, get_cursor_store
+from streaming.health import HealthStatus, WorkerHealthMonitor, get_health_registry
 from utils.logging import get_logger
 from utils.tracing import get_tracer, hash_span_id
 

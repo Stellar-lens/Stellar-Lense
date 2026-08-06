@@ -50,11 +50,11 @@ _PLAYBOOK_PATH = Path(__file__).parent.parent / "data" / "playbooks" / "high_ris
 @dataclass
 class IncidentRecord:
     incident_id: str
-    wallet_hash: str           # SHA-256(wallet), not raw address
-    alert_fingerprint: str     # SHA-256(wallet + alert_type + score bucket)
+    wallet_hash: str  # SHA-256(wallet), not raw address
+    alert_fingerprint: str  # SHA-256(wallet + alert_type + score bucket)
     alert_type: str
     risk_score: int
-    created_at: str            # ISO 8601 UTC
+    created_at: str  # ISO 8601 UTC
     status: str = "open"
     report_summary: dict = field(default_factory=dict)
     risk_history_snapshot: list[dict] = field(default_factory=list)
@@ -123,9 +123,15 @@ class IncidentResponder:
         self._webhook_url = webhook_url or os.getenv("INCIDENT_WEBHOOK_URL")
         if self._webhook_url and self._webhook_url.startswith("http://"):
             raise ValueError("Webhook URL must use HTTPS")
-        self._store: dict[str, IncidentRecord] = incident_store if incident_store is not None else {}
+        self._store: dict[str, IncidentRecord] = (
+            incident_store if incident_store is not None else {}
+        )
         dedup_cfg = self._playbook.get("deduplication", {})
-        self._dedup_window = dedup_window_seconds if dedup_window_seconds is not None else dedup_cfg.get("window_seconds", 3600)
+        self._dedup_window = (
+            dedup_window_seconds
+            if dedup_window_seconds is not None
+            else dedup_cfg.get("window_seconds", 3600)
+        )
         self._dedup_timestamps: dict[str, float] = {}
         self._lock = threading.Lock()
 
@@ -146,7 +152,9 @@ class IncidentResponder:
             return None
 
         wallet_hash = _hash_wallet(wallet)
-        fingerprint = _alert_fingerprint(wallet, alert.get("alert_type", ""), alert.get("risk_score", 0))
+        fingerprint = _alert_fingerprint(
+            wallet, alert.get("alert_type", ""), alert.get("risk_score", 0)
+        )
 
         with self._lock:
             if self._is_duplicate(fingerprint):
@@ -156,7 +164,9 @@ class IncidentResponder:
 
         return self._execute_playbook(wallet, wallet_hash, fingerprint, alert)
 
-    def simulate(self, wallet: str, risk_score: int = 95, alert_type: str = "high_risk_wallet") -> IncidentRecord | None:
+    def simulate(
+        self, wallet: str, risk_score: int = 95, alert_type: str = "high_risk_wallet"
+    ) -> IncidentRecord | None:
         """Run the playbook against a wallet without waiting for a live alert.
 
         Produces an identical result to a live ``handle_alert`` call (with mocked
@@ -309,7 +319,9 @@ class IncidentResponder:
             logger.info("Webhook notification sent for incident %s", incident.incident_id)
         except Exception as exc:
             # Do NOT include self._webhook_url in the log message.
-            logger.warning("Webhook notification failed for incident %s: %s", incident.incident_id, exc)
+            logger.warning(
+                "Webhook notification failed for incident %s: %s", incident.incident_id, exc
+            )
 
     @staticmethod
     def _load_playbook(path: str | Path) -> dict:

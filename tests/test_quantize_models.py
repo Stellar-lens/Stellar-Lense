@@ -117,8 +117,12 @@ class TestDANNOutputAgreement:
         wrapper_q = _QuantisableDANN(m_fp.feature_extractor)
         wrapper_q.eval()
         try:
-            tq.fuse_modules(wrapper_q, [["feature_extractor.0", "feature_extractor.1"]], inplace=True)
-            tq.fuse_modules(wrapper_q, [["feature_extractor.2", "feature_extractor.3"]], inplace=True)
+            tq.fuse_modules(
+                wrapper_q, [["feature_extractor.0", "feature_extractor.1"]], inplace=True
+            )
+            tq.fuse_modules(
+                wrapper_q, [["feature_extractor.2", "feature_extractor.3"]], inplace=True
+            )
         except Exception:
             pass
         wrapper_q.qconfig = tq.get_default_qconfig(torch.backends.quantized.engine)
@@ -132,9 +136,7 @@ class TestDANNOutputAgreement:
 
         # Generate test samples
         n_test = 200
-        X_test = torch.tensor(
-            rng.standard_normal((n_test, input_dim)).astype(np.float32)
-        )
+        X_test = torch.tensor(rng.standard_normal((n_test, input_dim)).astype(np.float32))
 
         with torch.no_grad():
             fp_out = m_fp.encode(X_test).numpy()
@@ -145,9 +147,9 @@ class TestDANNOutputAgreement:
         within_tol = (diff < 0.05).all(axis=1)  # all dims within tol per sample
         pct_passing = within_tol.mean()
 
-        assert pct_passing >= 0.95, (
-            f"Only {pct_passing:.1%} of samples within 0.05 tolerance (need ≥ 95 %)"
-        )
+        assert (
+            pct_passing >= 0.95
+        ), f"Only {pct_passing:.1%} of samples within 0.05 tolerance (need ≥ 95 %)"
 
     def test_predict_proba_agreement_within_tolerance(self, tmp_path):
         """Pruned DANN predict_proba must agree within 0.05 on ≥ 95 % of samples."""
@@ -161,9 +163,7 @@ class TestDANNOutputAgreement:
 
         from detection.dann_encoder import DANNEncoder
 
-        state_pruned = torch.load(
-            result["output_path"], map_location="cpu", weights_only=True
-        )
+        state_pruned = torch.load(result["output_path"], map_location="cpu", weights_only=True)
         m_pruned = DANNEncoder(input_dim=input_dim, hidden_dim=16, embedding_dim=8)
         m_pruned.load_state_dict(state_pruned)
         m_pruned.eval()
@@ -177,9 +177,9 @@ class TestDANNOutputAgreement:
 
         diff = np.abs(fp_proba - pr_proba)
         pct_passing = (diff < 0.05).mean()
-        assert pct_passing >= 0.95, (
-            f"Only {pct_passing:.1%} of pruned DANN samples within 0.05 tolerance"
-        )
+        assert (
+            pct_passing >= 0.95
+        ), f"Only {pct_passing:.1%} of pruned DANN samples within 0.05 tolerance"
 
 
 # ---------------------------------------------------------------------------
@@ -195,12 +195,12 @@ class TestPruningSparsity:
 
         result = prune_dann_encoder(str(tmp_path), sparsity=0.2, dry_run=False)
 
-        assert result["nonzero_after"] < result["nonzero_before"], (
-            "Pruning did not reduce non-zero weight count"
-        )
-        assert result["sparsity_actual"] >= 0.15, (
-            f"Actual sparsity {result['sparsity_actual']:.2f} below expected ≥ 0.15"
-        )
+        assert (
+            result["nonzero_after"] < result["nonzero_before"]
+        ), "Pruning did not reduce non-zero weight count"
+        assert (
+            result["sparsity_actual"] >= 0.15
+        ), f"Actual sparsity {result['sparsity_actual']:.2f} below expected ≥ 0.15"
 
     def test_prune_gnn_reduces_nonzero(self, tmp_path):
         _save_gnn(str(tmp_path))
@@ -214,9 +214,7 @@ class TestPruningSparsity:
         assert result["sparsity_actual"] >= 0.25
 
     def test_prune_pytorch_model_nonzero(self):
-        model = nn.Sequential(
-            nn.Linear(16, 32), nn.ReLU(), nn.Linear(32, 8)
-        )
+        model = nn.Sequential(nn.Linear(16, 32), nn.ReLU(), nn.Linear(32, 8))
         nz_before, total = _count_nonzero(model)
 
         pruned = prune_pytorch_model(model, sparsity=0.3)
@@ -235,9 +233,9 @@ class TestPruningSparsity:
             r = prune_dann_encoder(str(tmp_path), sparsity=s, dry_run=False)
             results[s] = r["nonzero_after"]
 
-        assert results[0.1] >= results[0.2] >= results[0.3], (
-            "Non-zero count must be monotonically non-increasing with sparsity"
-        )
+        assert (
+            results[0.1] >= results[0.2] >= results[0.3]
+        ), "Non-zero count must be monotonically non-increasing with sparsity"
 
     @pytest.mark.parametrize("sparsity", [0.1, 0.2, 0.3])
     def test_sparsity_output_file_suffix(self, tmp_path, sparsity):
@@ -245,9 +243,9 @@ class TestPruningSparsity:
         torch.save(m.state_dict(), tmp_path / "dann_encoder.pt")
         result = prune_dann_encoder(str(tmp_path), sparsity=sparsity, dry_run=False)
         expected_suffix = f"_pruned_s{int(round(sparsity * 100))}.pt"
-        assert result["output_path"].endswith(expected_suffix), (
-            f"Expected suffix {expected_suffix}, got {result['output_path']}"
-        )
+        assert result["output_path"].endswith(
+            expected_suffix
+        ), f"Expected suffix {expected_suffix}, got {result['output_path']}"
 
 
 # ---------------------------------------------------------------------------
@@ -277,9 +275,9 @@ class TestTreeLeafQuantisation:
             # the float16 epsilon scaled by the value magnitude
             diff = np.abs(vals - vals.astype(np.float16).astype(np.float64))
             max_diff = np.max(diff) if diff.size > 0 else 0
-            assert max_diff < 1e-2, (
-                f"Leaf value diff {max_diff} exceeds float16 representation error"
-            )
+            assert (
+                max_diff < 1e-2
+            ), f"Leaf value diff {max_diff} exceeds float16 representation error"
 
     def test_rf_output_shape_preserved(self, tmp_path):
         """Quantised RF must still return correct output shape."""
@@ -313,9 +311,7 @@ class TestTreeLeafQuantisation:
         p_q = clf_q.predict_proba(X)[:, 1]
 
         pct_passing = (np.abs(p_fp - p_q) < 0.05).mean()
-        assert pct_passing >= 0.95, (
-            f"Only {pct_passing:.1%} of tree samples within 0.05 tolerance"
-        )
+        assert pct_passing >= 0.95, f"Only {pct_passing:.1%} of tree samples within 0.05 tolerance"
 
     def test_dry_run_writes_no_files(self, tmp_path):
         import joblib
@@ -384,17 +380,15 @@ class TestFilenameConventions:
         m = _tiny_dann(input_dim=16)
         torch.save(m.state_dict(), tmp_path / "dann_encoder.pt")
         result = quantise_dann_int8(str(tmp_path), dry_run=False)
-        assert result["output_path"].endswith("_int8.pt"), (
-            "INT8 artifact must end with _int8.pt"
-        )
+        assert result["output_path"].endswith("_int8.pt"), "INT8 artifact must end with _int8.pt"
 
     def test_pruned_suffix_contains_sparsity(self, tmp_path):
         m = _tiny_dann(input_dim=16)
         torch.save(m.state_dict(), tmp_path / "dann_encoder.pt")
         result = prune_dann_encoder(str(tmp_path), sparsity=0.2, dry_run=False)
-        assert "_pruned_s20" in result["output_path"], (
-            "Pruned artifact must contain _pruned_sNN in filename"
-        )
+        assert (
+            "_pruned_s20" in result["output_path"]
+        ), "Pruned artifact must contain _pruned_sNN in filename"
 
     def test_leafq_suffix(self, tmp_path):
         import joblib
@@ -402,9 +396,9 @@ class TestFilenameConventions:
         clf = _make_rf()
         joblib.dump(clf, str(tmp_path / "random_forest.joblib"))
         results = quantise_tree_models(str(tmp_path), dry_run=False)
-        assert results["random_forest"]["output_path"].endswith("_leafq.joblib"), (
-            "Leaf-quantised tree must end with _leafq.joblib"
-        )
+        assert results["random_forest"]["output_path"].endswith(
+            "_leafq.joblib"
+        ), "Leaf-quantised tree must end with _leafq.joblib"
 
     def test_original_not_overwritten(self, tmp_path):
         """Compression must never overwrite the full-precision artifact."""
@@ -482,6 +476,6 @@ class TestRunAll:
         assert "s30" in prune_results
         # All three pruned files must exist on disk
         for key in ("s10", "s20", "s30"):
-            assert os.path.exists(prune_results[key]["output_path"]), (
-                f"Pruned artifact for {key} not found"
-            )
+            assert os.path.exists(
+                prune_results[key]["output_path"]
+            ), f"Pruned artifact for {key} not found"

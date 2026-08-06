@@ -46,6 +46,7 @@ os.environ.setdefault("MIN_TRADES_FOR_SCORING", "20")
 # Load modules via importlib to avoid detection/__init__.py import chain
 # ---------------------------------------------------------------------------
 
+
 def _load(name: str, rel_path: str):
     """Load a module by file path without going through package __init__."""
     path = REPO_ROOT / rel_path
@@ -172,6 +173,7 @@ FEATURE_DICT = REPO_ROOT / "data" / "feature_dictionary.md"
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _load_dict_feature_names() -> set[str]:
     """Extract feature names documented in data/feature_dictionary.md."""
     text = FEATURE_DICT.read_text(encoding="utf-8")
@@ -194,6 +196,7 @@ def _load_dict_feature_names() -> set[str]:
 # ---------------------------------------------------------------------------
 # Test 1: synthetic dataset → zero range violations
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.skipif(
     not SYNTHETIC_DATASET.exists(),
@@ -218,24 +221,26 @@ def test_validate_feature_ranges_on_synthetic_dataset():
 # Test 2: FEATURE_RANGES keys are documented in the dictionary
 # ---------------------------------------------------------------------------
 
+
 def test_shap_feature_names_subset_of_dictionary():
     dict_names = _load_dict_feature_names()
     for feature in FEATURE_RANGES:
-        assert feature in dict_names or feature in _FEATURE_ANCHORS, (
-            f"Feature '{feature}' is in FEATURE_RANGES but not in feature_dictionary.md."
-        )
+        assert (
+            feature in dict_names or feature in _FEATURE_ANCHORS
+        ), f"Feature '{feature}' is in FEATURE_RANGES but not in feature_dictionary.md."
 
 
 def test_feature_anchor_map_covers_feature_ranges():
     for feature in FEATURE_RANGES:
-        assert feature in _FEATURE_ANCHORS, (
-            f"Feature '{feature}' is in FEATURE_RANGES but missing from _FEATURE_ANCHORS."
-        )
+        assert (
+            feature in _FEATURE_ANCHORS
+        ), f"Feature '{feature}' is in FEATURE_RANGES but missing from _FEATURE_ANCHORS."
 
 
 # ---------------------------------------------------------------------------
 # Test 3: feature_dict_url
 # ---------------------------------------------------------------------------
+
 
 def test_feature_dict_url_known_features():
     known = [
@@ -264,8 +269,13 @@ def test_feature_dict_url_unknown_feature():
 
 def test_feature_dict_url_all_windows():
     for h in [1, 4, 24, 168, 720]:
-        for prefix in ["benford_chi_square", "benford_mad", "benford_z_max",
-                       "benford_residual_chi_square", "benford_residual_mad"]:
+        for prefix in [
+            "benford_chi_square",
+            "benford_mad",
+            "benford_z_max",
+            "benford_residual_chi_square",
+            "benford_residual_mad",
+        ]:
             url = feature_dict_url(f"{prefix}_{h}h")
             assert url is not None, f"feature_dict_url('{prefix}_{h}h') returned None"
 
@@ -273,6 +283,7 @@ def test_feature_dict_url_all_windows():
 # ---------------------------------------------------------------------------
 # Test 4: deliberate violation detection
 # ---------------------------------------------------------------------------
+
 
 def test_validate_detects_out_of_range_low():
     violations = validate_feature_ranges({"counterparty_concentration_ratio": -0.1})
@@ -299,20 +310,24 @@ def test_validate_passes_valid_values():
 
 
 def test_validate_nan_skipped():
-    violations = validate_feature_ranges({
-        "counterparty_concentration_ratio": float("nan"),
-        "benford_mad_24h": float("nan"),
-    })
+    violations = validate_feature_ranges(
+        {
+            "counterparty_concentration_ratio": float("nan"),
+            "benford_mad_24h": float("nan"),
+        }
+    )
     assert violations == []
 
 
 def test_validate_unknown_features_ignored():
-    violations = validate_feature_ranges({
-        "wallet": "GSYNTH000001",
-        "label": 1,
-        "gnn_0": 0.0,
-        "unknown_future_feature": 9999.9,
-    })
+    violations = validate_feature_ranges(
+        {
+            "wallet": "GSYNTH000001",
+            "label": 1,
+            "gnn_0": 0.0,
+            "unknown_future_feature": 9999.9,
+        }
+    )
     assert violations == []
 
 
@@ -334,6 +349,7 @@ def test_validate_multiple_violations():
 # ---------------------------------------------------------------------------
 # Test 5: SHAP explain() / explain_ensemble() include dict_url
 # ---------------------------------------------------------------------------
+
 
 def _load_shap_explainer():
     """Load ShapExplainer with all dependencies stubbed out.
@@ -383,8 +399,11 @@ def test_shap_explain_includes_dict_url():
     ShapExplainer = _load_shap_explainer()
 
     feature_cols = [
-        "benford_mad_24h", "counterparty_concentration_ratio",
-        "account_age_days", "entropy_of_amounts", "inter_arrival_cv",
+        "benford_mad_24h",
+        "counterparty_concentration_ratio",
+        "account_age_days",
+        "entropy_of_amounts",
+        "inter_arrival_cv",
     ]
     row = pd.Series({col: 0.5 for col in feature_cols})
     mock_explainer = types.SimpleNamespace(
@@ -406,9 +425,7 @@ def test_shap_explain_ensemble_includes_dict_url():
 
     feature_cols = ["benford_mad_24h", "counterparty_concentration_ratio", "account_age_days"]
     row = pd.Series({col: 0.5 for col in feature_cols})
-    mock_explainer = types.SimpleNamespace(
-        shap_values=lambda X: np.array([[0.1, 0.2, 0.3]])
-    )
+    mock_explainer = types.SimpleNamespace(shap_values=lambda X: np.array([[0.1, 0.2, 0.3]]))
     se = ShapExplainer()
     se._get_explainer = lambda model: mock_explainer  # type: ignore[method-assign]
 

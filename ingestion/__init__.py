@@ -35,6 +35,7 @@ def _register_builtin_sources() -> None:
     except ImportError:
         pass
 
+
 __all__ = [
     "AccountActivity",
     "AnomalyDetectionStrategy",
@@ -42,8 +43,16 @@ __all__ = [
     "DataSource",
     "HorizonHistoricalSource",
     "HorizonSSESource",
+    "IngestionError",
+    "IngestionNotFoundError",
+    "IngestionRateLimitError",
+    "IngestionTransportError",
+    "IngestionValidationError",
     "KafkaTradeSource",
     "OrderBookEvent",
+    "RecordValidationError",
+    "SchemaDecodeError",
+    "SchemaValidationError",
     "SourceConfig",
     "SourceRegistry",
     "SourceState",

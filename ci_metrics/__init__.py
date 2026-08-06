@@ -21,8 +21,8 @@ See ci_metrics/store.py and ci_metrics/regression.py for implementation details.
 """
 
 from ci_metrics.contracts import CIRunRecord, MetricSnapshot, RegressionAlert
-from ci_metrics.store import MetricsStore
 from ci_metrics.regression import RegressionDetector, record_run
+from ci_metrics.store import MetricsStore
 
 __all__ = [
     "CIRunRecord",

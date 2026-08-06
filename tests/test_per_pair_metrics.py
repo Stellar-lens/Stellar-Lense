@@ -71,6 +71,7 @@ def test_metrics_carry_asset_pair_label():
 
     if ledgerlens_score_duration_seconds is not None:
         from detection.per_pair_metrics import canonical_pair, record_scoring_duration
+
         with record_scoring_duration(pair):
             pass
         # Verify the label is registered
@@ -80,6 +81,7 @@ def test_metrics_carry_asset_pair_label():
 
     if ledgerlens_benford_computation_total is not None:
         from detection.per_pair_metrics import canonical_pair, record_benford_computation
+
         record_benford_computation(pair, status="ok")
         canon = canonical_pair(pair)
         sample = ledgerlens_benford_computation_total.labels(asset_pair=canon, status="ok")
@@ -87,6 +89,7 @@ def test_metrics_carry_asset_pair_label():
 
     if ledgerlens_risk_score_distribution is not None:
         from detection.per_pair_metrics import canonical_pair, record_risk_score
+
         record_risk_score(pair, 55.0)
         canon = canonical_pair(pair)
         sample = ledgerlens_risk_score_distribution.labels(asset_pair=canon)

@@ -3,8 +3,8 @@ from detection.artifact_compatibility import (
     ArtifactCompatibilityGate,
     ArtifactManifest,
     CompatibilityReport,
-    load_model_with_compatibility,
     check_artifact_compatibility,
+    load_model_with_compatibility,
 )
 from detection.benford_engine import compute_benford_metrics
 from detection.conformal import ConformalCalibrator

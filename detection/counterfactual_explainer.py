@@ -55,17 +55,30 @@ IMMUTABLE_FEATURES: frozenset[str] = frozenset(
 
 NON_NEGATIVE_FEATURES: frozenset[str] = frozenset(
     {
-        "benford_chi_square_1h", "benford_chi_square_4h", "benford_chi_square_24h",
-        "benford_chi_square_168h", "benford_chi_square_720h",
-        "benford_mad_1h", "benford_mad_4h", "benford_mad_24h",
-        "benford_mad_168h", "benford_mad_720h",
-        "benford_z_max_1h", "benford_z_max_4h", "benford_z_max_24h",
-        "benford_z_max_168h", "benford_z_max_720h",
-        "benford_residual_chi_square_1h", "benford_residual_chi_square_4h",
-        "benford_residual_chi_square_24h", "benford_residual_chi_square_168h",
+        "benford_chi_square_1h",
+        "benford_chi_square_4h",
+        "benford_chi_square_24h",
+        "benford_chi_square_168h",
+        "benford_chi_square_720h",
+        "benford_mad_1h",
+        "benford_mad_4h",
+        "benford_mad_24h",
+        "benford_mad_168h",
+        "benford_mad_720h",
+        "benford_z_max_1h",
+        "benford_z_max_4h",
+        "benford_z_max_24h",
+        "benford_z_max_168h",
+        "benford_z_max_720h",
+        "benford_residual_chi_square_1h",
+        "benford_residual_chi_square_4h",
+        "benford_residual_chi_square_24h",
+        "benford_residual_chi_square_168h",
         "benford_residual_chi_square_720h",
-        "benford_residual_mad_1h", "benford_residual_mad_4h",
-        "benford_residual_mad_24h", "benford_residual_mad_168h",
+        "benford_residual_mad_1h",
+        "benford_residual_mad_4h",
+        "benford_residual_mad_24h",
+        "benford_residual_mad_168h",
         "benford_residual_mad_720h",
         "counterparty_concentration_ratio",
         "round_trip_frequency",
@@ -175,6 +188,7 @@ _INTERPRETATION_TEMPLATES: list[tuple[str, str]] = [
 # Data classes
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class CounterfactualAction:
     feature: str
@@ -240,13 +254,15 @@ class CounterfactualResult:
 # Interpretation helper
 # ---------------------------------------------------------------------------
 
+
 def _interpret_action(feature: str, old: float, new: float) -> str:
     for key, template in _INTERPRETATION_TEMPLATES:
         if key in feature:
             n_cps = round(1.0 / new) if "concentration" in feature and new > 1e-6 else 0
             try:
-                return template.format(old=old, new=new, delta=abs(new - old),
-                                       n_counterparties=n_cps)
+                return template.format(
+                    old=old, new=new, delta=abs(new - old), n_counterparties=n_cps
+                )
             except (KeyError, ValueError):
                 pass
     return f"Change '{feature}' from {old:.4g} to {new:.4g} (delta: {new - old:+.4g})."
@@ -255,6 +271,7 @@ def _interpret_action(feature: str, old: float, new: float) -> str:
 # ---------------------------------------------------------------------------
 # Main explainer
 # ---------------------------------------------------------------------------
+
 
 class CounterfactualExplainer:
     """Diverse counterfactual explanation generator for the LedgerLens ensemble.
@@ -307,13 +324,18 @@ class CounterfactualExplainer:
         if original_score < self.flag_threshold:
             logger.info(
                 "Wallet %s scores %.1f — below threshold %.1f; skipping CF generation.",
-                wallet or "<unknown>", original_score, self.flag_threshold,
+                wallet or "<unknown>",
+                original_score,
+                self.flag_threshold,
             )
             return CounterfactualResult(
-                wallet=wallet, original_score=original_score,
-                flag_threshold=self.flag_threshold, counterfactuals=[],
+                wallet=wallet,
+                original_score=original_score,
+                flag_threshold=self.flag_threshold,
+                counterfactuals=[],
                 generation_time_seconds=time.monotonic() - t0,
-                n_requested=self.n_cfs, n_found=0,
+                n_requested=self.n_cfs,
+                n_found=0,
             )
 
         try:
@@ -322,23 +344,35 @@ class CounterfactualExplainer:
             elapsed = time.monotonic() - t0
             logger.error("CF generation failed for %s: %s", wallet, exc, exc_info=True)
             return CounterfactualResult(
-                wallet=wallet, original_score=original_score,
-                flag_threshold=self.flag_threshold, counterfactuals=[],
-                generation_time_seconds=elapsed, n_requested=self.n_cfs,
-                n_found=0, error=str(exc),
+                wallet=wallet,
+                original_score=original_score,
+                flag_threshold=self.flag_threshold,
+                counterfactuals=[],
+                generation_time_seconds=elapsed,
+                n_requested=self.n_cfs,
+                n_found=0,
+                error=str(exc),
             )
 
         elapsed = time.monotonic() - t0
         logger.info(
             "Generated %d/%d CFs for %s in %.2fs (score=%.1f, threshold=%.1f)",
-            len(cfs), self.n_cfs, wallet or "<unknown>",
-            elapsed, original_score, self.flag_threshold,
+            len(cfs),
+            self.n_cfs,
+            wallet or "<unknown>",
+            elapsed,
+            original_score,
+            self.flag_threshold,
         )
         return CounterfactualResult(
-            wallet=wallet, original_score=original_score,
-            flag_threshold=self.flag_threshold, counterfactuals=cfs,
-            generation_time_seconds=elapsed, n_requested=self.n_cfs,
-            n_found=len(cfs), timed_out=(elapsed >= self.timeout_seconds),
+            wallet=wallet,
+            original_score=original_score,
+            flag_threshold=self.flag_threshold,
+            counterfactuals=cfs,
+            generation_time_seconds=elapsed,
+            n_requested=self.n_cfs,
+            n_found=len(cfs),
+            timed_out=(elapsed >= self.timeout_seconds),
         )
 
     # ------------------------------------------------------------------
@@ -375,7 +409,7 @@ class CounterfactualExplainer:
         seen_keys: list[frozenset] = []
 
         max_attempts = 500
-        for attempt in range(max_attempts):
+        for _attempt in range(max_attempts):
             if time.monotonic() - t0 >= self.timeout_seconds:
                 break
             if len(found) >= self.n_cfs:
@@ -425,21 +459,21 @@ class CounterfactualExplainer:
                 new_val = float(candidate[col])
                 if abs(new_val - old_val) < 1e-6:
                     continue
-                actions.append(CounterfactualAction(
-                    feature=col,
-                    original_value=old_val,
-                    counterfactual_value=new_val,
-                    delta=new_val - old_val,
-                    interpretation=_interpret_action(col, old_val, new_val),
-                ))
+                actions.append(
+                    CounterfactualAction(
+                        feature=col,
+                        original_value=old_val,
+                        counterfactual_value=new_val,
+                        delta=new_val - old_val,
+                        interpretation=_interpret_action(col, old_val, new_val),
+                    )
+                )
 
             if not actions:
                 continue
 
             # Diversity: at least 1 feature must differ from existing CFs
-            action_key = frozenset(
-                (a.feature, round(a.counterfactual_value, 4)) for a in actions
-            )
+            action_key = frozenset((a.feature, round(a.counterfactual_value, 4)) for a in actions)
             if action_key in seen_keys:
                 continue
             seen_keys.append(action_key)
@@ -449,14 +483,16 @@ class CounterfactualExplainer:
             for col in self._all_feat_cols:
                 if col in candidate.index:
                     fv[col] = float(candidate[col])
-            found.append(Counterfactual(
-                cf_index=len(found),
-                feature_values=fv,
-                predicted_score=score,
-                actions=sorted(actions, key=lambda a: abs(a.delta), reverse=True),
-                original_score=original_score,
-                flag_threshold=self.flag_threshold,
-            ))
+            found.append(
+                Counterfactual(
+                    cf_index=len(found),
+                    feature_values=fv,
+                    predicted_score=score,
+                    actions=sorted(actions, key=lambda a: abs(a.delta), reverse=True),
+                    original_score=original_score,
+                    flag_threshold=self.flag_threshold,
+                )
+            )
 
         return found
 
@@ -488,8 +524,10 @@ class CounterfactualExplainer:
         # Use batch scoring if available, else fall back to individual
         try:
             scores_plus = self.scorer.score_continuous_batch(
-                probe_df.drop(columns=[c for c in probe_df.columns
-                                       if c in FEATURE_COLUMNS_EXCLUDE], errors="ignore")
+                probe_df.drop(
+                    columns=[c for c in probe_df.columns if c in FEATURE_COLUMNS_EXCLUDE],
+                    errors="ignore",
+                )
             )
         except Exception:
             scores_plus = [self.scorer.score_continuous(r) for _, r in probe_df.iterrows()]

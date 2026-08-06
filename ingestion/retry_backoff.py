@@ -35,8 +35,9 @@ import functools
 import logging
 import random
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, TypeVar
+from typing import Any, TypeVar
 
 logger = logging.getLogger(__name__)
 
@@ -162,7 +163,10 @@ class RetryPolicy:
         if attempt_number <= 1:
             return 0.0
         rng = rng or random
-        raw = min(self.base_delay_seconds * (self.multiplier ** (attempt_number - 2)), self.max_delay_seconds)
+        raw = min(
+            self.base_delay_seconds * (self.multiplier ** (attempt_number - 2)),
+            self.max_delay_seconds,
+        )
         if self.jitter == "none":
             return raw
         if self.jitter == "equal":
@@ -207,7 +211,9 @@ def call_with_retry(
         try:
             result = fn()
         except policy.retryable_exceptions as exc:
-            record = AttemptRecord(attempt_number=attempt_number, delay_before_seconds=delay, exception=exc)
+            record = AttemptRecord(
+                attempt_number=attempt_number, delay_before_seconds=delay, exception=exc
+            )
             history.add(record)
             if on_attempt:
                 on_attempt(record)
@@ -216,7 +222,9 @@ def call_with_retry(
                 raise RetryExhaustedError(history, exc) from exc
             continue
         else:
-            record = AttemptRecord(attempt_number=attempt_number, delay_before_seconds=delay, succeeded=True)
+            record = AttemptRecord(
+                attempt_number=attempt_number, delay_before_seconds=delay, succeeded=True
+            )
             history.add(record)
             if on_attempt:
                 on_attempt(record)
@@ -235,7 +243,9 @@ def retry_with_backoff(
     def decorator(func: Callable[..., T]) -> Callable[..., T]:
         @functools.wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> T:
-            return call_with_retry(lambda: func(*args, **kwargs), policy=policy, sleep=sleep, rng=rng)
+            return call_with_retry(
+                lambda: func(*args, **kwargs), policy=policy, sleep=sleep, rng=rng
+            )
 
         return wrapper
 

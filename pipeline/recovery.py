@@ -67,13 +67,12 @@ Usage
 from __future__ import annotations
 
 import time
+from collections.abc import Generator
 from contextlib import contextmanager
-from dataclasses import dataclass, field
-from datetime import UTC, datetime
-from typing import Any, Generator
+from dataclasses import dataclass
+from typing import Any
 
 from pipeline.idempotency import (
-    PIPELINE_STAGES,
     CheckpointStore,
     PipelineCheckpoint,
     _CheckpointState,
@@ -246,9 +245,7 @@ class RecoveryManager:
         """
         first_incomplete = self._store.first_incomplete_stage(run_id, pair_id)
         completed_stages = [
-            r.stage
-            for r in self._store.list_stages(run_id, pair_id)
-            if r.status == "done"
+            r.stage for r in self._store.list_stages(run_id, pair_id) if r.status == "done"
         ]
         return {
             "run_id": run_id,

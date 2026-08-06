@@ -44,10 +44,10 @@ import numpy as np
 
 @dataclass
 class TopKPayload:
-    values: np.ndarray   # shape (k,)
+    values: np.ndarray  # shape (k,)
     indices: np.ndarray  # shape (k,), integer
     shape: tuple[int, ...]
-    rotation_seed: int   # deterministic seed for the random rotation
+    rotation_seed: int  # deterministic seed for the random rotation
 
 
 @dataclass

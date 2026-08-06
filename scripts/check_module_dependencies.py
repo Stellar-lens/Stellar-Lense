@@ -73,7 +73,7 @@ class BoundaryConfig:
         self.excluded_packages: set[str] = set(raw.get("excluded_packages", []))
 
     @classmethod
-    def load(cls, path: Path) -> "BoundaryConfig":
+    def load(cls, path: Path) -> BoundaryConfig:
         with open(path) as fh:
             return cls(yaml.safe_load(fh) or {})
 

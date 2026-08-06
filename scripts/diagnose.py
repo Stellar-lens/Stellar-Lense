@@ -109,10 +109,9 @@ def _print_check_list(category: str | None = None) -> None:
 
 def _print_verbose_report(report: dict[str, any]) -> None:
     """Print detailed report with all check information."""
-    from utils.diagnostics import CheckStatus
 
     print(f"\n{'='*70}")
-    print(f"Repository Health Diagnostics")
+    print("Repository Health Diagnostics")
     print(f"{'='*70}\n")
 
     print(f"Overall Status: {report['overall_status'].upper()}")

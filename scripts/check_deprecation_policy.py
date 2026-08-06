@@ -94,9 +94,7 @@ def _decorator_name(decorator: ast.expr) -> str | None:
 
 def _keyword_str(call: ast.Call, name: str) -> str | None:
     for kw in call.keywords:
-        is_str_constant = isinstance(kw.value, ast.Constant) and isinstance(
-            kw.value.value, str
-        )
+        is_str_constant = isinstance(kw.value, ast.Constant) and isinstance(kw.value.value, str)
         if kw.arg == name and is_str_constant:
             return kw.value.value
     return None

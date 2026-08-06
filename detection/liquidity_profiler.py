@@ -263,9 +263,7 @@ def _validate_thin_market_config(cfg: dict) -> None:
     for key in numeric_keys:
         val = cfg.get(key)
         if val is None or not isinstance(val, (int, float)) or val <= 0:
-            raise ValueError(
-                f"thin_market config '{key}' must be a positive number, got: {val!r}"
-            )
+            raise ValueError(f"thin_market config '{key}' must be a positive number, got: {val!r}")
 
 
 @dataclass
@@ -357,7 +355,9 @@ class ThinMarketDetector:
         if unique_traders < self._cfg["max_unique_traders_7d"]:
             reasons.append(f"only {unique_traders} unique traders in 7d")
         if liquidity_depth_usd < self._cfg["min_liquidity_depth_usd"]:
-            reasons.append(f"depth=${liquidity_depth_usd:.0f} < ${self._cfg['min_liquidity_depth_usd']:.0f}")
+            reasons.append(
+                f"depth=${liquidity_depth_usd:.0f} < ${self._cfg['min_liquidity_depth_usd']:.0f}"
+            )
         if amm_tvl_usd < self._cfg["min_amm_tvl_usd"]:
             reasons.append(f"TVL=${amm_tvl_usd:.0f} < ${self._cfg['min_amm_tvl_usd']:.0f}")
 
@@ -398,16 +398,12 @@ class ThinMarketDetector:
           - Trader concentration (fewer unique traders → higher risk)
           - Round-trip frequency (calibrated to thin-market base rates)
         """
-        classification = self.classify(
-            asset_pair, trades_7d, liquidity_depth_usd, amm_tvl_usd
-        )
+        classification = self.classify(asset_pair, trades_7d, liquidity_depth_usd, amm_tvl_usd)
         if not classification.is_thin:
             return float("nan")
 
         # Inverse-liquidity component (0–1, higher = lower liquidity)
-        depth_score = 1.0 - min(
-            liquidity_depth_usd / self._cfg["min_liquidity_depth_usd"], 1.0
-        )
+        depth_score = 1.0 - min(liquidity_depth_usd / self._cfg["min_liquidity_depth_usd"], 1.0)
         tvl_score = 1.0 - min(amm_tvl_usd / self._cfg["min_amm_tvl_usd"], 1.0)
         liquidity_component = 0.5 * depth_score + 0.5 * tvl_score
 
@@ -419,11 +415,7 @@ class ThinMarketDetector:
         # Round-trip frequency (thin-market calibrated: already suspicious at lower rates)
         rt_component = min(round_trip_frequency * 2.0, 1.0)
 
-        raw = (
-            liquidity_component * 0.4
-            + trader_component * 0.35
-            + rt_component * 0.25
-        )
+        raw = liquidity_component * 0.4 + trader_component * 0.35 + rt_component * 0.25
         return float(round(raw * 100, 2))
 
     def check_and_dispatch_alert(
@@ -465,6 +457,7 @@ class ThinMarketDetector:
                     pass
             else:
                 import sys
+
                 print(f"THIN_MARKET_ALERT: {alert}", file=sys.stderr)
 
         return score

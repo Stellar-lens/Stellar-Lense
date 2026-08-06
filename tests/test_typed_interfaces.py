@@ -1,20 +1,22 @@
-import unittest
 import os
+import unittest
+
+from cli.diagnostics import EnvironmentHealthCheck, StreamingHealthCheck, run_diagnostics
 from utils.interfaces import (
-    ServiceHealth,
     HealthCheckable,
     MetricsProvider,
-    ConfigurableService,
-    ServiceRegistry
+    ServiceRegistry,
 )
-from cli.diagnostics import EnvironmentHealthCheck, StreamingHealthCheck, run_diagnostics
+
 
 class DummyMetricsService:
     def get_metrics(self):
         return {"requests_total": 100, "error_rate": 0.01}
 
+
 class DummyIncompleteService:
     pass
+
 
 class TestTypedInterfaces(unittest.TestCase):
 
@@ -40,7 +42,10 @@ class TestTypedInterfaces(unittest.TestCase):
 
         health_results = registry.check_all_health()
         self.assertIn("environment", health_results)
-        self.assertEqual(health_results["environment"].status, "FAIL" if "RISK_SCORE_DB_URL" not in os.environ else "PASS")
+        self.assertEqual(
+            health_results["environment"].status,
+            "FAIL" if "RISK_SCORE_DB_URL" not in os.environ else "PASS",
+        )
         self.assertEqual(health_results["incomplete"].status, "UNKNOWN")
 
         collected_metrics = registry.collect_all_metrics()
@@ -57,6 +62,7 @@ class TestTypedInterfaces(unittest.TestCase):
         self.assertIn("environment", diag["checks"])
         self.assertIn("streaming", diag["checks"])
         self.assertNotIn("pass", diag["checks"]["environment"]["details"]["RISK_SCORE_DB_URL"])
+
 
 if __name__ == "__main__":
     unittest.main()

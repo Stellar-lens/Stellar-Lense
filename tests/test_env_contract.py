@@ -34,9 +34,7 @@ def test_build_env_contract_dedupes_repeated_attribute_last_wins(tmp_path):
 def test_build_env_contract_marks_no_default_as_required(tmp_path):
     source = tmp_path / "cfg.py"
     source.write_text(
-        "import os\n\n"
-        "class Config:\n"
-        "    SECRET: str | None = os.getenv('SECRET')\n"
+        "import os\n\n" "class Config:\n" "    SECRET: str | None = os.getenv('SECRET')\n"
     )
 
     entries = build_env_contract(source)

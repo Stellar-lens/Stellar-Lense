@@ -26,12 +26,12 @@ def test_compute_ohlcv_features_expected_values_1m_known_5_trades():
     # Expected candle metrics for the single 1m candle
     o = 10.0
     h = 14.0
-    l = 10.0
+    low = 10.0
     c = 14.0
     v = sum(trades["amount"].tolist())
 
-    price_range_ratio = (h - l) / o
-    candle_body_ratio = (c - o) / (h - l)
+    price_range_ratio = (h - low) / o
+    candle_body_ratio = (c - o) / (h - low)
 
     vwap = float((trades["price"] * trades["amount"]).sum() / v)
     vwap_deviation = (c - vwap) / vwap
@@ -100,4 +100,3 @@ def test_resolution_validation_allowlist():
 
     with pytest.raises(ValueError):
         compute_ohlcv_features(trades, resolutions=["2m"])
-

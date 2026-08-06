@@ -56,7 +56,9 @@ def print_table(rows: list[dict]) -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--json", action="store_true", help="Print machine-readable JSON instead of a table")
+    parser.add_argument(
+        "--json", action="store_true", help="Print machine-readable JSON instead of a table"
+    )
     parser.add_argument(
         "--fail-on-error",
         action="store_true",

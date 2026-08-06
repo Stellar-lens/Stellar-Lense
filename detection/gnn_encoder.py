@@ -470,7 +470,9 @@ if _TORCH_AVAILABLE:
 
             self.conv1 = HeteroConv(
                 {
-                    ("wallet", "traded", "asset"): _SAGEConv((-1, -1), hidden_channels, aggr="mean"),
+                    ("wallet", "traded", "asset"): _SAGEConv(
+                        (-1, -1), hidden_channels, aggr="mean"
+                    ),
                     ("wallet", "provided_liquidity", "amm_pool"): _SAGEConv(
                         (-1, -1), hidden_channels, aggr="mean"
                     ),
@@ -554,11 +556,10 @@ class HeteroGNNEncoder:
         if not _TORCH_AVAILABLE or self._model is None:
             raise RuntimeError("torch and torch_geometric are required")
 
-        x_dict = {k: hetero_data[k].x for k in hetero_data.node_types if hetero_data[k].x is not None}
-        edge_index_dict = {
-            et: hetero_data[et].edge_index
-            for et in hetero_data.edge_types
+        x_dict = {
+            k: hetero_data[k].x for k in hetero_data.node_types if hetero_data[k].x is not None
         }
+        edge_index_dict = {et: hetero_data[et].edge_index for et in hetero_data.edge_types}
 
         with torch.no_grad():
             out = self._model(x_dict, edge_index_dict)
@@ -676,8 +677,8 @@ def pretrain_gnn_contrastive(
 # ---------------------------------------------------------------------------
 
 # Unix-second bounds for timestamp validation
-_TS_MIN = 1420070400   # 2015-01-01T00:00:00Z
-_TS_MAX = 2208988800   # 2040-01-01T00:00:00Z
+_TS_MIN = 1420070400  # 2015-01-01T00:00:00Z
+_TS_MAX = 2208988800  # 2040-01-01T00:00:00Z
 
 # Per-wallet memory cap in bytes (~1 MB)
 _WALLET_MEMORY_MAX_BYTES = 1 * 1024 * 1024
@@ -686,9 +687,7 @@ _WALLET_MEMORY_MAX_BYTES = 1 * 1024 * 1024
 def _validate_timestamp(ts: float) -> float:
     """Clamp and validate a trade timestamp (Unix seconds, 2015–2040)."""
     if not (_TS_MIN <= ts <= _TS_MAX):
-        raise ValueError(
-            f"Trade timestamp {ts} out of plausible range [{_TS_MIN}, {_TS_MAX}]"
-        )
+        raise ValueError(f"Trade timestamp {ts} out of plausible range [{_TS_MIN}, {_TS_MAX}]")
     return float(ts)
 
 
@@ -711,7 +710,7 @@ if _TORCH_AVAILABLE:
 
         def forward(self, delta_t: torch.Tensor) -> torch.Tensor:
             # delta_t: (...,) → (..., d)
-            delta_t = delta_t.unsqueeze(-1)              # (..., 1)
+            delta_t = delta_t.unsqueeze(-1)  # (..., 1)
             return torch.cos(self.w * delta_t + self.b)  # (..., d)
 
     class TemporalGraphAttentionLayer(nn.Module):
@@ -759,7 +758,7 @@ if _TORCH_AVAILABLE:
             self.k_proj = nn.Linear(proj_in, head_dim * n_heads)
             self.v_proj = nn.Linear(proj_in, head_dim * n_heads)
             self.out_proj = nn.Linear(in_dim + head_dim * n_heads, out_dim)
-            self._scale = head_dim ** -0.5
+            self._scale = head_dim**-0.5
 
         def forward(
             self,
@@ -781,32 +780,34 @@ if _TORCH_AVAILABLE:
                 Shape ``(out_dim,)``.
             """
             if nbr_feats.size(0) == 0:
-                return F.relu(self.out_proj(
-                    torch.cat([src_feat, torch.zeros(self.out_proj.in_features - self.in_dim)])
-                ))
+                return F.relu(
+                    self.out_proj(
+                        torch.cat([src_feat, torch.zeros(self.out_proj.in_features - self.in_dim)])
+                    )
+                )
 
-            time_emb = self.time_enc(delta_ts)                 # (K, time_dim)
+            time_emb = self.time_enc(delta_ts)  # (K, time_dim)
             nbr_with_time = torch.cat([nbr_feats, time_emb], dim=-1)  # (K, in_dim + time_dim)
 
-            Q = self.q_proj(src_feat.unsqueeze(0))             # (1, H*head_dim)
-            K = self.k_proj(nbr_with_time)                     # (K, H*head_dim)
-            V = self.v_proj(nbr_with_time)                     # (K, H*head_dim)
+            Q = self.q_proj(src_feat.unsqueeze(0))  # (1, H*head_dim)
+            K = self.k_proj(nbr_with_time)  # (K, H*head_dim)
+            V = self.v_proj(nbr_with_time)  # (K, H*head_dim)
 
             B, H, hd = 1, self.n_heads, self.out_dim // self.n_heads
             Q = Q.view(B, H, hd)
-            K = K.view(-1, H, hd).permute(1, 0, 2)            # (H, K, hd)
-            V = V.view(-1, H, hd).permute(1, 0, 2)            # (H, K, hd)
+            K = K.view(-1, H, hd).permute(1, 0, 2)  # (H, K, hd)
+            V = V.view(-1, H, hd).permute(1, 0, 2)  # (H, K, hd)
 
             attn = torch.softmax(
                 (Q.permute(1, 0, 2) @ K.transpose(-2, -1)) * self._scale, dim=-1
-            )                                                   # (H, 1, K)
-            ctx = (attn @ V).squeeze(-2).view(1, H * hd)       # (1, out_dim)
+            )  # (H, 1, K)
+            ctx = (attn @ V).squeeze(-2).view(1, H * hd)  # (1, out_dim)
 
             combined = torch.cat([src_feat.unsqueeze(0), ctx], dim=-1)  # (1, in_dim + out_dim)
-            return F.relu(self.out_proj(combined)).squeeze(0)   # (out_dim,)
+            return F.relu(self.out_proj(combined)).squeeze(0)  # (out_dim,)
 
 else:
-    _FunctionalTimeEncoding = None      # type: ignore[assignment,misc]
+    _FunctionalTimeEncoding = None  # type: ignore[assignment,misc]
     TemporalGraphAttentionLayer = None  # type: ignore[assignment]
 
 
@@ -1069,9 +1070,9 @@ class GraphLevelPooling:
         x = torch.tensor(node_embeddings, dtype=torch.float32)
 
         with torch.no_grad():
-            s = self._assign_net(x, data.edge_index)          # (N, K)
-            x_pooled = s.T @ x                                # (K, D)
-            graph_emb = x_pooled.mean(dim=0)                  # (D,)
+            s = self._assign_net(x, data.edge_index)  # (N, K)
+            x_pooled = s.T @ x  # (K, D)
+            graph_emb = x_pooled.mean(dim=0)  # (D,)
 
         return graph_emb.cpu().numpy().astype(np.float32)
 

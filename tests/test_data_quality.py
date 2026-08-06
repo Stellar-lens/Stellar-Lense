@@ -10,12 +10,14 @@ from utils.data_quality import (
 
 
 def test_valid_record_passes_all_rules():
-    validator = DataQualityValidator([
-        RequiredFieldRule("wallet"),
-        RequiredFieldRule("score"),
-        TypeRule("score", (int, float)),
-        RangeRule("score", minimum=0, maximum=100),
-    ])
+    validator = DataQualityValidator(
+        [
+            RequiredFieldRule("wallet"),
+            RequiredFieldRule("score"),
+            TypeRule("score", (int, float)),
+            RangeRule("score", minimum=0, maximum=100),
+        ]
+    )
     report = validator.validate({"wallet": "GABCDEF", "score": 42})
     assert report.passed
     assert report.issues == []
@@ -93,7 +95,9 @@ def test_validate_batch_fail_fast_stops_early():
 
 def test_range_rule_from_feature_ranges_file(tmp_path):
     ranges_path = tmp_path / "feature_ranges.json"
-    ranges_path.write_text(json.dumps({"velocity": {"min": 0, "max": 1000}, "not_a_range": "ignored"}))
+    ranges_path.write_text(
+        json.dumps({"velocity": {"min": 0, "max": 1000}, "not_a_range": "ignored"})
+    )
     rules = RangeRule.from_feature_ranges(str(ranges_path))
     assert len(rules) == 1
     assert rules[0].field == "velocity"

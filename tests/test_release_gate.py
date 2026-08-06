@@ -10,21 +10,15 @@ Covers:
 from __future__ import annotations
 
 import json
-import textwrap
 from pathlib import Path
 
-import pytest
-
 from scripts.release_gate import (
-    GateResult,
     ReleaseGateEvaluator,
-    TaxonomyEntry,
     TestCriticalityTaxonomy,
     TestResult,
     main,
     parse_junit_xml,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -133,7 +127,13 @@ class TestCriticalityTaxonomyClass:
     def test_reason_for_returns_reason(self, tmp_path):
         tpath = _write_taxonomy(
             tmp_path,
-            [{"pattern": "tests/test_benford.py", "criticality": "CRITICAL", "reason": "core scoring"}],
+            [
+                {
+                    "pattern": "tests/test_benford.py",
+                    "criticality": "CRITICAL",
+                    "reason": "core scoring",
+                }
+            ],
         )
         t = TestCriticalityTaxonomy(tpath)
         assert "core scoring" in t.reason_for("tests/test_benford.py::test_foo")
@@ -172,29 +172,55 @@ class TestCriticalityTaxonomyClass:
 
 class TestParseJunitXml:
     def test_parses_passed_tests(self, tmp_path):
-        p = _write_junit(tmp_path, [{"classname": "tests.test_benford", "name": "test_foo", "outcome": "passed"}])
+        p = _write_junit(
+            tmp_path, [{"classname": "tests.test_benford", "name": "test_foo", "outcome": "passed"}]
+        )
         results = parse_junit_xml(p)
         assert len(results) == 1
         assert results[0].outcome == "passed"
 
     def test_parses_failed_tests(self, tmp_path):
-        p = _write_junit(tmp_path, [{"classname": "tests.test_benford", "name": "test_bar", "outcome": "failed", "message": "AssertionError"}])
+        p = _write_junit(
+            tmp_path,
+            [
+                {
+                    "classname": "tests.test_benford",
+                    "name": "test_bar",
+                    "outcome": "failed",
+                    "message": "AssertionError",
+                }
+            ],
+        )
         results = parse_junit_xml(p)
         assert results[0].outcome == "failed"
         assert "AssertionError" in results[0].message
 
     def test_parses_error_tests(self, tmp_path):
-        p = _write_junit(tmp_path, [{"classname": "tests.test_x", "name": "test_y", "outcome": "error", "message": "ImportError"}])
+        p = _write_junit(
+            tmp_path,
+            [
+                {
+                    "classname": "tests.test_x",
+                    "name": "test_y",
+                    "outcome": "error",
+                    "message": "ImportError",
+                }
+            ],
+        )
         results = parse_junit_xml(p)
         assert results[0].outcome == "error"
 
     def test_parses_skipped_tests(self, tmp_path):
-        p = _write_junit(tmp_path, [{"classname": "tests.test_x", "name": "test_skip", "outcome": "skipped"}])
+        p = _write_junit(
+            tmp_path, [{"classname": "tests.test_x", "name": "test_skip", "outcome": "skipped"}]
+        )
         results = parse_junit_xml(p)
         assert results[0].outcome == "skipped"
 
     def test_node_id_format(self, tmp_path):
-        p = _write_junit(tmp_path, [{"classname": "tests.test_benford", "name": "test_foo", "outcome": "passed"}])
+        p = _write_junit(
+            tmp_path, [{"classname": "tests.test_benford", "name": "test_foo", "outcome": "passed"}]
+        )
         results = parse_junit_xml(p)
         # node_id should be: "tests/test_benford.py::test_foo"
         assert results[0].node_id == "tests/test_benford.py::test_foo"
@@ -369,9 +395,13 @@ class TestCLIMain:
             tmp_path,
             [{"classname": "tests.test_inference_shap", "name": "test_x", "outcome": "failed"}],
         )
-        code = main([
-            "--junit", str(junit_p),
-            "--taxonomy", str(taxonomy_p),
-            "--allow-high-failures",
-        ])
+        code = main(
+            [
+                "--junit",
+                str(junit_p),
+                "--taxonomy",
+                str(taxonomy_p),
+                "--allow-high-failures",
+            ]
+        )
         assert code == 0

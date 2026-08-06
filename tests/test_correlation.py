@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import logging
 import threading
-import time
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -24,7 +22,6 @@ from utils.correlation import (
     propagate_to_thread,
     snapshot,
 )
-
 
 # ── Correlation ID generation ────────────────────────────────────────────────
 
@@ -186,9 +183,7 @@ class TestCorrelationContextDecorator:
 
 class TestSnapshot:
     def test_snapshot_captures_all_fields(self) -> None:
-        with correlation_context(
-            "snap-1", stage="ingestion", pair_id="PAIR", wallet="W1"
-        ):
+        with correlation_context("snap-1", stage="ingestion", pair_id="PAIR", wallet="W1"):
             snap = snapshot()
             assert snap.correlation_id == "snap-1"
             assert snap.stage == "ingestion"

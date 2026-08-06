@@ -179,9 +179,9 @@ def parse_wormhole_vaa_payload(transaction_data: bytes) -> dict[str, Any] | None
         # For Solana: 32 bytes
         # Read remaining as destination address
 
-        destination_address = transaction_data[offset : offset + 32].hex() if len(
-            transaction_data
-        ) > offset else ""
+        destination_address = (
+            transaction_data[offset : offset + 32].hex() if len(transaction_data) > offset else ""
+        )
 
         # Optional fields (if present)
         token = None
@@ -258,7 +258,9 @@ class SolanaRPCClient:
             rpc_url: Solana RPC endpoint URL. Defaults to config.SOLANA_RPC_URL
             cache_ttl_seconds: Cache TTL for signatures and transactions (default 1 hour)
         """
-        self.rpc_url = rpc_url or getattr(config, "SOLANA_RPC_URL", "https://api.mainnet-beta.solana.com")
+        self.rpc_url = rpc_url or getattr(
+            config, "SOLANA_RPC_URL", "https://api.mainnet-beta.solana.com"
+        )
         self.cache: TTLCache = TTLCache(maxsize=1000, ttl=cache_ttl_seconds)
         self.session = requests.Session()
         self.session.headers.update({"Content-Type": "application/json"})
@@ -389,12 +391,17 @@ class SolanaRPCClient:
         # 2. Filter for deposit messages destined to Stellar
         # 3. Extract embedded Stellar addresses and link to Solana signers
 
-        logger.info("Placeholder: find_wormhole_deposits for %s (would query Wormhole program)", stellar_address)
+        logger.info(
+            "Placeholder: find_wormhole_deposits for %s (would query Wormhole program)",
+            stellar_address,
+        )
 
         return results
 
 
-def resolve_stellar_to_solana(stellar_address: str, rpc_client: SolanaRPCClient | None = None) -> list[dict[str, Any]]:
+def resolve_stellar_to_solana(
+    stellar_address: str, rpc_client: SolanaRPCClient | None = None
+) -> list[dict[str, Any]]:
     """Resolve a Stellar address to linked Solana addresses via Wormhole.
 
     Args:

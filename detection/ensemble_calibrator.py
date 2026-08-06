@@ -42,7 +42,7 @@ from pymoo.core.problem import Problem
 from pymoo.optimize import minimize
 
 from config import config
-from detection.model_training import FEATURE_COLUMNS_EXCLUDE
+from detection.model_contracts import FEATURE_COLUMNS_EXCLUDE
 from utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -561,8 +561,10 @@ class EnsembleDynamicWeightController:
         normalised = {name: v / total_raw for name, v in raw.items()}
 
         # Clamp to [_DYNAMIC_WEIGHT_MIN, _DYNAMIC_WEIGHT_MAX] then re-normalise
-        clamped = {name: max(_DYNAMIC_WEIGHT_MIN, min(_DYNAMIC_WEIGHT_MAX, w))
-                   for name, w in normalised.items()}
+        clamped = {
+            name: max(_DYNAMIC_WEIGHT_MIN, min(_DYNAMIC_WEIGHT_MAX, w))
+            for name, w in normalised.items()
+        }
         total_clamped = sum(clamped.values())
         target = {name: v / total_clamped for name, v in clamped.items()}
 

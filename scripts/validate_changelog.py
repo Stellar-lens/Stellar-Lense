@@ -26,8 +26,6 @@ import re
 import subprocess
 import sys
 from dataclasses import dataclass, field
-from typing import Optional
-
 
 # ─── Changelog format rules ───────────────────────────────────────────────────
 
@@ -172,7 +170,6 @@ def validate_entry_format(content: str) -> list[ValidationResult]:
     issues = []
 
     in_unreleased = False
-    current_section = None
 
     for i, line in enumerate(lines, 1):
         if re.match(r"## \[Unreleased\]", line):
@@ -180,12 +177,11 @@ def validate_entry_format(content: str) -> list[ValidationResult]:
             continue
         elif re.match(r"## \[", line):
             in_unreleased = False
-            current_section = None
             continue
 
         if in_unreleased:
             if re.match(r"### ", line):
-                current_section = line.strip()
+                line.strip()
             elif blank_entry.match(line):
                 issues.append(f"  line {i}: empty changelog entry '- '")
             elif line.strip().startswith("-") and not entry_pattern.match(line):
@@ -210,9 +206,7 @@ def validate_entry_format(content: str) -> list[ValidationResult]:
 
 def validate_unreleased_not_empty_on_pr(content: str) -> list[ValidationResult]:
     """[Unreleased] must have at least one entry — failing empty or placeholder-only."""
-    match = re.search(
-        r"## \[Unreleased\](.*?)(?=## \[|\Z)", content, re.DOTALL
-    )
+    match = re.search(r"## \[Unreleased\](.*?)(?=## \[|\Z)", content, re.DOTALL)
     if not match:
         return [
             ValidationResult(
@@ -225,7 +219,8 @@ def validate_unreleased_not_empty_on_pr(content: str) -> list[ValidationResult]:
     section = match.group(1)
     # Count non-empty, non-header, non-blank lines
     entries = [
-        ln for ln in section.splitlines()
+        ln
+        for ln in section.splitlines()
         if ln.strip() and not ln.strip().startswith("#") and not ln.strip().startswith("<!--")
     ]
     if not entries:
@@ -264,11 +259,7 @@ def get_changed_files(base_ref: str) -> list[str]:
 def classify_high_impact_changes(changed_files: list[str]) -> list[str]:
     """Return changed files that match high-impact path patterns."""
     patterns = [re.compile(p) for p in HIGH_IMPACT_PATHS]
-    return [
-        f
-        for f in changed_files
-        if any(p.search(f) for p in patterns)
-    ]
+    return [f for f in changed_files if any(p.search(f) for p in patterns)]
 
 
 def changelog_was_updated(base_ref: str) -> bool:
@@ -350,7 +341,9 @@ def validate_pr_coverage(base_ref: str, strict: bool) -> list[ValidationResult]:
 # ─── Model-specific validations ───────────────────────────────────────────────
 
 
-def validate_model_change_mentions_metrics(content: str, changed_files: list[str]) -> list[ValidationResult]:
+def validate_model_change_mentions_metrics(
+    content: str, changed_files: list[str]
+) -> list[ValidationResult]:
     """
     If model training/inference files changed, changelog should mention
     metrics (AUC, F1, precision, recall) or explicitly note 'no metric change'.
@@ -362,9 +355,7 @@ def validate_model_change_mentions_metrics(content: str, changed_files: list[str
     if not model_changed:
         return []
 
-    unreleased_match = re.search(
-        r"## \[Unreleased\](.*?)(?=## \[|\Z)", content, re.DOTALL
-    )
+    unreleased_match = re.search(r"## \[Unreleased\](.*?)(?=## \[|\Z)", content, re.DOTALL)
     section = unreleased_match.group(1) if unreleased_match else ""
 
     metrics_keywords = re.compile(
@@ -391,7 +382,9 @@ def validate_model_change_mentions_metrics(content: str, changed_files: list[str
     ]
 
 
-def validate_data_schema_change_documented(content: str, changed_files: list[str]) -> list[ValidationResult]:
+def validate_data_schema_change_documented(
+    content: str, changed_files: list[str]
+) -> list[ValidationResult]:
     """
     If feature_engineering.py or data_models.py changed, changelog should
     mention 'feature', 'schema', 'column', or 'field'.
@@ -404,9 +397,7 @@ def validate_data_schema_change_documented(content: str, changed_files: list[str
     if not schema_changed:
         return []
 
-    unreleased_match = re.search(
-        r"## \[Unreleased\](.*?)(?=## \[|\Z)", content, re.DOTALL
-    )
+    unreleased_match = re.search(r"## \[Unreleased\](.*?)(?=## \[|\Z)", content, re.DOTALL)
     section = unreleased_match.group(1) if unreleased_match else ""
 
     schema_keywords = re.compile(
@@ -484,7 +475,7 @@ def main() -> int:
             report.add(r)
 
     # Print results
-    print(f"CHANGELOG.md Validation Report")
+    print("CHANGELOG.md Validation Report")
     print("=" * 60)
     for r in report.results:
         icon = "✅" if r.passed else ("❌" if r.severity == "error" else "⚠️ ")
@@ -494,7 +485,9 @@ def main() -> int:
                 print(f"   {line}")
 
     print()
-    print(f"Results: {len(report.passed)} passed, {len(report.errors)} errors, {len(report.warnings)} warnings")
+    print(
+        f"Results: {len(report.passed)} passed, {len(report.errors)} errors, {len(report.warnings)} warnings"
+    )
 
     if report.errors:
         return 1

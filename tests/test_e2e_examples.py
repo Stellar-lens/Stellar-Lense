@@ -17,9 +17,6 @@ thresholds on a fresh checkout.
 
 from __future__ import annotations
 
-import pytest
-
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -31,9 +28,7 @@ def _assert_valid_result(result: dict) -> None:
     assert "score" in result, "result must contain 'score'"
     assert "benford_flag" in result, "result must contain 'benford_flag'"
     assert "n_trades" in result, "result must contain 'n_trades'"
-    assert 0.0 <= float(result["score"]) <= 100.0, (
-        f"score {result['score']} out of [0, 100]"
-    )
+    assert 0.0 <= float(result["score"]) <= 100.0, f"score {result['score']} out of [0, 100]"
     assert result["n_trades"] > 0, "example must produce at least one trade"
 
 
@@ -87,9 +82,9 @@ class TestE2EWashTradingRing:
 
         result = main()
         # At least one signal should fire for repeated fixed amounts
-        assert result["benford_flag"] or result["score"] > 0, (
-            "Fixed-lot wash trading should produce a non-zero signal"
-        )
+        assert (
+            result["benford_flag"] or result["score"] > 0
+        ), "Fixed-lot wash trading should produce a non-zero signal"
 
 
 # ---------------------------------------------------------------------------
@@ -110,9 +105,7 @@ class TestE2EBenfordAnomaly:
 
         result = main()
         # The example returns the suspicious-scenario result
-        assert result["benford_flag"], (
-            "Uniform-distribution amounts should fail the Benford check"
-        )
+        assert result["benford_flag"], "Uniform-distribution amounts should fail the Benford check"
 
 
 # ---------------------------------------------------------------------------

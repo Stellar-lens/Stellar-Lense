@@ -52,11 +52,10 @@ import os
 import re
 import warnings
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
-from typing import Any, Callable, Protocol
 
 from utils.logging import get_logger
 
@@ -89,7 +88,7 @@ class SecretRotationError(SecretError):
 # ---------------------------------------------------------------------------
 
 
-class SecretType(str, Enum):
+class SecretType(StrEnum):
     """Enum of supported secret types with their validation rules."""
 
     STELLAR_SECRET = "stellar_secret"
@@ -206,7 +205,7 @@ class SecretValidator:
             raise SecretValidationError(
                 "Invalid HMAC secret format. Must be hex-encoded (0-9, a-f), "
                 "minimum 32 characters (128-bit). Generate with: "
-                "python -c \"import secrets; print(secrets.token_hex(32))\""
+                'python -c "import secrets; print(secrets.token_hex(32))"'
             )
 
     @classmethod
@@ -383,9 +382,7 @@ class SecretAuditLogger:
         # Add HMAC if key is available
         if self.hmac_key:
             entry_str = "|".join(str(v) for v in entry.values())
-            signature = hmac_lib.new(
-                self.hmac_key, entry_str.encode(), hashlib.sha256
-            ).hexdigest()
+            signature = hmac_lib.new(self.hmac_key, entry_str.encode(), hashlib.sha256).hexdigest()
             entry["hmac_sha256"] = signature
 
         # Append to log file (NDJSON format)
@@ -513,9 +510,7 @@ class SecretsManager:
                 secret_name=name,
                 secret_type=secret_type,
                 accessed_at=datetime.utcnow(),
-                caller_module=caller_frame.f_globals["__name__"]
-                if caller_frame
-                else "unknown",
+                caller_module=caller_frame.f_globals["__name__"] if caller_frame else "unknown",
                 caller_function=caller_frame.f_code.co_name if caller_frame else "unknown",
                 version=definition.current_version if definition else 1,
                 redacted_value_hash=hashlib.sha256(value.encode()).hexdigest()[:16],
@@ -524,9 +519,7 @@ class SecretsManager:
 
         return value
 
-    def rotate_secret(
-        self, name: str, new_value: str, new_version: int | None = None
-    ) -> None:
+    def rotate_secret(self, name: str, new_value: str, new_version: int | None = None) -> None:
         """Rotate a secret to a new value.
 
         Args:
@@ -539,9 +532,7 @@ class SecretsManager:
         """
         definition = self._definitions.get(name)
         if definition and not definition.allow_rotation:
-            raise SecretRotationError(
-                f"Secret '{name}' is not configured to allow rotation"
-            )
+            raise SecretRotationError(f"Secret '{name}' is not configured to allow rotation")
 
         # Determine new version
         if new_version is None:
@@ -578,7 +569,7 @@ class SecretsManager:
             Dictionary mapping secret names to error messages (None if valid)
         """
         results = {}
-        for name, definition in self._definitions.items():
+        for name, _definition in self._definitions.items():
             try:
                 self.get_secret(name)
                 results[name] = None
@@ -622,7 +613,6 @@ def _create_default_manager() -> SecretsManager:
     # Create manager
     enable_validation = os.getenv("SECRETS_VALIDATION_ENABLED", "true").lower() == "true"
     return SecretsManager(provider, audit_logger, enable_validation)
-
 
 
 def configure_secrets_manager(manager: SecretsManager) -> None:

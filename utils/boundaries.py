@@ -36,8 +36,9 @@ Adding a new shared utility
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Protocol, TypeVar, runtime_checkable
+from typing import Any, Protocol, TypeVar, runtime_checkable
 
 T = TypeVar("T")
 
@@ -130,7 +131,9 @@ class ServiceRegistry:
         can bind cheap factories (e.g. ``lambda: get_logger(__name__)``)
         without constructing anything at import time.
         """
-        self._bindings[protocol] = _Binding(factory=factory, protocol=protocol, description=description)
+        self._bindings[protocol] = _Binding(
+            factory=factory, protocol=protocol, description=description
+        )
 
     def resolve(self, protocol: type[T]) -> T:
         """Return an instance satisfying ``protocol``.
@@ -164,7 +167,7 @@ class ServiceRegistry:
 def _default_circuit_breaker_factory() -> Any:
     from utils.circuit_breaker import CircuitBreaker
 
-    return CircuitBreaker(component="default")
+    return CircuitBreaker(name="default")
 
 
 def _default_field_encryption_adapter() -> Any:
@@ -202,7 +205,7 @@ registry = ServiceRegistry()
 registry.register(
     CircuitBreakerPort,
     _default_circuit_breaker_factory,
-    description="Default CircuitBreaker(component='default') instance",
+    description="Default CircuitBreaker(name='default') instance",
 )
 registry.register(
     FieldEncryptionPort,
@@ -257,9 +260,7 @@ def validate_service_boundaries(target: ServiceRegistry | None = None) -> list[s
             continue
         if not isinstance(instance, protocol):
             missing = [
-                m
-                for m in dir(protocol)
-                if not m.startswith("_") and not hasattr(instance, m)
+                m for m in dir(protocol) if not m.startswith("_") and not hasattr(instance, m)
             ]
             diagnostics.append(
                 f"[{name}] {type(instance).__name__!r} does not satisfy protocol"

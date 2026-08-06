@@ -141,5 +141,7 @@ class DataConnector(ABC, Generic[RecordT]):
         try:
             self.validate_config()
         except ConnectorConfigError as exc:
-            return ConnectorHealth(connector_id=self.metadata.connector_id, ok=False, detail=str(exc))
+            return ConnectorHealth(
+                connector_id=self.metadata.connector_id, ok=False, detail=str(exc)
+            )
         return ConnectorHealth(connector_id=self.metadata.connector_id, ok=True, detail="config OK")

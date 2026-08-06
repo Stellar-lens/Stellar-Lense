@@ -61,7 +61,7 @@ class TestCoresetSelector:
 
         rng = np.random.default_rng(42)
         cluster_a = rng.random((30, 2)).astype("float32") * 0.05  # near (0, 0)
-        cluster_b = (rng.random((30, 2)).astype("float32") * 0.05 + 5.0)  # near (5, 5)
+        cluster_b = rng.random((30, 2)).astype("float32") * 0.05 + 5.0  # near (5, 5)
         embeddings = np.vstack([cluster_a, cluster_b])
 
         # Label one point from cluster A as "already labelled"
@@ -121,15 +121,15 @@ class TestCoresetHybridStrategy:
             if len(vecs) < 2:
                 return 0.0
             diffs = vecs[:, np.newaxis] - vecs[np.newaxis, :]
-            dists = np.sqrt((diffs ** 2).sum(axis=2))
+            dists = np.sqrt((diffs**2).sum(axis=2))
             np.fill_diagonal(dists, 0)
             return dists.max()
 
         spread_coreset = _spread(sel_coreset, pool)
         spread_uncertainty = _spread(sel_uncertainty, pool)
-        assert spread_coreset >= spread_uncertainty, (
-            f"alpha=0 spread ({spread_coreset:.4f}) should be >= alpha=1 spread ({spread_uncertainty:.4f})"
-        )
+        assert (
+            spread_coreset >= spread_uncertainty
+        ), f"alpha=0 spread ({spread_coreset:.4f}) should be >= alpha=1 spread ({spread_uncertainty:.4f})"
 
     def test_strategy_in_registry(self):
         from detection.active_learning.query_strategies import STRATEGY_REGISTRY
@@ -193,9 +193,9 @@ class TestSlidingWindowBenfordAggregator:
         ref_chi = chi_square_statistic(pd.Series(surviving))
 
         # Tolerance
-        assert abs(agg.chi_square() - ref_chi) < 1e-4, (
-            f"sliding chi_sq={agg.chi_square():.8f} vs batch={ref_chi:.8f}"
-        )
+        assert (
+            abs(agg.chi_square() - ref_chi) < 1e-4
+        ), f"sliding chi_sq={agg.chi_square():.8f} vs batch={ref_chi:.8f}"
 
     def test_performance_10k_add_trade_under_100ms(self):
         """10 000 add_trade calls must complete in < 100ms."""
@@ -286,9 +286,9 @@ class TestCausalTransfer:
 
         if not result.fallback_to_global:
             # f1 should be in invariant features
-            assert "f1" in result.invariant_features, (
-                f"Expected f1 in invariant set, got {result.invariant_features}"
-            )
+            assert (
+                "f1" in result.invariant_features
+            ), f"Expected f1 in invariant set, got {result.invariant_features}"
 
     def test_fallback_to_global_when_no_invariant_set(self):
         """If no feature is invariant, must fall back to global model gracefully."""
@@ -296,12 +296,14 @@ class TestCausalTransfer:
 
         rng = np.random.default_rng(99)
         # Completely random labels — nothing will be invariant
-        df = pd.DataFrame({
-            "f1": rng.standard_normal(100),
-            "f2": rng.standard_normal(100),
-            "label": rng.integers(0, 2, 100),
-            "pair_id": ["A"] * 50 + ["B"] * 50,
-        })
+        df = pd.DataFrame(
+            {
+                "f1": rng.standard_normal(100),
+                "f2": rng.standard_normal(100),
+                "label": rng.integers(0, 2, 100),
+                "pair_id": ["A"] * 50 + ["B"] * 50,
+            }
+        )
         ct = CausalTransfer(feature_cols=["f1", "f2"])
         result = ct.fit(df, pair_col="pair_id", label_col="label")
         # Must not raise; may or may not fall back
@@ -331,9 +333,9 @@ class TestCausalTransfer:
         raw_pair_ids = {"PAIR_A", "PAIR_B"}
         if not result.fallback_to_global:
             stored_keys = set(result.pair_models.keys())
-            assert not (stored_keys & raw_pair_ids), (
-                f"Raw pair IDs leaked into pair_models: {stored_keys & raw_pair_ids}"
-            )
+            assert not (
+                stored_keys & raw_pair_ids
+            ), f"Raw pair IDs leaked into pair_models: {stored_keys & raw_pair_ids}"
 
 
 # ===========================================================================
@@ -362,7 +364,7 @@ class TestStoppingCriterion:
     def test_does_not_fire_early(self):
         """Before filling the window, criterion must not fire."""
         criterion = self._make_criterion(window=5)
-        for i in range(3):
+        for _i in range(3):
             criterion.record_round_auc(0.80)
         assert criterion.should_stop() is False
 
@@ -392,15 +394,18 @@ class TestStoppingCriterion:
 
         # Patch load_models to return nothing (no models → criterion can't fire EER)
         # but inject a converged AUC history via a patched StoppingCriterion
-        with patch(
-            "scripts.run_active_learning.load_models", return_value={}
-        ), patch(
-            "scripts.run_active_learning.run_active_learning", return_value=["W0001"]
-        ) as mock_run:
+        with (
+            patch("scripts.run_active_learning.load_models", return_value={}),
+            patch(
+                "scripts.run_active_learning.run_active_learning", return_value=["W0001"]
+            ) as mock_run,
+        ):
             sys.argv = [
                 "run_active_learning",
-                "--pool", pool_path,
-                "--queue", queue_path,
+                "--pool",
+                pool_path,
+                "--queue",
+                queue_path,
                 "--force-continue",
             ]
             from scripts.run_active_learning import main
@@ -419,6 +424,7 @@ class TestStoppingCriterion:
         with patch.dict("os.environ", {"ANNOTATION_HMAC_SECRET": "testsecret"}):
             # Re-instantiate config with patched secret
             from config import config as cfg
+
             original = cfg.ANNOTATION_HMAC_SECRET
             cfg.ANNOTATION_HMAC_SECRET = "testsecret"
             try:

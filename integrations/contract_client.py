@@ -28,6 +28,7 @@ class AnchorableReport(Protocol):
     report_sha256: str
     soroban_anchor_tx: str | None
 
+
 _NETWORK_PASSPHRASES = {
     "PUBLIC": Network.PUBLIC_NETWORK_PASSPHRASE,
     "TESTNET": Network.TESTNET_NETWORK_PASSPHRASE,

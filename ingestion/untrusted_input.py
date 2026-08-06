@@ -26,7 +26,8 @@ record: validation is all-or-nothing per record.
 from __future__ import annotations
 
 import math
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from typing import NoReturn
 
 from stellar_sdk import Asset as SdkAsset
@@ -53,7 +54,7 @@ MAX_STRING_FIELD_LENGTH = 128
 
 # Stellar public network genesis ledger closed 2015-09-30. Any ledger close
 # time before this is not physically possible.
-_STELLAR_GENESIS = datetime(2015, 9, 30, tzinfo=timezone.utc)
+_STELLAR_GENESIS = datetime(2015, 9, 30, tzinfo=UTC)
 # Small allowance for clock skew between this host and Horizon.
 _FUTURE_SKEW_TOLERANCE = timedelta(minutes=5)
 
@@ -114,7 +115,7 @@ def _check_bounded_string(value: object, field: str, *, source: str) -> str:
 def _check_finite_amount(
     value: object, field: str, *, source: str, allow_zero: bool = True
 ) -> float:
-    if not isinstance(value, int | float) or isinstance(value, bool):
+    if not isinstance(value, int | float | Decimal) or isinstance(value, bool):
         _reject(field, f"expected a numeric amount, got {type(value).__name__}", source=source)
     if math.isnan(value) or math.isinf(value):  # type: ignore[arg-type]
         _reject(field, "amount is NaN or Inf", source=source)
@@ -143,8 +144,8 @@ def _check_asset_code(value: object, field: str, *, source: str) -> str:
 
 
 def _check_ledger_close_time(value: datetime, field: str, *, source: str) -> datetime:
-    ts = value if value.tzinfo is not None else value.replace(tzinfo=timezone.utc)
-    now = datetime.now(timezone.utc)
+    ts = value if value.tzinfo is not None else value.replace(tzinfo=UTC)
+    now = datetime.now(UTC)
     if ts < _STELLAR_GENESIS:
         _reject(field, f"predates Stellar mainnet genesis: {ts.isoformat()}", source=source)
     if ts > now + _FUTURE_SKEW_TOLERANCE:

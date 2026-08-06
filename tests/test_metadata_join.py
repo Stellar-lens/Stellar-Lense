@@ -419,18 +419,14 @@ class TestPipelineMetadataEnrichment:
         # Pre-populate so get_metadata returns the update immediately.
         state.get_metadata(WALLET_A)  # promote to active
 
-        pipeline, buffer, scorer, dispatcher = self._make_pipeline(
-            metadata_join_state=state
-        )
+        pipeline, buffer, scorer, dispatcher = self._make_pipeline(metadata_join_state=state)
 
         pipeline._enrich_from_metadata(WALLET_A)
 
         buffer.apply_metadata.assert_called_once_with(WALLET_A, update)
 
     def test_enrich_does_not_call_apply_metadata_when_no_state(self):
-        pipeline, buffer, scorer, dispatcher = self._make_pipeline(
-            metadata_join_state=None
-        )
+        pipeline, buffer, scorer, dispatcher = self._make_pipeline(metadata_join_state=None)
         pipeline._enrich_from_metadata(WALLET_A)
         buffer.apply_metadata.assert_not_called()
 

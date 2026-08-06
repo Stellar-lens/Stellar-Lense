@@ -52,12 +52,12 @@ class IVEstimateResult:
     is weak (first-stage F < 10) or when OLS fallback was used.
     """
 
-    method: str          # "2SLS" or "OLS_fallback"
-    coef: float          # point estimate for endog variable
-    ci_lower: float      # 95% confidence interval lower bound
-    ci_upper: float      # 95% confidence interval upper bound
-    first_stage_f: float | None   # None for OLS fallback
-    reliable: bool       # False if weak instrument or OLS fallback
+    method: str  # "2SLS" or "OLS_fallback"
+    coef: float  # point estimate for endog variable
+    ci_lower: float  # 95% confidence interval lower bound
+    ci_upper: float  # 95% confidence interval upper bound
+    first_stage_f: float | None  # None for OLS fallback
+    reliable: bool  # False if weak instrument or OLS fallback
     warning: str | None  # human-readable warning when reliable=False
     disclaimer: str = IV_DISCLAIMER
 
@@ -195,9 +195,13 @@ class IVEstimator:
             first_stage_f=f_stat,
             reliable=not weak,
             warning=(
-                f"Weak instrument (F={f_stat:.2f} < {WEAK_INSTRUMENT_F_THRESHOLD}). "
-                "Result flagged as unreliable."
-            ) if weak else None,
+                (
+                    f"Weak instrument (F={f_stat:.2f} < {WEAK_INSTRUMENT_F_THRESHOLD}). "
+                    "Result flagged as unreliable."
+                )
+                if weak
+                else None
+            ),
         )
 
     def _ols_fallback(

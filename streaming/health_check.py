@@ -20,7 +20,7 @@ logger = get_logger(__name__)
 
 class WorkerHealthManager:
     """Tracks heartbeat timestamps for multiple workers."""
-    
+
     def __init__(self, timeout_seconds: float = 120.0):
         self._workers: dict[str, float] = {}
         self._timeout = timeout_seconds
@@ -37,7 +37,7 @@ class WorkerHealthManager:
             if not self._workers:
                 # If no workers registered yet, assume healthy to avoid premature failure.
                 return True, {"status": "ok", "message": "no workers registered"}
-            
+
             now = time.time()
             details = {}
             all_healthy = True
@@ -47,7 +47,7 @@ class WorkerHealthManager:
                     all_healthy = False
                 else:
                     details[wid] = "ok"
-            
+
             return all_healthy, details
 
 
@@ -64,16 +64,16 @@ def heartbeat(worker_id: str) -> None:
 
 class HealthCheckHandler(BaseHTTPRequestHandler):
     """Simple HTTP handler serving a /health endpoint."""
-    
+
     def do_GET(self) -> None:
-        if self.path == '/health':
+        if self.path == "/health":
             healthy, details = _health_manager.is_healthy()
             status_code = 200 if healthy else 503
-            
+
             self.send_response(status_code)
             self.send_header("Content-type", "application/json")
             self.end_headers()
-            
+
             response_body = {
                 "status": "ok" if healthy else "unhealthy",
                 "workers": details,
@@ -90,11 +90,11 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
 
 def start_health_server(port: int = 8080) -> None:
     """Start the health check HTTP server in a daemon thread."""
-    
+
     def run_server() -> None:
         try:
             # Bind to all interfaces for Kubernetes / Docker checks
-            server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
+            server = HTTPServer(("0.0.0.0", port), HealthCheckHandler)
             logger.info("Health check server started on port %d", port)
             server.serve_forever()
         except Exception as exc:

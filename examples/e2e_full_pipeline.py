@@ -23,9 +23,7 @@ from __future__ import annotations
 import os
 import sys
 import tempfile
-from datetime import UTC, datetime
 
-import numpy as np
 import pandas as pd
 
 # Ensure repo root is on the path
@@ -60,6 +58,7 @@ def _explain_wallet(wallet_features: pd.Series, model_dir: str) -> dict:
     """Return SHAP attributions for a single wallet feature row."""
     try:
         from detection.shap_explainer import ShapExplainer
+
         explainer = ShapExplainer(model_dir=model_dir)
         return explainer.explain(wallet_features)
     except Exception as exc:
@@ -116,7 +115,9 @@ def main() -> None:
         else:
             sample_row = wash_rows.iloc[0]
 
-        wallet = sample_row.get("wallet", "GEXAMPLE00000000000000000000000000000000000000000000000001")
+        wallet = sample_row.get(
+            "wallet", "GEXAMPLE00000000000000000000000000000000000000000000000001"
+        )
         pair = "USDC:GA5ZSEJYBY3RJRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN/XLM:native"
 
         from detection.model_training import FEATURE_COLUMNS_EXCLUDE
@@ -134,7 +135,6 @@ def main() -> None:
                 score_result = _score_wallet(feature_row, model_dir=model_dir)
             except Exception as exc:
                 print(f"      Scorer error ({exc}) — using Benford fallback.")
-                from detection.benford_engine import BenfordEngine
                 mad = float(feature_row.get("benford_mad_24h", 0.0))
                 score_result = {
                     "score": min(100, int(mad * 2000)),
@@ -162,7 +162,9 @@ def main() -> None:
         if models_available:
             shap_result = _explain_wallet(feature_row, model_dir=model_dir)
             if "error" not in shap_result and shap_result:
-                top_features = sorted(shap_result.items(), key=lambda x: abs(x[1]), reverse=True)[:5]
+                top_features = sorted(shap_result.items(), key=lambda x: abs(x[1]), reverse=True)[
+                    :5
+                ]
                 print("      Top 5 SHAP contributors:")
                 for feat, val in top_features:
                     sign = "▲ risk+" if val > 0 else "▼ risk-"

@@ -43,14 +43,14 @@ def test_merge_conflict_marker_is_flagged(tmp_path):
     pkg = tmp_path / "conflict_pkg"
     pkg.mkdir()
     (pkg / "__init__.py").write_text("")
-    (pkg / "module.py").write_text(
-        "x = 1\n<<<<<<< HEAD\ny = 2\n=======\ny = 3\n>>>>>>> branch\n"
-    )
+    (pkg / "module.py").write_text("x = 1\n<<<<<<< HEAD\ny = 2\n=======\ny = 3\n>>>>>>> branch\n")
 
     report = check_source_package_integrity(root=tmp_path, packages=("conflict_pkg",))
 
     assert not report.ok
-    markers_found = {i.message.split("'")[1] for i in report.issues if i.check == "merge-conflict-marker"}
+    markers_found = {
+        i.message.split("'")[1] for i in report.issues if i.check == "merge-conflict-marker"
+    }
     assert markers_found == {"<<<<<<<", "=======", ">>>>>>>"}
 
 

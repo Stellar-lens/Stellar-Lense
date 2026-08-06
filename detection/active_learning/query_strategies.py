@@ -252,13 +252,19 @@ class CoresetHybrid(BaseQueryStrategy):
         # --- coreset distance ---
         labelled_X: np.ndarray | None = None
         if labelled_pool is not None and len(labelled_pool) > 0:
-            labelled_X = labelled_pool[_feature_cols(labelled_pool)].astype(float).fillna(0.0).values.astype("float32")
+            labelled_X = (
+                labelled_pool[_feature_cols(labelled_pool)]
+                .astype(float)
+                .fillna(0.0)
+                .values.astype("float32")
+            )
 
         # We need distance scores for ALL candidates, not just the top-k.
         # Compute min-dist from each candidate to the labelled set.
         if labelled_X is not None and len(labelled_X) > 0:
             try:
                 import hnswlib  # type: ignore
+
                 index = hnswlib.Index(space="l2", dim=pool_X.shape[1])
                 index.init_index(max_elements=len(labelled_X), ef_construction=200, M=16)
                 index.add_items(labelled_X, list(range(len(labelled_X))))
@@ -267,12 +273,12 @@ class CoresetHybrid(BaseQueryStrategy):
                 coreset_dist = np.sqrt(sq_dists[:, 0])
             except Exception:
                 diff = pool_X[:, np.newaxis, :] - labelled_X[np.newaxis, :, :]
-                coreset_dist = np.sqrt((diff ** 2).sum(axis=2)).min(axis=1)
+                coreset_dist = np.sqrt((diff**2).sum(axis=2)).min(axis=1)
         else:
             # Cold-start: use pairwise distances within the pool itself
             if len(pool_X) > 1:
                 diff = pool_X[:, np.newaxis, :] - pool_X[np.newaxis, :, :]
-                all_dists = np.sqrt((diff ** 2).sum(axis=2))
+                all_dists = np.sqrt((diff**2).sum(axis=2))
                 np.fill_diagonal(all_dists, np.inf)
                 coreset_dist = all_dists.min(axis=1)
             else:

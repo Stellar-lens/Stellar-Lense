@@ -220,7 +220,9 @@ def test_run_pipeline_uses_idempotent_upsert_and_checkpointing():
         patch.object(run_pipeline, "RiskScoreStore", return_value=fake_score_store),
         patch("pipeline.idempotency._IDEMPOTENCY_DB_URL", "sqlite:///:memory:"),
     ):
-        with patch.object(run_pipeline, "idempotent_upsert", return_value=(True, None)) as mock_upsert:
+        with patch.object(
+            run_pipeline, "idempotent_upsert", return_value=(True, None)
+        ) as mock_upsert:
             run_pipeline.main()
 
     assert mock_upsert.call_count == 2

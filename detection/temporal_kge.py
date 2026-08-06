@@ -98,7 +98,9 @@ class TemporalKGEncoder:
         self._relation_to_id: dict[str, int] = {}
         self._last_training_time: datetime | None = None
 
-    def build_temporal_kg(self, trades_df: pd.DataFrame, reference_time: pd.Timestamp | None = None) -> dict:
+    def build_temporal_kg(
+        self, trades_df: pd.DataFrame, reference_time: pd.Timestamp | None = None
+    ) -> dict:
         """Build temporal KG triples from trade data.
 
         Triples are (wallet_A, traded_with, wallet_B, timestamp_bin).
@@ -367,7 +369,9 @@ class TemporalKGEncoder:
                     "artifact_sha256": artifact_sha,
                     "embedding_dim": self.embedding_dim,
                     "model_type": "TComplEx",
-                    "trained_at": self._last_training_time.isoformat() if self._last_training_time else None,
+                    "trained_at": (
+                        self._last_training_time.isoformat() if self._last_training_time else None
+                    ),
                     "n_entities": len(self._entity_to_id),
                     "entity_id_map": self._entity_to_id,
                 }

@@ -256,9 +256,7 @@ class BacktestEngine:
                     else ""
                 )
                 score = float(scored_by_wallet.get(wallet, 0.0))
-                wallet_features = feature_matrix[
-                    feature_matrix["wallet"] == wallet
-                ]
+                wallet_features = feature_matrix[feature_matrix["wallet"] == wallet]
                 features_dict = (
                     wallet_features.drop(columns=["wallet"]).iloc[0].to_dict()
                     if not wallet_features.empty
@@ -430,24 +428,24 @@ class BacktestEngine:
                 df = self._load_or_fetch_trades(pair, train_end, horizon_data_provider)
                 if not df.empty:
                     ts = pd.to_datetime(df["ledger_close_time"], utc=True, errors="coerce")
-                    train_trades.append(
-                        df[(ts >= train_start) & (ts < train_end)]
-                    )
+                    train_trades.append(df[(ts >= train_start) & (ts < train_end)])
 
             if not train_trades:
                 current += pd.Timedelta(days=step_days)
                 continue
 
-            train_df = pd.concat(train_trades, ignore_index=True) if len(train_trades) > 1 else train_trades[0]
+            train_df = (
+                pd.concat(train_trades, ignore_index=True)
+                if len(train_trades) > 1
+                else train_trades[0]
+            )
             if train_df.empty or len(train_df) < 50:
                 current += pd.Timedelta(days=step_days)
                 continue
 
             # Train model
             try:
-                train_models(
-                    pd.DataFrame({"dummy": [0]}), test_size=0.3, random_state=42
-                )
+                train_models(pd.DataFrame({"dummy": [0]}), test_size=0.3, random_state=42)
             except Exception:
                 current += pd.Timedelta(days=step_days)
                 continue
@@ -458,15 +456,17 @@ class BacktestEngine:
                 df = self._load_or_fetch_trades(pair, eval_end, horizon_data_provider)
                 if not df.empty:
                     ts = pd.to_datetime(df["ledger_close_time"], utc=True, errors="coerce")
-                    eval_trades_list.append(
-                        df[(ts >= train_end) & (ts <= eval_end)]
-                    )
+                    eval_trades_list.append(df[(ts >= train_end) & (ts <= eval_end)])
 
             if not eval_trades_list:
                 current += pd.Timedelta(days=step_days)
                 continue
 
-            eval_df = pd.concat(eval_trades_list, ignore_index=True) if len(eval_trades_list) > 1 else eval_trades_list[0]
+            eval_df = (
+                pd.concat(eval_trades_list, ignore_index=True)
+                if len(eval_trades_list) > 1
+                else eval_trades_list[0]
+            )
 
             if eval_df.empty:
                 window_results = {
@@ -503,7 +503,10 @@ class BacktestEngine:
             # Get ground truth labels for wallets in eval window
             gt_in_eval = ground_truth[
                 (pd.to_datetime(ground_truth["campaign_start"], utc=True) <= pd.Timestamp(eval_end))
-                & (pd.to_datetime(ground_truth["campaign_end"], utc=True) >= pd.Timestamp(train_end))
+                & (
+                    pd.to_datetime(ground_truth["campaign_end"], utc=True)
+                    >= pd.Timestamp(train_end)
+                )
             ]
             gt_wallets = set(gt_in_eval["wallet"].unique())
 
@@ -603,17 +606,20 @@ def generate_report(
 
     worst_missed = None
     if missed:
-        missed_info = [
-            {**lags[w], "wallet": w} for w in missed
-        ]
-        worst_missed = max(missed_info, key=lambda x: x.get("lag_hours", 0) if x.get("lag_hours") != float("inf") else 0)
+        missed_info = [{**lags[w], "wallet": w} for w in missed]
+        worst_missed = max(
+            missed_info,
+            key=lambda x: x.get("lag_hours", 0) if x.get("lag_hours") != float("inf") else 0,
+        )
 
     report: dict[str, Any] = {
         "period": f"{start_date}/{end_date}",
         "n_campaigns": n_campaigns,
         "n_wallets": n_wallets,
         "mean_detection_lag_hours": round(mean_lag, 2),
-        "random_baseline_lag_hours": round(random_baseline, 2) if random_baseline is not None else None,
+        "random_baseline_lag_hours": (
+            round(random_baseline, 2) if random_baseline is not None else None
+        ),
         "campaigns_detected": len(detected),
         "campaigns_missed": len(missed),
         "time_averaged_auc": round(temporal_auc, 4),
@@ -660,9 +666,7 @@ def _write_markdown_report(report: dict[str, Any], path: Path) -> None:
     ]
 
     if report.get("random_baseline_lag_hours") is not None:
-        lines.append(
-            f"| **Random baseline lag** | {report['random_baseline_lag_hours']} h |"
-        )
+        lines.append(f"| **Random baseline lag** | {report['random_baseline_lag_hours']} h |")
 
     lines += [
         f"| **Campaigns detected** | {report['campaigns_detected']} / {report['n_campaigns']} |",
@@ -690,8 +694,10 @@ def _write_markdown_report(report: dict[str, Any], path: Path) -> None:
         ]
         for i, w in enumerate(report["sliding_window_auc_series"]):
             auc = f"{w['auc_roc']:.4f}" if w["auc_roc"] is not None else "N/A"
-            prec = f"{w['precision_at_10pct']:.4f}" if w["precision_at_10pct"] is not None else "N/A"
-            rec = f"{w['recall_at_10pct']:.4f}" if w['recall_at_10pct'] is not None else "N/A"
+            prec = (
+                f"{w['precision_at_10pct']:.4f}" if w["precision_at_10pct"] is not None else "N/A"
+            )
+            rec = f"{w['recall_at_10pct']:.4f}" if w["recall_at_10pct"] is not None else "N/A"
             lines.append(
                 f"| {i + 1} | {w['train_start'][:10]} → {w['eval_end'][:10]} | {auc} | {prec} | {rec} |"
             )
@@ -858,7 +864,9 @@ def main() -> None:
     # Summary to stdout
     print("\n=== Backtest Summary ===")
     print(f"  Period:          {args.start} → {args.end}")
-    print(f"  Campaigns:       {report['n_campaigns']} total, {report['campaigns_detected']} detected, {report['campaigns_missed']} missed")
+    print(
+        f"  Campaigns:       {report['n_campaigns']} total, {report['campaigns_detected']} detected, {report['campaigns_missed']} missed"
+    )
     print(f"  Mean detection lag: {report['mean_detection_lag_hours']} h")
     if random_baseline_lag is not None:
         print(f"  Random baseline lag: {random_baseline_lag:.2f} h")

@@ -146,9 +146,7 @@ def issue_certificate(
         .not_valid_before(now)
         .not_valid_after(expires_at)
         .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
-        .add_extension(
-            x509.ExtendedKeyUsage([ExtendedKeyUsageOID.CLIENT_AUTH]), critical=False
-        )
+        .add_extension(x509.ExtendedKeyUsage([ExtendedKeyUsageOID.CLIENT_AUTH]), critical=False)
         .sign(ca_key, hashes.SHA256())
     )
 
@@ -172,7 +170,9 @@ def issue_certificate(
         )
         session.commit()
 
-    logger.info("Issued certificate for CN=%r (models=%s, expires=%s)", cn, models_str, expires_at.date())
+    logger.info(
+        "Issued certificate for CN=%r (models=%s, expires=%s)", cn, models_str, expires_at.date()
+    )
     return part_key, cert
 
 
@@ -212,9 +212,7 @@ def rotate_certificate(
     return issue_certificate(cn, allowed_models, ca_key, ca_cert, validity_days, db_url)
 
 
-def list_expiring_soon(
-    within_days: int = 30, db_url: str = _DB_URL
-) -> list[ParticipantCertRecord]:
+def list_expiring_soon(within_days: int = 30, db_url: str = _DB_URL) -> list[ParticipantCertRecord]:
     """Return participant records whose certificate expires within *within_days* days."""
     threshold = datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=within_days)
     SessionFactory = _get_session_factory(db_url)

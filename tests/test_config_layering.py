@@ -106,7 +106,9 @@ def test_invalid_yaml_top_level_raises_configuration_error(config_dir):
 
 def test_explain_lists_every_key_with_its_source(config_dir):
     _write(config_dir / "base.yaml", "log_level: WARNING\n")
-    cfg = LayeredConfig({"log_level": "INFO", "db_pool_size": 5}, environment="local", config_dir=config_dir)
+    cfg = LayeredConfig(
+        {"log_level": "INFO", "db_pool_size": 5}, environment="local", config_dir=config_dir
+    )
     output = cfg.explain()
     assert "log_level = 'WARNING'  [base_file]" in output
     assert "db_pool_size = 5  [default]" in output

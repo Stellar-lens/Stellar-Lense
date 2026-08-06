@@ -21,6 +21,7 @@ import pytest
 # Skip entire module when torch is absent (same pattern as test_gnn_encoder.py)
 try:
     import torch  # noqa: F401
+
     _TORCH_AVAILABLE = True
 except ImportError:
     _TORCH_AVAILABLE = False
@@ -35,6 +36,7 @@ from detection.model_inference import _cluster_id, score_cluster
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture(scope="module")
 def simple_ring_graph():
@@ -60,6 +62,7 @@ def pooler():
 # Test: cluster_id stability
 # ---------------------------------------------------------------------------
 
+
 class TestClusterId:
     def test_deterministic(self):
         ids = ["GABC", "GXYZ", "GDEF"]
@@ -81,6 +84,7 @@ class TestClusterId:
 # ---------------------------------------------------------------------------
 # Test: permutation invariance of GraphLevelPooling
 # ---------------------------------------------------------------------------
+
 
 class TestPermutationInvariance:
     def test_pool_graph_permutation_invariant(self, simple_ring_graph, encoder, pooler):
@@ -115,6 +119,7 @@ class TestPermutationInvariance:
 # Test: high-scoring ring produces cluster score > 80
 # ---------------------------------------------------------------------------
 
+
 class TestHighScoringRing:
     """A ring of 5 wallets all with individual score > 80 should produce
     a cluster score > 80 (using the 90th-percentile aggregation path)."""
@@ -142,14 +147,15 @@ class TestHighScoringRing:
             mock_scorer,
             feature_matrix=feature_matrix,
         )
-        assert result["cluster_score"] > 80, (
-            f"Expected cluster score > 80 for high-risk ring, got {result['cluster_score']}"
-        )
+        assert (
+            result["cluster_score"] > 80
+        ), f"Expected cluster score > 80 for high-risk ring, got {result['cluster_score']}"
 
 
 # ---------------------------------------------------------------------------
 # Test: score_cluster return shape
 # ---------------------------------------------------------------------------
+
 
 class TestScoreClusterAPI:
     def test_returns_required_keys(self, simple_ring_graph):

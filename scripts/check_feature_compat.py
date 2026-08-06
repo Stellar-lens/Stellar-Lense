@@ -137,9 +137,7 @@ def _print_diff(diff: dict[str, Any]) -> None:
     # Timeline for features that changed
     timeline = diff.get("feature_timeline", {})
     changed_features = {
-        feat: states
-        for feat, states in timeline.items()
-        if len(set(states.values())) > 1
+        feat: states for feat, states in timeline.items() if len(set(states.values())) > 1
     }
     if changed_features:
         print(f"\n  Features that changed across versions ({len(changed_features)}):")
@@ -184,36 +182,44 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         epilog=__doc__,
     )
     p.add_argument(
-        "--model-dir", default=str(MODELS_DIR),
+        "--model-dir",
+        default=str(MODELS_DIR),
         help=f"Model directory to check against (default: {MODELS_DIR}).",
     )
     p.add_argument(
-        "--compare-with", default=None,
+        "--compare-with",
+        default=None,
         help="Second model directory to compare with --model-dir (version diff mode).",
     )
     p.add_argument(
-        "--diff-all", action="store_true",
+        "--diff-all",
+        action="store_true",
         help="Diff all archived model versions in sequence.",
     )
     p.add_argument(
-        "--features-file", default=None,
+        "--features-file",
+        default=None,
         help="JSON file listing the source feature columns. "
-             "If omitted, the current pipeline features are inferred automatically.",
+        "If omitted, the current pipeline features are inferred automatically.",
     )
     p.add_argument(
-        "--strict", action="store_true",
+        "--strict",
+        action="store_true",
         help="Treat extra features in source as errors (not just warnings).",
     )
     p.add_argument(
-        "--ci", action="store_true",
+        "--ci",
+        action="store_true",
         help="CI mode: exit 2 on any error, exit 1 on warnings, exit 0 on full match.",
     )
     p.add_argument(
-        "--output-dir", default=str(REPORTS_DIR),
+        "--output-dir",
+        default=str(REPORTS_DIR),
         help=f"Directory for report files (default: {REPORTS_DIR}).",
     )
     p.add_argument(
-        "--no-report", action="store_true",
+        "--no-report",
+        action="store_true",
         help="Skip writing report files (print to stdout only).",
     )
     return p.parse_args(argv)
@@ -259,14 +265,14 @@ def main(argv: list[str] | None = None) -> int:
         if not args.no_report:
             output_dir.mkdir(parents=True, exist_ok=True)
             from datetime import UTC, datetime
+
             ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
             out_path = output_dir / f"feature_compat_diff_all_{ts}.json"
             out_path.write_text(json.dumps(diff.to_dict(), indent=2))
             print(f"\n[compat] Report written → {out_path}")
 
         any_error = any(
-            pw.get("error_count", 0) > 0
-            for pw in diff.to_dict().get("pairwise_diffs", [])
+            pw.get("error_count", 0) > 0 for pw in diff.to_dict().get("pairwise_diffs", [])
         )
         return 2 if any_error else 0
 
@@ -294,14 +300,14 @@ def main(argv: list[str] | None = None) -> int:
         if not args.no_report:
             output_dir.mkdir(parents=True, exist_ok=True)
             from datetime import UTC, datetime
+
             ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
             out_path = output_dir / f"feature_compat_{a_label}_vs_{b_label}_{ts}.json"
             out_path.write_text(json.dumps(diff.to_dict(), indent=2))
             print(f"\n[compat] Report written → {out_path}")
 
         any_error = any(
-            pw.get("error_count", 0) > 0
-            for pw in diff.to_dict().get("pairwise_diffs", [])
+            pw.get("error_count", 0) > 0 for pw in diff.to_dict().get("pairwise_diffs", [])
         )
         return 2 if any_error else 0
 
@@ -335,6 +341,7 @@ def main(argv: list[str] | None = None) -> int:
     if not args.no_report:
         output_dir.mkdir(parents=True, exist_ok=True)
         from datetime import UTC, datetime
+
         ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
         out_path = output_dir / f"feature_compat_{ts}.json"
         out_path.write_text(json.dumps(report_dict, indent=2))

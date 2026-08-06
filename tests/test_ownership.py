@@ -4,9 +4,6 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from unittest.mock import patch
-
-import pytest
 
 from utils.ownership import (
     SUBSYSTEMS,
@@ -15,7 +12,6 @@ from utils.ownership import (
     _matches_pattern,
     codeowners_entries,
 )
-
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -49,10 +45,7 @@ class TestCodeOwnersParsing:
     def test_parse_codeowners_skips_comments_and_blanks(self, tmp_path: Path) -> None:
         co_file = tmp_path / "CODEOWNERS"
         co_file.write_text(
-            "# This is a comment\n"
-            "\n"
-            "   \n"
-            "/docs/ @Ledger-Lenz/docs-team\n",
+            "# This is a comment\n" "\n" "   \n" "/docs/ @Ledger-Lenz/docs-team\n",
             encoding="utf-8",
         )
         entries = OwnershipRegistry._parse_codeowners(co_file)

@@ -16,8 +16,6 @@ import textwrap
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 from scripts.quality_metrics import (
     DEFAULT_WEIGHTS,
     MetricReading,
@@ -31,7 +29,6 @@ from scripts.quality_metrics import (
     compute_composite_score,
     main,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -279,6 +276,7 @@ class TestCollectCycleTime:
         # Simulate 24h between merges (< TARGET_CYCLE_TIME_HOURS=72)
         # Return 10 timestamps 24h apart in descending order
         import time as _time
+
         now = int(_time.time())
         timestamps = [str(now - i * 86400) for i in range(10)]  # 10 merges, 1 day apart
 
@@ -289,6 +287,7 @@ class TestCollectCycleTime:
 
     def test_very_long_cycle_time_scores_zero(self):
         import time as _time
+
         now = int(_time.time())
         # 20-day intervals far exceed WORST_CYCLE_TIME_HOURS=336
         timestamps = [str(now - i * 86400 * 20) for i in range(5)]
@@ -386,6 +385,7 @@ class TestQualityReport:
 
     def test_to_dict_serializable(self):
         import json
+
         d = self._report(75.0, 70.0).to_dict()
         json.dumps(d)  # must not raise
 
@@ -432,49 +432,68 @@ class TestCLIMain:
         taxonomy_p = _write_taxonomy(tmp_path, [])
         out_p = tmp_path / "quality_metrics.json"
 
-        code = main([
-            "--coverage", str(coverage_p),
-            "--junit", str(junit_p),
-            "--taxonomy", str(taxonomy_p),
-            "--output", str(out_p),
-            "--skip-missing",
-            "--threshold", "70",
-        ])
+        code = main(
+            [
+                "--coverage",
+                str(coverage_p),
+                "--junit",
+                str(junit_p),
+                "--taxonomy",
+                str(taxonomy_p),
+                "--output",
+                str(out_p),
+                "--skip-missing",
+                "--threshold",
+                "70",
+            ]
+        )
         assert code == 0
         assert out_p.exists()
 
     def test_exit_1_when_below_threshold(self, tmp_path):
         # Provide 0% coverage → very low composite
         coverage_p = _write_cobertura(tmp_path, 0.0)
-        junit_p = _write_junit(tmp_path, [
-            {"classname": "tests.test_benford", "name": "t", "outcome": "failed"}
-        ])
+        junit_p = _write_junit(
+            tmp_path, [{"classname": "tests.test_benford", "name": "t", "outcome": "failed"}]
+        )
         taxonomy_p = _write_taxonomy(
             tmp_path,
             [{"pattern": "tests/test_benford.py", "criticality": "CRITICAL"}],
         )
         out_p = tmp_path / "quality_metrics.json"
 
-        code = main([
-            "--coverage", str(coverage_p),
-            "--junit", str(junit_p),
-            "--taxonomy", str(taxonomy_p),
-            "--output", str(out_p),
-            "--skip-missing",
-            "--threshold", "99",  # unreachable threshold given 0% coverage
-        ])
+        code = main(
+            [
+                "--coverage",
+                str(coverage_p),
+                "--junit",
+                str(junit_p),
+                "--taxonomy",
+                str(taxonomy_p),
+                "--output",
+                str(out_p),
+                "--skip-missing",
+                "--threshold",
+                "99",  # unreachable threshold given 0% coverage
+            ]
+        )
         assert code == 1
 
     def test_output_json_written(self, tmp_path):
         junit_p = _write_junit(tmp_path, [])
         taxonomy_p = _write_taxonomy(tmp_path, [])
         out_p = tmp_path / "metrics.json"
-        main([
-            "--junit", str(junit_p),
-            "--taxonomy", str(taxonomy_p),
-            "--output", str(out_p),
-            "--skip-missing",
-        ])
+        main(
+            [
+                "--junit",
+                str(junit_p),
+                "--taxonomy",
+                str(taxonomy_p),
+                "--output",
+                str(out_p),
+                "--skip-missing",
+            ]
+        )
         assert out_p.exists()
         data = json.loads(out_p.read_text())
         assert "composite_score" in data
@@ -484,14 +503,20 @@ class TestCLIMain:
         taxonomy_p = _write_taxonomy(tmp_path, [])
         badge_p = tmp_path / "badge.json"
         out_p = tmp_path / "metrics.json"
-        main([
-            "--junit", str(junit_p),
-            "--taxonomy", str(taxonomy_p),
-            "--output", str(out_p),
-            "--badge",
-            "--badge-output", str(badge_p),
-            "--skip-missing",
-        ])
+        main(
+            [
+                "--junit",
+                str(junit_p),
+                "--taxonomy",
+                str(taxonomy_p),
+                "--output",
+                str(out_p),
+                "--badge",
+                "--badge-output",
+                str(badge_p),
+                "--skip-missing",
+            ]
+        )
         assert badge_p.exists()
         data = json.loads(badge_p.read_text())
         assert data["schemaVersion"] == 1
@@ -500,12 +525,18 @@ class TestCLIMain:
         junit_p = _write_junit(tmp_path, [])
         taxonomy_p = _write_taxonomy(tmp_path, [])
         out_p = tmp_path / "metrics.json"
-        code = main([
-            "--junit", str(junit_p),
-            "--taxonomy", str(taxonomy_p),
-            "--output", str(out_p),
-            "--weights", "not-valid-json",
-        ])
+        code = main(
+            [
+                "--junit",
+                str(junit_p),
+                "--taxonomy",
+                str(taxonomy_p),
+                "--output",
+                str(out_p),
+                "--weights",
+                "not-valid-json",
+            ]
+        )
         assert code == 2
 
     def test_custom_weights_override(self, tmp_path):
@@ -513,14 +544,21 @@ class TestCLIMain:
         junit_p = _write_junit(tmp_path, [])
         taxonomy_p = _write_taxonomy(tmp_path, [])
         out_p = tmp_path / "metrics.json"
-        main([
-            "--coverage", str(coverage_p),
-            "--junit", str(junit_p),
-            "--taxonomy", str(taxonomy_p),
-            "--output", str(out_p),
-            "--skip-missing",
-            "--weights", '{"test_coverage": 1.0}',
-        ])
+        main(
+            [
+                "--coverage",
+                str(coverage_p),
+                "--junit",
+                str(junit_p),
+                "--taxonomy",
+                str(taxonomy_p),
+                "--output",
+                str(out_p),
+                "--skip-missing",
+                "--weights",
+                '{"test_coverage": 1.0}',
+            ]
+        )
         data = json.loads(out_p.read_text())
         # With 100% coverage and weight 1.0, composite should be high
         assert data["composite_score"] >= 90.0

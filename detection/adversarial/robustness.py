@@ -27,7 +27,7 @@ from detection.adversarial.attack import (
     PGDAttack,
     feature_space_fgsm,
 )
-from detection.model_training import FEATURE_COLUMNS_EXCLUDE
+from detection.model_contracts import FEATURE_COLUMNS_EXCLUDE
 from utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -402,7 +402,11 @@ def run_adversarial_training(
     epoch_log = []
 
     for epoch in range(epochs):
-        results = train_models(current_train, test_size=0.0 if len(current_train) < 5 else 0.1, random_state=random_state)
+        results = train_models(
+            current_train,
+            test_size=0.0 if len(current_train) < 5 else 0.1,
+            random_state=random_state,
+        )
         tmp_dir = model_dir or tempfile.mkdtemp(prefix="ledgerlens_adv_train_")
         epoch_dir = os.path.join(tmp_dir, f"epoch_{epoch}")
         save_models(results, epoch_dir)
@@ -410,7 +414,9 @@ def run_adversarial_training(
 
         # Clean accuracy on test set
         X_feat, _ = split_features_labels(current_train)
-        probs_clean = np.array([scorer.score_continuous(row) / 100.0 for _, row in X_test.iterrows()])
+        probs_clean = np.array(
+            [scorer.score_continuous(row) / 100.0 for _, row in X_test.iterrows()]
+        )
         try:
             clean_auc = float(roc_auc_score(y_test, probs_clean))
         except Exception:
@@ -423,7 +429,9 @@ def run_adversarial_training(
             X_test_adv.loc[idx] = feature_space_fgsm(
                 row, epsilon, scorer, feature_scale=feature_scale
             )
-        probs_adv = np.array([scorer.score_continuous(row) / 100.0 for _, row in X_test_adv.iterrows()])
+        probs_adv = np.array(
+            [scorer.score_continuous(row) / 100.0 for _, row in X_test_adv.iterrows()]
+        )
         try:
             adv_auc = float(roc_auc_score(y_test, probs_adv))
         except Exception:
@@ -456,7 +464,9 @@ def run_adversarial_training(
             if "wallet" in current_train.columns:
                 n_orig = len(X_train)
                 aug_wallets = list(current_train["wallet"])
-                aug_wallets += [f"{w}_adv_e{epoch}" for w in current_train["wallet"].iloc[:len(X_aug) - n_orig]]
+                aug_wallets += [
+                    f"{w}_adv_e{epoch}" for w in current_train["wallet"].iloc[: len(X_aug) - n_orig]
+                ]
                 aug_df["wallet"] = aug_wallets
             current_train = aug_df
 
@@ -485,8 +495,12 @@ def run_adversarial_training(
     logger.info(
         "Adversarial training complete — clean_auc: %.4f→%.4f (Δ=%.4f, within_3pt_tol=%s) "
         "adversarial_auc: %.4f→%.4f (Δ=%.4f)",
-        first_clean, last_clean, clean_degradation,
+        first_clean,
+        last_clean,
+        clean_degradation,
         report["clean_degradation_within_tolerance"],
-        first_adv, last_adv, adv_improvement,
+        first_adv,
+        last_adv,
+        adv_improvement,
     )
     return report

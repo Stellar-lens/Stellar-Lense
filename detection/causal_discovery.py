@@ -131,8 +131,7 @@ class CausalPriorConstraints:
         constraints_raw = raw.get("constraints")
         if constraints_raw is None:
             raise ValueError(
-                f"Causal priors file {source!r} is missing the required "
-                "'constraints' key"
+                f"Causal priors file {source!r} is missing the required " "'constraints' key"
             )
         if not isinstance(constraints_raw, list):
             raise ValueError(
@@ -174,9 +173,7 @@ class CausalPriorConstraints:
                 )
             )
 
-        logger.info(
-            "Loaded %d causal prior constraints from %s", len(parsed), source
-        )
+        logger.info("Loaded %d causal prior constraints from %s", len(parsed), source)
         return cls(parsed)
 
     def validate(self, feature_columns: list[str] | set[str]) -> None:
@@ -198,8 +195,7 @@ class CausalPriorConstraints:
         if unknown:
             raise ValueError(
                 "Causal prior constraints reference variables not present in "
-                "the feature set. Unknown variables: "
-                + ", ".join(sorted(set(unknown)))
+                "the feature set. Unknown variables: " + ", ".join(sorted(set(unknown)))
             )
 
     # ------------------------------------------------------------------
@@ -273,12 +269,13 @@ class CausalPriorConstraints:
                 g.remove_edge(effect, cause)
                 logger.info(
                     "Causal prior: reversed edge %r → %r to %r → %r (required constraint)",
-                    effect, cause, cause, effect,
+                    effect,
+                    cause,
+                    cause,
+                    effect,
                 )
             g.add_edge(cause, effect)
-            logger.info(
-                "Causal prior: inserted required edge %r → %r", cause, effect
-            )
+            logger.info("Causal prior: inserted required edge %r → %r", cause, effect)
 
         return g
 
@@ -357,9 +354,7 @@ class WashTradeCausalDiscovery:
 
         # Ensure all columns are numeric
         numeric_cols = [
-            col
-            for col in feature_df.columns
-            if pd.api.types.is_numeric_dtype(feature_df[col])
+            col for col in feature_df.columns if pd.api.types.is_numeric_dtype(feature_df[col])
         ]
         df_filtered = feature_df[numeric_cols].dropna()
 

@@ -1,21 +1,16 @@
 """
 tests/test_validate_readme_examples.py — Tests for scripts/validate_readme_examples.py (#548)
 """
+
 from __future__ import annotations
 
 import json
 import pathlib
 import textwrap
 
-import pytest
-
 from scripts.validate_readme_examples import (
-    CodeLine,
-    Finding,
     ReadmeExamplesValidator,
-    ValidationReport,
     classify_line,
-    collect_markdown_files,
     extract_bash_blocks,
     file_exists,
     get_makefile_targets,
@@ -23,7 +18,6 @@ from scripts.validate_readme_examples import (
     module_exists,
     parse_code_block,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -110,8 +104,7 @@ def test_classify_make():
 
 def test_classify_env_prefix_stripped():
     cl = classify_line(
-        "ALERT_WEBHOOK_URL=https://example.com python -m scripts.stream",
-        "README.md", 1, 1
+        "ALERT_WEBHOOK_URL=https://example.com python -m scripts.stream", "README.md", 1, 1
     )
     assert cl.kind == "python_module"
     assert cl.target == "scripts.stream"
@@ -205,23 +198,29 @@ def test_get_makefile_targets_no_makefile(tmp_path):
 def test_validator_valid_module(tmp_path):
     make_module(tmp_path, "scripts/__init__.py")
     make_module(tmp_path, "scripts/generate_synthetic_dataset.py")
-    readme = make_readme(tmp_path, """
+    readme = make_readme(
+        tmp_path,
+        """
         # Docs
         ```bash
         python -m scripts.generate_synthetic_dataset --output data/foo.parquet
         ```
-    """)
+    """,
+    )
     validator = ReadmeExamplesValidator(root=tmp_path)
     report = validator.validate_files([readme])
     assert report.errors == []
 
 
 def test_validator_missing_module(tmp_path):
-    readme = make_readme(tmp_path, """
+    readme = make_readme(
+        tmp_path,
+        """
         ```bash
         python -m scripts.nonexistent_script_xyz
         ```
-    """)
+    """,
+    )
     validator = ReadmeExamplesValidator(root=tmp_path)
     report = validator.validate_files([readme])
     assert len(report.errors) >= 1
@@ -230,22 +229,28 @@ def test_validator_missing_module(tmp_path):
 
 def test_validator_valid_file(tmp_path):
     (tmp_path / "run_pipeline.py").write_text("")
-    readme = make_readme(tmp_path, """
+    readme = make_readme(
+        tmp_path,
+        """
         ```bash
         python run_pipeline.py
         ```
-    """)
+    """,
+    )
     validator = ReadmeExamplesValidator(root=tmp_path)
     report = validator.validate_files([readme])
     assert report.errors == []
 
 
 def test_validator_missing_file(tmp_path):
-    readme = make_readme(tmp_path, """
+    readme = make_readme(
+        tmp_path,
+        """
         ```bash
         python run_nonexistent.py
         ```
-    """)
+    """,
+    )
     validator = ReadmeExamplesValidator(root=tmp_path)
     report = validator.validate_files([readme])
     assert len(report.errors) >= 1
@@ -253,11 +258,14 @@ def test_validator_missing_file(tmp_path):
 
 def test_validator_make_target_warning(tmp_path):
     make_makefile(tmp_path, ["install", "test"])
-    readme = make_readme(tmp_path, """
+    readme = make_readme(
+        tmp_path,
+        """
         ```bash
         make nonexistent_target_xyz
         ```
-    """)
+    """,
+    )
     validator = ReadmeExamplesValidator(root=tmp_path)
     report = validator.validate_files([readme])
     # make targets are warnings, not errors
@@ -266,11 +274,14 @@ def test_validator_make_target_warning(tmp_path):
 
 
 def test_validator_warn_only_mode(tmp_path):
-    readme = make_readme(tmp_path, """
+    readme = make_readme(
+        tmp_path,
+        """
         ```bash
         python -m scripts.nonexistent_xyz
         ```
-    """)
+    """,
+    )
     validator = ReadmeExamplesValidator(root=tmp_path, warn_only=True)
     report = validator.validate_files([readme])
     # warn_only means errors become warnings
@@ -303,28 +314,34 @@ def test_validator_summary_no_findings(tmp_path):
 def test_main_no_errors(tmp_path):
     make_module(tmp_path, "scripts/__init__.py")
     make_module(tmp_path, "scripts/foo.py")
-    readme = make_readme(tmp_path, """
+    make_readme(
+        tmp_path,
+        """
         ```bash
         python -m scripts.foo
         ```
-    """)
+    """,
+    )
     ret = main(["--docs", "README.md", "--root", str(tmp_path)])
     assert ret == 0
 
 
 def test_main_with_errors(tmp_path):
-    readme = make_readme(tmp_path, """
+    make_readme(
+        tmp_path,
+        """
         ```bash
         python -m scripts.totally_missing_module_xyz
         ```
-    """)
+    """,
+    )
     ret = main(["--docs", "README.md", "--root", str(tmp_path)])
     assert ret == 2
 
 
 def test_main_json_output(tmp_path, capsys):
-    readme = make_readme(tmp_path, "No code blocks.")
-    ret = main(["--docs", "README.md", "--root", str(tmp_path), "--json"])
+    make_readme(tmp_path, "No code blocks.")
+    main(["--docs", "README.md", "--root", str(tmp_path), "--json"])
     out = capsys.readouterr().out
     data = json.loads(out)
     assert "checked" in data
@@ -336,11 +353,14 @@ def test_main_no_markdown_files(tmp_path):
 
 
 def test_main_warn_only_exits_zero(tmp_path):
-    readme = make_readme(tmp_path, """
+    make_readme(
+        tmp_path,
+        """
         ```bash
         python -m scripts.totally_missing_module_xyz
         ```
-    """)
+    """,
+    )
     ret = main(["--docs", "README.md", "--root", str(tmp_path), "--warn-only"])
     assert ret == 0
 

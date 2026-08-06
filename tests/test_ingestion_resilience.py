@@ -8,7 +8,6 @@ must never crash the rest of the page or the whole stream.
 
 from unittest.mock import MagicMock, patch
 
-import pandas as pd
 from stellar_sdk import Asset as SdkAsset
 
 from ingestion.account_activity_loader import load_accounts_activity
@@ -48,15 +47,18 @@ def test_load_trades_skips_malformed_record_without_crashing():
     zero_price_record = _good_trade_record("bad-2")
     zero_price_record["price"] = {"n": 1, "d": 0}  # would ZeroDivisionError pre-fix
 
-    records = [_good_trade_record("good-1"), bad_record, zero_price_record, _good_trade_record("good-2")]
+    records = [
+        _good_trade_record("good-1"),
+        bad_record,
+        zero_price_record,
+        _good_trade_record("good-2"),
+    ]
 
     with patch("ingestion.historical_loader._fetch_page") as mock_fetch:
         mock_fetch.side_effect = [
             {"_embedded": {"records": records}, "_links": {"next": {"href": ""}}},
         ]
-        trades = list(
-            load_trades(SdkAsset("USDC", VALID_ISSUER), SdkAsset.native())
-        )
+        trades = list(load_trades(SdkAsset("USDC", VALID_ISSUER), SdkAsset.native()))
 
     assert [t.trade_id for t in trades] == ["good-1", "good-2"]
 

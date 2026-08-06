@@ -81,7 +81,10 @@ def _run_ibp_certification(
         results[f"certified_robust_fraction_eps_{eps}"] = round(frac, 4)
         logger.info(
             "IBP certification at ε=%.3f: %d/%d (%.1f%%) wash wallets certified robust",
-            eps, certified, total, frac * 100,
+            eps,
+            certified,
+            total,
+            frac * 100,
         )
 
     return results

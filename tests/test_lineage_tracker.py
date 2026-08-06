@@ -1,6 +1,5 @@
 """Unit and integration tests for dataset and model input lineage tracking (Issue #463)."""
 
-import json
 from pathlib import Path
 
 import pandas as pd
@@ -8,10 +7,8 @@ import pytest
 
 from data.lineage import (
     DataArtifactMetadata,
-    LineageNode,
     LineageNodeType,
     LineageTracker,
-    TransformationStep,
     compute_file_sha256,
 )
 

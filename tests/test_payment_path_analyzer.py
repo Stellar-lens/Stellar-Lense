@@ -30,9 +30,7 @@ def sample_path_payment_strict_send() -> dict:
         "created_at": datetime(2024, 1, 1, 12, 0, 0),
         "amount": 100.0,  # source amount (exact)
         "destination_amount": 95.0,  # destination amount (variable)
-        "asset_path": [
-            {"code": "USDC", "issuer": "GA5Z"}
-        ],
+        "asset_path": [{"code": "USDC", "issuer": "GA5Z"}],
     }
 
 
@@ -46,10 +44,7 @@ def sample_path_payment_strict_receive() -> dict:
         "created_at": datetime(2024, 1, 1, 13, 0, 0),
         "amount_sent": 105.0,  # source amount (variable)
         "amount": 100.0,  # destination amount (exact)
-        "asset_path": [
-            {"code": "USDT", "issuer": "GA5Z"},
-            {"code": "USDC", "issuer": "GA5Z"}
-        ],
+        "asset_path": [{"code": "USDT", "issuer": "GA5Z"}, {"code": "USDC", "issuer": "GA5Z"}],
     }
 
 
@@ -63,10 +58,7 @@ def sample_round_trip_path() -> dict:
         "created_at": datetime(2024, 1, 1, 12, 0, 0),
         "amount": 100.0,
         "destination_amount": 95.0,
-        "asset_path": [
-            {"code": "USDC", "issuer": "GA5Z"},
-            {"code": "XLM", "issuer": None}
-        ],
+        "asset_path": [{"code": "USDC", "issuer": "GA5Z"}, {"code": "XLM", "issuer": None}],
     }
 
 
@@ -121,7 +113,7 @@ class TestReconstructPathFlow:
             "asset_path": [
                 {"code": "USDC", "issuer": "GA5Z"},
                 {"code": "XLM", "issuer": None},
-                {"code": "USDT", "issuer": "GA5Z"}
+                {"code": "USDT", "issuer": "GA5Z"},
             ],
         }
         flow = reconstruct_path_flow(op)
@@ -134,7 +126,7 @@ class TestReconstructPathFlow:
         """Test that invalid operation types raise ValueError."""
         op = sample_path_payment_strict_send()
         op["type"] = "trade"
-        
+
         with pytest.raises(ValueError, match="not a path payment variant"):
             reconstruct_path_flow(op)
 
@@ -165,8 +157,10 @@ class TestReconstructPathFlow:
     def test_reject_oversized_path(self):
         """Test that paths exceeding MAX_PATH_LENGTH are rejected."""
         op = sample_path_payment_strict_send()
-        op["asset_path"] = [{"code": f"ASS{i}", "issuer": "GA5Z"} for i in range(MAX_PATH_LENGTH + 1)]
-        
+        op["asset_path"] = [
+            {"code": f"ASS{i}", "issuer": "GA5Z"} for i in range(MAX_PATH_LENGTH + 1)
+        ]
+
         flow = reconstruct_path_flow(op)
         assert flow is None
 
@@ -174,7 +168,7 @@ class TestReconstructPathFlow:
         """Test that paths at exactly MAX_PATH_LENGTH are accepted."""
         op = sample_path_payment_strict_send()
         op["asset_path"] = [{"code": f"ASS{i}", "issuer": "GA5Z"} for i in range(MAX_PATH_LENGTH)]
-        
+
         flow = reconstruct_path_flow(op)
         assert flow is not None
         assert flow["hop_count"] == MAX_PATH_LENGTH
@@ -214,7 +208,9 @@ class TestValidatePathSchema:
     def test_reject_oversized_path(self):
         """Test rejection of paths exceeding MAX_PATH_LENGTH."""
         op = sample_path_payment_strict_send()
-        op["asset_path"] = [{"code": f"ASS{i}", "issuer": "GA5Z"} for i in range(MAX_PATH_LENGTH + 1)]
+        op["asset_path"] = [
+            {"code": f"ASS{i}", "issuer": "GA5Z"} for i in range(MAX_PATH_LENGTH + 1)
+        ]
         assert validate_path_schema(op) is False
 
 
@@ -240,7 +236,7 @@ class TestComputePathPaymentRoundTripFrequency:
             "execution_time": datetime(2024, 1, 1, 12, 0, 0),
             "is_round_trip": True,
         }
-        
+
         freq = compute_path_payment_round_trip_frequency(wallet, [flow])
         assert freq == 1.0  # 100% of volume is round-trip
 
@@ -257,7 +253,7 @@ class TestComputePathPaymentRoundTripFrequency:
             "execution_time": datetime(2024, 1, 1, 12, 0, 0),
             "is_round_trip": False,
         }
-        
+
         freq = compute_path_payment_round_trip_frequency(wallet, [flow])
         assert freq == 0.0
 
@@ -286,7 +282,7 @@ class TestComputePathPaymentRoundTripFrequency:
                 "is_round_trip": False,
             },
         ]
-        
+
         freq = compute_path_payment_round_trip_frequency(wallet, flows)
         assert freq == pytest.approx(100.0 / 300.0)  # 100 round-trip of 300 total
 
@@ -304,7 +300,7 @@ class TestComputePathPaymentRoundTripFrequency:
             "execution_time": datetime(2024, 1, 1, 12, 0, 0),
             "is_round_trip": False,
         }
-        
+
         freq = compute_path_payment_round_trip_frequency(wallet, [flow])
         assert freq == 0.0
 
@@ -339,7 +335,7 @@ class TestMergePathFlows:
             "execution_time": datetime(2024, 1, 1, 13, 0, 0),
             "is_round_trip": False,
         }
-        
+
         result = merge_path_flows([flow1], [flow2])
         assert len(result) == 2
 
@@ -365,7 +361,7 @@ class TestMergePathFlows:
             "execution_time": datetime(2024, 1, 1, 13, 0, 0),
             "is_round_trip": False,
         }
-        
+
         result = merge_path_flows([flow1], [flow2])
         assert len(result) == 1
         assert result[0]["source_amount"] == 250.0
@@ -380,7 +376,7 @@ class TestComputePaymentPathFeatures:
         """Test feature computation with no path flows."""
         wallet = "GAAAA" + "A" * 49
         features = compute_payment_path_features(wallet, None)
-        
+
         assert "path_payment_round_trip_frequency" in features
         assert features["path_payment_round_trip_frequency"] == 0.0
 
@@ -397,7 +393,7 @@ class TestComputePaymentPathFeatures:
             "execution_time": datetime(2024, 1, 1, 12, 0, 0),
             "is_round_trip": True,
         }
-        
+
         features = compute_payment_path_features(wallet, [flow])
         assert features["path_payment_round_trip_frequency"] == 1.0
 
@@ -416,6 +412,6 @@ class TestComputePaymentPathFeatures:
                 "is_round_trip": True,
             }
         ]
-        
+
         features = compute_payment_path_features(wallet, flows)
         assert isinstance(features["path_payment_round_trip_frequency"], float)

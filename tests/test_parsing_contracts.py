@@ -22,7 +22,6 @@ from validation.parsing import (
     parse_trade_record,
 )
 
-
 # ---------------------------------------------------------------------------
 # ParseResult helpers
 # ---------------------------------------------------------------------------
@@ -51,9 +50,9 @@ class TestParseResult:
         pr.raise_if_errors()  # should not raise
 
     def test_summary_contains_counts(self):
-        pr: ParseResult[dict] = ParseResult(records=[{}], errors=[
-            FieldError(row=1, column="c", raw_value="v", reason="r")
-        ])
+        pr: ParseResult[dict] = ParseResult(
+            records=[{}], errors=[FieldError(row=1, column="c", raw_value="v", reason="r")]
+        )
         s = pr.summary()
         assert "records=1" in s
         assert "errors=1" in s
@@ -164,7 +163,7 @@ class TestParseJSON:
             name: str
             count: int
 
-        data = json.dumps({"name": "test", "count": "not_an_int_but_coercible"})
+        json.dumps({"name": "test", "count": "not_an_int_but_coercible"})
         # pydantic v2 coerces strings to int; test a genuinely invalid case
         data_bad = json.dumps({"name": "test"})  # missing required field
         with pytest.raises(JSONParseError):

@@ -129,12 +129,8 @@ class AssetClassifier:
     def _load_config(self) -> None:
         cfg = _load_build_config()
         stablecoins = cfg.get("stablecoins", [])
-        if not isinstance(stablecoins, list) or not all(
-            isinstance(s, str) for s in stablecoins
-        ):
-            raise ValueError(
-                "build_config.json 'stablecoins' must be a list of strings"
-            )
+        if not isinstance(stablecoins, list) or not all(isinstance(s, str) for s in stablecoins):
+            raise ValueError("build_config.json 'stablecoins' must be a list of strings")
         self._stablecoins = {s.upper() for s in stablecoins}
 
         native_assets = cfg.get("native_assets", ["XLM"])
@@ -187,9 +183,7 @@ class AssetClassifier:
         cls = self.classify(asset_code)
         return self._baselines.get(cls, dict(BENFORD_EXPECTED))
 
-    def fit_from_clean_trades(
-        self, labelled_df: pd.DataFrame, amount_col: str = "amount"
-    ) -> None:
+    def fit_from_clean_trades(self, labelled_df: pd.DataFrame, amount_col: str = "amount") -> None:
         """Compute empirical baselines per asset class from clean (label=0) trades.
 
         Parameters
@@ -207,7 +201,7 @@ class AssetClassifier:
         for cls in (_ASSET_CLASS_STABLECOIN, _ASSET_CLASS_NATIVE, _ASSET_CLASS_VOLATILE):
             if "asset_code" in clean.columns:
                 mask = clean["asset_code"].apply(
-                    lambda c: self.classify(str(c)) == cls
+                    lambda c, asset_class=cls: self.classify(str(c)) == asset_class
                 )
                 subset = clean.loc[mask, amount_col].dropna()
             else:
@@ -228,6 +222,7 @@ def get_asset_classifier() -> "AssetClassifier":
         _classifier = AssetClassifier()
     return _classifier
 
+
 MAD_NONCONFORMITY_THRESHOLD = 0.015
 
 
@@ -237,6 +232,10 @@ def leading_digits(amounts: pd.Series) -> pd.Series:
     Zero and negative amounts are dropped — Benford's Law applies to the
     magnitude of nonzero values.
     """
+    # Pydantic represents ledger amounts as ``Decimal`` for precision. Benford
+    # extraction only needs magnitude and leading digit, so normalize mixed
+    # numeric Series to float before NumPy vectorized operations.
+    amounts = pd.to_numeric(amounts, errors="coerce").astype(float).dropna()
     amounts = amounts[amounts > 0]
     if amounts.empty:
         return amounts
@@ -345,6 +344,7 @@ def compute_benford_metrics(
     Returns a BenfordMetrics dataclass (backward compatible with dict access).
     """
     from config import config
+
     n = int((amounts > 0).sum())
     if n < config.MIN_TRADES_FOR_SCORING:
         return BenfordMetrics(
@@ -410,6 +410,7 @@ def compute_benford_metrics_for_windows(
     """
     if windows_hours is None:
         from config import config
+
         # Infer asset if not provided
         if asset is None and not df.empty:
             for col in ["base_asset", "counter_asset"]:
@@ -424,7 +425,11 @@ def compute_benford_metrics_for_windows(
             if asset is None and "base_asset" in df.columns:
                 asset = df["base_asset"].mode().iloc[0] if not df["base_asset"].empty else None
 
-        if asset and hasattr(config, "ASSET_BENFORD_WINDOWS") and asset in config.ASSET_BENFORD_WINDOWS:
+        if (
+            asset
+            and hasattr(config, "ASSET_BENFORD_WINDOWS")
+            and asset in config.ASSET_BENFORD_WINDOWS
+        ):
             windows_hours = config.ASSET_BENFORD_WINDOWS[asset]
         else:
             windows_hours = config.BENFORD_WINDOWS_HOURS
@@ -451,7 +456,7 @@ def compute_benford_metrics_for_windows(
         window_start = ref - pd.Timedelta(hours=hours)
         window_df = df[(timestamps > window_start) & (timestamps <= ref)]
         amounts = window_df[amount_col]
-        
+
         # First-digit metrics
         metrics = compute_benford_metrics(amounts, asset_code=asset)
         result = {
@@ -460,13 +465,13 @@ def compute_benford_metrics_for_windows(
             "z_scores": metrics.z_scores,
             "sample_size": metrics.sample_size,
         }
-        
+
         # Second-digit metrics (Issue #179)
         if include_second_digit:
             result["chi_square_2nd"] = chi_square_second_digit(amounts)
             result["mad_2nd"] = mad_score_second_digit(amounts)
             result["z_scores_2nd"] = z_scores_second_digit(amounts)
-        
+
         results[hours] = result
 
     return results
@@ -521,7 +526,7 @@ def second_digits(amounts: pd.Series) -> pd.Series:
     expected distribution of the second digit is flatter but still
     non-uniform, and adversarial rounding typically produces a very
     different second-digit pattern.
-    
+
     Amounts with a single significant digit (amounts < 10) are excluded
     from the analysis since they have no second digit. The count of excluded
     amounts is logged for auditing.
@@ -529,24 +534,24 @@ def second_digits(amounts: pd.Series) -> pd.Series:
     amounts_positive = amounts[amounts > 0]
     if amounts_positive.empty:
         return amounts_positive
-    
+
     magnitudes = np.floor(np.log10(amounts_positive)).astype(int)
     normalized = amounts_positive / (10.0**magnitudes)  # first digit is floor(normalized)
     # Remove first digit contribution, scale up and take floor
     second = np.floor((normalized - np.floor(normalized)) * 10).astype(int).clip(0, 9)
-    
+
     return second
 
 
 def second_digit_distribution(amounts: pd.Series) -> dict[int, float]:
     """Observed frequency of each second digit 0-9 in the data.
-    
+
     Amounts < 10 (single-digit) are excluded; the exclusion count is logged.
     """
     digits = second_digits(amounts)
     if digits.empty:
         return {d: 0.0 for d in range(10)}
-    
+
     # Log exclusion if significant
     amounts_positive = amounts[amounts > 0]
     excluded = len(amounts_positive[amounts_positive < 10])
@@ -558,14 +563,14 @@ def second_digit_distribution(amounts: pd.Series) -> dict[int, float]:
                 f"second_digit_distribution: {excluded}/{len(amounts_positive)} "
                 f"amounts excluded (< 10). Exclusion rate: {exclusion_rate:.1%}."
             )
-    
+
     counts = digits.value_counts(normalize=True)
     return {d: float(counts.get(d, 0.0)) for d in range(10)}
 
 
 def chi_square_second_digit(amounts: pd.Series) -> float:
     """Chi-square goodness-of-fit for second-digit distribution.
-    
+
     Tests whether the observed second-digit frequencies conform to Benford's
     expected second-digit distribution. High values indicate non-conformity
     (a potential manipulation signal).
@@ -574,7 +579,7 @@ def chi_square_second_digit(amounts: pd.Series) -> float:
     n = len(digits)
     if n == 0:
         return 0.0
-    
+
     observed_counts = digits.value_counts()
     chi_sq = 0.0
     for d in range(10):
@@ -582,13 +587,13 @@ def chi_square_second_digit(amounts: pd.Series) -> float:
         observed_count = observed_counts.get(d, 0)
         if expected_count > 0:
             chi_sq += (observed_count - expected_count) ** 2 / expected_count
-    
+
     return float(chi_sq)
 
 
 def z_scores_second_digit(amounts: pd.Series) -> dict[int, float]:
     """Per-digit Z-scores for second digits (0-9).
-    
+
     Measures how many standard errors each digit's observed frequency deviates
     from the expected Benford second-digit frequency.
     """
@@ -596,7 +601,7 @@ def z_scores_second_digit(amounts: pd.Series) -> dict[int, float]:
     n = len(digits)
     if n == 0:
         return {d: 0.0 for d in range(10)}
-    
+
     observed = second_digit_distribution(amounts)
     scores = {}
     for d in range(10):
@@ -607,20 +612,20 @@ def z_scores_second_digit(amounts: pd.Series) -> dict[int, float]:
             continue
         z = (abs(observed[d] - p) - (1 / (2 * n))) / std_err
         scores[d] = float(max(z, 0.0))
-    
+
     return scores
 
 
 def mad_score_second_digit(amounts: pd.Series) -> float:
     """Mean Absolute Deviation for second digits (0-9).
-    
+
     Measures the average absolute deviation between observed and expected
     second-digit frequencies. Values above 0.015 may indicate non-conformity.
     """
     digits = second_digits(amounts)
     if digits.empty:
         return 0.0
-    
+
     observed = second_digit_distribution(amounts)
     deviations = [abs(observed[d] - BENFORD_EXPECTED_2ND[d]) for d in range(10)]
     return float(sum(deviations) / len(deviations))
@@ -710,17 +715,25 @@ def compute_benford_confidence_intervals(
     seed = int(hashlib.sha256(f"{wallet_id}:{window_hours}".encode()).hexdigest(), 16) % (2**32)
     rng = np.random.default_rng(seed)
 
-    chi_samples = []
-    mad_samples = []
-    zmax_samples = []
+    # Work with leading digits and calculate all resamples in NumPy.  The old
+    # loop rebuilt three pandas Series per bootstrap iteration, making the CI
+    # path several minutes long in the coverage test and impractical in CI.
+    digits = leading_digits(amounts).to_numpy(dtype=np.int8)
+    sample_indices = rng.integers(0, n, size=(n_bootstrap, n))
+    sampled_digits = digits[sample_indices]
+    counts = np.stack(
+        [(sampled_digits == digit).sum(axis=1) for digit in range(1, 10)],
+        axis=1,
+    ).astype(float)
+    expected = np.fromiter(BENFORD_EXPECTED.values(), dtype=float)
+    expected_counts = expected * n
+    proportions = counts / n
 
-    for _ in range(n_bootstrap):
-        idx = rng.integers(0, n, size=n)
-        boot = amounts.iloc[idx]
-        chi_samples.append(chi_square_statistic(boot))
-        mad_samples.append(mad_score(boot))
-        zmax_boot = z_scores(boot)
-        zmax_samples.append(max(zmax_boot.values(), default=0.0))
+    chi_samples = np.sum((counts - expected_counts) ** 2 / expected_counts, axis=1)
+    mad_samples = np.mean(np.abs(proportions - expected), axis=1)
+    standard_errors = np.sqrt(expected * (1.0 - expected) / n)
+    z_samples = (np.abs(proportions - expected) - (1.0 / (2 * n))) / standard_errors
+    zmax_samples = np.maximum(z_samples, 0.0).max(axis=1)
 
     lo = alpha / 2 * 100
     hi = (1 - alpha / 2) * 100

@@ -106,6 +106,7 @@ class FederatedParticipant:
                 compressed_delta = TopKSparsifier.decompress(payload)
             else:
                 from .gradient_compression import PowerSGDCompressor
+
                 compressed_delta = PowerSGDCompressor.decompress(payload)
 
             # 3. Mask compressed delta (pairwise additive masks cancel at coordinator)
@@ -120,8 +121,10 @@ class FederatedParticipant:
                 resp = await client.post(
                     "/submit_encrypted_delta",
                     content=ciphertext,
-                    headers={"Content-Type": "application/octet-stream",
-                             "X-Participant-Id": self.participant_id},
+                    headers={
+                        "Content-Type": "application/octet-stream",
+                        "X-Participant-Id": self.participant_id,
+                    },
                 )
             else:
                 resp = await client.post(

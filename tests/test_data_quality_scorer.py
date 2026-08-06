@@ -6,31 +6,24 @@ import pandas as pd
 import pytest
 
 from ingestion.data_quality import (
-    AmountValidityRule,
-    CompletenessRule,
     LedgerQualityScorer,
-    OrderbookSpreadConsistencyRule,
-    QualityDimension,
-    QualityReport,
-    QualityRuleResult,
     ReadinessStatus,
-    StellarAddressValidityRule,
-    TimelinessRule,
-    UniquenessRule,
 )
 
 
 @pytest.fixture
 def valid_trade_df() -> pd.DataFrame:
     """Fixture providing clean, valid Stellar ledger trade records."""
-    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    now = datetime.datetime.now(tz=datetime.UTC)
     return pd.DataFrame(
         {
             "trade_id": [f"t_{i}" for i in range(20)],
             "account": ["GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFXYSFZW2BV3FL224GKO7"] * 20,
             "seller": ["GAHK7EEG2WWHVKTZB2LHVDT6EB2S6HREL5Y2FQZFYAZTXWCD4MGJQBOX"] * 20,
             "amount": [100.0 + i * 5 for i in range(20)],
-            "ledger_close_time": [(now - datetime.timedelta(minutes=i)).isoformat() for i in range(20)],
+            "ledger_close_time": [
+                (now - datetime.timedelta(minutes=i)).isoformat() for i in range(20)
+            ],
         }
     )
 
@@ -66,9 +59,12 @@ def test_stellar_address_validity_failure():
     df = pd.DataFrame(
         {
             "trade_id": ["t1", "t2"],
-            "account": ["INVALID_ACCOUNT_ADDRESS_123", "GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFXYSFZW2BV3FL224GKO7"],
+            "account": [
+                "INVALID_ACCOUNT_ADDRESS_123",
+                "GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFXYSFZW2BV3FL224GKO7",
+            ],
             "amount": [100.0, 50.0],
-            "ledger_close_time": [datetime.datetime.now(tz=datetime.timezone.utc).isoformat()] * 2,
+            "ledger_close_time": [datetime.datetime.now(tz=datetime.UTC).isoformat()] * 2,
         }
     )
     scorer = LedgerQualityScorer()
@@ -95,7 +91,7 @@ def test_amount_validity_failure():
 
 
 def test_timeliness_future_and_stale_timestamps():
-    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    now = datetime.datetime.now(tz=datetime.UTC)
     future_dt = (now + datetime.timedelta(days=2)).isoformat()
     stale_dt = (now - datetime.timedelta(days=500)).isoformat()
 
@@ -142,7 +138,9 @@ def test_orderbook_spread_consistency():
     scorer = LedgerQualityScorer()
     report = scorer.evaluate_import_readiness(test_orderbook_spread_crossed_markets_data)
 
-    spread_res = [r for r in report.rule_results if r.rule_name == "orderbook_spread_consistency"][0]
+    spread_res = [r for r in report.rule_results if r.rule_name == "orderbook_spread_consistency"][
+        0
+    ]
     assert spread_res.passed is False
     assert spread_res.failed_records_count == 1
 

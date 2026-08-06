@@ -43,11 +43,12 @@ logger = get_logger(__name__)
 # PII detection patterns
 # ---------------------------------------------------------------------------
 
-# Stellar public keys: G + 55 uppercase alphanumeric characters
-_STELLAR_ADDRESS_RE = re.compile(r"\bG[A-Z2-7]{55}\b")
+# Stellar public keys are 56 characters; also flag slightly truncated values
+# because partial identifiers remain linkable sensitive data.
+_STELLAR_ADDRESS_RE = re.compile(r"\bG[A-Z2-7]{53,55}\b")
 
 # Stellar secret keys: S + 55 uppercase alphanumeric characters
-_STELLAR_SECRET_RE = re.compile(r"\bS[A-Z2-7]{55}\b")
+_STELLAR_SECRET_RE = re.compile(r"\bS[A-Z2-7]{53,55}\b")
 
 # Email addresses (simplified RFC 5322)
 _EMAIL_RE = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")

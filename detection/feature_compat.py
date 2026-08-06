@@ -57,9 +57,7 @@ def load_metadata(path: Path | str) -> dict[str, Any]:
 
 def compute_feature_schema_hash(feature_columns: list[str]) -> str:
     """Reproduce the hash used by model_training.py to fingerprint the feature schema."""
-    return "sha256:" + hashlib.sha256(
-        json.dumps(sorted(feature_columns)).encode()
-    ).hexdigest()
+    return "sha256:" + hashlib.sha256(json.dumps(sorted(feature_columns)).encode()).hexdigest()
 
 
 # ---------------------------------------------------------------------------
@@ -69,9 +67,9 @@ def compute_feature_schema_hash(feature_columns: list[str]) -> str:
 
 @dataclass
 class CompatibilityIssue:
-    severity: str          # "error" | "warning" | "info"
-    code: str              # machine-readable code, e.g. "MISSING_FEATURE"
-    feature: str           # affected feature name (or "" for schema-level issues)
+    severity: str  # "error" | "warning" | "info"
+    code: str  # machine-readable code, e.g. "MISSING_FEATURE"
+    feature: str  # affected feature name (or "" for schema-level issues)
     message: str
 
 
@@ -79,8 +77,8 @@ class CompatibilityIssue:
 class CompatibilityReport:
     """Result of comparing a source feature schema against a target model's schema."""
 
-    source_label: str                  # e.g. "current_pipeline" or version name
-    target_label: str                  # e.g. "v2.1.0" or model dir path
+    source_label: str  # e.g. "current_pipeline" or version name
+    target_label: str  # e.g. "v2.1.0" or model dir path
     source_features: list[str]
     target_features: list[str]
     issues: list[CompatibilityIssue] = field(default_factory=list)
@@ -179,9 +177,7 @@ class FeatureCompatibilityChecker:
 
         target_cols = target_metadata.get("feature_columns")
         if not target_cols:
-            raise ValueError(
-                f"target metadata for '{target_label}' has no 'feature_columns' key"
-            )
+            raise ValueError(f"target metadata for '{target_label}' has no 'feature_columns' key")
         self._target_features: list[str] = list(target_cols)
 
     def check(self) -> CompatibilityReport:
@@ -387,14 +383,16 @@ def check_current_pipeline(
 def _infer_pipeline_features(metadata: dict[str, Any]) -> list[str]:
     """Best-effort: infer the current pipeline's feature columns."""
     try:
-        from detection.feature_engineering import build_feature_matrix
         import pandas as pd
+
+        from detection.feature_engineering import build_feature_matrix
 
         synth_path = Path("data/synthetic_dataset.parquet")
         if synth_path.exists():
             df = pd.read_parquet(synth_path)
             feat_df = build_feature_matrix(df)
             from detection.model_training import FEATURE_COLUMNS_EXCLUDE
+
             return [c for c in feat_df.columns if c not in FEATURE_COLUMNS_EXCLUDE]
     except Exception as exc:  # noqa: BLE001
         logger.warning("Could not infer pipeline features dynamically: %s", exc)

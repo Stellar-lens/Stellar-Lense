@@ -46,6 +46,7 @@ from detection.trade_sequence_transformer import (
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture()
 def small_model():
     """A tiny model suitable for unit tests (fast on CPU)."""
@@ -78,6 +79,7 @@ def _make_event(
 # 1. Identical-event test
 # ---------------------------------------------------------------------------
 
+
 class TestIdenticalEvents:
     """Feeding a sequence of identical repeated events must produce a
     deterministic output that is invariant to rotation of the sequence
@@ -93,9 +95,9 @@ class TestIdenticalEvents:
         seq = [_make_event() for _ in range(8)]
         emb1 = small_model.encode_trades([seq])
         emb2 = small_model.encode_trades([seq])
-        assert torch.allclose(emb1, emb2, atol=1e-6), (
-            "encode_trades must be deterministic in eval mode for identical inputs."
-        )
+        assert torch.allclose(
+            emb1, emb2, atol=1e-6
+        ), "encode_trades must be deterministic in eval mode for identical inputs."
 
     def test_identical_events_same_values(self, small_model):
         """Sequence of N identical events must produce the same embedding as
@@ -124,6 +126,7 @@ class TestIdenticalEvents:
 # 2. Variable-length masking
 # ---------------------------------------------------------------------------
 
+
 class TestVariableLengthMasking:
     def test_short_sequence_not_corrupted_by_padding(self, small_model):
         """The embedding of a short sequence must be identical whether it is
@@ -137,9 +140,9 @@ class TestVariableLengthMasking:
         # Encode together (padding applied to short_seq)
         emb_batched = small_model.encode_trades([short_seq, long_seq])
 
-        assert torch.allclose(emb_alone, emb_batched[0:1], atol=1e-5), (
-            "Padding a short sequence inside a larger batch must not alter its embedding."
-        )
+        assert torch.allclose(
+            emb_alone, emb_batched[0:1], atol=1e-5
+        ), "Padding a short sequence inside a larger batch must not alter its embedding."
 
     def test_single_event_sequence(self, small_model):
         """A sequence of exactly one event must not crash."""
@@ -160,6 +163,7 @@ class TestVariableLengthMasking:
 # ---------------------------------------------------------------------------
 # 3. Input validation
 # ---------------------------------------------------------------------------
+
 
 class TestInputValidation:
     def test_rejects_too_long_sequence(self, small_model):
@@ -195,6 +199,7 @@ class TestInputValidation:
 # 4. Integration training test
 # ---------------------------------------------------------------------------
 
+
 class TestIntegrationTraining:
     """Train for 2 epochs on a tiny synthetic dataset; confirm loss decreases."""
 
@@ -205,8 +210,13 @@ class TestIntegrationTraining:
         from torch.optim.lr_scheduler import CosineAnnealingLR
 
         model = TradeSequenceTransformer(
-            num_pairs=4, embed_dim=16, num_heads=2, num_layers=1,
-            ffn_dim=32, dropout=0.1, max_length=32,
+            num_pairs=4,
+            embed_dim=16,
+            num_heads=2,
+            num_layers=1,
+            ffn_dim=32,
+            dropout=0.1,
+            max_length=32,
         )
         head = nn.Linear(16, 1)
         criterion = nn.BCEWithLogitsLoss()
@@ -222,8 +232,17 @@ class TestIntegrationTraining:
             for i in range(16):
                 log_amt = 4.0 + rng.normal(0, 0.1 if label == 1 else 0.8)
                 delta = rng.exponential(5.0 if label == 1 else 60.0)
-                direction = float(1 if (i % 2 == 0) else -1) if label == 1 else float(rng.choice([1, -1]))
-                events.append(TradeEvent(log_amount=log_amt, time_delta_s=delta, pair_index=label, direction=direction))
+                direction = (
+                    float(1 if (i % 2 == 0) else -1) if label == 1 else float(rng.choice([1, -1]))
+                )
+                events.append(
+                    TradeEvent(
+                        log_amount=log_amt,
+                        time_delta_s=delta,
+                        pair_index=label,
+                        direction=direction,
+                    )
+                )
             return events
 
         seqs = [_make_seq(i % 2) for i in range(32)]
@@ -233,8 +252,8 @@ class TestIntegrationTraining:
             model.train()
             total_loss = 0.0
             for b in range(0, 32, 8):
-                batch_seqs = seqs[b:b+8]
-                batch_labels = torch.tensor(labels[b:b+8], dtype=torch.float32)
+                batch_seqs = seqs[b : b + 8]
+                batch_labels = torch.tensor(labels[b : b + 8], dtype=torch.float32)
                 emb = model.encode_trades(batch_seqs)
                 logits = head(emb).squeeze(-1)
                 loss = criterion(logits, batch_labels)
@@ -250,22 +269,28 @@ class TestIntegrationTraining:
         loss_e2 = _run_epoch()
 
         # Loss must decrease (allow small tolerance for stochastic mini-batches)
-        assert loss_e2 < loss_e1 * 1.05, (
-            f"Training loss did not decrease: epoch1={loss_e1:.4f}, epoch2={loss_e2:.4f}"
-        )
+        assert (
+            loss_e2 < loss_e1 * 1.05
+        ), f"Training loss did not decrease: epoch1={loss_e1:.4f}, epoch2={loss_e2:.4f}"
 
 
 # ---------------------------------------------------------------------------
 # 5. CPU latency test
 # ---------------------------------------------------------------------------
 
+
 class TestCPULatency:
     """Batch of 32 sequences × 64 events must complete in < 50 ms (p95)."""
 
     def test_inference_latency_batch32_seq64(self):
         model = TradeSequenceTransformer(
-            num_pairs=4, embed_dim=64, num_heads=4, num_layers=2,
-            ffn_dim=128, dropout=0.0, max_length=512,
+            num_pairs=4,
+            embed_dim=64,
+            num_heads=4,
+            num_layers=2,
+            ffn_dim=128,
+            dropout=0.0,
+            max_length=512,
         )
         model.eval()
 
@@ -281,6 +306,7 @@ class TestCPULatency:
 # 6. Save / load / integrity
 # ---------------------------------------------------------------------------
 
+
 class TestSaveLoad:
     def test_round_trip(self, small_model, tmp_path):
         """Weights survive a save/load round-trip."""
@@ -293,9 +319,9 @@ class TestSaveLoad:
         loaded.eval()
 
         emb_after = loaded.encode_trades([seq]).detach()
-        assert torch.allclose(emb_before, emb_after, atol=1e-5), (
-            "Loaded model must produce identical outputs to the saved model."
-        )
+        assert torch.allclose(
+            emb_before, emb_after, atol=1e-5
+        ), "Loaded model must produce identical outputs to the saved model."
 
     def test_integrity_check_catches_tamper(self, small_model, tmp_path):
         """Tampering with the weights file must be caught on load."""
@@ -320,16 +346,21 @@ class TestSaveLoad:
 # 7. build_sequence_embedding helper
 # ---------------------------------------------------------------------------
 
+
 class TestBuildSequenceEmbedding:
     def test_returns_zeros_when_model_none(self):
         from datetime import datetime
 
         import pandas as pd
 
-        trades = pd.DataFrame([{
-            "ledger_close_time": datetime.now(UTC),
-            "amount": 100.0,
-        }])
+        trades = pd.DataFrame(
+            [
+                {
+                    "ledger_close_time": datetime.now(UTC),
+                    "amount": 100.0,
+                }
+            ]
+        )
         result = build_sequence_embedding(trades, model=None)
         assert result.shape[0] > 0
         assert (result == 0).all()
@@ -340,16 +371,23 @@ class TestBuildSequenceEmbedding:
         import pandas as pd
 
         model = TradeSequenceTransformer(
-            num_pairs=4, embed_dim=16, num_heads=2, num_layers=1,
-            ffn_dim=32, dropout=0.0, max_length=64,
+            num_pairs=4,
+            embed_dim=16,
+            num_heads=2,
+            num_layers=1,
+            ffn_dim=32,
+            dropout=0.0,
+            max_length=64,
         )
         model.eval()
 
         now = datetime.now(UTC)
-        trades = pd.DataFrame([
-            {"ledger_close_time": now, "amount": 100.0, "base_account": "GFOO"},
-            {"ledger_close_time": now, "amount": 200.0, "base_account": "GBAR"},
-        ])
+        trades = pd.DataFrame(
+            [
+                {"ledger_close_time": now, "amount": 100.0, "base_account": "GFOO"},
+                {"ledger_close_time": now, "amount": 200.0, "base_account": "GBAR"},
+            ]
+        )
         result = build_sequence_embedding(trades, model=model)
         assert result.shape == (16,)
         assert result.dtype == np.float32
@@ -359,8 +397,13 @@ class TestBuildSequenceEmbedding:
         import pandas as pd
 
         model = TradeSequenceTransformer(
-            num_pairs=4, embed_dim=16, num_heads=2, num_layers=1,
-            ffn_dim=32, dropout=0.0, max_length=64,
+            num_pairs=4,
+            embed_dim=16,
+            num_heads=2,
+            num_layers=1,
+            ffn_dim=32,
+            dropout=0.0,
+            max_length=64,
         )
         result = build_sequence_embedding(pd.DataFrame(), model=model)
         assert (result == 0).all()

@@ -93,9 +93,11 @@ class TestGetSearchSpace:
             for name, spec in get_search_space(model).items():
                 assert len(spec) == 3, f"{model}.{name} spec should be (type, min, max)"
                 param_type, lo, hi = spec
-                assert param_type in ("int", "float", "float_log"), (
-                    f"Unknown type {param_type!r} in {model}.{name}"
-                )
+                assert param_type in (
+                    "int",
+                    "float",
+                    "float_log",
+                ), f"Unknown type {param_type!r} in {model}.{name}"
                 assert lo < hi, f"min >= max for {model}.{name}"
 
     def test_unknown_model_raises(self):
@@ -121,61 +123,117 @@ class TestValidateHyperparams:
     def test_valid_rf_params_pass(self):
         validate_hyperparams(
             "random_forest",
-            {"n_estimators": 100, "max_depth": 10, "min_samples_split": 5,
-             "min_samples_leaf": 2, "max_features": 0.8},
+            {
+                "n_estimators": 100,
+                "max_depth": 10,
+                "min_samples_split": 5,
+                "min_samples_leaf": 2,
+                "max_features": 0.8,
+            },
         )  # should not raise
 
     def test_valid_xgboost_params_pass(self):
         validate_hyperparams(
             "xgboost",
-            {"n_estimators": 200, "max_depth": 6, "learning_rate": 0.1,
-             "subsample": 0.8, "colsample_bytree": 0.8,
-             "min_child_weight": 3, "gamma": 1.0},
+            {
+                "n_estimators": 200,
+                "max_depth": 6,
+                "learning_rate": 0.1,
+                "subsample": 0.8,
+                "colsample_bytree": 0.8,
+                "min_child_weight": 3,
+                "gamma": 1.0,
+            },
         )
 
     def test_valid_lightgbm_params_pass(self):
         validate_hyperparams(
             "lightgbm",
-            {"n_estimators": 150, "max_depth": 8, "learning_rate": 0.05,
-             "subsample": 0.9, "colsample_bytree": 0.7,
-             "num_leaves": 63, "min_child_samples": 20},
+            {
+                "n_estimators": 150,
+                "max_depth": 8,
+                "learning_rate": 0.05,
+                "subsample": 0.9,
+                "colsample_bytree": 0.7,
+                "num_leaves": 63,
+                "min_child_samples": 20,
+            },
         )
 
     def test_max_depth_zero_rejected(self):
         """max_depth=0 would cause a silent failure in RF — must be rejected."""
         with pytest.raises(ValueError, match="max_depth"):
-            validate_hyperparams("random_forest", {"n_estimators": 100, "max_depth": 0,
-                                                    "min_samples_split": 2, "min_samples_leaf": 1,
-                                                    "max_features": 0.5})
+            validate_hyperparams(
+                "random_forest",
+                {
+                    "n_estimators": 100,
+                    "max_depth": 0,
+                    "min_samples_split": 2,
+                    "min_samples_leaf": 1,
+                    "max_features": 0.5,
+                },
+            )
 
     def test_negative_learning_rate_rejected(self):
         with pytest.raises(ValueError, match="learning_rate"):
-            validate_hyperparams("xgboost", {"n_estimators": 100, "max_depth": 3,
-                                              "learning_rate": -0.1, "subsample": 0.8,
-                                              "colsample_bytree": 0.8,
-                                              "min_child_weight": 1, "gamma": 0.0})
+            validate_hyperparams(
+                "xgboost",
+                {
+                    "n_estimators": 100,
+                    "max_depth": 3,
+                    "learning_rate": -0.1,
+                    "subsample": 0.8,
+                    "colsample_bytree": 0.8,
+                    "min_child_weight": 1,
+                    "gamma": 0.0,
+                },
+            )
 
     def test_n_estimators_zero_rejected(self):
         with pytest.raises(ValueError, match="n_estimators"):
-            validate_hyperparams("xgboost", {"n_estimators": 0, "max_depth": 3,
-                                              "learning_rate": 0.1, "subsample": 0.8,
-                                              "colsample_bytree": 0.8,
-                                              "min_child_weight": 1, "gamma": 0.0})
+            validate_hyperparams(
+                "xgboost",
+                {
+                    "n_estimators": 0,
+                    "max_depth": 3,
+                    "learning_rate": 0.1,
+                    "subsample": 0.8,
+                    "colsample_bytree": 0.8,
+                    "min_child_weight": 1,
+                    "gamma": 0.0,
+                },
+            )
 
     def test_subsample_above_one_rejected(self):
         with pytest.raises(ValueError, match="subsample"):
-            validate_hyperparams("lightgbm", {"n_estimators": 100, "max_depth": 5,
-                                               "learning_rate": 0.1, "subsample": 1.5,
-                                               "colsample_bytree": 0.8, "num_leaves": 31,
-                                               "min_child_samples": 20})
+            validate_hyperparams(
+                "lightgbm",
+                {
+                    "n_estimators": 100,
+                    "max_depth": 5,
+                    "learning_rate": 0.1,
+                    "subsample": 1.5,
+                    "colsample_bytree": 0.8,
+                    "num_leaves": 31,
+                    "min_child_samples": 20,
+                },
+            )
 
     def test_num_leaves_one_rejected(self):
         """num_leaves=1 is degenerate for LightGBM (single leaf = no split)."""
         with pytest.raises(ValueError, match="num_leaves"):
-            validate_hyperparams("lightgbm", {"n_estimators": 100, "max_depth": 5,
-                                               "learning_rate": 0.1, "subsample": 0.8,
-                                               "colsample_bytree": 0.8, "num_leaves": 1,
-                                               "min_child_samples": 20})
+            validate_hyperparams(
+                "lightgbm",
+                {
+                    "n_estimators": 100,
+                    "max_depth": 5,
+                    "learning_rate": 0.1,
+                    "subsample": 0.8,
+                    "colsample_bytree": 0.8,
+                    "num_leaves": 1,
+                    "min_child_samples": 20,
+                },
+            )
 
     def test_unknown_param_rejected(self):
         with pytest.raises(ValueError, match="Unknown parameter"):
@@ -321,9 +379,9 @@ class TestRunStudy:
         auc_after_3 = _run_and_get_best(3)
         auc_after_5 = _run_and_get_best(5)  # adds 5 more (load_if_exists=True)
 
-        assert auc_after_5 >= auc_after_3 - 1e-9, (
-            f"Best AUC decreased: {auc_after_3:.6f} → {auc_after_5:.6f}"
-        )
+        assert (
+            auc_after_5 >= auc_after_3 - 1e-9
+        ), f"Best AUC decreased: {auc_after_3:.6f} → {auc_after_5:.6f}"
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -392,7 +450,7 @@ class TestRunMultiobjectiveStudy:
 
 class TestSelectParetoPoint:
     def _make_front(self, entries):
-        return [{"auc": a, "latency_ms": l, "params": {}} for a, l in entries]
+        return [{"auc": auc, "latency_ms": latency, "params": {}} for auc, latency in entries]
 
     def test_picks_lowest_latency_above_auc_floor(self):
         front = self._make_front([(0.90, 2.0), (0.85, 1.0), (0.80, 0.5), (0.70, 0.1)])
@@ -489,6 +547,7 @@ class TestOptimisedParamsProduceTrainableModel:
 
         # Build and train with loaded params
         from detection.hyperparameter_search import _build_model
+
         model = _build_model(model_name, loaded, random_state=42)
         model.fit(X_train, y_train)
         proba = model.predict_proba(X_val)[:, 1]
@@ -522,6 +581,7 @@ class TestOptimisedParamsProduceTrainableModel:
         assert set(loaded.keys()) == {"random_forest", "xgboost", "lightgbm"}
 
         from detection.hyperparameter_search import _build_model
+
         for model_name, params in loaded.items():
             m = _build_model(model_name, params, random_state=42)
             m.fit(X_train, y_train)

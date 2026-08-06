@@ -143,7 +143,9 @@ def test_load_amm_pool_trades_returns_correct_schema(monkeypatch):
     ), f"Missing columns: {expected_cols - set(df.columns)}"
     assert len(df) == 1
     assert df.iloc[0]["base_account"] == "GCGPQMCLRXCUPCL3AVMYUUQML2WVC7A5M6HO5RKYSU4CIA7O7SI4VKWE"
-    assert df.iloc[0]["counter_account"] == "GB2HHLFDCBSBDAMU2QRDU4AJV63WQE2DWT7MBZWZRQDFYUXJXIPPUG7M"
+    assert (
+        df.iloc[0]["counter_account"] == "GB2HHLFDCBSBDAMU2QRDU4AJV63WQE2DWT7MBZWZRQDFYUXJXIPPUG7M"
+    )
     assert (
         df.iloc[0]["base_asset"] == "USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN"
     )

@@ -46,6 +46,7 @@ def _close_enough(a: float, b: float, tol: float = TOLERANCE) -> bool:
 # 1. 3-party local-mode: mean and variance within 1e-4
 # ---------------------------------------------------------------------------
 
+
 class TestThreePartyLocal:
     """Core requirement: 3-party MPC matches plaintext within 1e-4."""
 
@@ -90,30 +91,34 @@ class TestThreePartyLocal:
 class TestThreePartyVariousInputs:
     """Mean/variance correctness across different input distributions."""
 
-    @pytest.mark.parametrize("scores", [
-        # All same value
-        [[50.0] * 10, [50.0] * 10, [50.0] * 10],
-        # Wide spread
-        [[0.0, 100.0, 50.0], [25.0, 75.0, 50.0], [10.0, 90.0, 50.0]],
-        # Single score per party
-        [[42.0], [58.0], [70.0]],
-        # Unequal party sizes
-        [[10.0, 20.0, 30.0], [40.0, 50.0], [60.0]],
-    ])
+    @pytest.mark.parametrize(
+        "scores",
+        [
+            # All same value
+            [[50.0] * 10, [50.0] * 10, [50.0] * 10],
+            # Wide spread
+            [[0.0, 100.0, 50.0], [25.0, 75.0, 50.0], [10.0, 90.0, 50.0]],
+            # Single score per party
+            [[42.0], [58.0], [70.0]],
+            # Unequal party sizes
+            [[10.0, 20.0, 30.0], [40.0, 50.0], [60.0]],
+        ],
+    )
     def test_mean_variance_correctness(self, scores):
         result = _run(mpc_aggregate_scores_local(scores))
         expected = plaintext_aggregate(scores)
-        assert _close_enough(result["mean"], expected["mean"]), (
-            f"mean: MPC={result['mean']:.6f} plain={expected['mean']:.6f}"
-        )
-        assert _close_enough(result["variance"], expected["variance"]), (
-            f"variance: MPC={result['variance']:.6f} plain={expected['variance']:.6f}"
-        )
+        assert _close_enough(
+            result["mean"], expected["mean"]
+        ), f"mean: MPC={result['mean']:.6f} plain={expected['mean']:.6f}"
+        assert _close_enough(
+            result["variance"], expected["variance"]
+        ), f"variance: MPC={result['variance']:.6f} plain={expected['variance']:.6f}"
 
 
 # ---------------------------------------------------------------------------
 # 2. 2-party local-mode
 # ---------------------------------------------------------------------------
+
 
 class TestTwoPartyLocal:
     PARTY_SCORES = [
@@ -144,6 +149,7 @@ class TestTwoPartyLocal:
 # 3. Plaintext reference correctness
 # ---------------------------------------------------------------------------
 
+
 class TestPlaintextAggregate:
     def test_mean_single_party(self):
         r = plaintext_aggregate([[10.0, 20.0, 30.0]])
@@ -173,6 +179,7 @@ class TestPlaintextAggregate:
 # ---------------------------------------------------------------------------
 # 4. All-zero party does not reveal itself (output-indistinguishability)
 # ---------------------------------------------------------------------------
+
 
 class TestAllZeroPartyPrivacy:
     """An all-zero input from one party must produce the same aggregate output
@@ -216,9 +223,9 @@ class TestAllZeroPartyPrivacy:
         result_a = _run(mpc_aggregate_scores_local(config_a))
         result_b = _run(mpc_aggregate_scores_local(config_b))
 
-        assert _close_enough(result_a["mean"], result_b["mean"]), (
-            "Both configs have the same mean; MPC output must agree"
-        )
+        assert _close_enough(
+            result_a["mean"], result_b["mean"]
+        ), "Both configs have the same mean; MPC output must agree"
 
     def test_zero_party_index_cannot_be_inferred_from_variance(self):
         """Variance differs between configs, but that's inherent to the *aggregate*
@@ -231,7 +238,7 @@ class TestAllZeroPartyPrivacy:
         revealed).
         """
         scores = [
-            [0.0] * 5,                        # party 0: zeros
+            [0.0] * 5,  # party 0: zeros
             [40.0, 50.0, 60.0, 70.0, 80.0],  # party 1
             [20.0, 30.0, 40.0, 50.0, 60.0],  # party 2
         ]
@@ -250,6 +257,7 @@ class TestAllZeroPartyPrivacy:
 # 5. All parties see identical output
 # ---------------------------------------------------------------------------
 
+
 class TestAllPartiesIdenticalOutput:
     """All parties must see the same aggregate (no asymmetric output)."""
 
@@ -258,14 +266,18 @@ class TestAllPartiesIdenticalOutput:
 
         async def _collect():
             from mpyc.runtime import Mpc, Party
+
             parties = [Party(pid=i) for i in range(3)]
             party_results = []
+
             async def _run_one(pid):
                 rt = Mpc(pid=pid, parties=parties, threshold=1, no_party=True)
                 async with rt:
                     from detection.mpc_aggregator import _compute_aggregate_mpc
+
                     r = await _compute_aggregate_mpc(rt, scores[pid], 3, pid)
                     party_results.append((pid, r))
+
             await asyncio.gather(*[_run_one(i) for i in range(3)])
             return party_results
 
@@ -282,6 +294,7 @@ class TestAllPartiesIdenticalOutput:
 # ---------------------------------------------------------------------------
 # 6. Error conditions
 # ---------------------------------------------------------------------------
+
 
 class TestErrorConditions:
     def test_raises_when_mpyc_unavailable(self):
@@ -301,6 +314,7 @@ class TestErrorConditions:
             import inspect
 
             from detection.mpc_aggregator import mpc_aggregate_scores
+
             src = inspect.getsource(mpc_aggregate_scores)
             assert "n_parties" in src
             assert "warning" in src.lower()
@@ -310,12 +324,14 @@ class TestErrorConditions:
 # 7. Regression: MPC vs plaintext across random inputs
 # ---------------------------------------------------------------------------
 
+
 class TestMPCvsPlaintextRegression:
     """Property-based-style regression: random score lists must agree."""
 
     @pytest.mark.parametrize("seed", [0, 1, 42])
     def test_random_scores_three_parties(self, seed):
         import random
+
         rng = random.Random(seed)
         scores = [
             [rng.uniform(0, 100) for _ in range(8)],
@@ -324,9 +340,9 @@ class TestMPCvsPlaintextRegression:
         ]
         result = _run(mpc_aggregate_scores_local(scores))
         expected = plaintext_aggregate(scores)
-        assert _close_enough(result["mean"], expected["mean"], tol=1e-3), (
-            f"seed={seed} mean: MPC={result['mean']:.6f} plain={expected['mean']:.6f}"
-        )
-        assert _close_enough(result["variance"], expected["variance"], tol=1e-3), (
-            f"seed={seed} variance: MPC={result['variance']:.6f} plain={expected['variance']:.6f}"
-        )
+        assert _close_enough(
+            result["mean"], expected["mean"], tol=1e-3
+        ), f"seed={seed} mean: MPC={result['mean']:.6f} plain={expected['mean']:.6f}"
+        assert _close_enough(
+            result["variance"], expected["variance"], tol=1e-3
+        ), f"seed={seed} variance: MPC={result['variance']:.6f} plain={expected['variance']:.6f}"

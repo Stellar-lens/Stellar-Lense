@@ -85,7 +85,9 @@ def extract_bot_fingerprint(
     return fingerprint
 
 
-def _compute_trust_line_latency(account_created_at: datetime, effects: list[Effect]) -> float | None:
+def _compute_trust_line_latency(
+    account_created_at: datetime, effects: list[Effect]
+) -> float | None:
     """Compute latency from account creation to first trust line creation.
 
     Returns:
@@ -109,9 +111,7 @@ def _compute_trust_line_latency(account_created_at: datetime, effects: list[Effe
                 effect_time_str = effect.get("created_at")
                 if effect_time_str:
                     try:
-                        effect_time = datetime.fromisoformat(
-                            effect_time_str.replace("Z", "+00:00")
-                        )
+                        effect_time = datetime.fromisoformat(effect_time_str.replace("Z", "+00:00"))
                         if _is_plausible_timestamp(effect_time):
                             latency = (effect_time - created_at).total_seconds()
                             # Only return if plausible (non-negative and < 1 year)

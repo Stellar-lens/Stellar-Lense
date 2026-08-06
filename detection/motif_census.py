@@ -37,18 +37,18 @@ class MotifCensusResult:
     # 3-node motifs
     triangle_count: int = 0
     triangle_density: float = 0.0  # triangles / C(n,3)
-    star_count: int = 0            # open wedges (P3 patterns)
-    star_ratio: float = 0.0        # star_count / (star_count + triangle_count)
+    star_count: int = 0  # open wedges (P3 patterns)
+    star_ratio: float = 0.0  # star_count / (star_count + triangle_count)
 
     # 4-node motifs
-    cycle_4_count: int = 0         # distinct 4-cycles (C4 subgraphs)
+    cycle_4_count: int = 0  # distinct 4-cycles (C4 subgraphs)
 
     # Directed edge structure
-    reciprocity: float = 0.0       # fraction of directed edges with reverse present
+    reciprocity: float = 0.0  # fraction of directed edges with reverse present
 
     # Metadata
     node_count: int = 0
-    was_sampled: bool = False       # True when >500-node community was subsampled
+    was_sampled: bool = False  # True when >500-node community was subsampled
     census_truncated: bool = False  # True when timeout was hit mid-census
 
 
@@ -210,9 +210,7 @@ def compute_motif_census(
 
         triangle_count, max_triangles = _count_triangles_matrix(G_und)
         result.triangle_count = triangle_count
-        result.triangle_density = (
-            triangle_count / max_triangles if max_triangles > 0 else 0.0
-        )
+        result.triangle_density = triangle_count / max_triangles if max_triangles > 0 else 0.0
 
         # --- star / open-wedge motifs ---
         if time.monotonic() >= deadline:

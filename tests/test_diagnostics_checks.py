@@ -10,11 +10,7 @@ Tests cover:
 
 from __future__ import annotations
 
-import os
-from pathlib import Path
 from unittest import mock
-
-import pytest
 
 from utils.diagnostics import CheckStatus
 from utils.diagnostics_checks import (
@@ -31,7 +27,6 @@ from utils.diagnostics_checks import (
     RequiredFilesCheck,
     RequiredPackagesCheck,
 )
-
 
 # =============================================================================
 # Environment Checks Tests
@@ -153,9 +148,11 @@ def test_package_integrity_check_runs():
 
 def test_import_cycles_check_no_cycles():
     """ImportCyclesCheck passes when no cycles detected."""
-    with mock.patch("scripts.check_import_cycles._find_python_files", return_value=[]), \
-         mock.patch("scripts.check_import_cycles.build_dependency_graph", return_value={}), \
-         mock.patch("scripts.check_import_cycles.find_cycles", return_value=[]):
+    with (
+        mock.patch("scripts.check_import_cycles._find_python_files", return_value=[]),
+        mock.patch("scripts.check_import_cycles.build_dependency_graph", return_value={}),
+        mock.patch("scripts.check_import_cycles.find_cycles", return_value=[]),
+    ):
         check = ImportCyclesCheck()
         result = check.run()
 
@@ -169,9 +166,11 @@ def test_import_cycles_check_with_cycles():
         ["module_c", "module_d", "module_c"],
     ]
 
-    with mock.patch("scripts.check_import_cycles._find_python_files", return_value=[]), \
-         mock.patch("scripts.check_import_cycles.build_dependency_graph", return_value={}), \
-         mock.patch("scripts.check_import_cycles.find_cycles", return_value=mock_cycles):
+    with (
+        mock.patch("scripts.check_import_cycles._find_python_files", return_value=[]),
+        mock.patch("scripts.check_import_cycles.build_dependency_graph", return_value={}),
+        mock.patch("scripts.check_import_cycles.find_cycles", return_value=mock_cycles),
+    ):
         check = ImportCyclesCheck()
         result = check.run()
 

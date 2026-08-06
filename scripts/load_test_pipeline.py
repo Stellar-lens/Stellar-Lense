@@ -65,13 +65,13 @@ _N_SYNTHETIC_WALLETS = 10_000  # pool size; wallet pairs drawn mod this
 # Synthetic asset pairs used during load generation
 _SYNTHETIC_ASSET_PAIRS = [
     ("USDC", "GA5ZSEJYBY3RJRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN"),
-    ("BTC",  "GAUTUYY2THLF7SGITDFMXJVYH3LHDSMGEAKSBU267M2K7A3W543CKUEF"),
+    ("BTC", "GAUTUYY2THLF7SGITDFMXJVYH3LHDSMGEAKSBU267M2K7A3W543CKUEF"),
     ("AQUA", "GBNZILSTVQZ4R7IKQDGHYGY2QXL5QOFJYQMXPKWRRM5PAV7Y4M67AQUA"),
 ]
 
 # Pass/fail thresholds (issue spec)
-P99_LATENCY_THRESHOLD_S = 10.0   # seconds
-MEMORY_THRESHOLD_BYTES = 1024 ** 3  # 1 GB per worker
+P99_LATENCY_THRESHOLD_S = 10.0  # seconds
+MEMORY_THRESHOLD_BYTES = 1024**3  # 1 GB per worker
 
 # Default Kafka topic prefix (matches config.KAFKA_TOPIC_PREFIX)
 DEFAULT_TOPIC_PREFIX = "ledgerlens.trades"
@@ -80,6 +80,7 @@ DEFAULT_TOPIC_PREFIX = "ledgerlens.trades"
 # ---------------------------------------------------------------------------
 # Synthetic trade generation  (security: no real wallet data)
 # ---------------------------------------------------------------------------
+
 
 def _synthetic_wallet(idx: int) -> str:
     """Return a deterministic synthetic Stellar-like address (never real).
@@ -92,8 +93,9 @@ def _synthetic_wallet(idx: int) -> str:
     # the 51 * 2 = 102 hex digits this consumes (sha256's 64 digits ran out
     # partway through, since the loop originally assumed 100 were available).
     seed = hashlib.sha512(f"load-test-wallet-{idx}".encode()).hexdigest()
-    suffix = "".join(_WALLET_ALPHABET[int(seed[i : i + 2], 16) % len(_WALLET_ALPHABET)]
-                     for i in range(0, 102, 2))[:51]
+    suffix = "".join(
+        _WALLET_ALPHABET[int(seed[i : i + 2], 16) % len(_WALLET_ALPHABET)] for i in range(0, 102, 2)
+    )[:51]
     return f"GLOAD{suffix}"
 
 
@@ -109,20 +111,20 @@ def make_synthetic_trade(seq: int, rng: np.random.Generator, ts: datetime) -> di
     be serialised with ``ingestion.avro_codec.serialize`` when Kafka is live.
     Synthetic wallet addresses use the GLOAD prefix (never real accounts).
     """
-    base_idx  = seq % _N_SYNTHETIC_WALLETS
-    ctr_idx   = (seq + 1) % _N_SYNTHETIC_WALLETS
+    base_idx = seq % _N_SYNTHETIC_WALLETS
+    ctr_idx = (seq + 1) % _N_SYNTHETIC_WALLETS
     pair_code, pair_issuer = _SYNTHETIC_ASSET_PAIRS[seq % len(_SYNTHETIC_ASSET_PAIRS)]
     amount = _synthetic_amount(rng)
 
     return {
-        "trade_id":             f"LOADTEST-{seq:012d}",
-        "base_account":         _synthetic_wallet(base_idx),
-        "counter_account":      _synthetic_wallet(ctr_idx),
-        "base_amount":          amount,
-        "counter_amount":       round(amount * rng.uniform(0.9, 1.1), 6),
-        "price":                round(rng.uniform(0.5, 2.0), 6),
-        "asset_pair":           f"{pair_code}:{pair_issuer}/XLM:native",
-        "ledger_close_time":    ts,
+        "trade_id": f"LOADTEST-{seq:012d}",
+        "base_account": _synthetic_wallet(base_idx),
+        "counter_account": _synthetic_wallet(ctr_idx),
+        "base_amount": amount,
+        "counter_amount": round(amount * rng.uniform(0.9, 1.1), 6),
+        "price": round(rng.uniform(0.5, 2.0), 6),
+        "asset_pair": f"{pair_code}:{pair_issuer}/XLM:native",
+        "ledger_close_time": ts,
         "ingestion_timestamp_ms": int(ts.timestamp() * 1000),
     }
 
@@ -130,6 +132,7 @@ def make_synthetic_trade(seq: int, rng: np.random.Generator, ts: datetime) -> di
 # ---------------------------------------------------------------------------
 # Token-bucket rate limiter  (unit-testable without asyncio)
 # ---------------------------------------------------------------------------
+
 
 class TokenBucket:
     """Thread / coroutine-safe token-bucket rate limiter.
@@ -190,17 +193,18 @@ class TokenBucket:
 # Metrics collector
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class Metrics:
     """Accumulates latency samples and counters during the test run."""
 
-    start_time:        float = field(default_factory=time.monotonic)
-    end_time:          float = 0.0
-    total_sent:        int   = 0
-    total_acked:       int   = 0
-    total_errors:      int   = 0
-    latency_samples:   list[float] = field(default_factory=list)
-    kafka_lag_samples: list[int]   = field(default_factory=list)
+    start_time: float = field(default_factory=time.monotonic)
+    end_time: float = 0.0
+    total_sent: int = 0
+    total_acked: int = 0
+    total_errors: int = 0
+    latency_samples: list[float] = field(default_factory=list)
+    kafka_lag_samples: list[int] = field(default_factory=list)
     memory_samples_mb: list[float] = field(default_factory=list)
 
     def record_latency(self, seconds: float) -> None:
@@ -236,32 +240,30 @@ class Metrics:
         lag = self.kafka_lag_samples
         return {
             "summary": {
-                "total_sent":            self.total_sent,
-                "total_acked":           self.total_acked,
-                "total_errors":          self.total_errors,
-                "throughput_tps":        round(self.throughput(), 2),
+                "total_sent": self.total_sent,
+                "total_acked": self.total_acked,
+                "total_errors": self.total_errors,
+                "throughput_tps": round(self.throughput(), 2),
                 "benford_throughput_tps": round(self.benford_throughput(), 2),
-                "duration_s":            round(
-                    (self.end_time or time.monotonic()) - self.start_time, 2
-                ),
+                "duration_s": round((self.end_time or time.monotonic()) - self.start_time, 2),
             },
             "latency_s": {
-                "p50":  round(self.percentile(lat, 50),  4),
-                "p95":  round(self.percentile(lat, 95),  4),
-                "p99":  round(self.percentile(lat, 99),  4),
+                "p50": round(self.percentile(lat, 50), 4),
+                "p95": round(self.percentile(lat, 95), 4),
+                "p99": round(self.percentile(lat, 99), 4),
                 "p999": round(self.percentile(lat, 99.9), 4),
-                "max":  round(max(lat, default=float("nan")), 4),
+                "max": round(max(lat, default=float("nan")), 4),
                 "mean": round(float(np.mean(lat)) if lat else float("nan"), 4),
             },
             "kafka_lag": {
-                "p50": int(self.percentile(lag, 50))  if lag else None,
-                "p95": int(self.percentile(lag, 95))  if lag else None,
-                "max": int(max(lag, default=0))        if lag else None,
+                "p50": int(self.percentile(lag, 50)) if lag else None,
+                "p95": int(self.percentile(lag, 95)) if lag else None,
+                "max": int(max(lag, default=0)) if lag else None,
             },
             "memory_mb": {
-                "p50": round(self.percentile(mem, 50),  1) if mem else None,
-                "p99": round(self.percentile(mem, 99),  1) if mem else None,
-                "max": round(max(mem, default=0.0),     1) if mem else None,
+                "p50": round(self.percentile(mem, 50), 1) if mem else None,
+                "p99": round(self.percentile(mem, 99), 1) if mem else None,
+                "max": round(max(mem, default=0.0), 1) if mem else None,
             },
         }
 
@@ -269,6 +271,7 @@ class Metrics:
 # ---------------------------------------------------------------------------
 # Pass/fail evaluator
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class PassFailResult:
@@ -305,25 +308,29 @@ def evaluate_pass_fail(metrics: Metrics, rate: float) -> PassFailResult:
     p99 = results["latency_s"]["p99"]
     latency_applies = rate >= 500
     lat_passed = (not math.isnan(p99) and p99 < P99_LATENCY_THRESHOLD_S) or not latency_applies
-    checks.append({
-        "name":      f"p99 latency < {P99_LATENCY_THRESHOLD_S}s (at ≥500 tps)",
-        "passed":    lat_passed,
-        "actual":    f"{p99:.3f}s" if not math.isnan(p99) else "n/a",
-        "threshold": f"{P99_LATENCY_THRESHOLD_S}s",
-        "enforced":  latency_applies,
-    })
+    checks.append(
+        {
+            "name": f"p99 latency < {P99_LATENCY_THRESHOLD_S}s (at ≥500 tps)",
+            "passed": lat_passed,
+            "actual": f"{p99:.3f}s" if not math.isnan(p99) else "n/a",
+            "threshold": f"{P99_LATENCY_THRESHOLD_S}s",
+            "enforced": latency_applies,
+        }
+    )
 
     # 2. Worker memory
     max_mem_mb = results["memory_mb"]["max"] or 0.0
-    mem_threshold_mb = MEMORY_THRESHOLD_BYTES / (1024 ** 2)
+    mem_threshold_mb = MEMORY_THRESHOLD_BYTES / (1024**2)
     mem_passed = max_mem_mb == 0.0 or max_mem_mb < mem_threshold_mb
-    checks.append({
-        "name":      f"worker memory < {mem_threshold_mb:.0f} MB",
-        "passed":    mem_passed,
-        "actual":    f"{max_mem_mb:.1f} MB" if max_mem_mb > 0 else "n/a (no worker)",
-        "threshold": f"{mem_threshold_mb:.0f} MB",
-        "enforced":  True,
-    })
+    checks.append(
+        {
+            "name": f"worker memory < {mem_threshold_mb:.0f} MB",
+            "passed": mem_passed,
+            "actual": f"{max_mem_mb:.1f} MB" if max_mem_mb > 0 else "n/a (no worker)",
+            "threshold": f"{mem_threshold_mb:.0f} MB",
+            "enforced": True,
+        }
+    )
 
     passed = all(c["passed"] for c in checks if c.get("enforced", True))
     return PassFailResult(passed=passed, checks=checks)
@@ -332,6 +339,7 @@ def evaluate_pass_fail(metrics: Metrics, rate: float) -> PassFailResult:
 # ---------------------------------------------------------------------------
 # In-process pipeline driver  (--no-kafka mode)
 # ---------------------------------------------------------------------------
+
 
 class InProcessDriver:
     """Drives the FeatureBuffer + StreamingScorer pipeline without Kafka.
@@ -373,17 +381,19 @@ class InProcessDriver:
             asset_pair = record["asset_pair"]
             base_part, _, ctr_part = asset_pair.partition("/")
             base_code, _, base_issuer = base_part.partition(":")
-            ctr_code,  _, ctr_issuer  = ctr_part.partition(":")
+            ctr_code, _, ctr_issuer = ctr_part.partition(":")
 
             trade = Trade(
                 trade_id=record["trade_id"],
                 ledger_close_time=record["ledger_close_time"],
                 base_account=record["base_account"],
                 counter_account=record["counter_account"],
-                base_asset=Asset(code=base_code,
-                                 issuer=None if base_issuer == "native" else base_issuer),
-                counter_asset=Asset(code=ctr_code,
-                                    issuer=None if ctr_issuer == "native" else ctr_issuer),
+                base_asset=Asset(
+                    code=base_code, issuer=None if base_issuer == "native" else base_issuer
+                ),
+                counter_asset=Asset(
+                    code=ctr_code, issuer=None if ctr_issuer == "native" else ctr_issuer
+                ),
                 base_amount=record["base_amount"],
                 counter_amount=record["counter_amount"],
                 price=record["price"],
@@ -401,6 +411,7 @@ class InProcessDriver:
 # ---------------------------------------------------------------------------
 # Kafka driver
 # ---------------------------------------------------------------------------
+
 
 class KafkaDriver:
     """Produces Avro trade events to Kafka and measures produce-side latency.
@@ -452,6 +463,7 @@ class KafkaDriver:
 
     def _topic_for_pair(self, asset_pair: str) -> str:
         import re
+
         sanitised = re.sub(r"[^a-zA-Z0-9._-]+", "_", asset_pair).strip("_")
         return f"{self._topic_prefix}.{sanitised}"
 
@@ -465,8 +477,7 @@ class KafkaDriver:
             value = serialize(record, self._schema)
             topic = self._topic_for_pair(record["asset_pair"])
             key = record["base_account"].encode("utf-8")
-            self._producer.produce(topic=topic, value=value, key=key,
-                                   on_delivery=self._on_delivery)
+            self._producer.produce(topic=topic, value=value, key=key, on_delivery=self._on_delivery)
             self._producer.poll(0)
             self._metrics.total_sent += 1
         except Exception:
@@ -481,13 +492,14 @@ class KafkaDriver:
         """Sample consumer lag from the broker (best-effort; ignored on error)."""
         try:
             from confluent_kafka.admin import AdminClient
+
             admin = AdminClient({"bootstrap.servers": self._bootstrap})
             topics = admin.list_topics(timeout=5)
             for tp_name in topics.topics:
                 if not tp_name.startswith(self._topic_prefix):
                     continue
                 meta = topics.topics[tp_name]
-                for part_id in meta.partitions:
+                for _part_id in meta.partitions:
                     self._metrics.record_kafka_lag(0)  # placeholder; real lag needs consumer
         except Exception:
             pass
@@ -497,12 +509,14 @@ class KafkaDriver:
 # Memory sampler
 # ---------------------------------------------------------------------------
 
+
 def _sample_worker_memory_mb() -> float:
     """Return the current process RSS in MB (0.0 if psutil is unavailable)."""
     try:
         import psutil
+
         proc = psutil.Process(os.getpid())
-        return proc.memory_info().rss / (1024 ** 2)
+        return proc.memory_info().rss / (1024**2)
     except Exception:
         return 0.0
 
@@ -510,6 +524,7 @@ def _sample_worker_memory_mb() -> float:
 # ---------------------------------------------------------------------------
 # Async load generator
 # ---------------------------------------------------------------------------
+
 
 async def _memory_sampler(metrics: Metrics, interval: float = 2.0) -> None:
     """Background coroutine: sample RSS every *interval* seconds."""
@@ -520,8 +535,7 @@ async def _memory_sampler(metrics: Metrics, interval: float = 2.0) -> None:
         await asyncio.sleep(interval)
 
 
-async def _lag_sampler(driver: KafkaDriver, metrics: Metrics,
-                       interval: float = 5.0) -> None:
+async def _lag_sampler(driver: KafkaDriver, metrics: Metrics, interval: float = 5.0) -> None:
     """Background coroutine: poll Kafka consumer lag every *interval* seconds."""
     while True:
         driver.poll_consumer_lag()
@@ -607,6 +621,7 @@ async def run_load_test(
 # Report writer
 # ---------------------------------------------------------------------------
 
+
 def write_report(
     metrics: Metrics,
     pf: PassFailResult,
@@ -616,17 +631,17 @@ def write_report(
     """Write a structured JSON report to *output_path*."""
     report = {
         "meta": {
-            "tool":       "ledgerlens-load-test",
-            "version":    "1.0.0",
-            "timestamp":  datetime.now(UTC).isoformat(),
+            "tool": "ledgerlens-load-test",
+            "version": "1.0.0",
+            "timestamp": datetime.now(UTC).isoformat(),
             "parameters": {
-                "rate_tps":     args.rate,
-                "duration_s":   args.duration,
-                "ramp_time_s":  args.ramp_time,
-                "no_kafka":     args.no_kafka,
-                "bootstrap":    args.bootstrap_servers,
+                "rate_tps": args.rate,
+                "duration_s": args.duration,
+                "ramp_time_s": args.ramp_time,
+                "no_kafka": args.no_kafka,
+                "bootstrap": args.bootstrap_servers,
                 "topic_prefix": args.topic_prefix,
-                "seed":         args.seed,
+                "seed": args.seed,
             },
         },
         "results": metrics.to_dict(),
@@ -635,8 +650,8 @@ def write_report(
             "checks": pf.checks,
         },
         "thresholds": {
-            "p99_latency_s":     P99_LATENCY_THRESHOLD_S,
-            "memory_threshold_mb": MEMORY_THRESHOLD_BYTES / (1024 ** 2),
+            "p99_latency_s": P99_LATENCY_THRESHOLD_S,
+            "memory_threshold_mb": MEMORY_THRESHOLD_BYTES / (1024**2),
         },
     }
 
@@ -649,7 +664,7 @@ def write_report(
 def print_summary(metrics: Metrics) -> None:
     r = metrics.to_dict()
     s = r["summary"]
-    l = r["latency_s"]
+    latency = r["latency_s"]
     print("\n" + "=" * 60)
     print("  Load Test Results")
     print("=" * 60)
@@ -659,11 +674,11 @@ def print_summary(metrics: Metrics) -> None:
     print(f"  Errors:              {s['total_errors']}")
     print(f"  Throughput:          {s['throughput_tps']} tps")
     print(f"  Benford throughput:  {s['benford_throughput_tps']} tps")
-    print(f"  Latency p50:         {l['p50']}s")
-    print(f"  Latency p95:         {l['p95']}s")
-    print(f"  Latency p99:         {l['p99']}s")
-    print(f"  Latency p99.9:       {l['p999']}s")
-    print(f"  Latency max:         {l['max']}s")
+    print(f"  Latency p50:         {latency['p50']}s")
+    print(f"  Latency p95:         {latency['p95']}s")
+    print(f"  Latency p99:         {latency['p99']}s")
+    print(f"  Latency p99.9:       {latency['p999']}s")
+    print(f"  Latency max:         {latency['max']}s")
     if r["memory_mb"]["max"]:
         print(f"  Memory max:          {r['memory_mb']['max']} MB")
     if r["kafka_lag"]["max"] is not None:
@@ -675,6 +690,7 @@ def print_summary(metrics: Metrics) -> None:
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python scripts/load_test_pipeline.py",
@@ -682,19 +698,26 @@ def _build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
-        "--rate", type=float, default=500.0,
+        "--rate",
+        type=float,
+        default=500.0,
         help="Target sustained trade events per second",
     )
     parser.add_argument(
-        "--duration", type=float, default=120.0,
+        "--duration",
+        type=float,
+        default=120.0,
         help="Total test duration in seconds (including ramp)",
     )
     parser.add_argument(
-        "--ramp-time", type=float, default=30.0,
+        "--ramp-time",
+        type=float,
+        default=30.0,
         help="Linear ramp-up time in seconds (0 = instant full rate)",
     )
     parser.add_argument(
-        "--no-kafka", action="store_true",
+        "--no-kafka",
+        action="store_true",
         help="Drive the in-process pipeline only (no broker required)",
     )
     parser.add_argument(
@@ -703,19 +726,24 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Kafka bootstrap servers (ignored when --no-kafka)",
     )
     parser.add_argument(
-        "--topic-prefix", default=DEFAULT_TOPIC_PREFIX,
+        "--topic-prefix",
+        default=DEFAULT_TOPIC_PREFIX,
         help="Kafka topic prefix",
     )
     parser.add_argument(
-        "--seed", type=int, default=42,
+        "--seed",
+        type=int,
+        default=42,
         help="RNG seed for reproducible synthetic data",
     )
     parser.add_argument(
-        "--output", default="reports/load_test_results.json",
+        "--output",
+        default="reports/load_test_results.json",
         help="Path for the JSON results report",
     )
     parser.add_argument(
-        "--fail-on-threshold", action="store_true",
+        "--fail-on-threshold",
+        action="store_true",
         help="Exit with code 1 if pass/fail criteria are not met",
     )
     return parser
@@ -733,8 +761,10 @@ def main() -> None:
         args.ramp_time = args.duration
 
     print("LedgerLens Load Test")
-    print(f"  Rate:     {args.rate} tps  |  Duration: {args.duration}s  |  "
-          f"Ramp: {args.ramp_time}s")
+    print(
+        f"  Rate:     {args.rate} tps  |  Duration: {args.duration}s  |  "
+        f"Ramp: {args.ramp_time}s"
+    )
     print(f"  Backend:  {'in-process (--no-kafka)' if args.no_kafka else args.bootstrap_servers}")
     print(f"  Output:   {args.output}\n")
 

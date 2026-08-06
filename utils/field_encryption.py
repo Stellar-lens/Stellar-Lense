@@ -36,7 +36,7 @@ from utils.logging import get_logger
 logger = get_logger(__name__)
 
 _KEY_ENV_VAR = "FORENSIC_REPORT_ENCRYPTION_KEY"
-_IV_LENGTH = 12   # 96-bit IV recommended for AES-GCM
+_IV_LENGTH = 12  # 96-bit IV recommended for AES-GCM
 _TAG_LENGTH = 16  # 128-bit authentication tag
 
 
@@ -100,9 +100,7 @@ def decrypt_field(blob: bytes) -> str:
     try:
         from cryptography.hazmat.primitives.ciphers.aead import AESGCM
     except ImportError as exc:
-        raise RuntimeError(
-            "The 'cryptography' package is required for field encryption."
-        ) from exc
+        raise RuntimeError("The 'cryptography' package is required for field encryption.") from exc
 
     if len(blob) < _IV_LENGTH + _TAG_LENGTH:
         raise ValueError("Encrypted blob is too short to be valid")

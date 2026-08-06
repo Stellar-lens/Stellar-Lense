@@ -16,16 +16,14 @@ import pytest
 
 from ingestion.data_models import Asset
 from utils.currency_normalization import (
-    NATIVE_ASSET,
     AssetClassifier,
-    AssetMetadata,
     AssetType,
     CachedRateProvider,
     CurrencyPair,
     MockExchangeRateProvider,
     MultiHopNormalization,
-    NormalizedAmount,
     NormalizationStatus,
+    NormalizedAmount,
     StablecoinType,
     USDNormalization,
     XLMNormalization,
@@ -37,7 +35,6 @@ from utils.currency_normalization import (
     normalize_amount,
 )
 from utils.decimal_guards import DecimalAmount
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -285,6 +282,7 @@ class TestCachedRateProvider:
 
         # Wait for expiry
         import time
+
         time.sleep(0.002)
 
         # Second call (should re-fetch)
@@ -419,9 +417,7 @@ class TestNormalizationFunctions:
         old_time = datetime.now() - timedelta(minutes=10)
 
         amount = DecimalAmount("100")
-        normalized = normalize_amount(
-            amount, usdc_asset, xlm_asset, provider, timestamp=old_time
-        )
+        normalized = normalize_amount(amount, usdc_asset, xlm_asset, provider, timestamp=old_time)
 
         # Should still work but flag as stale
         assert normalized.value == Decimal("850.0")
@@ -448,9 +444,7 @@ class TestNormalizationFunctions:
         assert total.value == Decimal("600")
         assert total.is_successful()
 
-    def test_aggregate_multiple_currencies(
-        self, mock_provider, usdc_asset, usdt_asset, xlm_asset
-    ):
+    def test_aggregate_multiple_currencies(self, mock_provider, usdc_asset, usdt_asset, xlm_asset):
         """Aggregate multiple currencies."""
         amounts = [
             (DecimalAmount("100"), usdc_asset),  # 100 * 8.5 = 850
@@ -690,7 +684,7 @@ class TestIntegration:
 
     def test_multi_asset_portfolio(self, mock_provider, usdc_asset, usdt_asset, xlm_asset):
         """Calculate total portfolio value."""
-        strategy = XLMNormalization(mock_provider)
+        XLMNormalization(mock_provider)
 
         # Portfolio holdings
         holdings = [
@@ -709,9 +703,7 @@ class TestIntegration:
     def test_confidence_weighting(self, mock_provider, usdc_asset, xlm_asset):
         """Confidence affects normalization."""
         # Set rate with low confidence
-        mock_provider.set_rate(
-            usdc_asset, xlm_asset, Decimal("8.5"), confidence=Decimal("0.5")
-        )
+        mock_provider.set_rate(usdc_asset, xlm_asset, Decimal("8.5"), confidence=Decimal("0.5"))
 
         strategy = XLMNormalization(mock_provider)
         amount = DecimalAmount("100")

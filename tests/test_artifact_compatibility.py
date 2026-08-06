@@ -20,11 +20,11 @@ from detection.artifact_compatibility import (  # noqa: E402
     ArtifactCompatibilityError,
     ArtifactCompatibilityGate,
     ArtifactManifest,
+    _parse_version,
     build_manifest,
     check_artifact_compatibility,
     load_model_with_compatibility,
     write_artifact_manifest,
-    _parse_version,
 )
 
 

@@ -180,6 +180,7 @@ def propagate_risk_scores(
     updated_base_scores = base_scores.copy()
     try:
         from detection.cross_chain.resolver import resolve_risk_scores
+
         for node in combined.nodes():
             ext_scores = resolve_risk_scores(node, db_url=db_url)
             if ext_scores:
@@ -268,6 +269,7 @@ def propagation_attribution(
     updated_base_scores = base_scores.copy()
     try:
         from detection.cross_chain.resolver import resolve_risk_scores
+
         for node in combined.nodes():
             ext_scores = resolve_risk_scores(node, db_url=db_url)
             if ext_scores:
@@ -328,6 +330,7 @@ def propagation_attribution(
 
     contributions.sort(key=lambda x: float(x["contribution"]), reverse=True)
     return contributions[:top_n]
+
 
 # ---------------------------------------------------------------------------
 # Weighted Risk Propagation (issue #259)
@@ -411,6 +414,7 @@ class WeightedRiskPropagation:
         self.max_iterations = max_iterations
         if convergence_threshold is None:
             from config import config
+
             convergence_threshold = config.RISK_PROP_CONVERGENCE_THRESHOLD
         self.convergence_threshold = convergence_threshold
 
@@ -485,10 +489,7 @@ class WeightedRiskPropagation:
                     break
             propagated += (score / 100.0) * ppr
 
-        return {
-            nodes[i]: float(np.clip(propagated[i] * 100.0, 0.0, 100.0))
-            for i in range(n)
-        }
+        return {nodes[i]: float(np.clip(propagated[i] * 100.0, 0.0, 100.0)) for i in range(n)}
 
 
 def propagate_risk_scores_weighted(

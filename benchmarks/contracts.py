@@ -7,8 +7,9 @@ so the contracts can be imported without pulling in heavy dependencies.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable, Protocol, Sequence
+from typing import Protocol
 
 import pandas as pd
 

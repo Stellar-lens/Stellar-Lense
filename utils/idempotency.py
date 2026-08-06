@@ -43,7 +43,7 @@ import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from functools import wraps
 from typing import Any, TypeVar
 
@@ -56,7 +56,7 @@ T = TypeVar("T")
 DEFAULT_LEASE_SECONDS = 300.0
 
 
-class JobStatus(str, Enum):
+class JobStatus(StrEnum):
     PENDING = "pending"
     SUCCESS = "success"
     FAILED = "failed"
@@ -142,8 +142,7 @@ class IdempotencyLedger:
 
     def _init_schema(self) -> None:
         conn = self._conn()
-        conn.execute(
-            """
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS idempotency_jobs (
                 key TEXT PRIMARY KEY,
                 status TEXT NOT NULL,
@@ -154,8 +153,7 @@ class IdempotencyLedger:
                 created_at REAL NOT NULL,
                 updated_at REAL NOT NULL
             )
-            """
-        )
+            """)
         conn.commit()
 
     @staticmethod

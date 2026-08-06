@@ -38,13 +38,12 @@ import sys
 import time
 from decimal import Decimal
 from pathlib import Path
-from typing import Any
 
 import numpy as np
 import pandas as pd
 
-from utils.decimal_guards import DecimalAmount, sum_amounts, safe_divide
 from utils.benford_precision import leading_digits_safe
+from utils.decimal_guards import DecimalAmount, sum_amounts
 from utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -52,6 +51,7 @@ logger = get_logger(__name__)
 
 class Colors:
     """ANSI color codes."""
+
     GREEN = "\033[92m"
     YELLOW = "\033[93m"
     RED = "\033[91m"
@@ -325,7 +325,7 @@ def benchmark_bulk_operations() -> dict[str, BenchmarkResult]:
 
     # Float summation
     start = time.perf_counter()
-    float_sum = sum(float_amounts)
+    sum(float_amounts)
     elapsed = time.perf_counter() - start
     results["float_sum"] = BenchmarkResult(
         name="float_sum",
@@ -336,7 +336,7 @@ def benchmark_bulk_operations() -> dict[str, BenchmarkResult]:
 
     # Decimal summation with sum_amounts
     start = time.perf_counter()
-    decimal_sum = sum_amounts(decimal_amounts.tolist())
+    sum_amounts(decimal_amounts.tolist())
     elapsed = time.perf_counter() - start
     results["decimal_sum"] = BenchmarkResult(
         name="decimal_sum",
@@ -348,7 +348,7 @@ def benchmark_bulk_operations() -> dict[str, BenchmarkResult]:
     # Float Series operations
     float_series = pd.Series(float_amounts)
     start = time.perf_counter()
-    float_result = (float_series + 10) * 2
+    (float_series + 10) * 2
     elapsed = time.perf_counter() - start
     results["float_series_ops"] = BenchmarkResult(
         name="float_series_ops",
@@ -359,7 +359,7 @@ def benchmark_bulk_operations() -> dict[str, BenchmarkResult]:
 
     # Decimal Series operations
     start = time.perf_counter()
-    decimal_result = decimal_amounts.apply(lambda x: (x + DecimalAmount("10")) * DecimalAmount("2"))
+    decimal_amounts.apply(lambda x: (x + DecimalAmount("10")) * DecimalAmount("2"))
     elapsed = time.perf_counter() - start
     results["decimal_series_ops"] = BenchmarkResult(
         name="decimal_series_ops",
@@ -390,8 +390,8 @@ def benchmark_benford() -> dict[str, BenchmarkResult]:
     # Float-based leading digit extraction (using log10)
     start = time.perf_counter()
     float_magnitudes = np.floor(np.log10(float_series)).astype(int)
-    float_normalized = float_series / (10.0 ** float_magnitudes)
-    float_digits = np.floor(float_normalized).astype(int)
+    float_normalized = float_series / (10.0**float_magnitudes)
+    np.floor(float_normalized).astype(int)
     elapsed = time.perf_counter() - start
     results["float_leading_digits"] = BenchmarkResult(
         name="float_leading_digits",
@@ -402,7 +402,7 @@ def benchmark_benford() -> dict[str, BenchmarkResult]:
 
     # Decimal-based leading digit extraction
     start = time.perf_counter()
-    decimal_digits = leading_digits_safe(decimal_amounts)
+    leading_digits_safe(decimal_amounts)
     elapsed = time.perf_counter() - start
     results["decimal_leading_digits"] = BenchmarkResult(
         name="decimal_leading_digits",
@@ -437,7 +437,7 @@ def benchmark_trade_calculations() -> dict[str, BenchmarkResult]:
         counter = base * price
         fee_rate = 0.001
         fee = counter * fee_rate
-        net = counter - fee
+        counter - fee
     elapsed = time.perf_counter() - start
     results["float_trades"] = BenchmarkResult(
         name="float_trades",
@@ -454,7 +454,7 @@ def benchmark_trade_calculations() -> dict[str, BenchmarkResult]:
         counter = base * price
         fee_rate = DecimalAmount("0.001")
         fee = counter * fee_rate
-        net = counter - fee
+        counter - fee
     elapsed = time.perf_counter() - start
     results["decimal_trades"] = BenchmarkResult(
         name="decimal_trades",
@@ -521,9 +521,7 @@ def print_benchmark_results(
                         color = Colors.YELLOW
                         symbol = "≈"
 
-                    print(
-                        f"  Baseline: {colorize(f'{symbol} {percent_change:+.1f}%', color)}"
-                    )
+                    print(f"  Baseline: {colorize(f'{symbol} {percent_change:+.1f}%', color)}")
 
     # Summary comparisons
     print(colorize("\n\nPERFORMANCE SUMMARY", Colors.BOLD))
@@ -559,12 +557,8 @@ def print_benchmark_results(
 
     print("\n" + "=" * 80)
     print(colorize("Conclusion:", Colors.BOLD))
-    print(
-        "Decimal arithmetic is ~10-15x slower than float, but provides exact precision."
-    )
-    print(
-        "For financial calculations, correctness is more important than performance."
-    )
+    print("Decimal arithmetic is ~10-15x slower than float, but provides exact precision.")
+    print("For financial calculations, correctness is more important than performance.")
     print("=" * 80 + "\n")
 
 
@@ -583,9 +577,7 @@ def save_results(
     """
     output = {}
     for category, category_results in results.items():
-        output[category] = {
-            name: result.to_dict() for name, result in category_results.items()
-        }
+        output[category] = {name: result.to_dict() for name, result in category_results.items()}
 
     with open(filepath, "w") as f:
         json.dump(output, f, indent=2)
@@ -606,7 +598,7 @@ def load_baseline(filepath: Path) -> dict:
     dict
         Baseline results
     """
-    with open(filepath, "r") as f:
+    with open(filepath) as f:
         return json.load(f)
 
 

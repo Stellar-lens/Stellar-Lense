@@ -80,7 +80,7 @@ def _format_args(args: ast.arguments) -> str:
     n_pos = len(args.posonlyargs) + len(args.args)
     defaults = [None] * (n_pos - len(args.defaults)) + list(args.defaults)
     pos_args = args.posonlyargs + args.args
-    for arg, default in zip(pos_args, defaults):
+    for arg, default in zip(pos_args, defaults, strict=False):
         parts.append(fmt(arg, default))
         if args.posonlyargs and arg is args.posonlyargs[-1]:
             parts.append("/")
@@ -90,7 +90,7 @@ def _format_args(args: ast.arguments) -> str:
     elif args.kwonlyargs:
         parts.append("*")
 
-    for arg, default in zip(args.kwonlyargs, args.kw_defaults):
+    for arg, default in zip(args.kwonlyargs, args.kw_defaults, strict=False):
         parts.append(fmt(arg, default))
 
     if args.kwarg:
@@ -101,7 +101,10 @@ def _format_args(args: ast.arguments) -> str:
 
 def _find_top_level_def(tree: ast.Module, name: str) -> ast.AST | None:
     for node in tree.body:
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and node.name == name:
+        if (
+            isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+            and node.name == name
+        ):
             return node
     return None
 
@@ -167,13 +170,18 @@ def extract_public_api(package: str) -> dict[str, dict]:
             dotted, original = imports[name]
             target_file = _module_file(dotted)
             if target_file is not None:
-                target_tree = ast.parse(target_file.read_text(encoding="utf-8"), filename=str(target_file))
+                target_tree = ast.parse(
+                    target_file.read_text(encoding="utf-8"), filename=str(target_file)
+                )
                 target_def = _find_top_level_def(target_tree, original)
                 if target_def is not None:
                     result[name] = _describe_symbol(target_def)
                     continue
 
-        result[name] = {"kind": "unresolved", "signature": "<could not statically resolve definition>"}
+        result[name] = {
+            "kind": "unresolved",
+            "signature": "<could not statically resolve definition>",
+        }
 
     return result
 

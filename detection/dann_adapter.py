@@ -47,10 +47,7 @@ _NON_FEATURE = {_LABEL_COL, "domain", "wallet_id", "pair_id", "timestamp"}
 
 
 def _feature_cols(df: pd.DataFrame) -> list[str]:
-    return [
-        c for c in df.columns
-        if c not in _NON_FEATURE and pd.api.types.is_numeric_dtype(df[c])
-    ]
+    return [c for c in df.columns if c not in _NON_FEATURE and pd.api.types.is_numeric_dtype(df[c])]
 
 
 def _load_and_tag(synthetic_path: str, real_path: str) -> pd.DataFrame:
@@ -140,9 +137,7 @@ def train_dann_adapter(
             else:
                 label_loss = torch.tensor(0.0, device=_device)
 
-            domain_loss = F.binary_cross_entropy_with_logits(
-                domain_logits.squeeze(-1), d_b
-            )
+            domain_loss = F.binary_cross_entropy_with_logits(domain_logits.squeeze(-1), d_b)
             loss = label_loss + 0.5 * domain_loss
             optimiser.zero_grad()
             loss.backward()
@@ -153,7 +148,10 @@ def train_dann_adapter(
         if (epoch + 1) % 10 == 0 or epoch == epochs - 1:
             logger.info(
                 "DANN adapter epoch %d/%d  lambda=%.3f  domain_loss=%.4f",
-                epoch + 1, epochs, lam, epoch_d_loss / max(n_batches, 1),
+                epoch + 1,
+                epochs,
+                lam,
+                epoch_d_loss / max(n_batches, 1),
             )
 
     auc = _auc_roc(model, test_loader, _device)
