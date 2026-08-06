@@ -24,7 +24,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
-          pip install ruff black nbconvert nbformat jupyter-client ipykernel
+          pip install ruff black nbconvert nbformat jupyter-client ipykernel pytest-xdist
 
       - name: Lint
         if: matrix.python-version == '3.12'
@@ -171,8 +171,11 @@ jobs:
         run: python scripts/check_cli_contracts.py
 
       - name: Test
-        run: pytest -q --junitxml=reports/ci/junit_results.xml
-        continue-on-error: true
+        # Live integration coverage has its own testnet workflow; PPO training
+        # is intentionally kept out of the per-push feedback loop.
+        run: >-
+          pytest -q -n 2 --dist loadscope --timeout=120 -m "not integration and not slow"
+          --junitxml=reports/ci/junit_results.xml
 
       - name: Triage build failures (Issue #539)
         if: always()
@@ -357,7 +360,10 @@ jobs:
   mutation-test:
     name: Mutation Testing (≥80% score)
     runs-on: ubuntu-latest
-    # Run mutation testing only on Python 3.11 to keep CI time under 15 minutes.
+    timeout-minutes: 15
+    # Run mutation testing only on Python 3.11 and the Benford scoring core.
+    # Feature/model paths have much heavier fixtures and are covered by the
+    # normal test matrix; mutating all three made this gate run indefinitely.
     # It runs in parallel with the test matrix so it does not block PR feedback.
     steps:
       - uses: actions/checkout@v4
@@ -372,17 +378,15 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Run mutation tests on core scoring path
-        # --paths-to-mutate limits scope to the three core modules so the job
-        # completes in < 15 minutes. Mutmut restores every mutant after testing,
+        # Keep each mutant paired with the tests that exercise this module.
+        # Mutmut restores every mutant after testing,
         # so no mutated code is ever persisted to disk or the workspace.
         run: |
-          mutmut run \
-            --paths-to-mutate "detection/benford_engine.py,detection/feature_engineering.py,detection/model_inference.py" \
+          timeout 10m mutmut run \
+            --paths-to-mutate "detection/benford_engine.py" \
             --runner "python -m pytest -x -q --timeout=30 -m 'not integration and not slow' \
               tests/test_benford.py \
-              tests/test_benford_ci.py \
-              tests/test_feature_engineering.py \
-              tests/test_model_inference.py" \
+              tests/test_benford_ci.py" \
             --no-progress || true
 
       - name: Print mutation results summary
