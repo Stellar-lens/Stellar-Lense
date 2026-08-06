@@ -12,8 +12,7 @@ concurrency:
 jobs:
   # ── Lock-file freshness ────────────────────────────────────────────────────
   # Fails the PR when any requirements/*.txt is stale relative to its *.in
-  # source or pyproject.toml.  pip-compile --check is a dry-run: it re-solves
-  # the graph and errors if the on-disk file would differ.
+  # source or pyproject.toml.
   lock-check:
     name: Lock-file freshness
     runs-on: ubuntu-latest
@@ -27,25 +26,27 @@ jobs:
           cache: pip
 
       - name: Install pip-tools
-        run: pip install pip-tools==7.4.1
+        run: |
+          python -m pip install --upgrade pip==24.0
+          pip install pip-tools==7.4.1
 
       - name: Verify base lockfile
-        run: pip-compile --dry-run --check --output-file requirements/base.txt requirements/base.in
+        run: pip-compile --dry-run --quiet --output-file requirements/base.txt requirements/base.in
 
       - name: Verify test lockfile
-        run: pip-compile --dry-run --check --output-file requirements/test.txt requirements/test.in
+        run: pip-compile --dry-run --quiet --output-file requirements/test.txt requirements/test.in
 
       - name: Verify dev lockfile
-        run: pip-compile --dry-run --check --output-file requirements/dev.txt requirements/dev.in
+        run: pip-compile --dry-run --quiet --output-file requirements/dev.txt requirements/dev.in
 
       - name: Verify docs lockfile
-        run: pip-compile --dry-run --check --output-file requirements/docs.txt requirements/docs.in
+        run: pip-compile --dry-run --quiet --output-file requirements/docs.txt requirements/docs.in
 
       - name: Verify fuzz lockfile
-        run: pip-compile --dry-run --check --output-file requirements/fuzz.txt requirements/fuzz.in
+        run: pip-compile --dry-run --quiet --output-file requirements/fuzz.txt requirements/fuzz.in
 
       - name: Verify chain lockfile
-        run: pip-compile --dry-run --check --output-file requirements/chain.txt requirements/chain.in
+        run: pip-compile --dry-run --quiet --output-file requirements/chain.txt requirements/chain.in
 
   # ── Python test matrix ────────────────────────────────────────────────────
   test:

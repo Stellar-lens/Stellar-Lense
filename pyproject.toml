@@ -110,7 +110,7 @@ test = [
 docs = [
     "mkdocs-material>=9.5.0,<10.0",
     "mkdocstrings[python]>=0.25.0,<1.0",
-    "griffe>=0.45.0,<1.0",
+    "griffe>=1.0.0,<3.0",
 ]
 
 # ── fuzz: Atheris coverage-guided fuzzing harnesses ───────────────────────────

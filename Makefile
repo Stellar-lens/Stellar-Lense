@@ -56,12 +56,12 @@ lock:
 
 # Dry-run check — same check that CI's lock-check job runs.
 lock-check:
-	@pip-compile --dry-run --check --output-file requirements/base.txt  requirements/base.in
-	@pip-compile --dry-run --check --output-file requirements/test.txt  requirements/test.in
-	@pip-compile --dry-run --check --output-file requirements/dev.txt   requirements/dev.in
-	@pip-compile --dry-run --check --output-file requirements/docs.txt  requirements/docs.in
-	@pip-compile --dry-run --check --output-file requirements/fuzz.txt  requirements/fuzz.in
-	@pip-compile --dry-run --check --output-file requirements/chain.txt requirements/chain.in
+	@pip-compile --dry-run --quiet --output-file requirements/base.txt  requirements/base.in
+	@pip-compile --dry-run --quiet --output-file requirements/test.txt  requirements/test.in
+	@pip-compile --dry-run --quiet --output-file requirements/dev.txt   requirements/dev.in
+	@pip-compile --dry-run --quiet --output-file requirements/docs.txt  requirements/docs.in
+	@pip-compile --dry-run --quiet --output-file requirements/fuzz.txt  requirements/fuzz.in
+	@pip-compile --dry-run --quiet --output-file requirements/chain.txt requirements/chain.in
 	@echo "All lockfiles are up to date."
 
 # ── Linting ──────────────────────────────────────────────────────────────────

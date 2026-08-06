@@ -533,13 +533,13 @@ def get_case_stats(db_path: str | None = None) -> dict:
 
     Returns:
         dict with keys:
-        - avg_time_to_claim_seconds: float | None — average seconds between
-          queue appearance and first claim
-        - avg_time_to_resolution_seconds: float | None — average seconds
-          between claim and resolution (verdict submitted)
-        - assigned_count: int — wallets currently assigned (active claims)
-        - unassigned_count: int — wallets in the queue with no active claim
-        - expired_reclaimed_count: int — locks released due to expiry
+            avg_time_to_claim_seconds: average seconds between queue
+                appearance and first claim, or None.
+            avg_time_to_resolution_seconds: average seconds between claim
+                and resolution, or None.
+            assigned_count: wallets currently assigned to an active claim.
+            unassigned_count: queued wallets with no active claim.
+            expired_reclaimed_count: locks released due to expiry.
     """
     init_db(db_path)
     now = datetime.now(timezone.utc)

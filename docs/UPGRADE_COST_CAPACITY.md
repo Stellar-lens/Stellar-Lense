@@ -426,7 +426,7 @@ If you encounter issues:
 
 3. **Review documentation:**
    - [docs/cost_and_capacity.md](cost_and_capacity.md) — Comprehensive guide
-   - [monitoring/README.md](../monitoring/README.md) — Quick reference
+   - [monitoring/README.md](https://github.com/Ledger-Lenz/Ledgerlens-core/blob/main/monitoring/README.md) — Quick reference
 
 4. **File an issue:**
    - Include: error logs, Prometheus version, Kubernetes version

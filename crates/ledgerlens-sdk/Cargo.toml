@@ -30,5 +30,10 @@ default = ["async"]
 async = ["tokio"]
 zk-verify = ["ark-bn254", "ark-ec", "ark-serialize", "ark-ff", "sha2", "num-bigint"]
 
+[[example]]
+name = "soroban_integration"
+path = "examples/soroban_integration.rs"
+required-features = ["zk-verify"]
+
 [package.metadata.docs.rs]
 features = ["async", "zk-verify"]

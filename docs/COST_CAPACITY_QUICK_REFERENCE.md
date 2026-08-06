@@ -149,7 +149,7 @@ ROI = (revenue_per_wallet - cost_per_wallet_scored) / cost_per_wallet_scored × 
 
 - **Full guide:** [docs/cost_and_capacity.md](cost_and_capacity.md)
 - **Upgrade guide:** [docs/UPGRADE_COST_CAPACITY.md](UPGRADE_COST_CAPACITY.md)
-- **Monitoring README:** [monitoring/README.md](../monitoring/README.md)
+- **Monitoring README:** [monitoring/README.md](https://github.com/Ledger-Lenz/Ledgerlens-core/blob/main/monitoring/README.md)
 - **Observability:** [docs/observability.md](observability.md)
 
 ---
