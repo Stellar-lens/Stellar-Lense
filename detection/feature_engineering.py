@@ -1454,7 +1454,9 @@ def build_feature_matrix(
         all_pairs_df = trades_df
     elif "amount" in all_pairs_df:
         all_pairs_df = all_pairs_df.copy()
-        all_pairs_df["amount"] = pd.to_numeric(all_pairs_df["amount"], errors="coerce").astype(float)
+        all_pairs_df["amount"] = pd.to_numeric(all_pairs_df["amount"], errors="coerce").astype(
+            float
+        )
 
     if funding_graph is not None and community_map is None:
         community_map = detect_wash_trading_rings(funding_graph)
