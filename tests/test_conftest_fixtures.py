@@ -8,9 +8,7 @@ mechanism.
 
 from __future__ import annotations
 
-import sys
 
-import pytest
 
 
 # ---------------------------------------------------------------------------
@@ -64,7 +62,6 @@ def test_test_file_name_returns_basename_only():
 
 def test_test_file_name_fallback_uses_pathlib():
     """_test_file_name fallback (fspath) must still return basename only."""
-    from pathlib import Path
 
     from conftest import _test_file_name  # noqa: PLC0415
 

@@ -4,7 +4,6 @@ import pytest
 
 from detection.counterfactual_constraints import (
     FEATURE_CONSTRAINTS,
-    FeatureConstraint,
     _immutable,
     _decreasable,
     _increasable,

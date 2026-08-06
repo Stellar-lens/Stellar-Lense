@@ -2,8 +2,7 @@
 
 import json
 import math
-from datetime import datetime, timedelta, timezone
-from unittest.mock import patch
+from datetime import datetime, timezone
 
 import pytest
 

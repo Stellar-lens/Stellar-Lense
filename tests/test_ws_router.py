@@ -192,7 +192,8 @@ class TestHeartbeat:
         assert id(mock_ws) not in manager._connections
 
     async def test_heartbeat_drops_stale_connection(self, manager):
-        import asyncio, time
+        import asyncio
+        import time
         mock_ws = AsyncMock()
         mock_ws.accept = AsyncMock()
         mock_ws.close = AsyncMock()

@@ -12,7 +12,6 @@ Stability notes
 """
 
 import json
-import os
 
 import pytest
 

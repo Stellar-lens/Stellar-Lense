@@ -15,9 +15,7 @@ Covers:
 from __future__ import annotations
 
 import sqlite3
-from contextlib import contextmanager
 from datetime import datetime, timezone
-from unittest.mock import patch
 
 import pytest
 from fastapi import FastAPI
@@ -514,7 +512,7 @@ def test_correlation_id_in_response(app, canonical_api_key, db_path):
 
 def test_gateway_key_created_via_legacy_router_works_after_migration(app, db_path):
     """A key created with the old api_keys_router schema works after migrate_legacy_api_keys."""
-    from detection.api_key_store import migrate_legacy_api_keys, _init_table, _connect
+    from detection.api_key_store import migrate_legacy_api_keys, _connect
     import hashlib
 
     # Simulate a legacy key using the api_keys_router schema (SHA-256 hash field)

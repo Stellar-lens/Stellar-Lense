@@ -318,12 +318,7 @@ class TestSigningIntegration:
         pre-populate the key; monkeypatch clears it for the duration of
         this single test without leaking global state.
         """
-        import config.settings as settings_module
 
-        Uses ``monkeypatch.setattr`` on the property so the original value
-        is automatically restored after the test — no more try/finally
-        or ``object.__setattr__`` global-state coupling.
-        """
         model_dir = str(tmp_path)
         save_versioned_model(dummy_model, "rf", "v001", model_dir)
         monkeypatch.setattr(settings_module.settings, "model_signing_key", "")

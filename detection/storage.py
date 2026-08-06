@@ -28,6 +28,7 @@ import pandas as pd
 
 if TYPE_CHECKING:
     from detection.feature_store import WalletFeatureState
+    from detection.path_payment_engine import PathPaymentCycle
     from detection.sandwich_engine import SandwichCandidate
 
 from config.settings import settings

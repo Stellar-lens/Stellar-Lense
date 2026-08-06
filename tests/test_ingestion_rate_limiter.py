@@ -214,6 +214,7 @@ def test_adaptive_tick_restores_rate_after_window():
     ctrl = AdaptiveRateController(tb, configured_rate=10.0, restore_seconds=60.0)
     ctrl.on_429()
     reduced_rate = tb.current_rate
+    assert reduced_rate < 10.0
 
     # Simulate restore_seconds having elapsed by back-dating last_429_at.
     ctrl._last_429_at = time.monotonic() - 61.0

@@ -158,7 +158,6 @@ def test_v1_health_closed_circuit_is_ok(client_with_models, monkeypatch):
 def test_v1_health_returns_503_when_model_files_missing(client, tmp_path, monkeypatch):
     """When model files are absent, /v1/health returns 503 with models field."""
     import config.settings as settings_module
-    from detection.model_inference import _MODEL_FILENAMES
 
     # Point model_dir at an empty directory (no files)
     empty_model_dir = tmp_path / "empty_models"

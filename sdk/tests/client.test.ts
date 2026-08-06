@@ -64,6 +64,23 @@ describe("LedgerLensClient", () => {
     });
 
     it("strips unknown fields from response", async () => {
+      const raw = {
+        wallet: "GABCDEF1234567890123456789012345678901234567890123456",
+        asset_pair: "XLM/USDC",
+        score: 50,
+        benford_flag: false,
+        ml_flag: false,
+        confidence: 75,
+        disputed: false,
+        timestamp: "2025-06-25T12:00:00Z",
+        unknown_field: "should be stripped",
+      };
+      mockFetch(200, [raw]);
+
+      const result = await client.getScores();
+      expect(result[0]).not.toHaveProperty("unknown_field");
+    });
+  });
 
   describe("getScore", () => {
     it("returns a single risk score", async () => {
@@ -186,7 +203,6 @@ describe("LedgerLensClient", () => {
       expect(() => RiskScoreSchema.parse(raw)).toThrow();
     });
   });
-});
 
 
   describe("getRings", () => {
@@ -234,21 +250,4 @@ describe("LedgerLensClient", () => {
       await expect(client.getHealth()).rejects.toThrow("Network error");
     });
   });
-
-      const raw = {
-        wallet: "GABCDEF1234567890123456789012345678901234567890123456",
-        asset_pair: "XLM/USDC",
-        score: 50,
-        benford_flag: false,
-        ml_flag: false,
-        confidence: 75,
-        disputed: false,
-        timestamp: "2025-06-25T12:00:00Z",
-        unknown_field: "should be stripped",
-      };
-      mockFetch(200, [raw]);
-
-      const result = await client.getScores();
-      expect(result[0]).not.toHaveProperty("unknown_field");
-    });
-  });
+});

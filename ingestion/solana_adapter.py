@@ -25,11 +25,14 @@ import math
 import os
 import struct
 from datetime import datetime, timezone
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import httpx
 
 from ingestion.data_models import Asset, Trade, TradeType
+
+if TYPE_CHECKING:
+    from ingestion.dedup import IdempotencyKeyStore
 
 logger = logging.getLogger("ledgerlens.solana_adapter")
 
@@ -112,14 +115,29 @@ def _is_dex_transaction(tx: dict) -> bool:
 def _extract_spl_token_changes(
     tx: dict,
 ) -> list[tuple[str, str, float]]:
-    """Return ``(owner_pubkey, mint, amount_change)`` for each SPL balance change.
+    """Return ``(owner_pubkey, mint, amount_change)`` for each SPL balance change."""
 
-    pre_map: dict[tuple[int, str], float] = {}
+    meta = tx.get("meta") or {}
+    pre = meta.get("preTokenBalances") or []
+    post = meta.get("postTokenBalances") or []
+
+    def _amount(balance: dict) -> float:
+        try:
+            return float(balance.get("uiTokenAmount", {}).get("uiAmount") or 0)
+        except (TypeError, ValueError):
+            return 0.0
+
+    pre_map: dict[tuple[int, str], dict] = {}
     for b in pre:
         idx = b.get("accountIndex", -1)
         mint = b.get("mint", "")
-        amt = float(b.get("uiTokenAmount", {}).get("uiAmount") or 0)
-        pre_map[(idx, mint)] = amt
+        pre_map[(idx, mint)] = b
+
+    post_map: dict[tuple[int, str], dict] = {}
+    for b in post:
+        idx = b.get("accountIndex", -1)
+        mint = b.get("mint", "")
+        post_map[(idx, mint)] = b
 
     changes: list[tuple[str, str, float]] = []
     for key in sorted(pre_map.keys() | post_map.keys()):
@@ -226,10 +244,12 @@ class SolanaAdapter:
         dedup_store: IdempotencyKeyStore | None = None,
     ) -> None:
         from config.settings import settings
+
         # Imported at runtime inside __init__ to avoid a circular import at
         # module load time between ingestion.solana_adapter and ingestion.dedup.
         from ingestion.dedup import IdempotencyKeyStore
 
+        self.rpc_url = rpc_url
         self.dedup_store = dedup_store or (
             IdempotencyKeyStore(
                 db_path=settings.db_path,

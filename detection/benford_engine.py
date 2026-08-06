@@ -575,20 +575,20 @@ class BenfordResult:
     asset_pair: str
     chi_square: float = 0.0
     mad: float = 0.0
-    z_scores: Dict[int, float] = field(default_factory=dict)
-    flagged_digits: List[int] = field(default_factory=list)
+    z_scores: dict[int, float] = field(default_factory=dict)
+    flagged_digits: list[int] = field(default_factory=list)
     benford_flag: bool = False
     sample_size: int = 0
     valid: bool = True
     reason: str = ""
-    observed_distribution: Dict[int, float] = field(default_factory=dict)
+    observed_distribution: dict[int, float] = field(default_factory=dict)
 
 
 @dataclass
 class StratifiedBenfordSummary:
     """Aggregated summary across all per-stratum Benford results."""
 
-    stratum_results: Dict[str, BenfordResult] = field(default_factory=dict)
+    stratum_results: dict[str, BenfordResult] = field(default_factory=dict)
     max_stratum_chi2: float = 0.0
     max_stratum_MAD: float = 0.0
     mean_stratum_MAD: float = 0.0

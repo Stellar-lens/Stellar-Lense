@@ -64,6 +64,32 @@ export interface LedgerLensClientOptions {
 // ---------------------------------------------------------------------------
 
 async function parseResponse<T>(
+  response: Response,
+  schema: z.ZodType<T, z.ZodTypeDef, unknown>,
+  context: string,
+): Promise<T> {
+  if (!response.ok) {
+    let detail = `HTTP ${response.status}`;
+    try {
+      const body = await response.json();
+      const parsed = ApiErrorSchema.safeParse(body);
+      if (parsed.success) detail = parsed.data.detail;
+    } catch {
+      // Ignore malformed error bodies and retain the HTTP status message.
+    }
+    throw new LedgerLensError(detail, response.status);
+  }
+
+  const result = schema.safeParse(await response.json());
+  if (!result.success) {
+    throw new LedgerLensError(
+      `Response validation failed for ${context}`,
+      response.status,
+      result.error.issues,
+    );
+  }
+  return result.data;
+}
 
 // ---------------------------------------------------------------------------
 // Client
@@ -132,6 +158,33 @@ export class LedgerLensClient {
   }
 
   async getScore(wallet: string): Promise<RiskScore> {
+    const res = await this._fetch(`/score/${encodeURIComponent(wallet)}`);
+    return parseResponse(res, RiskScoreSchema, `getScore(${wallet})`);
+  }
+
+  async getAlerts(
+    params?: {
+      alert_type?: string;
+      wallet?: string;
+      limit?: number;
+      offset?: number;
+    },
+  ): Promise<Alert[]> {
+    const qs = this._buildQuery(params);
+    const res = await this._fetch(`/alerts${qs}`);
+    return parseResponse(res, z.array(AlertSchema), "getAlerts");
+  }
+
+  async getLiquidityPoolTrades(wallet: string): Promise<LiquidityPoolTrade[]> {
+    const res = await this._fetch(
+      `/liquidity-pool-trades/${encodeURIComponent(wallet)}`,
+    );
+    return parseResponse(
+      res,
+      z.array(LiquidityPoolTradeSchema),
+      "getLiquidityPoolTrades",
+    );
+  }
 
   // -----------------------------------------------------------------------
   // Asset risk rankings
@@ -242,73 +295,4 @@ export class LedgerLensClient {
     const str = qs.toString();
     return str ? `?${str}` : "";
   }
-}
-
-    const res = await this._fetch(`/score/${encodeURIComponent(wallet)}`);
-    return parseResponse(res, RiskScoreSchema, `getScore(${wallet})`);
-  }
-
-  // -----------------------------------------------------------------------
-  // Alerts
-  // -----------------------------------------------------------------------
-
-  async getAlerts(
-    params?: {
-      alert_type?: string;
-      wallet?: string;
-      limit?: number;
-      offset?: number;
-    },
-  ): Promise<Alert[]> {
-    const qs = this._buildQuery(params);
-    const res = await this._fetch(`/alerts${qs}`);
-    return parseResponse(res, z.array(AlertSchema), "getAlerts");
-  }
-
-  // -----------------------------------------------------------------------
-  // Liquidity pool trades
-  // -----------------------------------------------------------------------
-
-  async getLiquidityPoolTrades(wallet: string): Promise<LiquidityPoolTrade[]> {
-    const res = await this._fetch(
-      `/liquidity-pool-trades/${encodeURIComponent(wallet)}`,
-    );
-    return parseResponse(
-      res,
-      z.array(LiquidityPoolTradeSchema),
-      "getLiquidityPoolTrades",
-    );
-  }
-}
-
-  response: Response,
-  schema: z.ZodType<T>,
-  context: string,
-): Promise<T> {
-  if (!response.ok) {
-    let detail = `HTTP ${response.status}`;
-    try {
-      const body = await response.json();
-      const parsed = ApiErrorSchema.safeParse(body);
-      if (parsed.success) {
-        detail = parsed.data.detail;
-      }
-    } catch {
-      // ignore
-    }
-    throw new LedgerLensError(detail, response.status);
-  }
-
-  const json: unknown = await response.json();
-  const result = schema.safeParse(json);
-
-  if (!result.success) {
-    throw new LedgerLensError(
-      `Response validation failed for ${context}`,
-      response.status,
-      result.error.issues,
-    );
-  }
-
-  return result.data;
 }

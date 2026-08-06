@@ -32,9 +32,13 @@ import dataclasses
 import json
 import uuid
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
+if TYPE_CHECKING:
+    from api.streaming import ScoreUpdateEvent
 
 
 # ---------------------------------------------------------------------------

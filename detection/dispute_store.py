@@ -237,6 +237,10 @@ def cast_vote(dispute_id: str, voter_key_hash: str, vote: str) -> ScoreDispute:
                             tx_hash = publisher.submit_score(zero_score)
                             if tx_hash:
                                 _update_override_status(override_id, "submitted", tx_hash)
+                        except SorobanCircuitOpenError:
+                            _update_override_status(override_id, "failed")
+                        except Exception:
+                            _update_override_status(override_id, "failed")
                     except Exception:
                         pass
 

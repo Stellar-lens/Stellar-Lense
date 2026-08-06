@@ -28,6 +28,17 @@ export const RiskScoreSchema = z.object({
   asset_pair: z.string(),
   score: z.number().int().min(0).max(100),
   benford_flag: z.boolean(),
+  ml_flag: z.boolean(),
+  confidence: z.number().int().min(0).max(100),
+  disputed: z.boolean().default(false),
+  timestamp: z.string().datetime(),
+  score_lower: z.number().min(0).max(100).nullable().optional(),
+  score_upper: z.number().min(0).max(100).nullable().optional(),
+  prediction_set: z.array(z.number().int()).nullable().optional(),
+  coverage_guarantee: z.number().min(0).max(1).nullable().optional(),
+});
+
+export type RiskScore = z.infer<typeof RiskScoreSchema>;
 
 // ---------------------------------------------------------------------------
 // Alert types
@@ -40,6 +51,8 @@ export const AlertTypeSchema = z.enum([
   "SANDWICH_ATTACK",
   "PATH_PAYMENT_CYCLE",
 ]);
+
+export type AlertType = z.infer<typeof AlertTypeSchema>;
 
 export const AlertSchema = z.object({
   id: z.number().int(),
@@ -80,8 +93,6 @@ export const AssetRiskRankingSchema = z.object({
 });
 
 export type AssetRiskRanking = z.infer<typeof AssetRiskRankingSchema>;
-
-  ml_flag: z.boolean(),
 
 // ---------------------------------------------------------------------------
 // Wash-trading ring
@@ -135,6 +146,11 @@ export const WebhookSubscriberSchema = z.object({
   event_types: z.array(z.string()),
   active: z.boolean(),
   created_at: z.string().datetime(),
+});
+
+export type WebhookSubscriber = z.infer<typeof WebhookSubscriberSchema>;
+export type Counterfactual = z.infer<typeof CounterfactualSchema>;
+export type Ring = z.infer<typeof RingSchema>;
 
 // ---------------------------------------------------------------------------
 // Health, pagination, error
@@ -160,24 +176,3 @@ export const ApiErrorSchema = z.object({
 });
 
 export type ApiError = z.infer<typeof ApiErrorSchema>;
-
-});
-
-export type WebhookSubscriber = z.infer<typeof WebhookSubscriberSchema>;
-
-export type Counterfactual = z.infer<typeof CounterfactualSchema>;
-
-
-export type Ring = z.infer<typeof RingSchema>;
-
-  confidence: z.number().int().min(0).max(100),
-  disputed: z.boolean().default(false),
-  timestamp: z.string().datetime(),
-  // Conformal prediction uncertainty fields (optional, v2+)
-  score_lower: z.number().min(0).max(100).nullable().optional(),
-  score_upper: z.number().min(0).max(100).nullable().optional(),
-  prediction_set: z.array(z.number().int()).nullable().optional(),
-  coverage_guarantee: z.number().min(0).max(1).nullable().optional(),
-});
-
-export type RiskScore = z.infer<typeof RiskScoreSchema>;

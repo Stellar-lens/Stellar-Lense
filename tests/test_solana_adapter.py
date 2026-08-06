@@ -846,7 +846,6 @@ def test_extract_spl_token_changes_no_dead_variable():
 def test_extract_stellar_address_from_vaa_unknown_version():
     """VAA data whose version byte != 1 must be silently skipped."""
     import base64
-    import struct
 
     # Build a minimal fake VAA with version byte = 2 (unknown).
     WORMHOLE_CORE_PROG = "worm2ZoG2kUd4vFXhvjh93UUH596ayRfgQ2MgjNMTth"
