@@ -215,9 +215,12 @@ def test_benford_monotonicity_adding_conforming_trades(amounts_list):
     if len(amounts_list) < 5:
         return  # Skip small datasets
 
-    # Generate Benford-conforming trades using the factory
-    clean_trades = make_clean_trades(n=100)
-    conforming_amounts = [t["base_amount"] for t in clean_trades]
+    # Add a deterministic Benford-shaped sample. Using the random clean-trade
+    # factory inside a Hypothesis property makes the assertion flaky because a
+    # small random sample can itself deviate from Benford's distribution.
+    conforming_amounts = []
+    for digit, probability in BENFORD_EXPECTED.items():
+        conforming_amounts.extend([float(digit)] * round(probability * 50))
 
     amounts = pd.Series(amounts_list[:100])  # Limit to reasonable size
     chi_initial = chi_square_statistic(amounts)

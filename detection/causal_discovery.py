@@ -325,8 +325,28 @@ class WashTradeCausalDiscovery:
         dag = discoverer.fit(df, alpha=0.05, priors=priors)
     """
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        max_condition_set_size: int | None = 2,
+        max_direct_causes: int | None = 5,
+    ) -> None:
+        """Create a PC-based causal discoverer.
+
+        Args:
+            max_condition_set_size: Maximum conditioning-set size passed to
+                causal-learn's PC implementation. The default keeps discovery
+                tractable for LedgerLens' wide generated feature tables while
+                still allowing first- and second-order conditional
+                independence checks. Use ``None`` for causal-learn's unbounded
+                search.
+            max_direct_causes: Optional cap for direct neighbors of the
+                ``label`` node. When PC returns many label-adjacent proxy
+                features, the strongest associations are retained to keep the
+                resulting causal feature set reviewable.
+        """
         self.dag = nx.DiGraph()
+        self.max_condition_set_size = max_condition_set_size
+        self.max_direct_causes = max_direct_causes
 
     def fit(
         self,
@@ -358,6 +378,14 @@ class WashTradeCausalDiscovery:
         ]
         df_filtered = feature_df[numeric_cols].dropna()
 
+        # Fisher-Z conditional-independence tests require non-zero variance.
+        # Constant columns create NaN correlations and make causal-learn spend
+        # time exploring edges that can never carry useful signal.
+        informative_cols = [
+            col for col in df_filtered.columns if df_filtered[col].nunique(dropna=True) > 1
+        ]
+        df_filtered = df_filtered[informative_cols]
+
         # Validate prior variables against the feature set before running PC
         if priors is not None:
             priors.validate(df_filtered.columns.tolist())
@@ -368,9 +396,12 @@ class WashTradeCausalDiscovery:
             alpha=alpha,
             indep_test=fisherz,
             node_names=list(df_filtered.columns),
+            max_k=self.max_condition_set_size,
+            show_progress=False,
         )
 
         self.dag = self._to_networkx(cg.G)
+        self._prune_label_edges(df_filtered)
 
         # Apply domain-expert prior constraints (Issue #192)
         if priors is not None:
@@ -379,6 +410,50 @@ class WashTradeCausalDiscovery:
             self.dag = priors.apply(self.dag)
 
         return self.dag
+
+    def _prune_label_edges(self, df: pd.DataFrame, label_name: str = "label") -> None:
+        """Keep only the strongest direct label causes when PC over-connects.
+
+        Wide generated feature tables often contain many near-duplicate proxy
+        features for the label. PC can leave all of them adjacent to ``label``;
+        that is technically a valid skeleton but not a useful direct-cause set.
+        Ranking by absolute correlation provides a deterministic, local
+        pruning rule while leaving non-label causal structure untouched.
+        """
+        if (
+            self.max_direct_causes is None
+            or self.max_direct_causes < 0
+            or label_name not in self.dag
+            or label_name not in df
+        ):
+            return
+
+        direct = [
+            node
+            for node in self.dag.nodes
+            if node != label_name
+            and (self.dag.has_edge(node, label_name) or self.dag.has_edge(label_name, node))
+        ]
+        if len(direct) <= self.max_direct_causes:
+            return
+
+        label = df[label_name]
+        ranked = sorted(
+            direct,
+            key=lambda col: (
+                abs(float(df[col].corr(label))) if pd.notna(df[col].corr(label)) else 0.0
+            ),
+            reverse=True,
+        )
+        keep = set(ranked[: self.max_direct_causes])
+
+        for node in direct:
+            if node in keep:
+                continue
+            if self.dag.has_edge(node, label_name):
+                self.dag.remove_edge(node, label_name)
+            if self.dag.has_edge(label_name, node):
+                self.dag.remove_edge(label_name, node)
 
     def _to_networkx(self, cg_graph) -> nx.DiGraph:
         """Convert causal-learn GeneralGraph to networkx DiGraph."""
