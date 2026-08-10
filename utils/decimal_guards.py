@@ -260,6 +260,10 @@ def validate_stellar_amount(value: str | int | float | Decimal) -> Decimal:
         name="stellar_amount",
     )
 
+    if isinstance(value, float):
+        quantizer = Decimal(10) ** -STELLAR_PRECISION
+        decimal_value = decimal_value.quantize(quantizer, rounding=decimal.ROUND_HALF_EVEN)
+
     # Check decimal places
     if decimal_value.as_tuple().exponent < -STELLAR_PRECISION:
         raise AmountValidationError(

@@ -110,8 +110,8 @@ class TestSecondDigitBenfordAnalysis:
 
     def test_second_digit_distribution_uniform(self):
         """Uniform second digits should produce equal frequencies."""
-        # Create amounts with uniform second digits: 10, 20, 30, ..., 90, 101-110, etc.
-        amounts = pd.Series([float(10 * (i % 10) + 1) for i in range(1000)])
+        # Create amounts with uniform second digits: 101, 111, ..., 191.
+        amounts = pd.Series([float(100 + 10 * (i % 10) + 1) for i in range(1000)])
 
         dist = second_digit_distribution(amounts)
 

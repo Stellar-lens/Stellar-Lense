@@ -25,6 +25,7 @@ import networkx as nx
 
 from config import config
 from detection.feature_cache import FeatureCache
+from detection.model_inference import RiskScorer
 from streaming.feature_buffer import FeatureBuffer
 from utils.logging import get_logger
 
@@ -186,8 +187,6 @@ class StreamingScorer:
         funding_graph: nx.DiGraph | None = None,
         feature_cache: FeatureCache | None = None,
     ) -> None:
-        from detection.model_inference import RiskScorer
-
         self._risk_scorer = RiskScorer(model_dir=model_dir)
         self.min_trades: int = config.MIN_TRADES_FOR_SCORING
         self._gnn_encoder = gnn_encoder
