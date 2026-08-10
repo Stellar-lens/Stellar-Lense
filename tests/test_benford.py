@@ -4,11 +4,14 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
+import detection.benford_engine as benford_engine
 from detection.benford_engine import (
     BENFORD_EXPECTED,
     BENFORD_EXPECTED_2ND,
+    AssetClassifier,
     BenfordMetrics,
     chi_square_statistic,
+    get_asset_classifier,
     leading_digits,
     mad_score,
     observed_distribution,
@@ -51,6 +54,11 @@ def test_observed_distribution_sums_to_one():
     amounts = pd.Series(np.arange(1, 1000))
     dist = observed_distribution(amounts)
     assert abs(sum(dist.values()) - 1.0) < 1e-9
+
+
+def test_observed_distribution_empty_input_returns_zero_distribution():
+    dist = observed_distribution(pd.Series([0.0, -1.0, np.nan, "not-a-number"]))
+    assert dist == {digit: 0.0 for digit in range(1, 10)}
 
 
 def test_z_scores_nonnegative():
@@ -175,6 +183,101 @@ def test_unknown_asset_falls_back_to_theoretical_benford():
     clf = AssetClassifier()
     baseline = clf.get_baseline("MYSTERY")
     assert baseline == dict(BENFORD_EXPECTED)
+
+
+def test_asset_classifier_rejects_invalid_stablecoin_config(monkeypatch):
+    monkeypatch.setattr(benford_engine, "_load_build_config", lambda: {"stablecoins": "USDC"})
+
+    with pytest.raises(ValueError, match="stablecoins"):
+        AssetClassifier()
+
+
+def test_asset_classifier_loads_native_assets_and_static_stablecoin_baseline(monkeypatch):
+    stablecoin_distribution = {str(digit): value for digit, value in BENFORD_EXPECTED.items()}
+    monkeypatch.setattr(
+        benford_engine,
+        "_load_build_config",
+        lambda: {
+            "stablecoins": ["USDC"],
+            "native_assets": ["XLM", "AQUA"],
+            "asset_class_benford_baselines": {
+                "stablecoin": {"distribution": stablecoin_distribution}
+            },
+        },
+    )
+
+    clf = AssetClassifier()
+
+    assert clf.classify("USDC:GISSUER") == "stablecoin"
+    assert clf.classify("aqua") == "native"
+    assert clf.get_baseline("USDC") == dict(BENFORD_EXPECTED)
+
+
+def test_asset_classifier_default_native_asset_when_config_omits_native_assets(monkeypatch):
+    monkeypatch.setattr(benford_engine, "_load_build_config", lambda: {"stablecoins": []})
+
+    clf = AssetClassifier()
+
+    assert clf.classify("XLM") == "native"
+    assert clf.classify("BTC") == "volatile"
+
+
+def test_asset_classifier_pair_classification_branches(monkeypatch):
+    monkeypatch.setattr(
+        benford_engine,
+        "_load_build_config",
+        lambda: {"stablecoins": ["USDC"], "native_assets": ["XLM"]},
+    )
+    clf = AssetClassifier()
+
+    assert clf.classify_pair("USDC:GISSUER/BTC:GISSUER") == "stablecoin"
+    assert clf.classify_pair("XLM:native") == "native"
+    assert clf.classify_pair("BTC:GISSUER/XLM:native") == "volatile"
+    assert clf.classify_pair("/BTC:GISSUER/") == "volatile"
+
+
+def test_asset_classifier_fit_from_clean_trades_updates_empirical_baselines(monkeypatch):
+    monkeypatch.setattr(
+        benford_engine,
+        "_load_build_config",
+        lambda: {"stablecoins": ["USDC"], "native_assets": ["XLM"]},
+    )
+    clf = AssetClassifier()
+
+    labelled = pd.DataFrame(
+        {
+            "amount": [100.0] * 35 + [200.0] * 35 + [900.0] * 35 + [1.0] * 5,
+            "asset_code": ["USDC"] * 35 + ["XLM"] * 35 + ["BTC"] * 35 + ["USDC"] * 5,
+            "label": [0] * 105 + [1] * 5,
+        }
+    )
+    clf.fit_from_clean_trades(labelled)
+
+    assert clf.get_baseline("USDC")[1] == 1.0
+    assert clf.get_baseline("XLM")[2] == 1.0
+    assert clf.get_baseline("BTC")[9] == 1.0
+
+
+def test_asset_classifier_fit_from_clean_trades_noops_without_clean_or_asset_code(monkeypatch):
+    monkeypatch.setattr(benford_engine, "_load_build_config", lambda: {"stablecoins": ["USDC"]})
+    clf = AssetClassifier()
+
+    original = clf.get_baseline("USDC")
+    clf.fit_from_clean_trades(pd.DataFrame())
+    clf.fit_from_clean_trades(pd.DataFrame({"amount": [100.0] * 40, "label": [1] * 40}))
+    clf.fit_from_clean_trades(pd.DataFrame({"amount": [100.0] * 40, "label": [0] * 40}))
+
+    assert clf.get_baseline("USDC") == original
+
+
+def test_get_asset_classifier_returns_singleton(monkeypatch):
+    monkeypatch.setattr(benford_engine, "_classifier", None)
+    monkeypatch.setattr(benford_engine, "_load_build_config", lambda: {"stablecoins": []})
+
+    first = get_asset_classifier()
+    second = get_asset_classifier()
+
+    assert first is second
 
 
 def test_stablecoin_round_amounts_lower_chi_square_against_stablecoin_baseline():
