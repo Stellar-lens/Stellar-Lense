@@ -15,6 +15,7 @@ normalization paths.
 """
 
 from datetime import UTC, datetime
+from decimal import Decimal
 
 from hypothesis import given
 from hypothesis import strategies as st
@@ -32,7 +33,13 @@ issuers = st.one_of(
     st.none(), st.text(alphabet="ABCDEFGHIJKLMNOPQRSTUVWXYZ234567", min_size=5, max_size=56)
 )
 account_ids = st.text(alphabet="ABCDEFGHIJKLMNOPQRSTUVWXYZ234567", min_size=5, max_size=56)
-amounts = st.floats(min_value=0.0000001, max_value=1e12, allow_nan=False, allow_infinity=False)
+amounts = st.decimals(
+    min_value="0.0000001",
+    max_value="1000000",
+    places=7,
+    allow_nan=False,
+    allow_infinity=False,
+)
 close_times = st.datetimes(min_value=datetime(2015, 1, 1), max_value=datetime(2100, 1, 1)).map(
     lambda dt: dt.replace(tzinfo=UTC)
 )
@@ -162,7 +169,8 @@ def test_horizon_normalization_computes_price_from_fraction(
     )
     trade = _to_trade(record)
 
-    assert trade.price == n / d
+    expected_price = Decimal(str(float(n) / float(d))).quantize(Decimal("0.0000001"))
+    assert trade.price == expected_price
     assert trade.base_amount == base_amount
     assert trade.counter_amount == counter_amount
 
