@@ -6,6 +6,8 @@ from hypothesis import strategies as st
 
 from detection.benford_engine import (
     BENFORD_EXPECTED,
+    BENFORD_EXPECTED_2ND,
+    BenfordMetrics,
     chi_square_statistic,
     leading_digits,
     mad_score,
@@ -59,6 +61,55 @@ def test_z_scores_nonnegative():
 
 def test_benford_expected_sums_to_one():
     assert abs(sum(BENFORD_EXPECTED.values()) - 1.0) < 1e-9
+
+
+def test_second_digit_benford_expected_matches_reference_distribution():
+    """Lock the second-digit Benford reference table used by mutation CI."""
+    expected = {
+        0: 0.11968,
+        1: 0.11389,
+        2: 0.10882,
+        3: 0.10433,
+        4: 0.10031,
+        5: 0.09668,
+        6: 0.09337,
+        7: 0.09035,
+        8: 0.08757,
+        9: 0.08500,
+    }
+
+    assert BENFORD_EXPECTED_2ND == expected
+    assert abs(sum(BENFORD_EXPECTED_2ND.values()) - 1.0) < 1e-4
+    assert list(BENFORD_EXPECTED_2ND) == list(range(10))
+
+
+def test_benford_metrics_mapping_access_and_defaults():
+    metrics = BenfordMetrics(
+        chi_square=1.25,
+        mad=0.02,
+        mad_nonconforming=True,
+        z_scores={1: 0.5, 2: 3.0, 3: 1.5},
+        sample_size=42,
+    )
+
+    assert metrics["chi_square"] == 1.25
+    assert metrics["z_max"] == 3.0
+    assert metrics.get("mad") == 0.02
+    assert metrics.get("z_max") == 3.0
+    assert metrics.get("missing", "fallback") == "fallback"
+
+
+def test_benford_metrics_z_max_defaults_to_nan_for_empty_scores():
+    metrics = BenfordMetrics(
+        chi_square=0.0,
+        mad=0.0,
+        mad_nonconforming=False,
+        z_scores={},
+        sample_size=0,
+    )
+
+    assert np.isnan(metrics["z_max"])
+    assert np.isnan(metrics.get("z_max"))
 
 
 def test_minimum_sample_guard():
