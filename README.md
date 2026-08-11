@@ -571,7 +571,7 @@ align on approach.
 
 - GitHub Issues: [Create an issue](https://github.com/Ledger-Lenz/Ledgerlens-dashboard/issues)
 - Stellar Discord: Find us in `#builders`
-- Email: [victoruzoma874@gmail.com](mailto:victoruzoma874@gmail.com)
+- Email: okeijafiya@gmail.com
 
 ---
 
