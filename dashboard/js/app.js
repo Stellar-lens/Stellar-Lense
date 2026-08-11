@@ -147,14 +147,23 @@ async function loadAlerts(signal) {
   }
 }
 
+const assetsState = { data: [], filter: "" };
+
+function renderAssetsView() {
+  const term = assetsState.filter.toLowerCase();
+  const filtered = term
+    ? assetsState.data.filter((a) => a.asset_pair.toLowerCase().includes(term))
+    : assetsState.data;
+  renderAssets($("#asset-grid"), filtered);
+}
+
 async function loadAssets(signal) {
-  const grid = $("#asset-grid");
   try {
-    const data = await apiFetch("/assets/risk-ranking", { baseUrl: API_BASE, signal });
-    renderAssets(grid, data);
+    assetsState.data = await apiFetch("/assets/risk-ranking", { baseUrl: API_BASE, signal });
+    renderAssetsView();
   } catch (err) {
     if (isAbort(err)) return;
-    renderAssetsError(grid, err.message);
+    renderAssetsError($("#asset-grid"), err.message);
   }
 }
 
@@ -192,6 +201,11 @@ function init() {
   $("#alerts-filter").addEventListener("input", (e) => {
     alertsState.filter = e.target.value.trim();
     renderAlertsView();
+  });
+
+  $("#assets-filter").addEventListener("input", (e) => {
+    assetsState.filter = e.target.value.trim();
+    renderAssetsView();
   });
 
   document.querySelectorAll(".alerts-table th.sortable").forEach((th) => {
