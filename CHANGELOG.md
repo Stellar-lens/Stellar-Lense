@@ -28,6 +28,10 @@ client, not a monorepo duplicating the other four `Ledger-Lenz` repos.
 - `dashboard/js/{constants,formatters,api,render}.js` — the former single-file `app.js`
   split so the pure logic is unit-testable (`tests/formatters.test.js`,
   `tests/api.test.js`, run via `node --test`).
+- `tests/dashboard.integration.test.js` — mounts the real `dashboard/index.html` in
+  `jsdom` with a mocked `fetch` and exercises the DOM wiring end to end (filtering,
+  sorting, theme toggle, copy-to-clipboard, the full score-lookup path including a
+  simulated 404) — `render.js` and `app.js` were previously untested.
 - ESLint, Stylelint, and Prettier configs, wired into a GitHub Actions CI workflow.
 - Client-side wallet/asset-pair format validation before hitting the API.
 - Retry-with-backoff for the score lookup on transient (5xx/network) failures.

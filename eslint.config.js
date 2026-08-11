@@ -35,6 +35,10 @@ export default [
       globals: {
         console: "readonly",
         process: "readonly",
+        URL: "readonly",
+        AbortController: "readonly",
+        setTimeout: "readonly",
+        clearTimeout: "readonly",
       },
     },
   },
