@@ -18,6 +18,13 @@
   --medium-bg: #2e2200;
   --high-bg: #2e1010;
 
+  /* Color — risk-level foregrounds, aliased to the base palette so
+     `var(--${scoreClass(score)})` (used for the asset-card avg-score
+     number) resolves to something real instead of an undefined property. */
+  --low: var(--green);
+  --medium: var(--yellow);
+  --high: var(--red);
+
   /* Color — fixed (same in both themes; only ever sits on a colored button) */
   --on-accent: #fff;
 
