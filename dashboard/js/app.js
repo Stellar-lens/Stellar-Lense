@@ -1,5 +1,11 @@
 import { apiFetch } from "./api.js";
-import { ALERT_THRESHOLD, DEFAULT_API_BASE, REFRESH_INTERVAL_MS } from "./constants.js";
+import {
+  ALERT_THRESHOLD,
+  DEFAULT_API_BASE,
+  PAIR_PATTERN,
+  REFRESH_INTERVAL_MS,
+  WALLET_PATTERN,
+} from "./constants.js";
 import {
   renderAlerts,
   renderAlertsError,
@@ -56,6 +62,18 @@ async function lookupScore() {
 
   if (!wallet || !pair) {
     errEl.textContent = "Please enter both wallet address and asset pair.";
+    errEl.style.display = "block";
+    return;
+  }
+  if (!WALLET_PATTERN.test(wallet)) {
+    errEl.textContent =
+      "That doesn't look like a Stellar wallet address (should start with G, 56 characters).";
+    errEl.style.display = "block";
+    return;
+  }
+  if (!PAIR_PATTERN.test(pair)) {
+    errEl.textContent =
+      "That doesn't look like a valid asset pair (expected e.g. XLM/USDC:GISSUER...).";
     errEl.style.display = "block";
     return;
   }
