@@ -333,6 +333,7 @@ Ledgerlens-dashboard/
 │
 ├── README.md                    ← This file
 ├── ARCHITECTURE.md              ← Module layout and design rationale
+├── DESIGN_SYSTEM.md             ← Design tokens, component inventory, theming rules
 ├── CONTRIBUTING.md
 ├── SECURITY.md
 ├── CHANGELOG.md
@@ -341,7 +342,8 @@ Ledgerlens-dashboard/
 │
 ├── dashboard/
 │   ├── index.html                ← Dashboard markup
-│   ├── styles.css                ← Dashboard styling (incl. light/dark theme)
+│   ├── styleguide.html           ← Every component/variant, no API required
+│   ├── styles.css                ← Dashboard styling (design tokens + light/dark theme)
 │   ├── favicon.svg
 │   ├── config.js.example         ← Copy to config.js to set window.LEDGERLENS_API
 │   └── js/
@@ -353,10 +355,12 @@ Ledgerlens-dashboard/
 │
 └── tests/
     ├── api.test.js
-    └── formatters.test.js
+    ├── formatters.test.js
+    ├── design-tokens.test.js
+    └── dashboard.integration.test.js
 ```
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for why it's split this way. The detection engine, ingestion, Soroban contract, and REST API each live in their own repo — see [§16 Related Repositories](#16-related-repositories).
+See [ARCHITECTURE.md](ARCHITECTURE.md) for why it's split this way and [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md) for the styling system. The detection engine, ingestion, Soroban contract, and REST API each live in their own repo — see [§16 Related Repositories](#16-related-repositories).
 
 ---
 

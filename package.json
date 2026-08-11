@@ -5,7 +5,8 @@
   "type": "module",
   "description": "Static web dashboard for LedgerLens — Stellar DEX wash-trade risk scores, alerts, and asset rankings.",
   "scripts": {
-    "serve": "python3 -m http.server 8080 --directory dashboard",
+    "dev": "python3 -m http.server 8080 --directory dashboard",
+    "serve": "npm run dev",
     "lint": "eslint dashboard/js tests",
     "lint:css": "stylelint \"dashboard/**/*.css\"",
     "format": "prettier --write .",

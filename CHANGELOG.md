@@ -5,6 +5,29 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- Formal design token system in `styles.css` — spacing/type/radii/motion/z-index scales,
+  applied everywhere a value already matched a scale step exactly.
+- `dashboard/styleguide.html` — every component/variant rendered against the real
+  stylesheet, with its own theme toggle, no API required. See
+  [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md).
+- `tests/design-tokens.test.js` — guards against a CSS custom property referenced
+  dynamically from JS (`var(--${scoreClass(score)})`) silently not existing.
+
+### Fixed
+
+- `.asset-card .asset-avg`'s color has been broken since it was written: `render.js`
+  builds `var(--${scoreClass(score)})`, which needed `--low`/`--medium`/`--high` tokens
+  that were never defined — only `--green`/`--yellow`/`--red` existed. The number silently
+  fell back to the inherited text color instead of showing risk-level color. Found while
+  building the style guide; fixed by aliasing the missing tokens to the existing palette.
+- `.score-pill`'s low/medium/high backgrounds are now theme-aware tokens
+  (`--low-bg`/`--medium-bg`/`--high-bg`) instead of hardcoded dark-theme hex values that
+  never adapted when the light theme shipped.
+
 ## [1.0.0] — 2026-08-11
 
 First release of the dashboard as what it was always meant to be: a standalone static
