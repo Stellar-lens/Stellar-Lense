@@ -2,11 +2,11 @@
   "use strict";
 
   const API_BASE = window.LEDGERLENS_API || "http://localhost:8000";
+  const ALERT_THRESHOLD = 75;
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
 
   const $ = (sel) => document.querySelector(sel);
-  const $$ = (sel) => document.querySelectorAll(sel);
 
   function scoreClass(score) {
     if (score < 40) return "low";
@@ -34,7 +34,16 @@
 
   async function apiFetch(path) {
     const resp = await fetch(`${API_BASE}${path}`);
-    if (!resp.ok) throw new Error(`${resp.status} ${resp.statusText}`);
+    if (!resp.ok) {
+      let detail = resp.statusText;
+      try {
+        const body = await resp.json();
+        if (body?.detail) detail = body.detail;
+      } catch {
+        // response wasn't JSON — fall back to statusText
+      }
+      throw new Error(detail);
+    }
     return resp.json();
   }
 
@@ -56,16 +65,15 @@
     try {
       const [alerts, assets] = await Promise.all([
         apiFetch("/alerts/recent?limit=200"),
-        apiFetch("/assets/risk-ranking?limit=200"),
+        apiFetch("/assets/risk-ranking"),
       ]);
-      const flagged = alerts.total;
-      const assetCount = assets.total;
-      const avgScore = assets.assets.length
-        ? Math.round(assets.assets.reduce((s, a) => s + a.avg_score, 0) / assets.assets.length)
+      const flagged = alerts.filter((a) => a.score >= ALERT_THRESHOLD).length;
+      const avgScore = assets.length
+        ? Math.round(assets.reduce((s, a) => s + a.average_score, 0) / assets.length)
         : "—";
 
       $("#stat-flagged").textContent = flagged;
-      $("#stat-assets").textContent = assetCount;
+      $("#stat-assets").textContent = assets.length;
       $("#stat-avg").textContent = avgScore;
     } catch (e) {
       console.warn("Stats load failed:", e);
@@ -94,41 +102,24 @@
     btn.textContent = "Scoring…";
 
     try {
-      const encodedPair = encodeURIComponent(pair);
-      const data = await apiFetch(`/score/${wallet}/${encodedPair}`);
+      // encodeURI (not encodeURIComponent) — the API's pair path segment
+      // is itself slash-delimited (e.g. XLM/USDC:GISSUER...) and must
+      // reach the server with literal "/" characters intact.
+      const data = await apiFetch(`/score/${wallet}/${encodeURI(pair)}`);
 
-      // Gauge
       const gauge = $("#score-gauge");
       gauge.className = `gauge ${scoreClass(data.score)}`;
       $("#score-num").textContent = data.score;
       $("#score-risk-label").textContent = scoreLabel(data.score);
 
-      // Flags
       const flagRow = $("#flag-row");
       flagRow.innerHTML = "";
       if (data.benford_flag) flagRow.innerHTML += `<span class="badge benford">Benford anomaly</span>`;
       if (data.ml_flag) flagRow.innerHTML += `<span class="badge ml">ML flagged</span>`;
       if (!data.benford_flag && !data.ml_flag) flagRow.innerHTML += `<span class="badge clean">Clean signals</span>`;
 
-      // SHAP features
-      const list = $("#features-list");
-      list.innerHTML = "";
-      const features = data.explanation?.top_features || [];
-      features.forEach((f) => {
-        const pct = Math.min(100, Math.round(Math.abs(f.contribution) * 300));
-        const neg = f.direction === "decreases_risk";
-        list.innerHTML += `
-          <li>
-            <span class="feature-name">${f.feature.replace(/_/g, " ")}</span>
-            <span class="feature-bar-wrap">
-              <span class="feature-bar"><span class="feature-bar-fill${neg ? " neg" : ""}" style="width:${pct}%"></span></span>
-              <span style="font-size:11px;color:var(--text-muted);width:42px;text-align:right">${f.contribution > 0 ? "+" : ""}${f.contribution.toFixed(3)}</span>
-            </span>
-          </li>`;
-      });
-      if (!features.length) {
-        list.innerHTML = `<li style="color:var(--text-muted);font-size:12px">No SHAP explanation available (model not loaded)</li>`;
-      }
+      $("#score-meta").textContent =
+        `Confidence ${Math.round(data.confidence)}% · Last updated ${formatTs(data.timestamp)}`;
 
       resultEl.classList.add("visible");
     } catch (err) {
@@ -145,41 +136,41 @@
   async function loadAlerts() {
     const tbody = $("#alerts-body");
     try {
-      const data = await apiFetch("/alerts/recent?limit=50&min_score=75");
-      if (!data.alerts.length) {
-        tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state">No alerts in the last 24h</div></td></tr>`;
+      const data = await apiFetch("/alerts/recent?limit=50");
+      const flagged = data.filter((a) => a.score >= ALERT_THRESHOLD);
+      if (!flagged.length) {
+        tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state">No wallets currently flagged</div></td></tr>`;
         return;
       }
-      tbody.innerHTML = data.alerts.map((a) => `
+      tbody.innerHTML = flagged.map((a) => `
         <tr>
           <td title="${a.wallet}">${a.wallet.slice(0, 12)}…${a.wallet.slice(-4)}</td>
           <td>${a.asset_pair}</td>
           <td>${pill(a.score)}</td>
-          <td>${a.benford_flag ? "⚠ Yes" : "—"}</td>
-          <td>${a.ml_flag ? "⚠ Yes" : "—"}</td>
-          <td>${formatTs(a.flagged_at)}</td>
+          <td>${a.reason}</td>
+          <td>${formatTs(a.timestamp)}</td>
         </tr>`).join("");
     } catch (err) {
-      tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state">Failed to load alerts: ${err.message}</div></td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state">Failed to load alerts: ${err.message}</div></td></tr>`;
     }
   }
 
   // ── Asset ranking ─────────────────────────────────────────────────────────────
 
-  async function loadAssets(window = "24h") {
+  async function loadAssets() {
     const grid = $("#asset-grid");
     try {
-      const data = await apiFetch(`/assets/risk-ranking?limit=30&window=${window}`);
-      if (!data.assets.length) {
+      const data = await apiFetch("/assets/risk-ranking");
+      if (!data.length) {
         grid.innerHTML = `<div class="empty-state">No asset data yet</div>`;
         return;
       }
-      grid.innerHTML = data.assets.map((a) => `
+      grid.innerHTML = data.map((a) => `
         <div class="asset-card">
-          <div class="asset-code">${a.asset_code}</div>
-          <div class="asset-avg" style="color:var(--${scoreClass(Math.round(a.avg_score))})">${Math.round(a.avg_score)}</div>
+          <div class="asset-code">${a.asset_pair}</div>
+          <div class="asset-avg" style="color:var(--${scoreClass(Math.round(a.average_score))})">${Math.round(a.average_score)}</div>
           <div class="asset-meta">
-            Max ${a.max_score} · ${a.flagged_wallet_count} flagged wallet${a.flagged_wallet_count !== 1 ? "s" : ""}
+            Max ${a.max_score} · ${a.flagged_wallets}/${a.total_wallets} flagged
           </div>
         </div>`).join("");
     } catch (err) {
@@ -193,20 +184,18 @@
     checkHealth();
     loadStats();
     loadAlerts();
-    loadAssets("24h");
+    loadAssets();
 
     $("#lookup-btn").addEventListener("click", lookupScore);
     $("#wallet-input").addEventListener("keydown", (e) => { if (e.key === "Enter") lookupScore(); });
     $("#pair-input").addEventListener("keydown", (e) => { if (e.key === "Enter") lookupScore(); });
-
-    $("#window-select").addEventListener("change", (e) => loadAssets(e.target.value));
 
     // Refresh every 60s
     setInterval(() => {
       checkHealth();
       loadStats();
       loadAlerts();
-      loadAssets($("#window-select").value);
+      loadAssets();
     }, 60_000);
   }
 
