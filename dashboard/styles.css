@@ -52,8 +52,37 @@ header .tagline {
   color: var(--text-muted);
 }
 
-header .status-dot {
+.header-right {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.last-updated {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.refresh-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 4px 10px;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+
+.refresh-btn:hover {
+  background: var(--surface);
+  color: var(--text);
+}
+
+header .status-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
