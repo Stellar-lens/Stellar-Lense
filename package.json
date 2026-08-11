@@ -1,6 +1,6 @@
 {
   "name": "ledgerlens-dashboard",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "description": "Static web dashboard for LedgerLens — Stellar DEX wash-trade risk scores, alerts, and asset rankings.",
