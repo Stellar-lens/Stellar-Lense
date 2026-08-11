@@ -1,6 +1,9 @@
 # Local dashboard config (points at your API deployment)
 dashboard/config.js
 
+# Node tooling
+node_modules/
+
 # IDE
 .vscode/
 .idea/
