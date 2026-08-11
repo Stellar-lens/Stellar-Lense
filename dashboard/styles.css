@@ -183,42 +183,6 @@ main {
 .badge.ml { border-color: var(--accent); color: var(--accent); }
 .badge.clean { border-color: var(--green); color: var(--green); }
 
-.features-list { list-style: none; }
-
-.features-list li {
-  display: flex;
-  justify-content: space-between;
-  padding: 6px 0;
-  border-bottom: 1px solid var(--border);
-  font-size: 13px;
-}
-
-.features-list li:last-child { border-bottom: none; }
-
-.feature-name { color: var(--text-muted); }
-
-.feature-bar-wrap {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.feature-bar {
-  width: 80px; height: 6px;
-  background: var(--border);
-  border-radius: 3px;
-  overflow: hidden;
-}
-
-.feature-bar-fill {
-  height: 100%;
-  border-radius: 3px;
-  background: var(--accent);
-  transition: width 0.3s;
-}
-
-.feature-bar-fill.neg { background: var(--red); }
-
 /* ── Alerts table ────────────────────────────────────────────────────────────── */
 
 .alerts-table { width: 100%; border-collapse: collapse; }
