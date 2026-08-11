@@ -20,9 +20,11 @@ export function renderScoreResult(refs, data) {
   refs.riskLabel.textContent = scoreLabel(data.score);
 
   refs.flagRow.innerHTML = "";
-  if (data.benford_flag) refs.flagRow.innerHTML += `<span class="badge benford">Benford anomaly</span>`;
+  if (data.benford_flag)
+    refs.flagRow.innerHTML += `<span class="badge benford">Benford anomaly</span>`;
   if (data.ml_flag) refs.flagRow.innerHTML += `<span class="badge ml">ML flagged</span>`;
-  if (!data.benford_flag && !data.ml_flag) refs.flagRow.innerHTML += `<span class="badge clean">Clean signals</span>`;
+  if (!data.benford_flag && !data.ml_flag)
+    refs.flagRow.innerHTML += `<span class="badge clean">Clean signals</span>`;
 
   refs.meta.textContent = `Confidence ${Math.round(data.confidence)}% · Last updated ${formatTs(data.timestamp)}`;
 }
