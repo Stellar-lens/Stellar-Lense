@@ -1,5 +1,6 @@
 # LedgerLens
 
+[![CI](https://github.com/Ledger-Lenz/Ledgerlens-dashboard/actions/workflows/ci.yml/badge.svg)](https://github.com/Ledger-Lenz/Ledgerlens-dashboard/actions/workflows/ci.yml)
 [![Built on Stellar](https://img.shields.io/badge/Built%20on-Stellar-blue?logo=stellar)](https://stellar.org)
 [![Soroban Smart Contracts](https://img.shields.io/badge/Smart%20Contracts-Soroban-purple)](https://soroban.stellar.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -331,16 +332,31 @@ if risk.score > 75 {
 Ledgerlens-dashboard/
 │
 ├── README.md                    ← This file
+├── ARCHITECTURE.md              ← Module layout and design rationale
+├── CONTRIBUTING.md
+├── SECURITY.md
+├── CHANGELOG.md
 ├── LICENSE
+├── package.json                 ← Dev tooling only — no runtime dependencies
 │
-└── dashboard/
-    ├── index.html                ← Dashboard markup
-    ├── app.js                    ← Fetches from Ledgerlens-api and renders the UI
-    ├── styles.css                ← Dashboard styling
-    └── config.js.example         ← Copy to config.js to set window.LEDGERLENS_API
+├── dashboard/
+│   ├── index.html                ← Dashboard markup
+│   ├── styles.css                ← Dashboard styling (incl. light/dark theme)
+│   ├── favicon.svg
+│   ├── config.js.example         ← Copy to config.js to set window.LEDGERLENS_API
+│   └── js/
+│       ├── app.js                 ← Orchestrator: DOM events → api.js → render.js
+│       ├── api.js                 ← Fetch wrapper with typed errors + retry
+│       ├── render.js              ← DOM rendering, given data + element refs
+│       ├── formatters.js          ← Pure formatting helpers (unit tested)
+│       └── constants.js           ← Shared config values and validation patterns
+│
+└── tests/
+    ├── api.test.js
+    └── formatters.test.js
 ```
 
-The detection engine, ingestion, Soroban contract, and REST API each live in their own repo — see [§16 Related Repositories](#16-related-repositories).
+See [ARCHITECTURE.md](ARCHITECTURE.md) for why it's split this way. The detection engine, ingestion, Soroban contract, and REST API each live in their own repo — see [§16 Related Repositories](#16-related-repositories).
 
 ---
 
@@ -370,16 +386,20 @@ Edit `dashboard/config.js`:
 window.LEDGERLENS_API = "http://localhost:8000"; // or your deployed Ledgerlens-api URL
 ```
 
-If `config.js` is absent, `app.js` falls back to `http://localhost:8000`.
+If `config.js` is absent, the dashboard falls back to `http://localhost:8000`.
 
 ### 3. Serve it
 
 ```bash
-cd dashboard
-python -m http.server 8080
+npm run serve
 ```
 
-Open `http://localhost:8080`.
+(or `python -m http.server 8080 --directory dashboard` directly — `npm run serve` just
+wraps that). Open `http://localhost:8080`.
+
+`npm install` is only needed if you're contributing and want to run the lint/format/test
+tooling described in [CONTRIBUTING.md](CONTRIBUTING.md) — the dashboard itself has zero
+runtime dependencies.
 
 ---
 
@@ -427,10 +447,22 @@ The dashboard has exactly one setting: the API base URL, set via `dashboard/conf
 
 ## 13. Testing
 
-This repo has no automated tests yet — it's a small static site. To verify manually:
+```bash
+npm test        # unit tests (node --test) for dashboard/js/{formatters,api}.js
+npm run lint     # ESLint
+npm run lint:css # Stylelint
+npm run format:check
+```
 
-1. Start [Ledgerlens-api](https://github.com/Ledger-Lenz/Ledegerlens-api) locally.
-2. Serve `dashboard/` (§10) and confirm the status dot goes green, stats populate, and a score lookup against a wallet/pair from the API's seeded demo data returns a result.
+All four run in CI on every push/PR (`.github/workflows/ci.yml`).
+
+`formatters.js` and `api.js` are pure/injectable specifically so they're unit-testable
+without a browser (see [ARCHITECTURE.md](ARCHITECTURE.md)); `render.js` and `app.js` are
+DOM-coupled and are verified manually instead:
+
+1. Start [Ledegerlens-api](https://github.com/Ledger-Lenz/Ledegerlens-api) locally.
+2. Serve `dashboard/` (§10) and confirm the status dot goes green, stats populate, and a
+   score lookup against a wallet/pair from the API's seeded demo data returns a result.
 
 ---
 
@@ -527,12 +559,9 @@ Contributions are welcome. We are actively looking for collaborators with experi
 
 ### Process
 
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feat/your-feature`
-3. Manually verify against a running Ledgerlens-api instance (§13)
-4. Submit a pull request with a clear description of what changed and why
-
-Please open an issue before starting significant work so we can align on approach.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, the lint/format/test commands CI runs,
+and the full workflow. Please open an issue before starting significant work so we can
+align on approach.
 
 ### Contact
 
