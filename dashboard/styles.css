@@ -291,6 +291,24 @@ main {
   color: var(--green);
 }
 
+/* ── Filter input ────────────────────────────────────────────────────────────── */
+
+.filter-input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 13px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  outline: none;
+}
+
+.filter-input:focus {
+  border-color: var(--accent);
+}
+
 /* ── Alerts table ────────────────────────────────────────────────────────────── */
 
 .alerts-table {
@@ -307,6 +325,31 @@ main {
   letter-spacing: 0.05em;
   padding: 8px 0;
   border-bottom: 1px solid var(--border);
+}
+
+.alerts-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.alerts-table th.sortable:hover {
+  color: var(--text);
+}
+
+.alerts-table th.sortable::after {
+  content: "⇅";
+  margin-left: 4px;
+  opacity: 0.5;
+}
+
+.alerts-table th.sortable.sort-asc::after {
+  content: "↑";
+  opacity: 1;
+}
+
+.alerts-table th.sortable.sort-desc::after {
+  content: "↓";
+  opacity: 1;
 }
 
 .alerts-table td {
