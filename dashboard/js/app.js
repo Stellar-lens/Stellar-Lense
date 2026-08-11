@@ -1,4 +1,4 @@
-import { apiFetch } from "./api.js";
+import { apiFetch, apiFetchWithRetry } from "./api.js";
 import {
   ALERT_THRESHOLD,
   DEFAULT_API_BASE,
@@ -86,7 +86,9 @@ async function lookupScore() {
     // encodeURI (not encodeURIComponent) — the pair path segment is itself
     // slash-delimited (e.g. XLM/USDC:GISSUER...) and must reach the server
     // with literal "/" characters intact.
-    const data = await apiFetch(`/score/${wallet}/${encodeURI(pair)}`, { baseUrl: API_BASE });
+    const data = await apiFetchWithRetry(`/score/${wallet}/${encodeURI(pair)}`, {
+      baseUrl: API_BASE,
+    });
 
     renderScoreResult(
       {
