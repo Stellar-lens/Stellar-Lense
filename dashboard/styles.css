@@ -1,15 +1,65 @@
 :root {
+  /* Color — surfaces & text */
   --bg: #0d1117;
   --surface: #161b22;
   --border: #30363d;
   --text: #c9d1d9;
   --text-muted: #8b949e;
+
+  /* Color — brand & semantic */
   --accent: #58a6ff;
   --accent-dark: #1f6feb;
   --green: #3fb950;
   --yellow: #d29922;
   --red: #f85149;
+
+  /* Color — risk-level tints (score-pill backgrounds) */
+  --low-bg: #1a2e1a;
+  --medium-bg: #2e2200;
+  --high-bg: #2e1010;
+
+  /* Color — risk-level foregrounds, aliased to the base palette so
+     `var(--${scoreClass(score)})` (used for the asset-card avg-score
+     number) resolves to something real instead of an undefined property. */
+  --low: var(--green);
+  --medium: var(--yellow);
+  --high: var(--red);
+
+  /* Color — fixed (same in both themes; only ever sits on a colored button) */
+  --on-accent: #fff;
+
+  /* Spacing scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+
+  /* Type scale */
+  --text-2xs: 11px;
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 14px;
+  --text-md: 15px;
+  --text-lg: 18px;
+  --text-xl: 22px;
+  --text-2xl: 28px;
+  --text-3xl: 32px;
+
+  /* Radii */
+  --radius-sm: 6px;
   --radius: 8px;
+  --radius-pill: 12px;
+
+  /* Motion */
+  --transition-fast: 0.15s;
+  --transition-slow: 0.3s;
+
+  /* Z-index */
+  --z-header: 10;
+  --z-skip-link: 100;
   --font: "Inter", system-ui, -apple-system, sans-serif;
 }
 
@@ -24,6 +74,9 @@
   --green: #1a7f37;
   --yellow: #9a6700;
   --red: #cf222e;
+  --low-bg: #dafbe1;
+  --medium-bg: #fff8c5;
+  --high-bg: #ffebe9;
 }
 
 * {
@@ -36,11 +89,11 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font);
-  font-size: 14px;
+  font-size: var(--text-base);
   line-height: 1.5;
   transition:
-    background-color 0.15s,
-    color 0.15s;
+    background-color var(--transition-fast),
+    color var(--transition-fast);
 }
 
 /* ── Accessibility ───────────────────────────────────────────────────────────── */
@@ -48,17 +101,17 @@ body {
 .skip-link {
   position: absolute;
   top: -40px;
-  left: 8px;
+  left: var(--space-2);
   background: var(--accent-dark);
-  color: #fff;
-  padding: 8px 12px;
+  color: var(--on-accent);
+  padding: var(--space-2) var(--space-3);
   border-radius: var(--radius);
-  z-index: 100;
-  transition: top 0.15s;
+  z-index: var(--z-skip-link);
+  transition: top var(--transition-fast);
 }
 
 .skip-link:focus {
-  top: 8px;
+  top: var(--space-2);
 }
 
 a:focus-visible,
@@ -73,24 +126,24 @@ th.sortable:focus-visible {
 
 header {
   border-bottom: 1px solid var(--border);
-  padding: 12px 24px;
+  padding: var(--space-3) var(--space-6);
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
   position: sticky;
   top: 0;
   background: var(--bg);
-  z-index: 10;
+  z-index: var(--z-header);
 }
 
 header .logo {
-  font-size: 18px;
+  font-size: var(--text-lg);
   font-weight: 700;
   color: var(--accent);
 }
 
 header .tagline {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--text-muted);
 }
 
@@ -98,25 +151,25 @@ header .tagline {
   margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .last-updated {
-  font-size: 11px;
+  font-size: var(--text-2xs);
   color: var(--text-muted);
 }
 
 .refresh-btn {
   background: transparent;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   color: var(--text-muted);
   cursor: pointer;
-  font-size: 12px;
-  padding: 4px 10px;
+  font-size: var(--text-xs);
+  padding: var(--space-1) 10px;
   transition:
-    background 0.15s,
-    color 0.15s;
+    background var(--transition-fast),
+    color var(--transition-fast);
 }
 
 .refresh-btn:hover {
@@ -127,12 +180,12 @@ header .tagline {
 .theme-toggle {
   background: transparent;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   color: var(--text-muted);
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--text-sm);
   line-height: 1;
-  padding: 4px 8px;
+  padding: var(--space-1) var(--space-2);
 }
 
 .theme-toggle:hover {
@@ -154,10 +207,10 @@ header .status-dot.offline {
 main {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 24px;
+  padding: var(--space-6);
   display: grid;
   grid-template-columns: 1fr;
-  gap: 24px;
+  gap: var(--space-6);
 }
 
 /* ── Cards ───────────────────────────────────────────────────────────────────── */
@@ -166,16 +219,16 @@ main {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 20px;
+  padding: var(--space-5);
 }
 
 .card h2 {
-  font-size: 14px;
+  font-size: var(--text-base);
   font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  margin-bottom: 16px;
+  margin-bottom: var(--space-4);
 }
 
 /* ── Stats row ───────────────────────────────────────────────────────────────── */
@@ -183,26 +236,26 @@ main {
 .stats {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 16px;
+  gap: var(--space-4);
 }
 
 .stat {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 16px;
+  padding: var(--space-4);
 }
 
 .stat .value {
-  font-size: 28px;
+  font-size: var(--text-2xl);
   font-weight: 700;
   color: var(--text);
 }
 
 .stat .label {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--text-muted);
-  margin-top: 4px;
+  margin-top: var(--space-1);
 }
 
 .skeleton {
@@ -229,8 +282,8 @@ main {
 
 .search-row {
   display: flex;
-  gap: 8px;
-  margin-bottom: 16px;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
 }
 
 .search-row input {
@@ -239,8 +292,8 @@ main {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   color: var(--text);
-  font-size: 13px;
-  padding: 8px 12px;
+  font-size: var(--text-sm);
+  padding: var(--space-2) var(--space-3);
   outline: none;
 }
 
@@ -252,12 +305,12 @@ main {
   background: var(--accent-dark);
   border: none;
   border-radius: var(--radius);
-  color: #fff;
+  color: var(--on-accent);
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-weight: 600;
-  padding: 8px 16px;
-  transition: background 0.15s;
+  padding: var(--space-2) var(--space-4);
+  transition: background var(--transition-fast);
 }
 
 .search-row button:hover {
@@ -268,7 +321,7 @@ main {
 
 .score-result {
   display: none;
-  gap: 24px;
+  gap: var(--space-6);
   align-items: flex-start;
 }
 
@@ -289,8 +342,8 @@ main {
   align-items: center;
   justify-content: center;
   flex-direction: column;
-  margin: 0 auto 8px;
-  transition: border-color 0.3s;
+  margin: 0 auto var(--space-2);
+  transition: border-color var(--transition-slow);
 }
 
 .gauge.low {
@@ -306,12 +359,12 @@ main {
 }
 
 .gauge .score-num {
-  font-size: 32px;
+  font-size: var(--text-3xl);
   font-weight: 700;
 }
 
 .gauge .score-label {
-  font-size: 11px;
+  font-size: var(--text-2xs);
   color: var(--text-muted);
 }
 
@@ -321,16 +374,16 @@ main {
 
 .flag-row {
   display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
   flex-wrap: wrap;
 }
 
 .badge {
-  font-size: 11px;
+  font-size: var(--text-2xs);
   font-weight: 600;
-  padding: 3px 8px;
-  border-radius: 12px;
+  padding: 3px var(--space-2);
+  border-radius: var(--radius-pill);
   border: 1px solid;
 }
 
@@ -357,9 +410,9 @@ main {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   color: var(--text);
-  font-size: 13px;
-  padding: 8px 12px;
-  margin-bottom: 12px;
+  font-size: var(--text-sm);
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-3);
   outline: none;
 }
 
@@ -376,12 +429,12 @@ main {
 
 .alerts-table th {
   text-align: left;
-  font-size: 11px;
+  font-size: var(--text-2xs);
   font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  padding: 8px 0;
+  padding: var(--space-2) 0;
   border-bottom: 1px solid var(--border);
 }
 
@@ -396,7 +449,7 @@ main {
 
 .alerts-table th.sortable::after {
   content: "⇅";
-  margin-left: 4px;
+  margin-left: var(--space-1);
   opacity: 0.5;
 }
 
@@ -413,13 +466,13 @@ main {
 .alerts-table td {
   padding: 10px 0;
   border-bottom: 1px solid var(--border);
-  font-size: 13px;
+  font-size: var(--text-sm);
   vertical-align: middle;
 }
 
 .alerts-table td:first-child {
   font-family: monospace;
-  font-size: 11px;
+  font-size: var(--text-2xs);
   max-width: 180px;
   white-space: nowrap;
 }
@@ -434,8 +487,8 @@ main {
   border: none;
   color: var(--text-muted);
   cursor: pointer;
-  font-size: 12px;
-  margin-left: 4px;
+  font-size: var(--text-xs);
+  margin-left: var(--space-1);
   padding: 0;
 }
 
@@ -445,32 +498,32 @@ main {
 
 .score-pill {
   display: inline-block;
-  padding: 2px 8px;
-  border-radius: 10px;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-pill);
   font-weight: 700;
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 
 .score-pill.low {
-  background: #1a2e1a;
+  background: var(--low-bg);
   color: var(--green);
 }
 
 .score-pill.medium {
-  background: #2e2200;
+  background: var(--medium-bg);
   color: var(--yellow);
 }
 
 .score-pill.high {
-  background: #2e1010;
+  background: var(--high-bg);
   color: var(--red);
 }
 
 .empty-state {
   text-align: center;
-  padding: 32px;
+  padding: var(--space-7);
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 
 /* ── Asset ranking ───────────────────────────────────────────────────────────── */
@@ -478,7 +531,7 @@ main {
 .asset-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .asset-card {
@@ -490,30 +543,30 @@ main {
 
 .asset-card .asset-code {
   font-weight: 700;
-  font-size: 15px;
+  font-size: var(--text-md);
   margin-bottom: 6px;
 }
 
 .asset-card .asset-avg {
-  font-size: 22px;
+  font-size: var(--text-xl);
   font-weight: 700;
 }
 
 .asset-card .asset-meta {
-  font-size: 11px;
+  font-size: var(--text-2xs);
   color: var(--text-muted);
-  margin-top: 4px;
+  margin-top: var(--space-1);
 }
 
 /* ── Responsive ──────────────────────────────────────────────────────────────── */
 
 @media (width <= 640px) {
   header {
-    padding: 10px 16px;
+    padding: 10px var(--space-4);
   }
 
   main {
-    padding: 16px;
+    padding: var(--space-4);
   }
 
   .score-result {
