@@ -20,21 +20,26 @@ const API_BASE = window.LEDGERLENS_API || DEFAULT_API_BASE;
 
 const $ = (sel) => document.querySelector(sel);
 
-async function checkHealth() {
+function isAbort(err) {
+  return err?.name === "AbortError";
+}
+
+async function checkHealth(signal) {
   const dot = $("#status-dot");
   try {
-    const data = await apiFetch("/health", { baseUrl: API_BASE });
+    const data = await apiFetch("/health", { baseUrl: API_BASE, signal });
     setStatusOnline(dot, data.status === "ok");
-  } catch {
+  } catch (err) {
+    if (isAbort(err)) return;
     setStatusOnline(dot, false);
   }
 }
 
-async function loadStats() {
+async function loadStats(signal) {
   try {
     const [alerts, assets] = await Promise.all([
-      apiFetch("/alerts/recent?limit=200", { baseUrl: API_BASE }),
-      apiFetch("/assets/risk-ranking", { baseUrl: API_BASE }),
+      apiFetch("/alerts/recent?limit=200", { baseUrl: API_BASE, signal }),
+      apiFetch("/assets/risk-ranking", { baseUrl: API_BASE, signal }),
     ]);
     renderStats(
       {
@@ -46,8 +51,9 @@ async function loadStats() {
       assets,
       ALERT_THRESHOLD,
     );
-  } catch (e) {
-    console.warn("Stats load failed:", e);
+  } catch (err) {
+    if (isAbort(err)) return;
+    console.warn("Stats load failed:", err);
   }
 }
 
@@ -111,31 +117,41 @@ async function lookupScore() {
   }
 }
 
-async function loadAlerts() {
+async function loadAlerts(signal) {
   const tbody = $("#alerts-body");
   try {
-    const data = await apiFetch("/alerts/recent?limit=50", { baseUrl: API_BASE });
+    const data = await apiFetch("/alerts/recent?limit=50", { baseUrl: API_BASE, signal });
     renderAlerts(tbody, data, ALERT_THRESHOLD);
   } catch (err) {
+    if (isAbort(err)) return;
     renderAlertsError(tbody, err.message);
   }
 }
 
-async function loadAssets() {
+async function loadAssets(signal) {
   const grid = $("#asset-grid");
   try {
-    const data = await apiFetch("/assets/risk-ranking", { baseUrl: API_BASE });
+    const data = await apiFetch("/assets/risk-ranking", { baseUrl: API_BASE, signal });
     renderAssets(grid, data);
   } catch (err) {
+    if (isAbort(err)) return;
     renderAssetsError(grid, err.message);
   }
 }
 
+// Aborts the previous cycle's still-in-flight requests before starting a new
+// one, so a slow response can't land after a newer refresh already has.
+let refreshController = null;
+
 function refreshAll() {
-  checkHealth();
-  loadStats();
-  loadAlerts();
-  loadAssets();
+  refreshController?.abort();
+  refreshController = new AbortController();
+  const { signal } = refreshController;
+
+  checkHealth(signal);
+  loadStats(signal);
+  loadAlerts(signal);
+  loadAssets(signal);
 }
 
 function init() {
