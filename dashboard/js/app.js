@@ -17,6 +17,7 @@ import {
 } from "./render.js";
 
 const API_BASE = window.LEDGERLENS_API || DEFAULT_API_BASE;
+const LAST_LOOKUP_KEY = "ledgerlens:last-lookup";
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -108,6 +109,7 @@ async function lookupScore() {
     );
 
     resultEl.classList.add("visible");
+    localStorage.setItem(LAST_LOOKUP_KEY, JSON.stringify({ wallet, pair }));
   } catch (err) {
     errEl.textContent = `Scoring failed: ${err.message}`;
     errEl.style.display = "block";
@@ -186,7 +188,18 @@ async function refreshAll() {
   $("#last-updated").textContent = `Updated ${new Date().toLocaleTimeString()}`;
 }
 
+function restoreLastLookup() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(LAST_LOOKUP_KEY));
+    if (saved?.wallet) $("#wallet-input").value = saved.wallet;
+    if (saved?.pair) $("#pair-input").value = saved.pair;
+  } catch {
+    // corrupt or absent — ignore, inputs stay empty
+  }
+}
+
 function init() {
+  restoreLastLookup();
   refreshAll();
 
   $("#refresh-btn").addEventListener("click", refreshAll);
