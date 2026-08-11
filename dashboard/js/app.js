@@ -143,20 +143,25 @@ async function loadAssets(signal) {
 // one, so a slow response can't land after a newer refresh already has.
 let refreshController = null;
 
-function refreshAll() {
+async function refreshAll() {
   refreshController?.abort();
   refreshController = new AbortController();
   const { signal } = refreshController;
 
-  checkHealth(signal);
-  loadStats(signal);
-  loadAlerts(signal);
-  loadAssets(signal);
+  await Promise.allSettled([
+    checkHealth(signal),
+    loadStats(signal),
+    loadAlerts(signal),
+    loadAssets(signal),
+  ]);
+  if (signal.aborted) return;
+  $("#last-updated").textContent = `Updated ${new Date().toLocaleTimeString()}`;
 }
 
 function init() {
   refreshAll();
 
+  $("#refresh-btn").addEventListener("click", refreshAll);
   $("#lookup-btn").addEventListener("click", lookupScore);
   $("#wallet-input").addEventListener("keydown", (e) => {
     if (e.key === "Enter") lookupScore();
