@@ -77,14 +77,20 @@
             >(score ≥ 75)</span
           >
         </h2>
+        <input
+          class="filter-input"
+          id="alerts-filter"
+          type="text"
+          placeholder="Filter by wallet or asset pair…"
+        />
         <table class="alerts-table">
           <thead>
             <tr>
               <th>Wallet</th>
               <th>Asset Pair</th>
-              <th>Score</th>
+              <th class="sortable" data-sort-key="score">Score</th>
               <th>Reason</th>
-              <th>Flagged At</th>
+              <th class="sortable" data-sort-key="timestamp">Flagged At</th>
             </tr>
           </thead>
           <tbody id="alerts-body">
@@ -98,6 +104,12 @@
       <!-- Asset risk ranking -->
       <div class="card">
         <h2>Asset Risk Ranking</h2>
+        <input
+          class="filter-input"
+          id="assets-filter"
+          type="text"
+          placeholder="Filter by asset pair…"
+        />
         <div class="asset-grid" id="asset-grid">
           <div class="empty-state">Loading…</div>
         </div>
