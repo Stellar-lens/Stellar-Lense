@@ -18,8 +18,26 @@ import {
 
 const API_BASE = window.LEDGERLENS_API || DEFAULT_API_BASE;
 const LAST_LOOKUP_KEY = "ledgerlens:last-lookup";
+const THEME_KEY = "ledgerlens:theme";
 
 const $ = (sel) => document.querySelector(sel);
+
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  $("#theme-toggle").textContent = theme === "light" ? "☀️" : "🌙";
+}
+
+function initTheme() {
+  const saved = localStorage.getItem(THEME_KEY);
+  const preferred = window.matchMedia?.("(prefers-color-scheme: light)").matches ? "light" : "dark";
+  applyTheme(saved || preferred);
+}
+
+function toggleTheme() {
+  const next = document.documentElement.dataset.theme === "light" ? "dark" : "light";
+  localStorage.setItem(THEME_KEY, next);
+  applyTheme(next);
+}
 
 function isAbort(err) {
   return err?.name === "AbortError";
@@ -199,9 +217,11 @@ function restoreLastLookup() {
 }
 
 function init() {
+  initTheme();
   restoreLastLookup();
   refreshAll();
 
+  $("#theme-toggle").addEventListener("click", toggleTheme);
   $("#refresh-btn").addEventListener("click", refreshAll);
   $("#lookup-btn").addEventListener("click", lookupScore);
   $("#wallet-input").addEventListener("keydown", (e) => {
