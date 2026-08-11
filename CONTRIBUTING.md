@@ -42,9 +42,14 @@ All four run in CI on every PR; a failing one blocks merge.
 4. If you touched `dashboard/js/api.js` or `dashboard/js/formatters.js`, add or update a
    unit test in `tests/` — both are pure/injectable specifically so they're testable
    without a browser
-5. Manually verify in a browser against a running API (see above) — the unit tests cover
-   the pure logic, not the DOM wiring
-6. Submit a pull request with a clear description of what changed and why
+5. If you touched `dashboard/js/app.js` or `dashboard/js/render.js` (new DOM wiring, a new
+   event listener, a new rendered field), add or update a case in
+   `tests/dashboard.integration.test.js` — it mounts the real HTML in `jsdom` with a mocked
+   `fetch` and drives it like a user would
+6. Manually verify in a real browser against a running API (see above) regardless — jsdom
+   has no layout/CSS engine, so it can't catch a visual regression the way you clicking
+   around actually can
+7. Submit a pull request with a clear description of what changed and why
 
 Please open an issue before starting significant work so we can align on approach.
 

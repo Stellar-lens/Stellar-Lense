@@ -28,9 +28,16 @@ dashboard/
 
 The split follows one rule: **anything that doesn't need `window`/`document` is pure and
 lives in `constants.js`/`formatters.js`/`api.js`**, so it can be unit tested with Node's
-built-in test runner (`tests/`) without a browser or a DOM shim. `render.js` and `app.js`
-are DOM-coupled and are verified manually (see [CONTRIBUTING.md](CONTRIBUTING.md)) — adding
-a headless-browser dependency just to cover them hasn't been worth it at this size.
+built-in test runner without a DOM at all (`tests/formatters.test.js`, `tests/api.test.js`).
+
+`render.js` and `app.js` are DOM-coupled, but they're not untested — `tests/dashboard.integration.test.js`
+mounts the real `dashboard/index.html` in `jsdom` with a mocked `fetch` and drives it like a
+user would (fill the lookup form, click sort headers, type into filters, toggle the theme),
+asserting on the resulting DOM and `localStorage`. It's not a substitute for checking the
+real thing in a real browser against a real API before shipping a UI change (see
+[CONTRIBUTING.md](CONTRIBUTING.md)) — jsdom doesn't render layout or CSS, so it can't catch
+a visual regression — but it does catch wiring bugs (an event listener bound to the wrong
+element, a state update that doesn't reach the DOM) without a human in the loop.
 
 ## Data flow
 
