@@ -21,7 +21,9 @@ npm run serve                                        # http://localhost:8080
 ```
 
 You'll need a running [Ledgerlens-api](https://github.com/Ledger-Lenz/Ledegerlens-api)
-instance to see real data — this repo has no backend of its own.
+instance to see real data — this repo has no backend of its own. To work on styling
+without an API at all, visit `dashboard/styleguide.html` instead — see
+[DESIGN_SYSTEM.md](DESIGN_SYSTEM.md).
 
 ## Before opening a PR
 
@@ -49,7 +51,10 @@ All four run in CI on every PR; a failing one blocks merge.
 6. Manually verify in a real browser against a running API (see above) regardless — jsdom
    has no layout/CSS engine, so it can't catch a visual regression the way you clicking
    around actually can
-7. Submit a pull request with a clear description of what changed and why
+7. If you added or changed a visual component, add it to `dashboard/styleguide.html` and
+   the table in [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md); use an existing design token rather
+   than a new magic number where one fits
+8. Submit a pull request with a clear description of what changed and why
 
 Please open an issue before starting significant work so we can align on approach.
 
