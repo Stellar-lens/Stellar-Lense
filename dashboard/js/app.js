@@ -117,14 +117,33 @@ async function lookupScore() {
   }
 }
 
+const alertsState = { data: [], filter: "", sortKey: "score", sortDir: "desc" };
+
+function renderAlertsView() {
+  const term = alertsState.filter.toLowerCase();
+  const filtered = term
+    ? alertsState.data.filter(
+        (a) => a.wallet.toLowerCase().includes(term) || a.asset_pair.toLowerCase().includes(term),
+      )
+    : alertsState.data;
+
+  const { sortKey, sortDir } = alertsState;
+  const sorted = [...filtered].sort((a, b) => {
+    const cmp =
+      sortKey === "timestamp" ? a.timestamp.localeCompare(b.timestamp) : a.score - b.score;
+    return sortDir === "asc" ? cmp : -cmp;
+  });
+
+  renderAlerts($("#alerts-body"), sorted, ALERT_THRESHOLD);
+}
+
 async function loadAlerts(signal) {
-  const tbody = $("#alerts-body");
   try {
-    const data = await apiFetch("/alerts/recent?limit=50", { baseUrl: API_BASE, signal });
-    renderAlerts(tbody, data, ALERT_THRESHOLD);
+    alertsState.data = await apiFetch("/alerts/recent?limit=50", { baseUrl: API_BASE, signal });
+    renderAlertsView();
   } catch (err) {
     if (isAbort(err)) return;
-    renderAlertsError(tbody, err.message);
+    renderAlertsError($("#alerts-body"), err.message);
   }
 }
 
@@ -168,6 +187,28 @@ function init() {
   });
   $("#pair-input").addEventListener("keydown", (e) => {
     if (e.key === "Enter") lookupScore();
+  });
+
+  $("#alerts-filter").addEventListener("input", (e) => {
+    alertsState.filter = e.target.value.trim();
+    renderAlertsView();
+  });
+
+  document.querySelectorAll(".alerts-table th.sortable").forEach((th) => {
+    th.addEventListener("click", () => {
+      const key = th.dataset.sortKey;
+      if (alertsState.sortKey === key) {
+        alertsState.sortDir = alertsState.sortDir === "asc" ? "desc" : "asc";
+      } else {
+        alertsState.sortKey = key;
+        alertsState.sortDir = "desc";
+      }
+      document
+        .querySelectorAll(".alerts-table th.sortable")
+        .forEach((h) => h.classList.remove("sort-asc", "sort-desc"));
+      th.classList.add(alertsState.sortDir === "asc" ? "sort-asc" : "sort-desc");
+      renderAlertsView();
+    });
   });
 
   setInterval(refreshAll, REFRESH_INTERVAL_MS);
