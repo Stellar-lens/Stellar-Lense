@@ -13,6 +13,19 @@
   --font: "Inter", system-ui, -apple-system, sans-serif;
 }
 
+:root[data-theme="light"] {
+  --bg: #f6f8fa;
+  --surface: #fff;
+  --border: #d0d7de;
+  --text: #1f2328;
+  --text-muted: #59636e;
+  --accent: #0969da;
+  --accent-dark: #0550ae;
+  --green: #1a7f37;
+  --yellow: #9a6700;
+  --red: #cf222e;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -25,6 +38,9 @@ body {
   font-family: var(--font);
   font-size: 14px;
   line-height: 1.5;
+  transition:
+    background-color 0.15s,
+    color 0.15s;
 }
 
 /* ── Layout ─────────────────────────────────────────────────────────────────── */
@@ -78,6 +94,22 @@ header .tagline {
 }
 
 .refresh-btn:hover {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.theme-toggle {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 4px 8px;
+}
+
+.theme-toggle:hover {
   background: var(--surface);
   color: var(--text);
 }
