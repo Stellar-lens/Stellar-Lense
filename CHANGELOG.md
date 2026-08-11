@@ -53,5 +53,8 @@ client, not a monorepo duplicating the other four `Ledger-Lenz` repos.
 
 - `.env.example`, `pytest.ini`, `requirements.txt`, and friends removed — none of them
   applied to a static site with no server-side code.
+- README's `GET /score` example used a wallet address containing `0`, which isn't valid
+  Stellar base32 (the alphabet excludes `0`/`1`/`8`/`9`) — caught while writing the
+  integration tests, which need an actually-valid example wallet to test against.
 
 [1.0.0]: https://github.com/Ledger-Lenz/Ledgerlens-dashboard/releases/tag/v1.0.0

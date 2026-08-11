@@ -413,7 +413,7 @@ The dashboard is a read-only client of [Ledgerlens-api](https://github.com/Ledge
 
 ```json
 {
-  "wallet": "GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGMJUI6TUOHTFKDMHH0PMJK",
+  "wallet": "GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGMJUI6TUOHTFKDMHHOPMJK",
   "asset_pair": "XLM/USDC:GA5Z...",
   "score": 82,
   "benford_flag": true,
