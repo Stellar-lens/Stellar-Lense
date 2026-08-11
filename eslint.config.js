@@ -15,6 +15,8 @@ export default [
         navigator: "readonly",
         setInterval: "readonly",
         clearInterval: "readonly",
+        setTimeout: "readonly",
+        clearTimeout: "readonly",
         AbortController: "readonly",
         console: "readonly",
       },
