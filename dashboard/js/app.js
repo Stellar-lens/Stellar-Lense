@@ -253,20 +253,28 @@ function init() {
     renderAssetsView();
   });
 
+  function toggleAlertsSort(th) {
+    const key = th.dataset.sortKey;
+    if (alertsState.sortKey === key) {
+      alertsState.sortDir = alertsState.sortDir === "asc" ? "desc" : "asc";
+    } else {
+      alertsState.sortKey = key;
+      alertsState.sortDir = "desc";
+    }
+    document
+      .querySelectorAll(".alerts-table th.sortable")
+      .forEach((h) => h.classList.remove("sort-asc", "sort-desc"));
+    th.classList.add(alertsState.sortDir === "asc" ? "sort-asc" : "sort-desc");
+    renderAlertsView();
+  }
+
   document.querySelectorAll(".alerts-table th.sortable").forEach((th) => {
-    th.addEventListener("click", () => {
-      const key = th.dataset.sortKey;
-      if (alertsState.sortKey === key) {
-        alertsState.sortDir = alertsState.sortDir === "asc" ? "desc" : "asc";
-      } else {
-        alertsState.sortKey = key;
-        alertsState.sortDir = "desc";
+    th.addEventListener("click", () => toggleAlertsSort(th));
+    th.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        toggleAlertsSort(th);
       }
-      document
-        .querySelectorAll(".alerts-table th.sortable")
-        .forEach((h) => h.classList.remove("sort-asc", "sort-desc"));
-      th.classList.add(alertsState.sortDir === "asc" ? "sort-asc" : "sort-desc");
-      renderAlertsView();
     });
   });
 
