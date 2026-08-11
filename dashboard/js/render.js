@@ -40,7 +40,10 @@ export function renderAlerts(tbody, alerts, alertThreshold) {
     .map(
       (a) => `
         <tr>
-          <td title="${a.wallet}">${shortenWallet(a.wallet)}</td>
+          <td title="${a.wallet}">
+            <span class="wallet-cell">${shortenWallet(a.wallet)}</span>
+            <button class="copy-btn" data-wallet="${a.wallet}" title="Copy wallet address" aria-label="Copy wallet address">⧉</button>
+          </td>
           <td>${a.asset_pair}</td>
           <td>${pill(a.score)}</td>
           <td>${a.reason}</td>

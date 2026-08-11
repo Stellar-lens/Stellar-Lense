@@ -363,9 +363,26 @@ main {
   font-family: monospace;
   font-size: 11px;
   max-width: 180px;
+  white-space: nowrap;
+}
+
+.wallet-cell {
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+}
+
+.copy-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  margin-left: 4px;
+  padding: 0;
+}
+
+.copy-btn:hover {
+  color: var(--text);
 }
 
 .score-pill {
