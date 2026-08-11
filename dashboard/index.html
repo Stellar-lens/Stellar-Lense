@@ -23,6 +23,8 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
+    <a class="skip-link" href="#main-content">Skip to content</a>
+
     <header>
       <span class="logo">LedgerLens</span>
       <span class="tagline">Stellar DEX Wash Trade Detection</span>
@@ -30,11 +32,17 @@
         <span class="last-updated" id="last-updated"></span>
         <button class="refresh-btn" id="refresh-btn" title="Refresh now">⟳ Refresh</button>
         <button class="theme-toggle" id="theme-toggle" title="Toggle light/dark theme">🌙</button>
-        <span class="status-dot" id="status-dot" title="API status"></span>
+        <span
+          class="status-dot"
+          id="status-dot"
+          role="status"
+          aria-label="API status"
+          title="API status"
+        ></span>
       </div>
     </header>
 
-    <main>
+    <main id="main-content">
       <!-- Stats row -->
       <div class="stats" id="stats-row">
         <div class="stat">
@@ -55,8 +63,18 @@
       <div class="card">
         <h2>Score Lookup</h2>
         <div class="search-row">
-          <input id="wallet-input" type="text" placeholder="Wallet address (G…)" />
-          <input id="pair-input" type="text" placeholder="Asset pair (e.g. XLM/USDC:GA5Z…)" />
+          <input
+            id="wallet-input"
+            type="text"
+            placeholder="Wallet address (G…)"
+            aria-label="Wallet address"
+          />
+          <input
+            id="pair-input"
+            type="text"
+            placeholder="Asset pair (e.g. XLM/USDC:GA5Z…)"
+            aria-label="Asset pair"
+          />
           <button id="lookup-btn">Score</button>
         </div>
 
@@ -77,6 +95,8 @@
 
         <div
           id="lookup-error"
+          role="alert"
+          aria-live="assertive"
           style="color: var(--red); font-size: 13px; margin-top: 8px; display: none"
         ></div>
       </div>
@@ -94,6 +114,7 @@
           id="alerts-filter"
           type="text"
           placeholder="Filter by wallet or asset pair…"
+          aria-label="Filter alerts by wallet or asset pair"
         />
         <table class="alerts-table">
           <thead>
@@ -121,6 +142,7 @@
           id="assets-filter"
           type="text"
           placeholder="Filter by asset pair…"
+          aria-label="Filter assets by pair"
         />
         <div class="asset-grid" id="asset-grid">
           <div class="empty-state">Loading…</div>
