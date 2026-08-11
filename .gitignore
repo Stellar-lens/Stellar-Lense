@@ -1,32 +1,8 @@
-# Python
-__pycache__/
-*.py[cod]
-*.pyo
-.venv/
-venv/
-env/
-.env
-*.egg-info/
-dist/
-build/
-.pytest_cache/
-.coverage
-htmlcov/
-.mypy_cache/
+# Local dashboard config (points at your API deployment)
+dashboard/config.js
 
-# Models
-models/*.pkl
-models/*.joblib
-models/*.json
-!models/.gitkeep
-
-# Rust / Cargo
-target/
-Cargo.lock
-
-# Soroban
-*.wasm
-*.optimized.wasm
+# Node tooling
+node_modules/
 
 # IDE
 .vscode/
@@ -41,8 +17,3 @@ Thumbs.db
 # Logs
 *.log
 logs/
-
-# Data
-data/
-*.csv
-*.parquet

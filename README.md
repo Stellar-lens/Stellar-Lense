@@ -1,15 +1,15 @@
 # LedgerLens
 
+[![CI](https://github.com/Ledger-Lenz/Ledgerlens-dashboard/actions/workflows/ci.yml/badge.svg)](https://github.com/Ledger-Lenz/Ledgerlens-dashboard/actions/workflows/ci.yml)
 [![Built on Stellar](https://img.shields.io/badge/Built%20on-Stellar-blue?logo=stellar)](https://stellar.org)
 [![Soroban Smart Contracts](https://img.shields.io/badge/Smart%20Contracts-Soroban-purple)](https://soroban.stellar.org)
-[![Python](https://img.shields.io/badge/Python-3.11+-yellow?logo=python)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/API-FastAPI-teal?logo=fastapi)](https://fastapi.tiangolo.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-
-> *"On a transparent ledger, every transaction is visible. LedgerLens makes them legible."*
+> _"On a transparent ledger, every transaction is visible. LedgerLens makes them legible."_
 
 Hybrid on-chain fraud detection for the Stellar DEX — detecting wash trading and artificial volume using **Benford's Law** + **Ensemble Machine Learning** on **Soroban**.
+
+**This repository is the web dashboard only** — a static HTML/CSS/JS client that reads from the [Ledgerlens-api](https://github.com/Ledger-Lenz/Ledegerlens-api) service. It holds no detection, ingestion, or contract code; those live in their own repos (see [§16 Related Repositories](#16-related-repositories)). The sections below describe the LedgerLens product as a whole so this dashboard's place in it is clear.
 
 ---
 
@@ -224,11 +224,11 @@ Benford's Law states that in naturally occurring numerical datasets, the leading
 
 LedgerLens applies three metrics over rolling time windows for each wallet and trading pair:
 
-| Metric | Formula | Anomaly Threshold |
-|--------|----------|-------------------|
-| **Chi-square statistic** | `Σ (observed − expected)² / expected` | p < 0.05 |
-| **Z-score (per digit)** | `(observed_freq − expected_freq) / std_error` | \|z\| > 1.96 |
-| **Mean Absolute Deviation** | `mean(|observed − expected|)` | MAD > 0.015 |
+| Metric                      | Formula                                       | Anomaly Threshold   |
+| --------------------------- | --------------------------------------------- | ------------------- |
+| **Chi-square statistic**    | `Σ (observed − expected)² / expected`         | p < 0.05            |
+| **Z-score (per digit)**     | `(observed_freq − expected_freq) / std_error` | \|z\| > 1.96        |
+| **Mean Absolute Deviation** | `mean(                                        | observed − expected | )`  | MAD > 0.015 |
 
 Time windows: **1h · 4h · 24h · 7d · 30d** (15 Benford features total).
 
@@ -241,32 +241,36 @@ These signals are not standalone — Benford alone cannot distinguish high-frequ
 ### Feature Categories (30+ features)
 
 **Benford Features (15)**
+
 - Chi-square, Z-score, and MAD across 5 rolling time windows per wallet/pair
 
 **Trade Pattern Features**
+
 - Counterparty concentration ratio — fraction of volume with a single counterparty
 - Round-trip trade frequency — trades returning assets to origin wallet within N ledgers
 - Self-matching rate — correlated buy/sell orders from shared funding sources
 - Order cancellation rate and timing distribution
 
 **Volume and Timing Features**
+
 - Volume-to-unique-counterparty ratio
 - Intra-minute trade clustering coefficient
 - Off-hours activity ratio (trades at statistically unusual ledger times)
 - Volume spike frequency relative to rolling baseline
 
 **Wallet Graph Features**
+
 - Funding source similarity score
 - Network centrality within trading cluster graphs
 - Account age at time of first suspicious activity
 
 ### Model Architecture
 
-| Model | Role | Evaluation Metric |
-|-------|------|-------------------|
-| **Random Forest** | Stable baseline; handles missing features | AUC-ROC, F1 |
-| **XGBoost** | Primary classifier; best on tabular on-chain data | Precision-Recall AUC |
-| **LightGBM** | High-speed inference for real-time scoring | F1-score |
+| Model             | Role                                              | Evaluation Metric    |
+| ----------------- | ------------------------------------------------- | -------------------- |
+| **Random Forest** | Stable baseline; handles missing features         | AUC-ROC, F1          |
+| **XGBoost**       | Primary classifier; best on tabular on-chain data | Precision-Recall AUC |
+| **LightGBM**      | High-speed inference for real-time scoring        | F1-score             |
 
 All models use **SMOTE** oversampling to handle class imbalance. **SHAP values** explain every risk score for end-users and auditors.
 
@@ -325,57 +329,34 @@ if risk.score > 75 {
 ## 9. Repository Structure
 
 ```
-ledgerlens/
+Ledgerlens-dashboard/
 │
-├── README.md                         ← This file
-├── requirements.txt                  ← Python dependencies
-├── run_pipeline.py                   ← Full detection pipeline entry point
-├── .env.example                      ← Environment variable template
-│
-├── ingestion/
-│   ├── __init__.py
-│   ├── horizon_streamer.py           ← Real-time trade data via Horizon SSE
-│   ├── historical_loader.py          ← Bulk historical trade ingestion
-│   └── data_models.py               ← Pydantic schemas for trade records
-│
-├── detection/
-│   ├── __init__.py
-│   ├── benford_engine.py             ← Benford's Law feature computation
-│   ├── feature_engineering.py       ← On-chain ML feature extraction
-│   ├── model_training.py            ← Train ensemble classifiers
-│   ├── model_inference.py           ← Real-time risk scoring
-│   └── shap_explainer.py            ← SHAP interpretability layer
-│
-├── contracts/
-│   ├── ledgerlens-score/            ← Soroban smart contract (Rust)
-│   │   ├── src/
-│   │   │   ├── lib.rs               ← Contract entry point
-│   │   │   ├── types.rs             ← RiskScore and related types
-│   │   │   ├── storage.rs           ← Persistent storage helpers
-│   │   │   ├── events.rs            ← Event emission
-│   │   │   └── errors.rs            ← Custom error types
-│   │   └── Cargo.toml
-│   └── deploy.sh                    ← Testnet deployment script
-│
-├── api/
-│   ├── main.py                      ← FastAPI application
-│   ├── schemas.py                   ← Request / response Pydantic models
-│   └── routes/
-│       ├── __init__.py
-│       ├── scores.py                ← GET /score/{wallet}/{pair}
-│       ├── alerts.py                ← GET /alerts/recent
-│       └── assets.py               ← GET /assets/risk-ranking
+├── README.md                    ← This file
+├── ARCHITECTURE.md              ← Module layout and design rationale
+├── CONTRIBUTING.md
+├── SECURITY.md
+├── CHANGELOG.md
+├── LICENSE
+├── package.json                 ← Dev tooling only — no runtime dependencies
 │
 ├── dashboard/
-│   ├── index.html                   ← Web dashboard
-│   ├── app.js                       ← Dashboard frontend logic
-│   └── styles.css                   ← Dashboard styling
+│   ├── index.html                ← Dashboard markup
+│   ├── styles.css                ← Dashboard styling (incl. light/dark theme)
+│   ├── favicon.svg
+│   ├── config.js.example         ← Copy to config.js to set window.LEDGERLENS_API
+│   └── js/
+│       ├── app.js                 ← Orchestrator: DOM events → api.js → render.js
+│       ├── api.js                 ← Fetch wrapper with typed errors + retry
+│       ├── render.js              ← DOM rendering, given data + element refs
+│       ├── formatters.js          ← Pure formatting helpers (unit tested)
+│       └── constants.js           ← Shared config values and validation patterns
 │
 └── tests/
-    ├── test_benford.py
-    ├── test_features.py
-    └── test_api.py
+    ├── api.test.js
+    └── formatters.test.js
 ```
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for why it's split this way. The detection engine, ingestion, Soroban contract, and REST API each live in their own repo — see [§16 Related Repositories](#16-related-repositories).
 
 ---
 
@@ -383,162 +364,112 @@ ledgerlens/
 
 ### Prerequisites
 
-- Python 3.11+
-- [Stellar Horizon access](https://developers.stellar.org/api/horizon) (public endpoint or self-hosted)
-- [Rust + Soroban CLI](https://soroban.stellar.org/docs/getting-started/setup) (for contract deployment only)
+- A running [Ledgerlens-api](https://github.com/Ledger-Lenz/Ledegerlens-api) instance (local or deployed) — this dashboard has no backend of its own
+- Any static file server, or just open `dashboard/index.html` directly in a browser
 
-### 1. Clone and Install
+### 1. Clone
 
 ```bash
-git clone https://github.com/Inkman007/Ledgerlens-dashboard.git
+git clone https://github.com/Ledger-Lenz/Ledgerlens-dashboard.git
 cd Ledgerlens-dashboard
-python -m venv .venv
-source .venv/bin/activate      # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
 ```
 
-### 2. Configure Environment
+### 2. Point the dashboard at your API
 
 ```bash
-cp .env.example .env
+cp dashboard/config.js.example dashboard/config.js
 ```
 
-Edit `.env` with your settings:
+Edit `dashboard/config.js`:
+
+```js
+window.LEDGERLENS_API = "http://localhost:8000"; // or your deployed Ledgerlens-api URL
+```
+
+If `config.js` is absent, the dashboard falls back to `http://localhost:8000`.
+
+### 3. Serve it
 
 ```bash
-# Stellar network
-HORIZON_URL=https://horizon-testnet.stellar.org
-NETWORK=testnet
-
-# Asset pair to monitor (e.g. XLM:native / USDC:GA5Z...)
-TARGET_ASSET_CODE=USDC
-TARGET_ASSET_ISSUER=GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN
-
-# Soroban contract
-LEDGERLENS_CONTRACT_ID=your_contract_id_here
-SERVICE_ACCOUNT_SECRET=your_signing_key_here
-
-# API server
-API_HOST=0.0.0.0
-API_PORT=8000
-ALERT_THRESHOLD=75
+npm run serve
 ```
 
-### 3. Run the Detection Pipeline
+(or `python -m http.server 8080 --directory dashboard` directly — `npm run serve` just
+wraps that). Open `http://localhost:8080`.
 
-```bash
-python run_pipeline.py
-```
-
-### 4. Start the API Server
-
-```bash
-uvicorn api.main:app --reload
-```
-
-API docs available at `http://localhost:8000/docs`.
-
-### 5. Deploy the Soroban Contract (optional)
-
-```bash
-cd contracts
-chmod +x deploy.sh
-./deploy.sh testnet
-```
+`npm install` is only needed if you're contributing and want to run the lint/format/test
+tooling described in [CONTRIBUTING.md](CONTRIBUTING.md) — the dashboard itself has zero
+runtime dependencies.
 
 ---
 
 ## 11. API Reference
 
+The dashboard is a read-only client of [Ledgerlens-api](https://github.com/Ledger-Lenz/Ledegerlens-api). It calls:
+
 ### `GET /score/{wallet}/{asset_pair}`
 
-Returns the current LedgerLens risk score for a wallet and trading pair.
-
-**Response**
+`asset_pair` is slash-delimited, e.g. `XLM/USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN`.
 
 ```json
 {
-  "wallet": "GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGMJUI6TUOHTFKDMHH0PMJK",
-  "asset_pair": "XLM:USDC",
+  "wallet": "GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGMJUI6TUOHTFKDMHHOPMJK",
+  "asset_pair": "XLM/USDC:GA5Z...",
   "score": 82,
   "benford_flag": true,
   "ml_flag": true,
   "confidence": 91,
-  "timestamp": 1718500000,
-  "explanation": {
-    "top_features": [
-      { "feature": "counterparty_concentration_ratio", "contribution": 0.34 },
-      { "feature": "benford_chi_square_24h", "contribution": 0.27 },
-      { "feature": "round_trip_frequency", "contribution": 0.19 }
-    ]
-  }
+  "timestamp": "2026-06-01T00:04:00"
 }
 ```
 
-### `GET /alerts/recent`
+### `GET /alerts/recent?limit=50`
 
-Returns wallets and pairs flagged in the last 24 hours, ordered by score descending.
-
-**Query params**: `limit` (default 50), `min_score` (default 75)
+Returns a bare JSON array of `{ id, wallet, asset_pair, score, reason, timestamp }`, highest score first. The dashboard filters client-side for `score >= 75`.
 
 ### `GET /assets/risk-ranking`
 
-Returns all monitored assets ranked by their aggregate risk score.
+Returns a bare JSON array of `{ asset_pair, average_score, max_score, flagged_wallets, total_wallets }` for every known pair.
 
-**Query params**: `limit` (default 100), `window` (`1h` | `24h` | `7d`)
+### `GET /health`
+
+`{ "status": "ok" }` — polled every 60s to drive the header status dot.
+
+> These three list endpoints currently return unwrapped arrays with no `limit`/`window` filtering support server-side, so the dashboard requests a generous page and paginates/filters in the browser. See §16 for known gaps between this contract and the API repo's actual behavior.
 
 ---
 
 ## 12. Configuration
 
-All configuration is managed via environment variables. Copy `.env.example` to `.env` and fill in your values.
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `HORIZON_URL` | Yes | — | Stellar Horizon endpoint |
-| `NETWORK` | Yes | `testnet` | `testnet` or `mainnet` |
-| `TARGET_ASSET_CODE` | No | — | Specific asset to monitor |
-| `TARGET_ASSET_ISSUER` | No | — | Issuer of the target asset |
-| `LEDGERLENS_CONTRACT_ID` | Yes | — | Deployed Soroban contract address |
-| `SERVICE_ACCOUNT_SECRET` | Yes | — | Signing key for score submission |
-| `API_HOST` | No | `0.0.0.0` | API bind address |
-| `API_PORT` | No | `8000` | API port |
-| `ALERT_THRESHOLD` | No | `75` | Score above which a wallet is flagged |
-| `ML_MODEL_PATH` | No | `models/` | Path to trained model files |
-| `BENFORD_MIN_SAMPLES` | No | `30` | Minimum trades before Benford analysis |
-| `LOG_LEVEL` | No | `INFO` | Logging verbosity |
+The dashboard has exactly one setting: the API base URL, set via `dashboard/config.js` (see §10). There is no `.env` — this repo ships no server-side code.
 
 ---
 
 ## 13. Testing
 
 ```bash
-# Run all tests
-pytest tests/ -v
-
-# Run specific test suites
-pytest tests/test_benford.py -v
-pytest tests/test_features.py -v
-pytest tests/test_api.py -v
-
-# Run with coverage
-pytest tests/ --cov=. --cov-report=html
+npm test        # unit tests (node --test) for dashboard/js/{formatters,api}.js
+npm run lint     # ESLint
+npm run lint:css # Stylelint
+npm run format:check
 ```
 
-Test coverage targets:
+All four run in CI on every push/PR (`.github/workflows/ci.yml`).
 
-- ✅ Benford chi-square, Z-score, and MAD computation
-- ✅ Feature extraction against known wash trade patterns
-- ✅ API endpoint response schemas
-- ✅ Soroban contract: score submission and retrieval
-- ✅ Soroban contract: authorization enforcement
-- ✅ Edge cases: insufficient data, single counterparty, zero-volume pairs
+`formatters.js` and `api.js` are pure/injectable specifically so they're unit-testable
+without a browser (see [ARCHITECTURE.md](ARCHITECTURE.md)); `render.js` and `app.js` are
+DOM-coupled and are verified manually instead:
+
+1. Start [Ledegerlens-api](https://github.com/Ledger-Lenz/Ledegerlens-api) locally.
+2. Serve `dashboard/` (§10) and confirm the status dot goes green, stats populate, and a
+   score lookup against a wallet/pair from the API's seeded demo data returns a result.
 
 ---
 
 ## 14. Roadmap
 
-### Phase 1 — Foundation *(Months 1–2)*
+### Phase 1 — Foundation _(Months 1–2)_
+
 - [x] Project scaffolding and repository structure
 - [x] Pydantic data models for trade records
 - [x] Stellar Horizon SSE ingestion pipeline
@@ -547,21 +478,24 @@ Test coverage targets:
 - [ ] Baseline ML feature engineering
 - [ ] Initial model training on historical SDEX data
 
-### Phase 2 — Core Product *(Months 3–4)*
+### Phase 2 — Core Product _(Months 3–4)_
+
 - [ ] Full ensemble model training and evaluation
 - [ ] SHAP interpretability integration
 - [ ] Soroban contract deployment on Testnet
 - [ ] Public REST API (v1) with rate limiting
 - [ ] Web dashboard (beta)
 
-### Phase 3 — Ecosystem Integration *(Months 5–6)*
+### Phase 3 — Ecosystem Integration _(Months 5–6)_
+
 - [ ] Mainnet deployment
 - [ ] SDK for protocol integrations (Python + JavaScript)
 - [ ] Webhook alert system for asset issuers and protocol teams
 - [ ] Open dataset release: labelled SDEX wash trade patterns
 - [ ] Community feedback and model refinement cycle
 
-### Phase 4 — Scale *(Post-Grant)*
+### Phase 4 — Scale _(Post-Grant)_
+
 - [ ] Continuous model retraining pipeline
 - [ ] Coverage expansion to AMM pools and cross-asset paths
 - [ ] Integration partnerships with Stellar DEX aggregators
@@ -589,13 +523,13 @@ LedgerLens is not a surveillance tool. It is an **open-source public good** — 
 
 LedgerLens is split across focused repositories. Each can be developed, deployed, and integrated independently.
 
-| Repository | Role | Link |
-|------------|------|------|
-| **Ledgerlens-dashboard** *(this repo)* | Web dashboard — live score lookup, alert feed, asset risk ranking | [github.com/Ledger-Lenz/Ledgerlens-dashboard](https://github.com/Ledger-Lenz/Ledgerlens-dashboard) |
-| **Ledgerlens-api** | FastAPI REST service — `/score`, `/alerts`, `/assets`, `/webhooks` | [github.com/Ledger-Lenz/Ledgerlens-api](https://github.com/Ledger-Lenz/Ledgerlens-api) |
-| **Ledgerlens-core** | Detection engine — Benford engine, ML ensemble, SHAP explainer, scoring pipeline | [github.com/Ledger-Lenz/Ledgerlens-core](https://github.com/Ledger-Lenz/Ledgerlens-core) |
-| **Ledgerlens-contract** | Soroban smart contract — on-chain risk score registry, composable `get_score` | [github.com/Ledger-Lenz/Ledgerlens-contract](https://github.com/Ledger-Lenz/Ledgerlens-contract) |
-| **Ledgerlens-data** | Data layer — Horizon SSE streamer, historical loader, account resolver, Pydantic models | [github.com/Ledger-Lenz/Ledgerlens-data](https://github.com/Ledger-Lenz/Ledgerlens-data) |
+| Repository                                           | Role                                                                                             | Link                                                                                               |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| **Ledgerlens-dashboard** _(this repo)_               | Web dashboard — live score lookup, alert feed, asset risk ranking                                | [github.com/Ledger-Lenz/Ledgerlens-dashboard](https://github.com/Ledger-Lenz/Ledgerlens-dashboard) |
+| **Ledegerlens-api** _(repo name, note the spelling)_ | FastAPI REST service — `/score`, `/alerts`, `/assets` (`/webhooks` planned, not yet implemented) | [github.com/Ledger-Lenz/Ledegerlens-api](https://github.com/Ledger-Lenz/Ledegerlens-api)           |
+| **Ledgerlens-core**                                  | Detection engine — Benford engine, ML ensemble, SHAP explainer, scoring pipeline                 | [github.com/Ledger-Lenz/Ledgerlens-core](https://github.com/Ledger-Lenz/Ledgerlens-core)           |
+| **Ledgerlens-contract**                              | Soroban smart contract — on-chain risk score registry, composable `get_score`                    | [github.com/Ledger-Lenz/Ledgerlens-contract](https://github.com/Ledger-Lenz/Ledgerlens-contract)   |
+| **Ledgerlens-data**                                  | Data layer — Horizon SSE streamer, historical loader, account resolver, Pydantic models          | [github.com/Ledger-Lenz/Ledgerlens-data](https://github.com/Ledger-Lenz/Ledgerlens-data)           |
 
 ### How the Repos Connect
 
@@ -625,16 +559,13 @@ Contributions are welcome. We are actively looking for collaborators with experi
 
 ### Process
 
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feat/your-feature`
-3. Ensure all tests pass: `pytest tests/ -v`
-4. Submit a pull request with a clear description of what changed and why
-
-Please open an issue before starting significant work so we can align on approach.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, the lint/format/test commands CI runs,
+and the full workflow. Please open an issue before starting significant work so we can
+align on approach.
 
 ### Contact
 
-- GitHub Issues: [Create an issue](https://github.com/Inkman007/Ledgerlens-dashboard/issues)
+- GitHub Issues: [Create an issue](https://github.com/Ledger-Lenz/Ledgerlens-dashboard/issues)
 - Stellar Discord: Find us in `#builders`
 - Email: [victoruzoma874@gmail.com](mailto:victoruzoma874@gmail.com)
 
@@ -642,13 +573,13 @@ Please open an issue before starting significant work so we can align on approac
 
 ## 18. References
 
-- Benford, F. (1938) 'The law of anomalous numbers', *Proceedings of the American Philosophical Society*, 78(4), pp. 551–572.
-- Al Ali, A. et al. (2023) 'A powerful predicting model for financial statement fraud based on optimized XGBoost ensemble learning technique', *Applied Sciences*, 13(4).
-- Nti, I.K. and Somanathan, A.R. (2024) 'A scalable RF-XGBoost framework for financial fraud mitigation', *IEEE Transactions on Computational Social Systems*, 11(2), pp. 410–422.
-- Yadavalli, R. and Polisetti, R. (2025) 'Optimized financial fraud detection using SMOTE-enhanced ensemble learning with CatBoost and LightGBM', *ICVADV 2025*.
-- Harea, R. and Mihailă, S. (2025) 'Benford's law: Applicability in accounting and financial anomaly detection', *Challenges of Accounting for Young Researchers*, 3(1).
-- Stellar Development Foundation (2024) *Horizon API Documentation*. [https://developers.stellar.org/api/horizon](https://developers.stellar.org/api/horizon)
-- Stellar Development Foundation (2024) *Soroban Smart Contract Documentation*. [https://soroban.stellar.org/docs](https://soroban.stellar.org/docs)
+- Benford, F. (1938) 'The law of anomalous numbers', _Proceedings of the American Philosophical Society_, 78(4), pp. 551–572.
+- Al Ali, A. et al. (2023) 'A powerful predicting model for financial statement fraud based on optimized XGBoost ensemble learning technique', _Applied Sciences_, 13(4).
+- Nti, I.K. and Somanathan, A.R. (2024) 'A scalable RF-XGBoost framework for financial fraud mitigation', _IEEE Transactions on Computational Social Systems_, 11(2), pp. 410–422.
+- Yadavalli, R. and Polisetti, R. (2025) 'Optimized financial fraud detection using SMOTE-enhanced ensemble learning with CatBoost and LightGBM', _ICVADV 2025_.
+- Harea, R. and Mihailă, S. (2025) 'Benford's law: Applicability in accounting and financial anomaly detection', _Challenges of Accounting for Young Researchers_, 3(1).
+- Stellar Development Foundation (2024) _Horizon API Documentation_. [https://developers.stellar.org/api/horizon](https://developers.stellar.org/api/horizon)
+- Stellar Development Foundation (2024) _Soroban Smart Contract Documentation_. [https://soroban.stellar.org/docs](https://soroban.stellar.org/docs)
 
 ---
 
@@ -656,6 +587,6 @@ Please open an issue before starting significant work so we can align on approac
 
 **LedgerLens** — Making the Stellar ledger legible.
 
-*Built for the Stellar ecosystem. Open source. Community owned.*
+_Built for the Stellar ecosystem. Open source. Community owned._
 
 </div>
