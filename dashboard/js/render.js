@@ -9,6 +9,7 @@ export function renderStats({ flaggedEl, assetsEl, avgEl }, alerts, assets, aler
   const avgScore = assets.length
     ? Math.round(assets.reduce((s, a) => s + a.average_score, 0) / assets.length)
     : "—";
+  for (const el of [flaggedEl, assetsEl, avgEl]) el.classList.remove("skeleton");
   flaggedEl.textContent = flagged;
   assetsEl.textContent = assets.length;
   avgEl.textContent = avgScore;
