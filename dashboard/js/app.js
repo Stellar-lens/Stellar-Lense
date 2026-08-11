@@ -203,6 +203,18 @@ function init() {
     renderAlertsView();
   });
 
+  $("#alerts-body").addEventListener("click", (e) => {
+    const btn = e.target.closest(".copy-btn");
+    if (!btn) return;
+    navigator.clipboard.writeText(btn.dataset.wallet).then(() => {
+      const original = btn.textContent;
+      btn.textContent = "✓";
+      setTimeout(() => {
+        btn.textContent = original;
+      }, 1000);
+    });
+  });
+
   $("#assets-filter").addEventListener("input", (e) => {
     assetsState.filter = e.target.value.trim();
     renderAssetsView();
