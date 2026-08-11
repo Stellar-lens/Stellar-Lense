@@ -132,6 +132,4 @@ function init() {
   setInterval(refreshAll, REFRESH_INTERVAL_MS);
 }
 
-document.readyState === "loading"
-  ? document.addEventListener("DOMContentLoaded", init)
-  : init();
+document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", init) : init();

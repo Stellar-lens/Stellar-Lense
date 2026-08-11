@@ -4,8 +4,7 @@
 [![Soroban Smart Contracts](https://img.shields.io/badge/Smart%20Contracts-Soroban-purple)](https://soroban.stellar.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-
-> *"On a transparent ledger, every transaction is visible. LedgerLens makes them legible."*
+> _"On a transparent ledger, every transaction is visible. LedgerLens makes them legible."_
 
 Hybrid on-chain fraud detection for the Stellar DEX — detecting wash trading and artificial volume using **Benford's Law** + **Ensemble Machine Learning** on **Soroban**.
 
@@ -224,11 +223,11 @@ Benford's Law states that in naturally occurring numerical datasets, the leading
 
 LedgerLens applies three metrics over rolling time windows for each wallet and trading pair:
 
-| Metric | Formula | Anomaly Threshold |
-|--------|----------|-------------------|
-| **Chi-square statistic** | `Σ (observed − expected)² / expected` | p < 0.05 |
-| **Z-score (per digit)** | `(observed_freq − expected_freq) / std_error` | \|z\| > 1.96 |
-| **Mean Absolute Deviation** | `mean(|observed − expected|)` | MAD > 0.015 |
+| Metric                      | Formula                                       | Anomaly Threshold   |
+| --------------------------- | --------------------------------------------- | ------------------- |
+| **Chi-square statistic**    | `Σ (observed − expected)² / expected`         | p < 0.05            |
+| **Z-score (per digit)**     | `(observed_freq − expected_freq) / std_error` | \|z\| > 1.96        |
+| **Mean Absolute Deviation** | `mean(                                        | observed − expected | )`  | MAD > 0.015 |
 
 Time windows: **1h · 4h · 24h · 7d · 30d** (15 Benford features total).
 
@@ -241,32 +240,36 @@ These signals are not standalone — Benford alone cannot distinguish high-frequ
 ### Feature Categories (30+ features)
 
 **Benford Features (15)**
+
 - Chi-square, Z-score, and MAD across 5 rolling time windows per wallet/pair
 
 **Trade Pattern Features**
+
 - Counterparty concentration ratio — fraction of volume with a single counterparty
 - Round-trip trade frequency — trades returning assets to origin wallet within N ledgers
 - Self-matching rate — correlated buy/sell orders from shared funding sources
 - Order cancellation rate and timing distribution
 
 **Volume and Timing Features**
+
 - Volume-to-unique-counterparty ratio
 - Intra-minute trade clustering coefficient
 - Off-hours activity ratio (trades at statistically unusual ledger times)
 - Volume spike frequency relative to rolling baseline
 
 **Wallet Graph Features**
+
 - Funding source similarity score
 - Network centrality within trading cluster graphs
 - Account age at time of first suspicious activity
 
 ### Model Architecture
 
-| Model | Role | Evaluation Metric |
-|-------|------|-------------------|
-| **Random Forest** | Stable baseline; handles missing features | AUC-ROC, F1 |
-| **XGBoost** | Primary classifier; best on tabular on-chain data | Precision-Recall AUC |
-| **LightGBM** | High-speed inference for real-time scoring | F1-score |
+| Model             | Role                                              | Evaluation Metric    |
+| ----------------- | ------------------------------------------------- | -------------------- |
+| **Random Forest** | Stable baseline; handles missing features         | AUC-ROC, F1          |
+| **XGBoost**       | Primary classifier; best on tabular on-chain data | Precision-Recall AUC |
+| **LightGBM**      | High-speed inference for real-time scoring        | F1-score             |
 
 All models use **SMOTE** oversampling to handle class imbalance. **SHAP values** explain every risk score for end-users and auditors.
 
@@ -433,7 +436,8 @@ This repo has no automated tests yet — it's a small static site. To verify man
 
 ## 14. Roadmap
 
-### Phase 1 — Foundation *(Months 1–2)*
+### Phase 1 — Foundation _(Months 1–2)_
+
 - [x] Project scaffolding and repository structure
 - [x] Pydantic data models for trade records
 - [x] Stellar Horizon SSE ingestion pipeline
@@ -442,21 +446,24 @@ This repo has no automated tests yet — it's a small static site. To verify man
 - [ ] Baseline ML feature engineering
 - [ ] Initial model training on historical SDEX data
 
-### Phase 2 — Core Product *(Months 3–4)*
+### Phase 2 — Core Product _(Months 3–4)_
+
 - [ ] Full ensemble model training and evaluation
 - [ ] SHAP interpretability integration
 - [ ] Soroban contract deployment on Testnet
 - [ ] Public REST API (v1) with rate limiting
 - [ ] Web dashboard (beta)
 
-### Phase 3 — Ecosystem Integration *(Months 5–6)*
+### Phase 3 — Ecosystem Integration _(Months 5–6)_
+
 - [ ] Mainnet deployment
 - [ ] SDK for protocol integrations (Python + JavaScript)
 - [ ] Webhook alert system for asset issuers and protocol teams
 - [ ] Open dataset release: labelled SDEX wash trade patterns
 - [ ] Community feedback and model refinement cycle
 
-### Phase 4 — Scale *(Post-Grant)*
+### Phase 4 — Scale _(Post-Grant)_
+
 - [ ] Continuous model retraining pipeline
 - [ ] Coverage expansion to AMM pools and cross-asset paths
 - [ ] Integration partnerships with Stellar DEX aggregators
@@ -484,13 +491,13 @@ LedgerLens is not a surveillance tool. It is an **open-source public good** — 
 
 LedgerLens is split across focused repositories. Each can be developed, deployed, and integrated independently.
 
-| Repository | Role | Link |
-|------------|------|------|
-| **Ledgerlens-dashboard** *(this repo)* | Web dashboard — live score lookup, alert feed, asset risk ranking | [github.com/Ledger-Lenz/Ledgerlens-dashboard](https://github.com/Ledger-Lenz/Ledgerlens-dashboard) |
-| **Ledegerlens-api** *(repo name, note the spelling)* | FastAPI REST service — `/score`, `/alerts`, `/assets` (`/webhooks` planned, not yet implemented) | [github.com/Ledger-Lenz/Ledegerlens-api](https://github.com/Ledger-Lenz/Ledegerlens-api) |
-| **Ledgerlens-core** | Detection engine — Benford engine, ML ensemble, SHAP explainer, scoring pipeline | [github.com/Ledger-Lenz/Ledgerlens-core](https://github.com/Ledger-Lenz/Ledgerlens-core) |
-| **Ledgerlens-contract** | Soroban smart contract — on-chain risk score registry, composable `get_score` | [github.com/Ledger-Lenz/Ledgerlens-contract](https://github.com/Ledger-Lenz/Ledgerlens-contract) |
-| **Ledgerlens-data** | Data layer — Horizon SSE streamer, historical loader, account resolver, Pydantic models | [github.com/Ledger-Lenz/Ledgerlens-data](https://github.com/Ledger-Lenz/Ledgerlens-data) |
+| Repository                                           | Role                                                                                             | Link                                                                                               |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| **Ledgerlens-dashboard** _(this repo)_               | Web dashboard — live score lookup, alert feed, asset risk ranking                                | [github.com/Ledger-Lenz/Ledgerlens-dashboard](https://github.com/Ledger-Lenz/Ledgerlens-dashboard) |
+| **Ledegerlens-api** _(repo name, note the spelling)_ | FastAPI REST service — `/score`, `/alerts`, `/assets` (`/webhooks` planned, not yet implemented) | [github.com/Ledger-Lenz/Ledegerlens-api](https://github.com/Ledger-Lenz/Ledegerlens-api)           |
+| **Ledgerlens-core**                                  | Detection engine — Benford engine, ML ensemble, SHAP explainer, scoring pipeline                 | [github.com/Ledger-Lenz/Ledgerlens-core](https://github.com/Ledger-Lenz/Ledgerlens-core)           |
+| **Ledgerlens-contract**                              | Soroban smart contract — on-chain risk score registry, composable `get_score`                    | [github.com/Ledger-Lenz/Ledgerlens-contract](https://github.com/Ledger-Lenz/Ledgerlens-contract)   |
+| **Ledgerlens-data**                                  | Data layer — Horizon SSE streamer, historical loader, account resolver, Pydantic models          | [github.com/Ledger-Lenz/Ledgerlens-data](https://github.com/Ledger-Lenz/Ledgerlens-data)           |
 
 ### How the Repos Connect
 
@@ -537,13 +544,13 @@ Please open an issue before starting significant work so we can align on approac
 
 ## 18. References
 
-- Benford, F. (1938) 'The law of anomalous numbers', *Proceedings of the American Philosophical Society*, 78(4), pp. 551–572.
-- Al Ali, A. et al. (2023) 'A powerful predicting model for financial statement fraud based on optimized XGBoost ensemble learning technique', *Applied Sciences*, 13(4).
-- Nti, I.K. and Somanathan, A.R. (2024) 'A scalable RF-XGBoost framework for financial fraud mitigation', *IEEE Transactions on Computational Social Systems*, 11(2), pp. 410–422.
-- Yadavalli, R. and Polisetti, R. (2025) 'Optimized financial fraud detection using SMOTE-enhanced ensemble learning with CatBoost and LightGBM', *ICVADV 2025*.
-- Harea, R. and Mihailă, S. (2025) 'Benford's law: Applicability in accounting and financial anomaly detection', *Challenges of Accounting for Young Researchers*, 3(1).
-- Stellar Development Foundation (2024) *Horizon API Documentation*. [https://developers.stellar.org/api/horizon](https://developers.stellar.org/api/horizon)
-- Stellar Development Foundation (2024) *Soroban Smart Contract Documentation*. [https://soroban.stellar.org/docs](https://soroban.stellar.org/docs)
+- Benford, F. (1938) 'The law of anomalous numbers', _Proceedings of the American Philosophical Society_, 78(4), pp. 551–572.
+- Al Ali, A. et al. (2023) 'A powerful predicting model for financial statement fraud based on optimized XGBoost ensemble learning technique', _Applied Sciences_, 13(4).
+- Nti, I.K. and Somanathan, A.R. (2024) 'A scalable RF-XGBoost framework for financial fraud mitigation', _IEEE Transactions on Computational Social Systems_, 11(2), pp. 410–422.
+- Yadavalli, R. and Polisetti, R. (2025) 'Optimized financial fraud detection using SMOTE-enhanced ensemble learning with CatBoost and LightGBM', _ICVADV 2025_.
+- Harea, R. and Mihailă, S. (2025) 'Benford's law: Applicability in accounting and financial anomaly detection', _Challenges of Accounting for Young Researchers_, 3(1).
+- Stellar Development Foundation (2024) _Horizon API Documentation_. [https://developers.stellar.org/api/horizon](https://developers.stellar.org/api/horizon)
+- Stellar Development Foundation (2024) _Soroban Smart Contract Documentation_. [https://soroban.stellar.org/docs](https://soroban.stellar.org/docs)
 
 ---
 
@@ -551,6 +558,6 @@ Please open an issue before starting significant work so we can align on approac
 
 **LedgerLens** — Making the Stellar ledger legible.
 
-*Built for the Stellar ecosystem. Open source. Community owned.*
+_Built for the Stellar ecosystem. Open source. Community owned._
 
 </div>

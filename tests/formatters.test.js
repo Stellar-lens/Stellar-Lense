@@ -1,6 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { scoreClass, scoreLabel, pill, formatTs, shortenWallet } from "../dashboard/js/formatters.js";
+import {
+  scoreClass,
+  scoreLabel,
+  pill,
+  formatTs,
+  shortenWallet,
+} from "../dashboard/js/formatters.js";
 
 test("scoreClass buckets scores into low/medium/high", () => {
   assert.equal(scoreClass(0), "low");
