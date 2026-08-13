@@ -12,6 +12,11 @@ soroban-sdk = "21.0.0"
 
 [dev-dependencies]
 soroban-sdk = { version = "21.0.0", features = ["testutils"] }
+# soroban-env-host 21.2.1 depends on ed25519-dalek ">=2.0.0" (unbounded). Its
+# testutils PRNG code only satisfies ed25519-dalek 2.x's RNG trait bounds;
+# an unpinned resolve can pick 3.x and fail to compile. Pin to the
+# compatible 2.x line until soroban-env-host tightens its own constraint.
+ed25519-dalek = "=2.2.0"
 
 [profile.release]
 opt-level = "z"
