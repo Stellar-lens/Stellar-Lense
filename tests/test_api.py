@@ -29,7 +29,10 @@ def test_get_score_for_known_wallet():
 
 
 def test_get_score_unknown_pair_returns_404():
-    response = client.get("/score/SOMEWALLET/NOT/A/REAL/PAIR")
+    # Valid Stellar account ID format, but the pair doesn't exist.
+    response = client.get(
+        "/score/GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/NOT/A/REAL/PAIR"
+    )
     assert response.status_code == 404
 
 
