@@ -171,6 +171,14 @@ class Config:
     KAFKA_METRICS_PORT: int = int(os.getenv("KAFKA_METRICS_PORT", "9100"))
     TRADE_AVRO_SCHEMA_PATH: str = os.getenv("TRADE_AVRO_SCHEMA_PATH", "data/trade_avro_schema.json")
 
+    # Worker health monitoring (streaming/health.py::WorkerHealthMonitor). A
+    # worker is marked UNHEALTHY when it has not heartbeat within this many
+    # seconds — should comfortably exceed the poll-loop interval plus the
+    # slowest expected per-message processing time.
+    WORKER_HEALTH_STALE_THRESHOLD_SECONDS: float = float(
+        os.getenv("WORKER_HEALTH_STALE_THRESHOLD_SECONDS", "120")
+    )
+
     # End-to-end latency budget (Issue #124)
     E2E_LATENCY_BUDGET_MS: int = int(os.getenv("E2E_LATENCY_BUDGET_MS", "2000"))
     LATENCY_ANOMALY_RATE_THRESHOLD: float = float(
