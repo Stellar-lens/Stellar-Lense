@@ -45,7 +45,7 @@ from sqlalchemy import (
     event,
     select,
 )
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 
 from utils.logging import get_logger
@@ -358,7 +358,28 @@ class SqlExactlyOnceBackend:
             select(DedupRecord).where(DedupRecord.canonical_key == key.canonical())
         )
 
+    def _with_retry(self, fn: Any) -> Any:
+        """Retry *fn* (a zero-arg callable) on a transient ``OperationalError``.
+
+        SQLite can raise ``OperationalError`` for genuinely transient
+        conditions — lock contention (``database is locked``) or a momentary
+        ``disk I/O error`` from the underlying filesystem — that are not
+        application bugs and resolve on retry. Mirrors the existing
+        exponential-backoff pattern in
+        ``detection.risk_score_store.RiskScoreStore._upsert_impl``.
+        """
+        for attempt in range(5):
+            try:
+                return fn()
+            except OperationalError:
+                if attempt == 4:
+                    raise
+                time.sleep(0.05 * (2**attempt))
+
     def check_and_stage(self, key: DedupKey, ttl_seconds: float) -> DedupDecision:
+        return self._with_retry(lambda: self._check_and_stage_impl(key, ttl_seconds))
+
+    def _check_and_stage_impl(self, key: DedupKey, ttl_seconds: float) -> DedupDecision:
         with self._session_factory() as session:
             row = self._get_row(session, key)
             if row is None:
@@ -411,6 +432,9 @@ class SqlExactlyOnceBackend:
             return DedupDecision(DedupState.STAGED)
 
     def commit(self, key: DedupKey, payload: Any = None) -> None:
+        self._with_retry(lambda: self._commit_impl(key, payload))
+
+    def _commit_impl(self, key: DedupKey, payload: Any = None) -> None:
         with self._session_factory() as session:
             row = self._get_row(session, key)
             if row is None:
@@ -443,6 +467,9 @@ class SqlExactlyOnceBackend:
                 session.commit()
 
     def mark_failed(self, key: DedupKey) -> None:
+        self._with_retry(lambda: self._mark_failed_impl(key))
+
+    def _mark_failed_impl(self, key: DedupKey) -> None:
         with self._session_factory() as session:
             row = self._get_row(session, key)
             if row is not None:
@@ -450,6 +477,9 @@ class SqlExactlyOnceBackend:
                 session.commit()
 
     def get(self, key: DedupKey) -> DedupDecision:
+        return self._with_retry(lambda: self._get_impl(key))
+
+    def _get_impl(self, key: DedupKey) -> DedupDecision:
         with self._session_factory() as session:
             row = self._get_row(session, key)
             if row is None:
@@ -463,6 +493,9 @@ class SqlExactlyOnceBackend:
         ``source=f"pipeline_checkpoint:{run_id}:{pair_id}"``) to answer
         "list everything for this run" without a second index table.
         """
+        return self._with_retry(lambda: self._list_by_source_prefix_impl(source_prefix))
+
+    def _list_by_source_prefix_impl(self, source_prefix: str) -> list[DedupRecord]:
         with self._session_factory() as session:
             rows = list(
                 session.scalars(

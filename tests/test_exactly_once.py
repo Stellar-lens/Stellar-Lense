@@ -248,3 +248,48 @@ def test_fifty_concurrent_duplicate_submissions_exactly_one_winner_sql(tmp_path)
         t.join()
 
     assert len(winners) == 1
+
+
+# ---------------------------------------------------------------------------
+# Retry on transient OperationalError (e.g. sqlite "disk I/O error" / "database
+# is locked") — mirrors detection.risk_score_store.RiskScoreStore's existing
+# retry pattern for the same class of transient failure.
+# ---------------------------------------------------------------------------
+
+
+def test_sql_backend_retries_transient_operational_error(monkeypatch):
+    from sqlalchemy.exc import OperationalError
+
+    backend = SqlExactlyOnceBackend("sqlite:///:memory:")
+    key = DedupKey(source="test", external_id="a")
+
+    real_impl = backend._check_and_stage_impl
+    calls = {"n": 0}
+
+    def flaky(k, ttl):
+        calls["n"] += 1
+        if calls["n"] < 3:
+            raise OperationalError("stmt", {}, Exception("disk I/O error"))
+        return real_impl(k, ttl)
+
+    monkeypatch.setattr(backend, "_check_and_stage_impl", flaky)
+
+    decision = backend.check_and_stage(key, 86400.0)
+
+    assert calls["n"] == 3
+    assert decision.state is DedupState.NEW
+
+
+def test_sql_backend_gives_up_after_five_attempts(monkeypatch):
+    from sqlalchemy.exc import OperationalError
+
+    backend = SqlExactlyOnceBackend("sqlite:///:memory:")
+    key = DedupKey(source="test", external_id="a")
+
+    def always_fails(k, ttl):
+        raise OperationalError("stmt", {}, Exception("disk I/O error"))
+
+    monkeypatch.setattr(backend, "_check_and_stage_impl", always_fails)
+
+    with pytest.raises(OperationalError):
+        backend.check_and_stage(key, 86400.0)
