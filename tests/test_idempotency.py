@@ -9,6 +9,7 @@ from utils.idempotency import (
     IdempotencyConflictError,
     IdempotencyLedger,
     JobStatus,
+    _hash_payload,
     idempotent,
 )
 
@@ -43,15 +44,20 @@ def test_conflict_on_key_reuse_with_different_input(ledger):
 
 
 def test_concurrent_execution_within_lease_is_rejected(ledger):
-    # Simulate another worker holding the lease: begin an attempt but never complete it.
-    ledger._begin_attempt("job:2", "somehash")
+    # Simulate another worker holding the lease: begin an attempt but never
+    # complete it. _begin_attempt stores the hash of input_payload, not the
+    # raw payload, so the lease-held record must be seeded with the same
+    # hash run() will compute for "somehash" — otherwise run() sees an
+    # input_hash mismatch and raises IdempotencyConflictError instead of the
+    # ConcurrentExecutionError this test is actually about.
+    ledger._begin_attempt("job:2", _hash_payload("somehash"))
 
     with pytest.raises(ConcurrentExecutionError):
         ledger.run("job:2", lambda: "result", input_payload="somehash", lease_seconds=300)
 
 
 def test_stale_lease_is_reclaimed_and_job_runs(ledger):
-    ledger._begin_attempt("job:3", "somehash")
+    ledger._begin_attempt("job:3", _hash_payload("somehash"))
     # Force the lease to look old.
     conn = ledger._conn()
     conn.execute(

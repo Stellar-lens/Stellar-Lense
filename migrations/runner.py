@@ -212,18 +212,22 @@ class MigrationRunner:
         all_migrations = _load_all_migrations()
         _verify_registry(all_migrations)
 
+        # Kept unfiltered for status reporting — `status.pending` must still
+        # list migrations beyond `target` (they are pending, just not being
+        # applied by this call), not silently drop them from the report.
+        to_apply = all_migrations
         if target is not None:
             known_ids = {m.id for m in all_migrations}
             if target not in known_ids:
                 raise ValueError(f"Unknown migration target {target!r}. Known: {sorted(known_ids)}")
-            all_migrations = [m for m in all_migrations if int(m.id) <= int(target)]
+            to_apply = [m for m in all_migrations if int(m.id) <= int(target)]
 
         with self._engine.begin() as conn:
             _ensure_tracking_tables(conn)
             _acquire_lock(conn)
             applied = _applied_ids(conn)
 
-            pending = [m for m in all_migrations if m.id not in applied]
+            pending = [m for m in to_apply if m.id not in applied]
             if not pending:
                 logger.info("Database is up to date — no migrations to apply")
                 return self._build_status(all_migrations, applied)
