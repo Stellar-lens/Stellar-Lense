@@ -174,3 +174,64 @@ def test_without_checkpoint_pool_not_found_still_skipped(tmp_path):
         result = _load_amm_trades_for_pools(pool_ids, SINCE, UNTIL)
 
     assert result.empty
+
+
+def test_progress_callback_invoked_after_each_pool():
+    """Test that progress callback is invoked after each pool is processed."""
+    pool_ids = [POOL_A, POOL_B]
+    progress_calls = []
+
+    def track_progress(processed, total, rows, since, until):
+        progress_calls.append({
+            "processed": processed,
+            "total": total,
+            "rows": rows,
+            "since": since,
+            "until": until,
+        })
+
+    def fake_load(pool_id, since, until):
+        return _pool_trades(("GA", "GB") if pool_id == POOL_A else ("GC", "GD"))
+
+    with patch("scripts.backfill_amm_trades.load_amm_pool_trades", side_effect=fake_load):
+        _load_amm_trades_for_pools(
+            pool_ids, SINCE, UNTIL, progress_callback=track_progress
+        )
+
+    # Should have 2 progress calls, one per pool
+    assert len(progress_calls) == 2
+    assert progress_calls[0]["processed"] == 1
+    assert progress_calls[0]["total"] == 2
+    assert progress_calls[0]["rows"] == 1  # First pool has 1 row
+
+    assert progress_calls[1]["processed"] == 2
+    assert progress_calls[1]["total"] == 2
+    assert progress_calls[1]["rows"] == 2  # Both pools loaded = 2 rows total
+
+
+def test_progress_callback_with_fixture_scale(tmp_path):
+    """Test progress callback is invoked at expected cadence for fixture run."""
+    # Simulate a backfill with multiple pools where callback can track progress
+    pool_ids = [POOL_A, POOL_B]
+    progress_calls = []
+
+    def track_progress(processed, total, rows, since, until):
+        progress_calls.append({"processed": processed, "rows": rows})
+
+    def fake_load(pool_id, since, until):
+        # Simulate 100 rows per pool
+        return pd.DataFrame({
+            "base_account": ["GA"] * 100,
+            "counter_account": ["GB"] * 100,
+            "amount": [10.0] * 100,
+        })
+
+    with patch("scripts.backfill_amm_trades.load_amm_pool_trades", side_effect=fake_load):
+        _load_amm_trades_for_pools(
+            pool_ids, SINCE, UNTIL, progress_callback=track_progress
+        )
+
+    # With 2 pools × 100 rows, should see progress grow from 100 to 200
+    assert len(progress_calls) == 2
+    assert progress_calls[0]["rows"] == 100
+    assert progress_calls[1]["rows"] == 200

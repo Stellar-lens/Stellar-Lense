@@ -48,6 +48,7 @@ def _load_amm_trades_for_pools(
     until: datetime,
     checkpoint: PipelineCheckpoint | None = None,
     checkpoint_dir: Path | None = None,
+    progress_callback=None,
 ) -> pd.DataFrame:
     """Load AMM trade history for every pool, optionally resuming via *checkpoint*.
 
@@ -57,20 +58,29 @@ def _load_amm_trades_for_pools(
     failed — logged and retried on the next ``--checkpoint-file`` run — instead
     of propagating and aborting the whole backfill. Without a checkpoint, any
     exception other than ``PoolNotFoundError`` propagates unchanged.
+
+    Progress callback is invoked after each pool is processed with:
+        (processed_count, total_count, rows_loaded, since, until)
     """
     frames = []
     pending_ids = checkpoint.pending(pool_ids) if checkpoint is not None else pool_ids
+    processed_count = 0
 
     if checkpoint is not None:
         for pool_id in pool_ids:
             if pool_id in pending_ids:
                 continue
+            processed_count += 1
             cached_path = checkpoint.artifact_path(pool_id)
             if cached_path is None:
                 logger.info("Pool %s already processed (no trades) — skipping", pool_id)
-                continue
-            logger.info("Pool %s already fetched — reusing cached %s", pool_id, cached_path)
-            frames.append(pd.read_parquet(cached_path))
+            else:
+                logger.info("Pool %s already fetched — reusing cached %s", pool_id, cached_path)
+                frames.append(pd.read_parquet(cached_path))
+
+            rows_loaded = sum(len(f) for f in frames)
+            if progress_callback:
+                progress_callback(processed_count, len(pool_ids), rows_loaded, since, until)
 
     for pool_id in pending_ids:
         logger.info("Loading AMM trades for pool %s …", pool_id)
@@ -80,6 +90,10 @@ def _load_amm_trades_for_pools(
             logger.warning("Pool %s not found — skipping", pool_id)
             if checkpoint is not None:
                 checkpoint.record_success(pool_id, metadata={"found": False})
+            processed_count += 1
+            rows_loaded = sum(len(f) for f in frames)
+            if progress_callback:
+                progress_callback(processed_count, len(pool_ids), rows_loaded, since, until)
             continue
         except Exception as exc:
             if checkpoint is None:
@@ -88,12 +102,20 @@ def _load_amm_trades_for_pools(
                 "Pool %s failed to load — recording for retry on next --resume", pool_id
             )
             checkpoint.record_failure(pool_id, exc)
+            processed_count += 1
+            rows_loaded = sum(len(f) for f in frames)
+            if progress_callback:
+                progress_callback(processed_count, len(pool_ids), rows_loaded, since, until)
             continue
 
         if df.empty:
             logger.info("  → no trades in range")
             if checkpoint is not None:
                 checkpoint.record_success(pool_id, metadata={"rows": 0})
+            processed_count += 1
+            rows_loaded = sum(len(f) for f in frames)
+            if progress_callback:
+                progress_callback(processed_count, len(pool_ids), rows_loaded, since, until)
             continue
 
         df["pool_id"] = pool_id
@@ -108,6 +130,10 @@ def _load_amm_trades_for_pools(
             )
 
         frames.append(df)
+        processed_count += 1
+        rows_loaded = sum(len(f) for f in frames)
+        if progress_callback:
+            progress_callback(processed_count, len(pool_ids), rows_loaded, since, until)
 
     if not frames:
         return pd.DataFrame()
