@@ -168,6 +168,9 @@ class HorizonEndpointPool:
                 latency = time.monotonic() - start
                 return resp.status == 200, latency
         except Exception as exc:
+            # Broad catch justified: health checks must not crash on any network error
+            # (DNS failures, socket errors, timeouts, etc.). Probe failure just marks
+            # endpoint unhealthy; the pool will select another one on next call.
             logger.debug("Health check failed for %s: %s", url, exc)
             return False, float(self._failover_timeout)
 

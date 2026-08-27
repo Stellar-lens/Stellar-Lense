@@ -74,7 +74,10 @@ def fetch(
         started_at = time.perf_counter()
         try:
             result = call()
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
+            # Broad catch justified: any exception from Horizon needs to be examined
+            # to determine if it's a 429 (retryable rate limit) or another error
+            # (propagate immediately). Logging and metrics emission happen for all.
             emit_ingestion_failure(
                 "horizon",
                 exc,
