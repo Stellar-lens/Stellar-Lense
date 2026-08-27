@@ -23,6 +23,11 @@ from detection.artifact_lifecycle import ArtifactLifecycleError, ModelArtifactRe
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--manifest-path", default="models/artifact_manifest.json")
+    parser.add_argument(
+        "--check-only",
+        action="store_true",
+        help="Preview planned lifecycle actions without modifying the manifest (register, validate, promote, deprecate, rollback).",
+    )
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_register = sub.add_parser("register")
@@ -60,23 +65,40 @@ def main() -> None:
 
     try:
         if args.command == "register":
-            metrics = json.loads(args.metrics_json) if args.metrics_json else {}
-            version = registry.register(args.name, args.artifact_path, metrics=metrics)
-            print(f"Registered {args.name}:{version} (stage=staged)")
+            if args.check_only:
+                print(f"[CHECK-ONLY] Would register {args.name} from {args.artifact_path} (stage=staged)")
+            else:
+                metrics = json.loads(args.metrics_json) if args.metrics_json else {}
+                version = registry.register(args.name, args.artifact_path, metrics=metrics)
+                print(f"Registered {args.name}:{version} (stage=staged)")
         elif args.command == "validate":
-            registry.validate(args.name, args.version)
-            print(f"{args.name}:{args.version} -> validated")
+            if args.check_only:
+                print(f"[CHECK-ONLY] Would validate {args.name}:{args.version}")
+            else:
+                registry.validate(args.name, args.version)
+                print(f"{args.name}:{args.version} -> validated")
         elif args.command == "promote":
-            registry.promote(args.name, args.version)
-            print(f"{args.name}:{args.version} -> promoted (active)")
+            if args.check_only:
+                print(f"[CHECK-ONLY] Would promote {args.name}:{args.version} (active)")
+            else:
+                registry.promote(args.name, args.version)
+                print(f"{args.name}:{args.version} -> promoted (active)")
         elif args.command == "deprecate":
-            registry.deprecate(args.name, args.version, reason=args.reason)
-            print(f"{args.name}:{args.version} -> deprecated")
+            if args.check_only:
+                reason_str = f" (reason: {args.reason})" if args.reason else ""
+                print(f"[CHECK-ONLY] Would deprecate {args.name}:{args.version}{reason_str}")
+            else:
+                registry.deprecate(args.name, args.version, reason=args.reason)
+                print(f"{args.name}:{args.version} -> deprecated")
         elif args.command == "rollback":
-            record = registry.rollback(args.name, args.version, reason=args.reason)
-            print(
-                f"Rolled back {args.name}:{record.version}; reactivated parent={record.parent_version}"
-            )
+            if args.check_only:
+                reason_str = f" (reason: {args.reason})" if args.reason else ""
+                print(f"[CHECK-ONLY] Would rollback {args.name}:{args.version}{reason_str}")
+            else:
+                record = registry.rollback(args.name, args.version, reason=args.reason)
+                print(
+                    f"Rolled back {args.name}:{record.version}; reactivated parent={record.parent_version}"
+                )
         elif args.command == "verify":
             registry.verify_integrity(args.name, args.version)
             print(f"{args.name}:{args.version} integrity OK")
