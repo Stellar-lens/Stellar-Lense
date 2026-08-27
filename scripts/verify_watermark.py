@@ -52,6 +52,11 @@ def parse_args() -> argparse.Namespace:
         dest="json_output",
         help="Output result as JSON",
     )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Print per-trigger watermark check results with pass/fail details",
+    )
     return parser.parse_args()
 
 
@@ -79,6 +84,22 @@ def main() -> None:
         print(f"  Agreement : {result['agreement']:.4f} ({result['agreement']*100:.1f}%)")
         print(f"  Threshold : {result['threshold']:.2f}")
         print(f"  Triggers  : {result['n_triggers']}")
+
+        # Verbose: print per-trigger diagnostic information
+        if args.verbose:
+            print()
+            print("Per-Trigger Details:")
+            predictions = model.predict(triggers)
+            for i, (pred, expected) in enumerate(zip(predictions, [args.target_label] * len(predictions))):
+                match = "✓" if pred == expected else "✗"
+                print(f"  Trigger {i}: predicted={pred}, expected={expected} {match}")
+
+            # Print summary statistics
+            matches = sum(1 for p in predictions if p == args.target_label)
+            print(f"\n  Matches: {matches}/{len(predictions)} ({matches/len(predictions)*100:.1f}%)")
+            if matches < len(predictions):
+                failures = [i for i, p in enumerate(predictions) if p != args.target_label]
+                print(f"  Failed triggers: {failures}")
 
     sys.exit(0 if result["watermark_detected"] else 1)
 
