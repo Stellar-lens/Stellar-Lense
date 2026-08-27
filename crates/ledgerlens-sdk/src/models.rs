@@ -5,6 +5,32 @@ use serde::Deserialize;
 ///
 /// Field names and types match the Python SDK (`packages/ledgerlens-sdk/src/ledgerlens/models.py`)
 /// and the TypeScript SDK (`sdk/`) exactly.
+///
+/// # Examples
+///
+/// ```
+/// use ledgerlens_sdk::RiskScore;
+///
+/// let json = r#"{
+///     "wallet": "GABCDEFGHIJKLMNOPQRSTUVWXYZ012345678901234567890123456",
+///     "asset_pair": "XLM/USDC",
+///     "score": 82,
+///     "benford_flag": true,
+///     "ml_flag": true,
+///     "confidence": 91,
+///     "disputed": false,
+///     "timestamp": "2026-08-27T12:00:00Z",
+///     "score_lower": null,
+///     "score_upper": null,
+///     "prediction_set": null,
+///     "coverage_guarantee": null
+/// }"#;
+///
+/// let score: RiskScore = serde_json::from_str(json).unwrap();
+/// assert_eq!(score.score, 82);
+/// assert!(score.benford_flag);
+/// assert_eq!(score.asset_pair, "XLM/USDC");
+/// ```
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "snake_case")]
 pub struct RiskScore {
@@ -48,6 +74,36 @@ pub struct CrossChainLink {
 }
 
 /// Response shape of `GET /v1/scores/{wallet}`.
+///
+/// # Examples
+///
+/// ```
+/// use ledgerlens_sdk::WalletScoresResponse;
+///
+/// let json = r#"{
+///     "scores": [
+///         {
+///             "wallet": "GABCDEFGHIJKLMNOPQRSTUVWXYZ012345678901234567890123456",
+///             "asset_pair": "XLM/USDC",
+///             "score": 72,
+///             "benford_flag": false,
+///             "ml_flag": true,
+///             "confidence": 85,
+///             "disputed": false,
+///             "timestamp": "2026-08-27T12:00:00Z",
+///             "score_lower": null,
+///             "score_upper": null,
+///             "prediction_set": null,
+///             "coverage_guarantee": null
+///         }
+///     ],
+///     "cross_chain_links": []
+/// }"#;
+///
+/// let response: WalletScoresResponse = serde_json::from_str(json).unwrap();
+/// assert_eq!(response.scores.len(), 1);
+/// assert!(response.cross_chain_links.is_empty());
+/// ```
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "snake_case")]
 pub struct WalletScoresResponse {
