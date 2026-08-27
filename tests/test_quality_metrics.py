@@ -28,6 +28,7 @@ from scripts.quality_metrics import (
     collect_test_coverage,
     compute_composite_score,
     main,
+    report_to_csv,
 )
 
 # ---------------------------------------------------------------------------
@@ -562,3 +563,93 @@ class TestCLIMain:
         data = json.loads(out_p.read_text())
         # With 100% coverage and weight 1.0, composite should be high
         assert data["composite_score"] >= 90.0
+
+    def test_output_format_csv_writes_csv_file(self, tmp_path):
+        """Test that --output-format csv produces valid CSV output."""
+        import csv
+
+        junit_p = _write_junit(tmp_path, [])
+        taxonomy_p = _write_taxonomy(tmp_path, [])
+        out_p = tmp_path / "metrics.csv"
+        main(
+            [
+                "--junit",
+                str(junit_p),
+                "--taxonomy",
+                str(taxonomy_p),
+                "--output",
+                str(out_p),
+                "--output-format",
+                "csv",
+                "--skip-missing",
+            ]
+        )
+        assert out_p.exists()
+
+        # Parse the CSV and verify structure
+        with open(out_p) as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+
+        assert len(rows) > 0, "CSV should have data rows"
+        assert "metric_name" in rows[0]
+        assert "score" in rows[0]
+
+    def test_output_format_csv_contains_expected_columns(self, tmp_path):
+        """Test that CSV output has the expected columns."""
+        import csv
+
+        junit_p = _write_junit(tmp_path, [])
+        taxonomy_p = _write_taxonomy(tmp_path, [])
+        out_p = tmp_path / "metrics.csv"
+        main(
+            [
+                "--junit",
+                str(junit_p),
+                "--taxonomy",
+                str(taxonomy_p),
+                "--output",
+                str(out_p),
+                "--output-format",
+                "csv",
+                "--skip-missing",
+            ]
+        )
+
+        with open(out_p) as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+
+        # Check expected columns
+        fieldnames = set(reader.fieldnames)
+        expected = {"metric_name", "raw_value", "score", "source", "notes"}
+        assert expected.issubset(fieldnames), f"Missing columns. Got {fieldnames}"
+
+    def test_report_to_csv_function(self, tmp_path):
+        """Test the report_to_csv function directly."""
+        import csv
+        import io
+
+        metrics = [
+            MetricReading("test_coverage", 85.5, 85.5, "coverage.xml"),
+            MetricReading("mutation_score", None, 100.0, "cache", "skipped"),
+        ]
+        report = QualityReport(
+            composite_score=90.0,
+            passed_threshold=True,
+            threshold=70.0,
+            metrics=metrics,
+            weights=DEFAULT_WEIGHTS,
+        )
+
+        csv_output = report_to_csv(report)
+
+        # Parse the CSV string
+        reader = csv.DictReader(io.StringIO(csv_output))
+        rows = list(reader)
+
+        assert len(rows) == 2
+        assert rows[0]["metric_name"] == "test_coverage"
+        assert rows[0]["score"] == "85.50"
+        assert rows[1]["metric_name"] == "mutation_score"
+        assert rows[1]["raw_value"] == ""  # None should be empty string

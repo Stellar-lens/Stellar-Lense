@@ -68,6 +68,8 @@ Usage
 from __future__ import annotations
 
 import argparse
+import csv
+import io
 import json
 import sqlite3
 import subprocess
@@ -418,6 +420,31 @@ def build_badge_json(report: QualityReport) -> dict[str, str]:
     }
 
 
+def report_to_csv(report: QualityReport) -> str:
+    """Convert a QualityReport to CSV format.
+
+    Returns a CSV string with one row per metric, including columns for
+    metric name, raw value, score, source, and notes.
+    """
+    output = io.StringIO()
+    writer = csv.DictWriter(
+        output,
+        fieldnames=["metric_name", "raw_value", "score", "source", "notes"],
+    )
+    writer.writeheader()
+
+    for metric in report.metrics:
+        writer.writerow({
+            "metric_name": metric.name,
+            "raw_value": f"{metric.raw_value:.2f}" if metric.raw_value is not None else "",
+            "score": f"{metric.score:.2f}",
+            "source": metric.source,
+            "notes": metric.notes or "",
+        })
+
+    return output.getvalue()
+
+
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
@@ -436,6 +463,7 @@ Exit codes:
 Example:
   pytest --junitxml=reports/junit.xml --cov --cov-report=xml:reports/coverage.xml
   python -m scripts.quality_metrics --badge --threshold 70
+  python -m scripts.quality_metrics --output-format csv --output metrics.csv
         """,
     )
     parser.add_argument("--junit", default=str(DEFAULT_JUNIT))
@@ -444,6 +472,12 @@ Example:
     parser.add_argument("--drift-report", default=str(DEFAULT_DRIFT_REPORT))
     parser.add_argument("--taxonomy", default=str(DEFAULT_TAXONOMY))
     parser.add_argument("--output", default=str(DEFAULT_OUTPUT))
+    parser.add_argument(
+        "--output-format",
+        choices=["json", "csv"],
+        default="json",
+        help="Output format (json or csv)",
+    )
     parser.add_argument("--badge", action="store_true", help="Write quality_badge.json")
     parser.add_argument("--badge-output", default=str(DEFAULT_BADGE))
     parser.add_argument(
@@ -501,11 +535,18 @@ def main(argv: list[str] | None = None) -> int:
 
     print(report.summary())
 
-    # Write JSON report
+    # Write report in requested format
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(output_path, "w") as fh:
-        json.dump(report.to_dict(), fh, indent=2)
+
+    if args.output_format == "csv":
+        with open(output_path, "w", newline="") as fh:
+            fh.write(report_to_csv(report))
+    else:
+        # Default JSON format
+        with open(output_path, "w") as fh:
+            json.dump(report.to_dict(), fh, indent=2)
+
     logger.info("Quality metrics written to %s", output_path)
 
     # Write badge JSON
