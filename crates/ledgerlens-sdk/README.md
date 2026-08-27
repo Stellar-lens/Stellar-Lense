@@ -102,6 +102,10 @@ the Python prover and consumed by both the Python and Rust test suites. A change
 to one verifier that silently diverges from the other will fail CI in both
 places.
 
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for a version history.
+
 ## License
 
 MIT
