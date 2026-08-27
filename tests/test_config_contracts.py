@@ -103,6 +103,26 @@ def test_pipeline_onchain_rejects_invalid_stellar_network(monkeypatch):
         validate_mode("pipeline_onchain")
 
 
+def test_pipeline_onchain_fails_fast_without_submitter_secret(monkeypatch):
+    """Verify that --submit-onchain without LEDGERLENS_SUBMITTER_SECRET fails at startup.
+
+    This test confirms that the error message specifically names the missing variable,
+    and occurs before any pipeline work (ingestion/scoring) is invoked.
+    """
+    _set_pipeline_baseline(monkeypatch)
+    monkeypatch.setattr(Config, "LEDGERLENS_CONTRACT_ID", "contract-id")
+    monkeypatch.setattr(Config, "LEDGERLENS_SUBMITTER_SECRET", "")  # Empty secret
+    monkeypatch.setattr(Config, "SOROBAN_RPC_URL", "https://soroban-testnet.stellar.org")
+    monkeypatch.setattr(Config, "STELLAR_NETWORK", "TESTNET")
+
+    with pytest.raises(OSError) as exc:
+        validate_mode("pipeline_onchain")
+
+    error_msg = str(exc.value)
+    assert "LEDGERLENS_SUBMITTER_SECRET" in error_msg
+    assert "not set" in error_msg
+
+
 # ---------------------------------------------------------------------------
 # api
 # ---------------------------------------------------------------------------
