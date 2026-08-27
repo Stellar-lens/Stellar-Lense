@@ -178,6 +178,52 @@ class TestMigrationsFreshEngine:
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# Migration prerequisites
+# ---------------------------------------------------------------------------
+
+
+class TestMigrationPrerequisites:
+    def test_upgrade_detects_missing_prerequisites(self, populated_engine):
+        """Attempting to apply 0003 without 0001 and 0002 should raise RuntimeError."""
+        # Manually record 0004 as applied to simulate a broken state where a later
+        # migration was applied out of order
+        with populated_engine.begin() as conn:
+            from migrations.runner import _ensure_tracking_tables, _record_applied
+            from migrations.versions._0004_add_schema_version import migration as m0004
+
+            _ensure_tracking_tables(conn)
+            _record_applied(conn, m0004)
+
+        runner = MigrationRunner(populated_engine)
+        # Trying to upgrade should fail because prerequisites 0001, 0002, 0003 are missing
+        with pytest.raises(RuntimeError, match="missing prerequisite migrations"):
+            runner.upgrade()
+
+    def test_prerequisite_error_names_missing_migrations(self, populated_engine):
+        """The error message should name the specific missing prerequisite migrations."""
+        # Record only 0001 as applied
+        with populated_engine.begin() as conn:
+            from migrations.runner import _ensure_tracking_tables, _record_applied
+            from migrations.versions._0001_add_ring_id import migration as m0001
+
+            _ensure_tracking_tables(conn)
+            _record_applied(conn, m0001)
+
+        runner = MigrationRunner(populated_engine)
+        # Trying to apply 0003 should fail because 0002 is missing (0001 is satisfied)
+        with pytest.raises(RuntimeError) as exc:
+            runner.upgrade()
+
+        error_msg = str(exc.value)
+        assert "0002" in error_msg, "Error should name the missing prerequisite 0002"
+
+
+# ---------------------------------------------------------------------------
+# Migration discovery helpers
+# ---------------------------------------------------------------------------
+
+
 class TestMigrationDiscovery:
     def test_migrations_are_sorted_by_id(self):
         migrations = _load_all_migrations()

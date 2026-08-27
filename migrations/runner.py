@@ -229,6 +229,14 @@ class MigrationRunner:
                 return self._build_status(all_migrations, applied)
 
             for migration in pending:
+                # Check prerequisites: all earlier-numbered migrations must be applied
+                missing_prerequisites = self._check_prerequisites(migration, all_migrations, applied)
+                if missing_prerequisites:
+                    raise RuntimeError(
+                        f"Cannot apply migration {migration.id} ({migration.description}): "
+                        f"missing prerequisite migrations: {', '.join(sorted(missing_prerequisites))}"
+                    )
+
                 if self._dry_run:
                     logger.info(
                         "[dry-run] Would apply migration %s: %s",
@@ -245,6 +253,21 @@ class MigrationRunner:
         with self._engine.connect() as conn:
             applied = _applied_ids(conn)
         return self._build_status(all_migrations, applied)
+
+    def _check_prerequisites(
+        self, migration: Migration, all_migrations: list[Migration], applied: set[str]
+    ) -> set[str]:
+        """Check that all prerequisite (lower-numbered) migrations have been applied.
+
+        Returns a set of missing prerequisite migration IDs. Empty set means all
+        prerequisites are satisfied.
+        """
+        current_id = int(migration.id)
+        missing = set()
+        for m in all_migrations:
+            if int(m.id) < current_id and m.id not in applied:
+                missing.add(m.id)
+        return missing
 
     def status(self) -> MigrationStatus:
         """Return :class:`MigrationStatus` without applying anything."""
