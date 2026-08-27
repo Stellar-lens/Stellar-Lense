@@ -381,6 +381,8 @@ for the Kafka topology, partition strategy, and at-least-once semantics.
 | `--no-graph` | Skip loading account activity and building the wallet funding graph (faster; `funding_source_similarity` and `network_centrality` stay `0`) |
 | `--submit-onchain` | Submit flagged wallets' `RiskScore` to the `ledgerlens-score` contract via `integrations/contract_client.py` |
 | `--dry-run` | Run all pipeline stages but skip every write — no DB persistence and no on-chain submission (implies `--no-persist`; silently skips `--submit-onchain`). Flagged wallets are still printed. |
+| `--checkpoint-file <path>` | Path to a JSON checkpoint file enabling resumable per-pair processing. Pairs already completed are skipped; failed pairs are retried on the next run instead of aborting the whole pipeline. Ignored with `--dry-run`. |
+| `--fresh` | Discard an existing `--checkpoint-file` and start over. No effect without `--checkpoint-file`. |
 
 ## Model Artifacts
 

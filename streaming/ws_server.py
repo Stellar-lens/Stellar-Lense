@@ -374,9 +374,14 @@ async def _handler(websocket) -> None:
             _process_outbound(websocket, client_queue, client_id, rate_limiter)
         )
 
+        # Task 3: Heartbeat — sends a WebSocket ping every WS_HEARTBEAT_INTERVAL_SECONDS.
+        # If the client doesn't respond with a pong within the timeout, the connection
+        # is considered dead and the task exits, triggering cleanup via FIRST_COMPLETED.
+        heartbeat_task = asyncio.create_task(_heartbeat(websocket, client_id))
+
         # Wait for either task to complete or for client to disconnect
         done, pending = await asyncio.wait(
-            [inbound_task, outbound_task],
+            [inbound_task, outbound_task, heartbeat_task],
             return_when=asyncio.FIRST_COMPLETED,
         )
 
@@ -621,6 +626,37 @@ async def _handle_replay(websocket, client_id: str, permissions: set[str], paylo
     except ValidationError as exc:
         error = ErrorMessage(code="validation_error", message=str(exc))
         await websocket.send(error.model_dump_json())
+
+
+async def _heartbeat(websocket, client_id: str) -> None:
+    """Send periodic WebSocket pings to detect zombie (abruptly-disconnected) clients.
+
+    The ``websockets`` library automatically handles the pong response and raises
+    ``ConnectionClosed`` if the client does not reply within its internal timeout
+    or if the connection is already dead.  When that happens this coroutine exits,
+    which — via ``asyncio.wait(FIRST_COMPLETED)`` in ``_handler`` — triggers the
+    cleanup ``finally`` block that removes the client from ``_clients``.
+
+    The heartbeat interval is ``config.WS_HEARTBEAT_INTERVAL_SECONDS`` (default
+    30 s, configurable via ``WS_HEARTBEAT_INTERVAL_SECONDS``).
+    """
+    try:
+        while True:
+            await asyncio.sleep(config.WS_HEARTBEAT_INTERVAL_SECONDS)
+            try:
+                await websocket.ping()
+            except websockets.exceptions.ConnectionClosed:
+                logger.debug(
+                    "WebSocket heartbeat detected dead connection for client %s", client_id
+                )
+                break
+            except Exception as exc:
+                logger.warning(
+                    "WebSocket heartbeat error for client %s: %s", client_id, exc
+                )
+                break
+    except asyncio.CancelledError:
+        pass
 
 
 async def _process_outbound(
