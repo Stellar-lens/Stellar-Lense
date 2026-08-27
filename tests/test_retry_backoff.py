@@ -204,3 +204,114 @@ def test_attempt_history_render_includes_each_attempt():
     rendered = history.render()
     assert "attempt 1" in rendered
     assert "attempt 2" in rendered
+
+
+class TestBackoffStateDoesNotLeakBetweenRequests:
+    """After a call that retried several times before succeeding, the *next*
+    independent call must begin at the base delay — not at an inflated delay
+    carried over from the previous call's retries.
+
+    This verifies that retry/backoff state is scoped per-call, not shared
+    across calls (which would make a historical backfill progressively slower
+    even when Horizon is healthy after a transient outage).
+    """
+
+    def test_second_call_starts_at_base_delay(self):
+        """First call retries twice before succeeding; second call must use
+        the base delay on its first retry — not the inflated delay from
+        call 1's second retry."""
+        policy = RetryPolicy(
+            max_attempts=5,
+            base_delay_seconds=1.0,
+            max_delay_seconds=60.0,
+            multiplier=2.0,
+            jitter="none",
+            retryable_exceptions=(IOError,),
+        )
+        delays_recorded: list[float] = []
+
+        def capturing_sleep(seconds: float) -> None:
+            delays_recorded.append(seconds)
+
+        # --- Call 1: fail twice, succeed on attempt 3 ---
+        call1_attempts = {"count": 0}
+
+        def call1():
+            call1_attempts["count"] += 1
+            if call1_attempts["count"] < 3:
+                raise OSError("transient")
+            return "call1_ok"
+
+        result1 = call_with_retry(call1, policy=policy, sleep=capturing_sleep)
+        assert result1 == "call1_ok"
+        assert call1_attempts["count"] == 3
+        # Delays before attempt 2 and 3 should be base and base*multiplier
+        assert delays_recorded == [1.0, 2.0]
+
+        # --- Call 2: fail once, succeed on attempt 2 ---
+        delays_recorded.clear()
+        call2_attempts = {"count": 0}
+
+        def call2():
+            call2_attempts["count"] += 1
+            if call2_attempts["count"] < 2:
+                raise OSError("transient")
+            return "call2_ok"
+
+        result2 = call_with_retry(call2, policy=policy, sleep=capturing_sleep)
+        assert result2 == "call2_ok"
+        assert call2_attempts["count"] == 2
+        # The ONLY delay in call 2 must be the base delay (1.0 s), NOT the
+        # inflated 4.0 s or 8.0 s that would result from carrying over call 1's
+        # backoff state.
+        assert delays_recorded == [1.0], (
+            f"Expected second independent call to start at base delay 1.0 s, "
+            f"but got {delays_recorded}. Backoff state is leaking between calls."
+        )
+
+    def test_decorator_form_no_state_leak(self):
+        """The @retry_with_backoff decorator must also reset per decorated-function
+        call, not accumulate state across invocations of the same decorated function."""
+        policy = RetryPolicy(
+            max_attempts=5,
+            base_delay_seconds=1.0,
+            max_delay_seconds=60.0,
+            multiplier=2.0,
+            jitter="none",
+            retryable_exceptions=(IOError,),
+        )
+        delays_recorded: list[float] = []
+
+        def _sleep(s: float) -> None:
+            delays_recorded.append(s)
+
+        invocation = {"n": 0, "call_attempt": 0}
+
+        @retry_with_backoff(policy, sleep=_sleep)
+        def fetch_page():
+            invocation["n"] += 1
+            invocation["call_attempt"] += 1
+            # First invocation: fail twice then succeed
+            if invocation["n"] == 1 and invocation["call_attempt"] < 3:
+                raise OSError("transient")
+            return f"page-{invocation['n']}"
+
+        # First outer call — retries twice inside
+        invocation["call_attempt"] = 0
+        r1 = fetch_page()
+        assert r1 == "page-3"  # n increments each attempt
+        delays_after_first_call = list(delays_recorded)
+
+        # Reset attempt counter for the second outer call
+        invocation["call_attempt"] = 0
+        delays_recorded.clear()
+
+        # Second outer call — succeeds immediately (no retry needed because
+        # invocation["n"] is now 4, so the condition `n==1` is false)
+        r2 = fetch_page()
+        assert r2 == "page-4"
+        # No delays at all since second call succeeds first attempt
+        assert delays_recorded == [], (
+            f"Second call should have had zero delays but recorded {delays_recorded}. "
+            "State leaked from the first call's retry loop."
+        )

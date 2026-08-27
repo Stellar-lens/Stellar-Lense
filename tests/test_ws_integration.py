@@ -423,3 +423,89 @@ async def test_invalid_channel_format_rejected(ws_server):
             assert message["code"] == "invalid_channel"
         except TimeoutError:
             pytest.fail("Did not receive invalid_channel error message")
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Zombie connection (abrupt disconnect) cleanup test
+# ─────────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_zombie_connection_cleaned_up_after_heartbeat(ws_server):
+    """A client that disconnects without a close handshake must be removed from
+    the server's _clients dict within one heartbeat cycle.
+
+    This test:
+    1. Connects a legitimate client and confirms it appears in _clients.
+    2. Closes the underlying TCP transport without sending a WebSocket close
+       frame (simulating a network drop / browser tab kill).
+    3. Triggers a broadcast (which exercises the send path) and waits for the
+       server's write-failure detection to clean up the dead entry.
+    4. Asserts the dead client ID is no longer in _clients within a generous
+       timeout.
+    """
+    port, private_key, _ = ws_server
+    zombie_client_id = "zombie-test-client"
+    token = create_test_jwt(private_key, client_id=zombie_client_id)
+
+    uri = f"ws://127.0.0.1:{port}"
+    headers = {"Authorization": f"Bearer {token}"}
+
+    from streaming import ws_server as ws_module
+
+    # ── Step 1: Connect and confirm the client is registered ──────────────
+    websocket = await websockets.connect(uri, additional_headers=headers)
+    # Give the server's _handler coroutine time to register the client
+    await asyncio.sleep(0.3)
+
+    with ws_module._clients_lock:
+        assert zombie_client_id in ws_module._clients, (
+            "Client should be registered in _clients after connecting"
+        )
+
+    # Subscribe to a channel so the client is eligible to receive broadcasts
+    channel = "wallet/GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF"
+    await websocket.send(json.dumps({"type": "subscribe", "channels": [channel]}))
+    await asyncio.sleep(0.1)
+
+    # ── Step 2: Abrupt disconnect — close the transport without WS close ──
+    # websockets.WebSocketClientProtocol exposes the underlying asyncio
+    # transport; closing it abruptly mimics a network drop.
+    websocket.transport.close()
+
+    # ── Step 3: Trigger a broadcast so the server attempts a send to the
+    #            dead socket and detects the failure ─────────────────────
+    if ws_module._loop and ws_module._loop.is_running():
+        score_event = {
+            "wallet": "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+            "asset_pair": "XLM:native/USDC:test",
+            "score": 80,
+            "score_lower": 75,
+            "score_upper": 85,
+            "bft_divergence": False,
+            "top_features": [],
+            "timestamp": datetime.now(UTC).isoformat(),
+        }
+        asyncio.run_coroutine_threadsafe(
+            ws_module.publish_score_update(score_event), ws_module._loop
+        )
+
+    # ── Step 4: Wait for cleanup and assert ───────────────────────────────
+    # The server detects the dead connection either through the write failure
+    # in _process_outbound or through the heartbeat ping.  We use a generous
+    # 5-second timeout which is well within one heartbeat cycle even on slow CI.
+    deadline = asyncio.get_event_loop().time() + 5.0
+    while asyncio.get_event_loop().time() < deadline:
+        await asyncio.sleep(0.1)
+        with ws_module._clients_lock:
+            if zombie_client_id not in ws_module._clients:
+                break
+    else:
+        with ws_module._clients_lock:
+            still_present = zombie_client_id in ws_module._clients
+        if still_present:
+            pytest.fail(
+                f"Zombie client '{zombie_client_id}' was NOT removed from _clients "
+                "within 5 seconds of an abrupt transport close. The server is leaking "
+                "dead connections."
+            )

@@ -1222,6 +1222,33 @@ def compute_ts_decomposition_features(wallet_trades: pd.DataFrame) -> dict:
         }
 
 
+# ---------------------------------------------------------------------------
+# One-time GNN zero-fallback warning
+# ---------------------------------------------------------------------------
+
+# Sentinel so the warning fires at most once per interpreter session, avoiding
+# log spam when the pipeline processes thousands of wallets without a trained
+# encoder.
+_gnn_zero_fallback_warned: bool = False
+
+
+def _warn_gnn_zero_fallback() -> None:
+    """Emit a single WARNING the first time the all-zeros GNN fallback is used.
+
+    This signals to operators that ring-detection performance may be weaker
+    than expected because no trained GNN encoder is available yet.
+    """
+    global _gnn_zero_fallback_warned
+    if not _gnn_zero_fallback_warned:
+        logger.warning(
+            "GNN encoder not available — all gnn_0…gnn_%d features are set to 0.0. "
+            "Ring-detection signals from the graph embedding layer will be absent. "
+            "Run 'python -m detection.model_training --with-gnn' to train the encoder.",
+            config.GNN_EMBEDDING_DIM - 1,
+        )
+        _gnn_zero_fallback_warned = True
+
+
 def build_feature_vector(
     wallet: str,
     wallet_trades: pd.DataFrame,
@@ -1332,6 +1359,7 @@ def _build_feature_vector_inner(
     if gnn_encoder is not None and funding_graph is not None:
         features.update(compute_graph_embedding_features(wallet, funding_graph, gnn_encoder))
     else:
+        _warn_gnn_zero_fallback()
         features.update({f"gnn_{i}": 0.0 for i in range(config.GNN_EMBEDDING_DIM)})
 
     # Sequence model embedding features (#182) — graceful zero-fallback when model absent.
