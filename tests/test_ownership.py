@@ -10,6 +10,7 @@ from utils.ownership import (
     CodeOwnersEntry,
     OwnershipRegistry,
     _matches_pattern,
+    check_ownership_compliance,
     codeowners_entries,
 )
 
@@ -284,6 +285,97 @@ class TestCodeOwnersEntriesIterator:
 
 
 # ── Integration: real CODEOWNERS file in repo ────────────────────────────────
+
+
+# ── Ownership compliance checking ────────────────────────────────────────────
+
+
+class TestOwnershipComplianceCheck:
+    def test_check_compliance_names_file_and_pattern(self, tmp_path: Path) -> None:
+        """Ownership check failure names the specific file and matching CODEOWNERS pattern."""
+        registry = OwnershipRegistry(
+            codeowners_entries=[
+                CodeOwnersEntry(
+                    pattern="/detection/",
+                    owners=["@Ledger-Lenz/ml-team"],
+                    line_number=1,
+                ),
+                CodeOwnersEntry(
+                    pattern="/ingestion/",
+                    owners=["@Ledger-Lenz/data-team"],
+                    line_number=2,
+                ),
+            ],
+            subsystems={},
+            _repo_root=tmp_path,
+        )
+
+        # Mock the registry load to return our test registry
+        import unittest.mock as mock
+
+        with mock.patch("utils.ownership.OwnershipRegistry.load", return_value=registry):
+            compliant, violations = check_ownership_compliance(
+                ["detection/benford_engine.py", "ingestion/horizon_streamer.py"],
+                repo_root=tmp_path,
+            )
+
+        assert compliant is True
+        assert len(violations) == 0
+
+    def test_check_compliance_detects_unowned_file(self, tmp_path: Path) -> None:
+        """Ownership check detects files without CODEOWNERS pattern."""
+        registry = OwnershipRegistry(
+            codeowners_entries=[
+                CodeOwnersEntry(
+                    pattern="/detection/",
+                    owners=["@Ledger-Lenz/ml-team"],
+                    line_number=1,
+                ),
+            ],
+            subsystems={},
+            _repo_root=tmp_path,
+        )
+
+        import unittest.mock as mock
+
+        with mock.patch("utils.ownership.OwnershipRegistry.load", return_value=registry):
+            compliant, violations = check_ownership_compliance(
+                ["detection/benford_engine.py", "unknown/file.py"],
+                repo_root=tmp_path,
+            )
+
+        assert compliant is False
+        assert len(violations) == 1
+        # Violation should name the file and indicate no pattern matches
+        assert "unknown/file.py" in violations[0]
+        assert "no CODEOWNERS pattern" in violations[0]
+
+    def test_check_compliance_failure_includes_file_and_owner_detail(self, tmp_path: Path) -> None:
+        """Ownership check failure output includes file, pattern, and assigned owners."""
+        registry = OwnershipRegistry(
+            codeowners_entries=[
+                CodeOwnersEntry(
+                    pattern="/detection/",
+                    owners=["@Ledger-Lenz/ml-team"],
+                    line_number=1,
+                ),
+            ],
+            subsystems={},
+            _repo_root=tmp_path,
+        )
+
+        import unittest.mock as mock
+
+        with mock.patch("utils.ownership.OwnershipRegistry.load", return_value=registry):
+            compliant, violations = check_ownership_compliance(
+                ["unknown_subsystem/new_feature.py"],
+                repo_root=tmp_path,
+            )
+
+        assert compliant is False
+        violation_text = "\n".join(violations)
+        # Violation should name the file
+        assert "unknown_subsystem/new_feature.py" in violation_text
 
 
 class TestRealCodeOwners:
