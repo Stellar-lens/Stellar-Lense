@@ -212,6 +212,54 @@ class TestDriftMonitor:
         assert len(report.features) == 0
         assert not report.any_drift_detected
 
+    def test_report_includes_only_breaching_features_sorted_by_psi(self):
+        """Report includes only features exceeding PSI threshold, sorted descending by PSI."""
+        rng = np.random.default_rng(42)
+        n = 500
+
+        # Create reference distributions for 3 features
+        ref = {}
+        for feat_name in ["feat_a", "feat_b", "feat_c"]:
+            ref_data = rng.normal(0, 1, n)
+            bin_edges = np.histogram_bin_edges(ref_data, bins=10)
+            counts, _ = np.histogram(ref_data, bins=bin_edges)
+            total = counts.sum()
+            expected = np.maximum(counts / total, 1e-4)
+            expected = expected / expected.sum()
+            ref[feat_name] = {
+                "bin_edges": bin_edges.tolist(),
+                "expected_proportions": expected.tolist(),
+            }
+
+        # Create current data:
+        # - feat_a: similar to reference (low PSI, no drift)
+        # - feat_b: moderately shifted (PSI ~0.35)
+        # - feat_c: heavily shifted (PSI ~0.50)
+        current = pd.DataFrame(
+            {
+                "feat_a": rng.normal(0, 1, n),  # Similar to ref, low PSI
+                "feat_b": rng.normal(2.0, 0.8, n),  # Moderate drift
+                "feat_c": rng.normal(4.0, 0.5, n),  # Heavier drift
+            }
+        )
+
+        monitor = DriftMonitor(ref)
+        report = monitor.compute(current)
+
+        # Only features breaching the threshold should be in the report
+        breaching_features = [f for f in report.features if f["drift_flag"]]
+        assert len(breaching_features) > 0, "At least some features should breach threshold"
+
+        # All features in the report must have drift_flag=True
+        for feat in report.features:
+            assert (
+                feat["drift_flag"]
+            ), f"Feature {feat['feature']} should not be in report if drift_flag=False"
+
+        # Features should be sorted by PSI descending (worst drift first)
+        psi_values = [f["psi"] for f in report.features]
+        assert psi_values == sorted(psi_values, reverse=True), "Features should be sorted by PSI descending"
+
 
 class TestDriftReport:
     def test_to_dict(self):
