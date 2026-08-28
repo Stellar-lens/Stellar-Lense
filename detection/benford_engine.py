@@ -35,6 +35,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from config import config
 from utils.tracing import get_tracer
 
 _tracer = get_tracer(__name__)
@@ -223,7 +224,7 @@ def get_asset_classifier() -> "AssetClassifier":
     return _classifier
 
 
-MAD_NONCONFORMITY_THRESHOLD = 0.015
+MAD_NONCONFORMITY_THRESHOLD = config.MAD_NONCONFORMITY_THRESHOLD
 
 
 def leading_digits(amounts: pd.Series) -> pd.Series:

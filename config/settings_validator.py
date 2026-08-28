@@ -283,6 +283,23 @@ DEFAULT_LEDGERLENS_SPECS: list[SettingSpec] = [
         max_value=1.0,
         description="coverage level is a probability and must be in [0, 1]",
     ),
+    SettingSpec(
+        "RISK_SCORE_FLAG_THRESHOLD",
+        int,
+        required=False,
+        min_value=0,
+        max_value=100,
+        description="risk score is 0-100; a value outside that range would "
+        "flag every wallet or none silently",
+    ),
+    SettingSpec(
+        "MAD_NONCONFORMITY_THRESHOLD",
+        float,
+        required=False,
+        min_value=0.0,
+        description="Benford MAD is non-negative; a negative threshold would "
+        "make benford_flag always true",
+    ),
 ]
 
 
