@@ -91,6 +91,46 @@ class TestSeenEventCacheDeduplication:
         assert is_dup_2 is False  # Different token = different hash
 
 
+class TestIdenticalTimestampTrades:
+    """Sub-second Stellar ledger closes make identical timestamps common.
+
+    The dedup key is derived from the paging token (falling back to the trade
+    ID) and never from the trade timestamp, so two genuinely distinct trades
+    sharing a ledger close time must both survive.
+    """
+
+    def test_distinct_trades_with_identical_timestamp_both_survive(self, fake_redis_cache):
+        """Two distinct trades closed in the same ledger are not collapsed."""
+        asset_pair = "USDC/XLM"
+        ledger_close_time = "2024-01-01T12:00:00Z"
+
+        # Same ledger close time, different Horizon trade IDs / paging tokens.
+        dup_1 = fake_redis_cache.is_duplicate(
+            f"{ledger_close_time}-op-1", "165600493171154945-0", asset_pair
+        )
+        dup_2 = fake_redis_cache.is_duplicate(
+            f"{ledger_close_time}-op-2", "165600493171154945-1", asset_pair
+        )
+
+        assert dup_1 is False
+        assert dup_2 is False
+        assert fake_redis_cache.get_cache_size(asset_pair) == 2
+
+    def test_reingested_trade_with_same_id_is_still_removed(self, fake_redis_cache):
+        """A true duplicate (same trade ID re-ingested) is still suppressed."""
+        asset_pair = "USDC/XLM"
+        trade_id = "2024-01-01T12:00:00Z-op-1"
+        paging_token = "165600493171154945-0"
+
+        # Historical backfill, then the overlapping streaming load.
+        first = fake_redis_cache.is_duplicate(trade_id, paging_token, asset_pair)
+        second = fake_redis_cache.is_duplicate(trade_id, paging_token, asset_pair)
+
+        assert first is False
+        assert second is True
+        assert fake_redis_cache.get_cache_size(asset_pair) == 1
+
+
 class TestCacheTTLandEviction:
     """Tests for Redis TTL and cache eviction."""
 
