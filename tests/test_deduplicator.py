@@ -61,6 +61,40 @@ def test_alert_after_window_expiry_starts_new_group():
     assert grouped[1]["detectors"] == ["gnn"]
 
 
+def test_alert_at_exact_window_boundary_starts_new_group():
+    """The silence window is half-open: [last_seen, last_seen + window).
+
+    ``detected_at`` is the controllable clock here -- no wall-clock time and
+    no ``time.sleep`` is involved. An alert landing at exactly the expiry
+    moment is *outside* the window and therefore starts a new group.
+    """
+    window = 60
+    stream = [
+        _alert(WALLET_A, "benford", 60, 0.0),
+        _alert(WALLET_A, "gnn", 85, 0.0 + window),  # exactly at expiry
+    ]
+
+    grouped = list(deduplicate(stream, window_seconds=window))
+
+    assert len(grouped) == 2
+    assert grouped[0]["detectors"] == ["benford"]
+    assert grouped[1]["detectors"] == ["gnn"]
+
+
+def test_alert_just_inside_window_boundary_still_merges():
+    """One tick before expiry is inside the window and merges."""
+    window = 60
+    stream = [
+        _alert(WALLET_A, "benford", 60, 0.0),
+        _alert(WALLET_A, "gnn", 85, 0.0 + window - 0.001),
+    ]
+
+    grouped = list(deduplicate(stream, window_seconds=window))
+
+    assert len(grouped) == 1
+    assert grouped[0]["detectors"] == ["benford", "gnn"]
+
+
 def test_out_of_order_delivery_within_window_still_merges():
     stream = [
         _alert(WALLET_A, "gnn", 85, 110.0),
