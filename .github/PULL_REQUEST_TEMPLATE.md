@@ -53,7 +53,7 @@ What does this PR change and why?
 - [ ] `make test` passes locally
 - [ ] `make lint` and `make format` are clean
 - [ ] New/changed behavior has test coverage
-- [ ] `CHANGELOG.md` updated under `[Unreleased]`
+- [ ] Added a `CHANGELOG.md` entry under `[Unreleased]`, or this PR is exempt because it only touches docs/CI/tests (see [Changelog entries](CONTRIBUTING.md#changelog-entries))
 - [ ] If a shared contract changed (`RiskScore`, asset pair format, feature
       schema), linked issues/PRs in `ledgerlens-core` and downstream repos
 

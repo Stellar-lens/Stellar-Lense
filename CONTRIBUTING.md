@@ -25,6 +25,7 @@ cp .env.example .env  # then edit as needed
 make lint     # ruff + black --check
 make format   # ruff --fix + black
 make test     # pytest (unit tests only — no network)
+make check-env-example  # verify .env.example covers every config.py variable
 ```
 
 Optionally install the pre-commit hooks so checks run automatically:
@@ -74,6 +75,39 @@ schedule (Sundays 03:00 UTC) and on manual `workflow_dispatch` — it does
   out in the PR description so consuming repos (`ledgerlens-core`,
   `ledgerlens-api`, `ledgerlens-contract`, `ledgerlens-dashboard`) can be
   updated.
+
+### Changelog entries
+
+Every PR that touches high-impact paths must include a `CHANGELOG.md` entry
+under `## [Unreleased]`. The entry is enforced by
+[`scripts/validate_changelog.py`](scripts/validate_changelog.py) in CI.
+
+**Required format (Keep a Changelog):**
+
+```markdown
+## [Unreleased]
+
+### Added
+- New feature description
+
+### Changed
+- Behavior change description
+
+### Fixed
+- Bug fix description
+```
+
+- Entries must start with `- ` and be grouped under one of the standard
+  subsections: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`,
+  `Security`.
+- If your PR only touches documentation, CI configuration, or tests, a
+  changelog entry is not required — but you still need to check the
+  "Added a CHANGELOG.md entry, or this PR is exempt" box in the PR template.
+- The CI job
+  [`.github/workflows/changelog-validation.yml`](.github/workflows/changelog-validation.yml)
+  runs `python scripts/validate_changelog.py --check-pr` on every pull
+  request and fails the build if a high-impact path changed without a
+  matching entry.
 
 ## Security
 
