@@ -1,11 +1,41 @@
 """Counterfactual Explanation Generator for individual risk score decisions (Issue #193).
 
-Implements the DICE (Diverse Counterfactual Explanations) method for the
-LedgerLens ensemble model.  For a high-risk wallet (score >= flag threshold)
-this module answers:
+## What is a Counterfactual Explanation?
 
-    "What is the *minimal* change to this wallet's observable behaviour that
-    would reduce the risk score below 70?"
+A counterfactual explanation answers: **"What would need to change for this wallet to no
+longer be flagged as risky?"** It generates plausible, actionable scenarios that, if
+implemented by the wallet's operator, would drop the risk score below the detection
+threshold (typically 70). Counterfactuals are inherently *forward-looking* and
+*prescriptive* — they tell an investigator what the wallet owner *could change*.
+
+### Contrast with SHAP Attribution (detection/shap_explainer.py)
+
+**SHAP values** explain *why* a score is what it is: they decompose the risk score into
+per-feature contributions, with each feature assigned a positive or negative score impact.
+SHAP is *diagnostic* and *retrospective* — it explains historical behavior.
+
+**Counterfactuals**, by contrast, are *predictive* and *prescriptive*: they identify the
+minimal set of feature changes needed to achieve a target (non-flagged) score.
+
+| Aspect | SHAP Attribution | Counterfactual Explanation |
+|--------|-----------------|---------------------------|
+| Question | Why is the score what it is? | How can the score drop below 70? |
+| Type | Diagnostic | Prescriptive |
+| Output | Per-feature contribution to score | Feature change scenarios + predicted new score |
+| Use Case | Audit review, regulator explanation | Remediation guidance, wallet operator appeal |
+| Temporal | Historical — explains past | Prescriptive — proposes future changes |
+
+### When to Use
+
+- **SHAP**: Use in a forensic report to explain why a wallet was flagged. Essential for
+  regulatory compliance and audit trails.
+- **Counterfactual**: Use in a remediation workflow to guide a flagged wallet operator
+  toward legitimate behavior, or to assess whether a score can realistically be reduced.
+
+## Implementation Details
+
+Implements the DICE (Diverse Counterfactual Explanations) method for the
+LedgerLens ensemble model.
 
 Key design decisions
 --------------------
