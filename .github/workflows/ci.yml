@@ -275,6 +275,21 @@ jobs:
           python scripts/verify_lockfile.py --check-unpinned
 
       # -----------------------------------------------------------------------
+      # Issue #478 — Automated dependency risk reporting
+      # -----------------------------------------------------------------------
+      - name: Generate dependency risk report (issue #478)
+        run: |
+          python scripts/dependency_risk_report.py --output reports/ci/dependency_risk.json
+
+      - name: Upload dependency risk report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-risk-report
+          path: reports/ci/dependency_risk.json
+          retention-days: 30
+
+      # -----------------------------------------------------------------------
       # Issue #537 — Benchmark dataset integrity check
       # -----------------------------------------------------------------------
       - name: Validate benchmark datasets (issue #537)
