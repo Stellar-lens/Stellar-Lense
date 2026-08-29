@@ -638,7 +638,9 @@ It is `NULL` when the wallet is not part of any detected ring, lets the API and
 dashboard group wallets by ring, and is **not** part of the on-chain `RiskScore`
 struct. Databases created before this field was introduced are upgraded with
 `python -m scripts.migrate_add_ring_id` (a backward-compatible `ALTER TABLE`;
-existing rows get `ring_id = NULL`).
+existing rows get `ring_id = NULL`). See
+[docs/ring_id_migration.md](docs/ring_id_migration.md) for the full backup,
+migrate, verify, and rollback runbook.
 
 #### Asset pair identifier
 
