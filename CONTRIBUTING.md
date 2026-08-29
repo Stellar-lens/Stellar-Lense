@@ -94,6 +94,10 @@ All security-relevant PRs must reference the threat model and document which mit
 - Favor small, composable functions following the existing module layout:
   `ingestion/` for data acquisition, `detection/` for scoring logic,
   `tests/` mirrors both.
+- **Adding a new top-level module?** Also add a corresponding pattern to
+  [`.github/CODEOWNERS`](.github/CODEOWNERS) — see
+  [`.github/review-checklists.md`](.github/review-checklists.md) for the
+  expected review-gate entry and an example.
 - New feature columns added to `detection/feature_engineering.py` must be
   documented in the README's feature tables and accounted for in
   `detection/model_training.py::FEATURE_COLUMNS_EXCLUDE` handling.

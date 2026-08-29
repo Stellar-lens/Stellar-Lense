@@ -21,16 +21,20 @@ Usage:
     from config.contracts import validate_mode
 
     validate_mode("api")
-    validate_mode("streaming_kafka", alert_channel="webhook", role="worker")
+    validate_mode("streaming_kafka", alert_channel=args.alert_channel,
+                   role=args.role, backend=args.backend)
 
 Developer entry point: `python -m scripts.check_env --mode api` (or `--all`)
 runs these same contracts against the current environment without starting
-the service — see scripts/check_env.py.
+the service — see scripts/check_env.py.  Use `--list-modes` to see every
+registered mode and its required variables at a glance.
 """
 
 from __future__ import annotations
 
+import inspect
 import os
+import re
 from collections.abc import Callable
 from typing import Any
 
@@ -294,6 +298,95 @@ _CONTRACTS: dict[str, ModeContract] = {
 }
 
 RUNTIME_MODES: tuple[str, ...] = tuple(_CONTRACTS)
+
+_CORE_PIPELINE_ATTRS: list[str] = [
+    "WATCHED_ASSET_PAIRS",
+    "RISK_SCORE_DB_URL",
+    "MODEL_DIR",
+    "DP_AGGREGATOR_EPSILON",
+    "DP_AGGREGATOR_DELTA",
+]
+
+_CORE_PIPELINE_ATTRS_ONCHAIN: list[str] = [
+    "LEDGERLENS_CONTRACT_ID",
+    "LEDGERLENS_SUBMITTER_SECRET",
+]
+
+
+def _check_attrs(check: Check) -> list[str]:
+    """Return the config attribute names a single check validates."""
+    attrs: list[str] = []
+    # Builder-generated closures capture the attr name(s) in closure cells.
+    if hasattr(check, "__closure__") and check.__closure__:
+        for cell in check.__closure__:
+            try:
+                val = cell.cell_contents
+            except ValueError:
+                continue
+            if isinstance(val, str) and val.isupper() and "_" in val:
+                attrs.append(val)
+    if attrs:
+        return sorted(set(attrs))
+    # Named functions reference cls.ATTR_NAME in their body.
+    try:
+        src = inspect.getsource(check)
+        attrs = re.findall(r"cls\.([A-Z_][A-Z_0-9]*)", src)
+    except (OSError, TypeError):
+        pass
+    return sorted(set(attrs))
+
+
+def list_modes(
+    config_cls: type[Config] = Config,
+) -> list[dict[str, Any]]:
+    """Return a structured description of every registered runtime mode.
+
+    Each dict contains:
+
+    * ``mode`` — the mode name (e.g. ``"api"``).
+    * ``description`` — human-readable entry-point hint.
+    * ``required_attrs`` — sorted list of config attributes the mode requires.
+    * ``conditional_attrs`` — attrs required only in certain contexts.
+    """
+    result = []
+    for name, contract in _CONTRACTS.items():
+        required: list[str] = []
+        conditional: list[str] = []
+        for chk in contract.checks:
+            src = ""
+            try:
+                src = inspect.getsource(chk)
+            except (OSError, TypeError):
+                pass
+            if "_core_errors" in src:
+                required.extend(_CORE_PIPELINE_ATTRS)
+                require_onchain = False
+                if hasattr(chk, "__closure__") and chk.__closure__:
+                    for cell in chk.__closure__:
+                        try:
+                            val = cell.cell_contents
+                        except ValueError:
+                            continue
+                        if isinstance(val, bool):
+                            require_onchain = val
+                            break
+                if require_onchain:
+                    conditional.extend(_CORE_PIPELINE_ATTRS_ONCHAIN)
+            else:
+                required.extend(_check_attrs(chk))
+        required = sorted(set(required))
+        conditional = sorted(set(conditional))
+        # Remove conditionals from required if present
+        required = [a for a in required if a not in conditional]
+        result.append(
+            {
+                "mode": name,
+                "description": contract.description,
+                "required_attrs": required,
+                "conditional_attrs": conditional,
+            }
+        )
+    return result
 
 
 def validate_mode(mode: str, *, config_cls: type[Config] = Config, **context: Any) -> None:
