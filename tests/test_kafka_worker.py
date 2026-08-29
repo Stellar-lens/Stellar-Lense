@@ -129,5 +129,19 @@ def test_dlq_topic_is_skipped_not_scored():
     worker.process_message(msg)
 
     scorer.score_wallet.assert_not_called()
-    # Skipped messages are committed so they don't block the partition.
     consumer.commit.assert_called_once_with(message=msg, asynchronous=False)
+
+
+def test_dlq_topic_never_reprocessed():
+    consumer = MagicMock()
+    worker, scorer, dispatcher = _make_worker(consumer, score=None)
+
+    dlq_msg = _make_msg(topic="ledgerlens.trades.dlq", offset=1)
+    worker.process_message(dlq_msg)
+    consumer.reset_mock()
+
+    normal_msg = _make_msg(topic="ledgerlens.trades.USDC_X", offset=2)
+    worker.process_message(normal_msg)
+
+    scorer.score_wallet.assert_called_once()
+    consumer.commit.assert_called_once_with(message=normal_msg, asynchronous=False)

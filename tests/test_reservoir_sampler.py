@@ -222,6 +222,23 @@ def test_atomic_write_on_flush(tmp_path):
     assert "timestamp" in df.columns
 
 
+def test_atomic_write_sets_secure_mode(tmp_path):
+    """Flushed parquet file has mode 0o600 on POSIX."""
+    buffer_path = str(tmp_path / "reservoir.parquet")
+    sampler = DriftAwareReservoirSampler(
+        reservoir_size=10,
+        flush_interval=10,
+        drift_detector=MockCUSUMDetector(alarm_state=False),
+        buffer_path=buffer_path,
+    )
+    for i in range(15):
+        sampler.update({"value": float(i)}, timestamp=float(i))
+
+    assert os.path.exists(buffer_path)
+    file_mode = stat.S_IMODE(os.stat(buffer_path).st_mode)
+    assert file_mode == 0o600, f"Expected 0o600, got {oct(file_mode)}"
+
+
 def test_flush_empty_buffer_safe(tmp_path):
     """Flush on empty buffer should not error."""
     buffer_path = str(tmp_path / "empty.parquet")
@@ -332,3 +349,50 @@ def test_invalid_flush_interval():
 
     with pytest.raises(ValueError, match="flush_interval must be positive"):
         DriftAwareReservoirSampler(flush_interval=-1)
+
+
+# ---------------------------------------------------------------------------
+# Test 8: Statistical uniformity in stable mode (issue #786)
+# ---------------------------------------------------------------------------
+
+
+def test_stable_mode_uniform_sampling(tmp_path):
+    """In stable mode, every item has approximately equal probability of being
+    in the final sample (Chi-square goodness-of-fit)."""
+    reservoir_size = 5
+    n_items = 20
+    n_runs = 2000
+
+    sampler = DriftAwareReservoirSampler(
+        reservoir_size=reservoir_size,
+        flush_interval=100000,
+        drift_detector=MockCUSUMDetector(alarm_state=False),
+        buffer_path=str(tmp_path / "reservoir.parquet"),
+    )
+
+    expected_prob = reservoir_size / n_items
+    counts = {i: 0 for i in range(n_items)}
+
+    for _ in range(n_runs):
+        sampler.reset()
+        for i in range(n_items):
+            sampler.update({"value": float(i)}, timestamp=float(i))
+
+        for ex in sampler._buffer:
+            value = int(ex["value"])
+            if value in counts:
+                counts[value] += 1
+
+    chi_square = 0.0
+    for count in counts.values():
+        observed = count
+        expected = expected_prob * n_runs * reservoir_size
+        chi_square += (observed - expected) ** 2 / expected
+
+    df = n_items - 1
+    critical_value = 14.07  # chi-square 95th percentile for df=19
+
+    assert chi_square < critical_value, (
+        f"Chi-square {chi_square:.2f} exceeds critical value {critical_value} "
+        f"for df={df} — sampling is not uniform"
+    )

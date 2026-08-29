@@ -117,9 +117,15 @@ class CUSUMDetector:
                 self.h,
             )
             self._persist_alarm(True)
+            self._reset_statistics()
             return True
 
         return False
+
+    def _reset_statistics(self) -> None:
+        """Reset accumulated CUSUM statistics to zero after an alarm."""
+        self._s_high = 0.0
+        self._s_low = 0.0
 
     def acknowledge(self) -> None:
         """Reset CUSUM statistics and clear the alarm."""
