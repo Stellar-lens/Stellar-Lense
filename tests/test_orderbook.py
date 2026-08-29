@@ -114,6 +114,33 @@ def test_compute_order_cancellation_rate_handles_none():
     assert compute_order_cancellation_rate("A", None) == 0.0
 
 
+def orderbook_events_partial_fill_then_cancel() -> pd.DataFrame:
+    """Event stream for an offer that was partially filled, then cancelled.
+
+    A wallet places a 100-unit offer and 60 units are filled via the trade
+    stream, which produces no manage-offer operation. The remaining 40 units
+    are then cancelled in a single ``cancelled`` operation. The loader
+    cannot see the fill, so the `amount` column (100 offered, 40 remainder)
+    is the only trace that the order was partially filled before being
+    cancelled.
+    """
+    return pd.DataFrame(
+        [
+            {"event_id": "1", "account": "A", "action": "created", "amount": 100.0},
+            {"event_id": "2", "account": "A", "action": "cancelled", "amount": 40.0},
+        ]
+    )
+
+
+def test_compute_order_cancellation_rate_partial_fill_then_cancel_remainder():
+    """A partial fill followed by cancellation of the remainder counts as a
+    single cancellation: 1 cancelled manage-offer operation out of 2.
+    Fills are not manage-offer operations, so this is indistinguishable from
+    (and counted identically to) a pure cancellation."""
+    events = orderbook_events_partial_fill_then_cancel()
+    assert compute_order_cancellation_rate("A", events) == 1 / 2
+
+
 def test_compute_trade_pattern_features_includes_cancellation_rate():
     features = compute_trade_pattern_features("A", pd.DataFrame(), orderbook_events_df())
     assert features["order_cancellation_rate"] == 2 / 3

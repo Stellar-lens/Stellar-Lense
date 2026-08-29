@@ -433,6 +433,14 @@ def compute_order_cancellation_rate(wallet: str, orderbook_events: pd.DataFrame 
     `ingestion.orderbook_loader.load_accounts_orderbook_events` (or `None`/
     empty if order-book ingestion wasn't run), with an `account` and
     `action` ("created"/"cancelled"/"updated") column.
+
+    The `action` count here counts every manage-offer operation the loader
+    classified as `cancelled`. A `cancelled` operation covers both an offer
+    that was withdrawn while still fully unfilled (a pure cancellation) and
+    the cancellation of the remainder of an offer that was previously
+    partially filled. Horizon records partial fills in the trade stream, not
+    as manage-offer operations, so the loader cannot distinguish the two
+    cases and both contribute identically to the rate.
     """
     if orderbook_events is None or orderbook_events.empty:
         return 0.0
