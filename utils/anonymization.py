@@ -183,6 +183,18 @@ class AnonymizationChecker:
         ``high_cardinality_threshold``, as these may be quasi-identifiers.
     high_cardinality_threshold : float
         Uniqueness ratio above which a string column is flagged (default 0.9).
+    k : int, optional
+        Minimum group size for the k-anonymity guarantee. ``k=1`` is
+        rejected with :class:`ValueError` because a single record is
+        trivially re-identifiable — k=1 provides no anonymity at all, so
+        silently accepting it would pretend a privacy guarantee that does
+        not exist. Must be ``>= 2`` when provided.
+
+    Raises
+    ------
+    ValueError
+        If ``k`` is provided and ``k < 2`` (k=1 is not a valid anonymity
+        configuration).
     """
 
     def __init__(
@@ -192,7 +204,14 @@ class AnonymizationChecker:
         extra_sensitive_fields: set[str] | None = None,
         check_high_cardinality: bool = True,
         high_cardinality_threshold: float = 0.9,
+        k: int | None = None,
     ) -> None:
+        if k is not None and k < 2:
+            raise ValueError(
+                f"k={k} provides no anonymity guarantee — k-anonymity requires "
+                "k >= 2 so each equivalence class contains at least 2 records"
+            )
+        self._k = k
         self._patterns = list(_PATTERN_CHECKS)
         if extra_patterns:
             self._patterns.extend(extra_patterns.items())

@@ -409,3 +409,23 @@ class TestCustomChecker:
         violations = checker.check_value("internal_id", "some-value")
         types = {v.violation_type for v in violations}
         assert "sensitive_field_name" in types
+
+
+# ---------------------------------------------------------------------------
+# k-anonymity configuration (issue #684)
+# ---------------------------------------------------------------------------
+
+
+class TestKAnonymityConfig:
+    def test_k_eq_1_is_rejected_with_a_clear_error(self) -> None:
+        """k=1 provides no anonymity — the checker must reject it explicitly."""
+        with pytest.raises(ValueError, match="k=1"):
+            AnonymizationChecker(k=1)
+
+    def test_k_below_1_is_rejected(self) -> None:
+        with pytest.raises(ValueError):
+            AnonymizationChecker(k=0)
+
+    def test_valid_k_is_accepted(self) -> None:
+        checker = AnonymizationChecker(k=2)
+        assert checker.check_value("amount", "123.45") == []
