@@ -63,6 +63,34 @@ The `testnet-integration.yml` CI workflow runs these tests on a weekly
 schedule (Sundays 03:00 UTC) and on manual `workflow_dispatch` — it does
 **not** run on pull requests so it never blocks a PR merge.
 
+### Running a subset of tests
+
+With 300+ files under `tests/`, running the full suite on every iteration is
+slow. Use these `pytest` invocations to scope a run down while you iterate:
+
+```bash
+# A single test file
+pytest tests/test_benford.py
+
+# A single test function (-k matches by substring)
+pytest tests/test_benford.py -k test_chi_square_statistic
+
+# Everything except the slower integration and fuzz suites
+pytest tests/ --ignore=tests/integration --ignore=tests/fuzz
+```
+
+`pyproject.toml` defines these pytest markers (`-m 'not integration and not
+slow'` to exclude both):
+
+| Marker | Meaning |
+|---|---|
+| `integration` | Live Testnet integration tests — deselect with `-m "not integration"` (also skipped automatically unless `LEDGERLENS_INTEGRATION_TESTS=1` is set, see above) |
+| `slow` | Tests that run PPO training — deselect with `-m "not slow"` |
+| `concurrency` | Concurrency validation tests for streaming workers — included by default |
+
+`tests/fuzz/` is a separate atheris-based fuzzing suite, not run by plain
+`pytest`; see [`tests/fuzz/README.md`](tests/fuzz/README.md) and `make fuzz`.
+
 ## Pull requests
 
 - Keep PRs focused on a single logical change.
