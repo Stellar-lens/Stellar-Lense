@@ -5,6 +5,7 @@ and report serialisation.
 """
 
 import json
+import logging
 import os
 import re
 
@@ -200,6 +201,36 @@ class TestDriftMonitor:
         names = [f["feature"] for f in report.features]
         assert "known_feat" in names
         assert "unknown_feat" not in names
+
+    def test_missing_reference_distribution_is_skipped_with_warning(self, caplog):
+        """A feature with no reference distribution in model_metadata.json is
+        skipped with a logged warning instead of crashing the drift check (Issue #699)."""
+        # model_metadata.json-like fixture: reference distribution present for
+        # "present_feat" but missing for the brand-new "brand_new_feat".
+        ref = _build_reference(["present_feat"])
+        current = pd.DataFrame(
+            {
+                "present_feat": np.random.default_rng(42).normal(0, 1, 100),
+                "brand_new_feat": np.random.default_rng(42).normal(0, 1, 100),
+            }
+        )
+
+        monitor = DriftMonitor(ref)
+        with caplog.at_level(logging.WARNING, logger="detection.drift_monitor"):
+            report = monitor.compute(current)
+
+        # The missing-reference feature is skipped, not computed or crashed on.
+        names = [f["feature"] for f in report.features]
+        assert "brand_new_feat" not in names
+        assert "present_feat" in names
+
+        # A warning explaining the skip was logged, naming the missing feature.
+        assert any("brand_new_feat" in record.message for record in caplog.records)
+
+        # The other, present features still get a correct overall drift result.
+        present = next(f for f in report.features if f["feature"] == "present_feat")
+        assert np.isfinite(present["psi"])
+        assert report.any_drift_detected is not None
 
     def test_empty_current_data_no_features(self):
         """No feature columns matching reference results in empty report."""

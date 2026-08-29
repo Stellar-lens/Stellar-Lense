@@ -36,6 +36,28 @@ Every module scanned — not just candidates — is included in the JSON
 report with its reference counts and every signal checked, so "why was/
 wasn't this flagged" always has a concrete, inspectable answer.
 
+## Ignorelist YAML schema
+
+`analysis/dead_path_ignorelist.yaml` excludes known-intentional dead paths
+from the report. The schema is intentionally minimal:
+
+| Key | Type | Required | Description |
+| --- | --- | --- | --- |
+| `ignored` | mapping | yes | Top-level map of exclusions. |
+| `<dotted.module.path>` | mapping key | yes | Exact dotted module name of the excluded module. Keys are matched exactly — globs and regex are **not** supported. |
+| `<reason>` | string | yes | Free-text justification for the exclusion. A reason is required for every entry so no module is ignored silently. |
+
+Comments (`#`) are allowed anywhere in the file (including inline, after a
+value). Example entry:
+
+```yaml
+ignored:
+  monitoring.capacity_metrics: >-
+    Loaded only via importlib.import_module("monitoring.capacity_metrics")
+    in tests/test_capacity_metrics.py (to exercise Prometheus metric
+    registration on import), which the static import scanner cannot see.
+```
+
 ## Known limitation: dynamic imports
 
 This is a static, import-*statement* based analysis. It cannot see

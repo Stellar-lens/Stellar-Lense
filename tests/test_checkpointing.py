@@ -2,6 +2,7 @@
 
 import json
 import os
+import time
 
 import pytest
 
@@ -133,3 +134,25 @@ def test_workflow_ids_are_sanitised_for_filesystem_safety(store):
     with workflow.step("fetch"):
         pass
     assert store.exists("wf/with:weird chars")
+
+
+def test_cleanup_stale_removes_only_expired_checkpoints(store):
+    """Checkpoints older than the retention window are purged; newer ones are kept (Issue #698)."""
+    for workflow_id in ["old_a", "old_b", "new_a", "new_b"]:
+        workflow = CheckpointedWorkflow(store, workflow_id=workflow_id)
+        with workflow.step("fetch"):
+            pass
+
+    # Backdate two checkpoints past the default 30-day retention window.
+    now = time.time()
+    stale_mtime = now - 31 * 86400
+    for workflow_id in ["old_a", "old_b"]:
+        os.utime(store._path(workflow_id), (stale_mtime, stale_mtime))
+
+    removed = store.cleanup_stale(retention_days=30)
+
+    assert len(removed) == 2
+    assert not store.exists("old_a")
+    assert not store.exists("old_b")
+    assert store.exists("new_a")
+    assert store.exists("new_b")

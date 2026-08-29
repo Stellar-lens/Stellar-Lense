@@ -44,6 +44,12 @@ logger = get_logger(__name__)
 
 SCHEMA_VERSION = 1
 
+#: Default retention window (in days) for stale-checkpoint cleanup. Checkpoint
+#: files accumulate per ``workflow_id`` and are never pruned automatically, so
+#: long-lived deployments should call ``CheckpointStore.cleanup_stale`` to purge
+#: checkpoints older than this window (see docs/checkpointing.md).
+CHECKPOINT_RETENTION_DAYS = 30
+
 
 class CheckpointError(Exception):
     """Base class for checkpoint failures. Carries diagnostics for triage."""
@@ -170,6 +176,34 @@ class CheckpointStore:
         if os.path.exists(path):
             os.remove(path)
             logger.info("Cleared checkpoint for workflow_id=%s", workflow_id)
+
+    def cleanup_stale(self, retention_days: int = CHECKPOINT_RETENTION_DAYS) -> list[str]:
+        """Remove checkpoint files older than *retention_days*.
+
+        Unbounded checkpoint accumulation is a real disk-usage risk for
+        long-lived deployments, so stale checkpoints are pruned based on each
+        file's mtime. Returns the list of removed checkpoint file paths.
+        """
+        removed: list[str] = []
+        cutoff = time.time() - retention_days * 86400
+        if not os.path.isdir(self.directory):
+            return removed
+        for name in sorted(os.listdir(self.directory)):
+            if not name.endswith(".json"):
+                continue
+            path = os.path.join(self.directory, name)
+            try:
+                if os.path.getmtime(path) < cutoff:
+                    os.remove(path)
+                    logger.info(
+                        "Removed stale checkpoint %s (older than %d days)",
+                        path,
+                        retention_days,
+                    )
+                    removed.append(path)
+            except OSError:  # pragma: no cover - file vanished between scan and stat
+                continue
+        return removed
 
 
 class StepCheckpoint:
