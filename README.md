@@ -343,6 +343,11 @@ scale-out, durability, event replay, and backpressure, set
 `sse` backend remains the default and is unchanged — operators without Kafka
 need do nothing.
 
+For a complete, ready-to-uncomment local-dev configuration satisfying the
+`streaming_kafka` contract, see the example block in
+[`.env.example`](.env.example) (search for "streaming_kafka runtime-mode
+config").
+
 ```bash
 # Bring up Zookeeper, Kafka, the producer, 3 scorer replicas, Prometheus + Grafana
 docker-compose up --scale ledgerlens-scorer=3
