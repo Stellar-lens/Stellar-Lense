@@ -65,6 +65,54 @@ LayeredConfig(environment='local'):
   ...
 ```
 
+## Worked example: resolving `log_level`
+
+`log_level` is set at three of the five possible layers. Walking through how
+it resolves for the `local` environment shows the precedence rules in
+practice.
+
+1. **Defaults** (passed by the caller, e.g. `{"log_level": "INFO"}`).
+2. **`config/environments/base.yaml`** sets `log_level: INFO` — overrides the
+   default (same value here, but it's the base file's value that now wins,
+   not the caller's default).
+3. **`config/environments/local.yaml`** sets `log_level: DEBUG` — overrides
+   `base.yaml` because the environment-specific overlay is layer 3, above
+   layer 2.
+4. **`LEDGERLENS_LOG_LEVEL` environment variable** — if set (e.g.
+   `LEDGERLENS_LOG_LEVEL=WARNING` in a shell or `.env`), it overrides
+   `local.yaml`'s `DEBUG` because actual OS environment variables sit at
+   layer 4, above every YAML layer.
+5. **`overrides`** passed explicitly by the caller (tests, CLI flags) — if
+   given, this wins over everything else, including environment variables.
+
+So with no `LEDGERLENS_LOG_LEVEL` set and no explicit `overrides`, running
+locally resolves `log_level` to `"DEBUG"` from `local.yaml`:
+
+```
+$ LEDGERLENS_ENV=local python -c "from config.layering import LayeredConfig; \
+  cfg = LayeredConfig({'log_level': 'INFO'}, environment='local'); \
+  print(cfg.get('log_level'), '<-', cfg.source('log_level'))"
+DEBUG <- env_file
+```
+
+If `LEDGERLENS_LOG_LEVEL=WARNING` is set in the shell, it wins over
+`local.yaml`'s `DEBUG`:
+
+```
+$ LEDGERLENS_ENV=local LEDGERLENS_LOG_LEVEL=WARNING python -c "from config.layering import LayeredConfig; \
+  cfg = LayeredConfig({'log_level': 'INFO'}, environment='local'); \
+  print(cfg.get('log_level'), '<-', cfg.source('log_level'))"
+WARNING <- env_var
+```
+
+**Where OS environment variables fit:** actual `LEDGERLENS_*` OS environment
+variables are layer 4 — they override both `base.yaml` and every
+environment-specific YAML overlay (`local.yaml`, `ci.yaml`, etc.), but they
+are themselves overridden by explicit `overrides` passed in code (layer 5,
+used for tests/CLI flags). Env vars are never the *lowest*-precedence
+source; the YAML files exist so checked-in defaults don't have to be
+duplicated as env vars everywhere they're needed.
+
 ## Validation
 
 ```
