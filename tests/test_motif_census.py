@@ -189,6 +189,16 @@ class TestComputeMotifCensus:
         result = compute_motif_census(G, known)
         assert result.triangle_density == pytest.approx(1.0)
 
+    def test_empty_graph_returns_zero_counts(self):
+        """Degenerate graphs with fewer than three nodes should be treated as empty results."""
+        G = nx.Graph()
+        G.add_node("A")
+        result = compute_motif_census(G, {"A"})
+        assert result.triangle_count == 0
+        assert result.star_count == 0
+        assert result.cycle_4_count == 0
+        assert result.node_count == 1
+
     def test_star_graph_star_ratio_above_0_9(self):
         """A star graph must yield star_ratio > 0.9."""
         G = nx.DiGraph()
