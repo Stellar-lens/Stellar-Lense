@@ -73,3 +73,17 @@ def test_load_queue_empty_secret_skips(tmp_path, base_annotations, caplog):
 
     assert len(annotations) == 2
     assert "Skipping signature verification" in caplog.text
+
+
+def test_load_queue_rejects_tampered_item_label(tmp_path):
+    """Mutating a stored annotation label after signing must fail verification."""
+    file_path = tmp_path / "tampered_label.json"
+    annotations = [{"wallet": "GABC...", "label": "wash_trade"}]
+    save_queue(file_path, annotations, SECRET)
+
+    payload = json.loads(file_path.read_text())
+    payload["annotations"][0]["label"] = "organic"
+    file_path.write_text(json.dumps(payload))
+
+    with pytest.raises(ValueError, match="HMAC mismatch"):
+        load_queue(file_path, SECRET)
