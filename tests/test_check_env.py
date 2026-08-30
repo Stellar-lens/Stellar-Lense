@@ -16,8 +16,10 @@ def test_single_passing_mode_exits_zero(monkeypatch, capsys):
 
     code = check_env.main(["--mode", "api"])
 
+    out = capsys.readouterr().out
     assert code == 0
-    assert "[OK]   api" in capsys.readouterr().out
+    assert "=== api ===" in out
+    assert "all checks passed" in out
 
 
 def test_single_failing_mode_exits_nonzero_and_prints_reason(monkeypatch, capsys):
@@ -30,8 +32,8 @@ def test_single_failing_mode_exits_nonzero_and_prints_reason(monkeypatch, capsys
 
     out = capsys.readouterr().out
     assert code == 1
-    assert "[FAIL] api" in out
-    assert "API_KEYS" in out
+    assert "=== api ===" in out
+    assert "FAIL: API_KEYS" in out
 
 
 def test_all_flag_checks_every_registered_mode(monkeypatch, capsys):
@@ -69,3 +71,41 @@ def test_mode_and_all_are_mutually_exclusive():
 def test_requires_mode_or_all():
     with pytest.raises(SystemExit):
         check_env.main([])
+
+
+def test_all_output_groups_failures_per_mode(monkeypatch, capsys):
+    """A multi-mode --all run groups each mode's failures under its own heading."""
+    monkeypatch.setattr(Config, "RISK_SCORE_DB_URL", "sqlite:///test.db")
+    monkeypatch.setattr(Config, "MODEL_DIR", "./models")
+    monkeypatch.setattr(Config, "API_KEYS", [])  # fail the api mode
+    monkeypatch.setattr(Config, "API_RATE_LIMIT_RPM", 60)
+    monkeypatch.setattr(Config, "WS_MAX_CLIENTS", 0)  # fail the ws_server mode
+
+    code = check_env.main(["--all"])
+
+    out = capsys.readouterr().out
+    assert code == 1
+
+    # Split output into per-mode sections delimited by "=== <mode> ===".
+    sections: dict[str, list[str]] = {}
+    current: str | None = None
+    for line in out.splitlines():
+        if line.startswith("=== "):
+            current = line[4:-4]
+            sections[current] = []
+        elif current is not None:
+            sections[current].append(line)
+
+    # Each mode's own failure appears under its own heading, and never under
+    # another mode's section.
+    assert any("API_KEYS" in item for item in sections["api"])
+    assert any("WS_MAX_CLIENTS" in item for item in sections["ws_server"])
+    assert not any(
+        "API_KEYS" in item for mode, items in sections.items() if mode != "api" for item in items
+    )
+    assert not any(
+        "WS_MAX_CLIENTS" in item
+        for mode, items in sections.items()
+        if mode != "ws_server"
+        for item in items
+    )

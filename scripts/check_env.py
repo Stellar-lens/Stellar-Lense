@@ -22,6 +22,29 @@ import sys
 from config.contracts import RUNTIME_MODES, validate_mode
 
 
+def _format_error_group(error: str) -> list[str]:
+    """Break a ``validate_mode()`` OSError into its individual check bullets.
+
+    ``validate_mode()`` raises one OSError whose message is::
+
+        LedgerLens configuration errors for mode='api' (uvicorn api.app:app):
+        - RISK_SCORE_DB_URL is not set ...
+        - API_KEYS is not set ...
+
+    This splits it into just the discrete bullets (dropping the redundant
+    leading banner and the ``- `` list markers) so that each mode's section in
+    a multi-mode ``--all`` run lists its failures as individual items.
+    """
+    bullets: list[str] = []
+    for line in error.splitlines()[1:]:  # skip the "configuration errors for mode=..." banner
+        stripped = line.lstrip()
+        if stripped.startswith("- "):
+            stripped = stripped[2:]
+        if stripped:
+            bullets.append(stripped)
+    return bullets
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Validate LedgerLens runtime-mode config contracts"
@@ -48,15 +71,19 @@ def main(argv: list[str] | None = None) -> int:
     ok = all(r["ok"] for r in results)
 
     if args.json:
+        # JSON mirrors the per-mode structure with a "mode" key on each issue.
         print(json.dumps({"ok": ok, "results": results}, indent=2))
     else:
+        # Human-readable output groups each mode's failures under a clear
+        # per-mode heading, so a multi-mode `--all` run never reads as one
+        # flat list of unrelated errors.
         for r in results:
+            print(f"=== {r['mode']} ===")
             if r["ok"]:
-                print(f"[OK]   {r['mode']}")
+                print("    OK — all checks passed")
             else:
-                print(f"[FAIL] {r['mode']}")
-                for line in r["error"].splitlines():
-                    print(f"       {line}")
+                for bullet in _format_error_group(r["error"]):
+                    print(f"    FAIL: {bullet}")
 
     return 0 if ok else 1
 
