@@ -131,3 +131,35 @@ def test_dlq_topic_is_skipped_not_scored():
     scorer.score_wallet.assert_not_called()
     # Skipped messages are committed so they don't block the partition.
     consumer.commit.assert_called_once_with(message=msg, asynchronous=False)
+
+
+# ---------------------------------------------------------------------------
+# 4. Issue #735 — KAFKA_LAG_ALERT_THRESHOLD must be a positive integer
+#    (validated at worker startup, not at first lag comparison mid-stream)
+# ---------------------------------------------------------------------------
+
+
+def _make_worker_with_threshold(lag_threshold):
+    from streaming.kafka_worker import KafkaWorker
+
+    return KafkaWorker(
+        MagicMock(),
+        MagicMock(),
+        MagicMock(),
+        consumer=MagicMock(),
+        lag_threshold=lag_threshold,
+    )
+
+
+@pytest.mark.parametrize(
+    "bad_threshold",
+    ["500", "-1", "0", "fast", 0, -5, 1.5],
+)
+def test_worker_startup_rejects_non_positive_integer_threshold(bad_threshold):
+    with pytest.raises(ValueError, match="KAFKA_LAG_ALERT_THRESHOLD"):
+        _make_worker_with_threshold(bad_threshold)
+
+
+def test_worker_startup_accepts_positive_integer_threshold():
+    worker = _make_worker_with_threshold(1234)
+    assert worker._lag_threshold == 1234

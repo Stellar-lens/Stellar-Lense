@@ -269,6 +269,16 @@ class KafkaWorker:
         self._lag_threshold = (
             lag_threshold if lag_threshold is not None else config.KAFKA_LAG_ALERT_THRESHOLD
         )
+        if self._lag_threshold is None or not isinstance(self._lag_threshold, int):
+            raise ValueError(
+                f"KAFKA_LAG_ALERT_THRESHOLD must be a positive integer, got "
+                f"{self._lag_threshold!r}"
+            )
+        if self._lag_threshold <= 0:
+            raise ValueError(
+                f"KAFKA_LAG_ALERT_THRESHOLD must be a positive integer, got "
+                f"{self._lag_threshold!r}"
+            )
         self._metrics_port = metrics_port
         self._running = False
         self._in_flight: dict[tuple[str, int], int] = defaultdict(int)
