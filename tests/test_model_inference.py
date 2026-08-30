@@ -1,5 +1,7 @@
 """Tests for detection/model_inference.py — BFT voting and RiskScorer."""
 
+import importlib
+
 import numpy as np
 import pytest
 
@@ -216,3 +218,50 @@ def test_consensus_failure_score(trained_models, monkeypatch):
     assert result["consensus_failure"] is True
     assert result["score"] == 100
     assert result["confidence"] == 0
+
+
+# ---------------------------------------------------------------------------
+# BFT_SCORE_DIVERGENCE_THRESHOLD validation (Issue #736)
+# ---------------------------------------------------------------------------
+
+
+def _reload_model_inference_with_threshold(monkeypatch, value: str):
+    """Reload config + detection.model_inference with BFT_SCORE_DIVERGENCE_THRESHOLD
+    set to ``value``, so the module-level validation re-runs on import."""
+    monkeypatch.setenv("BFT_SCORE_DIVERGENCE_THRESHOLD", value)
+
+    import config as cfg_module
+
+    importlib.reload(cfg_module)
+
+    import detection.model_inference as mi_module
+
+    return importlib.reload(mi_module)
+
+
+@pytest.mark.parametrize("bad_value", ["0", "-1", "-30"])
+def test_bft_threshold_rejects_non_positive_at_load_time(monkeypatch, bad_value):
+    with pytest.raises(ValueError, match="BFT_SCORE_DIVERGENCE_THRESHOLD must be a positive number"):
+        _reload_model_inference_with_threshold(monkeypatch, bad_value)
+
+    # Restore the module to a valid state so later tests aren't left with a
+    # half-reloaded/broken detection.model_inference in sys.modules.
+    monkeypatch.undo()
+    import config as cfg_module
+
+    importlib.reload(cfg_module)
+    import detection.model_inference as mi_module
+
+    importlib.reload(mi_module)
+
+
+def test_bft_threshold_accepts_positive_value_at_load_time(monkeypatch):
+    mi_module = _reload_model_inference_with_threshold(monkeypatch, "45")
+    assert mi_module.config.BFT_SCORE_DIVERGENCE_THRESHOLD == 45
+
+    # Restore to the default for any subsequent tests.
+    monkeypatch.undo()
+    import config as cfg_module
+
+    importlib.reload(cfg_module)
+    importlib.reload(mi_module)
