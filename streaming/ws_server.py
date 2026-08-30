@@ -12,6 +12,7 @@ Features:
 """
 
 import asyncio
+import ipaddress
 import json
 import os
 import re
@@ -859,6 +860,22 @@ def push_alert_sync(payload: dict) -> None:
 # ─────────────────────────────────────────────────────────────────────────
 
 
+def _is_loopback_host(host: str) -> bool:
+    """Return True if `host` is a loopback address that is safe to bind by default.
+
+    Accepts the literal ``localhost`` alias and any address in the IPv4/IPv6
+    loopback ranges (e.g. 127.0.0.1, 127.0.0.5, ::1). A non-loopback address
+    such as 0.0.0.0 or a routable interface IP returns False. Unparseable hosts
+    are treated as non-loopback so they fail closed.
+    """
+    if host == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
 async def run_ws_server(host: str = "127.0.0.1", port: int = 8765) -> None:
     """Run the WebSocket server and block until cancelled.
 
@@ -869,8 +886,13 @@ async def run_ws_server(host: str = "127.0.0.1", port: int = 8765) -> None:
     effective_host = os.getenv("WS_BIND_HOST", host)
     effective_port = int(os.getenv("WS_PORT", str(port)))
 
-    if effective_host == "0.0.0.0" and not os.getenv("WS_ALLOW_EXTERNAL"):
-        raise ValueError("Binding WebSocket server to 0.0.0.0 requires WS_ALLOW_EXTERNAL=1")
+    # Fail closed: binding to any non-loopback address exposes the server to the
+    # network and must be an explicit, documented opt-in (WS_ALLOW_EXTERNAL=1).
+    if not _is_loopback_host(effective_host) and not os.getenv("WS_ALLOW_EXTERNAL"):
+        raise ValueError(
+            f"Refusing to bind WebSocket server to non-loopback host "
+            f"'{effective_host}': set WS_ALLOW_EXTERNAL=1 to allow external binding."
+        )
 
     logger.info("WebSocket server listening on %s:%d", effective_host, effective_port)
     async with websockets.serve(_handler, effective_host, effective_port):
