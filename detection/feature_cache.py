@@ -27,6 +27,7 @@ from typing import TYPE_CHECKING
 import pandas as pd
 
 from config import config
+from detection.model_compatibility import FEATURE_CONTRACT_VERSION
 
 if TYPE_CHECKING:
     pass
@@ -54,13 +55,46 @@ class FeatureCache:
     next access. When the cache is at ``maxsize``, the least-recently-used
     entry is evicted to make room for a new one (entries refreshed via
     :meth:`get` or :meth:`put` are moved to the most-recently-used position).
+
+    Feature schema invalidation: values are tracked against the active
+    ``feature_contract_version``. If the schema version changes, the full cache
+    is cleared so stale rows are never served against a newer feature contract.
     """
 
-    def __init__(self, ttl_seconds: int | None = None, maxsize: int | None = None) -> None:
+    def __init__(
+        self,
+        ttl_seconds: int | None = None,
+        maxsize: int | None = None,
+        schema_version: int | str | None = None,
+    ) -> None:
         self._ttl = ttl_seconds if ttl_seconds is not None else config.FEATURE_CACHE_TTL_SECONDS
         self._maxsize = maxsize if maxsize is not None else config.FEATURE_CACHE_MAXSIZE
+        self._schema_version = (
+            schema_version if schema_version is not None else FEATURE_CONTRACT_VERSION
+        )
         self._lock = threading.Lock()
-        self._cache: OrderedDict[str, tuple[pd.Series, float]] = OrderedDict()
+        self._cache: OrderedDict[str, tuple[pd.Series, float, int | str]] = OrderedDict()
+
+    @property
+    def schema_version(self) -> int | str:
+        return self._schema_version
+
+    @schema_version.setter
+    def schema_version(self, value: int | str) -> None:
+        self.set_schema_version(value)
+
+    def set_schema_version(self, schema_version: int | str) -> None:
+        """Replace the active schema version and invalidate all cached rows."""
+        if schema_version == self._schema_version:
+            return
+        with self._lock:
+            self._schema_version = schema_version
+            self._cache.clear()
+
+    def clear(self) -> None:
+        """Drop every cached value."""
+        with self._lock:
+            self._cache.clear()
 
     def get(self, wallet: str) -> pd.Series | None:
         """Return the cached feature matrix for *wallet*, or ``None`` on a miss."""
@@ -70,7 +104,11 @@ class FeatureCache:
                 self._record_miss()
                 return None
 
-            series, cached_at = entry
+            series, cached_at, cached_schema = entry
+            if cached_schema != self._schema_version:
+                del self._cache[wallet]
+                self._record_miss()
+                return None
             if time.monotonic() - cached_at >= self._ttl:
                 del self._cache[wallet]
                 self._record_miss()
@@ -80,11 +118,14 @@ class FeatureCache:
             self._record_hit()
             return series
 
-    def put(self, wallet: str, features: pd.Series) -> None:
+    def put(self, wallet: str, features: pd.Series, schema_version: int | str | None = None) -> None:
         """Cache *features* for *wallet*, evicting the LRU entry if at capacity."""
         with self._lock:
+            if schema_version is not None and schema_version != self._schema_version:
+                self._schema_version = schema_version
+                self._cache.clear()
             self._cache.pop(wallet, None)
-            self._cache[wallet] = (features, time.monotonic())
+            self._cache[wallet] = (features, time.monotonic(), self._schema_version)
             while len(self._cache) > self._maxsize:
                 self._cache.popitem(last=False)
 
