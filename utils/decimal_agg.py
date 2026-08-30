@@ -73,6 +73,13 @@ def to_decimal(value: float | int | str | Decimal) -> Decimal:
     For ``float`` inputs the conversion goes through ``str`` first to avoid
     the well-known ``Decimal(0.1) == Decimal('0.1000000000000000055...')``
     surprise.
+
+    Note:
+        This is the single, intentional input boundary that accepts ``float``
+        (Issue #778). Every public function in this module converts any
+        incoming ``float`` here and returns ``Decimal``; no function returns a
+        ``float``. Keeping this conversion in one place prevents a silent
+        ``Decimal``->``float`` loss at a *return* boundary anywhere else.
     """
     if isinstance(value, Decimal):
         return value

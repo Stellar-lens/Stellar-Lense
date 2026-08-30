@@ -314,3 +314,48 @@ class TestPrecisionRegression:
         line_items = [Decimal("19.99"), Decimal("29.99"), Decimal("9.99"), Decimal("49.99")]
         total = decimal_sum(line_items)
         assert total == Decimal("109.96")
+
+
+# ---------------------------------------------------------------------------
+# Decimal-return contract at public boundaries (Issue #778)
+# ---------------------------------------------------------------------------
+
+
+class TestDecimalReturnContract:
+    """Every public aggregation boundary returns Decimal, never float.
+
+    Issue #778 requires that a silent ``Decimal``->``float`` conversion never
+    happens at a function return boundary: even when callers pass native
+    ``float`` inputs, the result must remain a ``Decimal`` so downstream
+    precision guarantees are not undermined.
+    """
+
+    def test_decimal_sum_returns_decimal(self) -> None:
+        result = decimal_sum([0.1, 0.2])
+        assert isinstance(result, Decimal)
+
+    def test_decimal_mean_returns_decimal(self) -> None:
+        result = decimal_mean([0.1, 0.2, 0.3])
+        assert isinstance(result, Decimal)
+
+    def test_decimal_max_returns_decimal(self) -> None:
+        assert isinstance(decimal_max([0.5, 0.9]), Decimal)
+
+    def test_decimal_min_returns_decimal(self) -> None:
+        assert isinstance(decimal_min([0.5, 0.9]), Decimal)
+
+    def test_decimal_weighted_mean_returns_decimal(self) -> None:
+        result = decimal_weighted_mean([1, 2, 3], [1, 1, 1])
+        assert isinstance(result, Decimal)
+
+    def test_decimal_percentage_returns_decimal(self) -> None:
+        assert isinstance(decimal_percentage(25.0, 100.0), Decimal)
+
+    def test_aggregate_column_returns_decimal(self) -> None:
+        result = aggregate_column(pd.Series([0.1, 0.2, 0.3]), agg="sum")
+        assert isinstance(result, Decimal)
+
+    def test_aggregate_report_returns_decimals(self) -> None:
+        df = pd.DataFrame({"amount": [0.1, 0.2], "fee": [1.0, 2.0]})
+        results = aggregate_report(df, {"amount": "sum", "fee": "mean"})
+        assert all(isinstance(v, Decimal) for v in results.values())
