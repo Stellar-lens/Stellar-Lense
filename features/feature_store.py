@@ -22,17 +22,32 @@ ledgerlens_feature_cache_misses_total = Counter(
 logger = logging.getLogger(__name__)
 
 
+#: See ``streaming.feature_store.UNSCOPED_TENANT_NAMESPACE``; kept identical so
+#: both stores namespace unscoped entries the same way.
+UNSCOPED_TENANT_NAMESPACE = "_unscoped"
+
+
 class WalletFeatureStore:
-    def __init__(self, redis_client: redis.Redis):
+    """Redis-backed wallet feature cache, namespaced per tenant.
+
+    Pass ``tenant_id`` to scope every key this instance reads and writes. Two
+    tenants monitoring the same wallet previously shared cache entries, so one
+    tenant's computed features could be served to another; the tenant segment
+    in the key is what prevents that.
+    """
+
+    def __init__(self, redis_client: redis.Redis, tenant_id: str | None = None):
         self.redis = redis_client
         self.ttl = FEATURE_STORE_TTL_SECONDS
+        self.tenant_id = tenant_id
 
     def _hash_wallet(self, wallet_address: str) -> str:
         return hashlib.sha256(wallet_address.encode()).hexdigest()
 
     def _get_key(self, wallet_address: str, asset_pair: str) -> str:
         hashed_wallet = self._hash_wallet(wallet_address)
-        return f"feat:{hashed_wallet}:{asset_pair}"
+        namespace = self.tenant_id or UNSCOPED_TENANT_NAMESPACE
+        return f"feat:{namespace}:{hashed_wallet}:{asset_pair}"
 
     def get_or_compute(
         self,

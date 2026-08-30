@@ -26,12 +26,18 @@ picks it up automatically.
 
 from __future__ import annotations
 
+import os
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import StrEnum
 from importlib import import_module
 from typing import Any
+
+#: Environment variable naming the deployment mode a process is running under.
+#: Absent means :attr:`DeploymentMode.LOCAL` -- safety checks that harden
+#: production must therefore be *opt-in to relax*, never opt-in to enforce.
+DEPLOYMENT_MODE_ENV_VAR = "LEDGERLENS_DEPLOYMENT_MODE"
 
 
 class DeploymentMode(StrEnum):
@@ -156,6 +162,29 @@ DEPLOYMENT_MODE_FIXTURES: dict[DeploymentMode, DeploymentModeFixture] = {
         require_onchain=True,
     ),
 }
+
+
+def current_deployment_mode() -> DeploymentMode:
+    """Return the mode this process is running under.
+
+    Reads :data:`DEPLOYMENT_MODE_ENV_VAR`, defaulting to
+    :attr:`DeploymentMode.LOCAL`. An unrecognised value raises rather than
+    quietly degrading to local, so a typo in a production manifest cannot
+    switch production safety checks off.
+    """
+    raw = os.getenv(DEPLOYMENT_MODE_ENV_VAR, "").strip().lower()
+    if not raw:
+        return DeploymentMode.LOCAL
+    try:
+        return DeploymentMode(raw)
+    except ValueError as exc:
+        known = tuple(m.value for m in DeploymentMode)
+        raise UnknownDeploymentModeError(raw, known) from exc
+
+
+def is_production() -> bool:
+    """True when this process is running in production mode."""
+    return current_deployment_mode() is DeploymentMode.PRODUCTION
 
 
 def get_deployment_mode_fixture(mode: DeploymentMode | str) -> DeploymentModeFixture:
