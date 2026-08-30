@@ -57,6 +57,12 @@ class TestCliOperations(unittest.TestCase):
         exit_code = main(["healthcheck"])
         self.assertEqual(exit_code, 0)
 
+    def test_cli_entrypoint_healthcheck_json(self):
+        os.environ["RISK_SCORE_DB_URL"] = "postgresql://localhost"
+        os.environ["HORIZON_URL"] = "https://horizon.stellar.org"
+        exit_code = main(["healthcheck", "--json"])
+        self.assertEqual(exit_code, 0)
+
 
 if __name__ == "__main__":
     unittest.main()

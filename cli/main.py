@@ -20,7 +20,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    subparsers.add_parser("healthcheck", help="Run diagnostic health checks on setup and variables")
+    health_parser = subparsers.add_parser(
+        "healthcheck", help="Run diagnostic health checks on setup and variables"
+    )
+    health_parser.add_argument("--json", action="store_true", help="Emit machine-readable JSON")
 
     val_parser = subparsers.add_parser(
         "validate-artifacts", help="Validate local model and schema artifacts"
@@ -32,6 +35,20 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _format_health_summary(report: dict) -> str:
+    lines = [
+        f"Overall status: {report.get('overall_status', 'UNKNOWN')}",
+        f"Checks run: {report.get('checks', {}).get('environment', {}).get('status', 'unknown')}",
+    ]
+    env = report.get("checks", {}).get("environment", {})
+    if env:
+        lines.append(f"Environment: {env.get('status', 'unknown')}")
+    streaming = report.get("checks", {}).get("streaming", {})
+    if streaming:
+        lines.append(f"Streaming: {streaming.get('status', 'unknown')}")
+    return "\n".join(lines)
+
+
 def main(args=None) -> int:
     parser = build_parser()
     opts = parser.parse_args(args)
@@ -39,7 +56,10 @@ def main(args=None) -> int:
 
     if opts.command == "healthcheck":
         report = run_diagnostics()
-        print(json.dumps(report, indent=2))
+        if getattr(opts, "json", False):
+            print(json.dumps(report, indent=2))
+        else:
+            print(_format_health_summary(report))
         return 0 if report["overall_status"] == "PASS" else 2
 
     elif opts.command == "validate-artifacts":
