@@ -353,3 +353,58 @@ def test_training_rejects_non_positive_dp_epsilon(monkeypatch):
 
     with pytest.raises(OSError, match="DP_TARGET_EPSILON"):
         validate_mode("training")
+
+
+# ---------------------------------------------------------------------------
+# Aggregated Multi-Variable & Explicit Mode Unit Tests
+# ---------------------------------------------------------------------------
+
+
+def test_api_multi_variable_missing_lists_all_vars_and_runtime_mode(monkeypatch):
+    monkeypatch.setattr(Config, "RISK_SCORE_DB_URL", "")
+    monkeypatch.setattr(Config, "MODEL_DIR", "")
+    monkeypatch.setattr(Config, "API_KEYS", [])
+    monkeypatch.setattr(Config, "API_RATE_LIMIT_RPM", 60)
+
+    with pytest.raises(OSError) as exc:
+        validate_mode("api")
+
+    err_msg = str(exc.value)
+    assert "mode='api'" in err_msg
+    assert "RISK_SCORE_DB_URL" in err_msg
+    assert "MODEL_DIR" in err_msg
+    assert "API_KEYS" in err_msg
+
+
+def test_streaming_kafka_multi_variable_missing_lists_all_vars_and_runtime_mode(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setattr(Config, "WATCHED_ASSET_PAIRS", VALID_PAIRS)
+    monkeypatch.setattr(Config, "MODEL_DIR", "./models")
+    monkeypatch.setattr(Config, "KAFKA_BOOTSTRAP_SERVERS", "")
+    monkeypatch.setattr(Config, "TRADE_AVRO_SCHEMA_PATH", str(tmp_path / "non_existent.json"))
+    monkeypatch.setattr(Config, "KAFKA_SASL_USERNAME", None)
+    monkeypatch.setattr(Config, "KAFKA_SASL_PASSWORD", None)
+
+    with pytest.raises(OSError) as exc:
+        validate_mode("streaming_kafka", role="all", backend="kafka")
+
+    err_msg = str(exc.value)
+    assert "mode='streaming_kafka'" in err_msg
+    assert "KAFKA_BOOTSTRAP_SERVERS" in err_msg
+    assert "TRADE_AVRO_SCHEMA_PATH" in err_msg
+
+
+def test_pipeline_onchain_multi_variable_missing_lists_all_vars_and_runtime_mode(monkeypatch):
+    _set_pipeline_baseline(monkeypatch)
+    monkeypatch.setattr(Config, "LEDGERLENS_CONTRACT_ID", "")
+    monkeypatch.setattr(Config, "LEDGERLENS_SUBMITTER_SECRET", "")
+
+    with pytest.raises(OSError) as exc:
+        validate_mode("pipeline_onchain")
+
+    err_msg = str(exc.value)
+    assert "mode='pipeline_onchain'" in err_msg
+    assert "LEDGERLENS_CONTRACT_ID" in err_msg
+    assert "LEDGERLENS_SUBMITTER_SECRET" in err_msg
+

@@ -79,6 +79,7 @@ Auto-generated from `config.py` by `scripts/generate_env_contract_docs.py` (Issu
 | `WS_CLIENT_QUEUE_DEPTH` | `WS_CLIENT_QUEUE_DEPTH` | `int` | No | `'100'` | — |
 | `WS_REPLAY_BUFFER_SIZE` | `WS_REPLAY_BUFFER_SIZE` | `int` | No | `'1000'` | — |
 | `WS_RATE_LIMIT_MSGS_PER_SECOND` | `WS_RATE_LIMIT_MSGS_PER_SECOND` | `int` | No | `'100'` | — |
+| `WS_HEARTBEAT_INTERVAL_SECONDS` | `WS_HEARTBEAT_INTERVAL_SECONDS` | `float` | No | `'30'` | Seconds between WebSocket ping frames sent to each client. If the client does not respond with a pong within this interval, the connection is closed and the subscriber entry is cleaned up. |
 | `WS_ABUSE_MAX_REQUESTS_PER_MINUTE` | `WS_ABUSE_MAX_REQUESTS_PER_MINUTE` | `int` | No | `'300'` | WebSocket abuse detection (issue #223) |
 | `WS_ABUSE_MAX_DISTINCT_WALLETS` | `WS_ABUSE_MAX_DISTINCT_WALLETS` | `int` | No | `'50'` | — |
 | `WS_ABUSE_WALLET_WINDOW_SECONDS` | `WS_ABUSE_WALLET_WINDOW_SECONDS` | `int` | No | `'60'` | — |

@@ -35,9 +35,18 @@ import hashlib
 import os
 import platform
 import subprocess
-import sys
-import tomllib
-from datetime import UTC, datetime
+try:
+    import tomllib
+except ImportError:
+    try:
+        import tomli as tomllib  # type: ignore[no-redef]
+    except ImportError:
+        tomllib = None  # type: ignore[assignment]
+try:
+    from datetime import UTC, datetime
+except ImportError:
+    from datetime import datetime, timezone
+    UTC = timezone.utc
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -79,7 +88,7 @@ def get_version() -> str:
         return env_ver.strip()
 
     # 2. pyproject.toml (always present in the source tree)
-    if _PYPROJECT.exists():
+    if _PYPROJECT.exists() and tomllib is not None:
         try:
             with open(_PYPROJECT, "rb") as f:
                 data = tomllib.load(f)
