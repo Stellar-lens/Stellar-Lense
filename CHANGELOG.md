@@ -17,6 +17,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ingestion/`; degraded-mode behaviour (rate limiter, batch account loads,
   metadata cache) is unchanged. Documented in `docs/ingestion.md` under
   "Error handling".
+- `docs/simulator.md`: documents the wash-trade simulators
+  (`scripts/wash_trade_simulator.py`,
+  `scripts/adversarial_wash_trade_simulator.py`) and the realism evaluation
+  (`scripts/evaluate_simulator_realism.py`) — what each generates, what the FFD
+  and discriminator-accuracy metrics mean, how to read realism scores, and exact
+  generate/evaluate commands.
+- `docs/graph_features.md`: added a graph-theory glossary (funding edge,
+  ancestor traversal, community, ring, internal edge density, motif,
+  reciprocity), each linked to the function that computes it, with the terms
+  cross-linked from their first use in the document.
 - Cryptographically committed forensic audit trail (`detection/audit_trail.py`):
   signed NDJSON append-only log for report scores, feature/SHAP hashes, and model
   version; `scripts/verify_audit_trail.py` for regulator verification.
