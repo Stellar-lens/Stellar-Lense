@@ -1,4 +1,4 @@
-.PHONY: install lint format test run scale-workers typecheck mutation-test threshold-sweep anonymization-check check-env check-schema-compatibility check-review-gates ops-check ops-validate static-analysis benchmark verify-lockfile regenerate-lockfile partition-write partition-read retention-scan snapshot-freeze snapshot-list snapshot-verify run-compare run-compare-all check-cycles probe-deps probe-deps-json validate-readme validate-readme-warn validate-notebooks validate-notebooks-strict validate-notebooks-ci validate-all check-integrity dead-path-report env-docs env-docs-check migrate migrate-status migrate-dry-run new-migration onboard onboard-fix onboard-json
+.PHONY: install lint format test run scale-workers typecheck mutation-test threshold-sweep anonymization-check check-env check-schema-compatibility check-review-gates ops-check ops-validate static-analysis benchmark verify-lockfile regenerate-lockfile partition-write partition-read retention-scan snapshot-freeze snapshot-list snapshot-verify run-compare run-compare-all check-cycles check-boundaries probe-deps probe-deps-json validate-readme validate-readme-warn validate-notebooks validate-notebooks-strict validate-notebooks-ci validate-all check-integrity dead-path-report env-docs env-docs-check migrate migrate-status migrate-dry-run new-migration onboard onboard-fix onboard-json
 .ONESHELL:
 
 VENV_BIN := $(abspath .venv/bin)
@@ -178,6 +178,20 @@ check-cycles:
 	else \
 		$(PYTHON) scripts/check_import_cycles.py; \
 	fi
+
+# ---------------------------------------------------------------------------
+# Module dependency / layering rules (config/module_boundaries.yml, Issue #791)
+#
+# Usage:
+#   make check-boundaries                  # check all packages
+#   make check-boundaries PACKAGE=detection  # scope to one package
+#
+# Exit codes: 0 = within declared boundaries, 1 = one or more violations.
+# ---------------------------------------------------------------------------
+
+check-boundaries:
+	@echo "==> Checking module dependency / layering boundaries..."
+	$(PYTHON) scripts/check_module_dependencies.py $(if $(PACKAGE),--package $(PACKAGE),)
 
 # ---------------------------------------------------------------------------
 # Optional dependency probes (Issue #542)

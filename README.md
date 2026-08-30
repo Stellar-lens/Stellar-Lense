@@ -517,6 +517,12 @@ make lint      # ruff check .
 make format    # black .
 make test      # pytest
 make run       # python run_pipeline.py
+make check-env MODE=api      # validate one runtime mode
+make check-env               # validate every registered mode
+make check-cycles            # detect circular imports (Issue #546)
+make check-boundaries       # enforce module layering rules (config/module_boundaries.yml, Issue #791)
+make check-cycles PACKAGES="detection ingestion"   # scope the cycle check
+make check-boundaries PACKAGE=detection            # scope the boundary check
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the full dev setup and PR process.

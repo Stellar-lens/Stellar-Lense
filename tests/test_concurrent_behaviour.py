@@ -1054,3 +1054,119 @@ class TestStressRunner:
         """assert_eventually raises on timeout."""
         with pytest.raises(AssertionError):
             assert_eventually(lambda: False, timeout=0.2, interval=0.05)
+
+
+# ===================================================================
+# RiskScoreStore.upsert — atomic upsert under concurrent writers
+# (Issue #789). Two or more Kafka workers in the same consumer group
+# can process the same wallet/pair close together; the upsert must be a
+# single atomic INSERT ... ON CONFLICT DO UPDATE so the final stored
+# record is always one of the concurrent writes, never a merged hybrid.
+# ===================================================================
+
+
+class TestRiskScoreStoreUpsertConcurrency:
+    """Validate RiskScoreStore.upsert under concurrent same-key writers."""
+
+    def _make_store(self, tmp_path):
+        from detection.persistence import get_engine, get_session_factory
+
+        from detection.risk_score_store import RiskScoreStore
+
+        db_path = tmp_path / "risk_scores.db"
+        engine = get_engine(f"sqlite:///{db_path}")
+        return RiskScoreStore(get_session_factory(engine))
+
+    def test_concurrent_upsert_same_key_reflects_one_write(self):
+        """Concurrent writers to one (wallet, pair) leave a single coherent row."""
+        from sqlalchemy import func, select
+
+        from detection.persistence import RiskScoreRecord
+
+        store = self._make_store(tmp_path)
+        wallet = "G" + "A" * 55
+        pair = "USDC:XLM"
+        n_writers = 8
+        # Each writer writes a fully-distinct, deterministic score so we can
+        # prove the final row came from exactly one writer and was not merged.
+        expected_scores = {tid * 10 + 1 for tid in range(n_writers)}
+
+        def write(tid: int, it: int) -> None:
+            score = tid * 10 + 1
+            store.upsert(
+                wallet,
+                pair,
+                {
+                    "score": score,
+                    "benford_flag": bool(score % 2),
+                    "ml_flag": bool(score % 3),
+                    "confidence": score,
+                },
+            )
+
+        errors = StressRunner(target=write).run(n_threads=n_writers, n_iters=1, timeout=30)
+        assert not errors, f"Concurrent upsert errors: {errors}"
+
+        record = store.get(wallet, pair)
+        assert record is not None, "Expected a stored record for the key"
+        assert record.score in expected_scores, (
+            f"Final score {record.score} is a merged/corrupted value, not one "
+            f"of the concurrent writes {sorted(expected_scores)}"
+        )
+
+        # Exactly one row per (wallet, pair) — no duplicate/orphaned rows.
+        with store._session_factory() as session:
+            count = session.scalar(
+                select(func.count())
+                .select_from(RiskScoreRecord)
+                .where(
+                    RiskScoreRecord.wallet == wallet,
+                    RiskScoreRecord.asset_pair == pair,
+                )
+            )
+        assert count == 1, f"Expected exactly one row for the key, got {count}"
+
+    def test_concurrent_upsert_many_iterations_stays_consistent(self):
+        """Repeated concurrent upserts never produce a hybrid/duplicate row."""
+        from sqlalchemy import func, select
+
+        from detection.persistence import RiskScoreRecord
+
+        store = self._make_store(tmp_path)
+        wallet = "G" + "B" * 55
+        pair = "USDC:XLM"
+        n_writers = 6
+        n_iters = 20
+        expected_scores = {tid * 100 + it for tid in range(n_writers) for it in range(n_iters)}
+
+        def write(tid: int, it: int) -> None:
+            score = tid * 100 + it
+            store.upsert(
+                wallet,
+                pair,
+                {
+                    "score": score,
+                    "benford_flag": bool(score % 2),
+                    "ml_flag": bool(score % 3),
+                    "confidence": score,
+                },
+            )
+
+        errors = StressRunner(target=write).run(n_threads=n_writers, n_iters=n_iters, timeout=30)
+        assert not errors, f"Concurrent upsert errors: {errors}"
+
+        record = store.get(wallet, pair)
+        assert record is not None
+        assert (
+            record.score in expected_scores
+        ), f"Final score {record.score} is not one of the concurrent writes"
+        with store._session_factory() as session:
+            count = session.scalar(
+                select(func.count())
+                .select_from(RiskScoreRecord)
+                .where(
+                    RiskScoreRecord.wallet == wallet,
+                    RiskScoreRecord.asset_pair == pair,
+                )
+            )
+        assert count == 1, f"Expected exactly one row for the key, got {count}"

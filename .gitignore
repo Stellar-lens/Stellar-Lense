@@ -79,6 +79,7 @@ ci_metrics/history.jsonl
 .ruff_cache/
 .bandit/
 .radon_cache/
+.cache/
 bandit_report.json
 mypy_report.xml
 
