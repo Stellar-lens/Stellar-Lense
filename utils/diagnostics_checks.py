@@ -621,7 +621,7 @@ class DatabaseConnectivityCheck:
                 category=self.category,
                 status=CheckStatus.PASS,
                 message="Database is reachable",
-                details={"url": display_url},
+                details={"url": display_url, "component": "database"},
             )
 
         except ImportError:
@@ -633,12 +633,17 @@ class DatabaseConnectivityCheck:
                 remediation="Run: make install",
             )
         except Exception as exc:
+            display_url = sanitize_url(db_url)
             return DiagnosticResult(
                 check_name=self.name,
                 category=self.category,
                 status=CheckStatus.FAIL,
-                message="Cannot connect to database",
-                details={"url": display_url, "error": str(exc)[:100]},
+                message=f"Database connectivity check failed for {display_url}",
+                details={
+                    "url": display_url,
+                    "component": "database",
+                    "error": str(exc)[:100],
+                },
                 remediation="Check database URL and network connectivity",
             )
 
