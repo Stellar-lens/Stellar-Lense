@@ -66,6 +66,14 @@ class Trade(BaseModel):
 
         return validate_stellar_amount(v)
 
+    def __repr__(self) -> str:
+        # Compact summary for readable log/debugger output, not exhaustive field dump.
+        pair = f"{self.base_asset.code}:{self.counter_asset.code}"
+        return (
+            f"Trade(id={self.trade_id!r}, pair={pair}, "
+            f"amount={self.base_amount}, time={self.ledger_close_time.isoformat()})"
+        )
+
     @property
     def amount(self) -> Decimal:
         """Primary amount used for Benford digit analysis."""

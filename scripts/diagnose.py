@@ -47,6 +47,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from utils.diagnostics import CheckCategory, list_available_checks, run_diagnostics
+from utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -99,30 +102,29 @@ def _print_check_list(category: str | None = None) -> None:
     for check_name, cat in list_available_checks(category=category):
         checks_by_category[cat].append(check_name)
 
-    print("Available diagnostic checks:\n")
+    logger.info("Available diagnostic checks:")
     for cat in sorted(checks_by_category.keys()):
-        print(f"  {cat}:")
+        logger.info(f"  {cat}:")
         for check_name in sorted(checks_by_category[cat]):
-            print(f"    - {check_name}")
-    print()
+            logger.info(f"    - {check_name}")
 
 
 def _print_verbose_report(report: dict[str, any]) -> None:
     """Print detailed report with all check information."""
 
-    print(f"\n{'='*70}")
-    print("Repository Health Diagnostics")
-    print(f"{'='*70}\n")
+    logger.info(f"\n{'='*70}")
+    logger.info("Repository Health Diagnostics")
+    logger.info(f"{'='*70}\n")
 
-    print(f"Overall Status: {report['overall_status'].upper()}")
-    print(f"Total Checks: {report['total_checks']}")
-    print(f"  PASS: {report['pass_count']}")
-    print(f"  WARN: {report['warn_count']}")
-    print(f"  FAIL: {report['fail_count']}")
-    print(f"  ERROR: {report['error_count']}")
-    print(f"  SKIP: {report['skip_count']}")
-    print(f"Categories: {', '.join(report['categories_checked'])}")
-    print(f"Execution time: {report['total_duration_ms']:.0f}ms\n")
+    logger.info(f"Overall Status: {report['overall_status'].upper()}")
+    logger.info(f"Total Checks: {report['total_checks']}")
+    logger.info(f"  PASS: {report['pass_count']}")
+    logger.info(f"  WARN: {report['warn_count']}")
+    logger.info(f"  FAIL: {report['fail_count']}")
+    logger.info(f"  ERROR: {report['error_count']}")
+    logger.info(f"  SKIP: {report['skip_count']}")
+    logger.info(f"Categories: {', '.join(report['categories_checked'])}")
+    logger.info(f"Execution time: {report['total_duration_ms']:.0f}ms\n")
 
     # Group by category
     from collections import defaultdict
@@ -132,8 +134,8 @@ def _print_verbose_report(report: dict[str, any]) -> None:
         by_category[check["category"]].append(check)
 
     for category in sorted(by_category.keys()):
-        print(f"\n{category.upper()}")
-        print("-" * 70)
+        logger.info(f"\n{category.upper()}")
+        logger.info("-" * 70)
 
         checks = by_category[category]
         for check in sorted(checks, key=lambda x: x["check_name"]):
@@ -145,16 +147,16 @@ def _print_verbose_report(report: dict[str, any]) -> None:
                 "skip": "-",
             }.get(check["status"], "?")
 
-            print(f"\n  [{status_symbol}] {check['check_name']}")
-            print(f"      {check['message']}")
+            logger.info(f"\n  [{status_symbol}] {check['check_name']}")
+            logger.info(f"      {check['message']}")
 
             if check.get("details"):
-                print(f"      Details: {json.dumps(check['details'], indent=10)[:200]}")
+                logger.info(f"      Details: {json.dumps(check['details'], indent=10)[:200]}")
 
             if check.get("remediation"):
-                print(f"      Fix: {check['remediation']}")
+                logger.info(f"      Fix: {check['remediation']}")
 
-    print(f"\n{'='*70}\n")
+    logger.info(f"\n{'='*70}\n")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -170,7 +172,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         import utils.diagnostics_checks  # noqa: F401
     except ImportError as exc:
-        print(f"Error: Cannot import diagnostic checks: {exc}", file=sys.stderr)
+        logger.error("Cannot import diagnostic checks: %s", exc)
         return 2
 
     # Run diagnostics
@@ -180,11 +182,12 @@ def main(argv: list[str] | None = None) -> int:
         report_dict = report.to_dict()
 
         if args.json:
+            # Machine-readable JSON output for CI/tooling integration
             print(json.dumps(report_dict, indent=2))
         elif args.verbose:
             _print_verbose_report(report_dict)
         else:
-            print(report.summary())
+            logger.info(report.summary())
 
         # Exit code based on overall status
         if report.is_healthy():
@@ -193,14 +196,10 @@ def main(argv: list[str] | None = None) -> int:
             return 1
 
     except KeyboardInterrupt:
-        print("\nInterrupted by user", file=sys.stderr)
+        logger.warning("Interrupted by user")
         return 2
     except Exception as exc:
-        print(f"Error running diagnostics: {exc}", file=sys.stderr)
-        if args.verbose:
-            import traceback
-
-            traceback.print_exc()
+        logger.error("Error running diagnostics: %s", exc, exc_info=args.verbose)
         return 2
 
 
