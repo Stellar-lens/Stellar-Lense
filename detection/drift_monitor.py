@@ -132,18 +132,13 @@ class LiveDriftMonitor:
         try:
             from config import config  # type: ignore
 
-            self.threshold = (
-                config.DRIFT_PSI_THRESHOLD if threshold is None else float(threshold)
-            )
-            self.window_size = (
-                config.DRIFT_WINDOW_SIZE if window_size is None else int(window_size)
-            )
+            self.threshold = config.DRIFT_PSI_THRESHOLD if threshold is None else float(threshold)
+            self.window_size = config.DRIFT_WINDOW_SIZE if window_size is None else int(window_size)
         except Exception:  # pragma: no cover
             self.threshold = 0.2 if threshold is None else float(threshold)
             self.window_size = 1000 if window_size is None else int(window_size)
 
-
-        with open(reference_path, "r", encoding="utf-8") as f:
+        with open(reference_path, encoding="utf-8") as f:
             raw = json.load(f)
 
         # Support either the raw dict or wrapper under "feature_distributions".
@@ -202,4 +197,3 @@ class LiveDriftMonitor:
                 drifted.append(feature)
 
         return drifted
-

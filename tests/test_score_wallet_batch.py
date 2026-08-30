@@ -64,7 +64,9 @@ def test_batch_scores_ten_wallets_from_file(tmp_path, capsys, mock_scorer, mock_
         assert r["score"] == 83
 
 
-def test_batch_per_wallet_error_does_not_abort_others(tmp_path, capsys, mock_scorer, mock_load_trades):
+def test_batch_per_wallet_error_does_not_abort_others(
+    tmp_path, capsys, mock_scorer, mock_load_trades
+):
     """A failure scoring one wallet must surface in its `error` field, not crash the batch."""
     good_wallets = _wallets(4)
     bad_wallet = "NOT-A-VALID-WALLET"
@@ -95,9 +97,10 @@ def test_batch_workers_argument_controls_pool_size(tmp_path, capsys, mock_scorer
     wallets_file = tmp_path / "wallets.txt"
     wallets_file.write_text("\n".join(_wallets(3)))
 
-    with patch("scripts.score_wallet.ThreadPoolExecutor", wraps=__import__(
-        "concurrent.futures", fromlist=["ThreadPoolExecutor"]
-    ).ThreadPoolExecutor) as mock_pool:
+    with patch(
+        "scripts.score_wallet.ThreadPoolExecutor",
+        wraps=__import__("concurrent.futures", fromlist=["ThreadPoolExecutor"]).ThreadPoolExecutor,
+    ) as mock_pool:
         with patch(
             "sys.argv",
             [

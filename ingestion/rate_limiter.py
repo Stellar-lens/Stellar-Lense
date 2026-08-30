@@ -38,7 +38,7 @@ class TokenBucketLimiter:
         capacity: int | None = None,
         refill_rate_per_sec: float | None = None,
         poll_interval_seconds: float = 0.02,
-        client: "redis.Redis | None" = None,
+        client: redis.Redis | None = None,
     ):
         self._key = key
         self._capacity = float(capacity if capacity is not None else config.HORIZON_MAX_RPS)
@@ -59,15 +59,16 @@ class TokenBucketLimiter:
             )
             client.ping()
             return client
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
+            # Broad catch justified: Redis connection can fail for many reasons
+            # (network, DNS, auth, etc.). Gracefully degrade to no-op rate limiting
+            # so ingestion continues without a distributed rate limit.
             self._warn(f"Redis unavailable ({exc})")
             return None
 
     def _warn(self, reason: str) -> None:
         if not self._warned:
-            logger.warning(
-                "%s — proceeding without a distributed Horizon rate limit", reason
-            )
+            logger.warning("%s — proceeding without a distributed Horizon rate limit", reason)
             self._warned = True
 
     def try_acquire(self, tokens: float = 1.0) -> bool:

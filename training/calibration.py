@@ -61,7 +61,7 @@ def _compute_ece(probs: np.ndarray, labels: np.ndarray, n_bins: int = _ECE_N_BIN
     bins = np.linspace(0.0, 1.0, n_bins + 1)
     ece = 0.0
     n = len(labels)
-    for lo, hi in zip(bins[:-1], bins[1:]):
+    for lo, hi in zip(bins[:-1], bins[1:], strict=True):
         mask = (probs >= lo) & (probs < hi)
         if not mask.any():
             continue
@@ -93,7 +93,7 @@ class PlattCalibrator:
         )
         self._ece: float | None = None
 
-    def fit(self, scores: np.ndarray, labels: np.ndarray) -> "PlattCalibrator":
+    def fit(self, scores: np.ndarray, labels: np.ndarray) -> PlattCalibrator:
         """Fit the calibrator on held-out (score, label) pairs.
 
         Args:
@@ -137,7 +137,7 @@ class PlattCalibrator:
         logger.info("Saved PlattCalibrator to %s", path)
 
     @classmethod
-    def load(cls, path: str | os.PathLike) -> "PlattCalibrator":
+    def load(cls, path: str | os.PathLike) -> PlattCalibrator:
         """Load a persisted calibrator from ``path``."""
         with open(path, "rb") as f:
             obj = pickle.load(f)  # noqa: S301 — trusted internal model artifact
@@ -156,7 +156,7 @@ class PlattCalibrator:
         probs = self.calibrate(scores)
         bins = np.linspace(0.0, 1.0, _ECE_N_BINS + 1)
         mean_probs, mean_labels = [], []
-        for lo, hi in zip(bins[:-1], bins[1:]):
+        for lo, hi in zip(bins[:-1], bins[1:], strict=True):
             mask = (probs >= lo) & (probs < hi)
             if mask.any():
                 mean_probs.append(float(probs[mask].mean()))

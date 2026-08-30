@@ -28,9 +28,8 @@ from __future__ import annotations
 import json
 import os
 import textwrap
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from config import config
 from utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -61,7 +60,7 @@ def _build_user_prompt(report_dict: dict) -> str:
     score_lower = report_dict.get("score_lower", 0)
     score_upper = report_dict.get("score_upper", 100)
     verdict = report_dict.get("verdict", "unknown")
-    generated_at = report_dict.get("generated_at", datetime.now(timezone.utc).isoformat())
+    generated_at = report_dict.get("generated_at", datetime.now(UTC).isoformat())
 
     # Top SHAP features (up to 5)
     shap_lines = []
@@ -81,8 +80,7 @@ def _build_user_prompt(report_dict: dict) -> str:
         mad = first_window.get("mad", "n/a")
         nonconform = first_window.get("mad_nonconforming", False)
         benford_summary = (
-            f"chi-square={chi2}, MAD={mad}, "
-            f"non-conforming={'yes' if nonconform else 'no'}"
+            f"chi-square={chi2}, MAD={mad}, " f"non-conforming={'yes' if nonconform else 'no'}"
         )
 
     # Trade evidence count
@@ -160,13 +158,12 @@ class NarrativeGenerator:
             import openai  # type: ignore[import]
         except ImportError as exc:
             raise ImportError(
-                "openai package required for NARRATIVE_LLM_BACKEND=openai. "
-                "pip install openai"
+                "openai package required for NARRATIVE_LLM_BACKEND=openai. " "pip install openai"
             ) from exc
 
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
-            raise EnvironmentError("OPENAI_API_KEY environment variable is not set.")
+            raise OSError("OPENAI_API_KEY environment variable is not set.")
 
         model = os.getenv(_OPENAI_MODEL_ENV, _DEFAULT_OPENAI_MODEL)
         client = openai.OpenAI(api_key=api_key)
@@ -191,7 +188,7 @@ class NarrativeGenerator:
 
         api_key = os.getenv("ANTHROPIC_API_KEY")
         if not api_key:
-            raise EnvironmentError("ANTHROPIC_API_KEY environment variable is not set.")
+            raise OSError("ANTHROPIC_API_KEY environment variable is not set.")
 
         model = os.getenv(_ANTHROPIC_MODEL_ENV, _DEFAULT_ANTHROPIC_MODEL)
         client = anthropic.Anthropic(api_key=api_key)
@@ -223,15 +220,14 @@ class NarrativeGenerator:
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
+
 def _cli() -> None:
     import argparse
 
     parser = argparse.ArgumentParser(
         description="Generate a regulatory narrative from a LedgerLens forensic report JSON."
     )
-    parser.add_argument(
-        "--report", required=True, help="Path to forensic report JSON file."
-    )
+    parser.add_argument("--report", required=True, help="Path to forensic report JSON file.")
     parser.add_argument(
         "--backend",
         default=None,
@@ -250,6 +246,7 @@ def _cli() -> None:
 
     if args.output:
         from detection.forensic_report import write_report_secure
+
         write_report_secure(args.output, narrative)
         print(f"Narrative written to {args.output}")
     else:

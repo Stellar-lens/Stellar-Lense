@@ -16,3 +16,9 @@ feature_drift:
 
 # Local environment defaults to DEBUG mode and SQLite
 # No hardened authentication required
+# Local-development overlay. Applied on top of base.yaml when
+# LEDGERLENS_ENV=local (the default when no CI indicator is present).
+
+log_level: DEBUG
+log_format: text
+risk_score_db_url: sqlite:///ledgerlens_local.db

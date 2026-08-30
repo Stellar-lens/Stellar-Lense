@@ -69,6 +69,7 @@ class FeatureBuffer:
         When a wallet's deque is at capacity, ``deque(maxlen=…)`` automatically
         evicts the oldest entry on ``append()``.
         """
+        amount = float(trade.amount)
         record = {
             "trade_id": trade.trade_id,
             "ledger_close_time": trade.ledger_close_time,
@@ -76,7 +77,7 @@ class FeatureBuffer:
             "counter_account": trade.counter_account,
             "base_asset": str(trade.base_asset.code),
             "counter_asset": str(trade.counter_asset.code),
-            "amount": trade.amount,
+            "amount": amount,
         }
         pair_id = trade.base_asset.pair_id(trade.counter_asset)
 
@@ -87,7 +88,7 @@ class FeatureBuffer:
 
                 # Update wallet-level Benford sketches
                 for sketch in self._benford_sketches[wallet].values():
-                    sketch.update(trade.amount, trade.ledger_close_time)
+                    sketch.update(amount, trade.ledger_close_time)
 
                 # Update pair-level Benford sketches
                 if pair_id not in self._pair_benford_sketches[wallet]:
@@ -95,7 +96,7 @@ class FeatureBuffer:
                         h: StreamingBenfordSketch(h * 3600) for h in config.BENFORD_WINDOWS_HOURS
                     }
                 for sketch in self._pair_benford_sketches[wallet][pair_id].values():
-                    sketch.update(trade.amount, trade.ledger_close_time)
+                    sketch.update(amount, trade.ledger_close_time)
 
     def get_feature_row(self, wallet: str) -> pd.Series | None:
         """Build and return the feature row for *wallet*.

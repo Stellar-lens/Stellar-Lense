@@ -10,10 +10,11 @@ Tests verify:
   4. Cross-pair aggregator reads from all partitions
 """
 
-import json
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, Mock, patch
 
-import pytest
+from streaming.alert_dispatcher import AlertDispatcher
+from streaming.feature_buffer import FeatureBuffer
+from streaming.streaming_scorer import StreamingScorer
 
 
 class TestProducerConsumerIntegration:
@@ -22,8 +23,8 @@ class TestProducerConsumerIntegration:
     @patch("ingestion.kafka_producer.KafkaProducer")
     def test_producer_sends_with_partition_key(self, mock_producer_class):
         """Producer sends events with canonical pair ID as partition key."""
+        from ingestion.data_models import Asset, Trade
         from ingestion.kafka_producer import KafkaTradeProducer
-        from ingestion.data_models import Trade, Asset
 
         # Mock Kafka producer
         mock_producer_instance = Mock()
@@ -62,8 +63,8 @@ class TestProducerConsumerIntegration:
     @patch("ingestion.kafka_producer.KafkaProducer")
     def test_producer_sends_invalid_pair_to_dlq(self, mock_producer_class):
         """Producer sends events with invalid pairs to dead-letter queue."""
+        from ingestion.data_models import Asset, Trade
         from ingestion.kafka_producer import KafkaTradeProducer
-        from ingestion.data_models import Trade, Asset
 
         mock_producer_instance = Mock()
         mock_producer_class.return_value = mock_producer_instance
@@ -101,13 +102,13 @@ class TestWorkerProcessing:
 
     def test_worker_processes_message(self):
         """Worker correctly processes a single trade message."""
-        from streaming.kafka_worker import KafkaWorker
-        from streaming.feature_buffer import FeatureBuffer
-        from streaming.streaming_scorer import StreamingScorer
         from streaming.alert_dispatcher import AlertDispatcher
+        from streaming.feature_buffer import FeatureBuffer
+        from streaming.kafka_worker import KafkaWorker
+        from streaming.streaming_scorer import StreamingScorer
 
         buffer = FeatureBuffer()
-        
+
         # Mock scorer to avoid issues with uninitialized _feature_cache
         scorer = Mock(spec=StreamingScorer)
         scorer.score_wallet = Mock(return_value=None)
@@ -145,7 +146,7 @@ class TestWorkerProcessing:
             count_ga111 = buffer.wallet_trade_count("GA111")
             count_ga222 = buffer.wallet_trade_count("GA222")
             assert count_ga111 > 0 or count_ga222 > 0
-            
+
             # Verify scorer was called
             assert scorer.score_wallet.call_count >= 1
 

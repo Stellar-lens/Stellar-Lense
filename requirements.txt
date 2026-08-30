@@ -24,10 +24,6 @@ opacus>=1.5.0
 stable-baselines3>=2.3.0
 gymnasium>=0.29.0
 
-# GNN (Graph Neural Network encoder)
-torch>=2.2.0
-torch_geometric>=2.5.0
-
 # Multi-objective ensemble weight calibration (NSGA-II Pareto search)
 pymoo>=0.6.1
 
@@ -47,11 +43,6 @@ fastapi>=0.111.0
 uvicorn>=0.29.0
 httpx>=0.27.0
 
-# Distributed rate limiting (ingestion/rate_limiter.py)
-redis>=5.0.0
-
-prometheus_client>=0.18.0
-torch>=2.0.0
 # WebSocket server (streaming/ws_server.py)
 websockets>=12.0
 
@@ -70,8 +61,17 @@ fastavro>=1.9.0
 # Cryptography (model artifact signing/verification)
 cryptography>=42.0.0
 
+# Active learning — approximate nearest-neighbour index (core-set selection, Issue #253)
+hnswlib>=0.8.0
+
 # Static type checking
 mypy>=1.10.0
+
+# Security linting (issue #545 — static analysis gate)
+bandit>=1.7.9
+
+# Cyclomatic complexity analysis (issue #545 — static analysis gate)
+radon>=6.0.1
 
 # Label quality estimation — confident learning (#271)
 cleanlab>=2.6.0
@@ -84,6 +84,9 @@ pytest-timeout>=2.3.0
 hypothesis>=6.100.0
 factory-boy>=3.3.0
 
+# Mutation testing
+mutmut==2.4.4
+
 # Forensic reporting
 jinja2>=3.1.0
 tqdm>=4.66.0
@@ -95,3 +98,12 @@ tabulate>=0.9.0
 
 # Hyperparameter optimization (Issue #281)
 optuna>=4.0.0
+
+# Causal discovery prior constraints (Issue #192)
+causal-learn>=0.1.4
+
+# Counterfactual explainer (Issue #193)
+dice-ml>=0.11
+
+# Cross-chain Solana resolver TTL cache
+cachetools>=5.3.0

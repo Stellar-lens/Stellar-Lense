@@ -1,11 +1,12 @@
 import pandas as pd
+import pytest
 
 from detection.feature_engineering import (
     compute_order_cancellation_rate,
     compute_trade_pattern_features,
 )
+from ingestion.exceptions import RecordValidationError
 from ingestion.orderbook_loader import _action_for_operation, _to_orderbook_event
-from tests.factories import make_clean_trades
 
 
 def test_action_for_operation_created():
@@ -63,6 +64,32 @@ def test_to_orderbook_event_maps_fields():
 def test_to_orderbook_event_returns_none_for_noop():
     record = sample_operation_record(amount="0", offer_id="0")
     assert _to_orderbook_event(record) is None
+
+
+def test_to_orderbook_event_raises_typed_error_on_missing_field():
+    record = sample_operation_record()
+    del record["source_account"]
+
+    with pytest.raises(RecordValidationError) as excinfo:
+        _to_orderbook_event(record)
+
+    assert excinfo.value.source == "orderbook_loader._to_orderbook_event"
+    assert excinfo.value.raw is not None
+
+
+def test_to_orderbook_event_raises_typed_error_on_missing_type():
+    record = sample_operation_record()
+    del record["type"]
+
+    with pytest.raises(RecordValidationError):
+        _to_orderbook_event(record)
+
+
+def test_to_orderbook_event_raises_typed_error_on_bad_amount():
+    record = sample_operation_record(amount="not-a-number")
+
+    with pytest.raises(RecordValidationError):
+        _to_orderbook_event(record)
 
 
 def orderbook_events_df() -> pd.DataFrame:

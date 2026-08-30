@@ -17,7 +17,6 @@ Assumptions:
 
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -28,7 +27,7 @@ from sklearn.preprocessing import StandardScaler
 from utils.logging import get_logger
 
 if TYPE_CHECKING:
-    from detection.model_inference import RiskScorer
+    pass
 
 logger = get_logger(__name__)
 
@@ -134,10 +133,8 @@ class ActivationClusteringDetector:
 
             elif "XGBClassifier" in model_class_name or "XGBRegressor" in model_class_name:
                 # Extract leaf predictions (raw model output before final transformation)
-                booster = model.get_booster()
-                dmatrix = model.get_booster().DMatrix(X.values)
                 # Get raw predictions (pre-sigmoid for binary classification)
-                raw_preds = booster.predict(dmatrix, pred_leaf=False)
+                raw_preds = model.predict(X, output_margin=True)
                 # Shape: (n_samples,) for binary, or (n_samples, n_classes) for multiclass
                 if raw_preds.ndim == 1:
                     raw_preds = raw_preds.reshape(-1, 1)

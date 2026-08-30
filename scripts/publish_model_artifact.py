@@ -89,13 +89,18 @@ def publish(
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model-name", required=True, help="Model name (e.g. rf, xgb)")
-    parser.add_argument("--model-dir", default="./models", help="Directory containing model artifacts")
-    parser.add_argument("--private-key-path", required=True, help="Path to Ed25519 private key (PEM)")
+    parser.add_argument(
+        "--model-dir", default="./models", help="Directory containing model artifacts"
+    )
+    parser.add_argument(
+        "--private-key-path", required=True, help="Path to Ed25519 private key (PEM)"
+    )
     parser.add_argument("--db-url", default=None, help="SQLAlchemy DB URL (defaults to config)")
     args = parser.parse_args()
 
     if args.db_url is None:
         from config import config
+
         db_url = config.RISK_SCORE_DB_URL
     else:
         db_url = args.db_url

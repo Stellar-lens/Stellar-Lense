@@ -98,7 +98,6 @@ def _detect_and_quarantine_backdoors(
             return new_df, quarantined_indices
 
         # Check safety threshold for each class
-        flagged_set = set(flagged_indices)
         safety_triggered = False
 
         for label in sorted(y.unique()):
@@ -364,9 +363,7 @@ class IncrementalTrainer:
                 training_data,
                 test_size=self.val_size,
                 random_state=self.random_state,
-                stratify=training_data["label"]
-                if training_data["label"].nunique() > 1
-                else None,
+                stratify=training_data["label"] if training_data["label"].nunique() > 1 else None,
             )
 
         auc_before = _auc_on_df(models_before, val_df)

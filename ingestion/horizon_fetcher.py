@@ -14,7 +14,9 @@ from collections.abc import Callable
 from typing import TypeVar
 
 from config import config
+from ingestion.exceptions import SourceUnavailableError
 from ingestion.rate_limiter import TokenBucketLimiter
+from monitoring.ingestion_metrics import emit_ingestion_failure, emit_ingestion_success
 from utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -34,8 +36,12 @@ def get_limiter() -> TokenBucketLimiter:
     return _limiter
 
 
-class HorizonRateLimitExceeded(RuntimeError):
-    """Raised when HORIZON_MAX_RETRIES consecutive 429s are exhausted."""
+class HorizonRateLimitExceeded(SourceUnavailableError, RuntimeError):
+    """Raised when HORIZON_MAX_RETRIES consecutive 429s are exhausted.
+
+    Retains the ``RuntimeError`` base so existing callers catching it keep
+    working; ``SourceUnavailableError`` places it in the ingestion taxonomy.
+    """
 
 
 def _status_code(exc: Exception) -> int | None:
@@ -65,14 +71,26 @@ def fetch(
 
     for attempt in range(1, config.HORIZON_MAX_RETRIES + 1):
         limiter.acquire()
+        started_at = time.perf_counter()
         try:
-            return call()
-        except Exception as exc:
+            result = call()
+        except Exception as exc:  # noqa: BLE001
+            # Broad catch justified: any exception from Horizon needs to be examined
+            # to determine if it's a 429 (retryable rate limit) or another error
+            # (propagate immediately). Logging and metrics emission happen for all.
+            emit_ingestion_failure(
+                "horizon",
+                exc,
+                stage="fetch",
+                duration_seconds=time.perf_counter() - started_at,
+            )
             if _status_code(exc) != 429:
                 raise
             if attempt == config.HORIZON_MAX_RETRIES:
                 raise HorizonRateLimitExceeded(
-                    f"Horizon returned 429 on all {attempt} attempts"
+                    f"Horizon returned 429 on all {attempt} attempts",
+                    source="horizon_fetcher.fetch",
+                    reason=str(exc),
                 ) from exc
 
             delay = min(max_delay, base_delay * (2 ** (attempt - 1)))
@@ -85,5 +103,24 @@ def fetch(
                 delay,
             )
             sleep_fn(delay)
+        else:
+            emit_ingestion_success(
+                "horizon",
+                stage="fetch",
+                record_count=_record_count(result),
+                duration_seconds=time.perf_counter() - started_at,
+            )
+            return result
 
     raise AssertionError("unreachable")  # pragma: no cover
+
+
+def _record_count(result: object) -> int:
+    """Best-effort count for a Horizon page without coupling to its schema."""
+    if not isinstance(result, dict):
+        return 1
+    embedded = result.get("_embedded")
+    if not isinstance(embedded, dict):
+        return 1
+    records = embedded.get("records")
+    return len(records) if isinstance(records, list) else 1

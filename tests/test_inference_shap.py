@@ -125,7 +125,7 @@ def test_shap_explainer_explain(trained_models):
 
     assert len(explanation) == 3
     for entry in explanation:
-        assert set(entry) == {"feature", "contribution", "value"}
+        assert {"feature", "contribution", "value"}.issubset(set(entry))
 
 
 def test_shap_explainer_explain_ensemble(trained_models):
@@ -139,12 +139,13 @@ def test_shap_explainer_explain_ensemble(trained_models):
 
     assert len(explanation) == 3
     for entry in explanation:
-        assert set(entry) == {"feature", "contribution", "value"}
+        assert {"feature", "contribution", "value"}.issubset(set(entry))
 
 
 # ---------------------------------------------------------------------------
 # SHAP interaction value tests (Issue #267)
 # ---------------------------------------------------------------------------
+
 
 def _make_single_feature_model():
     """Train a single depth-1 decision tree that only splits on f0.
@@ -181,15 +182,16 @@ def test_interaction_values_zero_for_non_informative_pairs(monkeypatch):
     )
     # If it's not in top_n, it's even smaller — that also passes
     if f1_f2 is not None:
-        assert f1_f2["interaction"] < 0.001, (
-            f"Expected (f1, f2) interaction < 0.001, got {f1_f2['interaction']}"
-        )
+        assert (
+            f1_f2["interaction"] < 0.001
+        ), f"Expected (f1, f2) interaction < 0.001, got {f1_f2['interaction']}"
 
 
 def test_format_top_interactions_produces_five_strings():
     """format_top_interactions must return exactly 5 correctly formatted strings."""
-    from detection.shap_explainer import format_top_interactions
     import re
+
+    from detection.shap_explainer import format_top_interactions
 
     raw = [
         {"feature_a": f"feat_{i}", "feature_b": f"feat_{i+1}", "interaction": float(i) * 0.1}

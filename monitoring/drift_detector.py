@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 
 try:
     from prometheus_client import Gauge
+
     _drift_gauge = Gauge("ledgerlens_feature_drift_detected", "1=drift detected, 0=stable")
 except Exception:  # pragma: no cover
     _drift_gauge = None
@@ -25,7 +26,7 @@ class DriftReport:
 
 def _rbf_kernel(X: np.ndarray, Y: np.ndarray, bandwidth: float) -> np.ndarray:
     diff = X[:, None, :] - Y[None, :, :]
-    return np.exp(-np.sum(diff ** 2, axis=-1) / (2 * bandwidth ** 2))
+    return np.exp(-np.sum(diff**2, axis=-1) / (2 * bandwidth**2))
 
 
 def _mmd(X: np.ndarray, Y: np.ndarray) -> float:
@@ -50,6 +51,7 @@ class CovarianceShiftDetector:
     def __init__(self, threshold: float = 0.05) -> None:
         try:
             from config import Config
+
             self._ref_hours = Config.DRIFT_REFERENCE_WINDOW_HOURS
             self._test_hours = Config.DRIFT_TEST_WINDOW_HOURS
             self._interval = Config.DRIFT_CHECK_INTERVAL_MINUTES
@@ -59,7 +61,9 @@ class CovarianceShiftDetector:
             self._interval = 30
         self.threshold = threshold
 
-    def detect(self, reference: np.ndarray, current: np.ndarray, feature_names: list[str] | None = None) -> DriftReport:
+    def detect(
+        self, reference: np.ndarray, current: np.ndarray, feature_names: list[str] | None = None
+    ) -> DriftReport:
         """Compare reference and current windows per feature; return DriftReport.
 
         Args:

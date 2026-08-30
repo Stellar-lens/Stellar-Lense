@@ -16,6 +16,7 @@ from detection.differential_privacy import (
     load_shap_sensitivity,
     renyi_noise_multiplier,
 )
+from detection.feature_engineering import feature_dict_url as _feature_dict_url
 from detection.model_training import FEATURE_COLUMNS_EXCLUDE
 
 
@@ -71,7 +72,12 @@ class ShapExplainer:
         )[:top_n]
 
         return [
-            {"feature": name, "contribution": float(value), "value": float(raw)}
+            {
+                "feature": name,
+                "contribution": float(value),
+                "value": float(raw),
+                "dict_url": _feature_dict_url(name),
+            }
             for name, value, raw in contributions
         ]
 
@@ -137,9 +143,7 @@ class ShapExplainer:
             private_values[feature] = float(value + rng.normal(0.0, sigma))
         return private_values
 
-    def compute_interaction_values(
-        self, model, X: pd.DataFrame, top_n: int = 5
-    ) -> list[dict]:
+    def compute_interaction_values(self, model, X: pd.DataFrame, top_n: int = 5) -> list[dict]:
         """Return the top `top_n` pairwise feature interactions by absolute mean
         interaction value across all rows in `X`.
 
@@ -205,10 +209,7 @@ class ShapExplainer:
                 pairs.append((feature_cols[i], feature_cols[j], float(mean_abs[i, j])))
 
         pairs.sort(key=lambda p: p[2], reverse=True)
-        return [
-            {"feature_a": fa, "feature_b": fb, "interaction": v}
-            for fa, fb, v in pairs[:top_n]
-        ]
+        return [{"feature_a": fa, "feature_b": fb, "interaction": v} for fa, fb, v in pairs[:top_n]]
 
     def explain_ensemble(self, feature_row: pd.Series, models: dict, top_n: int = 5) -> list[dict]:
         """Aggregate per-model SHAP contributions across an ensemble into a
@@ -242,7 +243,12 @@ class ShapExplainer:
         )[:top_n]
 
         return [
-            {"feature": name, "contribution": float(value), "value": float(raw)}
+            {
+                "feature": name,
+                "contribution": float(value),
+                "value": float(raw),
+                "dict_url": _feature_dict_url(name),
+            }
             for name, value, raw in contributions
         ]
 

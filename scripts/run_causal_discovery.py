@@ -25,8 +25,7 @@ def _validate_data_path(path: str) -> str:
     abs_path = os.path.abspath(path)
     if not abs_path.startswith(_ALLOWED_ROOT):
         print(
-            f"ERROR: Data path must be inside {_ALLOWED_ROOT!r}. "
-            f"Got: {abs_path!r}",
+            f"ERROR: Data path must be inside {_ALLOWED_ROOT!r}. " f"Got: {abs_path!r}",
             file=sys.stderr,
         )
         sys.exit(1)

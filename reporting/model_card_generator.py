@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import datetime
 from typing import Literal
 
 import jsonschema
@@ -78,7 +77,7 @@ def _render_markdown(metadata: dict) -> str:
         "",
     ]
     if hyperparams:
-        lines += [f"| Parameter | Value |", "| --- | --- |"]
+        lines += ["| Parameter | Value |", "| --- | --- |"]
         for k, v in hyperparams.items():
             lines.append(f"| `{k}` | `{v}` |")
     else:

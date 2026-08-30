@@ -2,13 +2,12 @@
 
 import hashlib
 import logging
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 import msgpack
 import redis
 from prometheus_client import Counter
-
-from config import config
 
 FEATURE_STORE_TTL_SECONDS = 300
 SCHEMA_VERSION = "1"
@@ -64,7 +63,9 @@ class WalletFeatureStore:
             logger.warning(f"Redis cache write failed: {e}")
         return features
 
-    def prefetch(self, wallet_pairs: list[tuple[str, str]]) -> dict[tuple[str, str], dict[str, Any] | None]:
+    def prefetch(
+        self, wallet_pairs: list[tuple[str, str]]
+    ) -> dict[tuple[str, str], dict[str, Any] | None]:
         results: dict[tuple[str, str], dict[str, Any] | None] = {}
         pipe = self.redis.pipeline()
         keys = {self._get_key(w, p): (w, p) for w, p in wallet_pairs}
@@ -72,7 +73,7 @@ class WalletFeatureStore:
             pipe.hget(key, "data")
         cached_values = pipe.execute()
 
-        for key, cached in zip(keys.keys(), cached_values):
+        for key, cached in zip(keys.keys(), cached_values, strict=True):
             wallet, pair = keys[key]
             if cached:
                 try:

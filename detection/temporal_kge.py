@@ -18,7 +18,7 @@ import hashlib
 import json
 import logging
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import numpy as np
@@ -34,10 +34,9 @@ MAX_INFERENCE_TIME_MS = 5.0  # Inference must complete in <5ms
 
 # Optional PyKEEN imports — graceful absence supported
 try:
-    from pykeen.models import DistMultiModel, RotatE, TComplEx, TransE
-    from pykeen.triples import TriplesFactory
+    from pykeen.models import TComplEx
     from pykeen.training import SLCWATrainingLoop
-    from pykeen.evaluation import RankBasedEvaluator
+    from pykeen.triples import TriplesFactory
 
     _PYKEEN_AVAILABLE = True
 except ImportError:
@@ -99,7 +98,9 @@ class TemporalKGEncoder:
         self._relation_to_id: dict[str, int] = {}
         self._last_training_time: datetime | None = None
 
-    def build_temporal_kg(self, trades_df: pd.DataFrame, reference_time: pd.Timestamp | None = None) -> dict:
+    def build_temporal_kg(
+        self, trades_df: pd.DataFrame, reference_time: pd.Timestamp | None = None
+    ) -> dict:
         """Build temporal KG triples from trade data.
 
         Triples are (wallet_A, traded_with, wallet_B, timestamp_bin).
@@ -213,7 +214,7 @@ class TemporalKGEncoder:
             # TComplEx requires (head, relation, tail, time) format
             import torch
 
-            heads, relations, tails, times = zip(*tensor_triples)
+            heads, relations, tails, times = zip(*tensor_triples, strict=True)
             triples_tensor = torch.LongTensor([heads, relations, tails, times]).T
 
             # Initialize TComplEx model
@@ -249,7 +250,7 @@ class TemporalKGEncoder:
             raise TemporalKGEError(f"Training failed: {e}") from e
 
         training_time = time.time() - start_time
-        self._last_training_time = datetime.now(timezone.utc)
+        self._last_training_time = datetime.now(UTC)
 
         # Save model artifacts
         self._save_model()
@@ -302,7 +303,7 @@ class TemporalKGEncoder:
 
             # Default to next hour if not specified
             if target_time_bin is None:
-                target_time_bin = int(datetime.now(timezone.utc).timestamp() // 3600)
+                target_time_bin = int(datetime.now(UTC).timestamp() // 3600)
 
             # Score the triple (wallet_a, traded_with, wallet_b, target_time_bin)
             with torch.no_grad():
@@ -368,7 +369,9 @@ class TemporalKGEncoder:
                     "artifact_sha256": artifact_sha,
                     "embedding_dim": self.embedding_dim,
                     "model_type": "TComplEx",
-                    "trained_at": self._last_training_time.isoformat() if self._last_training_time else None,
+                    "trained_at": (
+                        self._last_training_time.isoformat() if self._last_training_time else None
+                    ),
                     "n_entities": len(self._entity_to_id),
                     "entity_id_map": self._entity_to_id,
                 }

@@ -17,11 +17,11 @@ import sys
 import threading
 import time
 
-from config import config
+from config.contracts import validate_mode
 from detection.model_inference import RiskScorer
-from streaming.kafka_worker import KafkaWorker
 from streaming.alert_dispatcher import AlertDispatcher
 from streaming.feature_buffer import FeatureBuffer
+from streaming.kafka_worker import KafkaWorker
 from streaming.streaming_scorer import StreamingScorer
 from utils.logging import get_logger
 
@@ -105,6 +105,12 @@ def run_worker_pool(
     signal.signal(signal.SIGINT, shutdown_handler)
 
     try:
+        # Start health check server
+        from streaming.health_check import start_health_server
+
+        health_port = int(os.getenv("HEALTH_SERVER_PORT", "8080"))
+        start_health_server(port=health_port)
+
         # Create and start workers
         logger.info("Starting %d workers...", num_workers)
         for worker_id in range(num_workers):
@@ -213,9 +219,13 @@ def main() -> None:
         bootstrap_servers,
     )
 
-    # Validate config
-    if not config.WATCHED_ASSET_PAIRS:
-        logger.warning("WATCHED_ASSET_PAIRS is not configured")
+    # Validate config — this pool always runs the Kafka worker/scorer role
+    # (topics are discovered dynamically, so WATCHED_ASSET_PAIRS isn't needed).
+    try:
+        validate_mode("streaming_kafka", role="worker", backend="kafka")
+    except OSError as exc:
+        logger.error(str(exc))
+        sys.exit(1)
 
     # Try to load models
     try:

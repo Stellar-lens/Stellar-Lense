@@ -5,19 +5,19 @@ from __future__ import annotations
 import json
 import os
 import tempfile
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
 from detection.cross_chain.bridge_detector import (
+    _validate_stellar_address,
     detect_bridge_wash_trade,
     load_bridge_anchors,
-    _validate_stellar_address,
 )
 
 ANCHOR_A = "GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGYWDEAVJJCSBVALM2XVKXB"
-WALLET = "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN"
-NOW = datetime(2024, 6, 1, 12, 0, 0, tzinfo=timezone.utc)
+WALLET = "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWNA"
+NOW = datetime(2024, 6, 1, 12, 0, 0, tzinfo=UTC)
 
 
 def _tx(frm, to, amount=100.0, hours_offset=0):

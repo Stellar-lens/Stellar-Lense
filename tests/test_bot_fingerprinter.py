@@ -1,16 +1,16 @@
 """Tests for bot detection fingerprinting from Horizon event patterns."""
 
-import pytest
-from datetime import datetime, timedelta, timezone
-import pandas as pd
+from datetime import UTC, datetime, timedelta
+
 import numpy as np
+import pandas as pd
 
 from detection.bot_fingerprinter import (
-    extract_bot_fingerprint,
-    _compute_trust_line_latency,
-    _compute_inter_trade_interval_cv,
     _compute_account_management_entropy,
+    _compute_inter_trade_interval_cv,
+    _compute_trust_line_latency,
     _is_plausible_timestamp,
+    extract_bot_fingerprint,
     is_likely_bot,
 )
 from ingestion.data_models import BotFingerprint
@@ -18,30 +18,32 @@ from ingestion.data_models import BotFingerprint
 
 def sample_bot_trades() -> pd.DataFrame:
     """Create synthetic bot trades with perfectly regular 5-second intervals."""
-    base_time = datetime(2024, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+    base_time = datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC)
     bot_account = "GBOT" + "B" * 52
     counterparty = "GCTR" + "C" * 52
 
     trades = []
     for i in range(10):
         timestamp = base_time + timedelta(seconds=5 * i)
-        trades.append({
-            "trade_id": f"bot-trade-{i}",
-            "ledger_close_time": timestamp.isoformat(),
-            "base_account": bot_account if i % 2 == 0 else counterparty,
-            "counter_account": counterparty if i % 2 == 0 else bot_account,
-            "base_asset": "USDC",
-            "counter_asset": "XLM",
-            "amount": 100.0,
-            "price": 0.1,
-        })
+        trades.append(
+            {
+                "trade_id": f"bot-trade-{i}",
+                "ledger_close_time": timestamp.isoformat(),
+                "base_account": bot_account if i % 2 == 0 else counterparty,
+                "counter_account": counterparty if i % 2 == 0 else bot_account,
+                "base_asset": "USDC",
+                "counter_asset": "XLM",
+                "amount": 100.0,
+                "price": 0.1,
+            }
+        )
 
     return pd.DataFrame(trades)
 
 
 def sample_human_trades() -> pd.DataFrame:
     """Create synthetic human trades with irregular intervals."""
-    base_time = datetime(2024, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+    base_time = datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC)
     human_account = "GHUM" + "H" * 51
     counterparty = "GCTR" + "C" * 52
 
@@ -52,23 +54,25 @@ def sample_human_trades() -> pd.DataFrame:
 
     for i, interval in enumerate(intervals):
         current_time += timedelta(seconds=interval)
-        trades.append({
-            "trade_id": f"human-trade-{i}",
-            "ledger_close_time": current_time.isoformat(),
-            "base_account": human_account if i % 2 == 0 else counterparty,
-            "counter_account": counterparty if i % 2 == 0 else human_account,
-            "base_asset": "USDC",
-            "counter_asset": "XLM",
-            "amount": 100.0 + np.random.randn() * 30,
-            "price": 0.1,
-        })
+        trades.append(
+            {
+                "trade_id": f"human-trade-{i}",
+                "ledger_close_time": current_time.isoformat(),
+                "base_account": human_account if i % 2 == 0 else counterparty,
+                "counter_account": counterparty if i % 2 == 0 else human_account,
+                "base_asset": "USDC",
+                "counter_asset": "XLM",
+                "amount": 100.0 + np.random.randn() * 30,
+                "price": 0.1,
+            }
+        )
 
     return pd.DataFrame(trades)
 
 
 def sample_effects_fast_trust_line() -> list[dict]:
     """Create Horizon effects with fast trust line creation (5 seconds)."""
-    base_time = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+    base_time = datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC)
     return [
         {
             "type": "account_created",
@@ -90,7 +94,7 @@ def sample_effects_fast_trust_line() -> list[dict]:
 
 def sample_effects_slow_trust_line() -> list[dict]:
     """Create Horizon effects with slow trust line creation (5 hours)."""
-    base_time = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+    base_time = datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC)
     return [
         {
             "type": "account_created",
@@ -110,7 +114,7 @@ class TestTrustLineLatency:
 
     def test_fast_trust_line_bot(self):
         """Bot account creates trust line within 5 seconds."""
-        base_time = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+        base_time = datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC)
         effects = sample_effects_fast_trust_line()
 
         latency = _compute_trust_line_latency(base_time, effects)
@@ -120,7 +124,7 @@ class TestTrustLineLatency:
 
     def test_slow_trust_line_human(self):
         """Human account creates trust line after 5 hours."""
-        base_time = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+        base_time = datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC)
         effects = sample_effects_slow_trust_line()
 
         latency = _compute_trust_line_latency(base_time, effects)
@@ -130,7 +134,7 @@ class TestTrustLineLatency:
 
     def test_no_trust_line(self):
         """Account with no trust line returns None."""
-        base_time = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+        base_time = datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC)
         effects = [
             {
                 "type": "account_created",
@@ -143,7 +147,7 @@ class TestTrustLineLatency:
 
     def test_rejects_future_timestamps(self):
         """Future timestamps are rejected as invalid."""
-        base_time = datetime.now(timezone.utc) + timedelta(hours=1)
+        base_time = datetime.now(UTC) + timedelta(hours=1)
         effects = [
             {
                 "type": "trust_line_created",
@@ -156,7 +160,7 @@ class TestTrustLineLatency:
 
     def test_rejects_pre_genesis_timestamps(self):
         """Pre-Stellar-genesis timestamps are rejected."""
-        base_time = datetime(2010, 1, 1, 0, 0, 0, tzinfo=timezone.utc)  # Before genesis
+        base_time = datetime(2010, 1, 1, 0, 0, 0, tzinfo=UTC)  # Before genesis
 
         latency = _compute_trust_line_latency(base_time, [])
         assert latency is None
@@ -187,54 +191,62 @@ class TestInterTradeIntervalCV:
 
     def test_insufficient_trades_returns_none(self):
         """Accounts with fewer than 5 trades return None."""
-        trades_df = pd.DataFrame([
-            {
-                "trade_id": "1",
-                "ledger_close_time": "2024-01-01T00:00:00Z",
-                "base_account": "GACC" + "A" * 52,
-                "counter_account": "GXXX" + "X" * 52,
-                "amount": 100.0,
-            },
-            {
-                "trade_id": "2",
-                "ledger_close_time": "2024-01-01T00:05:00Z",
-                "base_account": "GXXX" + "X" * 52,
-                "counter_account": "GACC" + "A" * 52,
-                "amount": 100.0,
-            },
-        ])
+        trades_df = pd.DataFrame(
+            [
+                {
+                    "trade_id": "1",
+                    "ledger_close_time": "2024-01-01T00:00:00Z",
+                    "base_account": "GACC" + "A" * 52,
+                    "counter_account": "GXXX" + "X" * 52,
+                    "amount": 100.0,
+                },
+                {
+                    "trade_id": "2",
+                    "ledger_close_time": "2024-01-01T00:05:00Z",
+                    "base_account": "GXXX" + "X" * 52,
+                    "counter_account": "GACC" + "A" * 52,
+                    "amount": 100.0,
+                },
+            ]
+        )
 
         cv = _compute_inter_trade_interval_cv("GACC" + "A" * 52, trades_df)
         assert cv is None
 
     def test_zero_intervals_returns_none(self):
         """All zero-interval trades return None."""
-        trades_df = pd.DataFrame([
-            {
-                "trade_id": f"{i}",
-                "ledger_close_time": "2024-01-01T00:00:00Z",  # All same time
-                "base_account": "GACC" + "A" * 52,
-                "counter_account": "GXXX" + "X" * 52,
-                "amount": 100.0,
-            }
-            for i in range(6)
-        ])
+        trades_df = pd.DataFrame(
+            [
+                {
+                    "trade_id": f"{i}",
+                    "ledger_close_time": "2024-01-01T00:00:00Z",  # All same time
+                    "base_account": "GACC" + "A" * 52,
+                    "counter_account": "GXXX" + "X" * 52,
+                    "amount": 100.0,
+                }
+                for i in range(6)
+            ]
+        )
 
         cv = _compute_inter_trade_interval_cv("GACC" + "A" * 52, trades_df)
         assert cv is None
 
     def test_uses_population_std(self):
         """CV uses population standard deviation (ddof=0)."""
-        trades_df = pd.DataFrame([
-            {
-                "trade_id": f"{i}",
-                "ledger_close_time": (datetime(2024, 1, 1, 0, 0, 0) + timedelta(seconds=10*i)).isoformat(),
-                "base_account": "GACC" + "A" * 52,
-                "counter_account": "GXXX" + "X" * 52,
-                "amount": 100.0,
-            }
-            for i in range(5)
-        ])
+        trades_df = pd.DataFrame(
+            [
+                {
+                    "trade_id": f"{i}",
+                    "ledger_close_time": (
+                        datetime(2024, 1, 1, 0, 0, 0) + timedelta(seconds=10 * i)
+                    ).isoformat(),
+                    "base_account": "GACC" + "A" * 52,
+                    "counter_account": "GXXX" + "X" * 52,
+                    "amount": 100.0,
+                }
+                for i in range(5)
+            ]
+        )
 
         cv = _compute_inter_trade_interval_cv("GACC" + "A" * 52, trades_df)
 
@@ -249,9 +261,7 @@ class TestAccountManagementEntropy:
 
     def test_clustered_operations_low_entropy(self):
         """Few operation types = low entropy (bot-like)."""
-        effects = [
-            {"type": "manage_offer"} for _ in range(8)
-        ] + [
+        effects = [{"type": "manage_offer"} for _ in range(8)] + [
             {"type": "trust_line_created"} for _ in range(2)
         ]
 
@@ -291,27 +301,27 @@ class TestPlausibleTimestamp:
 
     def test_valid_current_timestamp(self):
         """Current timestamp is plausible."""
-        ts = datetime.now(timezone.utc)
+        ts = datetime.now(UTC)
         assert _is_plausible_timestamp(ts) is True
 
     def test_valid_past_timestamp(self):
         """Past timestamp (after genesis) is plausible."""
-        ts = datetime(2023, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+        ts = datetime(2023, 1, 1, 0, 0, 0, tzinfo=UTC)
         assert _is_plausible_timestamp(ts) is True
 
     def test_rejects_pre_genesis(self):
         """Pre-Stellar-genesis timestamp is rejected."""
-        ts = datetime(2010, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+        ts = datetime(2010, 1, 1, 0, 0, 0, tzinfo=UTC)
         assert _is_plausible_timestamp(ts) is False
 
     def test_rejects_far_future(self):
         """Timestamp far in the future is rejected."""
-        ts = datetime.now(timezone.utc) + timedelta(days=1)
+        ts = datetime.now(UTC) + timedelta(days=1)
         assert _is_plausible_timestamp(ts) is False
 
     def test_allows_clock_skew(self):
         """Timestamp up to 60 seconds in future is allowed (clock skew)."""
-        ts = datetime.now(timezone.utc) + timedelta(seconds=30)
+        ts = datetime.now(UTC) + timedelta(seconds=30)
         assert _is_plausible_timestamp(ts) is True
 
 
@@ -320,7 +330,7 @@ class TestExtractBotFingerprint:
 
     def test_bot_fingerprint_bot_account(self):
         """Bot account produces expected fingerprint."""
-        base_time = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+        base_time = datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC)
         effects = sample_effects_fast_trust_line()
         trades_df = sample_bot_trades()
         bot_account = "GBOT" + "B" * 52
@@ -340,7 +350,7 @@ class TestExtractBotFingerprint:
 
     def test_human_fingerprint_human_account(self):
         """Human account produces expected fingerprint."""
-        base_time = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+        base_time = datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC)
         effects = sample_effects_slow_trust_line()
         trades_df = sample_human_trades()
         human_account = "GHUM" + "H" * 51

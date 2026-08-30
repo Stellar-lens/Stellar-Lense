@@ -7,7 +7,7 @@ Endpoints:
 """
 
 import re
-from typing import Optional
+from contextlib import asynccontextmanager
 
 import bcrypt
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Security
@@ -19,9 +19,14 @@ from slowapi.util import get_remote_address
 from sqlalchemy import select
 
 from config import config
+from config.contracts import validate_mode
 from detection.persistence import RiskScoreRecord, get_session_factory
 from detection.risk_score_store import RiskScoreStore
 from detection.shap_explainer import ShapExplainer
+from streaming.health import HealthStatus, get_health_registry
+from utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 # ---------------------------------------------------------------------------
 # Stellar address validation
@@ -41,7 +46,7 @@ def _validate_stellar_address(address: str) -> str:
 _api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
-def _check_api_key(api_key: Optional[str] = Security(_api_key_header)) -> str:
+def _check_api_key(api_key: str | None = Security(_api_key_header)) -> str:
     if api_key is None:
         raise HTTPException(status_code=401, detail="Missing API key")
     for hashed in config.API_KEYS:
@@ -55,10 +60,25 @@ def _check_api_key(api_key: Optional[str] = Security(_api_key_header)) -> str:
 # ---------------------------------------------------------------------------
 limiter = Limiter(key_func=get_remote_address)
 
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    # Fail fast on a missing/misconfigured var (e.g. no API_KEYS, meaning
+    # every request would 401 forever) instead of discovering it from the
+    # first request that hits the affected code path.
+    try:
+        validate_mode("api")
+    except OSError as exc:
+        logger.error(str(exc))
+        raise
+    yield
+
+
 app = FastAPI(
     title="LedgerLens Risk Score API",
     version="1.0.0",
     description="Wallet risk scores for Stellar DEX wash-trade detection.",
+    lifespan=_lifespan,
 )
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
@@ -76,14 +96,14 @@ class RiskScoreResponse(BaseModel):
     benford_flag: bool
     ml_flag: bool
     confidence: int
-    propagated_risk: Optional[float] = None
-    ring_id: Optional[str] = None
+    propagated_risk: float | None = None
+    ring_id: str | None = None
     updated_at: str
 
 
 class PaginatedScoresResponse(BaseModel):
     items: list[RiskScoreResponse]
-    next_cursor: Optional[int] = Field(None, description="score_id cursor for next page")
+    next_cursor: int | None = Field(None, description="score_id cursor for next page")
     total: int
 
 
@@ -101,6 +121,7 @@ class HealthResponse(BaseModel):
     status: str
     db: str
     model: str
+    workers: dict[str, dict] | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -145,8 +166,32 @@ async def health(request: Request):
 
     model_status = "ok" if os.path.isdir(config.MODEL_DIR) else "unavailable"
 
-    overall = "ok" if db_status == "ok" else "degraded"
-    return HealthResponse(status=overall, db=db_status, model=model_status)
+    registry = get_health_registry()
+    worker_status, worker_report = registry.get_overall_status()
+
+    if db_status != "ok" or worker_status in (HealthStatus.UNHEALTHY, HealthStatus.DEGRADED):
+        overall = "degraded" if db_status == "ok" else "unavailable"
+    else:
+        overall = "ok"
+
+    return HealthResponse(
+        status=overall,
+        db=db_status,
+        model=model_status,
+        workers=worker_report.get("components"),
+    )
+
+
+@app.get("/v1/health/workers", tags=["ops"])
+@limiter.limit(f"{config.API_RATE_LIMIT_RPM}/minute")
+async def worker_health(request: Request):
+    """Detailed health probe for all registered background worker processes."""
+    registry = get_health_registry()
+    overall_status, report = registry.get_overall_status()
+    return {
+        "status": overall_status.value,
+        "report": report,
+    }
 
 
 @app.get(
@@ -158,11 +203,11 @@ async def health(request: Request):
 async def get_wallet_scores(
     request: Request,
     address: str,
-    start_ts: Optional[int] = Query(None, description="Unix timestamp lower bound"),
-    end_ts: Optional[int] = Query(None, description="Unix timestamp upper bound"),
-    asset_pair: Optional[str] = Query(None),
-    min_score: Optional[int] = Query(None, ge=0, le=100),
-    cursor: Optional[int] = Query(None, description="Cursor from previous page (score_id)"),
+    start_ts: int | None = Query(None, description="Unix timestamp lower bound"),
+    end_ts: int | None = Query(None, description="Unix timestamp upper bound"),
+    asset_pair: str | None = Query(None),
+    min_score: int | None = Query(None, ge=0, le=100),
+    cursor: int | None = Query(None, description="Cursor from previous page (score_id)"),
     limit: int = Query(50, ge=1, le=200),
     _key: str = Depends(_check_api_key),
 ):
@@ -188,9 +233,7 @@ async def get_wallet_scores(
                 RiskScoreRecord.updated_at >= datetime.fromtimestamp(start_ts, tz=UTC)
             )
         if end_ts is not None:
-            stmt = stmt.where(
-                RiskScoreRecord.updated_at <= datetime.fromtimestamp(end_ts, tz=UTC)
-            )
+            stmt = stmt.where(RiskScoreRecord.updated_at <= datetime.fromtimestamp(end_ts, tz=UTC))
 
         rows = list(session.scalars(stmt.limit(limit + 1)))
 
@@ -214,7 +257,7 @@ async def get_wallet_scores(
 async def get_latest_score(
     request: Request,
     address: str,
-    asset_pair: Optional[str] = Query(None),
+    asset_pair: str | None = Query(None),
     _key: str = Depends(_check_api_key),
 ):
     """Latest risk score and top-3 contributing features for a wallet."""

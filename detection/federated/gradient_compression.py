@@ -33,11 +33,9 @@ Usage
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
-from typing import Any
+from dataclasses import dataclass
 
 import numpy as np
-
 
 # ---------------------------------------------------------------------------
 # Payload types
@@ -46,10 +44,10 @@ import numpy as np
 
 @dataclass
 class TopKPayload:
-    values: np.ndarray   # shape (k,)
+    values: np.ndarray  # shape (k,)
     indices: np.ndarray  # shape (k,), integer
     shape: tuple[int, ...]
-    rotation_seed: int   # deterministic seed for the random rotation
+    rotation_seed: int  # deterministic seed for the random rotation
 
 
 @dataclass

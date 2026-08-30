@@ -193,17 +193,22 @@ class CausalForensicReportGenerator:
             )
             for label, rr in [
                 ("overall score vs counterfactual", base_rr / max(cf_rr, 0.01)),
-                ("interventional wash-trade removal", base_rr / max(causal_attribution.interventional_score_if_no_wash / 50.0, 0.01)),
+                (
+                    "interventional wash-trade removal",
+                    base_rr / max(causal_attribution.interventional_score_if_no_wash / 50.0, 0.01),
+                ),
             ]:
                 try:
                     sr = analyse_attribution(label, rr)
-                    sensitivity_results.append({
-                        "label": sr.attribution_label,
-                        "risk_ratio": sr.risk_ratio,
-                        "evalue": sr.evalue,
-                        "low_confidence": sr.low_confidence,
-                        "interpretation": sr.interpretation,
-                    })
+                    sensitivity_results.append(
+                        {
+                            "label": sr.attribution_label,
+                            "risk_ratio": sr.risk_ratio,
+                            "evalue": sr.evalue,
+                            "low_confidence": sr.low_confidence,
+                            "interpretation": sr.interpretation,
+                        }
+                    )
                 except Exception:  # noqa: BLE001
                     pass
 

@@ -8,11 +8,8 @@ Tests verify:
   5. Score storage with replay tag
 """
 
-import json
-from datetime import UTC, datetime, timedelta
-from unittest.mock import MagicMock, Mock, patch
-
-import pytest
+from datetime import UTC, datetime
+from unittest.mock import Mock, patch
 
 
 class TestNoOpAlertDispatcher:
@@ -37,7 +34,7 @@ class TestStreamReplayerInitialization:
 
     def test_replayer_initializes_with_noop_dispatcher(self):
         """Replayer should use no-op dispatcher in replay mode."""
-        from scripts.replay_stream import StreamReplayer, NoOpAlertDispatcher
+        from scripts.replay_stream import NoOpAlertDispatcher, StreamReplayer
 
         with patch("scripts.replay_stream.KafkaConsumer"):
             with patch("scripts.replay_stream.RiskScorer"):
@@ -210,7 +207,12 @@ class TestReplayScoreStorage:
 
                     replayer._store_replay_score(
                         wallet="GA111",
-                        risk_score={"score": 75, "benford_flag": False, "ml_flag": True, "confidence": 80},
+                        risk_score={
+                            "score": 75,
+                            "benford_flag": False,
+                            "ml_flag": True,
+                            "confidence": 80,
+                        },
                         pair_id="USDC:native/XLM:native",
                     )
 
@@ -219,7 +221,7 @@ class TestReplayScoreStorage:
                     call_args = mock_store.upsert.call_args
                     assert call_args[0][0] == "GA111"
                     assert call_args[0][1] == "USDC:native/XLM:native"
-                    
+
                     # Check that replay_model_version tag was added
                     score_dict = call_args[0][2]
                     assert "replay_model_version" in score_dict

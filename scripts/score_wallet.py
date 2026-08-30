@@ -25,7 +25,6 @@ and never aborts the rest of the batch.
 import argparse
 import json
 import logging
-import re
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -36,7 +35,6 @@ import pandas as pd
 from stellar_sdk import Asset as SdkAsset
 
 from config import config
-from utils.logging import get_logger, set_level
 from detection.causal_attribution import CounterfactualAttributor
 from detection.feature_engineering import build_feature_vector
 from detection.forensic_report import ForensicReportGenerator, write_report_secure
@@ -47,7 +45,7 @@ from ingestion.orderbook_loader import (
     load_orderbook_events,
     orderbook_events_to_dataframe,
 )
-
+from utils.logging import get_logger, set_level
 
 logger = get_logger(__name__)
 
@@ -81,11 +79,15 @@ def parse_asset_pair(pair_str: str) -> tuple[SdkAsset, SdkAsset]:
 
         return _to_sdk_asset(base_str), _to_sdk_asset(counter_str)
     except Exception as e:
-        logger.error("Invalid asset pair format", exc_info=True, extra={
-            "wallet": "unknown",
-            "error_type": type(e).__name__,
-            "error_message": f"Invalid asset pair format '{pair_str}': {e}"
-        })
+        logger.error(
+            "Invalid asset pair format",
+            exc_info=True,
+            extra={
+                "wallet": "unknown",
+                "error_type": type(e).__name__,
+                "error_message": f"Invalid asset pair format '{pair_str}': {e}",
+            },
+        )
         sys.exit(1)
 
 
@@ -216,9 +218,7 @@ def score_one(
         trades = list(load_trades(base_asset, counter_asset, start_time=since))
         trades_df = trades_to_dataframe(trades)
         if not trades_df.empty:
-            mask = (trades_df["base_account"] == wallet) | (
-                trades_df["counter_account"] == wallet
-            )
+            mask = (trades_df["base_account"] == wallet) | (trades_df["counter_account"] == wallet)
             trades_df = trades_df[mask]
 
         feature_vector = build_feature_vector(wallet, trades_df, orderbook_events=None)
@@ -246,12 +246,18 @@ def run_batch(args: argparse.Namespace) -> None:
     try:
         scorer = RiskScorer()
     except RuntimeError as e:
-        logger.error("Model load error", exc_info=True, extra={
-            "error_type": type(e).__name__,
-            "error_message": str(e),
-        })
+        logger.error(
+            "Model load error",
+            exc_info=True,
+            extra={
+                "error_type": type(e).__name__,
+                "error_message": str(e),
+            },
+        )
         if "No trained models" in str(e):
-            logger.info("Suggestion: train models first by running model_training.py: python -m detection.model_training")
+            logger.info(
+                "Suggestion: train models first by running model_training.py: python -m detection.model_training"
+            )
         sys.exit(1)
 
     with ThreadPoolExecutor(max_workers=args.workers) as pool:
@@ -281,13 +287,16 @@ def main() -> None:
     try:
         scorer = RiskScorer()
     except RuntimeError as e:
-        logger.error("Model load error", exc_info=True, extra={
-            "wallet": args.wallet,
-            "error_type": type(e).__name__,
-            "error_message": str(e)
-        })
+        logger.error(
+            "Model load error",
+            exc_info=True,
+            extra={"wallet": args.wallet, "error_type": type(e).__name__, "error_message": str(e)},
+        )
         if "No trained models" in str(e):
-            logger.info("Suggestion: train models first by running model_training.py: python -m detection.model_training", extra={"wallet": args.wallet})
+            logger.info(
+                "Suggestion: train models first by running model_training.py: python -m detection.model_training",
+                extra={"wallet": args.wallet},
+            )
         sys.exit(1)
 
     override_val = scorer.list_override.check(args.wallet)
@@ -321,11 +330,15 @@ def main() -> None:
                 orderbook_events_df = orderbook_events_to_dataframe(events)
 
         except Exception as e:
-            logger.error("Error fetching data from Horizon", exc_info=True, extra={
-                "wallet": args.wallet,
-                "error_type": type(e).__name__,
-                "error_message": str(e)
-            })
+            logger.error(
+                "Error fetching data from Horizon",
+                exc_info=True,
+                extra={
+                    "wallet": args.wallet,
+                    "error_type": type(e).__name__,
+                    "error_message": str(e),
+                },
+            )
             sys.exit(1)
 
         # 3. Feature Engineering
@@ -340,20 +353,29 @@ def main() -> None:
             t0 = time.time()
             result = scorer.score(feature_row)
             latency_ms = (time.time() - t0) * 1000
-            model_version = scorer.metadata.get("model_version", "unknown") if scorer.metadata else "unknown"
-            logger.info("Wallet scored", extra={
-                "wallet": args.wallet,
-                "score": result["score"],
-                "latency_ms": latency_ms,
-                "model_version": model_version,
-                "asset_pair": args.pair
-            })
+            model_version = (
+                scorer.metadata.get("model_version", "unknown") if scorer.metadata else "unknown"
+            )
+            logger.info(
+                "Wallet scored",
+                extra={
+                    "wallet": args.wallet,
+                    "score": result["score"],
+                    "latency_ms": latency_ms,
+                    "model_version": model_version,
+                    "asset_pair": args.pair,
+                },
+            )
         except Exception as e:
-            logger.error("Error during scoring", exc_info=True, extra={
-                "wallet": args.wallet,
-                "error_type": type(e).__name__,
-                "error_message": str(e)
-            })
+            logger.error(
+                "Error during scoring",
+                exc_info=True,
+                extra={
+                    "wallet": args.wallet,
+                    "error_type": type(e).__name__,
+                    "error_message": str(e),
+                },
+            )
             sys.exit(1)
 
         remove_trade_ids = []
@@ -364,11 +386,15 @@ def main() -> None:
                     args.what_if_remove, trades_df, args.wallet
                 )
             except ValueError as exc:
-                logger.error("Error parsing what_if", exc_info=True, extra={
-                    "wallet": args.wallet,
-                    "error_type": type(exc).__name__,
-                    "error_message": str(exc)
-                })
+                logger.error(
+                    "Error parsing what_if",
+                    exc_info=True,
+                    extra={
+                        "wallet": args.wallet,
+                        "error_type": type(exc).__name__,
+                        "error_message": str(exc),
+                    },
+                )
                 raise
 
             attributor = CounterfactualAttributor(scorer)
@@ -471,11 +497,15 @@ def _generate_report(args, result, shap_explanations, trades_df, feature_row, sc
             tx_hash = client.anchor_report(report)
             logger.info("Anchored to Soroban", extra={"tx_hash": tx_hash})
         except Exception as e:
-            logger.warning("on-chain anchoring failed", exc_info=True, extra={
-                "wallet": args.wallet,
-                "error_type": type(e).__name__,
-                "error_message": str(e)
-            })
+            logger.warning(
+                "on-chain anchoring failed",
+                exc_info=True,
+                extra={
+                    "wallet": args.wallet,
+                    "error_type": type(e).__name__,
+                    "error_message": str(e),
+                },
+            )
 
     # Determine output path and format
     ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")

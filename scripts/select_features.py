@@ -22,7 +22,6 @@ import argparse
 import json
 import os
 
-import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_selection import RFECV
@@ -70,20 +69,22 @@ def run_rfecv(
     # Feature importances from the fitted estimator
     importances = rfecv.estimator_.feature_importances_
     selected_mask = rfecv.support_
-    selected_features = [f for f, s in zip(feature_cols, selected_mask) if s]
+    selected_features = [f for f, s in zip(feature_cols, selected_mask, strict=True) if s]
 
     # Print ranked feature importances
     importance_pairs = sorted(
-        zip(feature_cols, importances), key=lambda x: x[1], reverse=True
+        zip(feature_cols, importances, strict=True), key=lambda x: x[1], reverse=True
     )
-    print(f"\nTop 20 feature importances (from RFECV estimator):")
+    print("\nTop 20 feature importances (from RFECV estimator):")
     for feat, imp in importance_pairs[:20]:
         marker = "✓" if feat in selected_features else " "
         print(f"  {marker} {feat:<50s} {imp:.4f}")
 
     # Minimal subset within 1% AUC of full set
     target_auc = full_auc - 0.01
-    subset_auc_scores = cross_val_score(estimator, X[selected_features], y, cv=cv, scoring="roc_auc")
+    subset_auc_scores = cross_val_score(
+        estimator, X[selected_features], y, cv=cv, scoring="roc_auc"
+    )
     subset_auc = float(subset_auc_scores.mean())
     print(f"\nSelected {len(selected_features)}/{len(feature_cols)} features")
     print(f"Subset AUC: {subset_auc:.4f} (threshold: {target_auc:.4f})")
@@ -93,8 +94,10 @@ def run_rfecv(
         print("RFECV subset below threshold — growing by importance rank...")
         sorted_features = [f for f, _ in importance_pairs]
         for i in range(len(selected_features), len(sorted_features)):
-            candidate = sorted_features[:i + 1]
-            auc = float(cross_val_score(estimator, X[candidate], y, cv=cv, scoring="roc_auc").mean())
+            candidate = sorted_features[: i + 1]
+            auc = float(
+                cross_val_score(estimator, X[candidate], y, cv=cv, scoring="roc_auc").mean()
+            )
             if auc >= target_auc:
                 selected_features = candidate
                 subset_auc = auc

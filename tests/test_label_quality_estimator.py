@@ -24,6 +24,7 @@ from detection.active_learning.label_quality_estimator import LabelQualityEstima
 # Skip if cleanlab is not installed
 try:
     import cleanlab  # noqa: F401
+
     _CLEANLAB_AVAILABLE = True
 except ImportError:
     _CLEANLAB_AVAILABLE = False
@@ -32,6 +33,7 @@ except ImportError:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_separable_dataset(n_clean=45, n_wash=45, n_dim=5, random_state=0):
     """Make a cleanly separable binary dataset for testing."""
@@ -60,6 +62,7 @@ def _train_model(X: pd.DataFrame, y: np.ndarray):
 # ---------------------------------------------------------------------------
 # Test: 7-of-10 mislabelled detection
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.skipif(not _CLEANLAB_AVAILABLE, reason="cleanlab not installed")
 class TestMislabelledDetection:
@@ -113,6 +116,7 @@ class TestMislabelledDetection:
 # Test: per-annotator noise rate alert
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.skipif(not _CLEANLAB_AVAILABLE, reason="cleanlab not installed")
 class TestAnnotatorNoiseAlert:
     def test_alert_fires_when_noise_rate_exceeds_threshold(self, tmp_path, caplog):
@@ -134,12 +138,13 @@ class TestAnnotatorNoiseAlert:
             quarantine_log_path=str(tmp_path / "quarantine.ndjson"),
         )
 
-        with caplog.at_level(logging.WARNING, logger="detection.active_learning.label_quality_estimator"):
+        with caplog.at_level(
+            logging.WARNING, logger="detection.active_learning.label_quality_estimator"
+        ):
             estimator.evaluate_batch(X, y_noisy, annotator_ids=annotator_ids)
 
         assert any(
-            "bad_annotator" in r.message and "noise" in r.message.lower()
-            for r in caplog.records
+            "bad_annotator" in r.message and "noise" in r.message.lower() for r in caplog.records
         ), "Expected a WARNING about bad_annotator's high noise rate"
 
     def test_noise_rate_tracked_per_annotator(self, tmp_path):
@@ -149,9 +154,7 @@ class TestAnnotatorNoiseAlert:
         noisy_indices = list(range(80, 90))
         y_noisy = _inject_mislabelled(y_true, noisy_indices)
 
-        annotator_ids = (
-            ["alice"] * 80 + ["bad_actor"] * 10 + ["alice"] * 10
-        )
+        annotator_ids = ["alice"] * 80 + ["bad_actor"] * 10 + ["alice"] * 10
 
         estimator = LabelQualityEstimator(
             model=model,
@@ -170,6 +173,7 @@ class TestAnnotatorNoiseAlert:
 # ---------------------------------------------------------------------------
 # Test: quarantine log security
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.skipif(not _CLEANLAB_AVAILABLE, reason="cleanlab not installed")
 class TestQuarantineLog:
@@ -221,7 +225,7 @@ class TestQuarantineLog:
         if quarantined:
             # Log must exist and contain exactly as many records as quarantined items
             with open(log_path) as f:
-                records = [json.loads(l) for l in f if l.strip()]
+                records = [json.loads(line) for line in f if line.strip()]
             assert len(records) >= len(quarantined)
 
 
@@ -229,9 +233,11 @@ class TestQuarantineLog:
 # Test: evaluate_batch return keys
 # ---------------------------------------------------------------------------
 
+
 class TestEvaluateBatchAPI:
     def test_returns_required_keys(self, tmp_path):
         X, y = _make_separable_dataset(n_clean=10, n_wash=10)
+
         # Use a dummy model that just returns 0.5 for everything
         class DummyModel:
             def predict_proba(self, X):
@@ -242,7 +248,12 @@ class TestEvaluateBatchAPI:
             quarantine_log_path=str(tmp_path / "q.ndjson"),
         )
         result = estimator.evaluate_batch(X, y)
-        for key in ("clean_indices", "quarantined_indices", "noise_scores", "annotator_noise_rates"):
+        for key in (
+            "clean_indices",
+            "quarantined_indices",
+            "noise_scores",
+            "annotator_noise_rates",
+        ):
             assert key in result
 
     def test_empty_batch_returns_empty(self, tmp_path):

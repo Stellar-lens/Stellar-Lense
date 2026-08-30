@@ -91,9 +91,7 @@ class LabelQualityEstimator:
     ) -> None:
         self.model = model
         self.noise_threshold = (
-            noise_threshold
-            if noise_threshold is not None
-            else config.LABEL_QUALITY_NOISE_THRESHOLD
+            noise_threshold if noise_threshold is not None else config.LABEL_QUALITY_NOISE_THRESHOLD
         )
         self.annotator_alert_threshold = (
             annotator_alert_threshold
@@ -284,15 +282,9 @@ class LabelQualityEstimator:
                     "label": int(labels[idx]),
                     "noise_score": float(noise_scores[idx]),
                     "annotator_id": (
-                        annotator_ids[idx]
-                        if annotator_ids and idx < len(annotator_ids)
-                        else None
+                        annotator_ids[idx] if annotator_ids and idx < len(annotator_ids) else None
                     ),
-                    "wallet": (
-                        wallet_ids[idx]
-                        if wallet_ids and idx < len(wallet_ids)
-                        else None
-                    ),
+                    "wallet": (wallet_ids[idx] if wallet_ids and idx < len(wallet_ids) else None),
                     "status": "quarantined",
                 }
                 f.write(json.dumps(record) + "\n")

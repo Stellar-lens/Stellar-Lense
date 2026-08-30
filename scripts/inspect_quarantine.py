@@ -38,7 +38,9 @@ def list_quarantined(queue_path: str | None = None) -> None:
     for i, record in enumerate(quarantined, 1):
         print(f"{i}. Wallet: {record.get('wallet', 'N/A')}")
         print(f"   Asset Pair: {record.get('asset_pair', 'N/A')}")
-        print(f"   Label: {record.get('label', 'N/A')} ({'clean' if record.get('label') == 0 else 'wash trade'})")
+        print(
+            f"   Label: {record.get('label', 'N/A')} ({'clean' if record.get('label') == 0 else 'wash trade'})"
+        )
         print(f"   Annotator: {record.get('annotator_id', 'N/A')}")
         print(f"   Annotated: {record.get('annotated_at', 'N/A')}")
         print(f"   Quarantine Reason: {record.get('quarantine_reason', 'N/A')}")
@@ -73,15 +75,15 @@ def print_summary(queue_path: str | None = None) -> None:
         by_label[label_name] += 1
 
     print(f"\n{'='*100}")
-    print(f"QUARANTINE SUMMARY")
+    print("QUARANTINE SUMMARY")
     print(f"{'='*100}\n")
 
     print(f"Total quarantined: {len(quarantined)}")
-    print(f"\nBy Quarantine Reason:")
+    print("\nBy Quarantine Reason:")
     for reason, count in sorted(by_reason.items()):
         print(f"  {reason}: {count}")
 
-    print(f"\nBy Label:")
+    print("\nBy Label:")
     for label, count in sorted(by_label.items()):
         print(f"  {label}: {count}")
 

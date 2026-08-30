@@ -168,6 +168,25 @@ def test_model_separates_patterns():
 - **Setup/Teardown**: Use pytest `@pytest.fixture` (not class-based `setUp`/`tearDown`)
 - **Mocking**: Use `unittest.mock` for external dependencies (Horizon API, database)
 
+## Advanced Work-Item Traceability
+
+Advanced work items are registered in `tests/issue_traceability.json`. Each
+entry maps one stable work-item ID to exact pytest node IDs, and every mapped
+test carries the matching `@pytest.mark.issue("ADV-NNN")` marker. This makes
+the relationship queryable in both directions: issue to acceptance tests and
+test to originating issue.
+
+Validate the mapping locally with:
+
+```bash
+python scripts/check_issue_test_traceability.py
+```
+
+The static checker runs in CI before pytest. It fails on duplicate work-item
+IDs, missing or renamed test nodes, missing markers, unmapped marked tests, or
+advanced work items without tests. When adding or renaming a mapped test,
+update the manifest in the same commit.
+
 ## Running Tests
 
 ```bash

@@ -25,8 +25,9 @@ from prometheus_client import Counter, Gauge
 from pydantic import BaseModel, Field, ValidationError
 
 from config import config
+from config.contracts import validate_mode
 from streaming.pubsub_router import PubSubRouter
-from streaming.ws_abuse_detector import AbuseDetector, AbuseVerdict
+from streaming.ws_abuse_detector import AbuseDetector
 from streaming.ws_auth import JWTAuthenticator
 from utils.logging import get_logger
 
@@ -373,9 +374,14 @@ async def _handler(websocket) -> None:
             _process_outbound(websocket, client_queue, client_id, rate_limiter)
         )
 
+        # Task 3: Heartbeat — sends a WebSocket ping every WS_HEARTBEAT_INTERVAL_SECONDS.
+        # If the client doesn't respond with a pong within the timeout, the connection
+        # is considered dead and the task exits, triggering cleanup via FIRST_COMPLETED.
+        heartbeat_task = asyncio.create_task(_heartbeat(websocket, client_id))
+
         # Wait for either task to complete or for client to disconnect
         done, pending = await asyncio.wait(
-            [inbound_task, outbound_task],
+            [inbound_task, outbound_task, heartbeat_task],
             return_when=asyncio.FIRST_COMPLETED,
         )
 
@@ -420,13 +426,13 @@ async def _extract_token(websocket) -> str | None:
         Token string if found, None otherwise
     """
     # Try Authorization header
-    auth_header = websocket.request_headers.get("Authorization", "")
+    auth_header = websocket.request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer "):
         return str(auth_header[7:])
 
     # Try query parameter
-    if websocket.request_headers.get("Path"):
-        path = websocket.request_headers.get("Path", "")
+    if websocket.request.path:
+        path = websocket.request.path
         if "?token=" in path:
             try:
                 token = path.split("?token=")[1].split("&")[0]
@@ -622,6 +628,37 @@ async def _handle_replay(websocket, client_id: str, permissions: set[str], paylo
         await websocket.send(error.model_dump_json())
 
 
+async def _heartbeat(websocket, client_id: str) -> None:
+    """Send periodic WebSocket pings to detect zombie (abruptly-disconnected) clients.
+
+    The ``websockets`` library automatically handles the pong response and raises
+    ``ConnectionClosed`` if the client does not reply within its internal timeout
+    or if the connection is already dead.  When that happens this coroutine exits,
+    which — via ``asyncio.wait(FIRST_COMPLETED)`` in ``_handler`` — triggers the
+    cleanup ``finally`` block that removes the client from ``_clients``.
+
+    The heartbeat interval is ``config.WS_HEARTBEAT_INTERVAL_SECONDS`` (default
+    30 s, configurable via ``WS_HEARTBEAT_INTERVAL_SECONDS``).
+    """
+    try:
+        while True:
+            await asyncio.sleep(config.WS_HEARTBEAT_INTERVAL_SECONDS)
+            try:
+                await websocket.ping()
+            except websockets.exceptions.ConnectionClosed:
+                logger.debug(
+                    "WebSocket heartbeat detected dead connection for client %s", client_id
+                )
+                break
+            except Exception as exc:
+                logger.warning(
+                    "WebSocket heartbeat error for client %s: %s", client_id, exc
+                )
+                break
+    except asyncio.CancelledError:
+        pass
+
+
 async def _process_outbound(
     websocket, queue: asyncio.Queue, client_id: str, rate_limiter: TokenBucket
 ) -> None:
@@ -700,11 +737,14 @@ async def publish_score_update(score_event: dict) -> None:
             logger.warning("Score event missing wallet or asset_pair", extra={"event": score_event})
             return
 
-        logger.info("Score event published", extra={
-            "wallet": wallet_id,
-            "asset_pair": asset_pair,
-            "score": score_event.get("score")
-        })
+        logger.info(
+            "Score event published",
+            extra={
+                "wallet": wallet_id,
+                "asset_pair": asset_pair,
+                "score": score_event.get("score"),
+            },
+        )
 
         # Get next sequence number
         seq = _seq_counter.next()
@@ -840,10 +880,16 @@ async def run_ws_server(host: str = "127.0.0.1", port: int = 8765) -> None:
 def start_ws_server_thread(host: str = "127.0.0.1", port: int = 8765) -> threading.Thread:
     """Launch the WebSocket server in a daemon thread.
 
+    Validates the "ws_server" config contract first (e.g. JWT_PUBLIC_KEY_PATH
+    must exist) so a misconfigured deployment fails immediately here instead
+    of every client hitting a FileNotFoundError on first connection.
+
     Returns:
         Threading.Thread object (daemon=True)
     """
     global _loop
+
+    validate_mode("ws_server")
 
     ready = threading.Event()
 

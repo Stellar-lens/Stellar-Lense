@@ -12,17 +12,16 @@ Covers:
 from __future__ import annotations
 
 import threading
-import time
 
 import numpy as np
 import pytest
 
 from detection.federated.coordinator import AsyncFederatedCoordinator
 
-
 # ---------------------------------------------------------------------------
 # Test: staleness-aware weight correctness
 # ---------------------------------------------------------------------------
+
 
 class TestStalenessWeighting:
     """Two participants: staleness 0 and staleness 3.
@@ -75,16 +74,15 @@ class TestStalenessWeighting:
         assert coord4.model_version == 3
 
         # Now submit the target pair
-        coord4.submit_update("fresh", [4.0], gradient_model_version=3)   # staleness=0
-        coord4.submit_update("stale", [2.0], gradient_model_version=0)   # staleness=3
+        coord4.submit_update("fresh", [4.0], gradient_model_version=3)  # staleness=0
+        coord4.submit_update("stale", [2.0], gradient_model_version=0)  # staleness=3
 
         # Expected: 0.8*4 + 0.2*2 = 3.6, added to existing 0.0 weights
         weights = coord4.global_weights
         assert weights is not None
         expected = 0.8 * 4.0 + 0.2 * 2.0
         np.testing.assert_allclose(
-            weights[-1], expected, atol=1e-9,
-            err_msg=f"Expected {expected}, got {weights[-1]}"
+            weights[-1], expected, atol=1e-9, err_msg=f"Expected {expected}, got {weights[-1]}"
         )
 
     def test_fresh_update_weight_higher_than_stale(self):
@@ -102,8 +100,8 @@ class TestStalenessWeighting:
         for _ in range(3):
             c_fresh.submit_update("p1", [0.0], gradient_model_version=0)
             c_fresh.submit_update("p2", [0.0], gradient_model_version=0)
-        c_fresh.submit_update("a", [1.0], gradient_model_version=3)  # staleness=0
-        c_fresh.submit_update("b", [1.0], gradient_model_version=3)  # staleness=0
+        c_fresh.submit_update("a", [1.0], gradient_model_version=3)  # target is fresh
+        c_fresh.submit_update("b", [0.0], gradient_model_version=0)  # control is stale
         fresh_result = c_fresh.global_weights[0] - base
 
         # One aggregation round with delta=1.0, staleness=3 (weight=1/(1+3)=0.25)
@@ -111,18 +109,19 @@ class TestStalenessWeighting:
         for _ in range(3):
             c_stale.submit_update("p1", [0.0], gradient_model_version=0)
             c_stale.submit_update("p2", [0.0], gradient_model_version=0)
-        c_stale.submit_update("a", [1.0], gradient_model_version=3)   # staleness=0
-        c_stale.submit_update("b", [1.0], gradient_model_version=0)   # staleness=3
+        c_stale.submit_update("a", [0.0], gradient_model_version=3)  # control is fresh
+        c_stale.submit_update("b", [1.0], gradient_model_version=0)  # target is stale
         stale_result = c_stale.global_weights[0] - base
 
-        assert fresh_result > stale_result, (
-            f"Fresh contribution {fresh_result} should exceed stale {stale_result}"
-        )
+        assert (
+            fresh_result > stale_result
+        ), f"Fresh contribution {fresh_result} should exceed stale {stale_result}"
 
 
 # ---------------------------------------------------------------------------
 # Test: max staleness rejection
 # ---------------------------------------------------------------------------
+
 
 class TestMaxStalenessRejection:
     def test_over_max_staleness_rejected(self):
@@ -137,7 +136,7 @@ class TestMaxStalenessRejection:
             coord.submit_update(
                 "late_participant",
                 [1.0, 1.0, 1.0],
-                gradient_model_version=0,   # staleness=3 > max_staleness=2
+                gradient_model_version=0,  # staleness=3 > max_staleness=2
             )
 
     def test_exactly_max_staleness_accepted(self):
@@ -155,6 +154,7 @@ class TestMaxStalenessRejection:
 # ---------------------------------------------------------------------------
 # Test: thread safety
 # ---------------------------------------------------------------------------
+
 
 class TestThreadSafety:
     def test_concurrent_submissions_no_corruption(self):
@@ -189,7 +189,6 @@ class TestThreadSafety:
     def test_global_weights_integrity_under_concurrent_load(self):
         """Global weights must not contain NaN/Inf after concurrent writes."""
         coord = AsyncFederatedCoordinator(weight_dim=2, trigger_n=2, max_staleness=1000)
-        done = threading.Event()
 
         def flood(tid):
             for _ in range(20):
@@ -213,6 +212,7 @@ class TestThreadSafety:
 # Test: N-based trigger
 # ---------------------------------------------------------------------------
 
+
 class TestNTrigger:
     def test_aggregation_fires_at_trigger_n(self):
         coord = AsyncFederatedCoordinator(weight_dim=2, trigger_n=3, max_staleness=100)
@@ -227,6 +227,7 @@ class TestNTrigger:
 # ---------------------------------------------------------------------------
 # Test: time-based trigger
 # ---------------------------------------------------------------------------
+
 
 class TestTimeTrigger:
     def test_tick_triggers_aggregation_after_interval(self):

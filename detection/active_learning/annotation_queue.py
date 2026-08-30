@@ -43,6 +43,7 @@ import json
 import os
 import stat
 import tempfile
+from collections import deque
 from datetime import UTC, datetime
 from typing import Any
 
@@ -51,6 +52,7 @@ import pandas as pd
 
 try:
     import krippendorff
+
     _KRIPPENDORFF_AVAILABLE = True
 except ImportError:  # pragma: no cover
     _KRIPPENDORFF_AVAILABLE = False
@@ -121,16 +123,51 @@ class AnnotationQueue:
     # Write operations
     # ------------------------------------------------------------------
 
-    def push(self, wallets: list[str], strategy_name: str, asset_pair: str = "") -> None:
+    def push(
+        self,
+        wallets: list[str],
+        strategy_name: str,
+        asset_pair: str = "",
+        epistemic_uncertainties: dict[str, float] | None = None,
+        aleatoric_uncertainties: dict[str, float] | None = None,
+    ) -> None:
         """Add *wallets* to the queue with status ``pending``.
 
         Wallets already present (any status) are skipped.
+
+        Parameters
+        ----------
+        wallets:
+            Wallet IDs to enqueue.
+        strategy_name:
+            Name of the query strategy that selected these wallets.
+        asset_pair:
+            Optional asset pair context.
+        epistemic_uncertainties:
+            Optional mapping of wallet_id -> epistemic uncertainty [0, 1].
+            Used to rank samples for annotation (higher = prioritised).
+        aleatoric_uncertainties:
+            Optional mapping of wallet_id -> aleatoric uncertainty [0, 1].
+            Wallets above ``config.ACTIVE_LEARNING_ALEATORIC_THRESHOLD`` are
+            filtered out before enqueuing (inherently noisy, annotation won't help).
         """
+        aleatoric_threshold = config.ACTIVE_LEARNING_ALEATORIC_THRESHOLD
         queue = _load_queue(self.queue_path)
         existing = {item["wallet"] for item in queue}
         now = datetime.now(UTC).isoformat()
+        skipped_aleatoric = 0
         for wallet in wallets:
             if wallet in existing:
+                continue
+            aleatoric = (aleatoric_uncertainties or {}).get(wallet)
+            if aleatoric is not None and aleatoric > aleatoric_threshold:
+                logger.debug(
+                    "Skipping wallet %s: aleatoric uncertainty %.4f exceeds threshold %.4f",
+                    wallet,
+                    aleatoric,
+                    aleatoric_threshold,
+                )
+                skipped_aleatoric += 1
                 continue
             queue.append(
                 {
@@ -140,7 +177,15 @@ class AnnotationQueue:
                     "query_strategy": strategy_name,
                     "selected_at": now,
                     "status": "pending",
+                    "epistemic_uncertainty": (epistemic_uncertainties or {}).get(wallet),
+                    "aleatoric_uncertainty": aleatoric,
                 }
+            )
+        if skipped_aleatoric:
+            logger.info(
+                "push: filtered %d wallet(s) with aleatoric uncertainty above threshold %.4f",
+                skipped_aleatoric,
+                aleatoric_threshold,
             )
         _atomic_write(self.queue_path, queue)
 
@@ -254,7 +299,11 @@ class AnnotationQueue:
                 item.setdefault("annotations", [])
                 # prevent duplicate from same annotator
                 if any(a["annotator_id"] == annotator_id for a in item["annotations"]):
-                    logger.warning("Annotator %s already labelled wallet %s — skipping duplicate", annotator_id, wallet)
+                    logger.warning(
+                        "Annotator %s already labelled wallet %s — skipping duplicate",
+                        annotator_id,
+                        wallet,
+                    )
                     return
                 item["annotations"].append(new_entry)
                 self._refresh_agreement_status(item)
@@ -317,7 +366,7 @@ class AnnotationQueue:
             # With one rater each: p_class = (a==c + b==c) / 2 for class c
             p0 = ((a == 0) + (b == 0)) / 2.0
             p1 = ((a == 1) + (b == 1)) / 2.0
-            p_e = p0 ** 2 + p1 ** 2
+            p_e = p0**2 + p1**2
             if p_e == 1.0:
                 return 1.0  # both raters always choose same class
             return (0.0 - p_e) / (1.0 - p_e)
@@ -331,7 +380,9 @@ class AnnotationQueue:
             # Build a 2-D array: rows = annotators, cols = items (1 item here)
             reliability = np.array([[float(lbl)] for lbl in labels]).T  # shape (1, n)
             try:
-                alpha = float(krippendorff.alpha(reliability_data=reliability, level_of_measurement="nominal"))
+                alpha = float(
+                    krippendorff.alpha(reliability_data=reliability, level_of_measurement="nominal")
+                )
             except Exception as exc:  # pragma: no cover
                 logger.warning("Krippendorff alpha failed: %s", exc)
 
@@ -383,7 +434,11 @@ class AnnotationQueue:
                 if hmac.compare_digest(expected, ann.get("annotation_hmac", "")):
                     verified.append(ann["label"])
                 else:
-                    logger.warning("Invalid HMAC for multi-annotation wallet=%s annotator=%s", wallet_id, ann.get("annotator_id"))
+                    logger.warning(
+                        "Invalid HMAC for multi-annotation wallet=%s annotator=%s",
+                        wallet_id,
+                        ann.get("annotator_id"),
+                    )
             return verified
         return []
 
@@ -392,7 +447,12 @@ class AnnotationQueue:
         verified = []
         wallet = item["wallet"]
         for ann in item.get("annotations", []):
-            expected = _compute_hmac(wallet, ann.get("label", -1), ann.get("annotator_id", ""), ann.get("annotated_at", ""))
+            expected = _compute_hmac(
+                wallet,
+                ann.get("label", -1),
+                ann.get("annotator_id", ""),
+                ann.get("annotated_at", ""),
+            )
             if hmac.compare_digest(expected, ann.get("annotation_hmac", "")):
                 verified.append(ann["label"])
         if len(verified) < 2:
@@ -406,12 +466,14 @@ class AnnotationQueue:
                 return 1.0
             p0 = ((a == 0) + (b == 0)) / 2.0
             p1 = ((a == 1) + (b == 1)) / 2.0
-            p_e = p0 ** 2 + p1 ** 2
+            p_e = p0**2 + p1**2
             if p_e == 1.0:
                 return 1.0
             return (0.0 - p_e) / (1.0 - p_e)
 
-        kappas = [_kappa_pair(verified[i], verified[j]) for i, j in combinations(range(len(verified)), 2)]
+        kappas = [
+            _kappa_pair(verified[i], verified[j]) for i, j in combinations(range(len(verified)), 2)
+        ]
         kappa = float(np.mean(kappas))
         item["status"] = "disputed" if kappa < DISPUTE_KAPPA_THRESHOLD else "multi_annotated"
         item["agreement_kappa"] = kappa
@@ -430,10 +492,22 @@ class AnnotationQueue:
     # ------------------------------------------------------------------
 
     def pop_batch(self, n: int) -> list[dict]:
-        """Return the next *n* pending wallets (does not change status)."""
+        """Return the next *n* pending wallets ranked by epistemic uncertainty.
+
+        Wallets with ``epistemic_uncertainty`` set are sorted in descending
+        order (highest epistemic uncertainty first — most informative for
+        annotation).  Wallets without uncertainty scores retain their
+        insertion order, after the ranked wallets.
+        """
         queue = _load_queue(self.queue_path)
         pending = [item for item in queue if item.get("status") == "pending"]
-        return pending[:n]
+
+        # Separate ranked vs unranked; sort ranked by descending epistemic uncertainty
+        ranked = [item for item in pending if item.get("epistemic_uncertainty") is not None]
+        unranked = [item for item in pending if item.get("epistemic_uncertainty") is None]
+        ranked.sort(key=lambda x: x["epistemic_uncertainty"], reverse=True)
+
+        return (ranked + unranked)[:n]
 
     def pending_wallets(self) -> list[str]:
         return [item["wallet"] for item in self.pop_batch(10**9)]
@@ -446,9 +520,7 @@ class AnnotationQueue:
         """Return all quarantined annotation records."""
         queue = _load_queue(self.queue_path)
         return [
-            item
-            for item in queue
-            if item.get("quarantine") and item.get("status") == "annotated"
+            item for item in queue if item.get("quarantine") and item.get("status") == "annotated"
         ]
 
     def dismiss_quarantine(self, wallet: str) -> None:
@@ -491,6 +563,183 @@ class AnnotationQueue:
             os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
             df.to_parquet(output_path, index=False)
         return df
+
+
+# ---------------------------------------------------------------------------
+# Stopping criterion (Issue #256)
+# ---------------------------------------------------------------------------
+
+
+class StoppingCriterion:
+    """Active learning stopping criterion based on Expected Error Reduction (EER)
+    and rolling AUC improvement.
+
+    Convergence is declared when **either**:
+    - The EER of the highest-uncertainty unlabelled sample falls below
+      ``eer_threshold`` (default ``ACTIVE_LEARNING_EER_THRESHOLD``), OR
+    - The mean AUC improvement over the last ``convergence_window`` rounds
+      is below ``auc_improvement_threshold`` (default 0.005).
+
+    The check is designed to run at the end of each annotation batch (not
+    after each individual annotation).
+
+    Security: convergence reports log annotator IDs and counts only —
+    never raw label values.
+
+    Args:
+        eer_threshold: Stop when EER < this value (default 0.001).
+        convergence_window: Number of rounds to average for AUC trend (default 5).
+        auc_improvement_threshold: Min mean AUC improvement per round (default 0.005).
+    """
+
+    def __init__(
+        self,
+        eer_threshold: float | None = None,
+        convergence_window: int | None = None,
+        auc_improvement_threshold: float = 0.005,
+    ) -> None:
+        self.eer_threshold: float = (
+            eer_threshold
+            if eer_threshold is not None
+            else float(getattr(config, "ACTIVE_LEARNING_EER_THRESHOLD", 0.001))
+        )
+        self.convergence_window: int = (
+            convergence_window
+            if convergence_window is not None
+            else int(getattr(config, "ACTIVE_LEARNING_CONVERGENCE_WINDOW", 5))
+        )
+        self.auc_improvement_threshold = auc_improvement_threshold
+        # Rolling AUC history: deque of per-round AUC values
+        self._auc_history: deque[float] = deque(maxlen=self.convergence_window + 1)
+        self._round: int = 0
+
+    def record_round_auc(self, auc: float) -> None:
+        """Record the AUC after one annotation batch completes."""
+        self._auc_history.append(auc)
+        self._round += 1
+
+    def eer(self, model, unlabelled_pool: pd.DataFrame) -> float:
+        """Compute EER: expected error reduction for the highest-uncertainty sample.
+
+        Uses the current production model (no special model trained).  EER is
+        approximated as ``1 - max_class_probability`` for the most uncertain sample.
+
+        Args:
+            model: Fitted scikit-learn compatible model with ``predict_proba``.
+            unlabelled_pool: DataFrame of unlabelled candidates.
+
+        Returns:
+            EER estimate (float).  0.0 if pool is empty.
+        """
+        if unlabelled_pool.empty or model is None:
+            return 0.0
+
+        from detection.model_training import FEATURE_COLUMNS_EXCLUDE
+
+        feat_cols = [c for c in unlabelled_pool.columns if c not in FEATURE_COLUMNS_EXCLUDE]
+        X = unlabelled_pool[feat_cols].astype(float).fillna(0.0)
+        probs = model.predict_proba(X)  # (N, 2)
+        # EER ≈ 1 − max_prob for the most uncertain sample
+        max_probs = probs.max(axis=1)
+        return float(1.0 - max_probs.max())
+
+    def should_stop(
+        self,
+        model=None,
+        unlabelled_pool: pd.DataFrame | None = None,
+    ) -> bool:
+        """Return True if the stopping criterion has fired.
+
+        Checks both EER and rolling AUC trend.  Intended to be called at the
+        end of each annotation batch.
+        """
+        # EER check
+        if model is not None and unlabelled_pool is not None and not unlabelled_pool.empty:
+            eer_val = self.eer(model, unlabelled_pool)
+            if eer_val < self.eer_threshold:
+                logger.info(
+                    "StoppingCriterion: EER=%.6f < threshold=%.6f — convergence declared",
+                    eer_val,
+                    self.eer_threshold,
+                )
+                return True
+
+        # Rolling AUC improvement check
+        if len(self._auc_history) >= self.convergence_window + 1:
+            # compute round-over-round improvements for the last window rounds
+            history = list(self._auc_history)
+            improvements = [history[i] - history[i - 1] for i in range(1, len(history))]
+            mean_improvement = (
+                sum(improvements[-self.convergence_window :]) / self.convergence_window
+            )
+            if mean_improvement < self.auc_improvement_threshold:
+                logger.info(
+                    "StoppingCriterion: mean AUC improvement=%.6f < threshold=%.6f "
+                    "over last %d rounds — convergence declared",
+                    mean_improvement,
+                    self.auc_improvement_threshold,
+                    self.convergence_window,
+                )
+                return True
+
+        return False
+
+    def emit_convergence_report(
+        self,
+        queue_path: str,
+        db_path: str | None = None,
+    ) -> dict:
+        """Write a convergence report without including raw label values.
+
+        Logs annotator IDs and annotation counts only.
+
+        Returns the report dict (also written to ``reports/`` if *db_path* is set).
+        """
+        queue = _load_queue(queue_path)
+        annotated = [item for item in queue if item.get("status") == "annotated"]
+
+        # Count annotations per annotator (no label values)
+        annotator_counts: dict[str, int] = {}
+        for item in annotated:
+            aid = item.get("annotator_id", "unknown")
+            annotator_counts[aid] = annotator_counts.get(aid, 0) + 1
+
+        report: dict[str, Any] = {
+            "converged_at": datetime.now(UTC).isoformat(),
+            "rounds_completed": self._round,
+            "total_annotations": len(annotated),
+            "annotator_counts": annotator_counts,
+            "auc_history": list(self._auc_history),
+        }
+
+        # Dispatch alert via streaming alert dispatcher
+        try:
+            from streaming.alert_dispatcher import AlertDispatcher
+
+            dispatcher = AlertDispatcher(channel="stdout")
+            dispatcher.dispatch(
+                wallet="__convergence__",
+                pair_id="active_learning",
+                score=0,
+                benford_flag=False,
+                ml_flag=False,
+                confidence=0,
+            )
+        except Exception as exc:
+            logger.warning("Could not dispatch convergence alert: %s", exc)
+
+        # Persist report
+        import os
+
+        os.makedirs("reports", exist_ok=True)
+        ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%S")
+        report_path = os.path.join("reports", f"al_convergence_{ts}.json")
+        with open(report_path, "w") as f:
+            import json as _json
+
+            _json.dump(report, f, indent=2)
+        logger.info("Convergence report written to %s", report_path)
+        return report
 
 
 # ---------------------------------------------------------------------------

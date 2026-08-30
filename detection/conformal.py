@@ -110,16 +110,12 @@ class ConformalCalibrator:
                 "model must have predict_proba (classification) or predict (regression)"
             )
 
-    def _calibrate_classification(
-        self, model: Any, X_cal: pd.DataFrame, y_cal: pd.Series
-    ) -> None:
+    def _calibrate_classification(self, model: Any, X_cal: pd.DataFrame, y_cal: pd.Series) -> None:
         probs = model.predict_proba(X_cal)
         n_classes = probs.shape[1]
         self.classes_ = list(range(n_classes))
 
-        nonconformity = np.array([
-            1.0 - probs[i, int(y_cal.iloc[i])] for i in range(len(X_cal))
-        ])
+        nonconformity = np.array([1.0 - probs[i, int(y_cal.iloc[i])] for i in range(len(X_cal))])
         self._nonconformity_scores = nonconformity
         self.n_cal = len(X_cal)
         self.q_hat = float(np.quantile(nonconformity, 1.0 - self.alpha))
@@ -130,9 +126,7 @@ class ConformalCalibrator:
             self.alpha,
         )
 
-    def _calibrate_regression(
-        self, model: Any, X_cal: pd.DataFrame, y_cal: pd.Series
-    ) -> None:
+    def _calibrate_regression(self, model: Any, X_cal: pd.DataFrame, y_cal: pd.Series) -> None:
         y_pred = model.predict(X_cal)
         if isinstance(y_pred, np.ndarray):
             y_pred = y_pred.flatten()
@@ -191,12 +185,14 @@ class ConformalCalibrator:
                 if k >= RAPS_K0:
                     penalty += RAPS_LAMBDA
 
-            results.append({
-                "score": float(row_probs[1]) * 100 if n_classes == 2 else 50.0,
-                "prediction_set": sorted(prediction_set),
-                "coverage_guarantee": 1.0 - self.alpha,
-                "q_hat": self.q_hat,
-            })
+            results.append(
+                {
+                    "score": float(row_probs[1]) * 100 if n_classes == 2 else 50.0,
+                    "prediction_set": sorted(prediction_set),
+                    "coverage_guarantee": 1.0 - self.alpha,
+                    "q_hat": self.q_hat,
+                }
+            )
 
         return results
 
@@ -224,13 +220,19 @@ class ConformalCalibrator:
         probs = model.predict_proba(X)
         results = []
         for row_probs in probs:
-            score = float(row_probs[1]) * 100 if probs.shape[1] == 2 else float(row_probs.argmax()) / (probs.shape[1] - 1) * 100
+            score = (
+                float(row_probs[1]) * 100
+                if probs.shape[1] == 2
+                else float(row_probs.argmax()) / (probs.shape[1] - 1) * 100
+            )
             margin = self.q_hat * 100
-            results.append({
-                "score": score,
-                "lower": max(0.0, score - margin),
-                "upper": min(100.0, score + margin),
-            })
+            results.append(
+                {
+                    "score": score,
+                    "lower": max(0.0, score - margin),
+                    "upper": min(100.0, score + margin),
+                }
+            )
         return results
 
     def _interval_regression(self, model: Any, X: pd.DataFrame) -> list[dict]:
@@ -241,11 +243,13 @@ class ConformalCalibrator:
         for pred in y_pred:
             pred_f = float(pred)
             margin = self.q_hat
-            results.append({
-                "score": pred_f,
-                "lower": max(0.0, pred_f - margin),
-                "upper": min(100.0, pred_f + margin),
-            })
+            results.append(
+                {
+                    "score": pred_f,
+                    "lower": max(0.0, pred_f - margin),
+                    "upper": min(100.0, pred_f + margin),
+                }
+            )
         return results
 
     # ------------------------------------------------------------------

@@ -21,7 +21,8 @@ import numpy as np
 from sklearn.linear_model import SGDClassifier
 
 from .crypto import generate_masks, mask_delta
-from .gradient_compression import ErrorFeedbackCompressor, TopKSparsifier, TopKPayload
+from .gradient_compression import ErrorFeedbackCompressor, TopKPayload, TopKSparsifier
+from .secure_aggregation import SecureAggregationContext, encrypt_gradient
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,9 @@ class FederatedParticipant:
     compressor: ErrorFeedbackCompressor = field(
         default_factory=lambda: ErrorFeedbackCompressor(TopKSparsifier(k_ratio=0.01))
     )
+    # Optional CKKS secure aggregation context; when set, gradients are
+    # encrypted before submission using homomorphic encryption (#188)
+    secure_agg_context: SecureAggregationContext | None = None
 
     # ------------------------------------------------------------------ #
     # Weight helpers (flatten coef_ + intercept_ to a 1-D numpy vector)  #
@@ -102,21 +106,33 @@ class FederatedParticipant:
                 compressed_delta = TopKSparsifier.decompress(payload)
             else:
                 from .gradient_compression import PowerSGDCompressor
+
                 compressed_delta = PowerSGDCompressor.decompress(payload)
 
-            # 3. Mask compressed delta
+            # 3. Mask compressed delta (pairwise additive masks cancel at coordinator)
             all_ids = sorted(set(peers) | {self.participant_id})
             masks = generate_masks(all_ids, compressed_delta.shape)
             my_mask = masks[self.participant_id]
             masked = mask_delta(compressed_delta, my_mask)
 
-            # 4. Submit masked delta
-            resp = await client.post(
-                "/submit_delta",
-                json={
-                    "participant_id": self.participant_id,
-                    "delta": masked.tolist(),
-                },
-            )
+            # 4. Submit delta — encrypted when secure_agg_context is configured (#188)
+            if self.secure_agg_context is not None:
+                ciphertext = encrypt_gradient(masked, self.secure_agg_context)
+                resp = await client.post(
+                    "/submit_encrypted_delta",
+                    content=ciphertext,
+                    headers={
+                        "Content-Type": "application/octet-stream",
+                        "X-Participant-Id": self.participant_id,
+                    },
+                )
+            else:
+                resp = await client.post(
+                    "/submit_delta",
+                    json={
+                        "participant_id": self.participant_id,
+                        "delta": masked.tolist(),
+                    },
+                )
             resp.raise_for_status()
             logger.info("Participant %s submitted delta for round.", self.participant_id)

@@ -6,10 +6,9 @@ Covers:
 - Disputed wallet (Kappa < 0.6) appears in senior review queue
 """
 
-import os
 import pytest
 
-from detection.active_learning.annotation_queue import AnnotationQueue, DISPUTE_KAPPA_THRESHOLD
+from detection.active_learning.annotation_queue import DISPUTE_KAPPA_THRESHOLD, AnnotationQueue
 
 
 @pytest.fixture
@@ -18,9 +17,12 @@ def queue(tmp_path, monkeypatch):
     monkeypatch.setenv("ANNOTATION_HMAC_SECRET", "test-secret-key-265")
     # Reload config so the env var is picked up
     import importlib
+
     import config as cfg_module
+
     importlib.reload(cfg_module)
     from config import config as cfg
+
     monkeypatch.setattr(cfg, "ANNOTATION_HMAC_SECRET", "test-secret-key-265")
 
     return AnnotationQueue(queue_path=str(tmp_path / "queue.json"))
@@ -33,6 +35,7 @@ def _push_wallet(queue: AnnotationQueue, wallet: str) -> None:
 # ---------------------------------------------------------------------------
 # Test: perfect agreement → Kappa = 1.0
 # ---------------------------------------------------------------------------
+
 
 def test_kappa_perfect_agreement(queue):
     """Two annotators who always agree produce Kappa = 1.0."""
@@ -52,6 +55,7 @@ def test_kappa_perfect_agreement(queue):
 # Test: total disagreement → Kappa = -1.0
 # ---------------------------------------------------------------------------
 
+
 def test_kappa_total_disagreement(queue):
     """Two annotators who always disagree on a binary label produce Kappa = -1.0."""
     wallet = "GDISAGREE1111111111111111111111111111111111111111111111111"
@@ -69,6 +73,7 @@ def test_kappa_total_disagreement(queue):
 # ---------------------------------------------------------------------------
 # Test: disputed wallet appears in senior review queue
 # ---------------------------------------------------------------------------
+
 
 def test_disputed_wallet_in_senior_review_queue(queue):
     """A wallet with Kappa < 0.6 must appear in get_senior_review_queue()."""
@@ -94,6 +99,7 @@ def test_disputed_wallet_in_senior_review_queue(queue):
 # Test: fewer than 2 annotations raises ValueError
 # ---------------------------------------------------------------------------
 
+
 def test_agreement_requires_min_two_annotations(queue):
     wallet = "GSINGLE11111111111111111111111111111111111111111111111111"
     _push_wallet(queue, wallet)
@@ -107,13 +113,13 @@ def test_agreement_requires_min_two_annotations(queue):
 # Test: duplicate annotator is rejected
 # ---------------------------------------------------------------------------
 
+
 def test_duplicate_annotator_rejected(queue):
     wallet = "GDUPLICATE111111111111111111111111111111111111111111111111"
     _push_wallet(queue, wallet)
     queue.multi_annotate(wallet, label=1, annotator_id="anon-alice")
     queue.multi_annotate(wallet, label=0, annotator_id="anon-alice")  # duplicate
 
-    result = queue.compute_inter_annotator_agreement.__func__  # access but don't call
     # Only 1 annotation should be stored
     labels = queue._verified_labels(wallet)
     assert len(labels) == 1
@@ -122,6 +128,7 @@ def test_duplicate_annotator_rejected(queue):
 # ---------------------------------------------------------------------------
 # Test: DISPUTE_KAPPA_THRESHOLD constant is 0.6
 # ---------------------------------------------------------------------------
+
 
 def test_dispute_threshold_value():
     assert DISPUTE_KAPPA_THRESHOLD == 0.6

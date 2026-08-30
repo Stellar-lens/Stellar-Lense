@@ -1,61 +1,55 @@
-"""Base migration framework with data preservation and checksum validation."""
+"""Base class for all LedgerLens database migrations.
 
-import hashlib
-import inspect
+Every migration module in ``migrations/versions/`` must expose a module-level
+instance named ``migration`` that is a :class:`Migration` subclass.  The
+module's file name must start with the four-digit zero-padded ID followed by
+an underscore (e.g. ``0001_add_ring_id.py``).
+
+Migrations are expected to be **idempotent**: re-running an already-applied
+migration should not change the database and should not raise an error.  The
+:class:`MigrationRunner` guards against this by tracking applied migrations
+in the ``schema_migrations`` tracking table, but the individual migration
+implementations should be safe to call multiple times anyway (use
+``IF NOT EXISTS`` / inspect-then-act patterns where possible).
+
+Backwards-compatibility contract:
+- Never delete a migration that has ever been applied to a production database.
+- Never renumber an existing migration.
+- To "undo" a migration, add a new forward-migration that reverses the change.
+  Destructive down-migrations are not supported by design.
+"""
+
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
-from datetime import UTC, datetime
 
-from sqlalchemy.engine import Engine
-from sqlalchemy.orm import Session
+from sqlalchemy.engine import Connection
 
 
 class Migration(ABC):
-    """Abstract base class for all database migrations.
+    """Abstract base class for a single schema migration step.
 
-    Each migration:
-    - Has an up() method that applies the migration
-    - Must include a data_preservation_test() that verifies data survives
-    - Is immutable once applied (content hash is validated)
-    - Supports only forward migrations (down/rollback via forward-fix migrations)
+    Subclasses must set :attr:`id` and :attr:`description`, and implement
+    :meth:`up`.
     """
 
-    @property
-    def version(self) -> str:
-        """Migration version from class name (e.g., 0001_initial_schema)."""
-        return self.__class__.__name__
-
-    @property
-    def description(self) -> str:
-        """Human-readable migration description."""
-        return self.__doc__ or "No description"
-
-    @property
-    def content_hash(self) -> str:
-        """SHA256 hash of migration source code for integrity validation."""
-        source = inspect.getsource(self.__class__)
-        return hashlib.sha256(source.encode()).hexdigest()
+    #: Four-digit zero-padded identifier matching the file prefix.
+    id: str
+    #: Short human-readable description shown in ``runner.status()`` output.
+    description: str
 
     @abstractmethod
-    def up(self, engine: Engine, session: Session) -> None:
-        """Apply the migration to the database.
+    def up(self, conn: Connection) -> None:
+        """Apply the migration.
 
-        Args:
-            engine: SQLAlchemy engine
-            session: SQLAlchemy session for the migration
+        Receives an active SQLAlchemy ``Connection`` with an open transaction.
+        The :class:`MigrationRunner` commits the transaction if ``up`` returns
+        normally, and rolls it back if it raises.
+
+        Implementations should be idempotent: inspecting the current schema
+        state before executing DDL statements (e.g. using
+        ``sqlalchemy.inspect``) is the recommended pattern.
         """
-        pass
 
-    @abstractmethod
-    def data_preservation_test(self, engine: Engine) -> None:
-        """Verify pre-existing data survives this migration.
-
-        This test runs against a database seeded with representative data.
-        It must assert that no rows are lost and transformations are correct.
-
-        Args:
-            engine: SQLAlchemy engine with pre-populated data
-
-        Raises:
-            AssertionError: If data preservation is violated
-        """
-        pass
+    def __repr__(self) -> str:
+        return f"<Migration {self.id}: {self.description}>"

@@ -15,14 +15,13 @@ Regression test
 
 from __future__ import annotations
 
+import sys
+import types
+
 import numpy as np
-import pytest
 from sklearn.datasets import make_classification
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import log_loss
-
-import sys
-import types
 
 # Stub out detection.__init__ so we don't pull in networkx/dotenv/etc.
 # The module under test only needs detection.federated.gradient_compression.
@@ -37,10 +36,10 @@ from detection.federated.gradient_compression import (  # noqa: E402
     bandwidth_ratio,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_gradient(size: int = 2000, seed: int = 0) -> np.ndarray:
     rng = np.random.default_rng(seed)
@@ -177,9 +176,9 @@ def test_error_feedback_reduces_cumulative_error():
 
     # Error feedback doesn't necessarily reduce per-round error but limits
     # residual accumulation; at minimum it should not be dramatically worse.
-    assert total_ef <= total_plain * 2.0, (
-        f"Error feedback ({total_ef:.4f}) much worse than plain ({total_plain:.4f})"
-    )
+    assert (
+        total_ef <= total_plain * 2.0
+    ), f"Error feedback ({total_ef:.4f}) much worse than plain ({total_plain:.4f})"
 
 
 def test_error_feedback_reset_clears_memory():
@@ -240,8 +239,12 @@ def _simulate_rounds(
 def test_compressed_training_converges_similarly_to_uncompressed():
     """5 rounds of compressed training must converge within 2x of uncompressed loss."""
     X, y = make_classification(
-        n_samples=600, n_features=20, n_informative=15,
-        n_redundant=0, class_sep=2.0, random_state=0,
+        n_samples=600,
+        n_features=20,
+        n_informative=15,
+        n_redundant=0,
+        class_sep=2.0,
+        random_state=0,
     )
     X_train, y_train = X[:400], y[:400]
     X_test, y_test = X[400:], y[400:]
@@ -249,6 +252,6 @@ def test_compressed_training_converges_similarly_to_uncompressed():
     loss_uncompressed = _simulate_rounds(5, X_train, y_train, X_test, y_test, use_compression=False)
     loss_compressed = _simulate_rounds(5, X_train, y_train, X_test, y_test, use_compression=True)
 
-    assert loss_compressed <= loss_uncompressed * 2.0, (
-        f"Compressed loss {loss_compressed:.4f} > 2x uncompressed {loss_uncompressed:.4f}"
-    )
+    assert (
+        loss_compressed <= loss_uncompressed * 2.0
+    ), f"Compressed loss {loss_compressed:.4f} > 2x uncompressed {loss_uncompressed:.4f}"

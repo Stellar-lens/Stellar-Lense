@@ -1,18 +1,16 @@
 """Tests for idempotent trade ingestion with Redis deduplication."""
 
 import pytest
-import time
-from datetime import datetime, timedelta, timezone
 
 from ingestion.trade_deduplicator import (
     SeenEventCache,
-    is_duplicate_trade,
     get_trade_dedup_cache,
 )
 
 # Try to import fakeredis for testing
 try:
     import fakeredis
+
     _FAKEREDIS_AVAILABLE = True
 except ImportError:
     _FAKEREDIS_AVAILABLE = False

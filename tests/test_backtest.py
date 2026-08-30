@@ -91,36 +91,62 @@ def mock_engine() -> BacktestEngine:
 @pytest.fixture
 def sample_results() -> pd.DataFrame:
     rows = [
-        {"wallet": "GAAAAAAABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890", "timestep": "2024-01-03T00:00:00+00:00", "risk_score": 85.0, "features": {}, "asset_pair": "USDC/XLM"},
-        {"wallet": "GAAAAAAABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890", "timestep": "2024-01-04T00:00:00+00:00", "risk_score": 90.0, "features": {}, "asset_pair": "USDC/XLM"},
-        {"wallet": "GDDDDDDDCDEFGHIJKLMNOPQRSTUVWXYZ1234567890", "timestep": "2024-01-03T00:00:00+00:00", "risk_score": 30.0, "features": {}, "asset_pair": "USDC/XLM"},
-        {"wallet": "GDDDDDDDCDEFGHIJKLMNOPQRSTUVWXYZ1234567890", "timestep": "2024-01-04T00:00:00+00:00", "risk_score": 35.0, "features": {}, "asset_pair": "USDC/XLM"},
+        {
+            "wallet": "GAAAAAAABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890",
+            "timestep": "2024-01-03T00:00:00+00:00",
+            "risk_score": 85.0,
+            "features": {},
+            "asset_pair": "USDC/XLM",
+        },
+        {
+            "wallet": "GAAAAAAABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890",
+            "timestep": "2024-01-04T00:00:00+00:00",
+            "risk_score": 90.0,
+            "features": {},
+            "asset_pair": "USDC/XLM",
+        },
+        {
+            "wallet": "GDDDDDDDCDEFGHIJKLMNOPQRSTUVWXYZ1234567890",
+            "timestep": "2024-01-03T00:00:00+00:00",
+            "risk_score": 30.0,
+            "features": {},
+            "asset_pair": "USDC/XLM",
+        },
+        {
+            "wallet": "GDDDDDDDCDEFGHIJKLMNOPQRSTUVWXYZ1234567890",
+            "timestep": "2024-01-04T00:00:00+00:00",
+            "risk_score": 35.0,
+            "features": {},
+            "asset_pair": "USDC/XLM",
+        },
     ]
     return pd.DataFrame(rows)
 
 
 @pytest.fixture
 def sample_ground_truth() -> pd.DataFrame:
-    return pd.DataFrame([
-        {
-            "wallet": "GAAAAAAABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890",
-            "asset_pair": "USDC:GA5ZSEJYBY3RJRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN/XLM:native",
-            "campaign_start": "2024-01-03T00:00:00Z",
-            "campaign_end": "2024-01-10T00:00:00Z",
-            "label_source": "https://stellar.expert/test",
-            "label_confidence": 3,
-            "description": "Test campaign",
-        },
-        {
-            "wallet": "GDDDDDDDCDEFGHIJKLMNOPQRSTUVWXYZ1234567890",
-            "asset_pair": "USDC:GA5ZSEJYBY3RJRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN/XLM:native",
-            "campaign_start": "2024-02-01T00:00:00Z",
-            "campaign_end": "2024-02-14T00:00:00Z",
-            "label_source": "https://stellar.expert/test2",
-            "label_confidence": 3,
-            "description": "Test campaign 2",
-        },
-    ])
+    return pd.DataFrame(
+        [
+            {
+                "wallet": "GAAAAAAABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890",
+                "asset_pair": "USDC:GA5ZSEJYBY3RJRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN/XLM:native",
+                "campaign_start": "2024-01-03T00:00:00Z",
+                "campaign_end": "2024-01-10T00:00:00Z",
+                "label_source": "https://stellar.expert/test",
+                "label_confidence": 3,
+                "description": "Test campaign",
+            },
+            {
+                "wallet": "GDDDDDDDCDEFGHIJKLMNOPQRSTUVWXYZ1234567890",
+                "asset_pair": "USDC:GA5ZSEJYBY3RJRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN/XLM:native",
+                "campaign_start": "2024-02-01T00:00:00Z",
+                "campaign_end": "2024-02-14T00:00:00Z",
+                "label_source": "https://stellar.expert/test2",
+                "label_confidence": 3,
+                "description": "Test campaign 2",
+            },
+        ]
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -131,7 +157,10 @@ def sample_ground_truth() -> pd.DataFrame:
 def test_load_ground_truth_parses_all_rows(ground_truth_csv: Path):
     df = BacktestEngine.load_ground_truth(str(ground_truth_csv))
     assert len(df) == 25
-    assert all(c in df.columns for c in ["wallet", "asset_pair", "campaign_start", "campaign_end", "label_source"])
+    assert all(
+        c in df.columns
+        for c in ["wallet", "asset_pair", "campaign_start", "campaign_end", "label_source"]
+    )
 
 
 def test_load_ground_truth_raises_on_missing_columns(tmp_path: Path):
@@ -148,17 +177,33 @@ def test_load_ground_truth_raises_on_missing_columns(tmp_path: Path):
 
 
 def test_label_source_http_raises_value_error():
-    df = pd.DataFrame([
-        {"wallet": "G1", "asset_pair": "USDC/XLM", "campaign_start": "2024-01-01", "campaign_end": "2024-01-02", "label_source": "http://evil.com/mitm"}
-    ])
+    df = pd.DataFrame(
+        [
+            {
+                "wallet": "G1",
+                "asset_pair": "USDC/XLM",
+                "campaign_start": "2024-01-01",
+                "campaign_end": "2024-01-02",
+                "label_source": "http://evil.com/mitm",
+            }
+        ]
+    )
     with pytest.raises(ValueError, match="HTTPS"):
         _validate_label_source_urls(df)
 
 
 def test_label_source_https_passes():
-    df = pd.DataFrame([
-        {"wallet": "G1", "asset_pair": "USDC/XLM", "campaign_start": "2024-01-01", "campaign_end": "2024-01-02", "label_source": "https://stellar.expert/test"}
-    ])
+    df = pd.DataFrame(
+        [
+            {
+                "wallet": "G1",
+                "asset_pair": "USDC/XLM",
+                "campaign_start": "2024-01-01",
+                "campaign_end": "2024-01-02",
+                "label_source": "https://stellar.expert/test",
+            }
+        ]
+    )
     _validate_label_source_urls(df)
 
 
@@ -186,14 +231,43 @@ def test_detection_lag_zero_when_flagged_at_first_timestep(
 
 
 def test_detection_lag_positive_when_crossed_later():
-    results = pd.DataFrame([
-        {"wallet": "GA", "timestep": "2024-01-03T00:00:00+00:00", "risk_score": 30.0, "features": {}, "asset_pair": "USDC/XLM"},
-        {"wallet": "GA", "timestep": "2024-01-04T00:00:00+00:00", "risk_score": 85.0, "features": {}, "asset_pair": "USDC/XLM"},
-        {"wallet": "GA", "timestep": "2024-01-05T00:00:00+00:00", "risk_score": 90.0, "features": {}, "asset_pair": "USDC/XLM"},
-    ])
-    gt = pd.DataFrame([
-        {"wallet": "GA", "asset_pair": "USDC/XLM", "campaign_start": "2024-01-03T00:00:00Z", "campaign_end": "2024-01-10T00:00:00Z", "label_source": "https://example.com", "label_confidence": 3},
-    ])
+    results = pd.DataFrame(
+        [
+            {
+                "wallet": "GA",
+                "timestep": "2024-01-03T00:00:00+00:00",
+                "risk_score": 30.0,
+                "features": {},
+                "asset_pair": "USDC/XLM",
+            },
+            {
+                "wallet": "GA",
+                "timestep": "2024-01-04T00:00:00+00:00",
+                "risk_score": 85.0,
+                "features": {},
+                "asset_pair": "USDC/XLM",
+            },
+            {
+                "wallet": "GA",
+                "timestep": "2024-01-05T00:00:00+00:00",
+                "risk_score": 90.0,
+                "features": {},
+                "asset_pair": "USDC/XLM",
+            },
+        ]
+    )
+    gt = pd.DataFrame(
+        [
+            {
+                "wallet": "GA",
+                "asset_pair": "USDC/XLM",
+                "campaign_start": "2024-01-03T00:00:00Z",
+                "campaign_end": "2024-01-10T00:00:00Z",
+                "label_source": "https://example.com",
+                "label_confidence": 3,
+            },
+        ]
+    )
     engine = BacktestEngine(model_path="/tmp/nonexistent")
     lags = engine.compute_detection_lag(results, gt, threshold=70)
     assert lags["GA"]["detected"]
@@ -206,14 +280,44 @@ def test_detection_lag_positive_when_crossed_later():
 
 
 def test_temporal_auc_perfect_detection():
-    results = pd.DataFrame([
-        {"wallet": "GA", "timestep": "2024-01-03T00:00:00+00:00", "risk_score": 95.0, "features": {}, "asset_pair": "USDC/XLM"},
-        {"wallet": "GB", "timestep": "2024-01-03T00:00:00+00:00", "risk_score": 10.0, "features": {}, "asset_pair": "USDC/XLM"},
-    ])
-    gt = pd.DataFrame([
-        {"wallet": "GA", "asset_pair": "USDC/XLM", "campaign_start": "2024-01-03T00:00:00Z", "campaign_end": "2024-01-10T00:00:00Z", "label_source": "https://example.com", "label_confidence": 2},
-        {"wallet": "GB", "asset_pair": "USDC/XLM", "campaign_start": "2024-02-01T00:00:00Z", "campaign_end": "2024-02-14T00:00:00Z", "label_source": "https://example.com", "label_confidence": 2},
-    ])
+    results = pd.DataFrame(
+        [
+            {
+                "wallet": "GA",
+                "timestep": "2024-01-03T00:00:00+00:00",
+                "risk_score": 95.0,
+                "features": {},
+                "asset_pair": "USDC/XLM",
+            },
+            {
+                "wallet": "GB",
+                "timestep": "2024-01-03T00:00:00+00:00",
+                "risk_score": 10.0,
+                "features": {},
+                "asset_pair": "USDC/XLM",
+            },
+        ]
+    )
+    gt = pd.DataFrame(
+        [
+            {
+                "wallet": "GA",
+                "asset_pair": "USDC/XLM",
+                "campaign_start": "2024-01-03T00:00:00Z",
+                "campaign_end": "2024-01-10T00:00:00Z",
+                "label_source": "https://example.com",
+                "label_confidence": 2,
+            },
+            {
+                "wallet": "GB",
+                "asset_pair": "USDC/XLM",
+                "campaign_start": "2024-02-01T00:00:00Z",
+                "campaign_end": "2024-02-14T00:00:00Z",
+                "label_source": "https://example.com",
+                "label_confidence": 2,
+            },
+        ]
+    )
     engine = BacktestEngine(model_path="/tmp/nonexistent")
     auc = engine.compute_temporal_auc(results, gt, threshold=70)
     assert auc >= 0.99
@@ -224,14 +328,14 @@ def test_temporal_auc_perfect_detection():
 # ---------------------------------------------------------------------------
 
 
-def test_sliding_window_eval_returns_correct_number_of_windows(mock_engine: BacktestEngine, ground_truth_csv: Path):
+def test_sliding_window_eval_returns_correct_number_of_windows(
+    mock_engine: BacktestEngine, ground_truth_csv: Path
+):
     """With minimal data, sliding_window_eval should return a list."""
     gt = BacktestEngine.load_ground_truth(str(ground_truth_csv))
     start = datetime(2024, 1, 1, tzinfo=UTC)
     end = datetime(2024, 3, 1, tzinfo=UTC)
-    windows = mock_engine.sliding_window_eval(
-        gt, start, end, window_days=30, step_days=7
-    )
+    windows = mock_engine.sliding_window_eval(gt, start, end, window_days=30, step_days=7)
     assert isinstance(windows, list)
 
 
@@ -366,17 +470,19 @@ def test_integration_replay_testnet():
     """Integration test: replay 7 days of testnet history for known testnet wallets."""
     from scripts.backtest import BacktestEngine
 
-    gt = pd.DataFrame([
-        {
-            "wallet": "GBTEST123",
-            "asset_pair": "USDC:GA5ZSEJYBY3RJRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN/XLM:native",
-            "campaign_start": "2024-06-01T00:00:00Z",
-            "campaign_end": "2024-06-08T00:00:00Z",
-            "label_source": "https://stellar.expert/test",
-            "label_confidence": 3,
-            "description": "Testnet integration test wallet",
-        },
-    ])
+    gt = pd.DataFrame(
+        [
+            {
+                "wallet": "GBTEST123",
+                "asset_pair": "USDC:GA5ZSEJYBY3RJRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN/XLM:native",
+                "campaign_start": "2024-06-01T00:00:00Z",
+                "campaign_end": "2024-06-08T00:00:00Z",
+                "label_source": "https://stellar.expert/test",
+                "label_confidence": 3,
+                "description": "Testnet integration test wallet",
+            },
+        ]
+    )
 
     engine = BacktestEngine(model_path="./models")
     start = datetime(2024, 6, 1, tzinfo=UTC)
@@ -395,7 +501,9 @@ def test_integration_replay_testnet():
 
 
 def test_empty_ground_truth_raises(tmp_path: Path):
-    df = pd.DataFrame(columns=["wallet", "asset_pair", "campaign_start", "campaign_end", "label_source"])
+    df = pd.DataFrame(
+        columns=["wallet", "asset_pair", "campaign_start", "campaign_end", "label_source"]
+    )
     path = tmp_path / "empty.csv"
     df.to_csv(path, index=False)
     result = BacktestEngine.load_ground_truth(str(path))
@@ -409,9 +517,18 @@ def test_replay_empty_returns_empty_dataframe():
         threshold=DEFAULT_THRESHOLD,
         scorer=mock_scorer,
     )
-    gt = pd.DataFrame([
-        {"wallet": "GA", "asset_pair": "USDC/XLM", "campaign_start": "2024-01-01T00:00:00Z", "campaign_end": "2024-01-02T00:00:00Z", "label_source": "https://example.com", "label_confidence": 2},
-    ])
+    gt = pd.DataFrame(
+        [
+            {
+                "wallet": "GA",
+                "asset_pair": "USDC/XLM",
+                "campaign_start": "2024-01-01T00:00:00Z",
+                "campaign_end": "2024-01-02T00:00:00Z",
+                "label_source": "https://example.com",
+                "label_confidence": 2,
+            },
+        ]
+    )
     start = datetime(2024, 1, 1, tzinfo=UTC)
     end = datetime(2024, 1, 2, tzinfo=UTC)
     results = engine.replay(start, end, gt, step_hours=24)

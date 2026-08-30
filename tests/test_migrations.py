@@ -1,136 +1,198 @@
-"""Migration framework tests with populated data fixtures and data preservation validation."""
+"""Tests for the migration scaffolding (Issue #1).
+
+Exercises MigrationRunner discovery, ordering, idempotency, status tracking,
+the dry-run mode, and the individual version migrations using an in-memory
+SQLite database so the tests are fully self-contained.
+"""
+
+from __future__ import annotations
 
 import pytest
-from sqlalchemy import text
-from sqlalchemy.orm import Session
+from sqlalchemy import create_engine, inspect, text
 
-from detection.persistence import RiskScoreRecord, get_engine
-from migrations.base import Migration
-from migrations.runner import MigrationRunner
+from migrations import MigrationRunner
+from migrations.registry import REGISTRY
+from migrations.runner import _load_all_migrations
 
-
-@pytest.fixture
-def test_engine():
-    """In-memory SQLite engine for testing."""
-    from detection.persistence import Base
-
-    engine = get_engine("sqlite:///:memory:")
-    Base.metadata.create_all(engine)
-    return engine
+# ---------------------------------------------------------------------------
+# Fixtures
+# ---------------------------------------------------------------------------
 
 
-@pytest.fixture
-def populated_engine(test_engine):
-    """Seed database with representative data for migration tests."""
-    from detection.persistence import Base
-
-    Base.metadata.create_all(test_engine)
-
-    SessionLocal = type("SessionLocal", (), {
-        "__call__": lambda self: Session(bind=test_engine)
-    })()
-
-    session = Session(bind=test_engine)
-    try:
-        base_rows = [
-            RiskScoreRecord(
-                wallet=f"GXXX{i:05d}",
-                asset_pair="USDC/native",
-                score=50 + (i % 50),
-                benford_flag=i % 7 == 0,
-                ml_flag=i % 5 == 0,
-                confidence=75,
-            )
-            for i in range(10000)
-        ]
-        session.add_all(base_rows)
-        session.commit()
-    finally:
-        session.close()
-
-    return test_engine
+@pytest.fixture()
+def sqlite_engine():
+    """Fresh in-memory SQLite engine per test."""
+    engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
+    yield engine
+    engine.dispose()
 
 
-@pytest.fixture
-def migration_runner(test_engine):
-    """Create a migration runner for the test database."""
-    return MigrationRunner(test_engine)
+@pytest.fixture()
+def populated_engine(sqlite_engine):
+    """Engine with the risk_scores table already created (simulates an
+    existing database that needs to be migrated)."""
+    with sqlite_engine.begin() as conn:
+        conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS risk_scores (
+                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                    wallet      VARCHAR NOT NULL,
+                    asset_pair  VARCHAR NOT NULL,
+                    score       INTEGER NOT NULL,
+                    benford_flag BOOLEAN NOT NULL DEFAULT 0,
+                    ml_flag     BOOLEAN NOT NULL DEFAULT 0,
+                    confidence  INTEGER NOT NULL DEFAULT 0,
+                    updated_at  TIMESTAMP NOT NULL
+                )
+                """))
+    return sqlite_engine
 
 
-class Test0001InitialSchema(Migration):
-    """Initialize risk_scores, ensemble_weight_history, and related tables.
-
-    This is the baseline schema migration that creates core tables.
-    """
-
-    @property
-    def version(self) -> str:
-        return "0001_initial_schema"
-
-    def up(self, engine, session):
-        from detection.persistence import Base
-
-        Base.metadata.create_all(engine)
-
-    def data_preservation_test(self, engine):
-        pass
+# ---------------------------------------------------------------------------
+# MigrationRunner — basic upgrade
+# ---------------------------------------------------------------------------
 
 
-class TestMigrationFramework:
-    """Test that migrations preserve data correctly."""
+class TestMigrationRunnerUpgrade:
+    def test_upgrade_creates_tracking_table(self, populated_engine):
+        runner = MigrationRunner(populated_engine)
+        runner.upgrade()
+        inspector = inspect(populated_engine)
+        assert "schema_migrations" in inspector.get_table_names()
 
-    def test_migration_execution_order(self, migration_runner):
-        """Migrations execute in order without race conditions."""
-        migrations = [Test0001InitialSchema()]
-        migration_runner.run_migrations(migrations)
+    def test_upgrade_applies_all_migrations(self, populated_engine):
+        runner = MigrationRunner(populated_engine)
+        status = runner.upgrade()
+        assert status.is_up_to_date, f"Pending: {status.pending}"
 
-    def test_populated_fixture_seeded(self, populated_engine):
-        """populated_engine fixture seeds 10k representative rows."""
-        session = Session(bind=populated_engine)
-        try:
-            count = session.query(RiskScoreRecord).count()
-            assert count == 10000, f"Expected 10000 rows, got {count}"
+    def test_upgrade_is_idempotent(self, populated_engine):
+        runner = MigrationRunner(populated_engine)
+        runner.upgrade()
+        # Second call should be a no-op
+        status = runner.upgrade()
+        assert status.is_up_to_date
+        assert status.pending == []
 
-            benford_flagged = session.query(RiskScoreRecord).filter_by(benford_flag=True).count()
-            ml_flagged = session.query(RiskScoreRecord).filter_by(ml_flag=True).count()
+    def test_applied_ids_recorded(self, populated_engine):
+        runner = MigrationRunner(populated_engine)
+        status = runner.upgrade()
+        assert set(status.applied) == set(REGISTRY)
 
-            assert benford_flagged > 0, "populated_engine should include benford-flagged rows"
-            assert ml_flagged > 0, "populated_engine should include ml-flagged rows"
-        finally:
-            session.close()
+    def test_columns_added_by_migrations(self, populated_engine):
+        runner = MigrationRunner(populated_engine)
+        runner.upgrade()
+        inspector = inspect(populated_engine)
+        col_names = {col["name"] for col in inspector.get_columns("risk_scores")}
+        assert "ring_id" in col_names, "0001 should add ring_id"
+        assert "provenance_json" in col_names, "0002 should add provenance_json"
+        assert "certified_robust" in col_names, "0003 should add certified_robust"
+        assert "schema_version" in col_names, "0004 should add schema_version"
 
-    def test_concurrent_migration_lock_enforcement(self, migration_runner, test_engine):
-        """Two concurrent runners cannot execute simultaneously (lock blocks second)."""
-        session1 = Session(bind=test_engine)
-        session2 = Session(bind=test_engine)
 
-        try:
-            migration_runner.acquire_migration_lock(session1)
+# ---------------------------------------------------------------------------
+# MigrationRunner — status
+# ---------------------------------------------------------------------------
 
-            with pytest.raises(RuntimeError, match="Migration lock is held"):
-                migration_runner.acquire_migration_lock(session2)
-        finally:
-            migration_runner.release_migration_lock(session1)
-            session1.close()
-            session2.close()
 
-    def test_migration_checksum_validation(self, migration_runner, test_engine):
-        """Applying an unmodified migration twice is idempotent."""
-        migration = Test0001InitialSchema()
-        migration_runner.apply_migration(migration)
+class TestMigrationRunnerStatus:
+    def test_status_shows_pending_before_upgrade(self, populated_engine):
+        runner = MigrationRunner(populated_engine)
+        status = runner.status()
+        assert not status.is_up_to_date
+        assert len(status.pending) == len(REGISTRY)
 
-        migration_runner.apply_migration(migration)
+    def test_status_shows_up_to_date_after_upgrade(self, populated_engine):
+        runner = MigrationRunner(populated_engine)
+        runner.upgrade()
+        status = runner.status()
+        assert status.is_up_to_date
 
-    def test_data_preservation_on_applied_migration(self, populated_engine):
-        """Data preservation test runs and validates row survival."""
-        session = Session(bind=populated_engine)
-        try:
-            before_count = session.query(RiskScoreRecord).count()
+    def test_status_str_contains_applied(self, populated_engine):
+        runner = MigrationRunner(populated_engine)
+        runner.upgrade()
+        status = runner.status()
+        text_output = str(status)
+        assert "applied" in text_output
 
-            migration = Test0001InitialSchema()
-            migration.data_preservation_test(populated_engine)
 
-            after_count = session.query(RiskScoreRecord).count()
-            assert before_count == after_count, "Migration should preserve all rows"
-        finally:
-            session.close()
+# ---------------------------------------------------------------------------
+# MigrationRunner — partial upgrade with target
+# ---------------------------------------------------------------------------
+
+
+class TestMigrationRunnerTarget:
+    def test_upgrade_to_target_stops_early(self, populated_engine):
+        runner = MigrationRunner(populated_engine)
+        status = runner.upgrade(target="0002")
+        assert "0001" in status.applied
+        assert "0002" in status.applied
+        assert "0003" in status.pending
+        assert "0004" in status.pending
+
+    def test_upgrade_with_invalid_target_raises(self, populated_engine):
+        runner = MigrationRunner(populated_engine)
+        with pytest.raises(ValueError, match="Unknown migration target"):
+            runner.upgrade(target="9999")
+
+
+# ---------------------------------------------------------------------------
+# MigrationRunner — dry-run
+# ---------------------------------------------------------------------------
+
+
+class TestMigrationRunnerDryRun:
+    def test_dry_run_does_not_apply_migrations(self, populated_engine):
+        runner = MigrationRunner(populated_engine, dry_run=True)
+        runner.upgrade()
+        # Tracking table may have been created by _ensure_tracking_tables, but
+        # no migrations should be recorded as applied.
+        with populated_engine.begin() as conn:
+            rows = conn.execute(text("SELECT migration_id FROM schema_migrations")).fetchall()
+        assert rows == [], "Dry-run should not record any applied migrations"
+
+    def test_dry_run_columns_not_added(self, populated_engine):
+        runner = MigrationRunner(populated_engine, dry_run=True)
+        runner.upgrade()
+        inspector = inspect(populated_engine)
+        col_names = {col["name"] for col in inspector.get_columns("risk_scores")}
+        assert "ring_id" not in col_names, "Dry-run should not modify the schema"
+
+
+# ---------------------------------------------------------------------------
+# New-database: migrations against fresh engine (no pre-existing tables)
+# ---------------------------------------------------------------------------
+
+
+class TestMigrationsFreshEngine:
+    def test_fresh_engine_upgrade_is_noop_for_missing_table(self, sqlite_engine):
+        """On a fresh DB with no risk_scores table the column-adding migrations
+        skip gracefully because the table does not exist yet."""
+        runner = MigrationRunner(sqlite_engine)
+        status = runner.upgrade()
+        # All migrations should be marked applied (they each check for table
+        # existence and return early when it is absent)
+        assert status.is_up_to_date
+
+
+# ---------------------------------------------------------------------------
+# Migration discovery helpers
+# ---------------------------------------------------------------------------
+
+
+class TestMigrationDiscovery:
+    def test_migrations_are_sorted_by_id(self):
+        migrations = _load_all_migrations()
+        ids = [int(m.id) for m in migrations]
+        assert ids == sorted(ids), "Migrations must be in ascending ID order"
+
+    def test_all_registry_entries_are_discovered(self):
+        migrations = _load_all_migrations()
+        discovered = {m.id for m in migrations}
+        for rid in REGISTRY:
+            assert rid in discovered, f"Registry entry {rid!r} not found in versions/"
+
+    def test_migration_ids_are_four_digits(self):
+        migrations = _load_all_migrations()
+        import re
+
+        for m in migrations:
+            assert re.fullmatch(r"\d{4}", m.id), f"Migration ID {m.id!r} is not 4 digits"

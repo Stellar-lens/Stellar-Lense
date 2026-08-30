@@ -21,8 +21,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import logging
-import os
 import sys
 import time
 from datetime import UTC, datetime, timedelta
@@ -31,13 +29,10 @@ from typing import TYPE_CHECKING
 from kafka import KafkaConsumer, TopicPartition
 from kafka.errors import KafkaError
 
-from config import config
-from detection.model_inference import RiskScorer
 from detection.risk_score_store import RiskScoreStore
+from ingestion.data_models import Asset, Trade
 from streaming.feature_buffer import FeatureBuffer
 from streaming.streaming_scorer import StreamingScorer
-from streaming.alert_dispatcher import AlertDispatcher
-from ingestion.data_models import Trade, Asset
 from utils.logging import get_logger
 
 if TYPE_CHECKING:
@@ -94,7 +89,6 @@ class StreamReplayer:
 
         # Components
         self.buffer = FeatureBuffer()
-        risk_scorer = RiskScorer()
         self.scorer = StreamingScorer(model_dir=None)  # Uses default model dir
         # Use no-op dispatcher for replay (no live alerts)
         self.dispatcher = NoOpAlertDispatcher()

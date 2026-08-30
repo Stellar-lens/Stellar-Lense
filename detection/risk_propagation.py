@@ -180,6 +180,7 @@ def propagate_risk_scores(
     updated_base_scores = base_scores.copy()
     try:
         from detection.cross_chain.resolver import resolve_risk_scores
+
         for node in combined.nodes():
             ext_scores = resolve_risk_scores(node, db_url=db_url)
             if ext_scores:
@@ -268,6 +269,7 @@ def propagation_attribution(
     updated_base_scores = base_scores.copy()
     try:
         from detection.cross_chain.resolver import resolve_risk_scores
+
         for node in combined.nodes():
             ext_scores = resolve_risk_scores(node, db_url=db_url)
             if ext_scores:
@@ -328,244 +330,6 @@ def propagation_attribution(
 
     contributions.sort(key=lambda x: float(x["contribution"]), reverse=True)
     return contributions[:top_n]
-
-
-# ---------------------------------------------------------------------------
-# Weighted PPR — edge weights derived from trade-level features
-# ---------------------------------------------------------------------------
-
-
-class WeightedRiskPropagation:
-    """Personalised PageRank with trade-derived edge weights.
-
-    Edge weight combines three signals:
-    - ``shared_trades_weight``: log-normalised count of trades both wallets share
-    - ``temporal_concentration``: how clustered in time those trades are
-    - ``amount_similarity``: how similar the trade amounts are
-
-    Parameters
-    ----------
-    alpha:
-        Teleport probability (default 0.15).
-    max_iterations:
-        Hard cap on PPR power-iteration steps (default 100).
-    convergence_threshold:
-        Stops when max per-node score change drops below this value.
-        Defaults to ``config.RISK_PROP_CONVERGENCE_THRESHOLD`` (0.01).
-    """
-
-    def __init__(
-        self,
-        alpha: float = 0.15,
-        max_iterations: int = 100,
-        convergence_threshold: float | None = None,
-    ) -> None:
-        self.alpha = alpha
-        self.max_iterations = max_iterations
-        self.convergence_threshold = (
-            convergence_threshold
-            if convergence_threshold is not None
-            else config.RISK_PROP_CONVERGENCE_THRESHOLD
-        )
-
-    # ------------------------------------------------------------------
-    # Edge weight computation
-    # ------------------------------------------------------------------
-
-    @staticmethod
-    def _edge_weight(
-        shared_trade_count: int,
-        max_shared_trades: int,
-        inter_trade_intervals: list[float],
-        amounts: list[float],
-    ) -> float:
-        """Return a [0, 1] edge weight from three normalised signals."""
-        # 1. shared trades (log-normalised)
-        if max_shared_trades > 0:
-            shared_trades_weight = np.log1p(shared_trade_count) / np.log1p(max_shared_trades)
-        else:
-            shared_trades_weight = 0.0
-
-        # 2. temporal concentration
-        if len(inter_trade_intervals) >= 2:
-            arr = np.asarray(inter_trade_intervals, dtype=np.float64)
-            mean_i = arr.mean()
-            std_i = arr.std()
-            if mean_i > 0:
-                temporal_concentration = float(np.clip(1.0 - std_i / mean_i, 0.0, 1.0))
-            else:
-                temporal_concentration = 1.0  # all at the same time → maximally clustered
-        else:
-            temporal_concentration = 0.5
-
-        # 3. amount similarity
-        if amounts:
-            arr_a = np.asarray(amounts, dtype=np.float64)
-            mean_a = arr_a.mean()
-            std_a = arr_a.std()
-            amount_similarity = float(np.clip(1.0 - std_a / (mean_a + 1e-9), 0.0, 1.0))
-        else:
-            amount_similarity = 0.5
-
-        return (shared_trades_weight + temporal_concentration + amount_similarity) / 3.0
-
-    def _build_weighted_adjacency(
-        self,
-        graph: nx.DiGraph,
-        trade_data: dict | None,
-        nodes: list[str],
-        node_idx: dict[str, int],
-    ) -> csr_matrix:
-        """Build a row-normalised weighted adjacency CSR matrix."""
-        n = len(nodes)
-
-        # Pre-compute max_shared_trades across all edges for normalisation
-        if trade_data:
-            max_shared = max(
-                (
-                    trade_data.get((u, v), {}).get("shared_trade_count", 0)
-                    for u, v in graph.edges()
-                    if (u, v) in trade_data or trade_data.get((u, v))
-                ),
-                default=1,
-            )
-            # Also check edges that have the count stored directly on the graph
-            for u, v, d in graph.edges(data=True):
-                cnt = d.get("shared_trade_count", 0)
-                if cnt > max_shared:
-                    max_shared = cnt
-        else:
-            max_shared = max(
-                (d.get("shared_trade_count", 0) for _, _, d in graph.edges(data=True)),
-                default=1,
-            )
-        if max_shared < 1:
-            max_shared = 1
-
-        rows, cols, weights = [], [], []
-        for u, v, edge_data in graph.edges(data=True):
-            if u not in node_idx or v not in node_idx:
-                continue
-
-            # Pull edge-level trade stats — prefer trade_data dict, fall back to graph attrs
-            if trade_data and (u, v) in trade_data:
-                td = trade_data[(u, v)]
-            else:
-                td = edge_data
-
-            shared_count = int(td.get("shared_trade_count", 1))
-            intervals = td.get("inter_trade_intervals", [])
-            amounts = td.get("amounts", [])
-
-            w = self._edge_weight(shared_count, max_shared, intervals, amounts)
-            rows.append(node_idx[u])
-            cols.append(node_idx[v])
-            weights.append(w if w > 0 else 1e-9)  # avoid zero rows collapsing to uniform
-
-        if not rows:
-            return csr_matrix((n, n), dtype=np.float64)
-
-        adj_raw = csr_matrix(
-            (np.array(weights, dtype=np.float64), (rows, cols)),
-            shape=(n, n),
-            dtype=np.float64,
-        )
-        # Row-normalise
-        row_sums = np.asarray(adj_raw.sum(axis=1)).ravel()
-        row_sums[row_sums == 0] = 1.0
-        D_inv = diags(1.0 / row_sums)
-        return (D_inv @ adj_raw).tocsr()
-
-    # ------------------------------------------------------------------
-    # PPR power iteration (convergence by max score change)
-    # ------------------------------------------------------------------
-
-    def _ppr(self, A_csr: csr_matrix, seed_idx: int, n: int) -> np.ndarray:
-        e = np.zeros(n, dtype=np.float64)
-        e[seed_idx] = 1.0
-        ppr = e.copy()
-        for _ in range(self.max_iterations):
-            new_ppr = (1.0 - self.alpha) * A_csr.T.dot(ppr) + self.alpha * e
-            if float(np.abs(new_ppr - ppr).max()) < self.convergence_threshold:
-                ppr = new_ppr
-                break
-            ppr = new_ppr
-        return ppr
-
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
-
-    def propagate(
-        self,
-        base_scores: dict[str, float],
-        graph: nx.DiGraph,
-        trade_data: dict | None = None,
-    ) -> dict[str, float]:
-        """Propagate *base_scores* through *graph* using weighted PPR.
-
-        Parameters
-        ----------
-        base_scores:
-            Wallet → raw risk score (0–100).
-        graph:
-            Directed wallet graph (funding + co-trade).  Each edge may
-            carry ``shared_trade_count``, ``inter_trade_intervals``, and
-            ``amounts`` attributes used to compute edge weights.
-        trade_data:
-            Optional ``{(u, v): {"shared_trade_count": int,
-            "inter_trade_intervals": [...], "amounts": [...]}}`` mapping
-            that overrides per-edge graph attributes.
-
-        Returns
-        -------
-        dict[str, float]
-            Propagated score per node, clipped to [0, 100].
-        """
-        if graph.number_of_nodes() == 0:
-            return {}
-
-        nodes: list[str] = list(graph.nodes())
-        node_idx: dict[str, int] = {w: i for i, w in enumerate(nodes)}
-        n = len(nodes)
-
-        # Handle disconnected components independently by processing each
-        # weakly-connected component separately on the same shared matrix —
-        # PPR naturally stays within a component when the adjacency is block-diagonal,
-        # so no extra work is needed beyond building the full matrix once.
-        A_csr = self._build_weighted_adjacency(graph, trade_data, nodes, node_idx)
-
-        seeds = {w: s for w, s in base_scores.items() if w in node_idx and s > 0}
-        if not seeds:
-            return {w: 0.0 for w in nodes}
-
-        propagated = np.zeros(n, dtype=np.float64)
-        for wallet, score in seeds.items():
-            ppr = self._ppr(A_csr, node_idx[wallet], n)
-            propagated += (score / 100.0) * ppr
-
-        propagated_scores = np.clip(propagated * 100.0, 0.0, 100.0)
-        return {nodes[i]: float(propagated_scores[i]) for i in range(n)}
-
-
-def propagate_risk_scores_weighted(
-    base_scores: dict[str, float],
-    graph: nx.DiGraph,
-    trade_data: dict | None = None,
-    alpha: float = 0.15,
-    max_iterations: int = 100,
-    convergence_threshold: float | None = None,
-) -> dict[str, float]:
-    """Convenience wrapper around :class:`WeightedRiskPropagation`.
-
-    Parameters mirror ``WeightedRiskPropagation.__init__`` and
-    ``WeightedRiskPropagation.propagate``.
-    """
-    return WeightedRiskPropagation(
-        alpha=alpha,
-        max_iterations=max_iterations,
-        convergence_threshold=convergence_threshold,
-    ).propagate(base_scores, graph, trade_data=trade_data)
 
 
 # ---------------------------------------------------------------------------
@@ -650,6 +414,7 @@ class WeightedRiskPropagation:
         self.max_iterations = max_iterations
         if convergence_threshold is None:
             from config import config
+
             convergence_threshold = config.RISK_PROP_CONVERGENCE_THRESHOLD
         self.convergence_threshold = convergence_threshold
 
@@ -724,10 +489,7 @@ class WeightedRiskPropagation:
                     break
             propagated += (score / 100.0) * ppr
 
-        return {
-            nodes[i]: float(np.clip(propagated[i] * 100.0, 0.0, 100.0))
-            for i in range(n)
-        }
+        return {nodes[i]: float(np.clip(propagated[i] * 100.0, 0.0, 100.0)) for i in range(n)}
 
 
 def propagate_risk_scores_weighted(

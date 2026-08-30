@@ -60,17 +60,18 @@ def test_record_risk_score_does_not_raise():
 
 def test_metrics_carry_asset_pair_label():
     """When prometheus_client is available, all three metrics must emit asset_pair label."""
-    prometheus = pytest.importorskip("prometheus_client")
+    pytest.importorskip("prometheus_client")
     from detection.per_pair_metrics import (
-        ledgerlens_score_duration_seconds,
         ledgerlens_benford_computation_total,
         ledgerlens_risk_score_distribution,
+        ledgerlens_score_duration_seconds,
     )
 
     pair = "USDC:GABC123/XLM:native"
 
     if ledgerlens_score_duration_seconds is not None:
         from detection.per_pair_metrics import canonical_pair, record_scoring_duration
+
         with record_scoring_duration(pair):
             pass
         # Verify the label is registered
@@ -79,14 +80,16 @@ def test_metrics_carry_asset_pair_label():
         assert sample is not None
 
     if ledgerlens_benford_computation_total is not None:
-        from detection.per_pair_metrics import record_benford_computation, canonical_pair
+        from detection.per_pair_metrics import canonical_pair, record_benford_computation
+
         record_benford_computation(pair, status="ok")
         canon = canonical_pair(pair)
         sample = ledgerlens_benford_computation_total.labels(asset_pair=canon, status="ok")
         assert sample is not None
 
     if ledgerlens_risk_score_distribution is not None:
-        from detection.per_pair_metrics import record_risk_score, canonical_pair
+        from detection.per_pair_metrics import canonical_pair, record_risk_score
+
         record_risk_score(pair, 55.0)
         canon = canonical_pair(pair)
         sample = ledgerlens_risk_score_distribution.labels(asset_pair=canon)

@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "work_items": [
+    {
+      "id": "ADV-001",
+      "title": "Build structured log correlation across pipeline stages",
+      "tier": "advanced",
+      "tests": [
+        "tests/test_ingestion_observability.py::test_log_context_is_nested_and_transportable"
+      ]
+    },
+    {
+      "id": "ADV-002",
+      "title": "Build metrics emitters for ingestion throughput and failures",
+      "tier": "advanced",
+      "tests": [
+        "tests/test_ingestion_observability.py::test_ingestion_metrics_emit_throughput_and_typed_failures"
+      ]
+    },
+    {
+      "id": "ADV-003",
+      "title": "Build typed exceptions for ingestion and validation failures",
+      "tier": "advanced",
+      "tests": [
+        "tests/test_ingestion_observability.py::test_ingestion_exceptions_are_machine_readable"
+      ]
+    },
+    {
+      "id": "ADV-004",
+      "title": "Build issue-to-test traceability for advanced work items",
+      "tier": "advanced",
+      "tests": [
+        "tests/test_issue_traceability.py::test_advanced_work_item_traceability_is_complete"
+      ]
+    }
+  ]
+}

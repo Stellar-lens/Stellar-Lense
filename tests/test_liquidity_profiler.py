@@ -238,6 +238,7 @@ def test_thin_market_classification_liquid_pair():
 def test_thin_market_wash_risk_nan_for_liquid_pair():
     """thin_market_wash_risk must return NaN for a liquid pair (1000 traders)."""
     import math
+
     from detection.liquidity_profiler import ThinMarketDetector
 
     detector = ThinMarketDetector()
@@ -267,9 +268,9 @@ def test_thin_market_alert_fires_above_threshold():
         round_trip_frequency=0.9,
     )
     assert score is not None and not __import__("math").isnan(score)
-    assert score >= detector._cfg["alert_threshold"], (
-        f"Expected score >= {detector._cfg['alert_threshold']}, got {score}"
-    )
+    assert (
+        score >= detector._cfg["alert_threshold"]
+    ), f"Expected score >= {detector._cfg['alert_threshold']}, got {score}"
 
 
 def test_thin_market_invalid_config_raises_on_startup():
@@ -298,7 +299,11 @@ def test_thin_market_invalid_config_raises_on_startup():
 
         with patch.object(lp_mod, "_BUILD_CONFIG_PATH", tmp_path):
             with pytest.raises(ValueError, match="positive number"):
-                from detection.liquidity_profiler import ThinMarketDetector, _load_thin_market_config, _validate_thin_market_config
+                from detection.liquidity_profiler import (
+                    _load_thin_market_config,
+                    _validate_thin_market_config,
+                )
+
                 cfg = _load_thin_market_config()
                 # Manually trigger the load with the bad config
                 cfg["max_unique_traders_7d"] = -10

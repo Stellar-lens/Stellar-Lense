@@ -98,17 +98,30 @@ class AlertDispatcher:
             self._deliver_websocket(wallet, risk_score, pair_id)
 
     def _deliver_stdout(self, wallet: str, risk_score: dict, pair_id: str) -> None:
-        logger.info("Alert dispatched", extra={
-            "wallet": wallet,
-            "pair_id": pair_id,
-            "score": risk_score["score"],
-            "benford_flag": risk_score.get("benford_flag"),
-            "ml_flag": risk_score.get("ml_flag"),
-            "confidence": risk_score.get("confidence"),
-            "score_lower": risk_score.get("score_lower"),
-            "score_upper": risk_score.get("score_upper"),
-            "coverage_guarantee": risk_score.get("coverage_guarantee"),
-        })
+        # Human-readable line on real stdout — this is what the "stdout" channel
+        # name promises, and what operators tailing the process expect to see.
+        print(
+            f"[ALERT] wallet={wallet} pair={pair_id}"
+            f" score={risk_score['score']}"
+            f" benford={risk_score.get('benford_flag')}"
+            f" ml={risk_score.get('ml_flag')}"
+            f" confidence={risk_score.get('confidence')}"
+        )
+        # Structured JSON log for aggregation/observability tooling.
+        logger.info(
+            "Alert dispatched",
+            extra={
+                "wallet": wallet,
+                "pair_id": pair_id,
+                "score": risk_score["score"],
+                "benford_flag": risk_score.get("benford_flag"),
+                "ml_flag": risk_score.get("ml_flag"),
+                "confidence": risk_score.get("confidence"),
+                "score_lower": risk_score.get("score_lower"),
+                "score_upper": risk_score.get("score_upper"),
+                "coverage_guarantee": risk_score.get("coverage_guarantee"),
+            },
+        )
 
     def _write_to_dead_letter(self, payload: dict) -> None:
         try:

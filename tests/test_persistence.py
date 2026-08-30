@@ -195,7 +195,12 @@ def _make_transparency_log(tmp_path):
 
 def _setup_verifier_artifact(tmp_path):
     """Full artifact setup: valid file + signed metrics + transparency log entry."""
-    from detection.persistence import TransparencyLog, ModelArtifactVerifier, get_engine, get_session_factory
+    from detection.persistence import (
+        ModelArtifactVerifier,
+        TransparencyLog,
+        get_engine,
+        get_session_factory,
+    )
 
     model_dir = str(tmp_path / "models")
     os.makedirs(model_dir)
@@ -248,7 +253,13 @@ def test_model_artifact_verifier_fails_on_tampered_file(tmp_path):
 
 
 def test_model_artifact_verifier_fails_on_unsigned_artifact(tmp_path):
-    from detection.persistence import ModelIntegrityError, TransparencyLog, ModelArtifactVerifier, get_engine, get_session_factory
+    from detection.persistence import (
+        ModelArtifactVerifier,
+        ModelIntegrityError,
+        TransparencyLog,
+        get_engine,
+        get_session_factory,
+    )
 
     model_dir = str(tmp_path / "models")
     os.makedirs(model_dir)
@@ -278,7 +289,13 @@ def test_model_artifact_verifier_fails_on_unsigned_artifact(tmp_path):
 
 
 def test_model_artifact_verifier_fails_when_not_in_transparency_log(tmp_path):
-    from detection.persistence import ModelIntegrityError, TransparencyLog, ModelArtifactVerifier, get_engine, get_session_factory
+    from detection.persistence import (
+        ModelArtifactVerifier,
+        ModelIntegrityError,
+        TransparencyLog,
+        get_engine,
+        get_session_factory,
+    )
 
     model_dir = str(tmp_path / "models")
     os.makedirs(model_dir)
