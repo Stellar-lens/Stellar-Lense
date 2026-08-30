@@ -52,7 +52,9 @@ def get_asset_supply(
             cached = redis_client.get(cache_key)
             if cached is not None:
                 return float(cached)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
+            # Broad catch justified: Redis read can fail on network/auth/timeout issues.
+            # Fall through to local cache or Horizon fetch rather than crashing.
             logger.warning("Redis supply cache read failed: %s", exc)
 
     # --- check local cache ---
@@ -70,7 +72,10 @@ def get_asset_supply(
     if redis_client is not None and supply is not None:
         try:
             redis_client.setex(cache_key, _SUPPLY_CACHE_TTL_SECONDS, str(supply))
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
+            # Broad catch justified: Redis write can fail on network/auth/memory/timeout.
+            # Failure to cache doesn't prevent returning the supply value; next call
+            # will just re-fetch from Horizon.
             logger.warning("Redis supply cache write failed: %s", exc)
 
     return supply
@@ -91,7 +96,10 @@ def _fetch_from_horizon(
             raw = records[0].get("amount", 0)
             supply = float(raw)
             return supply if supply > 0 else None
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
+        # Broad catch justified: Horizon fetch can fail on network issues, malformed
+        # JSON, unexpected response shape, or type conversion errors. Return None
+        # (unknown supply) rather than crashing; caller uses fallback or handles None.
         logger.warning(
             "Failed to fetch supply for %s:%s from Horizon: %s", asset_code, asset_issuer, exc
         )

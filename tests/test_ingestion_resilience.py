@@ -130,3 +130,68 @@ def test_load_accounts_activity_tolerates_untrusted_input_error():
         results = load_accounts_activity([VALID_BASE, "bogus-wallet"])
 
     assert results == [good_activity]
+
+
+def test_horizon_endpoint_pool_probe_logs_network_error():
+    """Health check probe must log network errors rather than crash,
+    allowing pool to mark endpoint unhealthy and try another."""
+    from ingestion.horizon_streamer import HorizonEndpointPool
+
+    pool = HorizonEndpointPool(urls=["https://horizon.stellar.org"])
+
+    with patch("urllib.request.urlopen") as mock_urlopen:
+        mock_urlopen.side_effect = OSError("Connection refused")
+        with patch("ingestion.horizon_streamer.logger") as mock_logger:
+            healthy, latency = pool._probe("https://horizon.stellar.org")
+
+    assert healthy is False
+    assert latency > 0
+    mock_logger.debug.assert_called()
+    # Verify exception message is logged
+    call_args = mock_logger.debug.call_args[0]
+    assert "Connection refused" in str(call_args)
+
+
+def test_rate_limiter_degradation_on_redis_unavailable():
+    """Rate limiter must degrade gracefully when Redis unavailable,
+    not crash ingestion."""
+    from ingestion.rate_limiter import TokenBucketLimiter
+
+    limiter = TokenBucketLimiter(redis_url="redis://invalid:9999")
+    # Should not raise even though Redis is unreachable
+    assert limiter._client is None
+    assert limiter._warned is True
+
+    # try_acquire should return True (grant all) when Redis unavailable
+    result = limiter.try_acquire()
+    assert result is True
+
+
+def test_kafka_producer_serialization_failure_logs_and_routes_to_dlq():
+    """Serialization failure must be logged and routed to DLQ, not crash."""
+    from ingestion.kafka_producer import HorizonKafkaProducer
+    from ingestion.data_models import Trade, Asset
+
+    producer = HorizonKafkaProducer()
+    # Create a trade with invalid data that will fail serialization
+    bad_trade = Trade(
+        trade_id="test",
+        ledger_close_time="not-a-datetime",  # type: ignore
+        base_account=VALID_BASE,
+        counter_account=VALID_COUNTER,
+        base_asset=Asset(code="USDC"),
+        counter_asset=Asset(code="XLM"),
+        base_amount=100.0,
+        counter_amount=50.0,
+        price=0.5,
+    )
+
+    with patch("ingestion.kafka_producer.logger") as mock_logger:
+        with patch.object(producer, "_produce_to_dlq") as mock_dlq:
+            # This should log and route to DLQ, not raise
+            producer.produce_trade(bad_trade)
+
+            # Verify DLQ was called
+            mock_dlq.assert_called()
+            # Verify error was logged
+            assert mock_logger.error.called

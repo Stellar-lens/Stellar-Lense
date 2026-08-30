@@ -195,7 +195,11 @@ class HorizonKafkaProducer:
             record = trade_to_record(trade)
             try:
                 value = serialize(record, self._schema)
-            except Exception as exc:  # serialisation / validation failure → DLQ
+            except Exception as exc:  # noqa: BLE001
+                # Broad catch justified: Avro serialization can fail on any aspect of the
+                # record (field type mismatch, missing required fields, etc.). These are
+                # permanent failures for a specific trade, not retryable. Log and route
+                # to DLQ for human review rather than stopping the producer.
                 emit_ingestion_failure(
                     "kafka",
                     exc,

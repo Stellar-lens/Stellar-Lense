@@ -88,7 +88,9 @@ class SeenEventCache:
             self._redis.ping()
             self._redis_available = True
             logger.info("Connected to Redis for trade deduplication")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
+            # Broad catch justified: Redis connection can fail on network/DNS/auth/config
+            # issues. Ingestion must continue without deduplication rather than crashing.
             logger.warning(
                 f"Failed to connect to Redis ({self.redis_url}): {e} — proceeding without deduplication"
             )
@@ -153,7 +155,10 @@ class SeenEventCache:
         except RedisError as e:
             logger.warning(f"Redis error during dedup check: {e} — allowing trade through")
             return False
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
+            # Broad catch justified: unexpected non-Redis errors during dedup
+            # (e.g. hash computation errors, dict operations). Log and allow trade
+            # through rather than crashing the deduplication check.
             logger.error(f"Unexpected error in is_duplicate: {e}")
             return False
 
@@ -183,7 +188,9 @@ class SeenEventCache:
             expiration_time = int(current_time + self.ttl_seconds)
             self._redis.expireat(cache_key, expiration_time)
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
+            # Broad catch justified: Redis operations can fail on network/timeout/memory.
+            # Cache failure is non-fatal; allow duplicates through rather than crashing.
             logger.warning(f"Failed to cache trade {trade_id}: {e}")
 
     def get_cache_size(self, asset_pair: str = "unknown") -> int:
@@ -201,7 +208,9 @@ class SeenEventCache:
         try:
             cache_key = f"{self.key_prefix}{asset_pair}"
             return self._redis.zcard(cache_key) or 0
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
+            # Broad catch justified: Redis read can fail on network/timeout issues.
+            # Return sentinel value (-1) rather than crashing monitoring query.
             logger.warning(f"Failed to get cache size: {e}")
             return -1
 
@@ -227,7 +236,9 @@ class SeenEventCache:
                 for key in self._redis.scan_iter(match=pattern):
                     self._redis.delete(key)
             return True
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
+            # Broad catch justified: Redis operations can fail on network/timeout.
+            # Return False (failure status) rather than crashing test cleanup.
             logger.warning(f"Failed to clear cache: {e}")
             return False
 
@@ -243,7 +254,9 @@ class SeenEventCache:
         try:
             self._redis.ping()
             return True
-        except Exception:
+        except Exception:  # noqa: BLE001
+            # Silent return is justified: health_check is a probe that should not log
+            # or crash on any network error; returning False is the expected response.
             return False
 
 
