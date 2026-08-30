@@ -229,6 +229,42 @@ def test_score_wallet_log_level_flag_sets_root_logger_level(
     assert logging.getLogger().level == logging.DEBUG
 
 
+def test_validate_pair_format_accepts_canonical_pairs():
+    from scripts.score_wallet import validate_pair_format
+
+    # Full two-sided canonical pair
+    validate_pair_format("USDC:GA5Z.../XLM:native")  # Should not raise
+    # Single half (XLM counter assumed)
+    validate_pair_format("USDC:GA5Z...")  # Should not raise
+
+
+def test_validate_pair_format_missing_issuer_raises_value_error():
+    from scripts.score_wallet import validate_pair_format
+
+    # Missing the ':issuer' half — no separator at all
+    with pytest.raises(ValueError, match="CODE:ISSUER"):
+        validate_pair_format("USDC/XLM")
+
+    # Empty issuer after the separator
+    with pytest.raises(ValueError, match="CODE:ISSUER"):
+        validate_pair_format("USDC:/XLM:native")
+
+    # Empty code before the separator
+    with pytest.raises(ValueError, match="CODE:ISSUER"):
+        validate_pair_format(":GA5Z/XLM:native")
+
+    # Too many separators
+    with pytest.raises(ValueError, match="CODE:ISSUER"):
+        validate_pair_format("USDC:GA5Z/XLM:native/EXTRA:issuer")
+
+
+def test_score_wallet_malformed_pair_raises_value_error():
+    test_wallet = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    with patch("sys.argv", ["score_wallet.py", "--wallet", test_wallet, "--pair", "USDC/XLM"]):
+        with pytest.raises(ValueError, match="CODE:ISSUER"):
+            main()
+
+
 def test_validate_wallet_address():
     from scripts.score_wallet import validate_wallet_address
 

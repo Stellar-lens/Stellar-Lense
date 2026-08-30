@@ -58,8 +58,39 @@ def validate_wallet_address(wallet_id: str) -> None:
         )
 
 
+PAIR_FORMAT_HELP = (
+    "Expected canonical pair format 'CODE:ISSUER/CODE:ISSUER' "
+    "(e.g. 'USDC:GA5Z.../XLM:native'). A single 'CODE:ISSUER' half is also "
+    "accepted and assumes an 'XLM:native' counter. Each half must be a "
+    "non-empty asset code and issuer separated by ':'."
+)
+
+
+def validate_pair_format(pair_str: str) -> None:
+    """Validate a raw pair string against the canonical CODE:ISSUER/CODE:ISSUER format.
+
+    Raises a clear ``ValueError`` listing the expected format on mismatch, so a
+    malformed ``--pair`` argument fails fast instead of silently producing an
+    empty result set or a confusing downstream KeyError. Accepts either a full
+    two-sided pair or a single half (XLM counter assumed), matching
+    ``ingestion/data_models.py::Asset.pair_id``.
+    """
+    if not pair_str or not pair_str.strip():
+        raise ValueError(f"Empty asset pair. {PAIR_FORMAT_HELP}")
+
+    halves = pair_str.split("/")
+    if len(halves) > 2:
+        raise ValueError(f"Invalid asset pair '{pair_str}': too many '/' separators. {PAIR_FORMAT_HELP}")
+
+    for half in halves:
+        code, sep, issuer = half.partition(":")
+        if not sep or not code.strip() or not issuer.strip():
+            raise ValueError(f"Invalid asset pair '{pair_str}': malformed half '{half}'. {PAIR_FORMAT_HELP}")
+
+
 def parse_asset_pair(pair_str: str) -> tuple[SdkAsset, SdkAsset]:
     """Parse a pair string like 'CODE:ISSUER/CODE:ISSUER' or 'CODE:ISSUER' (assumes XLM counter)."""
+    validate_pair_format(pair_str)
     try:
         if "/" in pair_str:
             base_str, counter_str = pair_str.split("/")
