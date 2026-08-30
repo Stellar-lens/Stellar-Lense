@@ -5,6 +5,7 @@ and atomic write to disk.
 """
 
 import os
+import threading
 
 import pandas as pd
 import pytest
@@ -220,6 +221,30 @@ def test_atomic_write_on_flush(tmp_path):
     # far, so 10 here — not reservoir_size (100), which is just the cap.
     assert len(df) == 10
     assert "timestamp" in df.columns
+
+
+def test_concurrent_updates_never_exceed_reservoir_size(tmp_path):
+    """Concurrent writers must preserve the cap regardless of scheduling."""
+    sampler = DriftAwareReservoirSampler(
+        reservoir_size=8,
+        flush_interval=100000,
+        drift_detector=MockCUSUMDetector(alarm_state=False),
+        buffer_path=str(tmp_path / "concurrent.parquet"),
+    )
+    barrier = threading.Barrier(4)
+
+    def worker(offset: int) -> None:
+        barrier.wait()
+        for i in range(200):
+            sampler.update({"value": float(offset + i)}, timestamp=float(offset + i))
+
+    threads = [threading.Thread(target=worker, args=(i * 250,)) for i in range(4)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert sampler.size <= sampler.reservoir_size
 
 
 def test_flush_empty_buffer_safe(tmp_path):
