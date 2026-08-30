@@ -29,7 +29,14 @@ from __future__ import annotations
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from enum import StrEnum
+try:
+    from enum import StrEnum
+except ImportError:
+    from enum import Enum
+
+    class StrEnum(str, Enum):
+        pass
+
 from importlib import import_module
 from typing import Any
 

@@ -28,7 +28,11 @@ import json
 import os
 import sys
 from dataclasses import asdict, dataclass, field
-from datetime import UTC, datetime
+try:
+    from datetime import UTC, datetime
+except ImportError:
+    from datetime import datetime, timezone
+    UTC = timezone.utc  # type: ignore
 from typing import Any
 
 import joblib

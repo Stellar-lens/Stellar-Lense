@@ -10,6 +10,8 @@ Financial fields (amounts, prices) use Decimal type with validation to prevent
 float precision errors. See utils.decimal_guards for the precision guard system.
 """
 
+from __future__ import annotations
+
 from datetime import datetime
 from decimal import Decimal
 from typing import Any, Protocol

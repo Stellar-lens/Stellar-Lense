@@ -25,6 +25,8 @@ Zero-shot routing (Issue #274):
   ensemble score via config.ZERO_SHOT_WEIGHT when both are available.
 """
 
+from __future__ import annotations
+
 import hashlib
 import json
 import math
@@ -33,7 +35,11 @@ import random
 import statistics
 import threading
 import time
-from datetime import UTC, datetime
+try:
+    from datetime import UTC, datetime
+except ImportError:
+    from datetime import datetime, timezone
+    UTC = timezone.utc  # type: ignore
 from typing import Any, cast
 
 import joblib
@@ -218,9 +224,12 @@ class RiskScorer:
         self.selected_features: list[str] | None = self._load_selected_features()
         self.calibrators: dict[str, ConformalCalibrator] = {}
         self._load_calibrators()
-        from detection.meta_learner import LeafEmbeddingExtractor
+        try:
+            from detection.meta_learner import LeafEmbeddingExtractor
 
-        self.extractor = LeafEmbeddingExtractor(self.models)
+            self.extractor = LeafEmbeddingExtractor(self.models)
+        except Exception:
+            self.extractor = None
         self.maml_adapter, self.proto_classifier = self._load_meta_learners()
         self.seq_model = self._load_seq_model()
 
@@ -431,19 +440,34 @@ class RiskScorer:
             expected_hash = self.metadata["feature_schema_hash"]
 
             if current_hash != expected_hash:
-                model_cols = set(self.metadata["feature_columns"])
-                row_cols = set(feature_cols)
-                missing_in_row = model_cols - row_cols
-                missing_in_model = row_cols - model_cols
+                model_cols = self.metadata.get("feature_columns", [])
+                model_cols_set = set(model_cols)
+                row_cols_set = set(feature_cols)
+
+                missing_from_input = [col for col in model_cols if col not in row_cols_set]
+                unexpected_extra = [col for col in feature_cols if col not in model_cols_set]
+
+                common_in_model = [col for col in model_cols if col in row_cols_set]
+                common_in_input = [col for col in feature_cols if col in model_cols_set]
+
+                reordered = []
+                if common_in_model != common_in_input:
+                    reordered = [
+                        col
+                        for col in common_in_input
+                        if common_in_input.index(col) != common_in_model.index(col)
+                    ]
 
                 msg = (
                     f"Feature schema mismatch! Model expected hash {expected_hash}, "
                     f"got {current_hash}."
                 )
-                if missing_in_row:
-                    msg += f" Columns missing from input: {sorted(missing_in_row)}."
-                if missing_in_model:
-                    msg += f" Columns missing from model: {sorted(missing_in_model)}."
+                if missing_from_input:
+                    msg += f" Missing from input: {sorted(missing_from_input)}."
+                if unexpected_extra:
+                    msg += f" Unexpected extra: {sorted(unexpected_extra)}."
+                if reordered:
+                    msg += f" Reordered: {sorted(reordered)}."
                 raise RuntimeError(msg)
 
         X = feature_row[feature_cols].to_frame().T.astype(float)
@@ -536,7 +560,7 @@ class RiskScorer:
 
             avg_prob = sum(
                 self.weights.get(name, 0.0) * prob
-                for name, prob in zip(self.models, probs, strict=True)
+                for name, prob in zip(self.models, probs)
             )
             clean_score = int(round(avg_prob * 100))
             perturbed_score = _apply_output_perturbation(clean_score, caller_id)

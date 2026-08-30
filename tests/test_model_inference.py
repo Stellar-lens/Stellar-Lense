@@ -166,9 +166,12 @@ def test_risk_scorer_default_weights_none_preserves_bft_behavior(trained_models)
 
 def test_risk_scorer_weighted_mode_returns_calibrated_score(trained_models):
     _, model_dir, df = trained_models
+    temp_scorer = RiskScorer(model_dir=model_dir)
+    loaded_models = list(temp_scorer.models.keys())
+    weights = {m: 1.0 / len(loaded_models) for m in loaded_models}
     scorer = RiskScorer(
         model_dir=model_dir,
-        weights={"random_forest": 0.5, "xgboost": 0.3, "lightgbm": 0.2},
+        weights=weights,
     )
     row = df.drop(columns=["label"]).iloc[0]
     result = scorer.score(row)
@@ -216,3 +219,59 @@ def test_consensus_failure_score(trained_models, monkeypatch):
     assert result["consensus_failure"] is True
     assert result["score"] == 100
     assert result["confidence"] == 0
+
+
+def test_risk_scorer_raises_schema_mismatch_with_categorized_headers():
+    import pandas as pd
+    from detection.model_contracts import compute_feature_schema_hash
+
+    scorer = RiskScorer.__new__(RiskScorer)
+    scorer.model_dir = "dummy"
+    scorer.selected_features = None
+    scorer.models = {"dummy": None}
+
+    # Model expected feature columns in order
+    model_features = ["col_a", "col_b", "col_c", "col_missing"]
+    expected_hash = compute_feature_schema_hash(model_features)
+
+    scorer.metadata = {
+        "feature_columns": model_features,
+        "feature_schema_hash": expected_hash,
+    }
+
+    # Input row feature columns:
+    # - col_missing is missing from input
+    # - col_extra is an unexpected extra column
+    # - col_a and col_b are reordered (col_b comes before col_a)
+    input_row = pd.Series(
+        {
+            "wallet": "0x123",
+            "col_b": 1.0,
+            "col_a": 2.0,
+            "col_c": 3.0,
+            "col_extra": 4.0,
+        }
+    )
+
+    with pytest.raises(RuntimeError) as exc_info:
+        scorer._ensemble_probabilities(input_row)
+
+    err_msg = str(exc_info.value)
+
+    assert "Feature schema mismatch!" in err_msg
+    assert "Missing from input:" in err_msg
+    assert "'col_missing'" in err_msg
+    assert "Unexpected extra:" in err_msg
+    assert "'col_extra'" in err_msg
+    assert "Reordered:" in err_msg
+
+    missing_part = err_msg.split("Missing from input:")[1].split(".")[0]
+    assert "col_missing" in missing_part
+
+    extra_part = err_msg.split("Unexpected extra:")[1].split(".")[0]
+    assert "col_extra" in extra_part
+
+    reordered_part = err_msg.split("Reordered:")[1].split(".")[0]
+    assert "col_a" in reordered_part
+    assert "col_b" in reordered_part
+

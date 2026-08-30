@@ -18,6 +18,8 @@ over ensemble combination weights (see `detection/ensemble_calibrator.py`)
 and write `models/pareto_front.json`.
 """
 
+from __future__ import annotations
+
 import argparse
 import hashlib
 import json
@@ -25,19 +27,32 @@ import os
 import struct
 import sys
 import threading
-from datetime import UTC, datetime
+try:
+    from datetime import UTC, datetime
+except ImportError:
+    from datetime import datetime, timezone
+    UTC = timezone.utc  # type: ignore
 from importlib import import_module
 
 import joblib
-import lightgbm as lgb
 import numpy as np
 import pandas as pd
 from imblearn.over_sampling import SMOTE
-from lightgbm import LGBMClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import auc, f1_score, precision_recall_curve, roc_auc_score
 from sklearn.model_selection import train_test_split
-from xgboost import XGBClassifier
+
+try:
+    import lightgbm as lgb
+    from lightgbm import LGBMClassifier
+except Exception:
+    lgb = None
+    LGBMClassifier = None
+
+try:
+    from xgboost import XGBClassifier
+except Exception:
+    XGBClassifier = None
 
 from config import config
 from config.contracts import validate_mode
@@ -54,11 +69,13 @@ from utils.version_stamp import get_version as _get_ledgerlens_version
 
 logger = get_logger(__name__)
 
-MODEL_REGISTRY = {
+MODEL_REGISTRY: dict[str, type] = {
     "random_forest": RandomForestClassifier,
-    "xgboost": XGBClassifier,
-    "lightgbm": LGBMClassifier,
 }
+if XGBClassifier is not None:
+    MODEL_REGISTRY["xgboost"] = XGBClassifier
+if LGBMClassifier is not None:
+    MODEL_REGISTRY["lightgbm"] = LGBMClassifier
 
 PSI_N_BINS = 10
 PSI_EPSILON = 1e-4

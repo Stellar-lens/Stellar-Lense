@@ -34,12 +34,20 @@ from typing import Any
 
 import optuna
 import pandas as pd
-from lightgbm import LGBMClassifier
 from optuna.pruners import MedianPruner
 from optuna.samplers import NSGAIISampler, TPESampler
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import roc_auc_score
-from xgboost import XGBClassifier
+
+try:
+    from lightgbm import LGBMClassifier
+except Exception:
+    LGBMClassifier = None
+
+try:
+    from xgboost import XGBClassifier
+except Exception:
+    XGBClassifier = None
 
 from config import config
 
@@ -216,9 +224,9 @@ def _build_model(model_name: str, params: dict[str, Any], random_state: int = 42
     """Instantiate the sklearn-compatible model for *model_name* with *params*."""
     if model_name == "random_forest":
         return RandomForestClassifier(**params, random_state=random_state, n_jobs=1)
-    if model_name == "xgboost":
+    if model_name == "xgboost" and XGBClassifier is not None:
         return XGBClassifier(**params, random_state=random_state, verbosity=0, n_jobs=1)
-    if model_name == "lightgbm":
+    if model_name == "lightgbm" and LGBMClassifier is not None:
         return LGBMClassifier(**params, random_state=random_state, verbosity=-1, n_jobs=1)
     raise ValueError(f"No model builder for {model_name!r}")
 
