@@ -1,5 +1,7 @@
 """Central configuration loaded from environment variables / .env."""
 
+from __future__ import annotations
+
 import os
 
 from dotenv import load_dotenv

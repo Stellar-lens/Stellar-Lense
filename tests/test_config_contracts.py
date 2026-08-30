@@ -353,3 +353,73 @@ def test_training_rejects_non_positive_dp_epsilon(monkeypatch):
 
     with pytest.raises(OSError, match="DP_TARGET_EPSILON"):
         validate_mode("training")
+
+
+# ---------------------------------------------------------------------------
+# Multi-variable missing error aggregation & runtime mode assertions
+# ---------------------------------------------------------------------------
+
+
+def test_api_multi_variable_missing_lists_all_vars_and_runtime_mode(monkeypatch):
+    """When multiple required env vars are missing in api mode, a single OSError
+
+    is raised listing every missing variable and naming the runtime mode.
+    """
+    monkeypatch.setattr(Config, "RISK_SCORE_DB_URL", "")
+    monkeypatch.setattr(Config, "MODEL_DIR", "")
+    monkeypatch.setattr(Config, "API_KEYS", [])
+
+    with pytest.raises(OSError) as exc_info:
+        validate_mode("api")
+
+    err_msg = str(exc_info.value)
+    assert "mode='api'" in err_msg
+    assert "RISK_SCORE_DB_URL is not set" in err_msg
+    assert "MODEL_DIR is not set" in err_msg
+    assert "API_KEYS is not set" in err_msg
+
+    # Confirm all errors are in a single exception message
+    bullet_lines = [line for line in err_msg.splitlines() if line.startswith("- ")]
+    assert len(bullet_lines) >= 3
+
+
+def test_streaming_kafka_multi_variable_missing_lists_all_vars_and_runtime_mode(
+    monkeypatch, tmp_path
+):
+    """When multiple required env vars are missing in streaming_kafka mode, a
+
+    single OSError is raised listing every violation and naming the mode.
+    """
+    monkeypatch.setattr(Config, "WATCHED_ASSET_PAIRS", [])
+    monkeypatch.setattr(Config, "KAFKA_BOOTSTRAP_SERVERS", "")
+    monkeypatch.setattr(Config, "TRADE_AVRO_SCHEMA_PATH", str(tmp_path / "missing_schema.json"))
+
+    with pytest.raises(OSError) as exc_info:
+        validate_mode("streaming_kafka", role="all", backend="kafka")
+
+    err_msg = str(exc_info.value)
+    assert "mode='streaming_kafka'" in err_msg
+    assert "WATCHED_ASSET_PAIRS is not set" in err_msg
+    assert "KAFKA_BOOTSTRAP_SERVERS is not set" in err_msg
+    assert "TRADE_AVRO_SCHEMA_PATH" in err_msg
+
+
+def test_pipeline_onchain_multi_variable_missing_lists_all_vars_and_runtime_mode(monkeypatch):
+    """When multiple required env vars are missing in pipeline_onchain mode, all
+
+    are reported in a single message alongside mode='pipeline_onchain'.
+    """
+    _set_pipeline_baseline(monkeypatch)
+    monkeypatch.setattr(Config, "LEDGERLENS_CONTRACT_ID", "")
+    monkeypatch.setattr(Config, "LEDGERLENS_SUBMITTER_SECRET", "")
+    monkeypatch.setattr(Config, "STELLAR_NETWORK", "INVALID_NET")
+
+    with pytest.raises(OSError) as exc_info:
+        validate_mode("pipeline_onchain")
+
+    err_msg = str(exc_info.value)
+    assert "mode='pipeline_onchain'" in err_msg
+    assert "LEDGERLENS_CONTRACT_ID is not set" in err_msg
+    assert "LEDGERLENS_SUBMITTER_SECRET is not set" in err_msg
+    assert "STELLAR_NETWORK" in err_msg
+
