@@ -58,6 +58,19 @@ def validate_wallet_address(wallet_id: str) -> None:
         )
 
 
+class ScoreWalletError(Exception):
+    """Base class for clearly-classified score_wallet CLI outcomes."""
+
+
+class InsufficientTradeHistoryError(ScoreWalletError):
+    """The address is valid but has no trade history for the requested pair.
+
+    This is deliberately distinct from (a) an invalid address format and (b) a
+    genuine scoring failure, so a "can't score yet" wallet never reads like a
+    broken pipeline (Issue #744).
+    """
+
+
 def parse_asset_pair(pair_str: str) -> tuple[SdkAsset, SdkAsset]:
     """Parse a pair string like 'CODE:ISSUER/CODE:ISSUER' or 'CODE:ISSUER' (assumes XLM counter)."""
     try:
@@ -221,6 +234,16 @@ def score_one(
             mask = (trades_df["base_account"] == wallet) | (trades_df["counter_account"] == wallet)
             trades_df = trades_df[mask]
 
+        if trades_df.empty:
+            return {
+                "wallet": wallet,
+                "score": None,
+                "error": (
+                    f"Wallet {wallet} has valid address but no trade history for this pair "
+                    f"and cannot be scored yet"
+                ),
+            }
+
         feature_vector = build_feature_vector(wallet, trades_df, orderbook_events=None)
         feature_row = pd.Series(feature_vector)
         result = scorer.score(feature_row)
@@ -341,6 +364,12 @@ def main() -> None:
             )
             sys.exit(1)
 
+        if trades_df.empty:
+            raise InsufficientTradeHistoryError(
+                f"Wallet {args.wallet} has valid address but no trade history for pair "
+                f"{args.pair} and cannot be scored yet"
+            )
+
         # 3. Feature Engineering
         feature_vector = build_feature_vector(
             args.wallet, trades_df, orderbook_events=orderbook_events_df
@@ -368,13 +397,17 @@ def main() -> None:
             )
         except Exception as e:
             logger.error(
-                "Error during scoring",
+                "Scoring failed for wallet",
                 exc_info=True,
                 extra={
                     "wallet": args.wallet,
                     "error_type": type(e).__name__,
                     "error_message": str(e),
                 },
+            )
+            print(
+                f"Scoring failed for wallet {args.wallet} on pair {args.pair}: {e}",
+                file=sys.stderr,
             )
             sys.exit(1)
 

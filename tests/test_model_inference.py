@@ -50,6 +50,34 @@ def test_bft_trimmed_mean_single_value():
     assert diverged is False
 
 
+def test_bft_trimmed_mean_all_identical_scores():
+    # A unanimous ensemble: no divergence, returns the common score.
+    assert bft_trimmed_mean([30.0, 30.0, 30.0]) == (30.0, False)
+
+
+def test_bft_trimmed_mean_trims_outliers_for_many_models():
+    # Span (99) far exceeds the default threshold (30): the min and max are
+    # trimmed and the remaining scores are averaged.
+    score, diverged = bft_trimmed_mean([0.0, 50.0, 52.0, 54.0, 99.0])
+    assert diverged is True
+    assert score == pytest.approx(52.0)  # (50 + 52 + 54) / 3
+
+
+def test_bft_trimmed_mean_plain_mean_without_divergence():
+    # No outlier, so for >3 models the result is the plain (non-trimmed) mean.
+    score, diverged = bft_trimmed_mean([40.0, 42.0, 44.0, 46.0])
+    assert diverged is False
+    assert score == pytest.approx(43.0)
+
+
+def test_bft_divergence_flag_false_at_threshold_boundary():
+    # The default threshold is 30; a span of exactly 30 does NOT flag divergence
+    # because the comparison is strict (`>`), so the median is still used.
+    score, diverged = bft_trimmed_mean([10.0, 30.0, 40.0])
+    assert diverged is False
+    assert score == 30.0
+
+
 # ---------------------------------------------------------------------------
 # Consensus check
 # ---------------------------------------------------------------------------
