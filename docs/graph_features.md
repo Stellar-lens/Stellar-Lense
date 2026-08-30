@@ -4,11 +4,23 @@
 
 Once [Louvain community detection](#g-community) (`detection/community_detector.py`) partitions the wallet graph into suspected wash-trading [rings](#g-ring), the [motif](#g-motif) census (`detection/motif_census.py`) characterises the *internal structure* of each [community](#g-community) by counting k-node subgraph patterns (motifs). The resulting structural fingerprints distinguish coordinated wash rings (which favour dense triangles and reciprocal cycles) from organic market-maker networks (which tend toward hub-and-spoke star topologies with low [reciprocity](#g-reciprocity)).
 
+Entry point:
+
+```python
+from detection.community_detector import enrich_communities_with_motifs
+
+motif_features = enrich_communities_with_motifs(graph, community_map)
+# Returns: {community_id: {"triangle_density": ..., "star_ratio": ..., ...}}
+```
+
+---
+
 ## Glossary
 
-A quick reference for the graph-theory vocabulary used below. Each entry links to
-the exact function that computes or defines the concept. Terms are cross-linked
-from their first use elsewhere in this document.
+A quick reference for the graph-theory vocabulary used in this document and in
+the detection modules it describes. Each entry gives a one- or two-sentence
+plain-English definition and a pointer to the exact function that computes or
+defines the concept. Terms are cross-linked from their first use above.
 
 ### <a id="g-funding-edge"></a>Funding edge
 
@@ -61,17 +73,8 @@ an open wedge, or a 4-cycle. Counting how often each pattern occurs inside a
 The fraction of directed edges `(u, v)` for which the reverse edge `(v, u)` also
 exists. Wash rings show high reciprocity (round-trip flows); organic trading
 produces more one-way paths. Undirected graphs are defined to have reciprocity
-`1.0`. Detailed formula in [Reciprocity](#reciprocity) below.
+`1.0`. Full formula in [Reciprocity](#reciprocity) below.
 *Computed inside `compute_motif_census()` in [`detection/motif_census.py`](../detection/motif_census.py).*
-
-Entry point:
-
-```python
-from detection.community_detector import enrich_communities_with_motifs
-
-motif_features = enrich_communities_with_motifs(graph, community_map)
-# Returns: {community_id: {"triangle_density": ..., "star_ratio": ..., ...}}
-```
 
 ---
 
