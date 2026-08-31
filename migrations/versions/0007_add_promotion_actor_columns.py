@@ -1,4 +1,4 @@
-"""Migration 0005: Add promotion/rollback actor columns to model_versions.
+"""Migration 0007: Add promotion/rollback actor columns to model_versions.
 
 Grand 2 (issue #671) requires every promotion or rollback of a production
 model to record its approving actor so promotion history is queryable and
@@ -15,7 +15,7 @@ from migrations.base import Migration
 
 
 class AddPromotionActorColumns(Migration):
-    id = "0005"
+    id = "0007"
     description = (
         "Add nullable promoted_by, rolled_back_by, parent_version_id TEXT "
         "columns to model_versions"

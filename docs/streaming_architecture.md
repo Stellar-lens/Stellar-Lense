@@ -134,30 +134,39 @@ scripts/stream.py    Phase 2 CLI
 
 **Class: `KafkaWorker`**
 
+Actual constructor signature (`scorer` and `dispatcher` are required
+positional arguments; everything else is optional/keyword — this table
+previously documented a `partitions`/`commit_interval_seconds` shape that
+never existed in the shipped code):
+
 | Parameter | Default | Purpose |
 |-----------|---------|---------|
-| `topic` | — | Kafka topic |
-| `group_id` | — | Consumer group (e.g., `ledgerlens-workers`) |
-| `bootstrap_servers` | `localhost:9092` | Kafka brokers |
-| `buffer` | new FeatureBuffer() | Per-worker trade buffer |
-| `scorer` | — | StreamingScorer (required) |
-| `dispatcher` | — | AlertDispatcher (required) |
-| `partitions` | None | Explicit partition list (optional; uses group assignment if None) |
-| `commit_interval_seconds` | 30 | Offset commit frequency |
+| `scorer` | — | `StreamingScorer` (required, positional) |
+| `dispatcher` | — | `AlertDispatcher` (required, positional) |
+| `buffer` | new `FeatureBuffer()` | Per-worker trade buffer |
+| `watchdog` | `None` | Optional `EmergencyWatchdog` |
+| `consumer` | new `confluent_kafka.Consumer` | Inject a pre-built consumer (used by tests) |
+| `bootstrap_servers` | `config.KAFKA_BOOTSTRAP_SERVERS` | Kafka brokers |
+| `group_id` | `config.KAFKA_CONSUMER_GROUP` | Consumer group |
+| `topic_pattern` | `config.KAFKA_TOPIC_PATTERN` | Regex subscription |
+| `dlq_topic` | `config.KAFKA_DLQ_TOPIC` | Dead-letter topic to never process |
+| `lag_threshold` | `config.KAFKA_LAG_ALERT_THRESHOLD` | Lag before a CRITICAL log fires |
+| `enable_backpressure` | `True` | Wire up `BackPressureController` |
+| `dedup_cache` | new `DeduplicationCache()` | Inject an exactly-once dedup cache (used by tests) |
 
 | Method | Purpose |
 |--------|---------|
-| `run()` | Start consuming; blocks until SIGTERM/SIGINT |
-| `_process_batch(messages_by_partition)` | Process batch of messages |
-| `_process_message(payload)` | Process single trade, score wallets |
-| `_commit_offsets()` | Manually commit offsets |
-| `stop()` | Signal worker to stop |
+| `run()` | Poll-and-process loop; blocks until `stop()` is called |
+| `process_message(msg)` / `_process_correlated_message(msg)` | Process one message: decode → dedup stage → buffer → score → dispatch → dedup commit → offset commit |
+| `_check_lag(msg)` | Publish per-partition consumer lag, CRITICAL-log if over threshold |
+| `stop()` / `close()` | Signal shutdown / release the consumer and flush the DLT producer |
 
-**Rebalancing:**
-- Kafka's consumer group protocol handles partition reassignment
-- On revocation: `_commit_offsets()` called to preserve progress
-- New worker resumes from committed offset
-- No data loss or duplication (exactly-once semantics)
+**Rebalancing:** `confluent_kafka.Consumer` (`enable.auto.commit=False`)
+manages partition assignment itself; this worker never calls a manual
+rebalance/revocation hook. Because offsets are only committed after a
+message's dedup key is durably committed (see "Exactly-once dedup" below),
+a rebalance mid-processing simply leaves the in-flight message's offset
+uncommitted — the next assignee redelivers and reprocesses it safely.
 
 #### `detection/cross_venue_features.py`
 
@@ -235,9 +244,10 @@ Main thread (scripts/kafka_workers.py)
 │     KafkaWorker.run()
 │     ├─ FeatureBuffer + StreamingScorer (per-worker state)
 │     ├─ for message in consumer.poll():
-│     │    buffer.update(trade)
-│     │    score_wallet(wallet) → dispatch()
-│     └─ Commits offsets every 30s or on rebalance
+│     │    dedup_cache.check_and_stage() → buffer.update(trade)
+│     │    score_wallet(wallet) → dispatch() → dedup_cache.commit()
+│     └─ Commits the Kafka offset per-message, after the dedup commit above
+│        (see "Exactly-once effects, at-least-once delivery" below)
 │
 ├── Thread: worker-1
 │     (same as worker-0, different partitions via Kafka assignment)
@@ -307,9 +317,11 @@ python -c "from detection.cross_venue_features import CrossVenueAggregator; \
 - **Partition keys**: validated against canonical format before production
   - Invalid pairs rejected at source (no invalid data in Kafka)
   - Malformed pairs → dead-letter queue for audit
-- **Offset commits**: manual commit after successful message processing
-  - On rebalance: offsets committed before partition revocation
-  - Exactly-once semantics maintained
+- **Offset commits**: manual commit only after a message's exactly-once
+  dedup key is durably committed (see "Exactly-once dedup" below) —
+  Kafka delivery itself is still at-least-once (redelivery on crash/rebalance
+  is expected and normal), but a message's *effects* (feature update, score,
+  alert dispatch) are applied exactly once per dedup key
 - **Webhook**: HTTPS-only (http:// rejected at AlertDispatcher init)
 - **WebSocket**: bound to `127.0.0.1` by default (loopback-only)
 
@@ -686,14 +698,62 @@ per-wallet ordering that feature computation depends on, while still spreading
 distinct wallets across partitions for parallelism. New per-pair topics are
 picked up automatically by the workers' regex subscription — no restart needed.
 
-### At-least-once semantics
+### Exactly-once effects, at-least-once delivery (Issue #670)
+
+Kafka delivery is at-least-once — the same message can be redelivered after a
+crash, a rebalance, or an uncommitted offset. Prior to Issue #670,
+`KafkaWorker` did not correctly handle this: its `DeduplicationCache` marked a
+message's dedup key as "seen" *before* processing it, so a crash partway
+through processing (e.g. `AlertDispatcher.dispatch` raising for the second of
+two wallets in a trade) left the dedup key set but the second wallet never
+scored — on redelivery the message was misclassified as a duplicate and its
+offset committed **without reprocessing**, silently dropping the wallet. See
+`docs/adr/0001-unified-idempotency-finality.md` for the full analysis.
+
+The fix is a two-phase staged/committed dedup protocol
+(`pipeline.exactly_once.ExactlyOnceStore`), ordered so a crash at any point
+results in "redo the tail", never "silently drop":
+
+```
+consumer.poll() → msg
+       │
+       ▼
+dedup_cache.check_and_stage(ledger_seq, trade_id)   ← atomic Redis SET NX
+       │
+       ├── COMMITTED ──────────────────────────────► consumer.commit(msg)  [skip reprocessing]
+       │
+       └── NEW or STAGED (a prior attempt crashed
+           before committing — "redo this")
+                   │
+                   ▼
+           buffer.update(trade)              ← idempotent per (wallet, trade_id);
+                   │                            safe to redo, never double-counts
+                   ▼
+           for wallet in (base, counter):
+               score_wallet() → dispatcher.dispatch()
+                   │                            (if dispatch raises here, neither
+                   │                             commit below is reached — offset
+                   │                             stays uncommitted, dedup key stays
+                   │                             STAGED, redelivery redoes the message)
+                   ▼
+           dedup_cache.commit(ledger_seq, trade_id)   ← durable "done" marker
+                   │
+                   ▼
+           consumer.commit(msg)                       ← Kafka offset, committed LAST
+```
 
 * Consumers run with `enable.auto.commit=false`.
-* `KafkaWorker.process_message` commits a message's offset **only after** the
-  scorer and `AlertDispatcher.dispatch` have completed for that message.
-* If `dispatch` raises, the offset is left uncommitted; the message is
-  redelivered after the next restart/rebalance. Duplicate alerts are absorbed
-  by the dispatcher's per-wallet cooldown.
+* If the dedup backend (Redis) is unreachable, `check_and_stage`/`commit`
+  raise `DedupBackendUnavailableError` — the worker leaves the offset
+  uncommitted and does **not** fall back to "not a duplicate" (fail closed,
+  not fail open). This is exposed via the `dedup_backend_available` gauge and
+  `kafka_dedup_backend_degraded_total` counter.
+* `FeatureBuffer.update()` is idempotent per `(wallet, trade_id)`, which is
+  what makes redoing a `STAGED`-but-not-`COMMITTED` message safe — it can
+  never double-count a trade into feature state, whether that message is
+  redelivered within the same process or after a full restart.
+* Duplicate alerts from a redo within a live cooldown window are still
+  absorbed by `AlertDispatcher`'s per-wallet cooldown, as before.
 
 ### Avro schema & validation
 
@@ -833,3 +893,48 @@ python -m scripts.stream --fixed-batch-size 64
 | `STREAM_PID_KP` | `0.5` | Proportional gain |
 | `STREAM_PID_KI` | `0.1` | Integral gain |
 | `STREAM_PID_KD` | `0.05` | Derivative gain |
+
+---
+
+## Unified Exactly-Once Dedup, Finality, and Reconciliation (Issue #670)
+
+Full design rationale: `docs/adr/0001-unified-idempotency-finality.md`.
+
+### `pipeline/exactly_once.py`
+
+Single canonical dedup/idempotency key (`DedupKey(source, external_id,
+tenant_id)`) and two-phase `STAGED → COMMITTED` protocol
+(`ExactlyOnceStore`), backed by either `RedisExactlyOnceBackend` (fail-closed
+— raises `DedupBackendUnavailableError` on any Redis error, never silently
+treats an outage as "not a duplicate") or `SqlExactlyOnceBackend` (durable,
+for batch/offline use). `ingestion/trade_deduplicator.py` and
+`streaming/kafka_worker.py`'s `DeduplicationCache` are both built on this.
+
+### Finality
+
+`RiskScoreRecord.finality` (migration `0006`) is `"provisional"` (default;
+written by the continuous streaming/SSE path, which has no window-close
+event) or `"final"` (written by a completed batch pipeline run or completed
+stream-replay run over a closed, bounded time window). Set via
+`RiskScoreStore.upsert(..., finality="final")`.
+
+### Alert-delivery reconciliation
+
+`streaming/alert_ledger.py::AlertDeliveryLedger` durably records the terminal
+outcome of every alert-dispatch attempt that clears the threshold —
+`delivered`, `dead_lettered`, or `suppressed_cooldown` — keyed through the
+same `DedupKey` scheme (`source="alert_delivery"`). Wired into
+`AlertDispatcher` via an optional `delivery_ledger` constructor argument
+(passed by `scripts/stream.py` and `scripts/kafka_workers.py`; omitted by
+default so existing callers see no behavior change).
+`validation/reconciliation.py::reconcile_alert_delivery` traces every scored
+wallet at or above threshold to a ledger entry, flagging scores with no
+recorded outcome as a hard error — the "silently dropped alert" failure mode.
+
+### Audit-trail restart safety
+
+`detection/audit_trail.py::AuditMerkleChain` now persists leaf content
+(`content_hash`, `prev_merkle_root` — migration `0005`) alongside the Merkle
+root, and rehydrates `self._entries` from durable storage on every
+construction. A routine process restart no longer makes `verify_chain()`
+indistinguishable from real tampering.
