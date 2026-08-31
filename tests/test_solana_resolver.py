@@ -15,6 +15,7 @@ import pytest
 from detection.cross_chain.identity_graph import IdentityGraph
 from detection.cross_chain.solana_resolver import (
     SolanaRPCClient,
+    SolanaRPCResponseError,
     SolanaValidationError,
     WormholeVAAValidationError,
     extract_stellar_address_from_vaa,
@@ -210,6 +211,20 @@ class TestSolanaRPCClient:
         # Should return empty list on error
         sigs = client.get_signatures_for_address(addr)
         assert sigs == []
+
+    @patch("requests.Session.post")
+    def test_rpc_client_rejects_malformed_response_shape(self, mock_post):
+        """Malformed JSON should raise a typed response error instead of KeyError/TypeError."""
+        client = SolanaRPCClient()
+
+        mock_response = Mock()
+        mock_response.json.return_value = {"result": {"signature": "not-a-list"}}
+        mock_post.return_value = mock_response
+
+        addr = "11111111111111111111111111111111"
+
+        with pytest.raises(SolanaRPCResponseError, match="expected 'result' to be a list"):
+            client.get_signatures_for_address(addr)
 
 
 class TestIdentityGraphSolanaIntegration:

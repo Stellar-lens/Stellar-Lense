@@ -25,7 +25,7 @@ from utils.logging import get_logger
 logger = get_logger(__name__)
 
 # Solana address validation: 32-byte base58-encoded public key
-SOLANA_ADDRESS_PATTERN = re.compile(r"^[1-9A-HJ-NP-Z]{32,44}$")
+SOLANA_ADDRESS_PATTERN = re.compile(r"^[1-9A-HJ-NP-Za-km-z]{32,44}$")
 
 # Wormhole Program ID on Solana (base58-encoded)
 WORMHOLE_PROGRAM_ID = "wormDTL6mgvNpWAoVgqKmqDQMUqr94c3gqPqstQQQm"
@@ -38,6 +38,12 @@ WORMHOLE_INSTRUCTION_PREFIX = bytes.fromhex("d0e81637b694")  # Common Wormhole i
 
 class SolanaValidationError(Exception):
     """Raised when Solana address or transaction validation fails."""
+
+    pass
+
+
+class SolanaRPCResponseError(SolanaValidationError):
+    """Raised when a Solana RPC response is malformed or not shaped as expected."""
 
     pass
 
@@ -110,10 +116,17 @@ def parse_wormhole_vaa_payload(transaction_data: bytes) -> dict[str, Any] | None
     Raises:
         WormholeVAAValidationError: If VAA structure is invalid
     """
-    if not transaction_data or len(transaction_data) < 20:
+    if not transaction_data:
         return None
 
     try:
+        version = transaction_data[0]
+        if version != 1:
+            raise WormholeVAAValidationError(f"Unsupported VAA version: {version}")
+
+        if len(transaction_data) < 20:
+            return None
+
         # Wormhole VAA structure (simplified):
         # Byte 0: version (always 1)
         # Bytes 1-4: guardian_set_index (big-endian)
@@ -122,11 +135,7 @@ def parse_wormhole_vaa_payload(transaction_data: bytes) -> dict[str, Any] | None
         # Followed by core VAA (19 bytes header + payload)
 
         offset = 0
-        version = transaction_data[offset]
         offset += 1
-
-        if version != 1:
-            raise WormholeVAAValidationError(f"Unsupported VAA version: {version}")
 
         guardian_set_index = int.from_bytes(transaction_data[offset : offset + 4], "big")
         offset += 4
@@ -305,13 +314,38 @@ class SolanaRPCClient:
             response.raise_for_status()
             data = response.json()
 
+            if not isinstance(data, dict):
+                raise SolanaRPCResponseError(
+                    f"Malformed Solana RPC response for {address}: expected a JSON object, "
+                    f"got {type(data).__name__}"
+                )
+
             if "error" in data:
                 logger.error("Solana RPC error: %s", data["error"])
                 return []
 
-            signatures = [sig["signature"] for sig in data.get("result", [])]
-            self.cache[cache_key] = signatures
+            result = data.get("result")
+            if not isinstance(result, list):
+                raise SolanaRPCResponseError(
+                    f"Malformed Solana RPC response for {address}: expected 'result' to be a list, "
+                    f"got {type(result).__name__}"
+                )
 
+            signatures = []
+            for sig in result:
+                if not isinstance(sig, dict) or "signature" not in sig:
+                    raise SolanaRPCResponseError(
+                        f"Malformed Solana RPC response for {address}: each result item must include "
+                        "a string 'signature'"
+                    )
+                signature = sig["signature"]
+                if not isinstance(signature, str):
+                    raise SolanaRPCResponseError(
+                        f"Malformed Solana RPC response for {address}: 'signature' must be a string"
+                    )
+                signatures.append(signature)
+
+            self.cache[cache_key] = signatures
             return signatures
 
         except requests.RequestException as exc:
@@ -346,11 +380,23 @@ class SolanaRPCClient:
             response.raise_for_status()
             data = response.json()
 
+            if not isinstance(data, dict):
+                raise SolanaRPCResponseError(
+                    f"Malformed Solana RPC response for transaction {signature}: expected a JSON object, "
+                    f"got {type(data).__name__}"
+                )
+
             if "error" in data:
                 logger.warning("Transaction not found: %s", signature)
                 return None
 
             tx_data = data.get("result")
+            if not isinstance(tx_data, dict):
+                raise SolanaRPCResponseError(
+                    f"Malformed Solana RPC response for transaction {signature}: expected 'result' to be a "
+                    f"dict, got {type(tx_data).__name__}"
+                )
+
             if tx_data:
                 self.cache[signature] = tx_data
 
