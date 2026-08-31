@@ -1196,3 +1196,4 @@ def score_cluster(
         cluster_score,
     )
     return result
+# TODO(#731): Compare feature_contract_version explicitly on model load and name both versions in the error message.
