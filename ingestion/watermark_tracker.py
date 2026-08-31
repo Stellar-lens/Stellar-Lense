@@ -279,6 +279,18 @@ class WatermarkTracker:
                     updated_at=now,
                 )
             else:
+                if (
+                    existing.ledger_close_time is not None
+                    and ledger_close_time < existing.ledger_close_time
+                ):
+                    logger.warning(
+                        "Skipping out-of-order watermark update for pair %s: incoming %s is older than current %s",
+                        pair_id,
+                        ledger_close_time.isoformat(),
+                        existing.ledger_close_time.isoformat(),
+                    )
+                    return existing
+
                 existing.paging_token = paging_token
                 existing.ledger_close_time = ledger_close_time
                 existing.trade_count += increment
