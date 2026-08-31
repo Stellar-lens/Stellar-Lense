@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac as _hmac
+import json
 import os
 import threading
 import time
@@ -32,7 +33,8 @@ from datetime import UTC, datetime
 from typing import Any
 
 import requests
-from sqlalchemy import Integer, String, create_engine
+from sqlalchemy import Integer, String, create_engine, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
 from config import config
@@ -54,6 +56,14 @@ logger = get_logger(__name__)
 EVENT_HMAC_SECRET = os.getenv("EVENT_HMAC_SECRET", "ledgerlens-soroban-event-hmac-default")
 
 STALE_SCORE_ALERT_THRESHOLD = 20
+
+# Ledgers a Soroban event must be buried under before we treat it as final.
+# Stellar's SCP gives fast probabilistic finality, but an event read straight
+# off the tip can still be superseded; acting on one that later disappears
+# would leave local state describing chain history that never happened. Events
+# newer than this are held back entirely: not dispatched, not persisted, and
+# the watermark is not advanced past them, so the next poll re-reads them.
+DEFAULT_CONFIRMATION_DEPTH = 10
 
 _KNOWN_EVENT_TYPES = {"score_read", "score_updated", "threshold_updated"}
 
@@ -88,6 +98,11 @@ class ContractEvent:
     event_type: str
     ledger_sequence: int
     timestamp: datetime
+    # Soroban's own paging token for this event: globally unique and stable
+    # across re-reads, which is what makes ingestion idempotent. Synthesised
+    # deterministically when the source shape does not carry one.
+    event_id: str | None = None
+    contract_id: str | None = None
     score: int | None = None
     asset_pair: str | None = None
     wallet_id_hash: str | None = None
@@ -106,6 +121,11 @@ class ContractEventRecord(_EventBase):
     __tablename__ = "soroban_contract_events"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    # UNIQUE is the actual idempotency guarantee: a replayed batch after a
+    # partial-batch crash re-inserts the same event_id and is rejected by the
+    # database rather than relying on the caller to have checked first.
+    event_id: Mapped[str | None] = mapped_column(String, nullable=True, unique=True, index=True)
+    contract_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
     event_type: Mapped[str] = mapped_column(String, nullable=False, index=True)
     ledger_sequence: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     timestamp: Mapped[str] = mapped_column(String, nullable=False)
@@ -130,6 +150,45 @@ def _get_session_factory(db_url: str) -> sessionmaker:
     engine = create_engine(db_url)
     _EventBase.metadata.create_all(engine)
     return sessionmaker(bind=engine)
+
+
+def _event_identity(
+    raw: dict,
+    payload: dict,
+    event_type: str,
+    ledger_sequence: int,
+    timestamp_str: str | None,
+) -> str:
+    """Return a stable unique identity for one event.
+
+    Soroban RPC supplies ``id`` (its paging token), which is already unique and
+    stable across re-reads -- exactly what deduplication needs. The Horizon
+    effects fallback shape carries no such field, so derive one by hashing the
+    event's own content. Both are stable under replay, which is the property
+    that matters; neither collapses two distinct events that happen to share a
+    ledger sequence, which a ``(contract_id, ledger_sequence)`` key would.
+    """
+    native_id = raw.get("id") or payload.get("id")
+    if native_id:
+        return str(native_id)
+
+    digest = hashlib.sha256()
+    for part in (
+        payload.get("contractId") or raw.get("contractId") or "",
+        event_type,
+        str(ledger_sequence),
+        timestamp_str or "",
+        _canonical_repr(payload.get("topic")),
+        _canonical_repr(payload.get("value")),
+    ):
+        digest.update(str(part).encode("utf-8"))
+        digest.update(b"")
+    return f"synthetic:{digest.hexdigest()}"
+
+
+def _canonical_repr(value: Any) -> str:
+    """Deterministic string form of a nested topic/value structure."""
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), default=str)
 
 
 def parse_contract_event(raw: dict) -> ContractEvent | None:
@@ -161,6 +220,8 @@ def parse_contract_event(raw: dict) -> ContractEvent | None:
 
     ledger_sequence = int(payload.get("ledger", 0))
     timestamp = _parse_timestamp(timestamp_str) if timestamp_str else datetime.now(UTC)
+    contract_id = payload.get("contractId") or raw.get("contractId")
+    event_id = _event_identity(raw, payload, event_type, ledger_sequence, timestamp_str)
 
     wallet_id_hash = None
     if len(topics) > 1 and topics[1].get("type") == "address":
@@ -173,6 +234,8 @@ def parse_contract_event(raw: dict) -> ContractEvent | None:
         event_type=event_type,
         ledger_sequence=ledger_sequence,
         timestamp=timestamp,
+        event_id=event_id,
+        contract_id=contract_id,
         score=fields.get("score"),
         asset_pair=fields.get("asset_pair"),
         wallet_id_hash=wallet_id_hash,
@@ -182,11 +245,30 @@ def parse_contract_event(raw: dict) -> ContractEvent | None:
     )
 
 
-def persist_event(event: ContractEvent, session_factory: sessionmaker) -> None:
-    """Append *event* to the ``soroban_contract_events`` table."""
+def persist_event(event: ContractEvent, session_factory: sessionmaker) -> bool:
+    """Append *event* to ``soroban_contract_events``, ignoring a replay.
+
+    Returns ``True`` when a new row was written, ``False`` when this event was
+    already stored. Idempotency matters because the watermark only advances at
+    the end of a batch: a crash partway through means the surviving events are
+    re-read on restart, and without this every restart duplicated them.
+
+    The pre-check is an optimisation, not the guarantee -- two workers racing
+    can both pass it. The UNIQUE constraint on ``event_id`` is what actually
+    prevents the duplicate, so the ``IntegrityError`` path is the real one.
+    """
     with session_factory() as session:
+        if event.event_id is not None:
+            existing = session.scalar(
+                select(ContractEventRecord.id).where(ContractEventRecord.event_id == event.event_id)
+            )
+            if existing is not None:
+                return False
+
         session.add(
             ContractEventRecord(
+                event_id=event.event_id,
+                contract_id=event.contract_id,
                 event_type=event.event_type,
                 ledger_sequence=event.ledger_sequence,
                 timestamp=event.timestamp.isoformat(),
@@ -198,7 +280,12 @@ def persist_event(event: ContractEvent, session_factory: sessionmaker) -> None:
                 new_threshold=event.new_threshold,
             )
         )
-        session.commit()
+        try:
+            session.commit()
+        except IntegrityError:
+            session.rollback()
+            return False
+        return True
 
 
 def get_watermark(contract_id: str, session_factory: sessionmaker) -> int:
@@ -217,6 +304,54 @@ def set_watermark(contract_id: str, ledger_sequence: int, session_factory: sessi
         else:
             row.ledger_sequence = ledger_sequence
         session.commit()
+
+
+def fetch_latest_ledger(rpc_url: str, timeout: int = 10) -> int | None:
+    """Return the current ledger sequence, or ``None`` if it cannot be read.
+
+    ``None`` is deliberately distinct from ``0``: callers treat an unknown tip
+    as "cannot establish finality" and hold events back rather than assuming
+    everything is confirmed.
+    """
+    try:
+        resp = requests.post(
+            rpc_url,
+            json={"jsonrpc": "2.0", "id": 1, "method": "getLatestLedger"},
+            timeout=timeout,
+        )
+        resp.raise_for_status()
+        sequence = resp.json().get("result", {}).get("sequence")
+        return int(sequence) if sequence is not None else None
+    except Exception:
+        logger.warning("Could not read latest ledger from %s", rpc_url, exc_info=True)
+        return None
+
+
+def split_confirmed(
+    raw_events: list[dict],
+    latest_ledger: int | None,
+    confirmation_depth: int = DEFAULT_CONFIRMATION_DEPTH,
+) -> tuple[list[dict], list[dict]]:
+    """Partition *raw_events* into (confirmed, pending) by confirmation depth.
+
+    An event is confirmed once ``latest_ledger - event_ledger >= depth``.
+    When the tip is unknown, or the depth is zero, behaviour degrades to the
+    caller's explicit choice: an unknown tip holds everything back (safe), a
+    zero depth confirms everything (opt-out, preserving the old behaviour).
+    """
+    if confirmation_depth <= 0:
+        return list(raw_events), []
+    if latest_ledger is None:
+        return [], list(raw_events)
+
+    cutoff = latest_ledger - confirmation_depth
+    confirmed: list[dict] = []
+    pending: list[dict] = []
+    for raw in raw_events:
+        payload = raw.get("data") if "data" in raw and "topic" in raw.get("data", {}) else raw
+        ledger = int(payload.get("ledger", raw.get("ledger", 0)) or 0)
+        (confirmed if ledger <= cutoff else pending).append(raw)
+    return confirmed, pending
 
 
 def check_stale_score_alert(
@@ -270,10 +405,12 @@ class ScoreOracleEventListener:
         current_score_fn: Callable[[str], int | None] | None = None,
         stale_threshold: int = STALE_SCORE_ALERT_THRESHOLD,
         poll_interval: float = 5.0,
+        confirmation_depth: int = DEFAULT_CONFIRMATION_DEPTH,
     ) -> None:
         self.contract_id = contract_id
         self.rpc_url = rpc_url or config.SOROBAN_RPC_URL
         self.poll_interval = poll_interval
+        self.confirmation_depth = confirmation_depth
         self._session_factory = _get_session_factory(db_url)
         self._dispatcher = dispatcher
         self._current_score_fn = current_score_fn
@@ -299,10 +436,35 @@ class ScoreOracleEventListener:
         data = resp.json()
         return data.get("result", {}).get("events", [])
 
-    def process_batch(self, raw_events: list[dict]) -> list[ContractEvent]:
+    def process_batch(
+        self,
+        raw_events: list[dict],
+        latest_ledger: int | None = None,
+    ) -> list[ContractEvent]:
         """Parse, persist, and alert on a batch of raw events; advance the
         watermark to the highest ledger sequence seen. Returns the parsed
-        events (unrecognised raw events are silently skipped)."""
+        events (unrecognised raw events are silently skipped).
+
+        When *latest_ledger* is supplied, events not yet buried under
+        ``confirmation_depth`` ledgers are held back entirely -- not persisted,
+        not alerted on, and the watermark is not advanced past them -- so a
+        later poll re-reads them once final. :meth:`poll_once` supplies it.
+
+        This method performs no network I/O: the chain tip is an argument, not
+        something fetched here, so callers that already hold a batch of raw
+        events can process it offline and tests need no RPC endpoint.
+        """
+        if self.confirmation_depth > 0 and latest_ledger is not None:
+            raw_events, pending = split_confirmed(
+                raw_events, latest_ledger, self.confirmation_depth
+            )
+            if pending:
+                logger.debug(
+                    "Holding %d unconfirmed event(s) below %d-ledger confirmation depth",
+                    len(pending),
+                    self.confirmation_depth,
+                )
+
         parsed_events: list[ContractEvent] = []
         max_ledger: int | None = None
 
@@ -344,10 +506,33 @@ class ScoreOracleEventListener:
         """Signal the background poll loop to stop after its current iteration."""
         self._stop_event.set()
 
+    def poll_once(self) -> list[ContractEvent]:
+        """Fetch one batch from the chain and process the confirmed part.
+
+        This is the only path that reads from the chain, so it is where
+        finality is enforced. If the tip cannot be read the batch is held back
+        wholesale rather than assumed final -- the watermark does not advance,
+        so nothing is lost, it is merely deferred to the next poll.
+        """
+        raw_events = self._fetch_raw_events()
+        if not raw_events:
+            # Nothing to place relative to the tip, so do not pay for it.
+            return []
+
+        latest_ledger = fetch_latest_ledger(self.rpc_url) if self.confirmation_depth > 0 else None
+        if self.confirmation_depth > 0 and latest_ledger is None:
+            logger.warning(
+                "Chain tip unavailable; deferring %d event(s) rather than "
+                "treating them as final",
+                len(raw_events),
+            )
+            return []
+        return self.process_batch(raw_events, latest_ledger=latest_ledger)
+
     def _run_loop(self) -> None:
         while not self._stop_event.is_set():
             try:
-                self.process_batch(self._fetch_raw_events())
+                self.poll_once()
             except Exception:
                 logger.exception("ScoreOracleEventListener: poll error")
             self._stop_event.wait(self.poll_interval)
@@ -389,16 +574,42 @@ class SorobanEventListener:
         on_threshold_changed: Callable[[int], None] | None = None,
         on_contract_paused: Callable[[str], None] | None = None,
         on_contract_unpaused: Callable[[], None] | None = None,
+        db_url: str | None = None,
+        confirmation_depth: int = DEFAULT_CONFIRMATION_DEPTH,
     ) -> None:
         self.governance_contract_id = governance_contract_id
         self.pause_contract_id = pause_contract_id
         self.rpc_url = rpc_url or config.SOROBAN_RPC_URL
         self.poll_interval = poll_interval
+        self.confirmation_depth = confirmation_depth
         self._on_threshold_changed = on_threshold_changed or self._default_threshold_handler
         self._on_contract_paused = on_contract_paused or self._default_pause_handler
         self._on_contract_unpaused = on_contract_unpaused or self._default_unpause_handler
-        self._start_ledger: int = 0
         self._paused: bool = False
+
+        # Durable resume position. Without a db_url the cursor stays in memory
+        # and a restart rewinds to ledger 0 -- which, because getEvents is
+        # bounded to 200 results, silently skips pause/unpause/threshold events
+        # rather than replaying them. That is the failure mode this listener
+        # exists to prevent, so supply db_url in any real deployment.
+        self._session_factory = _get_session_factory(db_url) if db_url else None
+        self._watermark_key = f"gov:{governance_contract_id}|pause:{pause_contract_id}"
+        self._start_ledger: int = self._load_start_ledger()
+
+    def _load_start_ledger(self) -> int:
+        if self._session_factory is None:
+            logger.warning(
+                "SorobanEventListener has no db_url: resume position is "
+                "in-memory only and will reset to ledger 0 on restart, which "
+                "can silently skip safety-critical pause events."
+            )
+            return 0
+        return get_watermark(self._watermark_key, self._session_factory)
+
+    def _save_start_ledger(self, ledger: int) -> None:
+        self._start_ledger = ledger
+        if self._session_factory is not None:
+            set_watermark(self._watermark_key, ledger, self._session_factory)
 
     # ------------------------------------------------------------------
     # Public API
@@ -456,9 +667,32 @@ class SorobanEventListener:
         resp.raise_for_status()
         data = resp.json()
         events: list[dict] = data.get("result", {}).get("events", [])
-        if events:
-            # Advance cursor to avoid reprocessing
-            self._start_ledger = events[-1].get("ledger", self._start_ledger) + 1
+        if not events:
+            return events
+
+        if self.confirmation_depth > 0:
+            latest_ledger = fetch_latest_ledger(self.rpc_url)
+            if latest_ledger is None:
+                logger.warning(
+                    "Chain tip unavailable; deferring %d governance/pause "
+                    "event(s) rather than treating them as final",
+                    len(events),
+                )
+                return []
+            events, pending = split_confirmed(events, latest_ledger, self.confirmation_depth)
+            if pending:
+                logger.debug(
+                    "Holding %d unconfirmed governance/pause event(s) below "
+                    "%d-ledger confirmation depth",
+                    len(pending),
+                    self.confirmation_depth,
+                )
+            if not events:
+                return events
+
+        # Advance the cursor past the confirmed events only, and persist it, so
+        # a restart resumes here instead of rewinding to ledger 0.
+        self._save_start_ledger(events[-1].get("ledger", self._start_ledger) + 1)
         return events
 
     def _dispatch(self, event: dict) -> None:
