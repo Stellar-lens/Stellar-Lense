@@ -223,7 +223,9 @@ def get_asset_classifier() -> "AssetClassifier":
     return _classifier
 
 
-MAD_NONCONFORMITY_THRESHOLD = 0.015  # Nigrini (2012): threshold above which MAD indicates non-conformity
+MAD_NONCONFORMITY_THRESHOLD = (
+    0.015  # Nigrini (2012): threshold above which MAD indicates non-conformity
+)
 
 # Exclusion threshold for logging when computing second-digit distribution:
 # if >10% of amounts are single-digit (< 10), log a debug message.

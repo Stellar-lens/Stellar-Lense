@@ -459,9 +459,9 @@ async def test_zombie_connection_cleaned_up_after_heartbeat(ws_server):
     await asyncio.sleep(0.3)
 
     with ws_module._clients_lock:
-        assert zombie_client_id in ws_module._clients, (
-            "Client should be registered in _clients after connecting"
-        )
+        assert (
+            zombie_client_id in ws_module._clients
+        ), "Client should be registered in _clients after connecting"
 
     # Subscribe to a channel so the client is eligible to receive broadcasts
     channel = "wallet/GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF"
