@@ -209,9 +209,7 @@ class Config:
     # Seconds between WebSocket ping frames sent to each client.
     # If the client does not respond with a pong within this interval,
     # the connection is closed and the subscriber entry is cleaned up.
-    WS_HEARTBEAT_INTERVAL_SECONDS: float = float(
-        os.getenv("WS_HEARTBEAT_INTERVAL_SECONDS", "30")
-    )
+    WS_HEARTBEAT_INTERVAL_SECONDS: float = float(os.getenv("WS_HEARTBEAT_INTERVAL_SECONDS", "30"))
 
     # WebSocket abuse detection (issue #223)
     WS_ABUSE_MAX_REQUESTS_PER_MINUTE: int = int(
@@ -252,6 +250,45 @@ class Config:
     # Model integrity & BFT voting
     MODEL_SIGNING_PRIVATE_KEY_PATH: str = os.getenv("MODEL_SIGNING_PRIVATE_KEY_PATH", "")
     TRUSTED_SIGNING_KEY_FINGERPRINT: str = os.getenv("TRUSTED_SIGNING_KEY_FINGERPRINT", "")
+    # Ed25519 PUBLIC key used to verify model artifacts at *load* time (the
+    # inference-side counterpart to MODEL_SIGNING_PRIVATE_KEY_PATH). Required
+    # for RiskScorer to load any model in strict (default) mode — see
+    # detection/model_governance.py and docs/model_artifact_lifecycle.md.
+    TRUSTED_SIGNING_PUBLIC_KEY_PATH: str = os.getenv("TRUSTED_SIGNING_PUBLIC_KEY_PATH", "")
+    # Emergency override for the hard-block artifact integrity gate in
+    # RiskScorer._load_models. Both must be set for the override to apply;
+    # every use is written to the promotion_audit_log table. Never set this
+    # in a persisted environment file — it is meant to be exported for a
+    # single incident-response shell session only.
+    MODEL_INTEGRITY_OVERRIDE_ACTOR: str = os.getenv("MODEL_INTEGRITY_OVERRIDE_ACTOR", "")
+    MODEL_INTEGRITY_OVERRIDE_REASON: str = os.getenv("MODEL_INTEGRITY_OVERRIDE_REASON", "")
+
+    # Model promotion / rollback authorization (detection/model_governance.py).
+    # Comma-separated allowlist of actor IDs permitted to promote or roll back
+    # a production model. MODEL_PROMOTION_SECRET is the HMAC key used to
+    # authenticate the actor-supplied credential; rotate it like any other
+    # shared secret (e.g. via a secrets manager), never commit it.
+    MODEL_PROMOTION_AUTHORIZED_ACTORS: str = os.getenv("MODEL_PROMOTION_AUTHORIZED_ACTORS", "")
+    MODEL_PROMOTION_SECRET: str = os.getenv("MODEL_PROMOTION_SECRET", "")
+    # Actor identity used by the automated drift-triggered retraining pipeline
+    # (scripts/retrain_if_drifted.py) to authenticate its own promotions. Must
+    # be included in MODEL_PROMOTION_AUTHORIZED_ACTORS for automated promotion
+    # to succeed; its credential is derived from MODEL_PROMOTION_SECRET so no
+    # interactive secret is needed in CI.
+    MODEL_PROMOTION_SYSTEM_ACTOR: str = os.getenv(
+        "MODEL_PROMOTION_SYSTEM_ACTOR", "retrain-pipeline"
+    )
+    MODEL_PROMOTION_REGRESSION_TOLERANCE: float = float(
+        os.getenv("MODEL_PROMOTION_REGRESSION_TOLERANCE", "0.01")
+    )
+
+    # Drift-monitor health (monitoring/drift_detector.py). If no successful
+    # CovarianceShiftDetector.detect() call has been recorded within this many
+    # seconds, the monitor is considered stale and a distinct "drift-check
+    # failed" alert fires — see monitoring/alert_rules.yml.
+    DRIFT_MONITOR_HEARTBEAT_MAX_AGE_SECONDS: int = int(
+        os.getenv("DRIFT_MONITOR_HEARTBEAT_MAX_AGE_SECONDS", "3600")
+    )
     AUDIT_LOG_PATH: str = os.getenv("AUDIT_LOG_PATH", "data/audit_trail.ndjson")
     AUDIT_VERIFY_PUBLIC_KEY_PATH: str = os.getenv("AUDIT_VERIFY_PUBLIC_KEY_PATH", "")
     BFT_SCORE_DIVERGENCE_THRESHOLD: int = int(os.getenv("BFT_SCORE_DIVERGENCE_THRESHOLD", "30"))

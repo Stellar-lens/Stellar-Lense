@@ -934,10 +934,14 @@ def save_models(
     n_training_samples: int = 0,
 ) -> None:
     model_dir = model_dir or config.MODEL_DIR
+    from detection.model_governance import guard_production_write
+
+    guard_production_write(model_dir)
     os.makedirs(model_dir, exist_ok=True)
     to_save = results.get("results", results) if isinstance(results, dict) else results
     for name, result in to_save.items():
         model_path = os.path.join(model_dir, f"{name}.joblib")
+        # GUARDED: guard_production_write(model_dir) above, in this function.
         joblib.dump(result["model"], model_path)
         if feature_columns is not None and feature_schema_hash is not None:
             write_artifact_manifest(
@@ -958,6 +962,9 @@ def save_training_artifacts(
 ) -> None:
     """Write metrics.json and model_metadata.json to the model directory."""
     model_dir = model_dir or config.MODEL_DIR
+    from detection.model_governance import guard_production_write
+
+    guard_production_write(model_dir)
     os.makedirs(model_dir, exist_ok=True)
 
     results = training_output["results"]
@@ -1321,15 +1328,25 @@ def main() -> None:
     n_samples = training_output.get("n_train", 0)
     feature_cols = training_output.get("feature_columns", [])
     feature_hash = compute_feature_schema_hash(feature_cols)
-    save_models(
-        results,
-        model_dir,
-        feature_columns=feature_cols,
-        feature_schema_hash=feature_hash,
-        training_data_sha256=data_sha,
-        n_training_samples=n_samples,
-    )
-    save_training_artifacts(training_output, args.data_path, model_dir)
+
+    from detection.model_governance import UngatedProductionWriteError
+
+    try:
+        save_models(
+            results,
+            model_dir,
+            feature_columns=feature_cols,
+            feature_schema_hash=feature_hash,
+            training_data_sha256=data_sha,
+            n_training_samples=n_samples,
+        )
+        save_training_artifacts(training_output, args.data_path, model_dir)
+    except UngatedProductionWriteError as exc:
+        logger.error(
+            "%s\nTrained artifacts were computed in memory but NOT written to disk.",
+            exc,
+        )
+        sys.exit(1)
 
     # FGSM adversarial training (Issue #191)
     adv_training_enabled = config.ADV_TRAINING_ENABLED or args.adv_training

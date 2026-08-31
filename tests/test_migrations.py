@@ -162,6 +162,40 @@ class TestMigrationRunnerDryRun:
 # ---------------------------------------------------------------------------
 
 
+class TestMigration0005PromotionActorColumns:
+    """Grand 2 / issue #671: promoted_by/rolled_back_by/parent_version_id
+    columns added to model_versions."""
+
+    @pytest.fixture()
+    def engine_with_model_versions(self, sqlite_engine):
+        with sqlite_engine.begin() as conn:
+            conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS model_versions (
+                        id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                        version_id          VARCHAR NOT NULL,
+                        model_artifact_path VARCHAR NOT NULL,
+                        status              VARCHAR NOT NULL,
+                        trained_at          TIMESTAMP NOT NULL
+                    )
+                    """))
+        return sqlite_engine
+
+    def test_columns_added(self, engine_with_model_versions):
+        runner = MigrationRunner(engine_with_model_versions)
+        runner.upgrade()
+        inspector = inspect(engine_with_model_versions)
+        col_names = {col["name"] for col in inspector.get_columns("model_versions")}
+        assert "promoted_by" in col_names
+        assert "rolled_back_by" in col_names
+        assert "parent_version_id" in col_names
+
+    def test_noop_when_table_missing(self, sqlite_engine):
+        """No model_versions table (fresh env) — migration must skip gracefully."""
+        runner = MigrationRunner(sqlite_engine)
+        status = runner.upgrade()
+        assert "0005" in status.applied
+
+
 class TestMigrationsFreshEngine:
     def test_fresh_engine_upgrade_is_noop_for_missing_table(self, sqlite_engine):
         """On a fresh DB with no risk_scores table the column-adding migrations

@@ -19,4 +19,5 @@ REGISTRY: list[str] = [
     "0002",  # Add provenance_json column to risk_scores
     "0003",  # Add certified_robust column to risk_scores
     "0004",  # Add schema_version column to risk_scores for forward migration tracking
+    "0005",  # Add promoted_by/rolled_back_by/parent_version_id columns to model_versions
 ]

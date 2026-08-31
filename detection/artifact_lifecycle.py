@@ -37,6 +37,7 @@ import os
 import tempfile
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from enum import StrEnum
 from typing import Any
@@ -91,6 +92,26 @@ class InvalidTransitionError(ArtifactLifecycleError):
         super().__init__(
             f"Cannot move {name}:{version} from {current.value} -> {target.value}. "
             f"Allowed transitions from {current.value}: {allowed}."
+        )
+
+
+class TrustVerificationRequiredError(ArtifactLifecycleError):
+    """Raised by ``promote()`` when the registry has no ``trust_verifier``.
+
+    Grand 2 (issue #671) invariant: the trust chain and the promotion state
+    machine must never disagree, which means ``PROMOTED`` can only be
+    reached after a real cryptographic trust-chain check has run. A registry
+    constructed without a ``trust_verifier`` cannot make that guarantee, so
+    it refuses to promote anything rather than silently skipping the check.
+    """
+
+    def __init__(self, name: str, version: str):
+        super().__init__(
+            f"Cannot promote {name}:{version} — this ModelArtifactRegistry has no "
+            "trust_verifier configured. Construct it with "
+            "trust_verifier=detection.model_governance.make_trust_verifier(...) so "
+            "PROMOTED can only be reached after the Ed25519/transparency-log trust "
+            "chain succeeds."
         )
 
 
@@ -154,9 +175,26 @@ class ModelArtifactRegistry:
     cannot leave a truncated/corrupt manifest.
     """
 
-    def __init__(self, manifest_path: str = "models/artifact_manifest.json"):
+    def __init__(
+        self,
+        manifest_path: str = "models/artifact_manifest.json",
+        trust_verifier: Callable[[ArtifactRecord], None] | None = None,
+    ):
+        """
+        Args:
+            manifest_path: JSON manifest file backing this registry.
+            trust_verifier: Callable invoked with the :class:`ArtifactRecord`
+                about to be promoted. Must raise (e.g. ``ModelIntegrityError``
+                or ``ArtifactCompatibilityError``) if the artifact's
+                cryptographic trust chain or compatibility contract does not
+                hold; must return ``None`` on success. Required for
+                ``promote()`` to succeed — see ``TrustVerificationRequiredError``.
+                Typically built with
+                ``detection.model_governance.make_trust_verifier(...)``.
+        """
         self.manifest_path = manifest_path
         self._data: dict[str, dict[str, ArtifactRecord]] = {}
+        self._trust_verifier = trust_verifier
         self._load()
 
     # -- persistence ------------------------------------------------
@@ -247,10 +285,25 @@ class ModelArtifactRegistry:
     def promote(self, name: str, version: str) -> ArtifactRecord:
         """Promote a validated artifact to active/production use.
 
+        Before the state transition is applied, ``self._trust_verifier`` (if
+        configured) is called with the target :class:`ArtifactRecord`. Any
+        exception it raises propagates unchanged and the record's stage is
+        left untouched — a failed trust check must never be recorded as a
+        successful promotion, and a successful promotion can never happen
+        without one. If no verifier is configured, ``promote()`` raises
+        :class:`TrustVerificationRequiredError` rather than silently skipping
+        the check (Grand 2 / issue #671, invariant 2: the trust chain and the
+        promotion state machine must never be able to disagree).
+
         Any previously PROMOTED version of the same ``name`` is automatically
         moved to DEPRECATED so ``get_active`` always resolves to exactly one
         version.
         """
+        record = self._get(name, version)
+        if self._trust_verifier is None:
+            raise TrustVerificationRequiredError(name, version)
+        self._trust_verifier(record)  # raises on failure; nothing below runs
+
         for other_version, other in self._data.get(name, {}).items():
             if other.stage == ArtifactStage.PROMOTED and other_version != version:
                 other.stage = ArtifactStage.DEPRECATED
