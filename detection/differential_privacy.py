@@ -109,3 +109,4 @@ def add_laplace_noise(value: float, scale: float, rng: np.random.Generator | Non
         rng = np.random.default_rng()
     noise = rng.laplace(loc=0.0, scale=scale)
     return value + noise
+# TODO(#734): Validate DP_EPSILON > 0 and DP_DELTA in (0, 1) at construction time to prevent invalid noise calibration.
