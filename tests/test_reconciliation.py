@@ -7,10 +7,12 @@ import json
 import pandas as pd
 import pytest
 
+from streaming.alert_ledger import AlertDeliveryRecord
 from validation.reconciliation import (
     ReconciliationError,
     ReconciliationReport,
     merge_reports,
+    reconcile_alert_delivery,
     reconcile_features,
     reconcile_trade_counts,
     reconcile_wallet_scores,
@@ -279,3 +281,90 @@ class TestReconcileWalletScores:
         r = reconcile_wallet_scores(features, scores)
         assert "feature_wallet_count" in r.metadata
         assert "scored_wallet_count" in r.metadata
+
+
+# ---------------------------------------------------------------------------
+# reconcile_alert_delivery (Issue #670, required scope E)
+# ---------------------------------------------------------------------------
+
+
+def _scores_df(rows: list[tuple[str, str, float]]) -> pd.DataFrame:
+    return pd.DataFrame(rows, columns=["wallet_id", "asset_pair", "score"])
+
+
+class TestReconcileAlertDelivery:
+    def test_delivered_alert_is_accounted_for(self):
+        scores = _scores_df([("GABC", "pair-1", 85.0)])
+        records = [
+            AlertDeliveryRecord(
+                wallet="GABC",
+                pair_id="pair-1",
+                score=85,
+                outcome="delivered",
+                channel="stdout",
+                reason=None,
+            )
+        ]
+        report = reconcile_alert_delivery(scores, records, threshold=70.0)
+        assert report.ok
+        assert report.metadata["missing_count"] == 0
+        assert report.metadata["delivered_count"] == 1
+
+    def test_dead_lettered_alert_is_accounted_for_not_missing(self):
+        """The exact acceptance-criterion scenario: a dead-lettered webhook
+        alert must be reported as accounted-for, not missing."""
+        scores = _scores_df([("GABC", "pair-1", 90.0)])
+        records = [
+            AlertDeliveryRecord(
+                wallet="GABC",
+                pair_id="pair-1",
+                score=90,
+                outcome="dead_lettered",
+                channel="webhook",
+                reason="HTTP 500",
+            )
+        ]
+        report = reconcile_alert_delivery(scores, records, threshold=70.0)
+        assert report.ok  # dead-lettered is a warning, not a hard error
+        assert report.metadata["missing_count"] == 0
+        assert report.metadata["dead_lettered_count"] == 1
+        assert any(
+            "dead_lettered" in str(e.observed) and e.severity == "warning" for e in report.errors
+        )
+
+    def test_suppressed_cooldown_alert_is_accounted_for(self):
+        scores = _scores_df([("GABC", "pair-1", 80.0)])
+        records = [
+            AlertDeliveryRecord(
+                wallet="GABC",
+                pair_id="pair-1",
+                score=80,
+                outcome="suppressed_cooldown",
+                channel="stdout",
+                reason="cooldown active",
+            )
+        ]
+        report = reconcile_alert_delivery(scores, records, threshold=70.0)
+        assert report.ok
+        assert report.metadata["missing_count"] == 0
+        assert report.metadata["suppressed_cooldown_count"] == 1
+
+    def test_missing_outcome_is_hard_error(self):
+        """A qualifying score with NO recorded outcome is exactly the
+        silently-dropped-alert failure mode this check exists to catch."""
+        scores = _scores_df([("GABC", "pair-1", 95.0)])
+        report = reconcile_alert_delivery(scores, [], threshold=70.0)
+        assert not report.ok
+        assert report.hard_error_count == 1
+        assert report.metadata["missing_count"] == 1
+
+    def test_sub_threshold_score_requires_no_outcome(self):
+        scores = _scores_df([("GABC", "pair-1", 10.0)])
+        report = reconcile_alert_delivery(scores, [], threshold=70.0)
+        assert report.ok
+        assert report.metadata["qualifying_count"] == 0
+
+    def test_missing_required_column_is_error(self):
+        scores = pd.DataFrame({"wallet_id": ["GABC"]})
+        report = reconcile_alert_delivery(scores, [], threshold=70.0)
+        assert not report.ok

@@ -62,6 +62,7 @@ Auto-generated from `config.py` by `scripts/generate_env_contract_docs.py` (Issu
 | `KAFKA_LAG_ALERT_THRESHOLD` | `KAFKA_LAG_ALERT_THRESHOLD` | `int` | No | `'500'` | — |
 | `KAFKA_METRICS_PORT` | `KAFKA_METRICS_PORT` | `int` | No | `'9100'` | — |
 | `TRADE_AVRO_SCHEMA_PATH` | `TRADE_AVRO_SCHEMA_PATH` | `str` | No | `'data/trade_avro_schema.json'` | — |
+| `WORKER_HEALTH_STALE_THRESHOLD_SECONDS` | `WORKER_HEALTH_STALE_THRESHOLD_SECONDS` | `float` | No | `'120'` | Worker health monitoring (streaming/health.py::WorkerHealthMonitor). A worker is marked UNHEALTHY when it has not heartbeat within this many seconds — should comfortably exceed the poll-loop interval plus the slowest expected per-message processing time. |
 | `E2E_LATENCY_BUDGET_MS` | `E2E_LATENCY_BUDGET_MS` | `int` | No | `'2000'` | End-to-end latency budget (Issue #124) |
 | `LATENCY_ANOMALY_RATE_THRESHOLD` | `LATENCY_ANOMALY_RATE_THRESHOLD` | `float` | No | `'0.90'` | — |
 | `METADATA_TOPIC` | `METADATA_TOPIC` | `str` | No | `'ledgerlens.account_metadata'` | Account metadata streaming join (streaming/account_metadata_stream.py, streaming/pipeline.py MetadataJoinState) METADATA_TOPIC: dedicated Kafka topic for account metadata update events. |
