@@ -145,7 +145,13 @@ class BADGE(BaseQueryStrategy):
     Implementation: k-means++ seeding in (prob * feature) space.
     """
 
-    def select(self, pool: pd.DataFrame, n_query: int, model=None) -> list[str]:
+    def select(
+        self,
+        pool: pd.DataFrame,
+        n_query: int,
+        model=None,
+        seed: int | None = None,
+    ) -> list[str]:
         if model is None:
             raise ValueError("BADGE requires a model")
         cols = _feature_cols(pool)
@@ -156,13 +162,20 @@ class BADGE(BaseQueryStrategy):
         uncertainty = 1.0 - np.abs(2 * probs - 1)  # high near 0.5
         embeddings = X * uncertainty[:, np.newaxis]
 
-        selected_idx = _kmeans_pp_indices(embeddings, min(n_query, len(pool)))
+        selected_idx = _kmeans_pp_indices(
+            embeddings, min(n_query, len(pool)), seed=seed
+        )
         return cast(list[str], pool.iloc[selected_idx]["wallet"].tolist())
 
 
-def _kmeans_pp_indices(X: np.ndarray, k: int) -> list[int]:
-    """k-means++ seeding — returns k indices."""
-    rng = np.random.default_rng(42)
+def _kmeans_pp_indices(X: np.ndarray, k: int, seed: int | None = None) -> list[int]:
+    """k-means++ seeding — returns k indices.
+
+    When *seed* is provided the seeding is deterministic, enabling exact
+    reproduction of a batch selection.  Defaults to a fixed seed of 42 for
+    backward compatibility.
+    """
+    rng = np.random.default_rng(42 if seed is None else seed)
     idx = [int(rng.integers(len(X)))]
     for _ in range(k - 1):
         dists = _min_dist_to_set(X, X[idx])
