@@ -39,10 +39,47 @@ _KEY_ENV_VAR = "FORENSIC_REPORT_ENCRYPTION_KEY"
 _IV_LENGTH = 12  # 96-bit IV recommended for AES-GCM
 _TAG_LENGTH = 16  # 128-bit authentication tag
 
+#: Escape hatch for the rare production process that genuinely has no PII to
+#: protect. Deliberately awkward and loudly logged: the point is that running
+#: unencrypted in production becomes a recorded decision rather than the
+#: accidental consequence of an unset variable.
+_ALLOW_PLAINTEXT_ENV_VAR = "LEDGERLENS_ALLOW_PLAINTEXT_PII"
+
+
+class EncryptionKeyMissingError(RuntimeError):
+    """Raised when production is asked to store PII without an encryption key.
+
+    Previously a missing key only produced a warning and silently fell through
+    to plaintext, so a deployment that forgot the variable wrote wallet PII
+    unencrypted and nothing failed. Warnings are routinely filtered out; the
+    absence of encryption at rest should not depend on someone reading them.
+    """
+
+
+def _plaintext_allowed_in_production() -> bool:
+    return os.getenv(_ALLOW_PLAINTEXT_ENV_VAR, "").strip().lower() in {"1", "true", "yes"}
+
 
 def _load_key() -> bytes | None:
     raw = os.getenv(_KEY_ENV_VAR, "").strip()
     if not raw:
+        from config.deployment_modes import is_production
+
+        if is_production() and not _plaintext_allowed_in_production():
+            raise EncryptionKeyMissingError(
+                f"{_KEY_ENV_VAR} is required in production: refusing to store "
+                f"wallet PII in plaintext. Generate a key with "
+                f'`python -c "import os; print(os.urandom(32).hex())"`, or set '
+                f"{_ALLOW_PLAINTEXT_ENV_VAR}=true to accept plaintext storage "
+                f"as a deliberate, audited decision."
+            )
+        if is_production():
+            logger.error(
+                "%s is unset and %s is enabled: wallet PII is being stored in "
+                "PLAINTEXT in a production deployment.",
+                _KEY_ENV_VAR,
+                _ALLOW_PLAINTEXT_ENV_VAR,
+            )
         warnings.warn(
             f"{_KEY_ENV_VAR} is not set — wallet addresses will be stored in "
             "plaintext. Set this variable in production.",

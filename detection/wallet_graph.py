@@ -26,7 +26,7 @@ from collections import Counter, defaultdict, deque
 from collections.abc import Iterable, Mapping, Sequence
 from datetime import UTC, datetime
 from itertools import combinations
-from typing import Literal
+from typing import Literal, TypedDict
 
 import networkx as nx
 import numpy as np
@@ -378,12 +378,37 @@ def ring_id_for_members(members: Iterable[str]) -> str:
     return f"ring_{digest[:12]}"
 
 
-def ring_statistics(community_id: int, community_map: dict[str, int], graph: nx.DiGraph) -> dict:
+class RingStatistics(TypedDict):
+    """Statistics for a detected wash-trading ring community."""
+
+    ring_id: str
+    ring_size: int
+    internal_edge_density: float
+    avg_funding_depth: float
+
+
+def ring_statistics(
+    community_id: int, community_map: dict[str, int], graph: nx.DiGraph
+) -> RingStatistics:
     """Summarise a detected community.
 
-    Returns `{ring_id, ring_size, internal_edge_density, avg_funding_depth}`.
-    `internal_edge_density` is the fraction of possible undirected edges within
-    the community that actually exist (1.0 = fully connected clique).
+    Parameters
+    ----------
+    community_id:
+        The community identifier from the detection result.
+    community_map:
+        Mapping from wallet ID to community ID (result from detect_wash_trading_rings).
+    graph:
+        The networkx DiGraph containing the funding relationships.
+
+    Returns
+    -------
+    RingStatistics
+        Statistics dict with:
+        - ring_id: Stable string identifier for the ring (based on member set hash)
+        - ring_size: Number of wallets in the community
+        - internal_edge_density: Fraction of possible edges that exist (0.0-1.0)
+        - avg_funding_depth: Average distance to funding source within the ring
     """
     members = sorted(node for node, cid in community_map.items() if cid == community_id)
     ring_size = len(members)
@@ -401,9 +426,22 @@ def ring_statistics(community_id: int, community_map: dict[str, int], graph: nx.
     }
 
 
-def build_ring_statistics(community_map: dict[str, int], graph: nx.DiGraph) -> dict[int, dict]:
-    """Compute `ring_statistics` for every non-`NO_RING` community in the map."""
-    stats: dict[int, dict] = {}
+def build_ring_statistics(community_map: dict[str, int], graph: nx.DiGraph) -> dict[int, RingStatistics]:
+    """Compute `ring_statistics` for every non-`NO_RING` community in the map.
+
+    Parameters
+    ----------
+    community_map:
+        Mapping from wallet ID to community ID (result from detect_wash_trading_rings).
+    graph:
+        The networkx DiGraph containing the funding relationships.
+
+    Returns
+    -------
+    dict[int, RingStatistics]
+        Mapping from community ID to statistics dict for each ring (excluding NO_RING).
+    """
+    stats: dict[int, RingStatistics] = {}
     for community_id in set(community_map.values()):
         if community_id == NO_RING:
             continue

@@ -214,6 +214,12 @@ class Config:
     WS_CLIENT_QUEUE_DEPTH: int = int(os.getenv("WS_CLIENT_QUEUE_DEPTH", "100"))
     WS_REPLAY_BUFFER_SIZE: int = int(os.getenv("WS_REPLAY_BUFFER_SIZE", "1000"))
     WS_RATE_LIMIT_MSGS_PER_SECOND: int = int(os.getenv("WS_RATE_LIMIT_MSGS_PER_SECOND", "100"))
+    # Seconds between WebSocket ping frames sent to each client.
+    # If the client does not respond with a pong within this interval,
+    # the connection is closed and the subscriber entry is cleaned up.
+    WS_HEARTBEAT_INTERVAL_SECONDS: float = float(
+        os.getenv("WS_HEARTBEAT_INTERVAL_SECONDS", "30")
+    )
 
     # WebSocket abuse detection (issue #223)
     WS_ABUSE_MAX_REQUESTS_PER_MINUTE: int = int(

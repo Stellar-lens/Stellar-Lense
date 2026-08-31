@@ -34,7 +34,20 @@ pub struct ThresholdGovernanceContract;
 #[contractimpl]
 impl ThresholdGovernanceContract {
     /// One-time initialisation: set keyholders (N addresses) and quorum (M).
-    pub fn init(env: Env, keyholders: Vec<Address>, quorum: u32, initial_threshold: u32) {
+    ///
+    /// `deployer` must authorise the call. Guarding only against
+    /// *re*-initialisation left the keyholder set claimable by whoever landed
+    /// `init` first, letting an attacker who front-runs the deployment own
+    /// governance outright.
+    pub fn init(
+        env: Env,
+        deployer: Address,
+        keyholders: Vec<Address>,
+        quorum: u32,
+        initial_threshold: u32,
+    ) {
+        deployer.require_auth();
+
         if env.storage().instance().has(&symbol_short!("init")) {
             panic!("already initialised");
         }
@@ -42,11 +55,20 @@ impl ThresholdGovernanceContract {
             quorum >= 1 && (quorum as usize) <= keyholders.len(),
             "quorum must be between 1 and N"
         );
+        env.storage().instance().set(&symbol_short!("admin"), &deployer);
         env.storage().instance().set(&symbol_short!("keys"), &keyholders);
         env.storage().instance().set(&symbol_short!("quorum"), &quorum);
         env.storage().instance().set(&symbol_short!("thresh"), &initial_threshold);
         env.storage().instance().set(&symbol_short!("next_id"), &0u64);
         env.storage().instance().set(&symbol_short!("init"), &true);
+    }
+
+    /// The address that initialised the contract.
+    pub fn get_admin(env: Env) -> Address {
+        env.storage()
+            .instance()
+            .get(&symbol_short!("admin"))
+            .expect("not initialised")
     }
 
     /// Start a governance vote to change the threshold.

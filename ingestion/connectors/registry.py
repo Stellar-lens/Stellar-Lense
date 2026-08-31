@@ -103,7 +103,10 @@ class ConnectorRegistry:
         loaded: list[str] = []
         try:
             entry_points = importlib_metadata.entry_points(group=PLUGIN_ENTRY_POINT_GROUP)
-        except Exception as exc:  # pragma: no cover - defensive, environment-dependent
+        except Exception as exc:  # pragma: no cover - defensive, environment-dependent  # noqa: BLE001
+            # Broad catch justified: entry_points() call can fail on import machinery
+            # issues or corrupted environment. Plugin discovery failure is not fatal;
+            # return empty list so built-in connectors still work.
             logger.warning("Connector plugin discovery failed: %s", exc)
             return loaded
 
@@ -111,7 +114,10 @@ class ConnectorRegistry:
             try:
                 connector_cls = entry_point.load()
                 self.register(connector_cls)
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
+                # Broad catch justified: plugin loading can fail on import errors,
+                # missing dependencies, or malformed metadata. One bad plugin must not
+                # prevent discovery of other plugins; log and skip.
                 logger.warning(
                     "Skipping connector plugin entry point %r (%s): %s",
                     entry_point.name,
