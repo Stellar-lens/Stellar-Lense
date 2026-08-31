@@ -442,6 +442,10 @@ class RiskScorer:
         if not self._require_trust_chain:
             return {
                 name: joblib.load(os.path.join(self.model_dir, f"{name}.joblib"))
+                # No verify_chain/ModelArtifactVerifier call: require_trust_chain=False
+                # is the narrow, documented escape hatch for offline research tooling
+                # that trains disposable, never-served models (see this method's
+                # and RiskScorer.__init__'s require_trust_chain parameter docs).
                 for name in present
             }
 

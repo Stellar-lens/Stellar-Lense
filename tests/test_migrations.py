@@ -162,7 +162,7 @@ class TestMigrationRunnerDryRun:
 # ---------------------------------------------------------------------------
 
 
-class TestMigration0005PromotionActorColumns:
+class TestMigration0007PromotionActorColumns:
     """Grand 2 / issue #671: promoted_by/rolled_back_by/parent_version_id
     columns added to model_versions."""
 
@@ -193,7 +193,7 @@ class TestMigration0005PromotionActorColumns:
         """No model_versions table (fresh env) — migration must skip gracefully."""
         runner = MigrationRunner(sqlite_engine)
         status = runner.upgrade()
-        assert "0005" in status.applied
+        assert "0007" in status.applied
 
 
 class TestMigrationsFreshEngine:
