@@ -333,7 +333,8 @@ python -m scripts.stream --alert-channel websocket
 | `CROSS_PAIR_SYNCHRONY_WINDOW_SECONDS` | `30` | Time window (seconds) for detecting simultaneous trades across pairs |
 
 See [docs/streaming_architecture.md](docs/streaming_architecture.md) for the
-full pipeline diagram, threading model, and latency budget.
+full pipeline diagram, threading model, latency budget, and
+[troubleshooting guide](docs/streaming_architecture.md#troubleshooting).
 
 #### Kafka deployment option (`STREAMING_BACKEND=kafka`)
 

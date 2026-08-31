@@ -302,6 +302,44 @@ python -c "from detection.cross_venue_features import CrossVenueAggregator; \
 
 ---
 
+## Troubleshooting
+
+Common local failures are usually visible in the same places the runtime already exposes telemetry; these checks are the quickest way to narrow the problem.
+
+### 1) WebSocket server refuses to bind
+- Symptom: `OSError: [Errno 98] Address already in use` or no dashboard updates on `--alert-channel websocket`.
+- Likely cause: another process is already listening on `WS_PORT` (default `8765`), or `WS_BIND_HOST` is set to a non-loopback interface without `WS_ALLOW_EXTERNAL=1`.
+- Check: `WS_PORT`, `WS_BIND_HOST`, `WS_ALLOW_EXTERNAL`, and the startup log line from `streaming/ws_server.py` that shows the bind address.
+
+### 2) Kafka consumer lag climbs aggressively
+- Symptom: score throughput drops while the backlog grows; Prometheus shows `kafka_lag_by_partition` rising.
+- Likely cause: the consumer is slower than the producer, a partition is hot, or the worker is stuck in a slow scoring path.
+- Check: `KAFKA_BOOTSTRAP_SERVERS`, `KAFKA_LAG_ALERT_THRESHOLD`, the `kafka_lag_by_partition` gauge, and the worker log lines around offset commits / poll loops.
+
+### 3) No trades are scored and alerts never fire
+- Symptom: the stream is running but the dashboard stays silent and `alerts_dispatched_total` stays flat.
+- Likely cause: `WATCHED_ASSET_PAIRS` is empty, the worker never receives messages, or the wallet has not reached the configured `--min-trades` threshold.
+- Check: the startup config for `WATCHED_ASSET_PAIRS`, the `--min-trades` value, the `scoring_latency_ms` and `kafka_messages_consumed_total` metrics, and any log line showing a wallet buffer not yet meeting the threshold.
+
+### 4) Webhook delivery fails silently or is rejected
+- Symptom: `ALERT_CHANNEL=webhook` but no HTTP POSTs are received, or the service logs a warning and keeps running.
+- Likely cause: `ALERT_WEBHOOK_URL` is missing, not `https://`, or the endpoint is returning an error code / timeout.
+- Check: `ALERT_WEBHOOK_URL`, `ALERT_CHANNEL`, the `AlertDispatcher` warning about invalid webhook URLs, and the `alerts_dispatched_total` metric to confirm the event was emitted before transport.
+
+### 5) The pipeline appears healthy but no data is in the worker buffers
+- Symptom: Kafka topic is populated but no scoring is happening; the worker accepts messages but does nothing.
+- Likely cause: a malformed trade or a consumer/group mismatch; the producer may be sending to a different topic or partition than the worker is subscribed to.
+- Check: `KAFKA_TOPIC`, `KAFKA_GROUP_ID`, `KAFKA_BOOTSTRAP_SERVERS`, and the worker log line that records the last processed message or partition assignment.
+
+### 6) Local runs stop after a reconnect storm
+- Symptom: repeated reconnect warnings or stalled streamers on a laptop or local VM.
+- Likely cause: the upstream Horizon or Kafka endpoint is unavailable, the socket is timing out, or the worker is retrying with a stale configuration.
+- Check: the `stream_trades()` reconnect warnings, `KAFKA_BOOTSTRAP_SERVERS`, `STREAMING_BACKEND`, and the per-partition lag metrics before/after the reconnect window.
+
+These are the same surfaces the code already exposes: Prometheus metrics (`kafka_lag_by_partition`, `scoring_latency_ms`, `alerts_dispatched_total`), worker logs, and the streaming env vars above.
+
+---
+
 ## Security Notes
 
 - **Partition keys**: validated against canonical format before production
