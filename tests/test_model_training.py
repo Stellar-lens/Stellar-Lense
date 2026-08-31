@@ -234,7 +234,7 @@ def test_save_models_and_save_training_artifacts_call_the_production_write_guard
     output, _ = trained_output
     calls = []
     monkeypatch.setattr(
-        "detection.model_governance.guard_production_write", lambda d: calls.append(d)
+        "detection.production_write_guard.guard_production_write", lambda d: calls.append(d)
     )
 
     model_dir = str(tmp_path)

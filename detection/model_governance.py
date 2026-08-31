@@ -46,6 +46,10 @@ from datetime import UTC, datetime
 from typing import Any
 
 from config import config
+from detection.production_write_guard import (
+    UngatedProductionWriteError,  # noqa: F401 - re-exported public entry point
+    guard_production_write,  # noqa: F401 - re-exported public entry point
+)
 from utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -88,11 +92,6 @@ class ArtifactTrustError(PromotionError):
 
 class NoRollbackTargetError(PromotionError):
     """Raised when there is no prior known-good version to roll back to."""
-
-
-class UngatedProductionWriteError(PromotionError):
-    """Raised when code tries to write model artifacts to production MODEL_DIR
-    outside this module's gated promotion path."""
 
 
 @dataclass(frozen=True)
@@ -145,30 +144,9 @@ def _promotion_lock(model_dir: str):
         fh.close()
 
 
-def guard_production_write(target_dir: str) -> None:
-    """Raise :class:`UngatedProductionWriteError` if *target_dir* is the live
-    production ``MODEL_DIR`` and it already holds a promoted artifact.
-
-    Called from ``detection.model_training.save_models`` and
-    ``save_training_artifacts`` — the only two functions elsewhere in the
-    codebase that write trained model files to disk. Training into any other
-    directory (the normal case: a staging/candidate directory, then
-    ``promote_candidate`` to go live) is always allowed.
-    """
-    prod_dir = os.path.abspath(config.MODEL_DIR)
-    if os.path.abspath(target_dir) != prod_dir:
-        return
-    if not os.path.exists(os.path.join(prod_dir, "metrics.json")):
-        # Nothing promoted yet (e.g. first-ever training run, or a fresh
-        # environment) — allow bootstrapping production directly.
-        return
-    raise UngatedProductionWriteError(
-        f"Refusing to write model artifacts directly to the production MODEL_DIR "
-        f"({prod_dir}) — it already holds a promoted artifact. Train into a "
-        "separate staging directory and call "
-        "detection.model_governance.promote_candidate(...) to publish it, so the "
-        "trust-chain and regression gates run before production is overwritten."
-    )
+# guard_production_write / UngatedProductionWriteError live in
+# detection.production_write_guard (imported above) and are re-exported here
+# as the documented public entry point — see that module's docstring for why.
 
 
 # ---------------------------------------------------------------------------
