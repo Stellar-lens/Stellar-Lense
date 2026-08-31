@@ -37,28 +37,26 @@ class TestStreamReplayerInitialization:
         from scripts.replay_stream import NoOpAlertDispatcher, StreamReplayer
 
         with patch("scripts.replay_stream.KafkaConsumer"):
-            with patch("scripts.replay_stream.RiskScorer"):
-                with patch("scripts.replay_stream.StreamingScorer"):
-                    replayer = StreamReplayer(
-                        topic="trades",
-                        dry_run=False,
-                    )
+            with patch("scripts.replay_stream.StreamingScorer"):
+                replayer = StreamReplayer(
+                    topic="trades",
+                    dry_run=False,
+                )
 
-                    assert isinstance(replayer.dispatcher, NoOpAlertDispatcher)
+                assert isinstance(replayer.dispatcher, NoOpAlertDispatcher)
 
     def test_replayer_initializes_without_store_in_dry_run(self):
         """Replayer should not initialize RiskScoreStore in dry-run mode."""
         from scripts.replay_stream import StreamReplayer
 
         with patch("scripts.replay_stream.KafkaConsumer"):
-            with patch("scripts.replay_stream.RiskScorer"):
-                with patch("scripts.replay_stream.StreamingScorer"):
-                    replayer = StreamReplayer(
-                        topic="trades",
-                        dry_run=True,
-                    )
+            with patch("scripts.replay_stream.StreamingScorer"):
+                replayer = StreamReplayer(
+                    topic="trades",
+                    dry_run=True,
+                )
 
-                    assert replayer.store is None
+                assert replayer.store is None
 
 
 class TestTimestampParsing:
@@ -110,58 +108,56 @@ class TestTradeReconstruction:
         from scripts.replay_stream import StreamReplayer
 
         with patch("scripts.replay_stream.KafkaConsumer"):
-            with patch("scripts.replay_stream.RiskScorer"):
-                with patch("scripts.replay_stream.StreamingScorer"):
-                    replayer = StreamReplayer(topic="trades")
+            with patch("scripts.replay_stream.StreamingScorer"):
+                replayer = StreamReplayer(topic="trades")
 
-                    payload = {
-                        "trade_id": "123",
-                        "ledger_close_time": "2024-01-01T00:00:00",
-                        "base_account": "GA111",
-                        "counter_account": "GA222",
-                        "base_asset_code": "USDC",
-                        "base_asset_issuer": "native",
-                        "counter_asset_code": "XLM",
-                        "counter_asset_issuer": "native",
-                        "base_amount": 100.0,
-                        "counter_amount": 200.0,
-                        "price": 2.0,
-                    }
+                payload = {
+                    "trade_id": "123",
+                    "ledger_close_time": "2024-01-01T00:00:00",
+                    "base_account": "GA111",
+                    "counter_account": "GA222",
+                    "base_asset_code": "USDC",
+                    "base_asset_issuer": "native",
+                    "counter_asset_code": "XLM",
+                    "counter_asset_issuer": "native",
+                    "base_amount": 100.0,
+                    "counter_amount": 200.0,
+                    "price": 2.0,
+                }
 
-                    trade = replayer._reconstruct_trade(payload)
+                trade = replayer._reconstruct_trade(payload)
 
-                    assert trade.trade_id == "123"
-                    assert trade.base_account == "GA111"
-                    assert trade.counter_account == "GA222"
-                    assert trade.base_amount == 100.0
+                assert trade.trade_id == "123"
+                assert trade.base_account == "GA111"
+                assert trade.counter_account == "GA222"
+                assert trade.base_amount == 100.0
 
     def test_reconstruct_trade_with_missing_issuer(self):
         """Handle trade with missing issuer (should default to None)."""
         from scripts.replay_stream import StreamReplayer
 
         with patch("scripts.replay_stream.KafkaConsumer"):
-            with patch("scripts.replay_stream.RiskScorer"):
-                with patch("scripts.replay_stream.StreamingScorer"):
-                    replayer = StreamReplayer(topic="trades")
+            with patch("scripts.replay_stream.StreamingScorer"):
+                replayer = StreamReplayer(topic="trades")
 
-                    payload = {
-                        "trade_id": "456",
-                        "ledger_close_time": "2024-01-01T00:00:00",
-                        "base_account": "GA111",
-                        "counter_account": "GA222",
-                        "base_asset_code": "BTC",
-                        # base_asset_issuer omitted
-                        "counter_asset_code": "XLM",
-                        "counter_asset_issuer": "native",
-                        "base_amount": 50.0,
-                        "counter_amount": 100.0,
-                        "price": 2.0,
-                    }
+                payload = {
+                    "trade_id": "456",
+                    "ledger_close_time": "2024-01-01T00:00:00",
+                    "base_account": "GA111",
+                    "counter_account": "GA222",
+                    "base_asset_code": "BTC",
+                    # base_asset_issuer omitted
+                    "counter_asset_code": "XLM",
+                    "counter_asset_issuer": "native",
+                    "base_amount": 50.0,
+                    "counter_amount": 100.0,
+                    "price": 2.0,
+                }
 
-                    trade = replayer._reconstruct_trade(payload)
+                trade = replayer._reconstruct_trade(payload)
 
-                    assert trade.base_asset.code == "BTC"
-                    assert trade.base_asset.issuer is None
+                assert trade.base_asset.code == "BTC"
+                assert trade.base_asset.issuer is None
 
 
 class TestDryRunMode:
@@ -172,23 +168,22 @@ class TestDryRunMode:
         from scripts.replay_stream import StreamReplayer
 
         with patch("scripts.replay_stream.KafkaConsumer"):
-            with patch("scripts.replay_stream.RiskScorer"):
-                with patch("scripts.replay_stream.StreamingScorer"):
-                    replayer = StreamReplayer(topic="trades", dry_run=True)
+            with patch("scripts.replay_stream.StreamingScorer"):
+                replayer = StreamReplayer(topic="trades", dry_run=True)
 
-                    # Store should be None in dry-run
-                    assert replayer.store is None
+                # Store should be None in dry-run
+                assert replayer.store is None
 
-                    # Mock logger to capture logs
-                    with patch("scripts.replay_stream.logger") as mock_logger:
-                        replayer._store_replay_score(
-                            wallet="GA111",
-                            risk_score={"score": 75, "benford_flag": False, "ml_flag": True},
-                            pair_id="USDC:native/XLM:native",
-                        )
+                # Mock logger to capture logs
+                with patch("scripts.replay_stream.logger") as mock_logger:
+                    replayer._store_replay_score(
+                        wallet="GA111",
+                        risk_score={"score": 75, "benford_flag": False, "ml_flag": True},
+                        pair_id="USDC:native/XLM:native",
+                    )
 
-                        # Should have logged
-                        mock_logger.info.assert_called()
+                    # Should have logged
+                    mock_logger.info.assert_called()
 
 
 class TestReplayScoreStorage:
@@ -199,33 +194,32 @@ class TestReplayScoreStorage:
         from scripts.replay_stream import StreamReplayer
 
         with patch("scripts.replay_stream.KafkaConsumer"):
-            with patch("scripts.replay_stream.RiskScorer"):
-                with patch("scripts.replay_stream.StreamingScorer"):
-                    mock_store = Mock()
-                    replayer = StreamReplayer(topic="trades", dry_run=False)
-                    replayer.store = mock_store
+            with patch("scripts.replay_stream.StreamingScorer"):
+                mock_store = Mock()
+                replayer = StreamReplayer(topic="trades", dry_run=False)
+                replayer.store = mock_store
 
-                    replayer._store_replay_score(
-                        wallet="GA111",
-                        risk_score={
-                            "score": 75,
-                            "benford_flag": False,
-                            "ml_flag": True,
-                            "confidence": 80,
-                        },
-                        pair_id="USDC:native/XLM:native",
-                    )
+                replayer._store_replay_score(
+                    wallet="GA111",
+                    risk_score={
+                        "score": 75,
+                        "benford_flag": False,
+                        "ml_flag": True,
+                        "confidence": 80,
+                    },
+                    pair_id="USDC:native/XLM:native",
+                )
 
-                    # Verify store.upsert was called
-                    mock_store.upsert.assert_called_once()
-                    call_args = mock_store.upsert.call_args
-                    assert call_args[0][0] == "GA111"
-                    assert call_args[0][1] == "USDC:native/XLM:native"
+                # Verify store.upsert was called
+                mock_store.upsert.assert_called_once()
+                call_args = mock_store.upsert.call_args
+                assert call_args[0][0] == "GA111"
+                assert call_args[0][1] == "USDC:native/XLM:native"
 
-                    # Check that replay_model_version tag was added
-                    score_dict = call_args[0][2]
-                    assert "replay_model_version" in score_dict
-                    assert score_dict["replay_model_version"] == "replay"
+                # Check that replay_model_version tag was added
+                score_dict = call_args[0][2]
+                assert "replay_model_version" in score_dict
+                assert score_dict["replay_model_version"] == "replay"
 
 
 class TestConfirmationPrompt:

@@ -58,6 +58,12 @@ class RiskScoreRecord(Base):
     # True when this score has been certified robust via IBP at the standard
     # evaluation epsilons (ε=0.01 and ε=0.05) — Issue #245. Internal only.
     certified_robust: Mapped[bool | None] = mapped_column(Boolean, nullable=True, default=None)
+    # "provisional" (default): written by the continuous streaming/SSE path,
+    # which has no window-close event and may still change as more trades
+    # arrive. "final": written by a completed batch pipeline run or a
+    # completed stream-replay run over a closed, bounded time window
+    # (Issue #670). See docs/adr/0001-unified-idempotency-finality.md.
+    finality: Mapped[str] = mapped_column(String(16), nullable=False, default="provisional")
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )
@@ -68,6 +74,11 @@ class RiskScoreRecord(Base):
         return self.propagated_risk
 
     def to_risk_score(self) -> dict:
+        # NOTE: `finality` and `certified_robust` are deliberately excluded —
+        # this dict mirrors the on-chain/API RiskScore shape shared with
+        # ledgerlens-core, and unilaterally changing that wire shape from
+        # this repo would silently break cross-repo ABI compatibility. Read
+        # `finality` via the record attribute or `RiskScoreStore` instead.
         result = {
             "score": self.score,
             "benford_flag": self.benford_flag,

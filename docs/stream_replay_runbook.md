@@ -295,6 +295,25 @@ Risk Score DB (persisted)
    - Comparison: query before/after separately
    - Future: support multiple model versions
 
+4. **Finality**: replay scores are written with `finality="final"`
+   (Issue #670) — replay processes a defined, closed historical window,
+   unlike the continuous streaming path (which writes `finality="provisional"`
+   since it has no window-close event). See
+   `docs/adr/0001-unified-idempotency-finality.md`.
+
+5. **Per-message offset commits**: `--resume` now genuinely resumes from
+   this consumer group's last committed offset per partition (a bug fixed in
+   Issue #670 — `--resume` previously unconditionally seeked to the beginning
+   of the topic on every invocation, silently discarding all prior replay
+   progress). Offsets commit after every message, scoped to that message's
+   exact offset, matching the live Kafka worker's "commit only after durable
+   side effects" guarantee — a message that fails to persist its score
+   **halts the replay run** rather than being silently skipped by a later
+   commit (Kafka's per-partition committed offset is a single monotonic
+   pointer, so there is no way to commit past a later message while leaving
+   an earlier failed one for redelivery). Fix the underlying failure and
+   rerun with `--resume` to continue from exactly that message.
+
 ---
 
 ## Performance Tuning

@@ -24,6 +24,7 @@ import sys
 from config import config
 from config.contracts import validate_mode
 from streaming.alert_dispatcher import AlertDispatcher
+from streaming.alert_ledger import AlertDeliveryLedger
 from streaming.feature_buffer import FeatureBuffer
 from streaming.pipeline import StreamingPipeline
 from streaming.streaming_scorer import StreamingScorer
@@ -142,6 +143,7 @@ def main() -> None:
         webhook_url=os.getenv("ALERT_WEBHOOK_URL"),
         ws_client=ws_client,
         alert_cooldown_seconds=args.cooldown_seconds,
+        delivery_ledger=AlertDeliveryLedger(),
     )
     pipeline = StreamingPipeline(buffer, scorer, dispatcher, role=args.role)
 
