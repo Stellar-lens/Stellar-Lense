@@ -388,6 +388,7 @@ class TestGNNGracefulFallback:
         """Reset the one-time warning sentinel before each test so tests are
         independent of execution order."""
         import detection.feature_engineering as fe
+
         fe._gnn_zero_fallback_warned = False
 
     def test_build_feature_vector_gnn_absent(self):
@@ -460,7 +461,8 @@ class TestGNNGracefulFallback:
             fe_logger.removeHandler(handler)
 
         warning_records = [
-            r for r in log_records
+            r
+            for r in log_records
             if r.levelno == logging.WARNING and "gnn" in r.getMessage().lower()
         ]
         assert len(warning_records) == 1, (
@@ -518,13 +520,15 @@ class TestGNNGracefulFallback:
             fe_logger.removeHandler(handler)
 
         gnn_warnings = [
-            r for r in log_records
-            if r.levelno == logging.WARNING and "gnn" in r.getMessage().lower()
+            r
+            for r in log_records
+            if r.levelno == logging.WARNING
+            and "gnn" in r.getMessage().lower()
             and "zero" in r.getMessage().lower()
         ]
-        assert len(gnn_warnings) == 0, (
-            "GNN zero-fallback WARNING should NOT fire when an encoder is provided."
-        )
+        assert (
+            len(gnn_warnings) == 0
+        ), "GNN zero-fallback WARNING should NOT fire when an encoder is provided."
 
     @requires_torch
     def test_build_feature_vector_gnn_present(self):

@@ -426,7 +426,9 @@ def ring_statistics(
     }
 
 
-def build_ring_statistics(community_map: dict[str, int], graph: nx.DiGraph) -> dict[int, RingStatistics]:
+def build_ring_statistics(
+    community_map: dict[str, int], graph: nx.DiGraph
+) -> dict[int, RingStatistics]:
     """Compute `ring_statistics` for every non-`NO_RING` community in the map.
 
     Parameters

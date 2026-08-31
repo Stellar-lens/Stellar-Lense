@@ -8,6 +8,7 @@ from detection.artifact_lifecycle import (
     IntegrityCheckError,
     InvalidTransitionError,
     ModelArtifactRegistry,
+    TrustVerificationRequiredError,
 )
 
 
@@ -20,7 +21,15 @@ def artifact_file(tmp_path):
 
 @pytest.fixture()
 def registry(tmp_path):
-    return ModelArtifactRegistry(manifest_path=str(tmp_path / "artifact_manifest.json"))
+    # Grand 2 (issue #671): promote() requires a trust_verifier. A no-op
+    # stub is fine for tests that only exercise the state-machine mechanics
+    # (register/validate/promote/rollback transitions) — the *real* verifier
+    # wiring (detection.model_governance.make_trust_verifier) is covered by
+    # tests/test_model_governance.py.
+    return ModelArtifactRegistry(
+        manifest_path=str(tmp_path / "artifact_manifest.json"),
+        trust_verifier=lambda record: None,
+    )
 
 
 def test_register_creates_staged_version(registry, artifact_file):
@@ -118,3 +127,55 @@ def test_register_missing_artifact_raises_file_not_found(registry, tmp_path):
     missing = str(tmp_path / "does_not_exist.joblib")
     with pytest.raises(FileNotFoundError):
         registry.register("rf", missing)
+
+
+# ---------------------------------------------------------------------------
+# Grand 2 (issue #671) — trust-chain-gated promotion
+# ---------------------------------------------------------------------------
+
+
+def test_promote_without_trust_verifier_raises(tmp_path, artifact_file):
+    registry = ModelArtifactRegistry(manifest_path=str(tmp_path / "manifest.json"))
+    version = registry.register("rf", artifact_file)
+    registry.validate("rf", version)
+
+    with pytest.raises(TrustVerificationRequiredError):
+        registry.promote("rf", version)
+
+    # The failed promotion must not have mutated the record's stage.
+    assert registry._get("rf", version).stage == ArtifactStage.VALIDATED
+
+
+def test_promote_calls_trust_verifier_with_record(registry, artifact_file):
+    seen = []
+    registry._trust_verifier = lambda record: seen.append((record.name, record.version))
+
+    version = registry.register("rf", artifact_file)
+    registry.validate("rf", version)
+    registry.promote("rf", version)
+
+    assert seen == [("rf", version)]
+    assert registry.get_active("rf").version == version
+
+
+def test_promote_leaves_stage_untouched_when_trust_verifier_raises(tmp_path, artifact_file):
+    class _FakeTrustError(Exception):
+        pass
+
+    def _failing_verifier(record):
+        raise _FakeTrustError(f"tampered: {record.name}")
+
+    registry = ModelArtifactRegistry(
+        manifest_path=str(tmp_path / "manifest.json"), trust_verifier=_failing_verifier
+    )
+    version = registry.register("rf", artifact_file)
+    registry.validate("rf", version)
+
+    with pytest.raises(_FakeTrustError, match="tampered"):
+        registry.promote("rf", version)
+
+    # Stage must remain VALIDATED, not PROMOTED — a failed trust check must
+    # never be recorded as a successful promotion.
+    assert registry._get("rf", version).stage == ArtifactStage.VALIDATED
+    with pytest.raises(ArtifactNotFoundError):
+        registry.get_active("rf")

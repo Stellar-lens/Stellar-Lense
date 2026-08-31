@@ -8,6 +8,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Single, authenticated, cryptographically-gated model promotion/rollback path
+  (`detection/model_governance.py`, issue #671): `RiskScorer` now hard-blocks
+  on any model that fails Ed25519 signature or transparency-log verification
+  instead of logging and loading it anyway; every write to `config.MODEL_DIR`
+  (direct training, incremental warm-start, drift-triggered retraining) goes
+  through one gate (`guard_production_write`) enforcing signing, an AUC/F1
+  regression check, and compatibility validation before publishing; rollback
+  is a single authenticated, audited, trust-chain-verified operation
+  (`rollback_production`) backed by a queryable `ModelVersionRecord`
+  shadow→production→rolled_back history and an append-only
+  `promotion_audit_log`. Fixes the `--check-shadow`/`--no-shadow` flags on
+  `scripts/retrain_if_drifted.py`, which previously did not exist and made
+  every invocation raise `AttributeError`. Adds a drift-monitor heartbeat
+  health check (`DriftMonitorHeartbeatStale` alert) and a CI docs-vs-CLI
+  consistency test. See
+  `docs/model_artifact_trust_and_promotion_adr.md` and
+  `docs/model_rollback_runbook.md`. Migration `0007`.
 - Unified exactly-once dedup/idempotency library (`pipeline/exactly_once.py`)
   replacing the Kafka worker's and trade ingestion's independent, fail-open
   Redis dedup caches. Fixes a critical bug where a crash mid-processing (e.g.

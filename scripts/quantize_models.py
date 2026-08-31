@@ -279,6 +279,10 @@ def quantise_tree_models(
             }
             continue
 
+        # UNGUARDED-OK: writes a compressed edge-deployment variant under a
+        # distinct filename (e.g. random_forest_leafq.joblib), never the
+        # primary served artifact name that ModelArtifactVerifier checks —
+        # out of scope for the production trust/regression gate.
         joblib.dump(model, dst)
         q_size = os.path.getsize(dst) / 1024
 
