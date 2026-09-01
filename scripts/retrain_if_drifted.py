@@ -952,3 +952,4 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+# TODO(#732): Reject --lookback-days <= 0 at argparse time to prevent silent empty date ranges and false no-drift results.
