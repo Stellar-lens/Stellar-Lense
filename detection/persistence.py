@@ -444,7 +444,9 @@ class ModelArtifact:
             )
         if actual_sha != expected_sha:
             raise ModelIntegrityError(
-                f"SHA-256 mismatch for {model_name}: expected {expected_sha}, got {actual_sha}"
+                f"SHA-256 mismatch for {model_name}: expected {expected_sha}, got {actual_sha}. "
+                "Remediation: restore the model artifact from version control or re-run "
+                "`scripts/publish_model_artifact.py` to re-register the current file's hash."
             )
 
         # 2 — metrics.json signature
@@ -467,7 +469,11 @@ class ModelArtifact:
         try:
             public_key.verify(signature, payload)
         except InvalidSignature:
-            raise ModelIntegrityError("metrics.json signature verification failed") from None
+            raise ModelIntegrityError(
+                "metrics.json signature verification failed. "
+                "Remediation: re-run `scripts/publish_model_artifact.py` to regenerate "
+                "metrics.json.sig with the correct signing key."
+            ) from None
 
         # 3 — signing key fingerprint
         fp = trusted_fingerprint or config.TRUSTED_SIGNING_KEY_FINGERPRINT
@@ -475,7 +481,10 @@ class ModelArtifact:
             actual_fp = _key_fingerprint(public_key)
             if actual_fp != fp:
                 raise ModelIntegrityError(
-                    f"Signing key fingerprint mismatch: expected {fp}, got {actual_fp}"
+                    f"Signing key fingerprint mismatch: expected {fp}, got {actual_fp}. "
+                    "Remediation: set TRUSTED_SIGNING_KEY_FINGERPRINT to the key that actually "
+                    "signed this artifact, or re-run `scripts/publish_model_artifact.py` with the "
+                    "expected key."
                 )
 
         # 4 — training data SHA-256 (optional)
@@ -484,7 +493,10 @@ class ModelArtifact:
             if recorded != expected_data_sha256:
                 raise ModelIntegrityError(
                     f"Training data SHA-256 mismatch: expected {expected_data_sha256}, "
-                    f"got {recorded}"
+                    f"got {recorded}. "
+                    "Remediation: re-run `scripts/publish_model_artifact.py` after regenerating "
+                    "the training dataset so metrics.json's training_data_sha256 matches the data "
+                    "this artifact was trained on."
                 )
 
 

@@ -16,8 +16,10 @@ def test_single_passing_mode_exits_zero(monkeypatch, capsys):
 
     code = check_env.main(["--mode", "api"])
 
+    out = capsys.readouterr().out
     assert code == 0
-    assert "[OK]   api" in capsys.readouterr().out
+    assert "=== api ===" in out
+    assert "all checks passed" in out
 
 
 def test_single_failing_mode_exits_nonzero_and_prints_reason(monkeypatch, capsys):
@@ -30,8 +32,8 @@ def test_single_failing_mode_exits_nonzero_and_prints_reason(monkeypatch, capsys
 
     out = capsys.readouterr().out
     assert code == 1
-    assert "[FAIL] api" in out
-    assert "API_KEYS" in out
+    assert "=== api ===" in out
+    assert "FAIL: API_KEYS" in out
 
 
 def test_all_flag_checks_every_registered_mode(monkeypatch, capsys):
