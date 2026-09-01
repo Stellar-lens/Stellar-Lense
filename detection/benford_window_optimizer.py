@@ -7,6 +7,12 @@ For high-frequency pairs, longer windows may mask recent manipulation.
 This module provides:
   - `select_optimal_window()`: picks the shortest window whose trade count exceeds
     a configurable threshold, with fallback to the longest window if none qualify.
+
+Insufficient-data fallback: when a pair has too few trades for any window to reach
+`min_sample_size` -- including a brand-new pair with zero trades everywhere -- no
+window is chosen on noise. `select_optimal_window()` degrades to the *longest*
+candidate window (720h when no candidates are supplied at all) and logs a warning,
+since the widest window is the one most likely to accumulate a usable sample.
   - `optimize_windows_for_asset()`: offline Bayesian optimization of window schedules
     per asset using labelled wash-trade data.
 """
