@@ -62,6 +62,7 @@ Auto-generated from `config.py` by `scripts/generate_env_contract_docs.py` (Issu
 | `KAFKA_LAG_ALERT_THRESHOLD` | `KAFKA_LAG_ALERT_THRESHOLD` | `int` | No | `'500'` | — |
 | `KAFKA_METRICS_PORT` | `KAFKA_METRICS_PORT` | `int` | No | `'9100'` | — |
 | `TRADE_AVRO_SCHEMA_PATH` | `TRADE_AVRO_SCHEMA_PATH` | `str` | No | `'data/trade_avro_schema.json'` | — |
+| `WORKER_HEALTH_STALE_THRESHOLD_SECONDS` | `WORKER_HEALTH_STALE_THRESHOLD_SECONDS` | `float` | No | `'120'` | Worker health monitoring (streaming/health.py::WorkerHealthMonitor). A worker is marked UNHEALTHY when it has not heartbeat within this many seconds — should comfortably exceed the poll-loop interval plus the slowest expected per-message processing time. |
 | `E2E_LATENCY_BUDGET_MS` | `E2E_LATENCY_BUDGET_MS` | `int` | No | `'2000'` | End-to-end latency budget (Issue #124) |
 | `LATENCY_ANOMALY_RATE_THRESHOLD` | `LATENCY_ANOMALY_RATE_THRESHOLD` | `float` | No | `'0.90'` | — |
 | `METADATA_TOPIC` | `METADATA_TOPIC` | `str` | No | `'ledgerlens.account_metadata'` | Account metadata streaming join (streaming/account_metadata_stream.py, streaming/pipeline.py MetadataJoinState) METADATA_TOPIC: dedicated Kafka topic for account metadata update events. |
@@ -99,6 +100,14 @@ Auto-generated from `config.py` by `scripts/generate_env_contract_docs.py` (Issu
 | `ADV_TRAINING_RATIO` | `ADV_TRAINING_RATIO` | `float` | No | `'0.5'` | — |
 | `MODEL_SIGNING_PRIVATE_KEY_PATH` | `MODEL_SIGNING_PRIVATE_KEY_PATH` | `str` | No | `''` | Model integrity & BFT voting |
 | `TRUSTED_SIGNING_KEY_FINGERPRINT` | `TRUSTED_SIGNING_KEY_FINGERPRINT` | `str` | No | `''` | — |
+| `TRUSTED_SIGNING_PUBLIC_KEY_PATH` | `TRUSTED_SIGNING_PUBLIC_KEY_PATH` | `str` | No | `''` | Ed25519 PUBLIC key used to verify model artifacts at *load* time (the inference-side counterpart to MODEL_SIGNING_PRIVATE_KEY_PATH). Required for RiskScorer to load any model in strict (default) mode — see detection/model_governance.py and docs/model_artifact_lifecycle.md. |
+| `MODEL_INTEGRITY_OVERRIDE_ACTOR` | `MODEL_INTEGRITY_OVERRIDE_ACTOR` | `str` | No | `''` | Emergency override for the hard-block artifact integrity gate in RiskScorer._load_models. Both must be set for the override to apply; every use is written to the promotion_audit_log table. Never set this in a persisted environment file — it is meant to be exported for a single incident-response shell session only. |
+| `MODEL_INTEGRITY_OVERRIDE_REASON` | `MODEL_INTEGRITY_OVERRIDE_REASON` | `str` | No | `''` | — |
+| `MODEL_PROMOTION_AUTHORIZED_ACTORS` | `MODEL_PROMOTION_AUTHORIZED_ACTORS` | `str` | No | `''` | Model promotion / rollback authorization (detection/model_governance.py). Comma-separated allowlist of actor IDs permitted to promote or roll back a production model. MODEL_PROMOTION_SECRET is the HMAC key used to authenticate the actor-supplied credential; rotate it like any other shared secret (e.g. via a secrets manager), never commit it. |
+| `MODEL_PROMOTION_SECRET` | `MODEL_PROMOTION_SECRET` | `str` | No | `''` | — |
+| `MODEL_PROMOTION_SYSTEM_ACTOR` | `MODEL_PROMOTION_SYSTEM_ACTOR` | `str` | No | `'retrain-pipeline'` | Actor identity used by the automated drift-triggered retraining pipeline (scripts/retrain_if_drifted.py) to authenticate its own promotions. Must be included in MODEL_PROMOTION_AUTHORIZED_ACTORS for automated promotion to succeed; its credential is derived from MODEL_PROMOTION_SECRET so no interactive secret is needed in CI. |
+| `MODEL_PROMOTION_REGRESSION_TOLERANCE` | `MODEL_PROMOTION_REGRESSION_TOLERANCE` | `float` | No | `'0.01'` | — |
+| `DRIFT_MONITOR_HEARTBEAT_MAX_AGE_SECONDS` | `DRIFT_MONITOR_HEARTBEAT_MAX_AGE_SECONDS` | `int` | No | `'3600'` | Drift-monitor health (monitoring/drift_detector.py). If no successful CovarianceShiftDetector.detect() call has been recorded within this many seconds, the monitor is considered stale and a distinct "drift-check failed" alert fires — see monitoring/alert_rules.yml. |
 | `AUDIT_LOG_PATH` | `AUDIT_LOG_PATH` | `str` | No | `'data/audit_trail.ndjson'` | — |
 | `AUDIT_VERIFY_PUBLIC_KEY_PATH` | `AUDIT_VERIFY_PUBLIC_KEY_PATH` | `str` | No | `''` | — |
 | `BFT_SCORE_DIVERGENCE_THRESHOLD` | `BFT_SCORE_DIVERGENCE_THRESHOLD` | `int` | No | `'30'` | — |

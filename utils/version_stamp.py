@@ -35,18 +35,18 @@ import hashlib
 import os
 import platform
 import subprocess
+import sys
 try:
     import tomllib
 except ImportError:
-    try:
-        import tomli as tomllib  # type: ignore[no-redef]
-    except ImportError:
-        tomllib = None  # type: ignore[assignment]
+    import tomli as tomllib
+
+from datetime import datetime, timezone
 try:
-    from datetime import UTC, datetime
+    from datetime import UTC
 except ImportError:
-    from datetime import datetime, timezone
     UTC = timezone.utc
+
 from functools import lru_cache
 from pathlib import Path
 from typing import Any

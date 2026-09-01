@@ -23,9 +23,12 @@ from config import config
 from detection.feature_engineering import build_feature_vector
 from detection.streaming_benford import StreamingBenfordSketch
 from ingestion.data_models import Trade
+from utils.logging import get_logger
 
 if TYPE_CHECKING:
     pass
+
+logger = get_logger(__name__)
 
 
 class FeatureBuffer:
@@ -37,6 +40,13 @@ class FeatureBuffer:
         self._registry_lock = threading.RLock()
         self._buffers: dict[str, deque] = {}
         self._wallet_locks: dict[str, threading.Lock] = {}
+        # trade_id -> None per wallet, kept in the same append/evict order as
+        # ``_buffers[wallet]`` so membership checks for the "have I already
+        # applied this trade_id to this wallet's state" dedup guard are O(1)
+        # instead of an O(max_trades) scan (Issue #670, invariant 1: at
+        # least-once Kafka/replay redelivery of the same trade_id must never
+        # produce more than one feature-state update).
+        self._seen_trade_ids: dict[str, dict[str, None]] = {}
 
         # Benford sketches: wallet -> window_hours -> StreamingBenfordSketch
         self._benford_sketches: dict[str, dict[int, StreamingBenfordSketch]] = {}
@@ -57,6 +67,7 @@ class FeatureBuffer:
                     h: StreamingBenfordSketch(h * 3600) for h in config.BENFORD_WINDOWS_HOURS
                 }
                 self._pair_benford_sketches[wallet] = {}
+                self._seen_trade_ids[wallet] = {}
             return self._wallet_locks[wallet]
 
     # ------------------------------------------------------------------
@@ -68,6 +79,13 @@ class FeatureBuffer:
 
         When a wallet's deque is at capacity, ``deque(maxlen=…)`` automatically
         evicts the oldest entry on ``append()``.
+
+        Idempotent per ``(wallet, trade_id)``: a redelivered trade (at-least-
+        once Kafka redelivery when an offset was left uncommitted, or a stream
+        replay reprocessing an uncommitted tail) is a no-op for any wallet
+        that already applied it — this is what makes it safe for callers to
+        redo a partially-processed message without double-counting feature
+        state (Issue #670, invariant 1).
         """
         amount = float(trade.amount)
         record = {
@@ -84,7 +102,25 @@ class FeatureBuffer:
         for wallet in (trade.base_account, trade.counter_account):
             lock = self._ensure_wallet(wallet)
             with lock:
-                self._buffers[wallet].append(record)
+                seen = self._seen_trade_ids[wallet]
+                if trade.trade_id in seen:
+                    logger.debug(
+                        "FeatureBuffer.update: trade_id=%s already applied to wallet=%s — "
+                        "skipping duplicate (redelivery)",
+                        trade.trade_id,
+                        wallet,
+                    )
+                    continue
+
+                buf = self._buffers[wallet]
+                if len(buf) >= self.max_trades and buf:
+                    # ``deque(maxlen=…)`` is about to silently drop buf[0] on
+                    # append() below — evict its trade_id from the companion
+                    # index in lock-step so membership checks stay accurate.
+                    seen.pop(buf[0].get("trade_id"), None)
+
+                buf.append(record)
+                seen[trade.trade_id] = None
 
                 # Update wallet-level Benford sketches
                 for sketch in self._benford_sketches[wallet].values():

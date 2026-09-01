@@ -58,6 +58,19 @@ def validate_wallet_address(wallet_id: str) -> None:
         )
 
 
+class ScoreWalletError(Exception):
+    """Base class for clearly-classified score_wallet CLI outcomes."""
+
+
+class InsufficientTradeHistoryError(ScoreWalletError):
+    """The address is valid but has no trade history for the requested pair.
+
+    This is deliberately distinct from (a) an invalid address format and (b) a
+    genuine scoring failure, so a "can't score yet" wallet never reads like a
+    broken pipeline (Issue #744).
+    """
+
+
 def parse_asset_pair(pair_str: str) -> tuple[SdkAsset, SdkAsset]:
     """Parse a pair string like 'CODE:ISSUER/CODE:ISSUER' or 'CODE:ISSUER' (assumes XLM counter)."""
     try:
@@ -100,6 +113,12 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         help="Path to a file of wallet addresses (one per line; blank lines "
         "and lines starting with '#' are skipped) to score concurrently",
+    )
+    wallet_group.add_argument(
+        "--wallet-file",
+        type=Path,
+        help="Path to a text file of wallet addresses (one per line; blank lines "
+        "and lines starting with '#' are skipped) to score sequentially",
     )
     parser.add_argument(
         "--workers",
@@ -221,6 +240,16 @@ def score_one(
             mask = (trades_df["base_account"] == wallet) | (trades_df["counter_account"] == wallet)
             trades_df = trades_df[mask]
 
+        if trades_df.empty:
+            return {
+                "wallet": wallet,
+                "score": None,
+                "error": (
+                    f"Wallet {wallet} has valid address but no trade history for this pair "
+                    f"and cannot be scored yet"
+                ),
+            }
+
         feature_vector = build_feature_vector(wallet, trades_df, orderbook_events=None)
         feature_row = pd.Series(feature_vector)
         result = scorer.score(feature_row)
@@ -269,6 +298,41 @@ def run_batch(args: argparse.Namespace) -> None:
             print(json.dumps(future.result()))
 
 
+def run_sequential_batch(args: argparse.Namespace) -> None:
+    """Score every wallet in `args.wallet_file` sequentially, printing one
+    compact summary line per wallet."""
+    wallets = _load_wallets_from_file(args.wallet_file)
+    base_asset, counter_asset = parse_asset_pair(args.pair)
+
+    try:
+        scorer = RiskScorer()
+    except RuntimeError as e:
+        logger.error(
+            "Model load error",
+            exc_info=True,
+            extra={
+                "error_type": type(e).__name__,
+                "error_message": str(e),
+            },
+        )
+        if "No trained models" in str(e):
+            logger.info(
+                "Suggestion: train models first by running model_training.py: python -m detection.model_training"
+            )
+        sys.exit(1)
+
+    for wallet in wallets:
+        result = score_one(wallet, base_asset, counter_asset, scorer, args.since)
+        status = "FLAGGED" if result.get("score", -1) >= config.RISK_SCORE_FLAG_THRESHOLD else "OK"
+        if result.get("error"):
+            print(f"{wallet:<56} ERROR: {result['error']}")
+        else:
+            print(
+                f"{wallet:<56} score={result['score']:6.2f}  [{status}]  "
+                f"confidence={result['confidence']}"
+            )
+
+
 def main() -> None:
     args = parse_args()
     set_level(args.log_level)
@@ -278,6 +342,10 @@ def main() -> None:
 
     if args.wallets_file:
         run_batch(args)
+        return
+
+    if args.wallet_file:
+        run_sequential_batch(args)
         return
 
     validate_wallet_address(args.wallet)
@@ -341,6 +409,12 @@ def main() -> None:
             )
             sys.exit(1)
 
+        if trades_df.empty:
+            raise InsufficientTradeHistoryError(
+                f"Wallet {args.wallet} has valid address but no trade history for pair "
+                f"{args.pair} and cannot be scored yet"
+            )
+
         # 3. Feature Engineering
         feature_vector = build_feature_vector(
             args.wallet, trades_df, orderbook_events=orderbook_events_df
@@ -368,13 +442,17 @@ def main() -> None:
             )
         except Exception as e:
             logger.error(
-                "Error during scoring",
+                "Scoring failed for wallet",
                 exc_info=True,
                 extra={
                     "wallet": args.wallet,
                     "error_type": type(e).__name__,
                     "error_message": str(e),
                 },
+            )
+            print(
+                f"Scoring failed for wallet {args.wallet} on pair {args.pair}: {e}",
+                file=sys.stderr,
             )
             sys.exit(1)
 

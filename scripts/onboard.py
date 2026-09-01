@@ -17,6 +17,9 @@ import sys
 from pathlib import Path
 
 from scripts.onboarding_checks import CheckLevel, run_all_checks
+from utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -62,26 +65,26 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     if args.json_output:
+        # Machine-readable JSON output for CI/tooling integration
         print(json.dumps(report.to_dict(), indent=2))
     else:
         sep = "─" * 62
-        print(f"\n{sep}")
-        print(" LedgerLens Onboarding Checks")
-        print(sep)
+        logger.info(f"\n{sep}")
+        logger.info(" LedgerLens Onboarding Checks")
+        logger.info(sep)
         for result in report.results:
-            print(result)
-        print(sep)
-        print(f" Summary: {report.summary()}")
-        print(sep + "\n")
+            logger.info(result)
+        logger.info(sep)
+        logger.info(f" Summary: {report.summary()}")
+        logger.info(sep + "\n")
 
         if report.has_errors or report.has_warnings:
-            print("Suggested next steps:")
+            logger.info("Suggested next steps:")
             hints_shown: set[str] = set()
             for r in report.results:
                 if r.level != CheckLevel.OK and r.fix_hint and r.fix_hint not in hints_shown:
                     hints_shown.add(r.fix_hint)
-                    print(f"  → {r.fix_hint}")
-            print()
+                    logger.info(f"  → {r.fix_hint}")
 
     # Exit code
     if report.has_errors:

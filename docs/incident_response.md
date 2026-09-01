@@ -81,18 +81,37 @@ that score submissions have stopped.
 - Deploy a fix in a staging environment.
 - Obtain sign-off from the security lead.
 
-### Step 6 — Unpause
+### Step 6 — Unpause (requires 2-of-3, same as pausing)
 
-After the fix is deployed and verified:
+After the fix is deployed and verified. Unpausing is what puts a halted
+system back into service, so it takes the same two-keyholder quorum as
+pausing — one keyholder cannot do it alone.
+
+First keyholder opens the unpause proposal, passing the *pause* proposal id:
 
 ```python
-client._client.invoke(
-    "unpause",
-    [scval.to_address(keyholder_1_pubkey), scval.to_uint64(proposal_id)],
+unpause_proposal_id = client._client.invoke(
+    "initiate_unpause",
+    [scval.to_address(keyholder_1_pubkey), scval.to_uint64(pause_proposal_id)],
     source=keyholder_1_pubkey,
     signer=keyholder_1_signer,
 ).sign_and_submit()
 ```
+
+A second, distinct keyholder approves it, which lifts the pause and emits
+`c_unpaused`:
+
+```python
+client._client.invoke(
+    "approve_unpause",
+    [scval.to_address(keyholder_2_pubkey), scval.to_uint64(unpause_proposal_id)],
+    source=keyholder_2_pubkey,
+    signer=keyholder_2_signer,
+).sign_and_submit()
+```
+
+Unpause proposals expire on the same TTL as pause proposals; if the second
+approval does not land in time, open a fresh proposal.
 
 Verify that the event listener resumes the pipeline.
 
