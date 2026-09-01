@@ -2,7 +2,7 @@
 
 ## Overview
 
-Once Louvain community detection (`detection/community_detector.py`) partitions the wallet graph into suspected wash-trading rings, the motif census (`detection/motif_census.py`) characterises the *internal structure* of each community by counting k-node subgraph patterns (motifs). The resulting structural fingerprints distinguish coordinated wash rings (which favour dense triangles and reciprocal cycles) from organic market-maker networks (which tend toward hub-and-spoke star topologies with low reciprocity).
+Once [Louvain community detection](#g-community) (`detection/community_detector.py`) partitions the wallet graph into suspected wash-trading [rings](#g-ring), the [motif](#g-motif) census (`detection/motif_census.py`) characterises the *internal structure* of each [community](#g-community) by counting k-node subgraph patterns (motifs). The resulting structural fingerprints distinguish coordinated wash rings (which favour dense triangles and reciprocal cycles) from organic market-maker networks (which tend toward hub-and-spoke star topologies with low [reciprocity](#g-reciprocity)).
 
 Entry point:
 
@@ -12,6 +12,69 @@ from detection.community_detector import enrich_communities_with_motifs
 motif_features = enrich_communities_with_motifs(graph, community_map)
 # Returns: {community_id: {"triangle_density": ..., "star_ratio": ..., ...}}
 ```
+
+---
+
+## Glossary
+
+A quick reference for the graph-theory vocabulary used in this document and in
+the detection modules it describes. Each entry gives a one- or two-sentence
+plain-English definition and a pointer to the exact function that computes or
+defines the concept. Terms are cross-linked from their first use above.
+
+### <a id="g-funding-edge"></a>Funding edge
+
+A directed edge pointing from the account that funded another account to the
+account it funded ("funder → funded"). These edges are the backbone of the
+wallet graph; co-trading wallets add further edges on top.
+*See `build_funding_graph()` in [`detection/wallet_graph.py`](../detection/wallet_graph.py) (edges tagged `edge_type="funding"`).*
+
+### <a id="g-ancestor-traversal"></a>Ancestor traversal
+
+Walking [funding edges](#g-funding-edge) *backwards* from a wallet to collect the
+set of accounts that funded it, then funded those, and so on, up to a fixed hop
+limit. Two wallets whose ancestor sets overlap heavily probably share a common
+paymaster — a classic sock-puppet / [ring](#g-ring) signal.
+*See `multi_hop_ancestors()` in [`detection/wallet_graph.py`](../detection/wallet_graph.py), consumed by `_funding_source_similarity()`.*
+
+### <a id="g-community"></a>Community
+
+A group of wallets that are far more densely connected to each other than to the
+rest of the graph. LedgerLens finds communities with the **Louvain** algorithm,
+which greedily maximises modularity; a fixed random seed keeps the partition
+deterministic in CI.
+*See `detect_communities()` in [`detection/community_detector.py`](../detection/community_detector.py).*
+
+### <a id="g-ring"></a>Ring
+
+A [community](#g-community) large enough (`>= min_ring_size`) to be treated as a
+suspected coordinated wash-trading group. Rings get a stable content-addressed id
+derived from their sorted member set so the same group keeps the same label
+across runs.
+*See `detect_wash_trading_rings()` and `ring_id_for_members()` in [`detection/wallet_graph.py`](../detection/wallet_graph.py).*
+
+### <a id="g-internal-edge-density"></a>Internal edge density
+
+For one [ring](#g-ring), the fraction of the edges that *could* exist between its
+members that *actually* exist: `internal_edges / (k * (k - 1) / 2)` for `k`
+members. `1.0` means every member trades with every other member (a clique);
+values near `0` mean the members are barely connected to each other.
+*See `ring_statistics()` in [`detection/wallet_graph.py`](../detection/wallet_graph.py) (key `internal_edge_density`).*
+
+### <a id="g-motif"></a>Motif
+
+A small connected subgraph pattern (here, 3 or 4 nodes) — for example a triangle,
+an open wedge, or a 4-cycle. Counting how often each pattern occurs inside a
+[community](#g-community) gives a size-independent structural fingerprint.
+*See `compute_motif_census()` in [`detection/motif_census.py`](../detection/motif_census.py).*
+
+### <a id="g-reciprocity"></a>Reciprocity
+
+The fraction of directed edges `(u, v)` for which the reverse edge `(v, u)` also
+exists. Wash rings show high reciprocity (round-trip flows); organic trading
+produces more one-way paths. Undirected graphs are defined to have reciprocity
+`1.0`. Full formula in [Reciprocity](#reciprocity) below.
+*Computed inside `compute_motif_census()` in [`detection/motif_census.py`](../detection/motif_census.py).*
 
 ---
 

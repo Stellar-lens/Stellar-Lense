@@ -11,7 +11,7 @@ Attributes:
 """
 
 from datetime import datetime
-from typing import TypedDict
+from typing import NotRequired, TypedDict
 
 import pandas as pd
 
@@ -32,6 +32,38 @@ class ReconstructedPathFlow(TypedDict):
     path_payment_ids: list[str]
     execution_time: datetime
     is_round_trip: bool
+    is_cyclical: NotRequired[bool]
+
+
+def _asset_key(asset: object) -> tuple:
+    """Normalize an asset path entry into a hashable identity."""
+    if isinstance(asset, dict):
+        return (asset.get("code"), asset.get("issuer"))
+    return ("", asset)
+
+
+def path_has_cycle(asset_path: list) -> bool:
+    """Report whether an asset path revisits an asset it already passed through.
+
+    Stellar payment paths may legitimately cycle (a wallet paying out through
+    intermediate assets and back into one it already held). Cycles are flagged
+    rather than rejected, and path analysis never walks the hops recursively,
+    so a cyclical path terminates like any other.
+
+    Args:
+        asset_path: List of asset path entries (dicts with code/issuer, or
+            plain asset identifiers).
+
+    Returns:
+        True if any asset appears more than once in the path.
+    """
+    seen: set[tuple] = set()
+    for asset in asset_path or []:
+        key = _asset_key(asset)
+        if key in seen:
+            return True
+        seen.add(key)
+    return False
 
 
 def reconstruct_path_flow(
@@ -54,7 +86,8 @@ def reconstruct_path_flow(
 
     Returns:
         ReconstructedPathFlow dict with source/destination wallets, amounts,
-        hop count, and round-trip flag. Returns None if the operation is malformed
+        hop count, round-trip flag, and an ``is_cyclical`` flag set when the
+        asset path revisits an asset. Returns None if the operation is malformed
         or exceeds Stellar's path length limit.
 
     Raises:
@@ -123,6 +156,7 @@ def reconstruct_path_flow(
         "path_payment_ids": [transaction_id],
         "execution_time": created_at,
         "is_round_trip": is_round_trip,
+        "is_cyclical": path_has_cycle(asset_path),
     }
 
     return flow

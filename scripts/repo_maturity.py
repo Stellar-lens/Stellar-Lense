@@ -465,6 +465,45 @@ def compute_maturity(root: Path, threshold: float = 60.0) -> MaturityReport:
 
 
 # ---------------------------------------------------------------------------
+# Markdown export
+# ---------------------------------------------------------------------------
+
+
+def _maturity_to_markdown(report: MaturityReport) -> str:
+    """Convert a MaturityReport to a clean, README-embeddable Markdown summary."""
+    lines = [
+        "# Repository Maturity Report",
+        "",
+        f"## Composite Score: {report.composite_score:.1f}/100",
+        "",
+        f"**Status:** {'✓ PASSED' if report.passed else '✗ FAILED'} (threshold: {report.threshold})",
+        "",
+        "## Dimension Scores",
+        "",
+    ]
+
+    for dim in report.dimensions:
+        # Visual bar
+        bar_filled = int(dim.score / 5)
+        bar = "█" * bar_filled + "░" * (20 - bar_filled)
+
+        lines.append(f"### {dim.name.title()}")
+        lines.append(f"`[{bar}] {dim.score:.1f}/100` (weight: {dim.weight:.0%})")
+        lines.append("")
+
+        # Deductions if any
+        if dim.deductions:
+            lines.append("**Deductions:**")
+            for deduction in dim.deductions:
+                lines.append(f"- {deduction}")
+            lines.append("")
+
+    lines.append(f"*Generated: {report.generated_at}*")
+
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
@@ -502,6 +541,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "--report",
         metavar="PATH",
         help="Write JSON maturity report to this path.",
+    )
+    p.add_argument(
+        "--output",
+        metavar="PATH",
+        help="Write Markdown summary (README-embeddable) to this path.",
     )
     p.add_argument(
         "--verbose",
@@ -568,6 +612,17 @@ def main(argv: list[str] | None = None) -> int:
         )
         if not args.quiet:
             print(f"Report written to: {report_path}")
+
+    # ------------------------------------------------------------------
+    # Markdown summary
+    # ------------------------------------------------------------------
+    if args.output:
+        output_path = Path(args.output)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        markdown_content = _maturity_to_markdown(report)
+        output_path.write_text(markdown_content, encoding="utf-8")
+        if not args.quiet:
+            print(f"Markdown summary written to: {output_path}")
 
     return 0 if report.passed else 1
 

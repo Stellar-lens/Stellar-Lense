@@ -9,6 +9,13 @@ operations encode the lifecycle of an offer:
     cancelled (fully consumed or withdrawn)
   - otherwise -> an existing offer was updated (amount/price changed)
 
+  A withdrawal surfaced as a `cancelled` operation is either a pure
+  cancellation (an offer removed while still fully unfilled) or the
+  cancellation of the remainder of an offer that was previously partially
+  filled. Both cases look identical here: partial fills are recorded in the
+  trade stream, not as manage-offer operations, so the loader reports them
+  as the same `cancelled` action.
+
 This module pages through an account's manage-offer operations and maps
 them to `OrderBookEvent` records, which `feature_engineering.py` uses to
 compute `order_cancellation_rate`.

@@ -212,23 +212,35 @@ class MigrationRunner:
         all_migrations = _load_all_migrations()
         _verify_registry(all_migrations)
 
+        # Kept unfiltered for status reporting — `status.pending` must still
+        # list migrations beyond `target` (they are pending, just not being
+        # applied by this call), not silently drop them from the report.
+        to_apply = all_migrations
         if target is not None:
             known_ids = {m.id for m in all_migrations}
             if target not in known_ids:
                 raise ValueError(f"Unknown migration target {target!r}. Known: {sorted(known_ids)}")
-            all_migrations = [m for m in all_migrations if int(m.id) <= int(target)]
+            to_apply = [m for m in all_migrations if int(m.id) <= int(target)]
 
         with self._engine.begin() as conn:
             _ensure_tracking_tables(conn)
             _acquire_lock(conn)
             applied = _applied_ids(conn)
 
-            pending = [m for m in all_migrations if m.id not in applied]
+            pending = [m for m in to_apply if m.id not in applied]
             if not pending:
                 logger.info("Database is up to date — no migrations to apply")
                 return self._build_status(all_migrations, applied)
 
             for migration in pending:
+                # Check prerequisites: all earlier-numbered migrations must be applied
+                missing_prerequisites = self._check_prerequisites(migration, all_migrations, applied)
+                if missing_prerequisites:
+                    raise RuntimeError(
+                        f"Cannot apply migration {migration.id} ({migration.description}): "
+                        f"missing prerequisite migrations: {', '.join(sorted(missing_prerequisites))}"
+                    )
+
                 if self._dry_run:
                     logger.info(
                         "[dry-run] Would apply migration %s: %s",
@@ -245,6 +257,21 @@ class MigrationRunner:
         with self._engine.connect() as conn:
             applied = _applied_ids(conn)
         return self._build_status(all_migrations, applied)
+
+    def _check_prerequisites(
+        self, migration: Migration, all_migrations: list[Migration], applied: set[str]
+    ) -> set[str]:
+        """Check that all prerequisite (lower-numbered) migrations have been applied.
+
+        Returns a set of missing prerequisite migration IDs. Empty set means all
+        prerequisites are satisfied.
+        """
+        current_id = int(migration.id)
+        missing = set()
+        for m in all_migrations:
+            if int(m.id) < current_id and m.id not in applied:
+                missing.add(m.id)
+        return missing
 
     def status(self) -> MigrationStatus:
         """Return :class:`MigrationStatus` without applying anything."""

@@ -169,8 +169,8 @@ def test_rate_limiter_degradation_on_redis_unavailable():
 
 def test_kafka_producer_serialization_failure_logs_and_routes_to_dlq():
     """Serialization failure must be logged and routed to DLQ, not crash."""
+    from ingestion.data_models import Asset, Trade
     from ingestion.kafka_producer import HorizonKafkaProducer
-    from ingestion.data_models import Trade, Asset
 
     producer = HorizonKafkaProducer()
     # Create a trade with invalid data that will fail serialization

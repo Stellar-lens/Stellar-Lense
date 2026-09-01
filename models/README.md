@@ -2,8 +2,22 @@
 
 This directory contains trained model artifacts for the LedgerLens fraud-detection
 pipeline. All artifacts are integrity-protected: every `.joblib` and `.pt` file has its
-SHA-256 recorded in `metrics.json`, which is signed with an Ed25519 key. Loading any
-artifact without verifying the chain raises `ModelIntegrityError`.
+SHA-256 recorded in `metrics.json`, which is signed with an Ed25519 key. `RiskScorer`
+(the production inference path, `detection/model_inference.py`) verifies the full
+Ed25519 + transparency-log trust chain for every model at load time — a model that
+fails signature verification, transparency-log membership, or its compatibility
+contract **raises and is never added to the active model set**, by default; it is not
+logged-and-loaded-anyway. Set `MODEL_INTEGRITY_OVERRIDE_ACTOR`/`_REASON` for an
+audited, incident-response-only exception (skips the failing model, never bypasses
+verification for it) — see `docs/model_rollback_runbook.md`.
+
+No model reaches this directory in production without going through
+`detection.model_governance.promote_candidate` — the single gated, authenticated,
+audited path that runs the offline regression gate and the same trust-chain
+verification before publishing. See
+[the ADR](../docs/model_artifact_trust_and_promotion_adr.md) for the full design and
+`docs/model_rollback_runbook.md` for operational procedures (promotion, rollback,
+emergency override).
 
 ## Directory layout
 
