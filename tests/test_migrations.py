@@ -162,6 +162,40 @@ class TestMigrationRunnerDryRun:
 # ---------------------------------------------------------------------------
 
 
+class TestMigration0007PromotionActorColumns:
+    """Grand 2 / issue #671: promoted_by/rolled_back_by/parent_version_id
+    columns added to model_versions."""
+
+    @pytest.fixture()
+    def engine_with_model_versions(self, sqlite_engine):
+        with sqlite_engine.begin() as conn:
+            conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS model_versions (
+                        id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                        version_id          VARCHAR NOT NULL,
+                        model_artifact_path VARCHAR NOT NULL,
+                        status              VARCHAR NOT NULL,
+                        trained_at          TIMESTAMP NOT NULL
+                    )
+                    """))
+        return sqlite_engine
+
+    def test_columns_added(self, engine_with_model_versions):
+        runner = MigrationRunner(engine_with_model_versions)
+        runner.upgrade()
+        inspector = inspect(engine_with_model_versions)
+        col_names = {col["name"] for col in inspector.get_columns("model_versions")}
+        assert "promoted_by" in col_names
+        assert "rolled_back_by" in col_names
+        assert "parent_version_id" in col_names
+
+    def test_noop_when_table_missing(self, sqlite_engine):
+        """No model_versions table (fresh env) — migration must skip gracefully."""
+        runner = MigrationRunner(sqlite_engine)
+        status = runner.upgrade()
+        assert "0007" in status.applied
+
+
 class TestMigrationsFreshEngine:
     def test_fresh_engine_upgrade_is_noop_for_missing_table(self, sqlite_engine):
         """On a fresh DB with no risk_scores table the column-adding migrations
@@ -171,6 +205,52 @@ class TestMigrationsFreshEngine:
         # All migrations should be marked applied (they each check for table
         # existence and return early when it is absent)
         assert status.is_up_to_date
+
+
+# ---------------------------------------------------------------------------
+# Migration discovery helpers
+# ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# Migration prerequisites
+# ---------------------------------------------------------------------------
+
+
+class TestMigrationPrerequisites:
+    def test_upgrade_detects_missing_prerequisites(self, populated_engine):
+        """Attempting to apply 0003 without 0001 and 0002 should raise RuntimeError."""
+        # Manually record 0004 as applied to simulate a broken state where a later
+        # migration was applied out of order
+        with populated_engine.begin() as conn:
+            from migrations.runner import _ensure_tracking_tables, _record_applied
+            from migrations.versions._0004_add_schema_version import migration as m0004
+
+            _ensure_tracking_tables(conn)
+            _record_applied(conn, m0004)
+
+        runner = MigrationRunner(populated_engine)
+        # Trying to upgrade should fail because prerequisites 0001, 0002, 0003 are missing
+        with pytest.raises(RuntimeError, match="missing prerequisite migrations"):
+            runner.upgrade()
+
+    def test_prerequisite_error_names_missing_migrations(self, populated_engine):
+        """The error message should name the specific missing prerequisite migrations."""
+        # Record only 0001 as applied
+        with populated_engine.begin() as conn:
+            from migrations.runner import _ensure_tracking_tables, _record_applied
+            from migrations.versions._0001_add_ring_id import migration as m0001
+
+            _ensure_tracking_tables(conn)
+            _record_applied(conn, m0001)
+
+        runner = MigrationRunner(populated_engine)
+        # Trying to apply 0003 should fail because 0002 is missing (0001 is satisfied)
+        with pytest.raises(RuntimeError) as exc:
+            runner.upgrade()
+
+        error_msg = str(exc.value)
+        assert "0002" in error_msg, "Error should name the missing prerequisite 0002"
 
 
 # ---------------------------------------------------------------------------

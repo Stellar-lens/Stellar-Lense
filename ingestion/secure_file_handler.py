@@ -29,6 +29,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -115,11 +116,17 @@ def validate_path(
     FileNotFoundError
         If the file does not exist.
     """
-    resolved = Path(file_path).resolve()
+    candidate = Path(file_path)
+    if "\x00" in os.fspath(candidate):
+        raise ValueError("Path contains a null byte.")
 
-    # Path traversal check
+    # ``resolve(strict=False)`` makes the containment decision before the
+    # existence check, while still resolving symlinks for existing paths.
+    resolved = candidate.resolve(strict=False)
+
+    # Path traversal and symlink escape check
     if allowed_base is not None:
-        base = Path(allowed_base).resolve()
+        base = Path(allowed_base).resolve(strict=False)
         try:
             resolved.relative_to(base)
         except ValueError as exc:
@@ -132,6 +139,11 @@ def validate_path(
         raise FileNotFoundError(f"File not found: {resolved}")
 
     if not resolved.is_file():
+        raise ValueError(f"Path is not a regular file: {resolved}")
+
+    # Reject special files even if they report as file-like; ingestion must
+    # only read ordinary regular files and never block on a device/FIFO.
+    if not resolved.stat().st_mode & 0o170000 == 0o100000:
         raise ValueError(f"Path is not a regular file: {resolved}")
 
     return resolved
@@ -166,6 +178,8 @@ def validate_size(path: Path, max_bytes: int = MAX_FILE_SIZE_BYTES) -> int:
     ValueError
         If the file exceeds the size limit.
     """
+    if max_bytes < 1:
+        raise ValueError("Maximum file size must be greater than 0 bytes.")
     size = path.stat().st_size
     if size > max_bytes:
         raise ValueError(
@@ -243,6 +257,8 @@ def _read_json_secure(path: Path) -> pd.DataFrame:
     data = json.loads(content)
 
     if isinstance(data, list):
+        if not all(isinstance(record, dict) for record in data):
+            raise ValueError("JSON arrays must contain objects (records).")
         if len(data) > MAX_ROWS:
             data = data[:MAX_ROWS]
         df = pd.DataFrame(data)
@@ -276,6 +292,9 @@ def _read_ndjson_secure(path: Path) -> pd.DataFrame:
 
     if not records:
         raise ValueError("NDJSON file contains no valid records.")
+
+    if not all(isinstance(record, dict) for record in records):
+        raise ValueError("NDJSON records must be JSON objects.")
 
     df = pd.DataFrame(records)
 
@@ -321,6 +340,8 @@ class SecureFileHandler:
         max_file_size: int = MAX_FILE_SIZE_BYTES,
         require_columns: set[str] | None = None,
     ) -> None:
+        if max_file_size < 1:
+            raise ValueError("Maximum file size must be greater than 0 bytes.")
         self._allowed_base = allowed_base
         self._max_file_size = max_file_size
         self._require_columns = (
@@ -350,6 +371,11 @@ class SecureFileHandler:
 
             reader = _READERS[ext]
             df = reader(resolved)
+
+            if len(df) > MAX_ROWS:
+                raise ValueError(
+                    f"File contains {len(df):,} rows, exceeding maximum of {MAX_ROWS:,}."
+                )
 
             warnings: list[str] = []
 

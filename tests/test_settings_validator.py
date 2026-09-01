@@ -124,6 +124,34 @@ class TestSettingsValidator:
         assert "A" in rendered and "B" in rendered
 
 
+class TestRiskThresholdSpecs:
+    def _spec(self, name: str) -> SettingSpec:
+        return next(s for s in DEFAULT_LEDGERLENS_SPECS if s.name == name)
+
+    def test_risk_score_flag_threshold_rejects_out_of_range(self):
+        spec = self._spec("RISK_SCORE_FLAG_THRESHOLD")
+        issues = spec.check(700, present=True)
+        assert len(issues) == 1
+        assert "RISK_SCORE_FLAG_THRESHOLD" in str(issues[0])
+        assert "700" in issues[0].message
+
+    def test_risk_score_flag_threshold_accepts_in_range(self):
+        spec = self._spec("RISK_SCORE_FLAG_THRESHOLD")
+        assert spec.check(70, present=True) == []
+        assert spec.check(0, present=True) == []
+        assert spec.check(100, present=True) == []
+
+    def test_mad_nonconformity_threshold_rejects_negative(self):
+        spec = self._spec("MAD_NONCONFORMITY_THRESHOLD")
+        issues = spec.check(-0.5, present=True)
+        assert len(issues) == 1
+        assert "MAD_NONCONFORMITY_THRESHOLD" in str(issues[0])
+
+    def test_mad_nonconformity_threshold_accepts_default(self):
+        spec = self._spec("MAD_NONCONFORMITY_THRESHOLD")
+        assert spec.check(0.015, present=True) == []
+
+
 def test_default_ledgerlens_specs_validate_against_live_config():
     from config import Config
 

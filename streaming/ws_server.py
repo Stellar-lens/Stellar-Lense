@@ -651,9 +651,7 @@ async def _heartbeat(websocket, client_id: str) -> None:
                 )
                 break
             except Exception as exc:
-                logger.warning(
-                    "WebSocket heartbeat error for client %s: %s", client_id, exc
-                )
+                logger.warning("WebSocket heartbeat error for client %s: %s", client_id, exc)
                 break
     except asyncio.CancelledError:
         pass

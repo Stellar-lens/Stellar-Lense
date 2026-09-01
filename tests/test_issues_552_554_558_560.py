@@ -183,3 +183,39 @@ class TestRepoMaturity:
         assert "dimensions" in data
         assert "default_threshold" in data
         assert "version" in data
+
+    def test_main_writes_markdown_output(self, tmp_path):
+        """--output flag writes a clean Markdown summary to a file."""
+        from scripts.repo_maturity import main
+
+        output_path = tmp_path / "maturity.md"
+        rc = main(["--output", str(output_path), "--quiet"])
+        assert isinstance(rc, int)
+        assert output_path.exists(), f"Output file {output_path} was not created"
+        content = output_path.read_text(encoding="utf-8")
+
+        # Verify Markdown contains expected sections
+        assert "# Repository Maturity" in content or "Repository Maturity" in content
+        assert "Composite Score" in content
+        assert "/" in content  # Score fraction (e.g., "75/100")
+
+        # Verify it's not JSON or raw Python structures
+        assert not content.strip().startswith("{")
+        assert not content.strip().startswith("[")
+
+    def test_main_default_no_markdown_file(self, tmp_path, capsys):
+        """Without --output flag, no Markdown file is created; output goes to stdout."""
+        from scripts.repo_maturity import main
+
+        # Ensure output directory is clean
+        output_path = tmp_path / "nonexistent.md"
+        assert not output_path.exists()
+
+        # Run without --output
+        rc = main([])
+        captured = capsys.readouterr()
+
+        # Should write to stdout instead
+        assert "Composite score" in captured.out or "Repository Maturity" in captured.out
+        # File should not be created
+        assert not output_path.exists()

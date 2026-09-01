@@ -59,7 +59,10 @@ class TokenBucketLimiter:
             )
             client.ping()
             return client
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
+            # Broad catch justified: Redis connection can fail for many reasons
+            # (network, DNS, auth, etc.). Gracefully degrade to no-op rate limiting
+            # so ingestion continues without a distributed rate limit.
             self._warn(f"Redis unavailable ({exc})")
             return None
 
