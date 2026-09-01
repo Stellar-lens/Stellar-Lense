@@ -19,6 +19,10 @@ from datetime import UTC, datetime
 import numpy as np
 import pandas as pd
 
+from utils.logging import get_logger
+
+logger = get_logger(__name__)
+
 PSI_MODERATE_DRIFT_THRESHOLD = 0.25
 PSI_EPSILON = 1e-4
 
@@ -73,6 +77,12 @@ class DriftMonitor:
 
         for col in current_data.columns:
             if col not in self.reference:
+                logger.warning(
+                    "Skipping drift computation for feature %r: no reference "
+                    "distribution in model metadata (feature may be new since "
+                    "the last training run)",
+                    col,
+                )
                 continue
 
             ref = self.reference[col]
