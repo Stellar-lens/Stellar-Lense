@@ -175,6 +175,17 @@ jobs:
         run: python scripts/check_cli_contracts.py
 
       - name: Test
+        run: pytest -q
+
+  release-gate:
+    name: Production Release Gate (Blocking)
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
         # Live integration coverage has its own testnet workflow; PPO training
         # is intentionally kept out of the per-push feedback loop.
         run: >-
@@ -246,6 +257,20 @@ jobs:
           cache: pip
 
       - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install ruff black mypy bandit
+
+      - name: Run Release Gate
+        run: python scripts/release_gate.py
+        env:
+          LEDGERLENS_ENV: local
+
+      - name: Report Status
+        if: failure()
+        run: |
+          echo "❌ Release gate failed. This blocks deployment to production."
+          exit 1
         run: pip install -r requirements.txt
 
       - name: Fetch the base branch
