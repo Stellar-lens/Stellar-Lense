@@ -44,7 +44,7 @@ import fnmatch
 import threading
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, TypedDict
 
 import yaml
 
@@ -81,6 +81,20 @@ class RoutingConfigError(ValueError):
         self.rule_identifier = rule_identifier
         self.reason = reason
         super().__init__(f"invalid routing rule {rule_identifier!r}: {reason}")
+
+
+class Alert(TypedDict, total=False):
+    """Shape of an alert dict as consumed by routing rules.
+
+    All fields are optional (total=False) since alerts may be missing fields,
+    and routing rules handle missing fields gracefully (unset rules match any alert).
+    """
+
+    wallet_address: str
+    asset_pair: str
+    detectors: list[str]
+    risk_score: float
+    tenant: str
 
 
 @dataclass(frozen=True)
@@ -125,7 +139,7 @@ class RoutingRule:
     tenant: str | None = None
     stop_on_match: bool = False
 
-    def matches(self, alert: dict[str, Any]) -> bool:
+    def matches(self, alert: Alert) -> bool:
         if self.min_risk_score is not None:
             if float(alert.get("risk_score", 0)) < self.min_risk_score:
                 return False
@@ -246,7 +260,7 @@ class AlertRouter:
         with self._lock:
             self._rules = list(rules)
 
-    def route(self, alert: dict[str, Any]) -> list[RouteDestination]:
+    def route(self, alert: Alert) -> list[RouteDestination]:
         """Return the deduplicated, ordered list of destinations for *alert*.
 
         Rules are evaluated in registration order. Every matching rule's
@@ -286,7 +300,7 @@ class AlertRouter:
 
         return list(collected.values())
 
-    def explain(self, alert: dict[str, Any]) -> list[str]:
+    def explain(self, alert: Alert) -> list[str]:
         """Return the names of every rule that matches *alert*, in order.
 
         Diagnostic helper: when an alert goes to an unexpected destination

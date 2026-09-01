@@ -47,6 +47,10 @@ except Exception:  # pragma: no cover
     feature_cache_misses_total = None  # type: ignore[assignment]
 
 
+#: See ``streaming.feature_store.UNSCOPED_TENANT_NAMESPACE``.
+UNSCOPED_TENANT_NAMESPACE = "_unscoped"
+
+
 class FeatureCache:
     """Thread-safe TTL cache mapping wallet -> feature matrix (``pd.Series``).
 
@@ -56,42 +60,60 @@ class FeatureCache:
     :meth:`get` or :meth:`put` are moved to the most-recently-used position).
     """
 
-    def __init__(self, ttl_seconds: int | None = None, maxsize: int | None = None) -> None:
+    def __init__(
+        self,
+        ttl_seconds: int | None = None,
+        maxsize: int | None = None,
+        tenant_id: str | None = None,
+    ) -> None:
         self._ttl = ttl_seconds if ttl_seconds is not None else config.FEATURE_CACHE_TTL_SECONDS
         self._maxsize = maxsize if maxsize is not None else config.FEATURE_CACHE_MAXSIZE
         self._lock = threading.Lock()
         self._cache: OrderedDict[str, tuple[pd.Series, float]] = OrderedDict()
+        self.tenant_id = tenant_id
+
+    def _key(self, wallet: str) -> str:
+        """Namespace the cache key by tenant.
+
+        This cache is per-process, but a process serving more than one tenant
+        would otherwise let the first tenant to compute a wallet's features
+        serve them to the second. Keying by tenant removes that path.
+        """
+        return f"{self.tenant_id or UNSCOPED_TENANT_NAMESPACE}\x1f{wallet}"
 
     def get(self, wallet: str) -> pd.Series | None:
         """Return the cached feature matrix for *wallet*, or ``None`` on a miss."""
+        key = self._key(wallet)
         with self._lock:
-            entry = self._cache.get(wallet)
+            entry = self._cache.get(key)
             if entry is None:
                 self._record_miss()
                 return None
 
             series, cached_at = entry
             if time.monotonic() - cached_at >= self._ttl:
-                del self._cache[wallet]
+                del self._cache[key]
                 self._record_miss()
                 return None
 
-            self._cache.move_to_end(wallet)
+            self._cache.move_to_end(key)
             self._record_hit()
             return series
 
     def put(self, wallet: str, features: pd.Series) -> None:
         """Cache *features* for *wallet*, evicting the LRU entry if at capacity."""
+        key = self._key(wallet)
         with self._lock:
-            self._cache.pop(wallet, None)
-            self._cache[wallet] = (features, time.monotonic())
+            self._cache.pop(key, None)
+            self._cache[key] = (features, time.monotonic())
             while len(self._cache) > self._maxsize:
                 self._cache.popitem(last=False)
 
     def invalidate(self, wallet: str) -> None:
         """Remove *wallet* from the cache, if present."""
+        key = self._key(wallet)
         with self._lock:
-            self._cache.pop(wallet, None)
+            self._cache.pop(key, None)
 
     def __len__(self) -> int:
         with self._lock:

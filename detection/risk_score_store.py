@@ -33,14 +33,36 @@ class RiskScoreStore:
     def __init__(self, session_factory: sessionmaker[Session] | None = None):
         self._session_factory = session_factory or get_session_factory()
 
-    def upsert(self, wallet: str, asset_pair: str, risk_score: dict) -> RiskScoreRecord:
-        """Insert or update the `RiskScore` record for `(wallet, asset_pair)`."""
+    def upsert(
+        self,
+        wallet: str,
+        asset_pair: str,
+        risk_score: dict,
+        *,
+        finality: str = "provisional",
+    ) -> RiskScoreRecord:
+        """Insert or update the `RiskScore` record for `(wallet, asset_pair)`.
+
+        Parameters
+        ----------
+        finality:
+            ``"provisional"`` (default) for the continuous streaming/SSE
+            path, which has no window-close event. ``"final"`` for a
+            completed batch pipeline run or completed stream-replay run over
+            a closed, bounded time window (Issue #670). See
+            ``docs/adr/0001-unified-idempotency-finality.md``.
+        """
+        if finality not in ("provisional", "final"):
+            raise ValueError(f"finality must be 'provisional' or 'final', got {finality!r}")
         with _tracer.start_as_current_span("score.stored") as span:
             span.set_attribute("wallet.id", hash_span_id(wallet))
             span.set_attribute("score.value", risk_score.get("score", -1))
-            return self._upsert_impl(wallet, asset_pair, risk_score)
+            span.set_attribute("score.finality", finality)
+            return self._upsert_impl(wallet, asset_pair, risk_score, finality)
 
-    def _upsert_impl(self, wallet: str, asset_pair: str, risk_score: dict) -> RiskScoreRecord:
+    def _upsert_impl(
+        self, wallet: str, asset_pair: str, risk_score: dict, finality: str = "provisional"
+    ) -> RiskScoreRecord:
         """Internal upsert logic called inside an OTel span."""
         for attempt in range(5):
             try:
@@ -59,6 +81,7 @@ class RiskScoreStore:
                     existing.benford_flag = bool(risk_score["benford_flag"])
                     existing.ml_flag = bool(risk_score["ml_flag"])
                     existing.confidence = int(risk_score["confidence"])
+                    existing.finality = finality
                     if "propagated_risk" in risk_score:
                         existing.propagated_risk = float(risk_score["propagated_risk"])
                     if "ring_id" in risk_score:

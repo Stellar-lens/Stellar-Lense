@@ -10,6 +10,8 @@ Financial fields (amounts, prices) use Decimal type with validation to prevent
 float precision errors. See utils.decimal_guards for the precision guard system.
 """
 
+from __future__ import annotations
+
 from datetime import datetime
 from decimal import Decimal
 from typing import Any, Protocol
@@ -65,6 +67,14 @@ class Trade(BaseModel):
         from utils.decimal_guards import validate_stellar_amount
 
         return validate_stellar_amount(v)
+
+    def __repr__(self) -> str:
+        # Compact summary for readable log/debugger output, not exhaustive field dump.
+        pair = f"{self.base_asset.code}:{self.counter_asset.code}"
+        return (
+            f"Trade(id={self.trade_id!r}, pair={pair}, "
+            f"amount={self.base_amount}, time={self.ledger_close_time.isoformat()})"
+        )
 
     @property
     def amount(self) -> Decimal:

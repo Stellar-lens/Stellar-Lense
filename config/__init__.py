@@ -5,6 +5,8 @@ that ``from config import config`` and ``from config import Config`` continue
 to work even though a ``config/`` sub-package also exists at the project root.
 """
 
+from __future__ import annotations
+
 import importlib.util
 import os as _os
 

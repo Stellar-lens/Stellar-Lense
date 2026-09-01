@@ -212,6 +212,36 @@ def test_fallback_conservative_interval():
 # ---------------------------------------------------------------------------
 
 
+def test_coverage_guarantee_clamped_when_alpha_out_of_range(caplog):
+    """An out-of-range configured coverage (alpha < 0) is clamped to [0, 1] with a warning."""
+    import logging
+
+    X, y = make_classification(n_samples=300, n_features=5, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.5, random_state=42, stratify=y
+    )
+    X_cal, X_hold, y_cal, _ = train_test_split(
+        X_test, y_test, test_size=0.5, random_state=42, stratify=y_test
+    )
+
+    model = RandomForestClassifier(random_state=42, n_estimators=30)
+    model.fit(X_train, y_train)
+
+    # alpha = -0.5 → nominal coverage 1.5, which must be clamped to 1.0
+    calibrator = ConformalCalibrator(alpha=-0.5, random_state=42)
+    calibrator.calibrate(model, pd.DataFrame(X_cal), pd.Series(y_cal))
+
+    with caplog.at_level(logging.WARNING):
+        results = calibrator.predict_set(model, pd.DataFrame(X_hold))
+
+    assert results, "expected at least one prediction result"
+    for row in results:
+        assert 0.0 <= row["coverage_guarantee"] <= 1.0
+        assert row["coverage_guarantee"] == 1.0
+
+    assert any("coverage_guarantee" in r.message and "clamping" in r.message for r in caplog.records)
+
+
 def test_interval_width_shrinks_with_confidence():
     X_train = np.random.randn(300, 5)
     y_train = 50 + 10 * X_train[:, 0] + 5 * np.random.randn(300)

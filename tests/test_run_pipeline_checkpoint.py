@@ -224,4 +224,15 @@ def test_dry_run_ignores_checkpoint_file(tmp_path, two_pairs, caplog):
         )
 
     assert not ckpt_file.exists()
+
+
+def test_since_with_invalid_date_fails_at_arg_parsing(capsys):
+    """An invalid --since value must be rejected by argparse itself, with a clear
+    message, before any pipeline stage (e.g. a network call) runs."""
+    with patch("sys.argv", ["run_pipeline.py", "--since", "not-a-date"]):
+        with pytest.raises(SystemExit) as exc_info:
+            run_pipeline.parse_args()
+
+    assert exc_info.value.code == 2
+    assert "invalid --since value" in capsys.readouterr().err
     assert "--checkpoint-file has no effect with --dry-run" in caplog.text
