@@ -21,13 +21,38 @@ from ingestion.data_models import Asset, Trade
 # Mirrors ingestion/kafka_producer.py::_ASSET_CODE_RE.
 _CODE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
+# ---------------------------------------------------------------------------
+# Shared definitions of "valid" Stellar data.
+#
+# tests/factories.py imports these constants as well, so that the factory-style
+# generator and the Hypothesis strategies both draw from the same single
+# definition of what a valid Stellar wallet address and a valid trade amount
+# are — preventing the two modules from silently drifting into inconsistent
+# notions of "valid".
+# ---------------------------------------------------------------------------
+
+# A Stellar account/issuer id: "G" + 55 uppercase base32 characters.
+# Mirrors ingestion/kafka_producer.py::_ISSUER_RE (^G[A-Z0-9]{55}$).
+STELLAR_ACCOUNT_ID_PREFIX = "G"
+STELLAR_ACCOUNT_ID_ALPHABET = _CODE_ALPHABET
+STELLAR_ACCOUNT_ID_BODY_LENGTH = 55
+
+# Valid trade amount / price magnitude bounds (finite, positive, realistic).
+# factories.py keeps its patterned amounts within these same bounds.
+VALID_TRADE_AMOUNT_MIN = 1e-7
+VALID_TRADE_AMOUNT_MAX = 1e12
+VALID_TRADE_PRICE_MIN = 1e-9
+VALID_TRADE_PRICE_MAX = 1e6
+
 asset_codes = st.text(alphabet=_CODE_ALPHABET, min_size=1, max_size=12)
 
 # Stellar account/issuer IDs: "G" + 55 uppercase alphanumeric characters.
 # Mirrors ingestion/kafka_producer.py::_ISSUER_RE.
-stellar_ids = st.text(alphabet=_CODE_ALPHABET, min_size=55, max_size=55).map(
-    lambda tail: "G" + tail
-)
+stellar_ids = st.text(
+    alphabet=STELLAR_ACCOUNT_ID_ALPHABET,
+    min_size=STELLAR_ACCOUNT_ID_BODY_LENGTH,
+    max_size=STELLAR_ACCOUNT_ID_BODY_LENGTH,
+).map(lambda tail: STELLAR_ACCOUNT_ID_PREFIX + tail)
 
 # An asset's issuer field: None (native/XLM) or a valid issuer account id.
 issuers = st.one_of(st.none(), stellar_ids)
@@ -35,8 +60,18 @@ issuers = st.one_of(st.none(), stellar_ids)
 # Trade amounts/prices: finite, positive, within a realistic magnitude range.
 # IEEE-754 doubles round-trip exactly through the Avro "double" wire type, so
 # no tolerance is needed when asserting equality after encode/decode.
-finite_amounts = st.floats(min_value=1e-7, max_value=1e12, allow_nan=False, allow_infinity=False)
-finite_prices = st.floats(min_value=1e-9, max_value=1e6, allow_nan=False, allow_infinity=False)
+finite_amounts = st.floats(
+    min_value=VALID_TRADE_AMOUNT_MIN,
+    max_value=VALID_TRADE_AMOUNT_MAX,
+    allow_nan=False,
+    allow_infinity=False,
+)
+finite_prices = st.floats(
+    min_value=VALID_TRADE_PRICE_MIN,
+    max_value=VALID_TRADE_PRICE_MAX,
+    allow_nan=False,
+    allow_infinity=False,
+)
 
 # Trade ids / account ids used where only "some non-empty string" matters.
 non_empty_text = st.text(min_size=1, max_size=64).filter(lambda s: s.strip() != "")

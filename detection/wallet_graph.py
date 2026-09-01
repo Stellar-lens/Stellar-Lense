@@ -19,12 +19,18 @@ Also provides:
   same asset pair within a configurable time window.
 """
 
+from __future__ import annotations
+
 import hashlib
 import re
 import warnings
 from collections import Counter, defaultdict, deque
 from collections.abc import Iterable, Mapping, Sequence
-from datetime import UTC, datetime
+try:
+    from datetime import UTC, datetime
+except ImportError:
+    from datetime import datetime, timezone
+    UTC = timezone.utc  # type: ignore
 from itertools import combinations
 from typing import Literal, TypedDict
 
@@ -426,7 +432,9 @@ def ring_statistics(
     }
 
 
-def build_ring_statistics(community_map: dict[str, int], graph: nx.DiGraph) -> dict[int, RingStatistics]:
+def build_ring_statistics(
+    community_map: dict[str, int], graph: nx.DiGraph
+) -> dict[int, RingStatistics]:
     """Compute `ring_statistics` for every non-`NO_RING` community in the map.
 
     Parameters

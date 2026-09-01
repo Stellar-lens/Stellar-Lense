@@ -16,8 +16,10 @@ def test_single_passing_mode_exits_zero(monkeypatch, capsys):
 
     code = check_env.main(["--mode", "api"])
 
+    out = capsys.readouterr().out
     assert code == 0
-    assert "[OK]   api" in capsys.readouterr().out
+    assert "=== api ===" in out
+    assert "all checks passed" in out
 
 
 def test_single_failing_mode_exits_nonzero_and_prints_reason(monkeypatch, capsys):
@@ -30,8 +32,8 @@ def test_single_failing_mode_exits_nonzero_and_prints_reason(monkeypatch, capsys
 
     out = capsys.readouterr().out
     assert code == 1
-    assert "[FAIL] api" in out
-    assert "API_KEYS" in out
+    assert "=== api ===" in out
+    assert "FAIL: API_KEYS" in out
 
 
 def test_all_flag_checks_every_registered_mode(monkeypatch, capsys):
@@ -69,3 +71,41 @@ def test_mode_and_all_are_mutually_exclusive():
 def test_requires_mode_or_all():
     with pytest.raises(SystemExit):
         check_env.main([])
+
+
+def test_explain_known_variable_prints_info(capsys):
+    """Test that --explain prints info for a known contract variable."""
+    code = check_env.main(["--explain", "RISK_SCORE_DB_URL"])
+
+    assert code == 0
+    out = capsys.readouterr().out
+
+    # Should show the variable name and default
+    assert "RISK_SCORE_DB_URL" in out
+    assert "Default:" in out
+    assert "api" in out  # Should mention the api mode
+
+
+def test_explain_unknown_variable_exits_with_error(capsys):
+    """Test that --explain on unknown variable gives clear error message."""
+    code = check_env.main(["--explain", "NONEXISTENT_VAR"])
+
+    assert code == 1
+    err = capsys.readouterr().err
+
+    # Should have clear error message, not a traceback
+    assert "not a recognised contract variable" in err
+    assert "NONEXISTENT_VAR" in err
+    assert "Traceback" not in err
+
+
+def test_explain_lists_all_applicable_modes(capsys):
+    """Test that --explain shows all modes that use the variable."""
+    code = check_env.main(["--explain", "MODEL_DIR"])
+
+    assert code == 0
+    out = capsys.readouterr().out
+
+    # MODEL_DIR is used in multiple modes
+    assert "api" in out
+    assert "streaming_sse" in out or "training" in out  # At least one more mode

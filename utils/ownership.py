@@ -369,3 +369,48 @@ def _matches_pattern(file_path: str, pattern: str) -> bool:
         return file_path.startswith(pattern) or fnmatch.fnmatch(file_path, pattern + "*")
 
     return fnmatch.fnmatch(file_path, pattern)
+
+
+def check_ownership_compliance(
+    changed_files: list[str],
+    required_owners: set[str] | None = None,
+    repo_root: str | Path | None = None,
+) -> tuple[bool, list[str]]:
+    """Check if changed files have owners defined in CODEOWNERS.
+
+    Args:
+        changed_files: List of file paths (relative to repo root) that were changed.
+        required_owners: Set of owner handles that must be present for the check to pass.
+                        If None, any owner is acceptable.
+        repo_root: Repository root path. If None, walks up from utils/ownership.py.
+
+    Returns:
+        Tuple of (all_compliant: bool, violations: list[str]).
+        Each violation string names the file and its matching CODEOWNERS pattern/owner.
+    """
+    registry = OwnershipRegistry.load(repo_root)
+    violations: list[str] = []
+
+    for file_path in changed_files:
+        # Find the matching CODEOWNERS entry for this file
+        matching_entry: CodeOwnersEntry | None = None
+        for entry in registry.codeowners_entries:
+            if _matches_pattern(file_path, entry.pattern):
+                matching_entry = entry
+
+        if matching_entry:
+            owners = matching_entry.owners
+            owner_list = ", ".join(owners)
+            if required_owners and not any(owner in owners for owner in required_owners):
+                violations.append(
+                    f"  {file_path}: matches pattern '{matching_entry.pattern}' "
+                    f"(owners: {owner_list}) — no reviewer from {required_owners} "
+                    f"is assigned"
+                )
+        else:
+            violations.append(
+                f"  {file_path}: no CODEOWNERS pattern matches this file "
+                f"— add a pattern to .github/CODEOWNERS"
+            )
+
+    return len(violations) == 0, violations

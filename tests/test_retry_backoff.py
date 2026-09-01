@@ -300,7 +300,6 @@ class TestBackoffStateDoesNotLeakBetweenRequests:
         invocation["call_attempt"] = 0
         r1 = fetch_page()
         assert r1 == "page-3"  # n increments each attempt
-        delays_after_first_call = list(delays_recorded)
 
         # Reset attempt counter for the second outer call
         invocation["call_attempt"] = 0

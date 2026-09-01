@@ -28,10 +28,17 @@ wallets, and dispatches alerts.
 
 Delivery semantics
 -------------------
-At-least-once: the consumer commits a message's offset **only after** scoring
-and alert dispatch have completed for that message. If
-:meth:`AlertDispatcher.dispatch` raises, the offset is left uncommitted so the
-message is redelivered after a restart/rebalance.
+Exactly-once *effects*, at-least-once *delivery* (Issue #670): the consumer
+commits a message's offset **only after** its dedup key has been durably
+committed in :class:`~pipeline.exactly_once.ExactlyOnceStore`, which in turn
+only happens **after** scoring and alert dispatch have completed for both
+wallets. The dedup key is *staged* (not committed) before processing begins.
+If :meth:`AlertDispatcher.dispatch` raises, neither the dedup key nor the
+Kafka offset is committed, so the message is redelivered after a
+restart/rebalance and is correctly recognised as "redo this", not "already
+done" — see :meth:`KafkaWorker._process_correlated_message` and
+``docs/adr/0001-unified-idempotency-finality.md`` for the full ordering
+argument and the bug this replaced.
 
 Poison-pill protection
 -----------------------
@@ -59,6 +66,13 @@ from config import config
 from ingestion.avro_codec import deserialize, load_schema, record_to_trade, validate
 from monitoring.capacity_metrics import record_e2e_latency
 from monitoring.emergency_watchdog import EmergencyWatchdog
+from pipeline.exactly_once import (
+    DedupBackendUnavailableError,
+    DedupKey,
+    DedupState,
+    ExactlyOnceStore,
+    RedisExactlyOnceBackend,
+)
 from streaming.alert_dispatcher import AlertDispatcher
 from streaming.feature_buffer import FeatureBuffer
 from streaming.health import WorkerHealthMonitor, get_health_registry
@@ -100,14 +114,26 @@ KAFKA_BACKPRESSURE_RESUMES = Counter(
     "Total times a partition was resumed after draining below low-water-mark",
     ["topic", "partition"],
 )
+KAFKA_DEDUP_BACKEND_DEGRADED = Counter(
+    "kafka_dedup_backend_degraded_total",
+    "Total times the exactly-once dedup backend was unreachable while processing a message",
+)
 
 
 class DeduplicationCache:
-    """Redis SET-based deduplication keyed by (ledger_sequence, trade_id).
+    """Two-phase exactly-once dedup for the Kafka worker, keyed by
+    ``(ledger_sequence, trade_id)`` via :class:`~pipeline.exactly_once.ExactlyOnceStore`.
 
-    Acts as a second-layer defence for consumers that do not support Kafka
-    transactions.  Uses SETNX with a configurable TTL so the set stays bounded.
-    Falls back to a no-op when Redis is unavailable (logs a warning once).
+    This is a thin, source-scoped wrapper around the shared library (Issue
+    #670) — it replaces the previous single-phase Redis ``SETNX`` cache,
+    which marked a message "seen" *before* its side effects were known to
+    have completed and fell back to "not a duplicate" on any Redis error.
+    Both of those were the root cause of the critical silent-drop bug this
+    issue fixes: see ``docs/adr/0001-unified-idempotency-finality.md``.
+
+    Raises ``DedupBackendUnavailableError`` (imported from
+    ``pipeline.exactly_once``) from :meth:`check_and_stage`/:meth:`commit`
+    when Redis is unreachable — there is no silent "allow through" fallback.
     """
 
     def __init__(
@@ -115,29 +141,31 @@ class DeduplicationCache:
         redis_url: str | None = None,
         ttl_seconds: int | None = None,
     ) -> None:
-        self._ttl = ttl_seconds if ttl_seconds is not None else config.KAFKA_DEDUP_TTL_SECONDS
-        self._redis = None
-        self._unavailable = False
-        try:
-            import redis
+        ttl = ttl_seconds if ttl_seconds is not None else config.KAFKA_DEDUP_TTL_SECONDS
+        backend = RedisExactlyOnceBackend(
+            redis_url or config.REDIS_URL, key_prefix="ledgerlens:kafka_dedup:"
+        )
+        self._store = ExactlyOnceStore(backend, ttl_seconds=float(ttl))
 
-            self._redis = redis.from_url(redis_url or config.REDIS_URL, decode_responses=True)
-            self._redis.ping()
-        except Exception as exc:
-            logger.warning("DeduplicationCache: Redis unavailable — dedup disabled: %s", exc)
-            self._unavailable = True
+    @staticmethod
+    def _key(ledger_sequence: int | str, trade_id: str) -> DedupKey:
+        return DedupKey(source="kafka_trade", external_id=f"{ledger_sequence}:{trade_id}")
 
-    def is_duplicate(self, ledger_sequence: int | str, trade_id: str) -> bool:
-        """Return True if this (ledger_sequence, trade_id) pair has been seen before."""
-        if self._unavailable or self._redis is None:
-            return False
-        key = f"dedup:{ledger_sequence}:{trade_id}"
-        try:
-            added = self._redis.set(key, "1", nx=True, ex=self._ttl)
-            return added is None  # None → key already existed → duplicate
-        except Exception as exc:
-            logger.warning("DeduplicationCache: Redis error during check: %s", exc)
-            return False
+    def check_and_stage(self, ledger_sequence: int | str, trade_id: str) -> DedupState:
+        """Stage the key for this message and return its dedup state.
+
+        ``DedupState.COMMITTED`` means the message's side effects already
+        durably completed — skip reprocessing. ``DedupState.NEW`` or
+        ``DedupState.STAGED`` mean it must be (re)processed.
+        """
+        return self._store.check_and_stage(self._key(ledger_sequence, trade_id)).state
+
+    def commit(self, ledger_sequence: int | str, trade_id: str) -> None:
+        """Durably mark this message's side effects as complete."""
+        self._store.commit(self._key(ledger_sequence, trade_id))
+
+    def is_available(self) -> bool:
+        return self._store.is_available()
 
 
 class BackPressureController:
@@ -259,6 +287,7 @@ class KafkaWorker:
         schema_path: str | None = None,
         metrics_port: int | None = None,
         enable_backpressure: bool = True,
+        dedup_cache: DeduplicationCache | None = None,
     ) -> None:
         self._scorer = scorer
         self._dispatcher = dispatcher
@@ -269,6 +298,16 @@ class KafkaWorker:
         self._lag_threshold = (
             lag_threshold if lag_threshold is not None else config.KAFKA_LAG_ALERT_THRESHOLD
         )
+        if self._lag_threshold is None or not isinstance(self._lag_threshold, int):
+            raise ValueError(
+                f"KAFKA_LAG_ALERT_THRESHOLD must be a positive integer, got "
+                f"{self._lag_threshold!r}"
+            )
+        if self._lag_threshold <= 0:
+            raise ValueError(
+                f"KAFKA_LAG_ALERT_THRESHOLD must be a positive integer, got "
+                f"{self._lag_threshold!r}"
+            )
         self._metrics_port = metrics_port
         self._running = False
         self._in_flight: dict[tuple[str, int], int] = defaultdict(int)
@@ -287,7 +326,7 @@ class KafkaWorker:
             if enable_backpressure
             else None
         )
-        self._dedup_cache = DeduplicationCache()
+        self._dedup_cache = dedup_cache if dedup_cache is not None else DeduplicationCache()
         self._health_monitor = WorkerHealthMonitor("kafka_worker")
         get_health_registry().register(self._health_monitor)
 
@@ -399,12 +438,38 @@ class KafkaWorker:
 
         self._check_lag(msg)
 
-        # Exactly-once second-layer dedup via Redis.
+        # Exactly-once dedup: stage the key BEFORE any side effect runs, and
+        # only commit it AFTER scoring + dispatch durably succeed for both
+        # wallets (see the docstring at the top of this module and
+        # docs/adr/0001-unified-idempotency-finality.md). Staging before
+        # processing — rather than the previous single-phase "mark seen then
+        # process" — is what makes a crash between staging and commit safe:
+        # redelivery sees STAGED ("redo this"), never a false COMMITTED.
         ledger_seq = record.get("ledger_sequence", msg.offset())
         trade_id = record.get("trade_id", "")
-        if self._dedup_cache.is_duplicate(ledger_seq, trade_id):
+        try:
+            dedup_state = self._dedup_cache.check_and_stage(ledger_seq, trade_id)
+        except DedupBackendUnavailableError as exc:
+            # Fail closed: never treat "unknown" as "not a duplicate". Leave
+            # the offset uncommitted so this message is retried (halting
+            # effective progress on this partition) rather than risking a
+            # silent duplicate-processing or silent-drop outcome.
+            KAFKA_DEDUP_BACKEND_DEGRADED.inc()
+            self._health_monitor.update_details("dedup_backend_degraded", str(exc))
+            logger.error(
+                "Dedup backend unavailable for %s[%d]@%d — refusing to process "
+                "without a dedup guarantee: %s",
+                msg.topic(),
+                msg.partition(),
+                msg.offset(),
+                exc,
+            )
+            self._in_flight[tp_key] = max(0, self._in_flight[tp_key] - 1)
+            raise
+
+        if dedup_state is DedupState.COMMITTED:
             logger.debug(
-                "Duplicate trade %s (ledger=%s) skipped — dedup cache hit",
+                "Duplicate trade %s (ledger=%s) skipped — dedup key already committed",
                 trade_id,
                 ledger_seq,
             )
@@ -412,6 +477,10 @@ class KafkaWorker:
             self._in_flight[tp_key] = max(0, self._in_flight[tp_key] - 1)
             return
 
+        # dedup_state is NEW or STAGED (a prior attempt staged this key but
+        # crashed before committing it) — process (or reprocess) the message.
+        # FeatureBuffer.update is idempotent per (wallet, trade_id), so
+        # reprocessing a STAGED message never double-counts feature state.
         self._buffer.update(record_to_trade(record))
         pair_id = record["asset_pair"]
 
@@ -440,6 +509,27 @@ class KafkaWorker:
 
                 if self._watchdog is not None:
                     self._watchdog.record_score(wallet, score, e2e_latency_ms)
+
+        # Commit the dedup key BEFORE the Kafka offset: if the process dies
+        # between these two commits, redelivery sees COMMITTED and just
+        # advances the offset without reprocessing — no double dispatch, no
+        # dropped wallet. If dispatch raised above, neither commit is
+        # reached, and the message is correctly redelivered as STAGED.
+        try:
+            self._dedup_cache.commit(ledger_seq, trade_id)
+        except DedupBackendUnavailableError as exc:
+            KAFKA_DEDUP_BACKEND_DEGRADED.inc()
+            self._health_monitor.update_details("dedup_backend_degraded", str(exc))
+            logger.error(
+                "Dedup backend unavailable while committing %s[%d]@%d — offset left "
+                "uncommitted; side effects already ran and are safe to redo on retry: %s",
+                msg.topic(),
+                msg.partition(),
+                msg.offset(),
+                exc,
+            )
+            self._in_flight[tp_key] = max(0, self._in_flight[tp_key] - 1)
+            raise
 
         self._consumer.commit(message=msg, asynchronous=False)
         KAFKA_MESSAGES_CONSUMED.inc()
