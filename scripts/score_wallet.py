@@ -73,6 +73,7 @@ class InsufficientTradeHistoryError(ScoreWalletError):
 
 def parse_asset_pair(pair_str: str) -> tuple[SdkAsset, SdkAsset]:
     """Parse a pair string like 'CODE:ISSUER/CODE:ISSUER' or 'CODE:ISSUER' (assumes XLM counter)."""
+    validate_pair_format(pair_str)
     try:
         if "/" in pair_str:
             base_str, counter_str = pair_str.split("/")
