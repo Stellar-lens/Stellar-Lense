@@ -235,7 +235,11 @@ def stream_amm_pool_trades(pool_id: str) -> Generator[Trade, None, None]:
                     continue
                 cursor = record["paging_token"]
                 yield trade
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
+            # Broad catch justified: streaming can fail on connection issues, server
+            # errors, or SDK-level failures. Must reconnect and resume rather than
+            # crashing the entire streaming loop; a single transient error should not
+            # stop ingestion for this pool.
             logger.warning("AMM stream error for pool %s: %s — reconnecting", pool_id, exc)
 
 

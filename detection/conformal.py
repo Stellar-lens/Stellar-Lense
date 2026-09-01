@@ -10,6 +10,8 @@ Angelopoulos, A.N. & Bates, S. (2023) "Conformal prediction: A gentle
 introduction." Foundations and Trends in Machine Learning, 16(4), 494–591.
 """
 
+from __future__ import annotations
+
 import hashlib
 import json
 import os
