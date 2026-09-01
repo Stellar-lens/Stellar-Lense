@@ -87,6 +87,13 @@ def deduplicate(
     is still within the window correctly merges into the existing group
     rather than starting a new one.
 
+    Window boundary: the silence window is half-open --
+    ``[last_seen, last_seen + window_seconds)``. An alert landing at exactly
+    ``last_seen + window_seconds`` is treated as *outside* the window and
+    starts a new group, so ``window_seconds`` is the longest silence that
+    still merges. This is the safer of the two readings: it never holds an
+    alert back beyond the configured window.
+
     Evidence merging: the flushed alert carries the union of every
     contributing detector name, the maximum risk score across all signals in
     the group, the union of all ``evidence`` dict fields (later values win on

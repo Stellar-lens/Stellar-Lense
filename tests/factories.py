@@ -20,25 +20,29 @@ from factory.fuzzy import FuzzyDecimal
 
 from ingestion.data_models import Asset, Trade
 
+# Reuse the single source of truth for what a "valid" Stellar wallet address
+# and trade amount look like (see tests/strategies.py). This keeps the two
+# test-data modules from drifting into inconsistent definitions.
+from tests.strategies import STELLAR_ACCOUNT_ID_ALPHABET, STELLAR_ACCOUNT_ID_PREFIX
+
 
 def generate_stellar_account_id(seed: str = "") -> str:
     """Generate a valid Stellar G-prefixed Ed25519 account ID.
 
     Format: G + base32(32-byte Ed25519 public key) where base32 uses Stellar alphabet.
-    Minimal correctness: G + 56 alphanumeric chars matching Stellar's alphabet.
+    Minimal correctness: G + alphanumeric chars using the shared Stellar
+    account-id alphabet from tests/strategies.py.
     """
     if seed:
         h = hashlib.sha256(seed.encode()).digest()
     else:
         h = hashlib.sha256(str(uuid.uuid4()).encode()).digest()
 
-    # Stellar base32 alphabet (RFC4648 with no padding, but we'll use a simple one)
-    ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
     encoded = ""
     for byte in h:
-        encoded += ALPHABET[byte % 32]
+        encoded += STELLAR_ACCOUNT_ID_ALPHABET[byte % len(STELLAR_ACCOUNT_ID_ALPHABET)]
 
-    return "G" + encoded[:56]
+    return STELLAR_ACCOUNT_ID_PREFIX + encoded[:56]
 
 
 class AssetFactory(Factory):
@@ -77,7 +81,8 @@ class CleanTradeFactory(Factory):
     def base_amount(o) -> float:
         """Log-uniform amount (Benford-conforming)."""
         rng = np.random.default_rng(seed=random.randint(0, 2**31 - 1))
-        # Log-uniform in [10^2, 10^8] = [100, 100M]
+        # Log-uniform in [10^2, 10^8] = [100, 100M] — within the shared
+        # "valid trade amount" bounds (VALID_TRADE_AMOUNT_MIN..MAX).
         return round(float(10 ** rng.uniform(2, 8)), 7)
 
     counter_amount = FuzzyDecimal(10, 10000, precision=7)

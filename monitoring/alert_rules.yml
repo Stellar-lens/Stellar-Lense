@@ -192,3 +192,52 @@ groups:
             (2) the feature engineering pipeline is blocked/crashed.
             Check: Horizon API connectivity, streaming pipeline status, Prometheus scrape logs.
           runbook_url: "https://github.com/Ledger-Lenz/Ledgerlens-data/docs/monitoring.md#runbook-throughput"
+
+  - name: ledgerlens_model_governance
+    interval: 5m
+    rules:
+      # Grand 2 (issue #671, Task F): CovarianceShiftDetector.detect() had no
+      # failure handling — a silently-broken drift monitor (e.g. an unhandled
+      # exception on every call) would never surface. This is a DISTINCT
+      # alert from PairHealthScoreLow/BenfordThroughputCritical above: those
+      # detect degraded *scoring*, this detects that drift *monitoring
+      # itself* has stopped running or has been failing, which those cannot
+      # observe.
+      - alert: DriftMonitorHeartbeatStale
+        expr: |
+          ledgerlens_drift_monitor_stale == 1
+          or
+          (time() - ledgerlens_drift_monitor_last_success_unixtime) > 3600
+        for: 5m
+        labels:
+          severity: critical
+          slo: "model_governance"
+        annotations:
+          summary: "Drift-check failed: CovarianceShiftDetector heartbeat is stale"
+          description: >
+            No successful CovarianceShiftDetector.detect() call has been recorded
+            within DRIFT_MONITOR_HEARTBEAT_MAX_AGE_SECONDS (default 3600s). Either the
+            monitor process has stopped running the periodic check, or every recent
+            call has raised an exception (see ledgerlens_drift_monitor_check_failures_total).
+            Treat feature-drift monitoring as DOWN until resolved — retraining triggers
+            depending on drift detection will not fire.
+          runbook_url: "https://github.com/Ledger-Lenz/Ledgerlens-data/docs/model_rollback_runbook.md#drift-monitor-health"
+
+      # Grand 2: every promotion/rollback attempt is authorized and audited.
+      # A burst of denied attempts in a short window is a signal of either a
+      # misconfigured automation actor (credential drift after a secret
+      # rotation) or an active unauthorized-access attempt.
+      - alert: ModelPromotionUnauthorizedAttempts
+        expr: |
+          sum(increase(ledgerlens_promotion_denied_total[15m])) > 3
+        for: 1m
+        labels:
+          severity: warning
+          slo: "model_governance"
+        annotations:
+          summary: "Multiple denied model promotion/rollback attempts in 15m"
+          description: >
+            More than 3 promotion/rollback attempts were denied (unauthorized actor,
+            regression gate, or trust-chain failure) in the last 15 minutes. Check the
+            promotion_audit_log table for the actor and reason.
+          runbook_url: "https://github.com/Ledger-Lenz/Ledgerlens-data/docs/model_rollback_runbook.md#authorization-failures"

@@ -1,5 +1,8 @@
 # Cold-Start Scoring with Neural Process Meta-Learning
 
+> Last verified against code: 2026-08-28. `NP_COLD_START_THRESHOLD` and the
+> blend formula below were checked against `detection/neural_process.py`.
+
 ## Overview
 
 When a new asset pair is first listed on the Stellar DEX, the system has too few
@@ -49,38 +52,37 @@ trade history accumulates.
 
 ## Usage
 
+`detection/neural_process.py` is not currently wired into
+`detection.model_inference.RiskScorer` — there is no `score_cold_start`
+method on the main scorer. The module is used directly today (see
+`detection/certified_robustness.py` and `scripts/run_adversarial_eval.py`).
+The public API is the `NeuralProcess` class plus the blending helpers:
+
 ```python
-from detection.model_inference import RiskScorer
+from detection.neural_process import NeuralProcess, cold_start_blend_weight, blend_scores
 import numpy as np
 
-scorer = RiskScorer()
+np_model = NeuralProcess(feature_dim=32)
 
 # context_features: (n_context, feature_dim) array of seed trades
 # context_labels:   binary wash-trade labels for context trades
-result = scorer.score_cold_start(
-    feature_row=feature_row,
+np_score = np_model.predict_score(
     context_features=np.array([...]),
     context_labels=[0, 1, 0, 1, 0],
-    trade_count=5,
+    query_feature_row=feature_row,
 )
-# result["np_cold_start"] == True
-# result["np_blend_weight"] == 0.9
+
+blend_weight = cold_start_blend_weight(trade_count=5)  # == 0.9
+blended = blend_scores(np_score, ensemble_score, trade_count=5)
 ```
 
-## Security
-
-Context trades provided at inference time are validated against the feature
-schema before encoding.  Any trade with an unrecognised schema hash raises a
-`RuntimeError` before the NP encoder is invoked, matching the behaviour of the
-main ensemble scorer.
+Wiring this into `RiskScorer` so the ensemble path picks it up automatically
+is tracked as a separate follow-up, not covered by this doc.
 
 ## Testing
 
-```bash
-pytest tests/test_neural_process.py -v
-```
-
-Key tests:
-- **Consistency**: identical context and query sets must produce identical predictions.
-- **Cold-start regression**: NP scores on known wash-trade pairs must exceed 50
-  with as few as 5 context trades.
+There is no dedicated `tests/test_neural_process.py` yet; `NeuralProcess` is
+currently exercised indirectly through `detection/certified_robustness.py`
+and `scripts/run_adversarial_eval.py`. Adding direct unit tests (consistency
+of predictions for identical context/query sets, cold-start regression on
+known wash-trade pairs) is tracked as a separate follow-up.

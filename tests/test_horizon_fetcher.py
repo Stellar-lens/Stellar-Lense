@@ -51,11 +51,17 @@ def test_429_exhausts_retries_and_raises(monkeypatch):
 
     monkeypatch.setattr(config_module.config, "HORIZON_MAX_RETRIES", 3)
 
+    attempts = {"n": 0}
+
     def call():
+        attempts["n"] += 1
         raise _HttpError(429)
 
-    with pytest.raises(HorizonRateLimitExceeded):
+    with pytest.raises(HorizonRateLimitExceeded, match="3 attempts") as excinfo:
         fetch(call, limiter=_NoopLimiter(), sleep_fn=lambda d: None, jitter_fn=_no_jitter)
+
+    assert attempts["n"] == 3
+    assert "all 3 attempts" in str(excinfo.value)
 
 
 def test_non_429_4xx_is_not_retried(monkeypatch):

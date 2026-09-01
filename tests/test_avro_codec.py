@@ -7,7 +7,9 @@ Kafka messages, so its failure modes are asserted explicitly.
 import pytest
 
 from ingestion.avro_codec import (
+    SchemaDecodeError,
     SchemaRegistry,
+    deserialize,
     load_schema,
     record_to_trade,
     serialize,
@@ -157,3 +159,46 @@ def test_registry_rejects_an_unknown_new_fingerprint(schema):
         registry.check_forward_compatibility(known, -1)
 
     assert "Unknown fingerprint (new)" in str(excinfo.value)
+
+
+# ---------------------------------------------------------------------------
+# Malformed payload deserialisation (issue #682)
+# ---------------------------------------------------------------------------
+
+
+def test_deserialize_rejects_a_truncated_payload(schema):
+    """A payload cut off mid-record raises SchemaDecodeError, not a bare exception."""
+    full = serialize(trade_to_record(_trade()), schema)
+    truncated = full[: len(full) // 2]
+
+    with pytest.raises(SchemaDecodeError):
+        deserialize(truncated, schema)
+
+
+def test_deserialize_rejects_an_empty_payload(schema):
+    """An empty payload has no bytes to decode — SchemaDecodeError is raised."""
+    with pytest.raises(SchemaDecodeError):
+        deserialize(b"", schema)
+
+
+def test_deserialize_rejects_a_payload_encoded_against_a_different_schema(schema):
+    """Bytes written with a mismatched schema do not decode under the trade schema."""
+    other_schema = {
+        "type": "record",
+        "name": "Trade",
+        "namespace": "io.ledgerlens",
+        "fields": [{"name": "completely_different", "type": "string"}],
+    }
+    payload = serialize({"completely_different": "surprise"}, other_schema)
+
+    with pytest.raises(SchemaDecodeError):
+        deserialize(payload, schema)
+
+
+def test_deserialize_wraps_failures_in_schema_decode_error(schema):
+    """All malformed-payload failures surface as SchemaDecodeError (a ValueError)."""
+    for bad_payload in (b"", b"\x00\x01\x02", serialize(trade_to_record(_trade()), schema)[:-1]):
+        with pytest.raises(SchemaDecodeError):
+            deserialize(bad_payload, schema)
+        with pytest.raises(ValueError):
+            deserialize(bad_payload, schema)

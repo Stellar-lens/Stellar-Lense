@@ -1,4 +1,4 @@
-.PHONY: install lint format test run scale-workers typecheck mutation-test threshold-sweep anonymization-check check-env check-schema-compatibility check-review-gates ops-check ops-validate static-analysis benchmark verify-lockfile regenerate-lockfile partition-write partition-read retention-scan snapshot-freeze snapshot-list snapshot-verify run-compare run-compare-all check-cycles check-boundaries probe-deps probe-deps-json validate-readme validate-readme-warn validate-notebooks validate-notebooks-strict validate-notebooks-ci validate-all check-integrity dead-path-report env-docs env-docs-check migrate migrate-status migrate-dry-run new-migration onboard onboard-fix onboard-json
+.PHONY: install lint format test run scale-workers typecheck mutation-test threshold-sweep anonymization-check check-env check-schema-compatibility check-review-gates ops-check ops-validate static-analysis benchmark verify-lockfile regenerate-lockfile dependency-risk-report dependency-risk-report-osv partition-write partition-read retention-scan snapshot-freeze snapshot-list snapshot-verify run-compare run-compare-all check-cycles probe-deps probe-deps-json validate-readme validate-readme-warn validate-notebooks validate-notebooks-strict validate-notebooks-ci validate-all check-integrity dead-path-report env-docs env-docs-check migrate migrate-status migrate-dry-run new-migration onboard onboard-fix onboard-json
 .ONESHELL:
 
 VENV_BIN := $(abspath .venv/bin)
@@ -30,6 +30,12 @@ format:
 
 test:
 	$(PYTEST) -q
+
+test-fast:
+	$(PYTEST) -q -m "not integration and not slow" --ignore=tests/fuzz
+
+check-env-example:
+	$(PYTHON) -m scripts.check_env_example
 
 # ---------------------------------------------------------------------------
 # Source package integrity checks (Issue #540)
@@ -465,6 +471,18 @@ verify-lockfile:
 regenerate-lockfile:
 	@echo "==> Regenerating requirements.lock from current environment..."
 	$(PYTHON) scripts/verify_lockfile.py --generate
+
+# ---------------------------------------------------------------------------
+# Dependency risk reporting (Issue #478)
+#
+# The default report is deterministic and offline. Use dependency-risk-report-osv
+# when network access is available to enrich it with OSV.dev advisories.
+# ---------------------------------------------------------------------------
+dependency-risk-report:
+	$(PYTHON) scripts/dependency_risk_report.py
+
+dependency-risk-report-osv:
+	$(PYTHON) scripts/dependency_risk_report.py --osv
 
 # ---------------------------------------------------------------------------
 # Threshold sweep — run threshold diagnostics on a backtest dataset

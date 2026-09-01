@@ -502,6 +502,8 @@ def idempotent_upsert(
     wallet: str,
     asset_pair: str,
     risk_score: dict,
+    *,
+    finality: str = "provisional",
 ) -> tuple[bool, Any]:
     """Write *risk_score* only when the content differs from the stored record.
 
@@ -545,5 +547,5 @@ def idempotent_upsert(
             )
             return False, existing
 
-    record = store.upsert(wallet, asset_pair, risk_score)
+    record = store.upsert(wallet, asset_pair, risk_score, finality=finality)
     return True, record

@@ -143,7 +143,10 @@ def test_verify_chain_raises_on_wrong_sha256(tmp_path):
         f.write(b"tampered-model-data")
 
     artifact = ModelArtifact(model_dir)
-    with pytest.raises(ModelIntegrityError, match="SHA-256 mismatch"):
+    with pytest.raises(
+        ModelIntegrityError,
+        match=r"SHA-256 mismatch for rf.*Remediation: restore the model artifact",
+    ):
         artifact.verify_chain("rf", public_key=public_key)
 
 
@@ -155,7 +158,10 @@ def test_verify_chain_raises_on_invalid_signature(tmp_path):
         f.write(b"\x00" * 64)
 
     artifact = ModelArtifact(model_dir)
-    with pytest.raises(ModelIntegrityError, match="signature verification failed"):
+    with pytest.raises(
+        ModelIntegrityError,
+        match=r"signature verification failed.*Remediation: re-run.*publish_model_artifact.py",
+    ):
         artifact.verify_chain("rf", public_key=public_key)
 
 
@@ -164,7 +170,10 @@ def test_verify_chain_raises_on_wrong_signing_key_fingerprint(tmp_path):
     wrong_fingerprint = "a" * 64
 
     artifact = ModelArtifact(model_dir)
-    with pytest.raises(ModelIntegrityError, match="fingerprint mismatch"):
+    with pytest.raises(
+        ModelIntegrityError,
+        match=r"fingerprint mismatch.*Remediation: set TRUSTED_SIGNING_KEY_FINGERPRINT",
+    ):
         artifact.verify_chain("rf", public_key=public_key, trusted_fingerprint=wrong_fingerprint)
 
 
@@ -172,7 +181,10 @@ def test_verify_chain_raises_on_mismatched_training_data_sha256(tmp_path):
     public_key, model_dir = _setup_valid_artifact(tmp_path)
 
     artifact = ModelArtifact(model_dir)
-    with pytest.raises(ModelIntegrityError, match="Training data SHA-256 mismatch"):
+    with pytest.raises(
+        ModelIntegrityError,
+        match=r"Training data SHA-256 mismatch.*Remediation: re-run.*publish_model_artifact.py",
+    ):
         artifact.verify_chain(
             "rf",
             public_key=public_key,
