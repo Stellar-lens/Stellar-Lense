@@ -8,6 +8,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Single, authenticated, cryptographically-gated model promotion/rollback path
+  (`detection/model_governance.py`, issue #671): `RiskScorer` now hard-blocks
+  on any model that fails Ed25519 signature or transparency-log verification
+  instead of logging and loading it anyway; every write to `config.MODEL_DIR`
+  (direct training, incremental warm-start, drift-triggered retraining) goes
+  through one gate (`guard_production_write`) enforcing signing, an AUC/F1
+  regression check, and compatibility validation before publishing; rollback
+  is a single authenticated, audited, trust-chain-verified operation
+  (`rollback_production`) backed by a queryable `ModelVersionRecord`
+  shadow→production→rolled_back history and an append-only
+  `promotion_audit_log`. Fixes the `--check-shadow`/`--no-shadow` flags on
+  `scripts/retrain_if_drifted.py`, which previously did not exist and made
+  every invocation raise `AttributeError`. Adds a drift-monitor heartbeat
+  health check (`DriftMonitorHeartbeatStale` alert) and a CI docs-vs-CLI
+  consistency test. See
+  `docs/model_artifact_trust_and_promotion_adr.md` and
+  `docs/model_rollback_runbook.md`. Migration `0007`.
 - Unified exactly-once dedup/idempotency library (`pipeline/exactly_once.py`)
   replacing the Kafka worker's and trade ingestion's independent, fail-open
   Redis dedup caches. Fixes a critical bug where a crash mid-processing (e.g.
@@ -34,6 +51,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ingestion/`; degraded-mode behaviour (rate limiter, batch account loads,
   metadata cache) is unchanged. Documented in `docs/ingestion.md` under
   "Error handling".
+- `docs/simulator.md`: documents the wash-trade simulators
+  (`scripts/wash_trade_simulator.py`,
+  `scripts/adversarial_wash_trade_simulator.py`) and the realism evaluation
+  (`scripts/evaluate_simulator_realism.py`) — what each generates, what the FFD
+  and discriminator-accuracy metrics mean, how to read realism scores, and exact
+  generate/evaluate commands.
+- `docs/graph_features.md`: added a graph-theory glossary (funding edge,
+  ancestor traversal, community, ring, internal edge density, motif,
+  reciprocity), each linked to the function that computes it, with the terms
+  cross-linked from their first use in the document.
 - Cryptographically committed forensic audit trail (`detection/audit_trail.py`):
   signed NDJSON append-only log for report scores, feature/SHAP hashes, and model
   version; `scripts/verify_audit_trail.py` for regulator verification.

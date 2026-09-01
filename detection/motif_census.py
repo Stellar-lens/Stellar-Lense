@@ -193,6 +193,9 @@ def compute_motif_census(
 
     result = MotifCensusResult(node_count=community_subgraph.number_of_nodes())
 
+    if community_subgraph.number_of_nodes() < 3:
+        return result
+
     if community_subgraph.number_of_nodes() > MOTIF_CENSUS_MAX_NODES:
         community_subgraph = _sample_subgraph(community_subgraph, MOTIF_CENSUS_MAX_NODES)
         result.was_sampled = True

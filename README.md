@@ -333,7 +333,8 @@ python -m scripts.stream --alert-channel websocket
 | `CROSS_PAIR_SYNCHRONY_WINDOW_SECONDS` | `30` | Time window (seconds) for detecting simultaneous trades across pairs |
 
 See [docs/streaming_architecture.md](docs/streaming_architecture.md) for the
-full pipeline diagram, threading model, and latency budget.
+full pipeline diagram, threading model, latency budget, and
+[troubleshooting guide](docs/streaming_architecture.md#troubleshooting).
 
 #### Kafka deployment option (`STREAMING_BACKEND=kafka`)
 
@@ -342,6 +343,11 @@ scale-out, durability, event replay, and backpressure, set
 `STREAMING_BACKEND=kafka` to route trades through Apache Kafka instead. The
 `sse` backend remains the default and is unchanged — operators without Kafka
 need do nothing.
+
+For a complete, ready-to-uncomment local-dev configuration satisfying the
+`streaming_kafka` contract, see the example block in
+[`.env.example`](.env.example) (search for "streaming_kafka runtime-mode
+config").
 
 ```bash
 # Bring up Zookeeper, Kafka, the producer, 3 scorer replicas, Prometheus + Grafana
@@ -516,7 +522,14 @@ make install   # pip install -r requirements.txt
 make lint      # ruff check .
 make format    # black .
 make test      # pytest
+make test-fast # pytest (excludes integration, slow, and fuzz tests)
 make run       # python run_pipeline.py
+make check-env MODE=api      # validate one runtime mode
+make check-env               # validate every registered mode
+make check-cycles            # detect circular imports (Issue #546)
+make check-boundaries       # enforce module layering rules (config/module_boundaries.yml, Issue #791)
+make check-cycles PACKAGES="detection ingestion"   # scope the cycle check
+make check-boundaries PACKAGE=detection            # scope the boundary check
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the full dev setup and PR process.
@@ -638,7 +651,9 @@ It is `NULL` when the wallet is not part of any detected ring, lets the API and
 dashboard group wallets by ring, and is **not** part of the on-chain `RiskScore`
 struct. Databases created before this field was introduced are upgraded with
 `python -m scripts.migrate_add_ring_id` (a backward-compatible `ALTER TABLE`;
-existing rows get `ring_id = NULL`).
+existing rows get `ring_id = NULL`). See
+[docs/ring_id_migration.md](docs/ring_id_migration.md) for the full backup,
+migrate, verify, and rollback runbook.
 
 #### Asset pair identifier
 
@@ -873,6 +888,8 @@ We're actively looking for collaborators with experience in:
 | [`docs/drift_detection.md`](docs/drift_detection.md) | PSI-based feature drift detection methodology |
 | [`docs/backtesting.md`](docs/backtesting.md) | Historical backtesting framework |
 | [`docs/checkpointing.md`](docs/checkpointing.md) | Checkpoint/resume contract for long-running batch pipelines |
+| [`docs/simulator.md`](docs/simulator.md) | Wash-trade simulators and the FFD / discriminator-accuracy realism evaluation |
+| [`docs/graph_features.md`](docs/graph_features.md) | Motif-census graph features, with a graph-theory glossary |
 
 ## License
 

@@ -30,6 +30,13 @@ def _proba(model, X: pd.DataFrame) -> np.ndarray:
     return cast(np.ndarray, model.predict_proba(X))
 
 
+def _selection_limit(pool: pd.DataFrame, n_query: int) -> int:
+    """Return the number of candidates to select, guarding empty/negative requests."""
+    if pool is None or len(pool) == 0 or n_query <= 0:
+        return 0
+    return min(int(n_query), len(pool))
+
+
 class BaseQueryStrategy(abc.ABC):
     @abc.abstractmethod
     def select(self, pool: pd.DataFrame, n_query: int, model=None) -> list[str]:
@@ -45,12 +52,15 @@ class LeastConfidence(BaseQueryStrategy):
     """Select wallets with the lowest max predicted probability."""
 
     def select(self, pool: pd.DataFrame, n_query: int, model=None) -> list[str]:
+        limit = _selection_limit(pool, n_query)
+        if limit == 0:
+            return []
         if model is None:
             raise ValueError("LeastConfidence requires a model")
         X = pool[_feature_cols(pool)].astype(float)
         probs = _proba(model, X)
         scores = probs.max(axis=1)  # lower = more uncertain
-        idx = np.argsort(scores)[: min(n_query, len(pool))]
+        idx = np.argsort(scores)[:limit]
         return cast(list[str], pool.iloc[idx]["wallet"].tolist())
 
 
@@ -58,13 +68,16 @@ class MarginSampling(BaseQueryStrategy):
     """Select wallets with the smallest margin between top-2 probabilities."""
 
     def select(self, pool: pd.DataFrame, n_query: int, model=None) -> list[str]:
+        limit = _selection_limit(pool, n_query)
+        if limit == 0:
+            return []
         if model is None:
             raise ValueError("MarginSampling requires a model")
         X = pool[_feature_cols(pool)].astype(float)
         probs = _proba(model, X)
         sorted_probs = np.sort(probs, axis=1)
         margins = sorted_probs[:, -1] - sorted_probs[:, -2]
-        idx = np.argsort(margins)[: min(n_query, len(pool))]
+        idx = np.argsort(margins)[:limit]
         return cast(list[str], pool.iloc[idx]["wallet"].tolist())
 
 
@@ -72,6 +85,9 @@ class Entropy(BaseQueryStrategy):
     """Select wallets with the highest Shannon entropy over class probabilities."""
 
     def select(self, pool: pd.DataFrame, n_query: int, model=None) -> list[str]:
+        limit = _selection_limit(pool, n_query)
+        if limit == 0:
+            return []
         if model is None:
             raise ValueError("Entropy requires a model")
         X = pool[_feature_cols(pool)].astype(float)
@@ -79,7 +95,7 @@ class Entropy(BaseQueryStrategy):
         # Clip to avoid log(0)
         probs = np.clip(probs, 1e-10, 1.0)
         entropy = -np.sum(probs * np.log2(probs), axis=1)
-        idx = np.argsort(-entropy)[: min(n_query, len(pool))]
+        idx = np.argsort(-entropy)[:limit]
         return cast(list[str], pool.iloc[idx]["wallet"].tolist())
 
 
@@ -102,6 +118,9 @@ class CoreSet(BaseQueryStrategy):
         model=None,
         labelled_pool: pd.DataFrame | None = None,
     ) -> list[str]:
+        limit = _selection_limit(pool, n_query)
+        if limit == 0:
+            return []
         cols = _feature_cols(pool)
         pool_X = pool[cols].astype(float).values
 
@@ -115,7 +134,7 @@ class CoreSet(BaseQueryStrategy):
         selected_idx: list[int] = []
         remaining = dist_to_labelled.copy()
 
-        for _ in range(min(n_query, len(pool))):
+        for _ in range(limit):
             chosen = int(np.argmax(remaining))
             selected_idx.append(chosen)
             # Update remaining distances
@@ -145,13 +164,10 @@ class BADGE(BaseQueryStrategy):
     Implementation: k-means++ seeding in (prob * feature) space.
     """
 
-    def select(
-        self,
-        pool: pd.DataFrame,
-        n_query: int,
-        model=None,
-        seed: int | None = None,
-    ) -> list[str]:
+    def select(self, pool: pd.DataFrame, n_query: int, model=None) -> list[str]:
+        limit = _selection_limit(pool, n_query)
+        if limit == 0:
+            return []
         if model is None:
             raise ValueError("BADGE requires a model")
         cols = _feature_cols(pool)
@@ -162,9 +178,7 @@ class BADGE(BaseQueryStrategy):
         uncertainty = 1.0 - np.abs(2 * probs - 1)  # high near 0.5
         embeddings = X * uncertainty[:, np.newaxis]
 
-        selected_idx = _kmeans_pp_indices(
-            embeddings, min(n_query, len(pool)), seed=seed
-        )
+        selected_idx = _kmeans_pp_indices(embeddings, limit)
         return cast(list[str], pool.iloc[selected_idx]["wallet"].tolist())
 
 
@@ -206,6 +220,9 @@ class CommitteeDisagreement(BaseQueryStrategy):
         model=None,
         models: dict | None = None,
     ) -> list[str]:
+        limit = _selection_limit(pool, n_query)
+        if limit == 0:
+            return []
         cols = _feature_cols(pool)
         X = pool[cols].astype(float)
 
@@ -216,7 +233,7 @@ class CommitteeDisagreement(BaseQueryStrategy):
         all_probs = np.stack([m.predict_proba(X)[:, 1] for m in estimators], axis=1)
         # variance across committee members per sample
         disagreement = all_probs.var(axis=1)
-        idx = np.argsort(-disagreement)[: min(n_query, len(pool))]
+        idx = np.argsort(-disagreement)[:limit]
         return cast(list[str], pool.iloc[idx]["wallet"].tolist())
 
 
@@ -245,6 +262,9 @@ class CoresetHybrid(BaseQueryStrategy):
         labelled_pool: pd.DataFrame | None = None,
         alpha: float | None = None,
     ) -> list[str]:
+        limit = _selection_limit(pool, n_query)
+        if limit == 0:
+            return []
         if alpha is None:
             alpha = float(getattr(config, "ACTIVE_LEARNING_ALPHA", 0.5))
 
@@ -303,7 +323,7 @@ class CoresetHybrid(BaseQueryStrategy):
 
         # Combined score — higher is better
         combined = alpha * uncertainty + (1.0 - alpha) * coreset_dist_norm
-        idx = np.argsort(-combined)[: min(n_query, len(pool))]
+        idx = np.argsort(-combined)[:limit]
         return cast(list[str], pool.iloc[idx]["wallet"].tolist())
 
 

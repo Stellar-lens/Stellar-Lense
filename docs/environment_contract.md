@@ -80,6 +80,7 @@ Auto-generated from `config.py` by `scripts/generate_env_contract_docs.py` (Issu
 | `WS_CLIENT_QUEUE_DEPTH` | `WS_CLIENT_QUEUE_DEPTH` | `int` | No | `'100'` | — |
 | `WS_REPLAY_BUFFER_SIZE` | `WS_REPLAY_BUFFER_SIZE` | `int` | No | `'1000'` | — |
 | `WS_RATE_LIMIT_MSGS_PER_SECOND` | `WS_RATE_LIMIT_MSGS_PER_SECOND` | `int` | No | `'100'` | — |
+| `WS_HEARTBEAT_INTERVAL_SECONDS` | `WS_HEARTBEAT_INTERVAL_SECONDS` | `float` | No | `'30'` | Seconds between WebSocket ping frames sent to each client. If the client does not respond with a pong within this interval, the connection is closed and the subscriber entry is cleaned up. |
 | `WS_ABUSE_MAX_REQUESTS_PER_MINUTE` | `WS_ABUSE_MAX_REQUESTS_PER_MINUTE` | `int` | No | `'300'` | WebSocket abuse detection (issue #223) |
 | `WS_ABUSE_MAX_DISTINCT_WALLETS` | `WS_ABUSE_MAX_DISTINCT_WALLETS` | `int` | No | `'50'` | — |
 | `WS_ABUSE_WALLET_WINDOW_SECONDS` | `WS_ABUSE_WALLET_WINDOW_SECONDS` | `int` | No | `'60'` | — |
@@ -99,6 +100,14 @@ Auto-generated from `config.py` by `scripts/generate_env_contract_docs.py` (Issu
 | `ADV_TRAINING_RATIO` | `ADV_TRAINING_RATIO` | `float` | No | `'0.5'` | — |
 | `MODEL_SIGNING_PRIVATE_KEY_PATH` | `MODEL_SIGNING_PRIVATE_KEY_PATH` | `str` | No | `''` | Model integrity & BFT voting |
 | `TRUSTED_SIGNING_KEY_FINGERPRINT` | `TRUSTED_SIGNING_KEY_FINGERPRINT` | `str` | No | `''` | — |
+| `TRUSTED_SIGNING_PUBLIC_KEY_PATH` | `TRUSTED_SIGNING_PUBLIC_KEY_PATH` | `str` | No | `''` | Ed25519 PUBLIC key used to verify model artifacts at *load* time (the inference-side counterpart to MODEL_SIGNING_PRIVATE_KEY_PATH). Required for RiskScorer to load any model in strict (default) mode — see detection/model_governance.py and docs/model_artifact_lifecycle.md. |
+| `MODEL_INTEGRITY_OVERRIDE_ACTOR` | `MODEL_INTEGRITY_OVERRIDE_ACTOR` | `str` | No | `''` | Emergency override for the hard-block artifact integrity gate in RiskScorer._load_models. Both must be set for the override to apply; every use is written to the promotion_audit_log table. Never set this in a persisted environment file — it is meant to be exported for a single incident-response shell session only. |
+| `MODEL_INTEGRITY_OVERRIDE_REASON` | `MODEL_INTEGRITY_OVERRIDE_REASON` | `str` | No | `''` | — |
+| `MODEL_PROMOTION_AUTHORIZED_ACTORS` | `MODEL_PROMOTION_AUTHORIZED_ACTORS` | `str` | No | `''` | Model promotion / rollback authorization (detection/model_governance.py). Comma-separated allowlist of actor IDs permitted to promote or roll back a production model. MODEL_PROMOTION_SECRET is the HMAC key used to authenticate the actor-supplied credential; rotate it like any other shared secret (e.g. via a secrets manager), never commit it. |
+| `MODEL_PROMOTION_SECRET` | `MODEL_PROMOTION_SECRET` | `str` | No | `''` | — |
+| `MODEL_PROMOTION_SYSTEM_ACTOR` | `MODEL_PROMOTION_SYSTEM_ACTOR` | `str` | No | `'retrain-pipeline'` | Actor identity used by the automated drift-triggered retraining pipeline (scripts/retrain_if_drifted.py) to authenticate its own promotions. Must be included in MODEL_PROMOTION_AUTHORIZED_ACTORS for automated promotion to succeed; its credential is derived from MODEL_PROMOTION_SECRET so no interactive secret is needed in CI. |
+| `MODEL_PROMOTION_REGRESSION_TOLERANCE` | `MODEL_PROMOTION_REGRESSION_TOLERANCE` | `float` | No | `'0.01'` | — |
+| `DRIFT_MONITOR_HEARTBEAT_MAX_AGE_SECONDS` | `DRIFT_MONITOR_HEARTBEAT_MAX_AGE_SECONDS` | `int` | No | `'3600'` | Drift-monitor health (monitoring/drift_detector.py). If no successful CovarianceShiftDetector.detect() call has been recorded within this many seconds, the monitor is considered stale and a distinct "drift-check failed" alert fires — see monitoring/alert_rules.yml. |
 | `AUDIT_LOG_PATH` | `AUDIT_LOG_PATH` | `str` | No | `'data/audit_trail.ndjson'` | — |
 | `AUDIT_VERIFY_PUBLIC_KEY_PATH` | `AUDIT_VERIFY_PUBLIC_KEY_PATH` | `str` | No | `''` | — |
 | `BFT_SCORE_DIVERGENCE_THRESHOLD` | `BFT_SCORE_DIVERGENCE_THRESHOLD` | `int` | No | `'30'` | — |

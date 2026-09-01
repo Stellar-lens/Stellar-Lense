@@ -410,7 +410,10 @@ def run_adversarial_training(
         tmp_dir = model_dir or tempfile.mkdtemp(prefix="ledgerlens_adv_train_")
         epoch_dir = os.path.join(tmp_dir, f"epoch_{epoch}")
         save_models(results, epoch_dir)
-        scorer = RiskScorer(model_dir=epoch_dir)
+        # require_trust_chain=False: `epoch_dir` holds a disposable model
+        # trained moments ago purely for this evaluation loop, never
+        # published or served — see RiskScorer.__init__ docstring.
+        scorer = RiskScorer(model_dir=epoch_dir, require_trust_chain=False)
 
         # Clean accuracy on test set
         X_feat, _ = split_features_labels(current_train)

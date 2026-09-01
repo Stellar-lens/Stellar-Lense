@@ -25,6 +25,7 @@ cp .env.example .env  # then edit as needed
 make lint     # ruff + black --check
 make format   # ruff --fix + black
 make test     # pytest (unit tests only — no network)
+make check-env-example  # verify .env.example covers every config.py variable
 ```
 
 Optionally install the pre-commit hooks so checks run automatically:
@@ -63,6 +64,34 @@ The `testnet-integration.yml` CI workflow runs these tests on a weekly
 schedule (Sundays 03:00 UTC) and on manual `workflow_dispatch` — it does
 **not** run on pull requests so it never blocks a PR merge.
 
+### Running a subset of tests
+
+With 300+ files under `tests/`, running the full suite on every iteration is
+slow. Use these `pytest` invocations to scope a run down while you iterate:
+
+```bash
+# A single test file
+pytest tests/test_benford.py
+
+# A single test function (-k matches by substring)
+pytest tests/test_benford.py -k test_chi_square_statistic
+
+# Everything except the slower integration and fuzz suites
+pytest tests/ --ignore=tests/integration --ignore=tests/fuzz
+```
+
+`pyproject.toml` defines these pytest markers (`-m 'not integration and not
+slow'` to exclude both):
+
+| Marker | Meaning |
+|---|---|
+| `integration` | Live Testnet integration tests — deselect with `-m "not integration"` (also skipped automatically unless `LEDGERLENS_INTEGRATION_TESTS=1` is set, see above) |
+| `slow` | Tests that run PPO training — deselect with `-m "not slow"` |
+| `concurrency` | Concurrency validation tests for streaming workers — included by default |
+
+`tests/fuzz/` is a separate atheris-based fuzzing suite, not run by plain
+`pytest`; see [`tests/fuzz/README.md`](tests/fuzz/README.md) and `make fuzz`.
+
 ## Pull requests
 
 - Keep PRs focused on a single logical change.
@@ -74,6 +103,39 @@ schedule (Sundays 03:00 UTC) and on manual `workflow_dispatch` — it does
   out in the PR description so consuming repos (`ledgerlens-core`,
   `ledgerlens-api`, `ledgerlens-contract`, `ledgerlens-dashboard`) can be
   updated.
+
+### Changelog entries
+
+Every PR that touches high-impact paths must include a `CHANGELOG.md` entry
+under `## [Unreleased]`. The entry is enforced by
+[`scripts/validate_changelog.py`](scripts/validate_changelog.py) in CI.
+
+**Required format (Keep a Changelog):**
+
+```markdown
+## [Unreleased]
+
+### Added
+- New feature description
+
+### Changed
+- Behavior change description
+
+### Fixed
+- Bug fix description
+```
+
+- Entries must start with `- ` and be grouped under one of the standard
+  subsections: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`,
+  `Security`.
+- If your PR only touches documentation, CI configuration, or tests, a
+  changelog entry is not required — but you still need to check the
+  "Added a CHANGELOG.md entry, or this PR is exempt" box in the PR template.
+- The CI job
+  [`.github/workflows/changelog-validation.yml`](.github/workflows/changelog-validation.yml)
+  runs `python scripts/validate_changelog.py --check-pr` on every pull
+  request and fails the build if a high-impact path changed without a
+  matching entry.
 
 ## Security
 
@@ -94,6 +156,10 @@ All security-relevant PRs must reference the threat model and document which mit
 - Favor small, composable functions following the existing module layout:
   `ingestion/` for data acquisition, `detection/` for scoring logic,
   `tests/` mirrors both.
+- **Adding a new top-level module?** Also add a corresponding pattern to
+  [`.github/CODEOWNERS`](.github/CODEOWNERS) — see
+  [`.github/review-checklists.md`](.github/review-checklists.md) for the
+  expected review-gate entry and an example.
 - New feature columns added to `detection/feature_engineering.py` must be
   documented in the README's feature tables and accounted for in
   `detection/model_training.py::FEATURE_COLUMNS_EXCLUDE` handling.

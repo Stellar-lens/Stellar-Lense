@@ -130,6 +130,46 @@ def test_detect_label_poisoning_returns_false_when_ratio_ok(tmp_path):
     assert not detect_label_poisoning(distribution, baseline_path=baseline_path, threshold=0.15)
 
 
+@pytest.mark.parametrize(
+    "bad_threshold",
+    [
+        15,  # Issue #740's exact motivating mix-up: 15 (percent) instead of 0.15
+        1.5,
+        0,
+        -0.1,
+    ],
+)
+def test_detect_label_poisoning_rejects_out_of_range_threshold(tmp_path, bad_threshold):
+    baseline_path = str(tmp_path / "baseline.json")
+    with open(baseline_path, "w") as f:
+        json.dump({"wash_trade_ratio": 0.10}, f)
+
+    distribution = {0: 70, 1: 30}
+    with pytest.raises(ValueError, match="POISON_LABEL_RATIO_THRESHOLD must be a fraction in \\(0, 1\\]"):
+        detect_label_poisoning(distribution, baseline_path=baseline_path, threshold=bad_threshold)
+
+
+def test_detect_label_poisoning_accepts_boundary_threshold_of_one(tmp_path):
+    """1.0 is the inclusive upper bound — a 100% ratio shift is a valid (if
+    extreme) configuration, not a mix-up like 15 vs 0.15."""
+    baseline_path = str(tmp_path / "baseline.json")
+    with open(baseline_path, "w") as f:
+        json.dump({"wash_trade_ratio": 0.0}, f)
+
+    distribution = {0: 0, 1: 100}
+    assert not detect_label_poisoning(distribution, baseline_path=baseline_path, threshold=1.0)
+
+
+def test_detect_label_poisoning_rejects_bad_config_default(monkeypatch):
+    """The same validation applies when the bad value comes from config
+    (POISON_LABEL_RATIO_THRESHOLD) rather than an explicit override."""
+    import detection.model_training as mt
+
+    monkeypatch.setattr(mt.config, "POISON_LABEL_RATIO_THRESHOLD", 15)
+    with pytest.raises(ValueError, match="POISON_LABEL_RATIO_THRESHOLD must be a fraction in \\(0, 1\\]"):
+        detect_label_poisoning({0: 70, 1: 30})
+
+
 def test_detect_label_poisoning_creates_baseline_when_missing(tmp_path):
     baseline_path = str(tmp_path / "new_baseline.json")
     assert not os.path.exists(baseline_path)
@@ -179,3 +219,66 @@ def test_detect_label_poisoning_aborts_training(tmp_path, monkeypatch):
         assert not os.path.exists(os.path.join(model_dir, f"{name}.joblib"))
 
     os.unlink(tmp_file_path)
+
+
+# ---------------------------------------------------------------------------
+# Grand 2 (issue #671, Task C): `python -m detection.model_training` must
+# never overwrite an already-promoted production model directory.
+# ---------------------------------------------------------------------------
+
+
+def test_main_refuses_to_overwrite_already_promoted_model_dir(tmp_path, monkeypatch):
+    import tempfile
+
+    import detection.model_training as mt
+
+    model_dir = str(tmp_path / "models")
+    os.makedirs(model_dir, exist_ok=True)
+    original_metrics = {"random_forest": {"artifact_sha256": "a" * 64}}
+    with open(os.path.join(model_dir, "metrics.json"), "w") as f:
+        json.dump(original_metrics, f)
+    with open(os.path.join(model_dir, "random_forest.joblib"), "wb") as f:
+        f.write(b"already-promoted-production-bytes")
+
+    monkeypatch.setattr(mt.config, "MODEL_DIR", model_dir)
+
+    df = generate_synthetic_dataset(n_wallets=30, seed=11)
+    with tempfile.NamedTemporaryFile(suffix=".parquet", delete=False) as tmp_file:
+        df.to_parquet(tmp_file.name)
+        tmp_file_path = tmp_file.name
+
+    monkeypatch.setattr(
+        "sys.argv", ["model_training", "--data-path", tmp_file_path, "--model-dir", model_dir]
+    )
+
+    try:
+        with pytest.raises(SystemExit) as excinfo:
+            mt.main()
+        assert excinfo.value.code == 1
+    finally:
+        os.unlink(tmp_file_path)
+
+    # The pre-existing "promoted production" artifact must be untouched.
+    with open(os.path.join(model_dir, "metrics.json")) as f:
+        assert json.load(f) == original_metrics
+    with open(os.path.join(model_dir, "random_forest.joblib"), "rb") as f:
+        assert f.read() == b"already-promoted-production-bytes"
+
+
+def test_save_models_and_save_training_artifacts_call_the_production_write_guard(
+    tmp_path, trained_output, monkeypatch
+):
+    """Regression guard: if a future refactor removes the
+    guard_production_write() call from either function, this must fail
+    loudly rather than silently reopening the ungated write path."""
+    output, _ = trained_output
+    calls = []
+    monkeypatch.setattr(
+        "detection.production_write_guard.guard_production_write", lambda d: calls.append(d)
+    )
+
+    model_dir = str(tmp_path)
+    save_models(output["results"], model_dir)
+    save_training_artifacts(output, "data/synthetic.parquet", model_dir)
+
+    assert calls == [model_dir, model_dir]

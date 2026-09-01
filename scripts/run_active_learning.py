@@ -62,13 +62,17 @@ def load_models(model_dir: str) -> dict:
         artifact_path = os.path.join(model_dir, f"{name}.joblib")
         if os.path.exists(artifact_path):
             model = joblib.load(artifact_path)
-            # verify_chain — skipped silently when no public key is configured
             try:
-                from detection.persistence import ModelArtifact
+                from detection.persistence import ModelArtifact, load_trusted_public_key
 
-                ModelArtifact(model_dir).verify_chain(name)
+                ModelArtifact(model_dir).verify_chain(name, public_key=load_trusted_public_key())
             except Exception as exc:
-                logger.warning("Integrity check skipped for %s: %s", name, exc)
+                logger.warning(
+                    "Integrity check failed or skipped for %s (best-effort — active learning "
+                    "does not gate on the production trust chain): %s",
+                    name,
+                    exc,
+                )
             models[name] = model
     return models
 

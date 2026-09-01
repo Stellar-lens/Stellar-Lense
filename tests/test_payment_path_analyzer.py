@@ -15,6 +15,7 @@ from ingestion.payment_path_analyzer import (
     ReconstructedPathFlow,
     compute_path_payment_round_trip_frequency,
     merge_path_flows,
+    path_has_cycle,
     reconstruct_path_flow,
     validate_path_schema,
 )
@@ -172,6 +173,51 @@ class TestReconstructPathFlow:
         flow = reconstruct_path_flow(op)
         assert flow is not None
         assert flow["hop_count"] == MAX_PATH_LENGTH
+
+
+class TestCyclicalPaths:
+    """Payment paths may legitimately revisit an asset they already passed through."""
+
+    def test_path_has_cycle_detects_revisited_asset(self):
+        cyclical = [
+            {"code": "USDC", "issuer": "GA5Z"},
+            {"code": "XLM", "issuer": None},
+            {"code": "USDC", "issuer": "GA5Z"},
+        ]
+        assert path_has_cycle(cyclical) is True
+
+    def test_path_has_cycle_false_for_acyclic_path(self):
+        acyclic = [{"code": "USDC", "issuer": "GA5Z"}, {"code": "XLM", "issuer": None}]
+        assert path_has_cycle(acyclic) is False
+
+    def test_path_has_cycle_handles_empty_path(self):
+        assert path_has_cycle([]) is False
+
+    def test_reconstruct_cyclical_path_terminates_with_result(self):
+        """A cyclical path returns a sane flow rather than hanging or recursing.
+
+        Reconstruction never walks the hops recursively, so the cycle is only
+        flagged. If this ever regressed into a graph walk the test would hang
+        or raise RecursionError instead of asserting.
+        """
+        op = sample_path_payment_strict_send()
+        op["asset_path"] = [
+            {"code": "USDC", "issuer": "GA5Z"},
+            {"code": "XLM", "issuer": None},
+            {"code": "USDC", "issuer": "GA5Z"},  # revisits the first asset
+        ]
+
+        flow = reconstruct_path_flow(op)
+
+        assert flow is not None
+        assert flow["hop_count"] == 3
+        assert flow["is_cyclical"] is True
+
+    def test_acyclic_path_is_not_flagged_as_cyclical(self):
+        flow = reconstruct_path_flow(sample_path_payment_strict_receive())
+
+        assert flow is not None
+        assert flow["is_cyclical"] is False
 
 
 class TestValidatePathSchema:

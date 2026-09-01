@@ -64,8 +64,10 @@ class AlertDispatcher:
         if channel == "webhook":
             if not self._webhook_url:
                 raise ValueError("ALERT_WEBHOOK_URL is required when alert channel is 'webhook'")
-            if self._webhook_url.startswith("http://"):
-                raise ValueError("ALERT_WEBHOOK_URL must use https:// — http:// is not allowed")
+            if not self._webhook_url.startswith("https://"):
+                raise ValueError(
+                    "ALERT_WEBHOOK_URL must start with https:// — got " f"{self._webhook_url!r}"
+                )
 
         self._cooldowns: dict[str, float] = {}
         self._lock = threading.Lock()

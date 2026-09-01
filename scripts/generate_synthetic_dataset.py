@@ -12,6 +12,8 @@ Usage:
     python -m scripts.generate_synthetic_dataset --profile AdaptiveAttacker --gan-rounds 5
 """
 
+from __future__ import annotations
+
 import argparse
 import sys
 from importlib import import_module

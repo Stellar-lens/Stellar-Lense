@@ -72,6 +72,7 @@ def write_csv_report(out_path: str, report: ForensicReport) -> None:
         writer = csv.DictWriter(f, fieldnames=CSV_COLUMNS)
         writer.writeheader()
         writer.writerows(report.to_csv_rows())
+    _apply_secure_mode(out_path)
 
 
 @dataclass
@@ -553,6 +554,20 @@ def _write_secure(path: str, content: str) -> None:
     fd = os.open(str(p), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(fd, "w") as f:
         f.write(content)
+    _apply_secure_mode(str(p))
+
+
+def _apply_secure_mode(path: str) -> None:
+    """Attempt to apply 0o600 permissions; warn on platforms where it is a no-op."""
+    try:
+        os.chmod(path, 0o600)
+    except (OSError, NotImplementedError) as exc:
+        logger.warning(
+            "Could not set 0o600 permissions on %s: %s. "
+            "The permission guarantee does not apply on this platform.",
+            path,
+            exc,
+        )
 
 
 def write_report_secure(path: str, content: str) -> None:

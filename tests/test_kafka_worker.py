@@ -164,7 +164,6 @@ def test_dlq_topic_is_skipped_not_scored():
     worker.process_message(msg)
 
     scorer.score_wallet.assert_not_called()
-    # Skipped messages are committed so they don't block the partition.
     consumer.commit.assert_called_once_with(message=msg, asynchronous=False)
 
 
