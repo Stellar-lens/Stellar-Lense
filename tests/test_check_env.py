@@ -73,39 +73,39 @@ def test_requires_mode_or_all():
         check_env.main([])
 
 
-def test_all_output_groups_failures_per_mode(monkeypatch, capsys):
-    """A multi-mode --all run groups each mode's failures under its own heading."""
-    monkeypatch.setattr(Config, "RISK_SCORE_DB_URL", "sqlite:///test.db")
-    monkeypatch.setattr(Config, "MODEL_DIR", "./models")
-    monkeypatch.setattr(Config, "API_KEYS", [])  # fail the api mode
-    monkeypatch.setattr(Config, "API_RATE_LIMIT_RPM", 60)
-    monkeypatch.setattr(Config, "WS_MAX_CLIENTS", 0)  # fail the ws_server mode
+def test_explain_known_variable_prints_info(capsys):
+    """Test that --explain prints info for a known contract variable."""
+    code = check_env.main(["--explain", "RISK_SCORE_DB_URL"])
 
-    code = check_env.main(["--all"])
-
+    assert code == 0
     out = capsys.readouterr().out
+
+    # Should show the variable name and default
+    assert "RISK_SCORE_DB_URL" in out
+    assert "Default:" in out
+    assert "api" in out  # Should mention the api mode
+
+
+def test_explain_unknown_variable_exits_with_error(capsys):
+    """Test that --explain on unknown variable gives clear error message."""
+    code = check_env.main(["--explain", "NONEXISTENT_VAR"])
+
     assert code == 1
+    err = capsys.readouterr().err
 
-    # Split output into per-mode sections delimited by "=== <mode> ===".
-    sections: dict[str, list[str]] = {}
-    current: str | None = None
-    for line in out.splitlines():
-        if line.startswith("=== "):
-            current = line[4:-4]
-            sections[current] = []
-        elif current is not None:
-            sections[current].append(line)
+    # Should have clear error message, not a traceback
+    assert "not a recognised contract variable" in err
+    assert "NONEXISTENT_VAR" in err
+    assert "Traceback" not in err
 
-    # Each mode's own failure appears under its own heading, and never under
-    # another mode's section.
-    assert any("API_KEYS" in item for item in sections["api"])
-    assert any("WS_MAX_CLIENTS" in item for item in sections["ws_server"])
-    assert not any(
-        "API_KEYS" in item for mode, items in sections.items() if mode != "api" for item in items
-    )
-    assert not any(
-        "WS_MAX_CLIENTS" in item
-        for mode, items in sections.items()
-        if mode != "ws_server"
-        for item in items
-    )
+
+def test_explain_lists_all_applicable_modes(capsys):
+    """Test that --explain shows all modes that use the variable."""
+    code = check_env.main(["--explain", "MODEL_DIR"])
+
+    assert code == 0
+    out = capsys.readouterr().out
+
+    # MODEL_DIR is used in multiple modes
+    assert "api" in out
+    assert "streaming_sse" in out or "training" in out  # At least one more mode

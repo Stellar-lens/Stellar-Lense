@@ -48,6 +48,16 @@ def _atomic_write_parquet(path: str, df: pd.DataFrame) -> None:
             pass
         raise
 
+    try:
+        os.chmod(path, stat.S_IRUSR | stat.S_IWUSR)  # 0o600
+    except (OSError, NotImplementedError) as exc:
+        logger.warning(
+            "Could not set 0o600 permissions on %s: %s. "
+            "The permission guarantee does not apply on this platform.",
+            path,
+            exc,
+        )
+
 
 class DriftAwareReservoirSampler:
     """Fixed-size reservoir sampler with drift-biased replacement.

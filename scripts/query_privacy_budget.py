@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from datetime import datetime
 
 from detection.privacy.budget_tracker import DPBudgetTracker
 
@@ -29,6 +30,18 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Override alert threshold epsilon (default: from config/env)",
     )
+    parser.add_argument(
+        "--since",
+        type=lambda s: datetime.fromisoformat(s),
+        default=None,
+        help="ISO date to start filtering budget events from (default: all available)",
+    )
+    parser.add_argument(
+        "--until",
+        type=lambda s: datetime.fromisoformat(s),
+        default=None,
+        help="ISO date to stop filtering budget events at (default: all available)",
+    )
     args = parser.parse_args(argv)
 
     tracker = DPBudgetTracker(
@@ -36,6 +49,20 @@ def main(argv: list[str] | None = None) -> int:
         alert_threshold_epsilon=args.alert_threshold,
     )
     status = tracker.status()
+
+    # Filter events by date range if --since/--until provided
+    if args.since or args.until:
+        filtered_events = []
+        for event in status["events"]:
+            if event["created_at"] is None:
+                continue
+            event_dt = datetime.fromisoformat(event["created_at"])
+            if args.since and event_dt < args.since:
+                continue
+            if args.until and event_dt > args.until:
+                continue
+            filtered_events.append(event)
+        status["events"] = filtered_events
 
     if args.json:
         print(json.dumps(status, indent=2))

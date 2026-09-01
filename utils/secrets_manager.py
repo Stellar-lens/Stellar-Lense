@@ -240,9 +240,9 @@ class SecretValidator:
         """Validate that a filepath exists."""
         path = Path(value)
         if not path.exists():
-            raise SecretValidationError(f"Secret file does not exist: {value}")
+            raise SecretValidationError("Secret file does not exist")
         if not path.is_file():
-            raise SecretValidationError(f"Secret path is not a file: {value}")
+            raise SecretValidationError("Secret path is not a file")
 
 
 # ---------------------------------------------------------------------------

@@ -124,9 +124,11 @@ def test_pipeline_upserts_one_record_per_wallet_per_pair():
         return pair_a_trades if call_count[0] == 1 else pair_b_trades
 
     upserted: list[tuple[str, str]] = []
+    finalities: list[str] = []
 
-    def fake_upsert(wallet, asset_pair, risk_score):
+    def fake_upsert(wallet, asset_pair, risk_score, *, finality="provisional"):
         upserted.append((wallet, asset_pair))
+        finalities.append(finality)
 
     feat_a = pd.DataFrame({"wallet": ["GA", "GB"], "benford_mad_1h": [0.0, 0.0]})
     feat_b = pd.DataFrame({"wallet": ["GC", "GD"], "benford_mad_1h": [0.0, 0.0]})
@@ -178,6 +180,10 @@ def test_pipeline_upserts_one_record_per_wallet_per_pair():
     assert len(upserted) == 4
     pair_ids = {ap for _, ap in upserted}
     assert len(pair_ids) == 2  # two distinct pair_ids
+    # A completed batch pipeline run over a bounded window writes final scores
+    # (Issue #670) — the continuous streaming path is the only one that
+    # writes provisional.
+    assert finalities == ["final"] * 4
 
 
 def test_run_pipeline_uses_idempotent_upsert_and_checkpointing():

@@ -35,6 +35,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from config import config
 from utils.tracing import get_tracer
 
 _tracer = get_tracer(__name__)
@@ -207,7 +208,7 @@ class AssetClassifier:
             else:
                 subset = pd.Series(dtype=float)
 
-            if len(subset) >= 30:
+            if len(subset) >= MIN_CLEAN_TRADES_FOR_BASELINE:
                 self._baselines[cls] = observed_distribution(subset)
 
 
@@ -223,7 +224,16 @@ def get_asset_classifier() -> "AssetClassifier":
     return _classifier
 
 
-MAD_NONCONFORMITY_THRESHOLD = 0.015
+MAD_NONCONFORMITY_THRESHOLD = (
+    0.015  # Nigrini (2012): threshold above which MAD indicates non-conformity
+)
+
+# Exclusion threshold for logging when computing second-digit distribution:
+# if >10% of amounts are single-digit (< 10), log a debug message.
+SECOND_DIGIT_EXCLUSION_RATE_LOG_THRESHOLD = 0.1
+
+# Minimum number of clean trades required to fit an asset-class baseline distribution.
+MIN_CLEAN_TRADES_FOR_BASELINE = 30
 
 
 def leading_digits(amounts: pd.Series) -> pd.Series:
@@ -561,7 +571,7 @@ def second_digit_distribution(amounts: pd.Series) -> dict[int, float]:
     excluded = len(amounts_positive[amounts_positive < 10])
     if excluded > 0 and len(amounts_positive) > 0:
         exclusion_rate = excluded / len(amounts_positive)
-        if exclusion_rate > 0.1:  # Log if >10% excluded
+        if exclusion_rate > SECOND_DIGIT_EXCLUSION_RATE_LOG_THRESHOLD:
             logger_module = logging.getLogger(__name__)
             logger_module.debug(
                 f"second_digit_distribution: {excluded}/{len(amounts_positive)} "

@@ -84,6 +84,13 @@ def print_table(versions: list[dict], max_rows: int | None = None) -> None:
         print(f"{version:<20} {trained_at:<28} {rows_str:<20} {auc_display:<20} {f1_display:<20}")
 
 
+def print_json(versions: list[dict], max_rows: int | None = None) -> None:
+    """Output versions as JSON."""
+    if max_rows is not None:
+        versions = versions[:max_rows]
+    print(json.dumps(versions, indent=2))
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="List archived model versions")
     parser.add_argument("--max-rows", type=int, default=None, help="Limit number of versions shown")
@@ -92,13 +99,22 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=ARCHIVE_DIR,
         help="Archive directory (default: models/archive)",
     )
+    parser.add_argument(
+        "--format",
+        choices=["table", "json"],
+        default="table",
+        help="Output format: table (default) or json",
+    )
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> None:
     args = parse_args(argv)
     versions = list_versions(args.archive_dir)
-    print_table(versions, max_rows=args.max_rows)
+    if args.format == "json":
+        print_json(versions, max_rows=args.max_rows)
+    else:
+        print_table(versions, max_rows=args.max_rows)
 
 
 if __name__ == "__main__":

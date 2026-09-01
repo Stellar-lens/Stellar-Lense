@@ -1,4 +1,11 @@
-"""Wallet list override check for allowlisting and denylisting."""
+"""Wallet list override check for allowlisting and denylisting.
+
+Resolution Strategy
+-------------------
+If a wallet appears in both the allowlist and denylist (a conflict), the
+allowlist takes precedence and the wallet is treated as allowed (score 0).
+This prioritizes operator intent to explicitly allow over deny decisions.
+"""
 
 import json
 import os

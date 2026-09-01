@@ -545,6 +545,12 @@ class DecimalAmount:
         rounded = self._value.quantize(quantizer, rounding=decimal.ROUND_HALF_EVEN)
         return DecimalAmount(rounded)
 
+    # INTENTIONAL PRECISION BOUNDARY (see Issue #778): the only place in this
+    # module (and utils/decimal_agg.py) where a Decimal is deliberately
+    # converted to float. This is an explicit escape hatch for legacy code that
+    # still expects a native ``float``; it is NOT a silent Decimal->float
+    # conversion on the happy path and every other public boundary returns
+    # Decimal. The precision loss is surfaced to callers via a warning.
     def to_float(self) -> float:
         """Convert to float (may lose precision).
 
