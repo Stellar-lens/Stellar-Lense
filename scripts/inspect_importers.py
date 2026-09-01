@@ -428,6 +428,17 @@ def cmd_json(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_list_names(args: argparse.Namespace) -> int:
+    """Print just the importer names, one per line."""
+    registry = get_registry()
+    importers = registry.list_all()
+
+    for name in importers:
+        print(name)
+
+    return 0
+
+
 # ============================================================================
 # Main entry point
 # ============================================================================
@@ -440,6 +451,8 @@ def main() -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
+
+    parser.add_argument("--list", action="store_true", help="List all importer names (one per line)")
 
     subparsers = parser.add_subparsers(dest="command", help="Command to execute")
 
@@ -479,6 +492,9 @@ def main() -> int:
     json_parser.add_argument("--output", "-o", help="Output file (default: stdout)")
 
     args = parser.parse_args()
+
+    if args.list:
+        return cmd_list_names(args)
 
     if not args.command:
         parser.print_help()

@@ -38,6 +38,7 @@ The input schema is defined in `reporting/schemas/model_metadata.json` (JSON Sch
 |---|---|---|
 | `dataset_fingerprint` | string | SHA-256 of training Parquet file (computed at training time, not accepted as input) |
 | `shap_importance_chart_path` | string | Relative path to SHAP chart image |
+| `ledgerlens_version` | string | LedgerLens codebase version at training time |
 | `regulatory_contact` | string | Contact for regulatory enquiries |
 | `data_retention_policy` | string | Data retention description |
 
@@ -56,6 +57,11 @@ generate_model_card(
 ```
 
 A `MetadataValidationError` is raised with the missing field name if any required field is absent.
+
+**Example:** [`docs/examples/model_metadata.example.json`](examples/model_metadata.example.json) is a
+sample metadata file (referencing `data/synthetic_dataset.parquet`'s fingerprint) and
+[`docs/examples/MODEL_CARD_xgboost_0.2.0.example.md`](examples/MODEL_CARD_xgboost_0.2.0.example.md) is
+the Markdown card `generate_model_card` renders from it.
 
 ## Updating a Model Card After Re-evaluation
 

@@ -785,6 +785,12 @@ def build_cli() -> argparse.ArgumentParser:
         default=100,
         help="Number of simulations for random baseline (default: 100)",
     )
+    parser.add_argument(
+        "--top-n",
+        type=int,
+        default=None,
+        help="Limit report to top N worst-lag campaigns (default: show all)",
+    )
     return parser
 
 
@@ -821,6 +827,16 @@ def main() -> None:
     # Compute detection lag
     lags = engine.compute_detection_lag(results, ground_truth, threshold=args.threshold)
     temporal_auc = engine.compute_temporal_auc(results, ground_truth, threshold=args.threshold)
+
+    # Apply --top-n filter if specified
+    if args.top_n is not None and args.top_n > 0:
+        sorted_lags = sorted(
+            lags.items(),
+            key=lambda x: x[1].get("lag_hours", 0) if x[1].get("lag_hours") != float("inf") else -1,
+            reverse=True,
+        )
+        lags = dict(sorted_lags[:args.top_n])
+        logger.info("Limited report to top %d worst-lag campaigns", args.top_n)
 
     # Random baseline
     random_baseline_lag = None
