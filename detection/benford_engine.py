@@ -35,6 +35,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from config import config
 from utils.tracing import get_tracer
 
 _tracer = get_tracer(__name__)
