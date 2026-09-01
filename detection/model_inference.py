@@ -68,6 +68,16 @@ BENFORD_MAD_FLAG_THRESHOLD = 0.015
 ML_FLAG_THRESHOLD = 0.5
 _CONSENSUS_WINDOW = 10  # two models must be within this many points of each other
 
+# Issue #736: BFT_SCORE_DIVERGENCE_THRESHOLD gates the outlier-trimming
+# behaviour in bft_trimmed_mean() below. Zero would trim on any disagreement
+# at all (degenerate) and negative is nonsensical, so this is validated once
+# at module load rather than on every scoring call.
+if config.BFT_SCORE_DIVERGENCE_THRESHOLD <= 0:
+    raise ValueError(
+        "BFT_SCORE_DIVERGENCE_THRESHOLD must be a positive number, got "
+        f"{config.BFT_SCORE_DIVERGENCE_THRESHOLD}"
+    )
+
 # ---------------------------------------------------------------------------
 # Prometheus counter (optional — gracefully absent if prometheus_client not
 # installed or not yet wired to an exporter)
