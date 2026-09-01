@@ -136,10 +136,28 @@ def _ttl_for_window(window_hours: int | None, window_ttls: dict[int, int]) -> in
 # ---------------------------------------------------------------------------
 
 
-def _make_key(wallet_id: str, pair_id: str) -> str:
-    """Build a Redis key for the (wallet, pair) feature entry."""
+#: Namespace used when no tenant is supplied. Explicit rather than an empty
+#: segment so an unscoped entry is visibly unscoped in Redis, and so it can
+#: never collide with a real tenant id (which the tenants.yaml allowlist
+#: constrains to ordinary identifiers).
+UNSCOPED_TENANT_NAMESPACE = "_unscoped"
+
+
+def _make_key(wallet_id: str, pair_id: str, tenant_id: str | None = None) -> str:
+    """Build a Redis key for the (tenant, wallet, pair) feature entry.
+
+    The tenant segment is structural, not decorative: two tenants monitoring
+    the same wallet previously hashed to the same key and therefore read each
+    other's cached feature vectors. Including it in the key is what makes that
+    impossible rather than merely unlikely.
+
+    Note this changes the key format, so entries written by an older build are
+    not read by this one. They are not deleted either -- they simply age out
+    under their existing TTL, which is the intended migration: a cold cache,
+    not a cross-tenant read.
+    """
     wallet_hash = hashlib.sha256(wallet_id.encode()).hexdigest()[:16]
-    return f"feat:{wallet_hash}:{pair_id}"
+    return f"feat:{tenant_id or UNSCOPED_TENANT_NAMESPACE}:{wallet_hash}:{pair_id}"
 
 
 # ---------------------------------------------------------------------------
@@ -179,6 +197,7 @@ class RedisFeatureStore:
         window_ttls: dict[int, int] | None = None,
         fallback_enabled: bool | None = None,
         store_name: str = "default",
+        tenant_id: str | None = None,
     ) -> None:
         self._url = redis_url or config.FEATURE_STORE_REDIS_URL
         self._pool_size = (
@@ -193,6 +212,10 @@ class RedisFeatureStore:
             else config.FEATURE_STORE_FALLBACK_ENABLED
         )
         self._store_name = store_name
+        # Scopes every key this instance reads or writes. Left unset, entries
+        # land in the shared UNSCOPED_TENANT_NAMESPACE, which is the pre-
+        # existing behaviour made explicit rather than a new sharing path.
+        self.tenant_id = tenant_id
         self._client: redis.Redis | None = None
 
     # ------------------------------------------------------------------
@@ -237,7 +260,7 @@ class RedisFeatureStore:
 
         Only msgpack-deserialised content is returned.  Pickle is never used.
         """
-        key = _make_key(wallet_id, pair_id)
+        key = _make_key(wallet_id, pair_id, self.tenant_id)
         try:
             raw = self._get_client().get(key)
         except Exception as exc:
@@ -287,7 +310,7 @@ class RedisFeatureStore:
         if ttl_seconds is None:
             ttl_seconds = _ttl_for_window(window_hours, self._window_ttls)
 
-        key = _make_key(wallet_id, pair_id)
+        key = _make_key(wallet_id, pair_id, self.tenant_id)
         # Validate: only serialise float/int/str/list/dict types — reject anything
         # that msgpack cannot round-trip safely.
         _validate_features(features)
@@ -346,7 +369,7 @@ class RedisFeatureStore:
 
     def delete(self, wallet_id: str, pair_id: str) -> None:
         """Explicitly evict a cached entry."""
-        key = _make_key(wallet_id, pair_id)
+        key = _make_key(wallet_id, pair_id, self.tenant_id)
         try:
             self._get_client().delete(key)
         except Exception as exc:
@@ -367,7 +390,7 @@ class RedisFeatureStore:
         if not wallet_pair_list:
             return {}
 
-        keys = [_make_key(w, p) for w, p in wallet_pair_list]
+        keys = [_make_key(w, p, self.tenant_id) for w, p in wallet_pair_list]
         try:
             pipe = self._get_client().pipeline(transaction=False)
             for k in keys:

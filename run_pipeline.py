@@ -202,6 +202,7 @@ def _process_pair(
                         "confidence": row["confidence"],
                         "ring_id": row.get("ring_id"),
                     },
+                    finality="final",
                 )
             logger.info("[pair=%s] Persisted %d scored wallets", pair_id, len(scored))
     else:
@@ -350,6 +351,7 @@ def main() -> None:
                                         "confidence": row["confidence"],
                                         "ring_id": row.get("ring_id"),
                                     },
+                                    finality="final",
                                 )
                             logger.info("Persisted %d scored wallets", len(scored))
                 else:

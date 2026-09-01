@@ -1,15 +1,26 @@
-"""Idempotent trade ingestion using Redis deduplication cache.
+"""Idempotent trade ingestion using the unified exactly-once dedup store.
 
-Handles duplicate trades from Stellar Horizon SSE stream by caching trade IDs
-in Redis with a 24-hour TTL. Gracefully degrades when Redis is unavailable.
+Handles duplicate trades from the Stellar Horizon SSE stream by staging/
+committing trade hashes in Redis via ``pipeline.exactly_once.ExactlyOnceStore``.
+
+Unlike the previous implementation, this module is **fail-closed** (Issue
+#670, invariant 8): when Redis is unreachable, ``is_duplicate`` raises
+``DedupBackendUnavailableError`` instead of silently allowing every event
+through. Callers that cannot tolerate raising should catch that error
+explicitly and decide whether to queue, halt, or (with an explicit, logged
+decision) skip deduplication — there is no built-in silent fallback.
 """
 
 from __future__ import annotations
 
-import hashlib
-import time
-
 from config import config
+from pipeline.exactly_once import (
+    DedupBackendUnavailableError,
+    DedupKey,
+    DedupState,
+    ExactlyOnceStore,
+    RedisExactlyOnceBackend,
+)
 from utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -31,27 +42,19 @@ except ImportError:
     ledgerlens_duplicate_events_total = None
     ledgerlens_dedup_cache_hits_total = None
 
-# Optional Redis imports
-try:
-    import redis
-    from redis.exceptions import RedisError
-
-    _REDIS_AVAILABLE = True
-except ImportError:
-    _REDIS_AVAILABLE = False
-    RedisError = Exception  # type: ignore
-
 
 class SeenEventCache:
-    """Redis-backed cache for deduplicating Horizon trade events.
+    """Fail-closed dedup cache for Horizon trade events.
 
-    Uses a Redis sorted set (ZSET) with:
-    - Score: timestamp (for TTL + expiration)
-    - Member: SHA-256 hash of trade paging token
+    Keyed by ``sha256(paging_token or trade_id)`` scoped to ``asset_pair``,
+    via ``pipeline.exactly_once.DedupKey(source=f"horizon_trade:{asset_pair}",
+    external_id=trade_hash)``. A trade hash is committed (durably marked seen)
+    the first time it is checked — this class has no separate side-effect
+    boundary of its own, so "checked" and "committed" happen atomically from
+    the caller's point of view.
 
-    TTL is enforced by Redis EXPIREAT, surviving process restarts.
-    Gracefully degrades when Redis unavailable: logs warning and allows
-    duplicate through (do not stop ingestion).
+    Raises ``DedupBackendUnavailableError`` from every method when Redis is
+    unreachable. There is intentionally no "allow through" fallback.
     """
 
     def __init__(
@@ -60,40 +63,19 @@ class SeenEventCache:
         ttl_seconds: int | None = None,
         key_prefix: str | None = None,
     ):
-        """Initialize the deduplication cache.
-
-        Args:
-            redis_url: Redis connection URL (default config.REDIS_URL).
-            ttl_seconds: Expiration time in seconds (default 24h).
-            key_prefix: Key prefix for cache entries (default ledgerlens:trades:).
-        """
         self.redis_url = redis_url or config.REDIS_URL
         self.ttl_seconds = ttl_seconds or config.TRADE_DEDUP_TTL_SECONDS
         self.key_prefix = key_prefix or config.TRADE_DEDUP_CACHE_KEY_PREFIX
 
-        self._redis: redis.Redis | None = None
-        self._redis_available = False
+        self._backend = RedisExactlyOnceBackend(self.redis_url, key_prefix=self.key_prefix)
+        self._store = ExactlyOnceStore(self._backend, ttl_seconds=float(self.ttl_seconds))
 
-        self._init_redis()
+    def _key(self, trade_id: str, paging_token: str | None, asset_pair: str) -> DedupKey:
+        import hashlib
 
-    def _init_redis(self) -> None:
-        """Initialize Redis connection with fallback to no-op mode."""
-        if not _REDIS_AVAILABLE:
-            logger.warning("Redis library not installed; trade deduplication disabled")
-            return
-
-        try:
-            self._redis = redis.from_url(self.redis_url, decode_responses=True, socket_timeout=5)
-            # Test connection
-            self._redis.ping()
-            self._redis_available = True
-            logger.info("Connected to Redis for trade deduplication")
-        except Exception as e:
-            logger.warning(
-                f"Failed to connect to Redis ({self.redis_url}): {e} — proceeding without deduplication"
-            )
-            self._redis = None
-            self._redis_available = False
+        hash_input = paging_token or trade_id
+        trade_hash = hashlib.sha256(hash_input.encode()).hexdigest()
+        return DedupKey(source=f"horizon_trade:{asset_pair}", external_id=trade_hash)
 
     def is_duplicate(
         self,
@@ -101,61 +83,30 @@ class SeenEventCache:
         paging_token: str | None = None,
         asset_pair: str = "unknown",
     ) -> bool:
-        """Check if trade has been seen before and cache it.
+        """Check if trade has been seen before, and mark it seen if not.
 
-        Args:
-            trade_id: Horizon trade ID.
-            paging_token: Horizon paging token (used for hashing).
-            asset_pair: Asset pair for metric labeling (e.g., "USDC/XLM").
-
-        Returns:
-            True if trade is a duplicate (already cached), False if new.
+        Raises:
+            DedupBackendUnavailableError: Redis is unreachable — the caller
+                must not treat this as "not a duplicate".
         """
-        if not self._redis_available:
-            # No Redis: allow all trades through
-            return False
+        key = self._key(trade_id, paging_token, asset_pair)
+        decision = self._store.check_and_stage(key)
 
-        try:
-            # Hash the trade ID or paging token
-            hash_input = paging_token or trade_id
-            trade_hash = hashlib.sha256(hash_input.encode()).hexdigest()
+        if decision.state is DedupState.COMMITTED:
+            logger.debug("Trade duplicate detected: %s (%s…)", trade_id, key.external_id[:8])
+            if ledgerlens_duplicate_events_total:
+                ledgerlens_duplicate_events_total.labels(asset_pair=asset_pair).inc()
+            if ledgerlens_dedup_cache_hits_total:
+                ledgerlens_dedup_cache_hits_total.inc()
+            return True
 
-            # Construct cache key
-            cache_key = f"{self.key_prefix}{asset_pair}"
-
-            # Current timestamp (score in sorted set)
-            current_time = time.time()
-
-            # Check if trade hash exists in sorted set (exists = duplicate)
-            score = self._redis.zscore(cache_key, trade_hash)
-
-            if score is not None:
-                # Duplicate found
-                logger.debug(f"Trade duplicate detected: {trade_id} ({trade_hash[:8]}…)")
-                if ledgerlens_duplicate_events_total:
-                    ledgerlens_duplicate_events_total.labels(asset_pair=asset_pair).inc()
-                if ledgerlens_dedup_cache_hits_total:
-                    ledgerlens_dedup_cache_hits_total.inc()
-                return True
-
-            # New trade: add to cache
-            self._redis.zadd(cache_key, {trade_hash: current_time})
-
-            # Set expiration: absolute timestamp when key should expire
-            expiration_time = int(current_time + self.ttl_seconds)
-            self._redis.expireat(cache_key, expiration_time)
-
-            logger.debug(
-                f"Trade cached: {trade_id} ({trade_hash[:8]}…), expires at {expiration_time}"
-            )
-            return False
-
-        except RedisError as e:
-            logger.warning(f"Redis error during dedup check: {e} — allowing trade through")
-            return False
-        except Exception as e:
-            logger.error(f"Unexpected error in is_duplicate: {e}")
-            return False
+        # NEW, STAGED (redo), or TTL_EXPIRED_REVERIFY: not yet committed. This
+        # cache has no side-effect boundary of its own (see class docstring),
+        # so "checked" and "committed" happen atomically here rather than via
+        # a separate downstream commit() call.
+        self._store.commit(key)
+        logger.debug("Trade cached: %s (%s…)", trade_id, key.external_id[:8])
+        return False
 
     def cache_trade(
         self,
@@ -169,94 +120,57 @@ class SeenEventCache:
             trade_id: Horizon trade ID.
             paging_token: Horizon paging token.
             asset_pair: Asset pair for organization.
+
+        Raises:
+            DedupBackendUnavailableError: Redis is unreachable.
         """
-        if not self._redis_available:
-            return
-
-        try:
-            hash_input = paging_token or trade_id
-            trade_hash = hashlib.sha256(hash_input.encode()).hexdigest()
-            cache_key = f"{self.key_prefix}{asset_pair}"
-            current_time = time.time()
-
-            self._redis.zadd(cache_key, {trade_hash: current_time})
-            expiration_time = int(current_time + self.ttl_seconds)
-            self._redis.expireat(cache_key, expiration_time)
-
-        except Exception as e:
-            logger.warning(f"Failed to cache trade {trade_id}: {e}")
+        key = self._key(trade_id, paging_token, asset_pair)
+        self._store.commit(key)
 
     def get_cache_size(self, asset_pair: str = "unknown") -> int:
-        """Get the number of cached trade hashes for an asset pair.
+        """Return the number of cached trade hashes for an asset pair.
 
-        Args:
-            asset_pair: Asset pair identifier.
-
-        Returns:
-            Number of cached trades, or -1 if Redis unavailable.
+        Returns -1 if Redis is unavailable (ops introspection only — this is
+        not on the correctness-critical dedup path).
         """
-        if not self._redis_available:
-            return -1
-
         try:
-            cache_key = f"{self.key_prefix}{asset_pair}"
-            return self._redis.zcard(cache_key) or 0
-        except Exception as e:
+            return self._backend.scan_count(f"horizon_trade:{asset_pair}")
+        except DedupBackendUnavailableError as e:
             logger.warning(f"Failed to get cache size: {e}")
             return -1
 
     def clear_cache(self, asset_pair: str | None = None) -> bool:
-        """Clear cached trades (for testing).
-
-        Args:
-            asset_pair: Specific pair to clear, or None to clear all.
-
-        Returns:
-            True if successful, False otherwise.
-        """
-        if not self._redis_available:
-            return False
-
+        """Clear cached trades (for testing/ops). Returns False if Redis unavailable."""
         try:
             if asset_pair:
-                cache_key = f"{self.key_prefix}{asset_pair}"
-                self._redis.delete(cache_key)
+                self._backend.scan_delete(f"horizon_trade:{asset_pair}")
             else:
-                # Clear all keys matching prefix
-                pattern = f"{self.key_prefix}*"
-                for key in self._redis.scan_iter(match=pattern):
-                    self._redis.delete(key)
+                self._backend.scan_delete("horizon_trade")
             return True
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
+            # Broad catch justified: Redis operations can fail on network/timeout.
+            # Return False (failure status) rather than crashing test cleanup.
             logger.warning(f"Failed to clear cache: {e}")
             return False
 
     def health_check(self) -> bool:
-        """Check if Redis connection is healthy.
+        """Check whether the dedup backend is available.
 
         Returns:
-            True if Redis is available and responsive, False otherwise.
+            True if the backend is available and responsive, False otherwise.
         """
-        if not self._redis_available or not self._redis:
-            return False
-
-        try:
-            self._redis.ping()
-            return True
-        except Exception:
-            return False
+        return self._store.is_available()
 
 
-# Global singleton cache instance
+# ---------------------------------------------------------------------------
+# Global singleton + convenience wrapper
+# ---------------------------------------------------------------------------
+
 _cache_instance: SeenEventCache | None = None
 
 
 def get_trade_dedup_cache() -> SeenEventCache:
-    """Get or create the global trade deduplication cache.
-
-    Returns:
-        SeenEventCache instance.
-    """
+    """Get or create the global trade deduplication cache."""
     global _cache_instance
     if _cache_instance is None:
         _cache_instance = SeenEventCache()
@@ -268,15 +182,18 @@ def is_duplicate_trade(
     paging_token: str | None = None,
     asset_pair: str = "unknown",
 ) -> bool:
-    """Convenience function: check if trade is a duplicate using the global cache.
+    """Convenience wrapper around the global cache.
 
-    Args:
-        trade_id: Horizon trade ID.
-        paging_token: Horizon paging token.
-        asset_pair: Asset pair for metric labeling.
-
-    Returns:
-        True if trade is a duplicate, False if new.
+    Raises:
+        DedupBackendUnavailableError: propagated from ``SeenEventCache.is_duplicate``.
     """
     cache = get_trade_dedup_cache()
     return cache.is_duplicate(trade_id, paging_token, asset_pair)
+
+
+__all__ = [
+    "DedupBackendUnavailableError",
+    "SeenEventCache",
+    "get_trade_dedup_cache",
+    "is_duplicate_trade",
+]

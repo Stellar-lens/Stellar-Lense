@@ -5,6 +5,7 @@ import os
 import pytest
 
 from alerts.router import (
+    Alert,
     AlertRouter,
     RouteDestination,
     RoutingConfigError,
@@ -13,15 +14,16 @@ from alerts.router import (
 )
 
 
-def _alert(**overrides):
-    base = {
+def _alert(**overrides: object) -> Alert:
+    """Create a test alert with optional field overrides."""
+    base: Alert = {
         "wallet_address": "GWALLET",
         "asset_pair": "USDC:GISSUER/native",
         "detectors": ["benford_engine"],
         "risk_score": 50,
         "tenant": "default",
     }
-    base.update(overrides)
+    base.update(overrides)  # type: ignore[typeddict-unknown-key]
     return base
 
 
@@ -94,6 +96,18 @@ def test_route_dedupes_same_destination_from_multiple_rules():
     )
     destinations = router.route(_alert())
     assert len(destinations) == 1
+
+
+def test_alert_dict_structure_is_typed():
+    """Verify that Alert TypedDict properly documents alert structure."""
+    alert = _alert()
+
+    # All expected fields should be present and have correct types
+    assert isinstance(alert.get("wallet_address"), str)
+    assert isinstance(alert.get("asset_pair"), str)
+    assert isinstance(alert.get("detectors"), list)
+    assert isinstance(alert.get("risk_score"), (int, float))
+    assert isinstance(alert.get("tenant"), str)
 
 
 def test_stop_on_match_short_circuits_and_owns_alert():

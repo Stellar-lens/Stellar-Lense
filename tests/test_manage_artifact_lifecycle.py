@@ -1,187 +1,191 @@
-"""Tests for scripts/manage_artifact_lifecycle.py --check-only mode."""
+"""Tests for scripts/manage_artifact_lifecycle.py — authenticated, audited
+promote/rollback CLI (Grand 2 / issue #671, Task E).
+"""
 
-import json
-import subprocess
-from pathlib import Path
+import os
+
+import pytest
+
+from config import config
+from detection import model_governance as mg
+from detection.persistence import PromotionAuditLog, get_engine, get_session_factory
+from scripts.manage_artifact_lifecycle import main
 
 
-def test_check_only_mode_does_not_modify_manifest(tmp_path, capsys):
-    """Test that --check-only prints planned actions without modifying the manifest."""
-    # Create test artifacts
-    artifact_dir = tmp_path / "artifacts"
-    artifact_dir.mkdir()
-    artifact_v1 = artifact_dir / "model_v1.joblib"
-    artifact_v1.write_bytes(b"model-bytes-v1")
+@pytest.fixture(autouse=True)
+def _governance_config(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "MODEL_PROMOTION_SECRET", "test-secret")
+    monkeypatch.setattr(config, "MODEL_PROMOTION_AUTHORIZED_ACTORS", "alice")
+    monkeypatch.setattr(config, "RISK_SCORE_DB_URL", f"sqlite:///{tmp_path}/cli_gov.db")
 
-    artifact_v2 = artifact_dir / "model_v2.joblib"
-    artifact_v2.write_bytes(b"model-bytes-v2")
 
-    manifest_path = tmp_path / "artifact_manifest.json"
+@pytest.fixture()
+def artifact_file(tmp_path):
+    path = tmp_path / "rf.joblib"
+    path.write_bytes(b"fake-model-bytes-v1")
+    return str(path)
 
-    # Register v1 and promote it
-    subprocess.run(
-        [
-            "python", "-m", "scripts.manage_artifact_lifecycle",
-            "--manifest-path", str(manifest_path),
-            "register", "--name", "test-model", "--artifact-path", str(artifact_v1),
-        ],
-        check=True,
-        cwd="/home/ajidokwu/Desktop/Drips/Fred/Ledgerlens-data",
-    )
 
-    # Get the version from the manifest
+def _run(monkeypatch, argv):
+    monkeypatch.setattr("sys.argv", ["manage_artifact_lifecycle.py", *argv])
+    main()
+
+
+class TestPromoteAuthorization:
+    def test_promote_without_credential_is_denied_and_audited(
+        self, tmp_path, artifact_file, monkeypatch
+    ):
+        manifest_path = str(tmp_path / "manifest.json")
+        monkeypatch.setattr(
+            "sys.argv",
+            [
+                "manage_artifact_lifecycle.py",
+                "--manifest-path",
+                manifest_path,
+                "register",
+                "--name",
+                "rf",
+                "--artifact-path",
+                artifact_file,
+            ],
+        )
+        main()
+        monkeypatch.setattr(
+            "sys.argv",
+            [
+                "manage_artifact_lifecycle.py",
+                "--manifest-path",
+                manifest_path,
+                "validate",
+                "--name",
+                "rf",
+                "--version",
+                _read_only_version(manifest_path),
+            ],
+        )
+        main()
+
+        with pytest.raises(SystemExit):
+            _run(
+                monkeypatch,
+                [
+                    "--manifest-path",
+                    manifest_path,
+                    "promote",
+                    "--name",
+                    "rf",
+                    "--version",
+                    _read_only_version(manifest_path),
+                    "--actor",
+                    "mallory",
+                    "--credential",
+                    "wrong",
+                ],
+            )
+
+        audit_log = PromotionAuditLog(get_session_factory(get_engine()))
+        rows = audit_log.recent()
+        assert any(r.actor == "mallory" and not r.success for r in rows)
+
+    def test_authorized_promote_succeeds_and_is_audited(self, tmp_path, artifact_file, monkeypatch):
+        manifest_path = str(tmp_path / "manifest.json")
+        _run(
+            monkeypatch,
+            [
+                "--manifest-path",
+                manifest_path,
+                "register",
+                "--name",
+                "rf",
+                "--artifact-path",
+                artifact_file,
+            ],
+        )
+        version = _read_only_version(manifest_path)
+        _run(
+            monkeypatch,
+            ["--manifest-path", manifest_path, "validate", "--name", "rf", "--version", version],
+        )
+
+        # A signed, transparency-logged copy of the artifact must exist at
+        # the SAME path recorded in the registry for make_trust_verifier to
+        # succeed (it re-verifies via ModelArtifactVerifier against the
+        # directory containing record.artifact_path).
+        public_key_path = _sign_and_register(artifact_file, "rf")
+        monkeypatch.setattr(config, "TRUSTED_SIGNING_PUBLIC_KEY_PATH", public_key_path)
+
+        _run(
+            monkeypatch,
+            [
+                "--manifest-path",
+                manifest_path,
+                "promote",
+                "--name",
+                "rf",
+                "--version",
+                version,
+                "--actor",
+                "alice",
+                "--credential",
+                mg.expected_credential("alice"),
+            ],
+        )
+
+        audit_log = PromotionAuditLog(get_session_factory(get_engine()))
+        rows = audit_log.recent()
+        assert any(r.actor == "alice" and r.action == "promote" and r.success for r in rows)
+
+
+def _read_only_version(manifest_path: str) -> str:
+    import json
+
     with open(manifest_path) as f:
-        manifest = json.load(f)
-    v1_version = list(manifest["test-model"].keys())[0]
-
-    # Validate v1
-    subprocess.run(
-        [
-            "python", "-m", "scripts.manage_artifact_lifecycle",
-            "--manifest-path", str(manifest_path),
-            "validate", "--name", "test-model", "--version", v1_version,
-        ],
-        check=True,
-        cwd="/home/ajidokwu/Desktop/Drips/Fred/Ledgerlens-data",
-    )
-
-    # Promote v1
-    subprocess.run(
-        [
-            "python", "-m", "scripts.manage_artifact_lifecycle",
-            "--manifest-path", str(manifest_path),
-            "promote", "--name", "test-model", "--version", v1_version,
-        ],
-        check=True,
-        cwd="/home/ajidokwu/Desktop/Drips/Fred/Ledgerlens-data",
-    )
-
-    # Save manifest state before check-only operations
-    with open(manifest_path) as f:
-        manifest_before = json.load(f)
-
-    # Register v2
-    result = subprocess.run(
-        [
-            "python", "-m", "scripts.manage_artifact_lifecycle",
-            "--manifest-path", str(manifest_path),
-            "register", "--name", "test-model", "--artifact-path", str(artifact_v2),
-        ],
-        capture_output=True,
-        text=True,
-        check=True,
-        cwd="/home/ajidokwu/Desktop/Drips/Fred/Ledgerlens-data",
-    )
-
-    # Get the version of v2
-    with open(manifest_path) as f:
-        manifest = json.load(f)
-    versions = list(manifest["test-model"].keys())
-    v2_version = [v for v in versions if v != v1_version][0]
-
-    # Validate v2
-    subprocess.run(
-        [
-            "python", "-m", "scripts.manage_artifact_lifecycle",
-            "--manifest-path", str(manifest_path),
-            "validate", "--name", "test-model", "--version", v2_version,
-        ],
-        check=True,
-        cwd="/home/ajidokwu/Desktop/Drips/Fred/Ledgerlens-data",
-    )
-
-    # Save manifest state before check-only promote
-    with open(manifest_path) as f:
-        manifest_before_promote = json.load(f)
-
-    # Try to promote v2 in check-only mode
-    result = subprocess.run(
-        [
-            "python", "-m", "scripts.manage_artifact_lifecycle",
-            "--manifest-path", str(manifest_path),
-            "--check-only",
-            "promote", "--name", "test-model", "--version", v2_version,
-        ],
-        capture_output=True,
-        text=True,
-        cwd="/home/ajidokwu/Desktop/Drips/Fred/Ledgerlens-data",
-    )
-
-    # Assert the manifest was not modified
-    with open(manifest_path) as f:
-        manifest_after = json.load(f)
-    assert manifest_after == manifest_before_promote, "Manifest should not be modified in --check-only mode"
-
-    # Assert the action was printed
-    output = result.stdout
-    assert "test-model" in output, "Should print the artifact name"
-    assert v2_version in output, "Should print the version"
-    assert "promote" in output.lower(), "Should indicate the promote action in the output"
+        data = json.load(f)
+    return next(iter(data["rf"]))
 
 
-def test_check_only_deprecate_no_changes(tmp_path):
-    """Test that --check-only mode for deprecate doesn't modify the manifest."""
-    artifact_dir = tmp_path / "artifacts"
-    artifact_dir.mkdir()
-    artifact = artifact_dir / "model.joblib"
-    artifact.write_bytes(b"model-bytes")
+def _sign_and_register(artifact_path: str, model_name: str) -> str:
+    """Returns the public key PEM path to configure as TRUSTED_SIGNING_PUBLIC_KEY_PATH."""
+    """Sign the metrics.json expected next to *artifact_path* and register
+    it in the default transparency log, so make_trust_verifier can succeed."""
+    import hashlib
+    import json
 
-    manifest_path = tmp_path / "artifact_manifest.json"
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-    # Register and promote an artifact
-    subprocess.run(
-        [
-            "python", "-m", "scripts.manage_artifact_lifecycle",
-            "--manifest-path", str(manifest_path),
-            "register", "--name", "model", "--artifact-path", str(artifact),
-        ],
-        check=True,
-        cwd="/home/ajidokwu/Desktop/Drips/Fred/Ledgerlens-data",
-    )
+    from detection.persistence import get_default_transparency_log, sign_metrics
 
-    with open(manifest_path) as f:
-        manifest = json.load(f)
-    version = list(manifest["model"].keys())[0]
+    model_dir = os.path.dirname(artifact_path)
+    sha = hashlib.sha256()
+    with open(artifact_path, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            sha.update(chunk)
+    metrics_path = os.path.join(model_dir, "metrics.json")
+    with open(metrics_path, "w") as f:
+        json.dump({model_name: {"artifact_sha256": sha.hexdigest()}}, f)
 
-    subprocess.run(
-        [
-            "python", "-m", "scripts.manage_artifact_lifecycle",
-            "--manifest-path", str(manifest_path),
-            "validate", "--name", "model", "--version", version,
-        ],
-        check=True,
-        cwd="/home/ajidokwu/Desktop/Drips/Fred/Ledgerlens-data",
-    )
+    private_key = Ed25519PrivateKey.generate()
+    key_path = os.path.join(model_dir, "signing_key.pem")
+    with open(key_path, "wb") as f:
+        f.write(
+            private_key.private_bytes(
+                serialization.Encoding.PEM,
+                serialization.PrivateFormat.PKCS8,
+                serialization.NoEncryption(),
+            )
+        )
+    sign_metrics(metrics_path, key_path)
 
-    subprocess.run(
-        [
-            "python", "-m", "scripts.manage_artifact_lifecycle",
-            "--manifest-path", str(manifest_path),
-            "promote", "--name", "model", "--version", version,
-        ],
-        check=True,
-        cwd="/home/ajidokwu/Desktop/Drips/Fred/Ledgerlens-data",
-    )
+    public_key = private_key.public_key()
+    public_path = os.path.join(model_dir, "public_key.pem")
+    with open(public_path, "wb") as f:
+        f.write(
+            public_key.public_bytes(
+                serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo
+            )
+        )
 
-    # Save manifest state
-    with open(manifest_path) as f:
-        manifest_before = json.load(f)
-
-    # Try to deprecate in check-only mode
-    subprocess.run(
-        [
-            "python", "-m", "scripts.manage_artifact_lifecycle",
-            "--manifest-path", str(manifest_path),
-            "--check-only",
-            "deprecate", "--name", "model", "--version", version,
-            "--reason", "test deprecation",
-        ],
-        capture_output=True,
-        text=True,
-        cwd="/home/ajidokwu/Desktop/Drips/Fred/Ledgerlens-data",
-    )
-
-    # Assert manifest unchanged
-    with open(manifest_path) as f:
-        manifest_after = json.load(f)
-    assert manifest_after == manifest_before, "Manifest should not be modified in --check-only mode"
+    log = get_default_transparency_log()
+    log.append(model_name, sha.hexdigest())
+    return public_path

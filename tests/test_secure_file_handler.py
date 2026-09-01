@@ -102,6 +102,18 @@ class TestValidatePath:
         result = validate_path(valid_csv)
         assert result == valid_csv.resolve()
 
+    def test_symlink_escape_blocked(self, tmp_upload_dir: Path, tmp_path: Path) -> None:
+        outside = tmp_path / "secret.csv"
+        outside.write_text("trade_id,amount\nt1,100\n")
+        link = tmp_upload_dir / "link.csv"
+        link.symlink_to(outside)
+        with pytest.raises(ValueError, match="Path traversal"):
+            validate_path(link, allowed_base=tmp_upload_dir)
+
+    def test_null_byte_path_rejected(self, tmp_upload_dir: Path) -> None:
+        with pytest.raises(ValueError, match="null byte"):
+            validate_path(str(tmp_upload_dir / "ledger.csv\x00"), allowed_base=tmp_upload_dir)
+
 
 # ---------------------------------------------------------------------------
 # Extension validation
@@ -270,6 +282,13 @@ class TestJSONIngestion:
         result = h.ingest(p)
         assert not result.accepted
 
+    def test_json_scalar_records_rejected(self, tmp_upload_dir: Path) -> None:
+        p = tmp_upload_dir / "scalar.json"
+        p.write_text(json.dumps([{"trade_id": "t1"}, "unexpected scalar"]))
+        result = SecureFileHandler(allowed_base=tmp_upload_dir).ingest(p)
+        assert not result.accepted
+        assert "objects" in result.rejection_reason
+
 
 # ---------------------------------------------------------------------------
 # NDJSON ingestion
@@ -288,6 +307,13 @@ class TestNDJSONIngestion:
         h = SecureFileHandler(allowed_base=tmp_upload_dir)
         result = h.ingest(p)
         assert not result.accepted
+
+    def test_ndjson_scalar_record_rejected(self, tmp_upload_dir: Path) -> None:
+        p = tmp_upload_dir / "scalar.ndjson"
+        p.write_text('"unexpected scalar"\n')
+        result = SecureFileHandler(allowed_base=tmp_upload_dir).ingest(p)
+        assert not result.accepted
+        assert "objects" in result.rejection_reason
 
     def test_jsonl_extension_works(self, tmp_upload_dir: Path) -> None:
         p = tmp_upload_dir / "data.jsonl"
