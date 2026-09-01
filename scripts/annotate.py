@@ -170,3 +170,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+# TODO(#733): Reject empty or whitespace-only --annotator-id at startup before any annotation is recorded.
