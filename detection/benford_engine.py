@@ -24,6 +24,8 @@ Second-digit Benford analysis (Issue #179):
   chi_square_second_digit, z_scores_second_digit, mad_score_second_digit.
 """
 
+from __future__ import annotations
+
 import hashlib
 import json
 import logging

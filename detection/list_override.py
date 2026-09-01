@@ -7,6 +7,8 @@ allowlist takes precedence and the wallet is treated as allowed (score 0).
 This prioritizes operator intent to explicitly allow over deny decisions.
 """
 
+from __future__ import annotations
+
 import json
 import os
 import time

@@ -2,15 +2,31 @@
 integrity verification (Ed25519 trust chain).
 """
 
+from __future__ import annotations
+
 import hashlib
 import json
 import os
 import threading
-from datetime import UTC, datetime
+from typing import Optional
+
+try:
+    from datetime import UTC, datetime
+except ImportError:
+    from datetime import datetime, timezone
+    UTC = timezone.utc  # type: ignore
 
 import numpy as np
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
+try:
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import (
+        Ed25519PrivateKey,
+        Ed25519PublicKey,
+    )
+except Exception:
+    serialization = None
+    Ed25519PrivateKey = None
+    Ed25519PublicKey = None
 from sqlalchemy import (
     Boolean,
     DateTime,
@@ -48,13 +64,13 @@ class RiskScoreRecord(Base):
     ml_flag: Mapped[bool] = mapped_column(nullable=False, default=False)
     confidence: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     # Non-breaking addition: NULL means propagation has not been run yet.
-    propagated_risk: Mapped[float | None] = mapped_column(nullable=True, default=None)
+    propagated_risk: Mapped[Optional[float]] = mapped_column(nullable=True, default=None)
     # Stable wash-trading ring id ("ring_<hash>") grouping wallets in the same
     # detected community; NULL when the wallet is not part of any ring.
-    ring_id: Mapped[str | None] = mapped_column(String, index=True, nullable=True, default=None)
+    ring_id: Mapped[Optional[str]] = mapped_column(String, index=True, nullable=True, default=None)
     # JSON blob mapping feature_name → [trade_id, ...] for provenance tracking
     # (Issue #244). NULL when FEATURE_PROVENANCE_ENABLED=False or not computed.
-    provenance_json: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
+    provenance_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True, default=None)
     # True when this score has been certified robust via IBP at the standard
     # evaluation epsilons (ε=0.01 and ε=0.05) — Issue #245. Internal only.
     certified_robust: Mapped[bool | None] = mapped_column(Boolean, nullable=True, default=None)
@@ -121,15 +137,15 @@ class ModelVersionRecord(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     version_id: Mapped[str] = mapped_column(String, unique=True, nullable=False, index=True)
     model_artifact_path: Mapped[str] = mapped_column(String, nullable=False)
-    artifact_signature: Mapped[str | None] = mapped_column(String, nullable=True)
+    artifact_signature: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     status: Mapped[str] = mapped_column(String, nullable=False, default="shadow", index=True)
     trained_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC), index=True
     )
-    shadow_start: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    promoted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    rolled_back_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    shadow_drift_rate: Mapped[float | None] = mapped_column(Float, nullable=True)
+    shadow_start: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    promoted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    rolled_back_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    shadow_drift_rate: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     shadow_total_requests: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     shadow_drift_events: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     promotion_blocked_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -548,7 +564,7 @@ class FederatedAuditRecord(Base):
     round_outcome: Mapped[str] = mapped_column(String, nullable=False)
     model_version: Mapped[int] = mapped_column(Integer, nullable=False)
     participant_count: Mapped[int] = mapped_column(Integer, nullable=False)
-    prev_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    prev_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     recorded_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )
