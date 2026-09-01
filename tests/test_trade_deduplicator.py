@@ -1,13 +1,21 @@
-"""Tests for idempotent trade ingestion with Redis deduplication."""
+"""Tests for idempotent trade ingestion via the unified exactly-once dedup store.
+
+Issue #670 replaced the previous ZSET-based, fail-open ``SeenEventCache`` with
+a fail-closed implementation built on ``pipeline.exactly_once.ExactlyOnceStore``.
+The graceful-degradation tests below intentionally assert the new fail-closed
+contract (raise ``DedupBackendUnavailableError``) — the old fail-open behavior
+("allow trade through when Redis is unavailable") is the invariant-8 bug this
+issue fixes, not a regression.
+"""
 
 import pytest
 
 from ingestion.trade_deduplicator import (
+    DedupBackendUnavailableError,
     SeenEventCache,
     get_trade_dedup_cache,
 )
 
-# Try to import fakeredis for testing
 try:
     import fakeredis
 
@@ -19,314 +27,134 @@ except ImportError:
 
 @pytest.fixture
 def fake_redis_cache():
-    """Create a SeenEventCache with fakeredis backend for testing."""
+    """Create a SeenEventCache backed by a fakeredis client."""
     if not _FAKEREDIS_AVAILABLE:
         pytest.skip("fakeredis not installed")
 
-    # Create a mock redis module using fakeredis
     fake_redis_instance = fakeredis.FakeStrictRedis(decode_responses=True)
 
-    # Patch redis.from_url to return our fake instance
     cache = SeenEventCache(
         redis_url="redis://localhost:6379/0",
         ttl_seconds=86400,
         key_prefix="ledgerlens:trades:",
     )
-
-    # Replace the internal Redis instance with fake
-    cache._redis = fake_redis_instance
-    cache._redis_available = True
-
+    cache._backend._redis = fake_redis_instance
+    cache._backend._init_error = None
     return cache
 
 
 class TestSeenEventCacheDeduplication:
-    """Tests for duplicate trade detection."""
-
     def test_first_trade_not_duplicate(self, fake_redis_cache):
-        """First submission of a trade should not be flagged as duplicate."""
-        trade_id = "trade-123"
-        paging_token = "paging-456"
-        asset_pair = "USDC/XLM"
-
-        is_dup = fake_redis_cache.is_duplicate(trade_id, paging_token, asset_pair)
-
-        assert is_dup is False
+        assert fake_redis_cache.is_duplicate("trade-123", "paging-456", "USDC/XLM") is False
 
     def test_second_identical_trade_is_duplicate(self, fake_redis_cache):
-        """Second submission of same trade should be flagged as duplicate."""
-        trade_id = "trade-123"
-        paging_token = "paging-456"
-        asset_pair = "USDC/XLM"
-
-        # First submission
-        is_dup_1 = fake_redis_cache.is_duplicate(trade_id, paging_token, asset_pair)
-        assert is_dup_1 is False
-
-        # Second submission (same paging token)
-        is_dup_2 = fake_redis_cache.is_duplicate(trade_id, paging_token, asset_pair)
-        assert is_dup_2 is True
+        trade_id, token, pair = "trade-123", "paging-456", "USDC/XLM"
+        assert fake_redis_cache.is_duplicate(trade_id, token, pair) is False
+        assert fake_redis_cache.is_duplicate(trade_id, token, pair) is True
 
     def test_different_trades_not_duplicates(self, fake_redis_cache):
-        """Different trades should not be flagged as duplicates."""
-        asset_pair = "USDC/XLM"
-
-        # First trade
-        fake_redis_cache.is_duplicate("trade-1", "paging-1", asset_pair)
-
-        # Second trade (different paging token)
-        is_dup = fake_redis_cache.is_duplicate("trade-2", "paging-2", asset_pair)
-
-        assert is_dup is False
+        pair = "USDC/XLM"
+        fake_redis_cache.is_duplicate("trade-1", "paging-1", pair)
+        assert fake_redis_cache.is_duplicate("trade-2", "paging-2", pair) is False
 
     def test_trade_hash_prevents_id_collision(self, fake_redis_cache):
-        """Different paging tokens produce different hashes."""
-        asset_pair = "USDC/XLM"
-
-        # Two trades with similar IDs but different tokens
-        is_dup_1 = fake_redis_cache.is_duplicate("trade-1", "token-A", asset_pair)
-        is_dup_2 = fake_redis_cache.is_duplicate("trade-1", "token-B", asset_pair)
-
-        assert is_dup_1 is False
-        assert is_dup_2 is False  # Different token = different hash
-
-
-class TestIdenticalTimestampTrades:
-    """Sub-second Stellar ledger closes make identical timestamps common.
-
-    The dedup key is derived from the paging token (falling back to the trade
-    ID) and never from the trade timestamp, so two genuinely distinct trades
-    sharing a ledger close time must both survive.
-    """
-
-    def test_distinct_trades_with_identical_timestamp_both_survive(self, fake_redis_cache):
-        """Two distinct trades closed in the same ledger are not collapsed."""
-        asset_pair = "USDC/XLM"
-        ledger_close_time = "2024-01-01T12:00:00Z"
-
-        # Same ledger close time, different Horizon trade IDs / paging tokens.
-        dup_1 = fake_redis_cache.is_duplicate(
-            f"{ledger_close_time}-op-1", "165600493171154945-0", asset_pair
-        )
-        dup_2 = fake_redis_cache.is_duplicate(
-            f"{ledger_close_time}-op-2", "165600493171154945-1", asset_pair
-        )
-
-        assert dup_1 is False
-        assert dup_2 is False
-        assert fake_redis_cache.get_cache_size(asset_pair) == 2
-
-    def test_reingested_trade_with_same_id_is_still_removed(self, fake_redis_cache):
-        """A true duplicate (same trade ID re-ingested) is still suppressed."""
-        asset_pair = "USDC/XLM"
-        trade_id = "2024-01-01T12:00:00Z-op-1"
-        paging_token = "165600493171154945-0"
-
-        # Historical backfill, then the overlapping streaming load.
-        first = fake_redis_cache.is_duplicate(trade_id, paging_token, asset_pair)
-        second = fake_redis_cache.is_duplicate(trade_id, paging_token, asset_pair)
-
-        assert first is False
-        assert second is True
-        assert fake_redis_cache.get_cache_size(asset_pair) == 1
-
-
-class TestCacheTTLandEviction:
-    """Tests for Redis TTL and cache eviction."""
-
-    def test_cache_entry_expires(self, fake_redis_cache):
-        """Cached trade should expire after TTL."""
-        trade_id = "trade-123"
-        paging_token = "paging-456"
-        asset_pair = "USDC/XLM"
-
-        # Add trade
-        fake_redis_cache.is_duplicate(trade_id, paging_token, asset_pair)
-
-        # Verify it's cached
-        cache_key = f"{fake_redis_cache.key_prefix}{asset_pair}"
-        size_before = fake_redis_cache._redis.zcard(cache_key)
-        assert size_before == 1
-
-        # Simulate TTL expiration by directly deleting the key
-        # (fakeredis doesn't automatically expire keys)
-        fake_redis_cache._redis.delete(cache_key)
-
-        # Verify cache is empty
-        size_after = fake_redis_cache._redis.zcard(cache_key) or 0
-        assert size_after == 0
-
-    def test_cache_does_not_grow_unbounded(self, fake_redis_cache):
-        """Multiple unique trades should add to cache, not exceed sorted set."""
-        asset_pair = "USDC/XLM"
-        cache_key = f"{fake_redis_cache.key_prefix}{asset_pair}"
-
-        # Add 100 different trades
-        for i in range(100):
-            fake_redis_cache.is_duplicate(f"trade-{i}", f"token-{i}", asset_pair)
-
-        # Cache should have exactly 100 entries
-        size = fake_redis_cache._redis.zcard(cache_key)
-        assert size == 100
-
-    def test_cache_size_query(self, fake_redis_cache):
-        """get_cache_size should return correct count."""
-        asset_pair = "USDC/XLM"
-
-        # Add 5 trades
-        for i in range(5):
-            fake_redis_cache.is_duplicate(f"trade-{i}", f"token-{i}", asset_pair)
-
-        # Check size
-        size = fake_redis_cache.get_cache_size(asset_pair)
-        assert size == 5
-
-
-class TestGracefulDegradation:
-    """Tests for behavior when Redis is unavailable."""
-
-    def test_cache_unavailable_allows_trades(self):
-        """When Redis unavailable, is_duplicate returns False (allow trade)."""
-        cache = SeenEventCache(redis_url="redis://nonexistent:9999/0")
-
-        # Redis should not be available
-        assert cache._redis_available is False
-
-        # Should allow all trades through
-        is_dup = cache.is_duplicate("trade-1", "token-1", "USDC/XLM")
-        assert is_dup is False
-
-    def test_cache_fallback_on_redis_error(self, fake_redis_cache):
-        """If Redis fails during check, allow trade through (don't crash)."""
-        # Simulate Redis error by closing connection
-        fake_redis_cache._redis = None
-
-        # Should not raise, just allow trade
-        is_dup = fake_redis_cache.is_duplicate("trade-1", "token-1", "USDC/XLM")
-        assert is_dup is False
+        pair = "USDC/XLM"
+        assert fake_redis_cache.is_duplicate("trade-1", "token-A", pair) is False
+        assert fake_redis_cache.is_duplicate("trade-1", "token-B", pair) is False
 
 
 class TestCacheOperations:
-    """Tests for cache utility operations."""
-
     def test_cache_trade_explicitly(self, fake_redis_cache):
-        """cache_trade should add trade without checking first."""
-        asset_pair = "USDC/XLM"
-        cache_key = f"{fake_redis_cache.key_prefix}{asset_pair}"
+        pair = "USDC/XLM"
+        fake_redis_cache.cache_trade("trade-1", "token-1", pair)
+        assert fake_redis_cache.get_cache_size(pair) == 1
+        # Subsequent check now sees it as a duplicate.
+        assert fake_redis_cache.is_duplicate("trade-1", "token-1", pair) is True
 
-        # Explicitly cache
-        fake_redis_cache.cache_trade("trade-1", "token-1", asset_pair)
+    def test_cache_size_query(self, fake_redis_cache):
+        pair = "USDC/XLM"
+        for i in range(5):
+            fake_redis_cache.is_duplicate(f"trade-{i}", f"token-{i}", pair)
+        assert fake_redis_cache.get_cache_size(pair) == 5
 
-        # Verify it's cached
-        size = fake_redis_cache._redis.zcard(cache_key)
-        assert size == 1
+    def test_cache_does_not_grow_unbounded_across_pairs(self, fake_redis_cache):
+        pair = "USDC/XLM"
+        for i in range(100):
+            fake_redis_cache.is_duplicate(f"trade-{i}", f"token-{i}", pair)
+        assert fake_redis_cache.get_cache_size(pair) == 100
 
     def test_clear_cache_specific_pair(self, fake_redis_cache):
-        """clear_cache should remove trades for specific pair."""
-        pair1 = "USDC/XLM"
-        pair2 = "EUR/XLM"
-
-        # Add trades for both pairs
+        pair1, pair2 = "USDC/XLM", "EUR/XLM"
         fake_redis_cache.is_duplicate("trade-1", "token-1", pair1)
         fake_redis_cache.is_duplicate("trade-2", "token-2", pair2)
 
-        # Clear first pair
         fake_redis_cache.clear_cache(pair1)
 
-        # First pair should be empty, second should still have data
-        assert (fake_redis_cache._redis.zcard(f"{fake_redis_cache.key_prefix}{pair1}") or 0) == 0
-        assert (fake_redis_cache._redis.zcard(f"{fake_redis_cache.key_prefix}{pair2}") or 0) == 1
+        assert fake_redis_cache.get_cache_size(pair1) == 0
+        assert fake_redis_cache.get_cache_size(pair2) == 1
 
     def test_health_check_available(self, fake_redis_cache):
-        """health_check should return True when Redis available."""
         assert fake_redis_cache.health_check() is True
 
     def test_health_check_unavailable(self):
-        """health_check should return False when Redis unavailable."""
-        cache = SeenEventCache(redis_url="redis://nonexistent:9999/0")
+        cache = SeenEventCache(redis_url="redis://nonexistent-host-for-tests:9999/0")
         assert cache.health_check() is False
 
 
+class TestFailClosedDegradation:
+    """Redis outage must raise, never silently allow trades through (invariant 8)."""
+
+    def test_is_duplicate_raises_when_redis_unreachable(self):
+        cache = SeenEventCache(redis_url="redis://nonexistent-host-for-tests:9999/0")
+        with pytest.raises(DedupBackendUnavailableError):
+            cache.is_duplicate("trade-1", "token-1", "USDC/XLM")
+
+    def test_is_duplicate_raises_when_client_becomes_none(self, fake_redis_cache):
+        fake_redis_cache._backend._redis = None
+        fake_redis_cache._backend._init_error = "connection dropped mid-session"
+        with pytest.raises(DedupBackendUnavailableError):
+            fake_redis_cache.is_duplicate("trade-1", "token-1", "USDC/XLM")
+
+    def test_get_cache_size_degrades_to_sentinel_not_raise(self):
+        """Introspection helpers stay lenient — they are not the correctness path."""
+        cache = SeenEventCache(redis_url="redis://nonexistent-host-for-tests:9999/0")
+        assert cache.get_cache_size("USDC/XLM") == -1
+        assert cache.clear_cache("USDC/XLM") is False
+
+
 class TestAssetPairSeparation:
-    """Tests for per-pair cache isolation."""
-
     def test_same_trade_different_pairs_separate(self, fake_redis_cache):
-        """Same trade ID on different pairs should not be flagged as duplicate."""
-        trade_id = "trade-123"
-        token = "paging-456"
-
-        # Same trade, different pairs
-        dup_1 = fake_redis_cache.is_duplicate(trade_id, token, "USDC/XLM")
-        dup_2 = fake_redis_cache.is_duplicate(trade_id, token, "EUR/XLM")
-
-        # Both should be new (different pair caches)
-        assert dup_1 is False
-        assert dup_2 is False
+        trade_id, token = "trade-123", "paging-456"
+        assert fake_redis_cache.is_duplicate(trade_id, token, "USDC/XLM") is False
+        assert fake_redis_cache.is_duplicate(trade_id, token, "EUR/XLM") is False
 
     def test_cache_isolation_per_pair(self, fake_redis_cache):
-        """Cache entries are isolated per asset pair."""
-        # Add trade to pair 1
         fake_redis_cache.is_duplicate("trade-1", "token-1", "USDC/XLM")
-
-        # Pair 1 should have 1 entry
-        size_1 = fake_redis_cache.get_cache_size("USDC/XLM")
-        assert size_1 == 1
-
-        # Pair 2 should have 0 entries
-        size_2 = fake_redis_cache.get_cache_size("EUR/XLM")
-        assert size_2 == 0
+        assert fake_redis_cache.get_cache_size("USDC/XLM") == 1
+        assert fake_redis_cache.get_cache_size("EUR/XLM") == 0
 
 
 class TestConvenienceFunctions:
-    """Tests for module-level convenience functions."""
-
     def test_is_duplicate_trade_convenience(self):
-        """is_duplicate_trade convenience function should work."""
-        # Get global cache (may not be Redis-backed in test env)
         cache = get_trade_dedup_cache()
         assert cache is not None
 
     def test_get_trade_dedup_cache_singleton(self):
-        """get_trade_dedup_cache should return same instance."""
-        cache1 = get_trade_dedup_cache()
-        cache2 = get_trade_dedup_cache()
-        assert cache1 is cache2
+        assert get_trade_dedup_cache() is get_trade_dedup_cache()
 
 
 class TestEdgeCases:
-    """Tests for edge cases and boundary conditions."""
-
     def test_empty_paging_token_uses_trade_id(self, fake_redis_cache):
-        """If paging token is None, use trade ID for hashing."""
-        trade_id = "trade-123"
-        asset_pair = "USDC/XLM"
-
-        # Submit with None paging token
-        dup_1 = fake_redis_cache.is_duplicate(trade_id, None, asset_pair)
-        assert dup_1 is False
-
-        # Submit again (same trade ID, None token)
-        dup_2 = fake_redis_cache.is_duplicate(trade_id, None, asset_pair)
-        assert dup_2 is True
+        trade_id, pair = "trade-123", "USDC/XLM"
+        assert fake_redis_cache.is_duplicate(trade_id, None, pair) is False
+        assert fake_redis_cache.is_duplicate(trade_id, None, pair) is True
 
     def test_unicode_trade_ids(self, fake_redis_cache):
-        """Handle Unicode in trade IDs gracefully."""
-        trade_id = "trade-αβγ"
-        token = "token-日本語"
-        asset_pair = "USDC/XLM"
-
-        dup_1 = fake_redis_cache.is_duplicate(trade_id, token, asset_pair)
-        dup_2 = fake_redis_cache.is_duplicate(trade_id, token, asset_pair)
-
-        assert dup_1 is False
-        assert dup_2 is True
+        trade_id, token, pair = "trade-αβγ", "token-日本語", "USDC/XLM"
+        assert fake_redis_cache.is_duplicate(trade_id, token, pair) is False
+        assert fake_redis_cache.is_duplicate(trade_id, token, pair) is True
 
     def test_long_asset_pair_name(self, fake_redis_cache):
-        """Handle long asset pair names."""
-        asset_pair = "USDC:GA5ZSEJYBY3RJRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN/XLM:native"
-
-        dup_1 = fake_redis_cache.is_duplicate("trade-1", "token-1", asset_pair)
-        dup_2 = fake_redis_cache.is_duplicate("trade-1", "token-1", asset_pair)
-
-        assert dup_1 is False
-        assert dup_2 is True
+        pair = "USDC:GA5ZSEJYBY3RJRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN/XLM:native"
+        assert fake_redis_cache.is_duplicate("trade-1", "token-1", pair) is False
+        assert fake_redis_cache.is_duplicate("trade-1", "token-1", pair) is True

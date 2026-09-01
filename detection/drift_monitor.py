@@ -95,8 +95,11 @@ class DriftMonitor:
             drift_flag = psi >= PSI_MODERATE_DRIFT_THRESHOLD
             if drift_flag:
                 any_drift = True
+                # Only include features that breached the threshold
+                features.append({"feature": col, "psi": float(psi), "drift_flag": drift_flag})
 
-            features.append({"feature": col, "psi": psi, "drift_flag": drift_flag})
+        # Sort by PSI descending (worst-drifted features first)
+        features.sort(key=lambda f: f["psi"], reverse=True)
 
         report = DriftReport(features=features, any_drift_detected=any_drift)
         self._write_report(report)
