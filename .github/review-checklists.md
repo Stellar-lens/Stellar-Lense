@@ -104,6 +104,22 @@ parameters. State why it changed and whether the signature was regenerated.
 
 ---
 
+## New top-level module
+
+**Fires on:** any new top-level directory (e.g. `contracts/`, `mlops/`, `pipeline/`)
+
+When you add a brand-new top-level module or directory, add a corresponding
+pattern to [`.github/CODEOWNERS`](../CODEOWNERS) so the right team is
+automatically requested for review on future changes.  For example, adding a
+`contracts/` directory for Soroban smart-contract helpers:
+
+```gitignore
+/contracts/                      @Ledger-Lenz/contract-team
+```
+
+If the new module touches an existing team's area, include both teams
+(e.g. `@Ledger-Lenz/contract-team @Ledger-Lenz/infra-team`).
+
 ## What is deliberately not gated
 
 Gating paths that carry no contract trains people to acknowledge noise, which

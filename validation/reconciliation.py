@@ -31,9 +31,18 @@ Public API
         reconcile_trade_counts,
         reconcile_features,
         reconcile_wallet_scores,
+        reconcile_alert_delivery,
         ReconciliationReport,
         ReconciliationError,
     )
+
+``reconcile_alert_delivery`` (Issue #670, required scope E) traces every
+scored wallet at or above the alert threshold through to a terminal
+delivery outcome recorded in ``streaming.alert_ledger.AlertDeliveryLedger``
+— ``delivered``, ``dead_lettered`` (e.g. a webhook 500), or
+``suppressed_cooldown`` — so a silently dropped alert is distinguishable
+from an intentionally suppressed one, and a dead-lettered alert is reported
+as accounted-for rather than as a missing trace.
 """
 
 from __future__ import annotations
@@ -44,6 +53,8 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
+
+from streaming.alert_ledger import AlertDeliveryRecord
 
 # ---------------------------------------------------------------------------
 # Result / error types
@@ -579,5 +590,120 @@ def reconcile_wallet_scores(
     report.metadata["scored_wallet_count"] = len(score_wallets)
     report.metadata["unscored_count"] = len(unscored)
     report.metadata["orphan_score_count"] = len(orphan)
+
+    return report
+
+
+# ---------------------------------------------------------------------------
+# Check 4: alert-delivery reconciliation (score >= threshold <-> ledger outcome)
+# ---------------------------------------------------------------------------
+
+
+def reconcile_alert_delivery(
+    scored_wallets: pd.DataFrame,
+    delivery_records: list[AlertDeliveryRecord],
+    *,
+    wallet_column: str = "wallet_id",
+    pair_column: str = "asset_pair",
+    score_column: str = "score",
+    threshold: float = 70.0,
+) -> ReconciliationReport:
+    """Assert every wallet scored at/above *threshold* has an accounted-for
+    alert outcome (Issue #670, required scope E and invariant 7).
+
+    A missing outcome is a hard error — it means a score crossed the alert
+    threshold but the dispatcher never recorded what happened to it (neither
+    delivered, dead-lettered, nor suppressed by cooldown), which is exactly
+    the "silently dropped alert" failure mode this Grand is required to make
+    observable. A ``dead_lettered`` outcome is reported as *accounted for*,
+    not as missing — the point of the ledger is to distinguish "we know this
+    failed and why" from "we have no idea what happened to this".
+
+    Parameters
+    ----------
+    scored_wallets:
+        DataFrame with *wallet_column*, *pair_column*, *score_column*.
+    delivery_records:
+        Every :class:`~streaming.alert_ledger.AlertDeliveryRecord` for the
+        run being reconciled (e.g. from ``AlertDeliveryLedger.all_records()``).
+    threshold:
+        Score at/above which a delivery outcome is required.
+
+    Returns
+    -------
+    ReconciliationReport
+    """
+    report = ReconciliationReport(checks_run=["alert_delivery"])
+
+    for col in (wallet_column, pair_column, score_column):
+        if col not in scored_wallets.columns:
+            report.errors.append(
+                ReconciliationError(
+                    check="alert_delivery",
+                    entity=f"scored_wallets.{col}",
+                    expected="column present",
+                    observed="missing",
+                    severity="error",
+                )
+            )
+    if not report.ok:
+        return report
+
+    accounted: dict[tuple[str, str], list[AlertDeliveryRecord]] = {}
+    for rec in delivery_records:
+        accounted.setdefault((rec.wallet, rec.pair_id), []).append(rec)
+
+    qualifying = scored_wallets[scored_wallets[score_column] >= threshold]
+
+    delivered_count = 0
+    dead_lettered_count = 0
+    suppressed_count = 0
+    missing_count = 0
+
+    for _, row in qualifying.iterrows():
+        wallet = str(row[wallet_column])
+        pair_id = str(row[pair_column])
+        outcomes = accounted.get((wallet, pair_id), [])
+
+        if not outcomes:
+            missing_count += 1
+            report.errors.append(
+                ReconciliationError(
+                    check="alert_delivery",
+                    entity=f"{wallet}@{pair_id}",
+                    expected="a recorded delivery outcome "
+                    "(delivered, dead_lettered, or suppressed_cooldown)",
+                    observed="no outcome recorded — alert may have been silently dropped",
+                    severity="error",
+                )
+            )
+            continue
+
+        for outcome in outcomes:
+            if outcome.outcome == "delivered":
+                delivered_count += 1
+            elif outcome.outcome == "dead_lettered":
+                dead_lettered_count += 1
+                # Accounted for, not an error — but surfaced as a warning so
+                # operators can see dead-lettered alerts without them being
+                # conflated with silently-missing ones.
+                report.errors.append(
+                    ReconciliationError(
+                        check="alert_delivery",
+                        entity=f"{wallet}@{pair_id}",
+                        expected="delivered",
+                        observed=f"dead_lettered ({outcome.reason or 'no reason recorded'})",
+                        severity="warning",
+                    )
+                )
+            elif outcome.outcome == "suppressed_cooldown":
+                suppressed_count += 1
+
+    report.metadata["threshold"] = threshold
+    report.metadata["qualifying_count"] = len(qualifying)
+    report.metadata["delivered_count"] = delivered_count
+    report.metadata["dead_lettered_count"] = dead_lettered_count
+    report.metadata["suppressed_cooldown_count"] = suppressed_count
+    report.metadata["missing_count"] = missing_count
 
     return report

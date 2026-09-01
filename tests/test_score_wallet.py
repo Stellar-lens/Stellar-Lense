@@ -2,9 +2,10 @@ import json
 import logging
 from unittest.mock import MagicMock, patch
 
+import pandas as pd
 import pytest
 
-from scripts.score_wallet import main
+from scripts.score_wallet import InsufficientTradeHistoryError, main
 
 
 @pytest.fixture
@@ -26,9 +27,27 @@ def mock_ingestion():
     with (
         patch("scripts.score_wallet.load_trades") as m_trades,
         patch("scripts.score_wallet.load_orderbook_events") as m_events,
+        patch("scripts.score_wallet.trades_to_dataframe") as m_tdf,
     ):
         m_trades.return_value = iter([])
         m_events.return_value = iter([])
+        # A single trade involving the valid test wallet so the scoring path —
+        # not the "insufficient trade history" path — is exercised.
+        wallet = "G" + "A" * 55
+        m_tdf.return_value = pd.DataFrame(
+            [
+                {
+                    "trade_id": "t1",
+                    "ledger_close_time": pd.Timestamp("2024-01-01"),
+                    "base_account": wallet,
+                    "counter_account": "G" + "B" * 55,
+                    "base_asset": "XLM:native",
+                    "counter_asset": "USDC:GBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+                    "amount": 100.0,
+                    "price": 1.0,
+                }
+            ]
+        )
         yield m_trades, m_events
 
 
@@ -251,3 +270,52 @@ def test_validate_wallet_address():
     # Wrong prefix
     with pytest.raises(ValueError, match="Invalid Stellar address"):
         validate_wallet_address("X" + "A" * 55)
+
+
+# ---------------------------------------------------------------------------
+# Issue #744 — three distinct outcomes
+# ---------------------------------------------------------------------------
+
+
+def test_invalid_address_format_distinct_from_other_outcomes():
+    """Outcome 1: a malformed address yields a clear format error."""
+    from scripts.score_wallet import validate_wallet_address
+
+    with pytest.raises(ValueError, match="Invalid Stellar address"):
+        validate_wallet_address("G" + "A" * 54)
+
+
+def test_insufficient_trade_history_is_distinct(capsys):
+    """Outcome 2: valid address with no trade history is distinct from a failure."""
+    wallet = "G" + "A" * 55
+    with patch("scripts.score_wallet.RiskScorer") as mock_scorer:
+        mock_scorer.return_value.list_override.check.return_value = None
+        with (
+            patch("scripts.score_wallet.load_trades", return_value=iter([])),
+            patch("scripts.score_wallet.load_orderbook_events", return_value=iter([])),
+            patch("scripts.score_wallet.trades_to_dataframe", return_value=pd.DataFrame()),
+            patch(
+                "sys.argv",
+                ["score_wallet.py", "--wallet", wallet, "--pair", "USDC:G..."],
+            ),
+        ):
+            with pytest.raises(InsufficientTradeHistoryError, match="no trade history"):
+                main()
+
+
+def test_genuine_scoring_failure_is_distinct(capsys, mock_ingestion):
+    """Outcome 3: a real scoring failure is clearly worded and exits nonzero."""
+    wallet = "G" + "A" * 55
+    with patch("scripts.score_wallet.RiskScorer") as mock_scorer:
+        mock_scorer.return_value.list_override.check.return_value = None
+        mock_scorer.return_value.score.side_effect = RuntimeError("inference crashed")
+        with patch(
+            "sys.argv",
+            ["score_wallet.py", "--wallet", wallet, "--pair", "USDC:G..."],
+        ):
+            with pytest.raises(SystemExit) as excinfo:
+                main()
+
+    assert excinfo.value.code == 1
+    _, err = capsys.readouterr()
+    assert "Scoring failed" in err

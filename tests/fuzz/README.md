@@ -116,9 +116,75 @@ cp /path/to/crash corpus/crash_<description>.bin
 
 Commit the new seed so all developers have it.
 
+### Regenerating the Corpus
+
+The corpus should be regenerated when:
+- **Code changes to test targets:** If `ingestion/avro_codec.py`, `ingestion/data_models.py`, 
+  or the test factories change, regenerate to ensure seeds reflect current valid inputs.
+- **Schema updates:** When Avro schemas or Pydantic models change, regeneration ensures 
+  seeds are valid against the new schema.
+- **New trade patterns:** If new trade simulation profiles are added to the factories, 
+  regenerate to include those patterns in seed corpus coverage.
+
+**Regeneration command:**
+
+```bash
+python tests/fuzz/generate_corpus.py
+```
+
+This will:
+1. Create `tests/fuzz/corpus/` if it doesn't exist
+2. Generate Avro-serialized trade records using the factories
+3. Generate JSON API responses using the factories
+4. Write all seeds as binary or text files (see note below)
+
+**Reviewing the diff:**
+
+After regenerating, review the Git diff carefully:
+
+```bash
+git status tests/fuzz/corpus/
+git diff tests/fuzz/corpus/
+```
+
+Expected behaviour:
+- **Seed files grow:** Existing corpus files may grow slightly as serialization changes
+- **New seeds added:** If new trade patterns were added to factories, expect new files
+- **Rare shrinkage:** Corpus files should *not* shrink significantly. Unexpected shrinkage 
+  (> 10% reduction) or content changes to existing seeds should be treated as suspicious 
+  and investigated:
+  - Did the schema change in a breaking way?
+  - Did a factory change how it generates data?
+  - Was there a regression in serialization?
+
+**Commit the regenerated corpus:**
+
+```bash
+git add tests/fuzz/corpus/
+git commit -m "Regenerate fuzz corpus after [reason: schema update / new patterns / code changes]"
+```
+
 ### Corpus Size
 
 Keep the corpus small (< 10 MB total) for fast iteration. libFuzzer will derive new inputs via mutations, so seed diversity matters more than quantity.
+
+### Binary vs Text Format
+
+Avro seed files are written as **binary** (`.bin` extension) and cannot be meaningfully 
+inspected as text. JSON seed files are written as **text** (`.json` extension) and may 
+be manually reviewed.
+
+When reviewing large binary diffs in `git diff`, use:
+
+```bash
+git diff --binary tests/fuzz/corpus/
+```
+
+or skip binary files entirely:
+
+```bash
+git diff --binary-data=delta tests/fuzz/corpus/
+```
 
 ## Triage: What to Do When the Fuzzer Finds a Crash
 

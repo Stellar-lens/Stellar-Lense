@@ -238,6 +238,8 @@ def _warm_start_update(
         updated["lightgbm"] = lgbm_model
 
     # Persist updated artifacts
+    # GUARDED: IncrementalTrainer.update() calls guard_production_write(model_dir)
+    # before dispatching to this function.
     for name, model in updated.items():
         joblib.dump(model, os.path.join(model_dir, f"{name}.joblib"))
 
@@ -275,6 +277,8 @@ def _warm_start_update(
             proto = PrototypicalClassifier()
             proto.fit_prototype(embeddings, y_new.values)
             proto_path = os.path.join(model_dir, "prototypes.joblib")
+            # GUARDED: same call site as above — guarded by update()'s
+            # guard_production_write(model_dir) before this function runs.
             joblib.dump(proto.prototypes, proto_path)
             logger.info("Prototypical prototypes saved to %s", proto_path)
         except Exception as e:
@@ -312,13 +316,19 @@ class IncrementalTrainer:
             path = os.path.join(self.model_dir, f"{name}.joblib")
             if os.path.exists(path):
                 model = joblib.load(path)
-                # verify_chain — skipped silently when no public key is configured
                 try:
-                    from detection.persistence import ModelArtifact
+                    from detection.persistence import ModelArtifact, load_trusted_public_key
 
-                    ModelArtifact(self.model_dir).verify_chain(name)
+                    ModelArtifact(self.model_dir).verify_chain(
+                        name, public_key=load_trusted_public_key()
+                    )
                 except Exception as exc:
-                    logger.warning("Integrity check skipped for %s: %s", name, exc)
+                    logger.warning(
+                        "Integrity check failed or skipped for %s (best-effort — active "
+                        "learning does not gate on the production trust chain): %s",
+                        name,
+                        exc,
+                    )
                 models[name] = model
         return models
 
@@ -338,6 +348,9 @@ class IncrementalTrainer:
         quarantine (to prevent false positives from blocking training).
         """
         model_dir = model_dir or self.model_dir
+        from detection.model_governance import guard_production_write
+
+        guard_production_write(model_dir)
         threshold = config.AL_RETRAIN_THRESHOLD
         rollback_threshold = config.AL_ROLLBACK_AUC_DROP
 
