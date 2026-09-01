@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import os
 import stat
+import threading
 from typing import Any
 
 import numpy as np
@@ -93,6 +94,7 @@ class DriftAwareReservoirSampler:
         self._timestamps: list[float] = []
         self._total_seen = 0
         self._updates_since_flush = 0
+        self._lock = threading.RLock()
 
         self._load_if_exists()
 
@@ -156,23 +158,24 @@ class DriftAwareReservoirSampler:
             example: The data example to add (dictionary of feature values).
             timestamp: Optional timestamp for recency weighting. Defaults to current time.
         """
-        if timestamp is None:
-            timestamp = np.datetime64("now").astype(np.int64) / 1e9
+        with self._lock:
+            if timestamp is None:
+                timestamp = np.datetime64("now").astype(np.int64) / 1e9
 
-        self._total_seen += 1
+            self._total_seen += 1
 
-        if len(self._buffer) < self.reservoir_size:
-            self._buffer.append(example)
-            self._timestamps.append(timestamp)
-        else:
-            if self._is_drift_mode():
-                self._recency_biased_replace(example, timestamp)
+            if len(self._buffer) < self.reservoir_size:
+                self._buffer.append(example)
+                self._timestamps.append(timestamp)
             else:
-                self._standard_replace(example, timestamp)
+                if self._is_drift_mode():
+                    self._recency_biased_replace(example, timestamp)
+                else:
+                    self._standard_replace(example, timestamp)
 
-        self._updates_since_flush += 1
-        if self._updates_since_flush >= self.flush_interval:
-            self.flush()
+            self._updates_since_flush += 1
+            if self._updates_since_flush >= self.flush_interval:
+                self.flush()
 
     def sample(self, n: int) -> pd.DataFrame:
         """Return n examples from the reservoir without removal.
@@ -186,41 +189,45 @@ class DriftAwareReservoirSampler:
         Raises:
             ValueError: If n exceeds reservoir size.
         """
-        if n > len(self._buffer):
-            raise ValueError(
-                f"Cannot sample {n} examples from reservoir of size {len(self._buffer)}"
-            )
+        with self._lock:
+            if n > len(self._buffer):
+                raise ValueError(
+                    f"Cannot sample {n} examples from reservoir of size {len(self._buffer)}"
+                )
 
-        indices = np.random.choice(len(self._buffer), size=n, replace=False)
-        return pd.DataFrame([self._buffer[i] for i in indices])
+            indices = np.random.choice(len(self._buffer), size=n, replace=False)
+            return pd.DataFrame([self._buffer[i] for i in indices])
 
     def flush(self) -> None:
         """Persist the reservoir to disk as Parquet (atomic write)."""
-        if not self._buffer:
-            return
+        with self._lock:
+            if not self._buffer:
+                return
 
-        df = pd.DataFrame(self._buffer)
-        df["timestamp"] = self._timestamps
+            df = pd.DataFrame(self._buffer)
+            df["timestamp"] = self._timestamps
 
-        _atomic_write_parquet(self.buffer_path, df)
-        self._updates_since_flush = 0
-        logger.debug("Flushed reservoir (%d examples) to %s", len(self._buffer), self.buffer_path)
+            _atomic_write_parquet(self.buffer_path, df)
+            self._updates_since_flush = 0
+            logger.debug("Flushed reservoir (%d examples) to %s", len(self._buffer), self.buffer_path)
 
     def reset(self) -> None:
         """Clear the reservoir buffer (for manual reset)."""
-        self._buffer.clear()
-        self._timestamps.clear()
-        self._total_seen = 0
-        self._updates_since_flush = 0
+        with self._lock:
+            self._buffer.clear()
+            self._timestamps.clear()
+            self._total_seen = 0
+            self._updates_since_flush = 0
 
-        if os.path.exists(self.buffer_path):
-            os.remove(self.buffer_path)
-            logger.info("Reset reservoir and removed %s", self.buffer_path)
+            if os.path.exists(self.buffer_path):
+                os.remove(self.buffer_path)
+                logger.info("Reset reservoir and removed %s", self.buffer_path)
 
     @property
     def size(self) -> int:
         """Current number of examples in the reservoir."""
-        return len(self._buffer)
+        with self._lock:
+            return len(self._buffer)
 
     def ack_drift(self) -> None:
         """Acknowledge drift signal and exit drift mode."""

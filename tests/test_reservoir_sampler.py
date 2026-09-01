@@ -5,6 +5,7 @@ and atomic write to disk.
 """
 
 import os
+import threading
 
 import pandas as pd
 import pytest
