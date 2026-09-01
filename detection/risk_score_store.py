@@ -10,7 +10,7 @@ from datetime import UTC, datetime
 from typing import cast
 
 from sqlalchemy import select
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session, sessionmaker
 
 from config import config
@@ -67,10 +67,19 @@ class RiskScoreStore:
         for attempt in range(5):
             try:
                 with self._session_factory() as session:
-                    existing = session.scalar(
-                        select(RiskScoreRecord).where(
-                            RiskScoreRecord.wallet == wallet,
-                            RiskScoreRecord.asset_pair == asset_pair,
+                    dialect_name = session.get_bind().dialect.name
+                    if dialect_name == "mysql":
+                        from sqlalchemy.dialects.mysql import insert as dialect_insert
+
+                        stmt = dialect_insert(table).values(**values)
+                        stmt = stmt.on_duplicate_key_update(**update_columns)
+                    elif dialect_name == "postgresql":
+                        from sqlalchemy.dialects.postgresql import insert as dialect_insert
+
+                        stmt = dialect_insert(table).values(**values)
+                        stmt = stmt.on_conflict_do_update(
+                            index_elements=["wallet", "asset_pair"],
+                            set_=update_columns,
                         )
                     )
                     if existing is None:
@@ -87,10 +96,21 @@ class RiskScoreStore:
                     if "ring_id" in risk_score:
                         existing.ring_id = risk_score["ring_id"]
 
+                        stmt = dialect_insert(table).values(**values)
+                        stmt = stmt.on_conflict_do_update(
+                            index_elements=["wallet", "asset_pair"],
+                            set_=update_columns,
+                        )
+                    else:
+                        raise NotImplementedError(
+                            f"Atomic upsert not configured for dialect "
+                            f"'{dialect_name}'. Add an ON CONFLICT / equivalent "
+                            f"branch in RiskScoreStore._upsert_impl."
+                        )
+                    session.execute(stmt)
                     session.commit()
-                    session.refresh(existing)
-                    return existing
-            except OperationalError:
+                    return self.get(wallet, asset_pair)
+            except (OperationalError, IntegrityError):
                 if attempt == 4:
                     raise
                 time.sleep(0.05 * (2**attempt))

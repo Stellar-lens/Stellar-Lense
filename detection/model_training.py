@@ -18,6 +18,8 @@ over ensemble combination weights (see `detection/ensemble_calibrator.py`)
 and write `models/pareto_front.json`.
 """
 
+from __future__ import annotations
+
 import argparse
 import hashlib
 import json
@@ -25,19 +27,32 @@ import os
 import struct
 import sys
 import threading
-from datetime import UTC, datetime
+try:
+    from datetime import UTC, datetime
+except ImportError:
+    from datetime import datetime, timezone
+    UTC = timezone.utc  # type: ignore
 from importlib import import_module
 
 import joblib
-import lightgbm as lgb
 import numpy as np
 import pandas as pd
 from imblearn.over_sampling import SMOTE
-from lightgbm import LGBMClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import auc, f1_score, precision_recall_curve, roc_auc_score
 from sklearn.model_selection import train_test_split
-from xgboost import XGBClassifier
+
+try:
+    import lightgbm as lgb
+    from lightgbm import LGBMClassifier
+except Exception:
+    lgb = None
+    LGBMClassifier = None
+
+try:
+    from xgboost import XGBClassifier
+except Exception:
+    XGBClassifier = None
 
 from config import config
 from config.contracts import validate_mode
@@ -54,11 +69,13 @@ from utils.version_stamp import get_version as _get_ledgerlens_version
 
 logger = get_logger(__name__)
 
-MODEL_REGISTRY = {
+MODEL_REGISTRY: dict[str, type] = {
     "random_forest": RandomForestClassifier,
-    "xgboost": XGBClassifier,
-    "lightgbm": LGBMClassifier,
 }
+if XGBClassifier is not None:
+    MODEL_REGISTRY["xgboost"] = XGBClassifier
+if LGBMClassifier is not None:
+    MODEL_REGISTRY["lightgbm"] = LGBMClassifier
 
 PSI_N_BINS = 10
 PSI_EPSILON = 1e-4
@@ -573,6 +590,17 @@ def detect_label_poisoning(
     baseline_path = baseline_path or LABEL_DISTRIBUTION_BASELINE_PATH
     threshold = threshold if threshold is not None else config.POISON_LABEL_RATIO_THRESHOLD
 
+    # Issue #740: this threshold is a *fraction* of label-ratio shift (e.g.
+    # 0.15 = 15%). A value like 15 (percent, not fraction) would make the
+    # `abs(...) > threshold` check below effectively unreachable — silently
+    # disabling label-poisoning detection rather than just producing a wrong
+    # number, so this fails loudly rather than warning.
+    if not (0 < threshold <= 1):
+        raise ValueError(
+            f"POISON_LABEL_RATIO_THRESHOLD must be a fraction in (0, 1], got "
+            f"{threshold!r} (e.g. use 0.15 for 15%, not 15)"
+        )
+
     total = sum(label_distribution.values())
     if total == 0:
         return False
@@ -934,10 +962,14 @@ def save_models(
     n_training_samples: int = 0,
 ) -> None:
     model_dir = model_dir or config.MODEL_DIR
+    from detection.production_write_guard import guard_production_write
+
+    guard_production_write(model_dir)
     os.makedirs(model_dir, exist_ok=True)
     to_save = results.get("results", results) if isinstance(results, dict) else results
     for name, result in to_save.items():
         model_path = os.path.join(model_dir, f"{name}.joblib")
+        # GUARDED: guard_production_write(model_dir) above, in this function.
         joblib.dump(result["model"], model_path)
         if feature_columns is not None and feature_schema_hash is not None:
             write_artifact_manifest(
@@ -958,6 +990,9 @@ def save_training_artifacts(
 ) -> None:
     """Write metrics.json and model_metadata.json to the model directory."""
     model_dir = model_dir or config.MODEL_DIR
+    from detection.production_write_guard import guard_production_write
+
+    guard_production_write(model_dir)
     os.makedirs(model_dir, exist_ok=True)
 
     results = training_output["results"]
@@ -1081,6 +1116,39 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     return parser.parse_args()
+
+
+def _save_trained_artifacts_or_exit(
+    results: dict,
+    training_output: dict,
+    model_dir: str,
+    data_path: str,
+    feature_cols: list[str],
+    feature_hash: str,
+    data_sha: str,
+    n_samples: int,
+) -> None:
+    """Persist trained artifacts, exiting with an error if the production
+    write guard blocks it (Grand 2 / issue #671: a direct training run must
+    never overwrite an already-promoted production model directory)."""
+    from detection.production_write_guard import UngatedProductionWriteError
+
+    try:
+        save_models(
+            results,
+            model_dir,
+            feature_columns=feature_cols,
+            feature_schema_hash=feature_hash,
+            training_data_sha256=data_sha,
+            n_training_samples=n_samples,
+        )
+        save_training_artifacts(training_output, data_path, model_dir)
+    except UngatedProductionWriteError as exc:
+        logger.error(
+            "%s\nTrained artifacts were computed in memory but NOT written to disk.",
+            exc,
+        )
+        sys.exit(1)
 
 
 def main() -> None:
@@ -1321,15 +1389,17 @@ def main() -> None:
     n_samples = training_output.get("n_train", 0)
     feature_cols = training_output.get("feature_columns", [])
     feature_hash = compute_feature_schema_hash(feature_cols)
-    save_models(
+
+    _save_trained_artifacts_or_exit(
         results,
+        training_output,
         model_dir,
-        feature_columns=feature_cols,
-        feature_schema_hash=feature_hash,
-        training_data_sha256=data_sha,
-        n_training_samples=n_samples,
+        args.data_path,
+        feature_cols,
+        feature_hash,
+        data_sha,
+        n_samples,
     )
-    save_training_artifacts(training_output, args.data_path, model_dir)
 
     # FGSM adversarial training (Issue #191)
     adv_training_enabled = config.ADV_TRAINING_ENABLED or args.adv_training

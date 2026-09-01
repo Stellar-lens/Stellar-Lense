@@ -220,6 +220,25 @@ Each check is self-contained and produces a structured result with:
 | `make check-integrity` | Run package integrity check standalone |
 | `make check-cycles` | Run import cycle detection standalone |
 | `make validate-all` | Run all validation tools (cycles, deps, README, notebooks) |
+| `make dependency-risk-report` | Generate the deterministic offline core dependency risk report |
+| `make dependency-risk-report-osv` | Enrich the dependency risk report with OSV.dev advisories |
+
+## Dependency risk reporting (Issue #478)
+
+The dependency risk reporter evaluates the direct packages used by the core
+scoring, ingestion, API, and security paths. It compares `requirements.txt`
+with `requirements.lock` and assigns low/medium/high/critical risk based on
+lockfile coverage and optional vulnerability advisories.
+
+```bash
+make dependency-risk-report
+python scripts/dependency_risk_report.py --format markdown --output reports/dependency_risk.md
+python scripts/dependency_risk_report.py --osv --output reports/dependency_risk.json
+```
+
+The default command is offline and deterministic, which makes it suitable for
+CI. `--osv` performs best-effort OSV.dev lookups; network failures are included
+as warnings in the report rather than being hidden.
 
 ## Troubleshooting
 
@@ -253,3 +272,4 @@ python -m scripts.diagnose
 - `scripts/check_package_integrity.py` — Standalone package integrity check
 - `scripts/check_import_cycles.py` — Standalone import cycle detection
 - `utils/dependency_probe.py` — Optional dependency availability probe
+- `scripts/dependency_risk_report.py` — Core package lockfile and advisory risk report (Issue #478)

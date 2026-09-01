@@ -52,11 +52,26 @@ from utils.logging import get_logger
 logger = get_logger(__name__)
 
 
+def _iso_date(value: str) -> datetime:
+    """Argparse ``type`` for ``--since``: parse an ISO 8601 date/datetime string.
+
+    Raises ``argparse.ArgumentTypeError`` (caught by argparse at parse time,
+    before any network calls) with a clear, actionable message on bad input.
+    """
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(
+            f"invalid --since value {value!r}: expected an ISO 8601 date or "
+            "datetime, e.g. 2024-01-01 or 2024-01-01T00:00:00"
+        ) from None
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run the LedgerLens detection pipeline")
     parser.add_argument(
         "--since",
-        type=lambda s: datetime.fromisoformat(s),
+        type=_iso_date,
         default=None,
         help="ISO date to start loading historical trades from (default: all available)",
     )

@@ -89,6 +89,85 @@ class SolanaAdapter(ChainAdapter):
 default_registry.register(SolanaAdapter())
 ```
 
+## Adding a connector
+
+The in-tree plugin contract lives in `ingestion/connectors/base.py` and
+`ingestion/connectors/registry.py`. A minimal connector has three moving parts:
+
+1. subclass `DataConnector[YourRecordType]`,
+2. set `metadata = ConnectorMetadata(...)`, and
+3. register the class so the global registry can discover it.
+
+The built-in Horizon wrappers in `ingestion/connectors/builtin.py` are the
+best reference implementation; they show the exact pattern used by the repo.
+
+```python
+from datetime import datetime
+from typing import Iterator
+
+from ingestion.connectors.base import ConnectorMetadata, DataConnector
+from ingestion.connectors.registry import register_connector
+from ingestion.data_models import Trade
+
+
+@register_connector
+class DemoTradeConnector(DataConnector[Trade]):
+    metadata = ConnectorMetadata(
+        connector_id="demo-trades",
+        record_type=Trade,
+        source="demo",
+        description="Toy connector for a new source",
+    )
+
+    def load(self, *, since: datetime | None = None, **kwargs: object) -> Iterator[Trade]:
+        # Replace this with the source-specific API call.
+        yield from []
+```
+
+A few practical rules to keep in mind when adding a new connector:
+
+- `load()` should yield the repo's normalized pydantic record types from
+  `ingestion.data_models`, not a raw third-party payload.
+- `metadata.required_env` should be used for any mandatory secrets or config;
+  `scripts/list_connectors.py` calls `health_check()` to surface missing env vars
+  without making network calls.
+- The connector class should be imported at least once so the decorator runs.
+  The easiest way is to add it to `ingestion/connectors/__init__.py` or to the
+  module that owns the source-specific integration.
+
+After implementing the class, add a focused test alongside
+`tests/test_connectors.py` using the same conventions as the existing registry
+checks. A simple test should verify:
+
+- the connector registers under its unique `connector_id`,
+- `registry.create()` instantiates it successfully,
+- `validate_config()` raises when required env vars are missing, and
+- `load()` yields the expected record shape.
+
+The test pattern is intentionally lightweight because the boundary is the
+important part, not a network round-trip.
+
+```python
+from ingestion.connectors import registry
+
+
+def test_demo_connector_registers():
+    cls = registry.get("demo-trades")
+    instance = registry.create("demo-trades")
+    assert instance.metadata.source == "demo"
+    assert cls is not None
+```
+
+Finally, run the repo's connector listing command to confirm the new connector is
+visible and that its config health looks correct:
+
+```bash
+python -m scripts.list_connectors
+```
+
+The command prints a table of connector IDs and status. A contributor can use
+that output as a quick sanity check before wiring the connector into a pipeline.
+
 ## Validation
 
 ```

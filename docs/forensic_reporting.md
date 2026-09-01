@@ -134,6 +134,111 @@ for the report to be considered valid.
 
 ---
 
+## Example Forensic Report (Synthetic)
+
+Below is an actual generated Markdown report using synthetic wallet data, showing the
+anomalous trades, SHAP attribution, and Benford analysis sections as they appear to
+compliance reviewers and regulators.
+
+---
+
+### LedgerLens Forensic Report
+
+**Report ID:** `550e8400-e29b-41d4-a716-446655440000` | **Generated:** 2025-08-28T14:32:17Z
+
+| Field | Value |
+|---|---|
+| Wallet | `GWASH123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890` |
+| Asset Pair | USDC:GA5ZSEJYBY3RJRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN / XLM:native |
+| **Risk Score** | **82 / 100** (78–86 conformal interval) |
+| **Verdict** | **WASH_TRADE** |
+
+⚠️  This wallet has been classified as a **wash-trade** participant with high confidence.
+The evidence below should be reviewed for potential SAR submission under FinCEN guidance
+and FATF Recommendation 20.
+
+### Risk Score Summary
+
+| Metric | Value |
+|---|---|
+| Risk Score | 82 |
+| Conformal Lower Bound | 78 |
+| Conformal Upper Bound | 86 |
+| Verdict | wash_trade |
+| Model Name | LedgerLens Ensemble v2.1 |
+| Model Version | 2.1.3 |
+| Training Dataset SHA-256 | `a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6` |
+| Feature Schema Version | 1.8 |
+
+### SHAP Feature Attribution
+
+The table below shows the top features that drove this wallet's risk score,
+ordered by the magnitude of their SHAP contribution.
+
+| # | Feature | Description | Value | SHAP Contribution |
+|---|---|---|---|---|
+| 1 | `benford_mad_24h` | Mean Absolute Deviation between observed and expected Benford digit frequencies over the trailing 24-hour window. | 0.0847 | +12.34 |
+| 2 | `self_matching_rate` | Fraction of trades that match buy/sell orders between wallets with shared funding sources. | 0.73 | +10.18 |
+| 3 | `counterparty_concentration_ratio` | Fraction of total volume traded with the single most frequent counterparty. | 0.89 | +9.45 |
+| 4 | `round_trip_frequency` | Frequency of round-trip trades returning assets to the originating wallet within N ledgers. | 0.61 | +7.82 |
+| 5 | `intra_minute_clustering` | Number of trades executed within the same minute, indicating coordinated order placement. | 24 | +5.63 |
+| 6 | `cross_pair_trade_synchrony` | Temporal correlation of trades across asset pairs; high values indicate synchronized execution. | 0.78 | +4.91 |
+| 7 | `entropy_of_amounts` | Shannon entropy of trade amounts; low values indicate repetitive sizing. | 1.24 | +3.27 |
+| 8 | `order_cancellation_rate` | Fraction of placed orders that are cancelled before execution. | 0.14 | +1.82 |
+| 9 | `volume_spike_frequency` | Number of 10-minute windows where volume exceeded the rolling 95th percentile. | 8 | +0.94 |
+| 10 | `pair_diversity_score` | Count of distinct asset pairs traded by the wallet. | 2 | -0.56 |
+
+### Benford's Law Analysis
+
+Benford's Law predicts the expected frequency of leading digits in naturally
+occurring data. Deviation from this distribution is a statistical indicator
+of artificially manipulated trade amounts.
+
+**Threshold:** MAD > 0.015 indicates non-conformity (Nigrini, 2012).
+**Chi-square critical value (df=8, p=0.05):** 15.51.
+
+| Window | Chi-Square | MAD | Non-Conforming | Max Z-Score | Sample Size |
+|---|---|---|---|---|---|
+| 1h | 42.17 | 0.0562 | ✗ | 3.24 | 156 |
+| 4h | 38.92 | 0.0479 | ✗ | 2.91 | 487 |
+| 24h | 35.61 | 0.0847 | ✗ | 4.13 | 1203 |
+| 168h | 28.44 | 0.0321 | ✗ | 2.67 | 2841 |
+| 720h | 22.13 | 0.0198 | ✗ | 1.89 | 3156 |
+
+**Interpretation:** All time windows show MAD values well above 0.015, indicating statistically significant deviation from Benford's Law. This is consistent with deliberate trade amount manipulation.
+
+### Trade Evidence
+
+The 10 most anomalous trades are listed below. Each trade can be independently verified via the Horizon URL.
+
+| # | Trade ID | Ledger | Base Account | Counter Account | Base Amount | Counter Amount | Asset Pair | Horizon URL |
+|---|---|---|---|---|---|---|---|---|
+| 1 | `0000000123456789` | 49123456 | `GWASH123…` | `GRING456A…` | 5000.00 | 5001.23 | USDC/XLM | [View](https://horizon.stellar.org/trades/0000000123456789) |
+| 2 | `0000000123456790` | 49123457 | `GRING456A…` | `GWASH789…` | 5001.23 | 4999.87 | XLM/USDC | [View](https://horizon.stellar.org/trades/0000000123456790) |
+| 3 | `0000000123456791` | 49123460 | `GWASH789…` | `GRING789B…` | 5500.00 | 5502.15 | USDC/XLM | [View](https://horizon.stellar.org/trades/0000000123456791) |
+| 4 | `0000000123456792` | 49123461 | `GRING789B…` | `GWASH123…` | 5502.15 | 5498.50 | XLM/USDC | [View](https://horizon.stellar.org/trades/0000000123456792) |
+| 5 | `0000000123456793` | 49123464 | `GWASH123…` | `GRING654C…` | 4800.00 | 4802.88 | USDC/XLM | [View](https://horizon.stellar.org/trades/0000000123456793) |
+| 6 | `0000000123456794` | 49123465 | `GRING654C…` | `GWASH456…` | 4802.88 | 4798.12 | XLM/USDC | [View](https://horizon.stellar.org/trades/0000000123456794) |
+| 7 | `0000000123456795` | 49123469 | `GWASH456…` | `GRING321D…` | 6200.00 | 6204.62 | USDC/XLM | [View](https://horizon.stellar.org/trades/0000000123456795) |
+| 8 | `0000000123456796` | 49123470 | `GRING321D…` | `GWASH123…` | 6204.62 | 6199.38 | XLM/USDC | [View](https://horizon.stellar.org/trades/0000000123456796) |
+| 9 | `0000000123456797` | 49123473 | `GWASH789…` | `GRING999E…` | 3500.00 | 3501.75 | USDC/XLM | [View](https://horizon.stellar.org/trades/0000000123456797) |
+| 10 | `0000000123456798` | 49123474 | `GRING999E…` | `GWASH789…` | 3501.75 | 3498.50 | XLM/USDC | [View](https://horizon.stellar.org/trades/0000000123456798) |
+
+### Report Integrity
+
+| Field | Value |
+|---|---|
+| Report SHA-256 | `7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a` |
+| Soroban Anchor Tx | *Not anchored* |
+
+---
+
+**Note:** This report uses synthetic wallet data (GWASH, GRING account prefixes are
+illustrative) and is for documentation purposes only. Real reports are anchored to
+the Stellar ledger with actual Horizon trade URLs.
+
+---
+
 ## Generating a Report
 
 ### Single wallet (CLI)

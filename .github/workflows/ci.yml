@@ -107,6 +107,9 @@ jobs:
           markdown-link-check docs/security.md
           markdown-link-check CONTRIBUTING.md
 
+      - name: Validate documentation internal links (Issue #512)
+        run: python -m scripts.validate_docs
+
       - name: Check import cycles (Issue #546)
         run: |
           python scripts/check_import_cycles.py
@@ -118,12 +121,6 @@ jobs:
           python -m utils.dependency_probe --groups ml_core cryptography prometheus
         # Probes core required groups; missing optional deps are warnings only.
         # Add --require <group> here if a group becomes mandatory.
-
-      - name: Validate README bash examples (Issue #548)
-        run: |
-          python scripts/validate_readme_examples.py --docs README.md docs/
-        # Exits 2 if any python -m or python <file> reference is broken.
-        # make <target> mismatches are always warnings (never block CI).
 
       - name: Validate notebooks — structure (Issue #549)
         run: |
@@ -155,6 +152,9 @@ jobs:
           JWT_PUBLIC_KEY_PATH=/tmp/ci_jwt_public_key.pem \
           python -m scripts.check_env --all
 
+      - name: Check .env.example covers every config.py variable
+        run: python -m scripts.check_env_example
+
       - name: Execute Benford explainer notebook
         run: |
           cd notebooks
@@ -175,6 +175,17 @@ jobs:
         run: python scripts/check_cli_contracts.py
 
       - name: Test
+        run: pytest -q
+
+  release-gate:
+    name: Production Release Gate (Blocking)
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
         # Live integration coverage has its own testnet workflow; PPO training
         # is intentionally kept out of the per-push feedback loop.
         run: >-
@@ -201,6 +212,33 @@ jobs:
             --model-dir models/ \
             --no-report || true
 
+  validate-readme-examples:
+    name: Validate README bash examples (Issue #548)
+    needs: test
+    runs-on: ubuntu-latest
+    if: always() && (needs.test.result == 'success' || needs.test.result == 'failure')
+    paths:
+      - 'README.md'
+      - 'run_pipeline.py'
+      - 'scripts/cli/**'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Validate README bash examples (Issue #548)
+        run: |
+          python scripts/validate_readme_examples.py --docs README.md docs/
+        # Exits 2 if any python -m or python <file> reference is broken.
+        # make <target> mismatches are always warnings (never block CI).
+
   schema-compatibility:
     name: Avro Schema Compatibility
     runs-on: ubuntu-latest
@@ -219,6 +257,20 @@ jobs:
           cache: pip
 
       - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install ruff black mypy bandit
+
+      - name: Run Release Gate
+        run: python scripts/release_gate.py
+        env:
+          LEDGERLENS_ENV: local
+
+      - name: Report Status
+        if: failure()
+        run: |
+          echo "❌ Release gate failed. This blocks deployment to production."
+          exit 1
         run: pip install -r requirements.txt
 
       - name: Fetch the base branch
@@ -273,6 +325,21 @@ jobs:
       - name: Verify dependency lockfile (issue #541)
         run: |
           python scripts/verify_lockfile.py --check-unpinned
+
+      # -----------------------------------------------------------------------
+      # Issue #478 — Automated dependency risk reporting
+      # -----------------------------------------------------------------------
+      - name: Generate dependency risk report (issue #478)
+        run: |
+          python scripts/dependency_risk_report.py --output reports/ci/dependency_risk.json
+
+      - name: Upload dependency risk report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-risk-report
+          path: reports/ci/dependency_risk.json
+          retention-days: 30
 
       # -----------------------------------------------------------------------
       # Issue #537 — Benchmark dataset integrity check
@@ -400,3 +467,24 @@ jobs:
         # Exits 1 (failing the CI step) if fewer than 80% of mutations are killed.
         # Prints surviving mutations so they can be opened as follow-up issues.
         run: python scripts/check_mutation_score.py --threshold 80
+
+      - name: Mutation score CI summary
+        # Visibility only — does not change the pass/fail behaviour above.
+        # Surfaces the headline mutation score and any files with surviving
+        # (below-threshold) mutations in the GitHub Actions job summary so PR
+        # authors don't have to dig through the raw log.
+        if: always()
+        run: |
+          {
+            echo "## Mutation Testing Summary"
+            echo ""
+            if [ -f .mutmut-cache ]; then
+              echo "Headline mutation score and files with surviving (below-threshold) mutations, as reported by \`scripts/check_mutation_score.py\`:"
+              echo ""
+              echo '```'
+              python scripts/check_mutation_score.py --threshold 80 2>&1 || true
+              echo '```'
+            else
+              echo "No \`.mutmut-cache\` was produced in this run; run \`make mutation-test\` to populate mutation results before this summary can be rendered."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

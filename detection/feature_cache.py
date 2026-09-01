@@ -27,6 +27,7 @@ from typing import TYPE_CHECKING
 import pandas as pd
 
 from config import config
+from detection.model_compatibility import FEATURE_CONTRACT_VERSION
 
 if TYPE_CHECKING:
     pass
@@ -58,6 +59,10 @@ class FeatureCache:
     next access. When the cache is at ``maxsize``, the least-recently-used
     entry is evicted to make room for a new one (entries refreshed via
     :meth:`get` or :meth:`put` are moved to the most-recently-used position).
+
+    Feature schema invalidation: values are tracked against the active
+    ``feature_contract_version``. If the schema version changes, the full cache
+    is cleared so stale rows are never served against a newer feature contract.
     """
 
     def __init__(
@@ -68,6 +73,9 @@ class FeatureCache:
     ) -> None:
         self._ttl = ttl_seconds if ttl_seconds is not None else config.FEATURE_CACHE_TTL_SECONDS
         self._maxsize = maxsize if maxsize is not None else config.FEATURE_CACHE_MAXSIZE
+        self._schema_version = (
+            schema_version if schema_version is not None else FEATURE_CONTRACT_VERSION
+        )
         self._lock = threading.Lock()
         self._cache: OrderedDict[str, tuple[pd.Series, float]] = OrderedDict()
         self.tenant_id = tenant_id
@@ -90,7 +98,11 @@ class FeatureCache:
                 self._record_miss()
                 return None
 
-            series, cached_at = entry
+            series, cached_at, cached_schema = entry
+            if cached_schema != self._schema_version:
+                del self._cache[wallet]
+                self._record_miss()
+                return None
             if time.monotonic() - cached_at >= self._ttl:
                 del self._cache[key]
                 self._record_miss()
@@ -100,7 +112,7 @@ class FeatureCache:
             self._record_hit()
             return series
 
-    def put(self, wallet: str, features: pd.Series) -> None:
+    def put(self, wallet: str, features: pd.Series, schema_version: int | str | None = None) -> None:
         """Cache *features* for *wallet*, evicting the LRU entry if at capacity."""
         key = self._key(wallet)
         with self._lock:

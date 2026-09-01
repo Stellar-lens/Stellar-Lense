@@ -10,6 +10,8 @@ Angelopoulos, A.N. & Bates, S. (2023) "Conformal prediction: A gentle
 introduction." Foundations and Trends in Machine Learning, 16(4), 494–591.
 """
 
+from __future__ import annotations
+
 import hashlib
 import json
 import os
@@ -118,7 +120,7 @@ class ConformalCalibrator:
         nonconformity = np.array([1.0 - probs[i, int(y_cal.iloc[i])] for i in range(len(X_cal))])
         self._nonconformity_scores = nonconformity
         self.n_cal = len(X_cal)
-        self.q_hat = float(np.quantile(nonconformity, 1.0 - self.alpha))
+        self.q_hat = float(np.quantile(nonconformity, self._coverage_guarantee()))
         logger.info(
             "Conformal calibration (classification) done: n_cal=%d, q_hat=%.6f, alpha=%.2f",
             self.n_cal,
@@ -133,7 +135,7 @@ class ConformalCalibrator:
         residuals = np.abs(np.array(y_cal) - np.array(y_pred))
         self._nonconformity_scores = residuals
         self.n_cal = len(X_cal)
-        self.q_hat = float(np.quantile(residuals, 1.0 - self.alpha))
+        self.q_hat = float(np.quantile(residuals, self._coverage_guarantee()))
         logger.info(
             "Conformal calibration (regression) done: n_cal=%d, q_hat=%.6f, alpha=%.2f",
             self.n_cal,
@@ -144,6 +146,26 @@ class ConformalCalibrator:
     # ------------------------------------------------------------------
     # Prediction
     # ------------------------------------------------------------------
+
+    def _coverage_guarantee(self) -> float:
+        """Return the coverage guarantee (``1 - alpha``) clamped to ``[0, 1]``.
+
+        ``coverage_guarantee`` is surfaced as a probability in every
+        ``RiskScore`` record and consumed by the API/dashboard and
+        ``ledgerlens-core``'s shared type. A configured ``alpha`` outside
+        ``[0, 1]`` would yield a nonsensical coverage value, so it is clamped
+        here with a logged warning rather than propagated downstream.
+        """
+        coverage = 1.0 - self.alpha
+        clamped = min(1.0, max(0.0, coverage))
+        if clamped != coverage:
+            logger.warning(
+                "coverage_guarantee %.4f is outside [0, 1] (alpha=%.4f); clamping to %.4f",
+                coverage,
+                self.alpha,
+                clamped,
+            )
+        return clamped
 
     def predict_set(self, model: Any, X: pd.DataFrame) -> list[dict]:
         """Return a prediction set for each row using RAPS.
@@ -165,6 +187,7 @@ class ConformalCalibrator:
 
         probs = model.predict_proba(X)
         n_classes = probs.shape[1]
+        coverage_guarantee = self._coverage_guarantee()
 
         results = []
         for row_probs in probs:
@@ -189,7 +212,7 @@ class ConformalCalibrator:
                 {
                     "score": float(row_probs[1]) * 100 if n_classes == 2 else 50.0,
                     "prediction_set": sorted(prediction_set),
-                    "coverage_guarantee": 1.0 - self.alpha,
+                    "coverage_guarantee": coverage_guarantee,
                     "q_hat": self.q_hat,
                 }
             )

@@ -1,3 +1,55 @@
+# Code review gates for PR approval
+# When a PR matches any rule's glob patterns, it requires the specified approval/label
+# This ensures high-risk code paths get dedicated review
+
+version: 1
+gates:
+  - name: "Database Schema & Migration Review"
+    description: "PRs touching database schema or migrations require explicit migration review"
+    required: true
+    paths:
+      - "migrations/**/*.py"
+      - "migrations/base.py"
+      - "migrations/runner.py"
+      - "detection/persistence.py"
+      - ".github/review-gates.yml"
+    checks:
+      - "Migration data-preservation test included"
+      - "Schema review completed"
+
+  - name: "Security & Threat Model Review"
+    description: "Changes to security controls or threat model need security review"
+    required: true
+    paths:
+      - "docs/security_threat_model.md"
+      - "docs/security.md"
+      - "scripts/release_gate.py"
+      - "config/environments/production.yaml"
+    checks:
+      - "Security audit completed"
+
+  - name: "Release Gate & CI Pipeline Review"
+    description: "Changes to CI/release automation need release engineer review"
+    required: true
+    paths:
+      - ".github/workflows/*.yml"
+      - "scripts/release_gate.py"
+      - "scripts/backup.py"
+      - "scripts/restore.py"
+    checks:
+      - "Pipeline impact assessed"
+      - "Gate logic verified"
+
+  - name: "Model & Detection Logic Review"
+    description: "Risk scoring and detection models need analysis team review"
+    required: true
+    paths:
+      - "detection/**/*.py"
+      - "models/**"
+      - "training/**/*.py"
+    checks:
+      - "Model validation completed"
+      - "Drift impact assessed"
 # Review gates for high-risk data and model changes.
 #
 # Single source of truth for which paths require a written acknowledgement in

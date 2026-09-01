@@ -103,7 +103,9 @@ class ConnectorRegistry:
         loaded: list[str] = []
         try:
             entry_points = importlib_metadata.entry_points(group=PLUGIN_ENTRY_POINT_GROUP)
-        except Exception as exc:  # pragma: no cover - defensive, environment-dependent  # noqa: BLE001
+        except (
+            Exception
+        ) as exc:  # pragma: no cover - defensive, environment-dependent  # noqa: BLE001
             # Broad catch justified: entry_points() call can fail on import machinery
             # issues or corrupted environment. Plugin discovery failure is not fatal;
             # return empty list so built-in connectors still work.

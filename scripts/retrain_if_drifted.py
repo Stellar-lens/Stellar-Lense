@@ -19,6 +19,7 @@ Incremental training mode (``--incremental``):
 """
 
 import argparse
+import hashlib
 import json
 import os
 import shutil
@@ -31,6 +32,7 @@ import joblib
 import pandas as pd
 
 from config import config
+from detection import model_governance
 from detection.drift_monitor import DriftMonitor
 from detection.feature_cache import RecentDataBuffer
 from detection.feature_engineering import build_feature_matrix
@@ -41,12 +43,14 @@ from detection.model_compatibility import (
 from detection.model_training import (
     MODEL_REGISTRY,
     IncrementalTrainingStalenessDetector,
+    compute_feature_schema_hash,
     incremental_train_lightgbm,
     load_training_data,
     save_models,
     save_training_artifacts,
     train_models,
 )
+from detection.persistence import PromotionAuditLog, get_engine, get_session_factory
 from utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -134,45 +138,25 @@ def should_promote(
 ) -> tuple[bool, str]:
     """Check if the new model should be promoted.
 
-    Requires AUC-ROC >= old_auc - tolerance AND F1 >= old_f1 - tolerance
-    for every model in the ensemble.
+    Requires AUC-ROC >= old_auc - tolerance AND F1 >= old_f1 - tolerance for
+    every model in the ensemble. This is now a thin wrapper around
+    ``detection.model_governance.evaluate_regression_gate`` — the same
+    regression gate ``promote_candidate`` enforces — kept as a
+    module-level function here so existing callers/tests that check the
+    offline metric comparison in isolation (without exercising the full
+    signature/authorization pipeline) keep working.
 
-    Returns (promote: bool, reason: str).
+    Returns (promote: bool, reason: str). Unlike the original
+    implementation, a model family missing from *old_metrics* is treated as
+    "nothing to regress against" (approved) rather than a hard block —
+    matching ``evaluate_regression_gate``'s handling of brand-new model
+    families; a family present in *old_metrics* but missing from
+    *new_metrics* is still blocked.
     """
-    reasons = []
-    for model_name in MODEL_REGISTRY:
-        if model_name not in old_metrics:
-            reasons.append(f"{model_name}: missing in old metrics")
-            continue
-        if model_name not in new_metrics:
-            reasons.append(f"{model_name}: missing in new metrics")
-            continue
-
-        old = old_metrics[model_name]
-        new = new_metrics[model_name]
-
-        old_auc = old["auc_roc"]
-        new_auc = new["auc_roc"]
-        old_f1 = old["f1"]
-        new_f1 = new["f1"]
-
-        auc_ok = new_auc >= old_auc - tolerance
-        f1_ok = new_f1 >= old_f1 - tolerance
-
-        if not auc_ok:
-            reasons.append(
-                f"{model_name}: AUC-ROC {new_auc:.4f} < {old_auc:.4f} - {tolerance} "
-                f"(delta {new_auc - old_auc:+.4f})"
-            )
-        if not f1_ok:
-            reasons.append(
-                f"{model_name}: F1 {new_f1:.4f} < {old_f1:.4f} - {tolerance} "
-                f"(delta {new_f1 - old_f1:+.4f})"
-            )
-
-    if reasons:
-        return False, "; ".join(reasons)
-    return True, "All model metrics within tolerance — promoting."
+    decision = model_governance.evaluate_regression_gate(
+        old_metrics, new_metrics, model_names=list(MODEL_REGISTRY), tolerance=tolerance
+    )
+    return decision.approved, decision.reason
 
 
 def write_retrain_report(
@@ -272,12 +256,26 @@ def compute_false_positive_rate(model_dir: str, test_data_path: str) -> float | 
 
 
 def evaluate_shadow_candidate(
-    shadow_state: dict, model_dir: str, retrain_data_path: str | None
+    shadow_state: dict,
+    model_dir: str,
+    retrain_data_path: str | None,
+    session_factory=None,
 ) -> int:
     """Check if the shadow candidate is ready for promotion or needs rollback.
 
     Returns the appropriate exit code (5 = promoted, 6 = rolled back, 4 = still waiting).
+
+    Promotion (once the shadow period has elapsed and drift/FP-rate checks
+    pass) is delegated to ``detection.model_governance.promote_candidate`` —
+    the single gated path that re-runs the offline AUC/F1 regression gate
+    plus the Ed25519 + transparency-log trust chain before anything is
+    copied into ``model_dir``. A shadow candidate that clears the *live*
+    drift/FP checks below can still be rejected there (e.g. it also
+    regressed on the offline test set, or fails signing).
     """
+    sf = session_factory or get_session_factory(get_engine(config.RISK_SCORE_DB_URL))
+    audit_log = PromotionAuditLog(sf)
+
     candidate_dir = shadow_state.get("candidate_dir")
     shadow_start_str = shadow_state.get("shadow_start")
     version_id = shadow_state.get("version_id", "unknown")
@@ -304,6 +302,11 @@ def evaluate_shadow_candidate(
 
     # Shadow period complete — read accumulated drift stats
     drift_rate = shadow_state.get("drift_rate", 0.0)
+    drift_stats = {
+        "drift_rate": drift_rate,
+        "drift_events": shadow_state.get("drift_events", 0),
+        "total_shadow_requests": shadow_state.get("total_shadow_requests", 0),
+    }
     logger.info(
         "Shadow period complete for %s: drift_rate=%.2f%% (threshold %.2f%%)",
         version_id,
@@ -312,10 +315,17 @@ def evaluate_shadow_candidate(
     )
 
     if drift_rate >= config.SHADOW_DRIFT_MAX_RATE:
-        logger.warning(
-            "Shadow drift rate %.2f%% exceeds threshold — blocking promotion of %s",
-            drift_rate * 100,
+        reason = (
+            f"Shadow drift rate {drift_rate:.2%} exceeds threshold "
+            f"{config.SHADOW_DRIFT_MAX_RATE:.2%}"
+        )
+        logger.warning("%s — blocking promotion of %s", reason, version_id)
+        model_governance.record_shadow_outcome(
             version_id,
+            status="rolled_back",
+            reason=reason,
+            drift_stats=drift_stats,
+            session_factory=sf,
         )
         clear_shadow_state(model_dir)
         shutil.rmtree(candidate_dir, ignore_errors=True)
@@ -328,19 +338,18 @@ def evaluate_shadow_candidate(
         if prod_fp is not None and cand_fp is not None:
             excess = cand_fp - prod_fp
             if excess > config.SHADOW_FP_RATE_MAX_EXCESS:
-                logger.warning(
-                    "Candidate FP rate %.2f%% exceeds production %.2f%% by %.2f%% (max %.2f%%) "
-                    "— rolling back %s",
-                    cand_fp * 100,
-                    prod_fp * 100,
-                    excess * 100,
-                    config.SHADOW_FP_RATE_MAX_EXCESS * 100,
-                    version_id,
+                reason = (
+                    f"Candidate FP rate {cand_fp:.2%} exceeds production {prod_fp:.2%} by "
+                    f"{excess:.2%} (max {config.SHADOW_FP_RATE_MAX_EXCESS:.2%})"
                 )
-                # Verify artifact signature before noting rollback
-                from detection.model_inference import verify_model_artifact_signature
-
-                verify_model_artifact_signature(model_dir, version_id)
+                logger.warning("%s — rolling back %s", reason, version_id)
+                model_governance.record_shadow_outcome(
+                    version_id,
+                    status="rolled_back",
+                    reason=reason,
+                    drift_stats=drift_stats,
+                    session_factory=sf,
+                )
                 clear_shadow_state(model_dir)
                 shutil.rmtree(candidate_dir, ignore_errors=True)
                 logger.warning(
@@ -350,20 +359,55 @@ def evaluate_shadow_candidate(
                 )
                 return 6
 
-    # Promote candidate
-    logger.info("Promoting candidate %s to production", version_id)
-    archive_current_models(model_dir)
-    for fname in os.listdir(candidate_dir):
-        src = os.path.join(candidate_dir, fname)
-        dst = os.path.join(model_dir, fname)
-        shutil.copy2(src, dst)
+    # Live checks passed — attempt gated promotion (offline regression gate +
+    # trust chain still apply here).
+    old_metrics = load_metrics(model_dir)
+    new_metrics = load_metrics(candidate_dir)
+    actor, credential = model_governance.system_actor_credential()
+    try:
+        model_governance.promote_candidate(
+            candidate_dir=candidate_dir,
+            model_dir=model_dir,
+            actor=actor,
+            credential=credential,
+            old_metrics=old_metrics,
+            new_metrics=new_metrics,
+            reason=f"shadow deployment complete (shadow_version_id={version_id})",
+            session_factory=sf,
+            audit_log=audit_log,
+        )
+    except model_governance.PromotionError as exc:
+        logger.warning("Gated promotion of shadow candidate %s failed: %s", version_id, exc)
+        model_governance.record_shadow_outcome(
+            version_id,
+            status="rolled_back",
+            reason=str(exc),
+            drift_stats=drift_stats,
+            session_factory=sf,
+        )
+        clear_shadow_state(model_dir)
+        shutil.rmtree(candidate_dir, ignore_errors=True)
+        return 6
+
     logger.info("Candidate %s promoted to %s", version_id, model_dir)
+    model_governance.record_shadow_outcome(
+        version_id,
+        status="archived",
+        reason="promoted",
+        drift_stats=drift_stats,
+        session_factory=sf,
+    )
     clear_shadow_state(model_dir)
     shutil.rmtree(candidate_dir, ignore_errors=True)
     return 5
 
 
-def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+def build_parser() -> argparse.ArgumentParser:
+    """Build the argparse parser (split from parse_args() so
+    tests/test_docs_cli_consistency.py can introspect the real flag set
+    without parsing argv — the historical bug this guards against is
+    docs/CLI drift: --check-shadow/--no-shadow were documented and read
+    from `args` but never actually registered here)."""
     parser = argparse.ArgumentParser(description="Detect feature drift and trigger retraining")
     parser.add_argument(
         "--lookback-days",
@@ -425,7 +469,34 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=None,
         help="Override path for the staleness detector state JSON file.",
     )
-    return parser.parse_args(argv)
+    parser.add_argument(
+        "--check-shadow",
+        action="store_true",
+        default=False,
+        help=(
+            "Evaluate a previously-registered shadow candidate (see "
+            "shadow_deployment_state.json in --model-dir) for promotion or rollback "
+            "and exit, without running drift detection. Exit codes: 0 (no shadow "
+            "candidate registered), 4 (shadow period still running), 5 (promoted), "
+            "6 (rolled back)."
+        ),
+    )
+    parser.add_argument(
+        "--no-shadow",
+        action="store_true",
+        default=False,
+        help=(
+            "Skip shadow deployment: attempt gated promotion of a freshly retrained "
+            "candidate immediately via detection.model_governance.promote_candidate "
+            "(still subject to the regression gate and the Ed25519/transparency-log "
+            "trust chain — this only skips the live shadow-traffic evaluation period)."
+        ),
+    )
+    return parser
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    return build_parser().parse_args(argv)
 
 
 # ---------------------------------------------------------------------------
@@ -438,12 +509,17 @@ def run_incremental_training(
     new_data: pd.DataFrame,
     n_new_trees: int,
     staleness_detector: IncrementalTrainingStalenessDetector,
+    candidate_dir: str,
 ) -> tuple[bool, str]:
     """Attempt an incremental LightGBM update.
 
-    Appends *n_new_trees* to the existing LightGBM model using *new_data*,
-    overwrites ``lightgbm.joblib`` in *model_dir*, and increments the
-    staleness counter.
+    Appends *n_new_trees* to the existing LightGBM model using *new_data* and
+    writes the result into *candidate_dir* (never *model_dir* directly — see
+    ``detection.model_governance.guard_production_write``): every other file
+    currently in *model_dir* is copied into *candidate_dir* unchanged so the
+    candidate is a complete, self-contained bundle that
+    ``model_governance.promote_candidate`` can gate and publish atomically.
+    Increments the staleness counter on success.
 
     Returns:
         ``(success: bool, reason: str)``
@@ -473,10 +549,33 @@ def run_incremental_training(
     except Exception as exc:
         return False, f"incremental_train_lightgbm failed: {exc}"
 
-    # Overwrite the LightGBM artifact in-place (atomic-ish via temp file)
-    tmp_path = lgbm_path + ".tmp"
-    joblib.dump(updated_lgbm, tmp_path)
-    os.replace(tmp_path, lgbm_path)
+    os.makedirs(candidate_dir, exist_ok=True)
+    for fname in os.listdir(model_dir):
+        src = os.path.join(model_dir, fname)
+        if os.path.isfile(src):
+            shutil.copy2(src, os.path.join(candidate_dir, fname))
+
+    lgbm_candidate_path = os.path.join(candidate_dir, "lightgbm.joblib")
+    # UNGUARDED-OK: writes only to candidate_dir (a staging bundle), never to
+    # model_dir directly — publishing candidate_dir to production goes
+    # through detection.model_governance.promote_candidate, called by this
+    # script's main() after this returns.
+    joblib.dump(updated_lgbm, lgbm_candidate_path)
+
+    # Refresh the recorded hash for the updated artifact so the candidate's
+    # metrics.json — copied from production above — reflects the new bytes
+    # before promote_candidate signs it.
+    metrics_path = os.path.join(candidate_dir, "metrics.json")
+    if os.path.exists(metrics_path):
+        with open(metrics_path) as f:
+            metrics = json.load(f)
+        sha = hashlib.sha256()
+        with open(lgbm_candidate_path, "rb") as f:
+            for chunk in iter(lambda: f.read(65536), b""):
+                sha.update(chunk)
+        metrics.setdefault("lightgbm", {})["artifact_sha256"] = sha.hexdigest()
+        with open(metrics_path, "w") as f:
+            json.dump(metrics, f, indent=2)
 
     stale = staleness_detector.increment()
     msg = (
@@ -530,6 +629,7 @@ def _evaluate_incremental_model(
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     model_dir = args.model_dir or config.MODEL_DIR
+    session_factory = get_session_factory(get_engine(config.RISK_SCORE_DB_URL))
 
     # ------------------------------------------------------------------
     # Shadow evaluation mode: check a previously registered candidate
@@ -539,7 +639,9 @@ def main(argv: list[str] | None = None) -> int:
         if shadow_state is None:
             logger.info("No shadow candidate registered in %s", model_dir)
             return 0
-        return evaluate_shadow_candidate(shadow_state, model_dir, args.retrain_data_path)
+        return evaluate_shadow_candidate(
+            shadow_state, model_dir, args.retrain_data_path, session_factory=session_factory
+        )
 
     # Check for pending shadow candidate before running drift detection
     shadow_state = load_shadow_state(model_dir)
@@ -548,7 +650,9 @@ def main(argv: list[str] | None = None) -> int:
             "Pending shadow candidate detected (version %s) — evaluating before drift check",
             shadow_state.get("version_id"),
         )
-        rc = evaluate_shadow_candidate(shadow_state, model_dir, args.retrain_data_path)
+        rc = evaluate_shadow_candidate(
+            shadow_state, model_dir, args.retrain_data_path, session_factory=session_factory
+        )
         if rc != 0:
             return rc
 
@@ -652,53 +756,62 @@ def main(argv: list[str] | None = None) -> int:
 
             reference_feature_columns: list[str] = metadata.get("feature_columns", [])
             old_metrics = load_metrics(model_dir)
-            archive_path = archive_current_models(model_dir)
+            incremental_candidate_dir = model_dir.rstrip("/\\") + "_incremental_new"
 
             success, reason = run_incremental_training(
                 model_dir=model_dir,
                 new_data=buffered_data,
                 n_new_trees=n_new_trees,
                 staleness_detector=staleness_detector,
+                candidate_dir=incremental_candidate_dir,
             )
 
             if not success:
                 logger.error("Incremental training failed: %s", reason)
-                write_retrain_report(drift_dict, old_metrics, None, False, reason, archive_path)
+                write_retrain_report(drift_dict, old_metrics, None, False, reason, None)
+                shutil.rmtree(incremental_candidate_dir, ignore_errors=True)
                 return 1
 
-            # Evaluate the updated LightGBM on the buffered data
+            # Evaluate the updated LightGBM candidate on the buffered data
             new_metrics = _evaluate_incremental_model(
-                model_dir, buffered_data, reference_feature_columns
+                incremental_candidate_dir, buffered_data, reference_feature_columns
             )
 
-            # Lightweight promotion check: only LightGBM AUC is available
-            promote = True
-            if (
-                old_metrics
-                and new_metrics
-                and "lightgbm" in old_metrics
-                and "lightgbm" in new_metrics
-            ):
-                old_auc = old_metrics["lightgbm"].get("auc_roc", 0.0)
-                new_auc = new_metrics["lightgbm"].get("auc_roc", 0.0)
-                if new_auc < old_auc - PROMOTION_TOLERANCE:
-                    promote = False
-                    reason = (
-                        f"Incremental update: LightGBM AUC {new_auc:.4f} < "
-                        f"{old_auc:.4f} - {PROMOTION_TOLERANCE} — not promoted"
-                    )
-                    logger.warning(reason)
+            # Gated promotion: only `lightgbm` changed, so only its metrics
+            # are evaluated by the regression gate, but the full trust-chain
+            # (signature + transparency log) and compatibility checks still
+            # run before anything overwrites production.
+            actor, credential = model_governance.system_actor_credential()
+            try:
+                model_governance.promote_candidate(
+                    candidate_dir=incremental_candidate_dir,
+                    model_dir=model_dir,
+                    actor=actor,
+                    credential=credential,
+                    old_metrics=old_metrics,
+                    new_metrics=new_metrics,
+                    reason="drift-triggered incremental LightGBM retrain",
+                    model_names=["lightgbm"],
+                    session_factory=session_factory,
+                )
+            except model_governance.PromotionError as exc:
+                reason = str(exc)
+                logger.warning("Incremental candidate not promoted: %s", reason)
+                write_retrain_report(drift_dict, old_metrics, new_metrics, False, reason, None)
+                shutil.rmtree(incremental_candidate_dir, ignore_errors=True)
+                return 3
 
             write_retrain_report(
-                drift_dict, old_metrics, new_metrics, promote, reason, archive_path
+                drift_dict, old_metrics, new_metrics, True, "Incremental update promoted", None
             )
+            shutil.rmtree(incremental_candidate_dir, ignore_errors=True)
 
             if staleness_detector.is_stale():
                 logger.warning(
                     "Staleness cap now reached — next drift event will trigger a full retrain"
                 )
 
-            return 2 if promote else 3
+            return 2
 
     # -----------------------------------------------------------------------
     # Full-retrain path (original behaviour, also used after staleness reset)
@@ -716,10 +829,14 @@ def main(argv: list[str] | None = None) -> int:
     logger.info("Training new ensemble models")
     training_output = train_models(df, test_size=args.test_size, random_state=args.random_state)
     results = training_output["results"]
+    feature_cols = training_output.get("feature_columns", [])
+    feature_hash = compute_feature_schema_hash(feature_cols) if feature_cols else None
 
     temp_model_dir = model_dir + "_new"
     os.makedirs(temp_model_dir, exist_ok=True)
-    save_models(results, temp_model_dir)
+    save_models(
+        results, temp_model_dir, feature_columns=feature_cols, feature_schema_hash=feature_hash
+    )
     save_training_artifacts(training_output, args.retrain_data_path, temp_model_dir)
 
     new_metrics = evaluate_new_model(temp_model_dir)
@@ -728,87 +845,83 @@ def main(argv: list[str] | None = None) -> int:
         shutil.rmtree(temp_model_dir, ignore_errors=True)
         return 1
 
-    promote, reason = should_promote(old_metrics or {}, new_metrics)
-
+    # Feature-contract compatibility is checked up front regardless of
+    # --no-shadow — a schema-incompatible candidate is rejected outright, it
+    # never even reaches shadow deployment.
     candidate_metadata = load_model_metadata(temp_model_dir)
-    if promote and "feature_columns" in metadata:
+    compatible, compat_reason = True, ""
+    if "feature_columns" in metadata:
         if candidate_metadata is None:
-            promote = False
-            reason = "Feature compatibility gate failed: candidate metadata is missing"
+            compatible, compat_reason = False, "candidate metadata is missing"
         else:
             try:
                 compatibility = validate_feature_compatibility(
                     metadata,
                     candidate_metadata,
                     reference_source=os.path.join(model_dir, "model_metadata.json"),
-                    candidate_source=os.path.join(
-                        temp_model_dir,
-                        "model_metadata.json",
-                    ),
+                    candidate_source=os.path.join(temp_model_dir, "model_metadata.json"),
                 )
                 if not compatibility.compatible:
-                    promote = False
-                    reason = "Feature compatibility gate failed: " + " ".join(
-                        compatibility.diagnostics
-                    )
+                    compatible = False
+                    compat_reason = " ".join(compatibility.diagnostics)
             except FeatureContractError as exc:
-                promote = False
-                reason = f"Feature compatibility gate failed: {exc}"
+                compatible, compat_reason = False, str(exc)
 
-    logger.info("Promotion decision: %s — %s", promote, reason)
-
-    if promote:
+    if not compatible:
+        reason = f"Feature compatibility gate failed: {compat_reason}"
+        logger.warning("%s — archiving candidate, not promoted", reason)
+        archive_path = archive_current_models(model_dir)
+        write_retrain_report(drift_dict, old_metrics, new_metrics, False, reason, archive_path)
         for fname in os.listdir(temp_model_dir):
-            src = os.path.join(temp_model_dir, fname)
-            dst = os.path.join(model_dir, fname)
-            shutil.copy2(src, dst)
-        logger.info("New models promoted to %s", model_dir)
+            shutil.copy2(os.path.join(temp_model_dir, fname), os.path.join(archive_path, fname))
+        shutil.rmtree(temp_model_dir, ignore_errors=True)
+        return 3
+
+    # ------------------------------------------------------------------
+    # --no-shadow: attempt gated promotion immediately. Otherwise: always
+    # start a shadow deployment — the offline regression gate and trust
+    # chain are (re-)enforced by promote_candidate at --check-shadow time,
+    # once live drift/FP-rate checks have also passed.
+    # ------------------------------------------------------------------
+    if args.no_shadow:
+        actor, credential = model_governance.system_actor_credential()
+        try:
+            model_governance.promote_candidate(
+                candidate_dir=temp_model_dir,
+                model_dir=model_dir,
+                actor=actor,
+                credential=credential,
+                old_metrics=old_metrics,
+                new_metrics=new_metrics,
+                reason="drift-triggered full retrain (--no-shadow)",
+                session_factory=session_factory,
+            )
+        except model_governance.PromotionError as exc:
+            reason = str(exc)
+            logger.warning("Full-retrain candidate not promoted: %s", reason)
+            archive_path = archive_current_models(model_dir)
+            write_retrain_report(drift_dict, old_metrics, new_metrics, False, reason, archive_path)
+            for fname in os.listdir(temp_model_dir):
+                shutil.copy2(os.path.join(temp_model_dir, fname), os.path.join(archive_path, fname))
+            shutil.rmtree(temp_model_dir, ignore_errors=True)
+            return 3
+
+        logger.info("New models promoted immediately (--no-shadow) to %s", model_dir)
         write_retrain_report(
-            drift_dict,
-            old_metrics,
-            new_metrics,
-            promote,
-            reason,
-            archive_path,
+            drift_dict, old_metrics, new_metrics, True, "Promoted immediately (--no-shadow)", None
         )
         shutil.rmtree(temp_model_dir, ignore_errors=True)
 
         # Reset staleness counter — a full retrain resets the incremental clock
         try:
-            staleness_state_path = getattr(args, "staleness_state_path", None)
             staleness_detector = IncrementalTrainingStalenessDetector(
-                state_path=staleness_state_path
+                state_path=args.staleness_state_path
             )
             staleness_detector.reset()
             logger.info("Staleness counter reset after full retrain")
         except Exception as exc:
             logger.warning("Could not reset staleness counter: %s", exc)
 
-        return 2
-    else:
-        logger.warning("New models did not meet promotion criteria — archived but not promoted")
-        archive_path = archive_current_models(model_dir)
-        write_retrain_report(drift_dict, old_metrics, new_metrics, promote, reason, archive_path)
-        for fname in os.listdir(temp_model_dir):
-            src = os.path.join(temp_model_dir, fname)
-            dst = os.path.join(archive_path, fname)
-            shutil.copy2(src, dst)
-        logger.info("New models also archived to %s", archive_path)
-        shutil.rmtree(temp_model_dir, ignore_errors=True)
-        return 3
-
-    # ------------------------------------------------------------------
-    # Shadow deployment (unless --no-shadow is set)
-    # ------------------------------------------------------------------
-    if args.no_shadow:
-        archive_path = archive_current_models(model_dir)
-        for fname in os.listdir(temp_model_dir):
-            src = os.path.join(temp_model_dir, fname)
-            dst = os.path.join(model_dir, fname)
-            shutil.copy2(src, dst)
-        logger.info("New models promoted immediately (--no-shadow) to %s", model_dir)
-        write_retrain_report(drift_dict, old_metrics, new_metrics, True, reason, archive_path)
-        shutil.rmtree(temp_model_dir, ignore_errors=True)
         return 2
 
     version_id = str(uuid.uuid4())
@@ -821,6 +934,9 @@ def main(argv: list[str] | None = None) -> int:
         "total_shadow_requests": 0,
     }
     save_shadow_state(model_dir, shadow_state)
+    model_governance.record_shadow_start(
+        version_id, temp_model_dir, metrics=new_metrics, session_factory=session_factory
+    )
     logger.info(
         "Shadow deployment started for version %s — candidate in %s. "
         "Run with --check-shadow after %d hours to evaluate promotion.",

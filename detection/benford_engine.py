@@ -24,6 +24,8 @@ Second-digit Benford analysis (Issue #179):
   chi_square_second_digit, z_scores_second_digit, mad_score_second_digit.
 """
 
+from __future__ import annotations
+
 import hashlib
 import json
 import logging
@@ -35,6 +37,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from config import config
 from utils.tracing import get_tracer
 
 _tracer = get_tracer(__name__)
@@ -223,7 +226,9 @@ def get_asset_classifier() -> "AssetClassifier":
     return _classifier
 
 
-MAD_NONCONFORMITY_THRESHOLD = 0.015  # Nigrini (2012): threshold above which MAD indicates non-conformity
+MAD_NONCONFORMITY_THRESHOLD = (
+    0.015  # Nigrini (2012): threshold above which MAD indicates non-conformity
+)
 
 # Exclusion threshold for logging when computing second-digit distribution:
 # if >10% of amounts are single-digit (< 10), log a debug message.
