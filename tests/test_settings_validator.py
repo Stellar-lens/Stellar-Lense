@@ -159,3 +159,92 @@ def test_default_ledgerlens_specs_validate_against_live_config():
     # The live Config module ships sane defaults; this is a regression guard
     # so a future default change gets caught here with a named setting.
     assert report.ok, report.render()
+
+
+class TestThresholdBoundsValidation:
+    """Tests for negative and out-of-range threshold rejection."""
+
+    def test_negative_threshold_rejected(self):
+        """Negative threshold should fail validation with named variable and range."""
+        specs = [
+            SettingSpec(
+                "RISK_SCORE_FLAG_THRESHOLD",
+                int,
+                required=True,
+                min_value=0,
+                max_value=100,
+                description="must be in range [0, 100]",
+            )
+        ]
+        report = SettingsValidator(specs).validate({"RISK_SCORE_FLAG_THRESHOLD": -5})
+        assert not report.ok
+        assert len(report.errors) == 1
+        error = report.errors[0]
+        assert error.setting_name == "RISK_SCORE_FLAG_THRESHOLD"
+        assert "-5" in error.message
+        assert "0" in error.message
+
+    def test_above_max_threshold_rejected(self):
+        """Threshold above 100 should fail validation."""
+        specs = [
+            SettingSpec(
+                "RISK_SCORE_FLAG_THRESHOLD",
+                int,
+                required=True,
+                min_value=0,
+                max_value=100,
+                description="must be in range [0, 100]",
+            )
+        ]
+        report = SettingsValidator(specs).validate({"RISK_SCORE_FLAG_THRESHOLD": 105})
+        assert not report.ok
+        assert len(report.errors) == 1
+        error = report.errors[0]
+        assert error.setting_name == "RISK_SCORE_FLAG_THRESHOLD"
+        assert "105" in error.message
+        assert "100" in error.message
+
+    def test_zero_threshold_passes(self):
+        """Boundary value 0 should be valid."""
+        specs = [
+            SettingSpec(
+                "RISK_SCORE_FLAG_THRESHOLD",
+                int,
+                required=True,
+                min_value=0,
+                max_value=100,
+            )
+        ]
+        report = SettingsValidator(specs).validate({"RISK_SCORE_FLAG_THRESHOLD": 0})
+        assert report.ok
+
+    def test_hundred_threshold_passes(self):
+        """Boundary value 100 should be valid."""
+        specs = [
+            SettingSpec(
+                "RISK_SCORE_FLAG_THRESHOLD",
+                int,
+                required=True,
+                min_value=0,
+                max_value=100,
+            )
+        ]
+        report = SettingsValidator(specs).validate({"RISK_SCORE_FLAG_THRESHOLD": 100})
+        assert report.ok
+
+    def test_negative_float_threshold_rejected(self):
+        """Negative float threshold (e.g., for MAD_NONCONFORMITY_THRESHOLD) rejected."""
+        specs = [
+            SettingSpec(
+                "MAD_NONCONFORMITY_THRESHOLD",
+                float,
+                required=True,
+                min_value=0.0,
+                description="must be non-negative",
+            )
+        ]
+        report = SettingsValidator(specs).validate({"MAD_NONCONFORMITY_THRESHOLD": -0.5})
+        assert not report.ok
+        error = report.errors[0]
+        assert error.setting_name == "MAD_NONCONFORMITY_THRESHOLD"
+        assert "-0.5" in error.message
