@@ -73,6 +73,13 @@ def to_decimal(value: float | int | str | Decimal) -> Decimal:
     For ``float`` inputs the conversion goes through ``str`` first to avoid
     the well-known ``Decimal(0.1) == Decimal('0.1000000000000000055...')``
     surprise.
+
+    Note:
+        This is the single, intentional input boundary that accepts ``float``
+        (Issue #778). Every public function in this module converts any
+        incoming ``float`` here and returns ``Decimal``; no function returns a
+        ``float``. Keeping this conversion in one place prevents a silent
+        ``Decimal``->``float`` loss at a *return* boundary anywhere else.
     """
     if isinstance(value, Decimal):
         return value
@@ -82,7 +89,11 @@ def to_decimal(value: float | int | str | Decimal) -> Decimal:
 
 
 def quantize(value: Decimal, places: int = _DEFAULT_DISPLAY_PLACES) -> Decimal:
-    """Round *value* to *places* decimal digits using banker's rounding."""
+    """Round *value* to *places* decimal digits using banker's rounding.
+    
+    Uses ROUND_HALF_EVEN (banker's rounding) which rounds 0.5 to the nearest
+    even number, minimizing bias in aggregations.
+    """
     if places < 0:
         raise ValueError(f"places must be >= 0, got {places}")
     exp = Decimal(10) ** -places
@@ -100,6 +111,8 @@ def quantize(value: Decimal, places: int = _DEFAULT_DISPLAY_PLACES) -> Decimal:
 def decimal_sum(values: Iterable[float | int | str | Decimal]) -> Decimal:
     """Return the exact sum of *values* as a Decimal.
 
+    Uses ROUND_HALF_EVEN (banker's rounding) for internal arithmetic.
+    
     ``NaN`` and ``None`` entries are silently skipped (matching pandas
     behaviour for ``Series.sum(skipna=True)``).
     """
@@ -120,6 +133,8 @@ def decimal_sum(values: Iterable[float | int | str | Decimal]) -> Decimal:
 def decimal_mean(values: Iterable[float | int | str | Decimal]) -> Decimal:
     """Return the exact arithmetic mean of *values* as a Decimal.
 
+    Uses ROUND_HALF_EVEN (banker's rounding) for internal arithmetic.
+    
     Raises ``ValueError`` if no valid (non-NaN, non-None) values are found.
     """
     with localcontext() as ctx:

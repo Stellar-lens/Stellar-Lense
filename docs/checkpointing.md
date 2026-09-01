@@ -55,6 +55,19 @@ To force a full restart (e.g. because upstream source data changed):
 workflow.clear()
 ```
 
+## Retention / stale-checkpoint cleanup
+
+Checkpoint files accumulate one file per `workflow_id` and are never pruned
+automatically. For long-lived deployments, purge checkpoints older than the
+retention window to avoid unbounded disk usage:
+
+```python
+store.cleanup_stale(retention_days=30)   # default CHECKPOINT_RETENTION_DAYS = 30
+```
+
+`CheckpointStore.cleanup_stale` deletes every checkpoint whose file mtime is
+older than the retention window and returns the list of removed paths.
+
 ## Validation
 
 ```

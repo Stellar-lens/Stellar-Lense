@@ -49,7 +49,6 @@ import pandas as pd
 from config import config
 from detection.artifact_compatibility import (
     ArtifactCompatibilityError,
-    ArtifactCompatibilityGate,
     load_model_with_compatibility,
 )
 from detection.conformal import ConformalCalibrator
@@ -213,13 +212,63 @@ def _apply_output_perturbation(
 
 
 class RiskScorer:
-    """Loads trained ensemble models and produces BFT-hardened risk scores."""
+    """Loads trained ensemble models and produces BFT-hardened risk scores.
 
-    def __init__(self, model_dir: str | None = None, weights: dict[str, float] | None = None):
+    Artifact trust (Grand 2 / issue #671): every model in ``model_dir`` must
+    pass the full Ed25519 signature + transparency-log trust chain
+    (:class:`detection.persistence.ModelArtifactVerifier`) and the
+    compatibility gate (:class:`detection.artifact_compatibility
+    .ArtifactCompatibilityGate`) before it is added to ``self.models``. A
+    failure on either check raises by default — it is never logged-and-
+    skipped-silently. ``public_key``/``transparency_log`` default to
+    ``config.TRUSTED_SIGNING_PUBLIC_KEY_PATH`` / the production DB-backed
+    transparency log; pass them explicitly to pin a specific trust root
+    (e.g. in tests, or for a canary/shadow scorer using its own key).
+
+    ``integrity_override_actor`` (falls back to
+    ``config.MODEL_INTEGRITY_OVERRIDE_ACTOR``) is the only way to construct a
+    ``RiskScorer`` when one or more models fail verification: the failing
+    model is skipped (never loaded, never trusted) and the failure is
+    written to the promotion audit log with that actor's name, but
+    construction no longer raises as long as at least one model still
+    passes. This exists for incident response only — see
+    docs/model_rollback_runbook.md.
+    """
+
+    def __init__(
+        self,
+        model_dir: str | None = None,
+        weights: dict[str, float] | None = None,
+        *,
+        public_key: Any = None,
+        transparency_log: Any = None,
+        integrity_override_actor: str | None = None,
+        require_trust_chain: bool = True,
+    ):
+        """
+        Args:
+            require_trust_chain: When ``False``, skips the Ed25519/
+                transparency-log/compatibility gate entirely and loads every
+                ``.joblib`` in ``model_dir`` directly. This is **only** for
+                offline research tooling that trains disposable, never-served
+                models on the fly (e.g. adversarial-robustness evaluation
+                loops in ``detection/adversarial/`` — see their call sites
+                for the rationale each time it's used). Never set this to
+                ``False`` for a ``RiskScorer`` that will actually score
+                traffic; the default (``True``) is the Grand 2 / issue #671
+                hard-block behavior and must stay the default everywhere
+                else.
+        """
         self.model_dir = model_dir or config.MODEL_DIR
         self.weights = self._validate_weights(weights)
         self.list_override = ListOverride()
         self.metadata = self._load_metadata()
+        self._public_key = public_key
+        self._transparency_log = transparency_log
+        self._integrity_override_actor = (
+            integrity_override_actor or config.MODEL_INTEGRITY_OVERRIDE_ACTOR
+        )
+        self._require_trust_chain = require_trust_chain
         self.models = self._load_models()
         self.selected_features: list[str] | None = self._load_selected_features()
         self.calibrators: dict[str, ConformalCalibrator] = {}
@@ -303,12 +352,19 @@ class RiskScorer:
                     # Prototypical classifier
                     proto_path = os.path.join(self.model_dir, "prototypes.joblib")
                     if os.path.exists(proto_path):
-                        from detection.persistence import ModelArtifact, ModelIntegrityError
+                        from detection.persistence import (
+                            ModelIntegrityError,
+                            load_trusted_public_key,
+                        )
 
                         proto = PrototypicalClassifier()
                         proto.prototypes = joblib.load(proto_path)
                         try:
-                            ModelArtifact(self.model_dir).verify_chain("prototypes")
+                            from detection.persistence import ModelArtifact
+
+                            ModelArtifact(self.model_dir).verify_chain(
+                                "prototypes", public_key=load_trusted_public_key()
+                            )
                         except ModelIntegrityError as exc:
                             logger.warning(
                                 "Artifact integrity check skipped or failed for prototypes: %s",
@@ -335,51 +391,114 @@ class RiskScorer:
                 return cast(dict[Any, Any], json.load(f))
         return None
 
-    def _load_models(self) -> dict:
-        from detection.persistence import ModelArtifact, ModelIntegrityError
+    def _handle_load_failure(self, name: str, exc: Exception) -> None:
+        """Record and either raise (default) or skip-with-audit (override)
+        a trust-chain or compatibility failure for model *name*.
 
-        artifact = ModelArtifact(self.model_dir)
-        gate = ArtifactCompatibilityGate(self.model_dir)
+        Never re-raises a wrapped/generic exception — the original typed
+        exception (``ModelIntegrityError`` vs ``ArtifactCompatibilityError``)
+        always propagates unchanged so callers can distinguish failure
+        classes, per Grand 2 acceptance criteria.
+        """
+        from detection.persistence import PromotionAuditLog, get_engine, get_session_factory
+
+        if not self._integrity_override_actor:
+            raise exc
+
+        logger.error(
+            "EMERGENCY OVERRIDE by %r: skipping model '%s' in %s instead of hard-blocking "
+            "RiskScorer construction — %s",
+            self._integrity_override_actor,
+            name,
+            self.model_dir,
+            exc,
+        )
+        try:
+            audit_log = PromotionAuditLog(get_session_factory(get_engine()))
+            audit_log.record(
+                actor=self._integrity_override_actor,
+                action="integrity_override",
+                model_name=name,
+                success=False,
+                reason=config.MODEL_INTEGRITY_OVERRIDE_REASON or None,
+                detail=str(exc),
+            )
+        except Exception:
+            logger.exception("Failed to write integrity-override audit log entry for %s", name)
+
+    def _load_models(self) -> dict:
+        from detection.persistence import (
+            ModelArtifactVerifier,
+            ModelIntegrityError,
+            get_default_transparency_log,
+            load_trusted_public_key,
+        )
+
+        present = [
+            name
+            for name in MODEL_REGISTRY
+            if os.path.exists(os.path.join(self.model_dir, f"{name}.joblib"))
+        ]
+        if not present:
+            # Nothing to verify yet (e.g. before the first training run) —
+            # this is a benign empty state, not a trust-chain failure, so we
+            # must not require a configured public key just to discover
+            # there is nothing here. `score()`/`_ensemble_probabilities`
+            # raise RuntimeError for callers that then try to use an empty
+            # RiskScorer.
+            return {}
+
+        if not self._require_trust_chain:
+            return {
+                name: joblib.load(os.path.join(self.model_dir, f"{name}.joblib"))
+                # No verify_chain/ModelArtifactVerifier call: require_trust_chain=False
+                # is the narrow, documented escape hatch for offline research tooling
+                # that trains disposable, never-served models (see this method's
+                # and RiskScorer.__init__'s require_trust_chain parameter docs).
+                for name in present
+            }
+
+        public_key = self._public_key or load_trusted_public_key()
+        transparency_log = self._transparency_log or get_default_transparency_log()
+        verifier = ModelArtifactVerifier(transparency_log, self.model_dir)
+
         models = {}
-        for name in MODEL_REGISTRY:
-            path = os.path.join(self.model_dir, f"{name}.joblib")
-            if not os.path.exists(path):
-                continue
+        attempted = 0
+        for name in present:
+            attempted += 1
+
+            feature_columns = self.metadata.get("feature_columns") if self.metadata else None
 
             try:
-                gate.check(
-                    name,
-                    feature_columns=self.metadata.get("feature_columns") if self.metadata else None,
-                )
-            except Exception as exc:
-                logger.warning(
-                    "Compatibility gate check failed for %s: %s — loading with best effort",
-                    name,
-                    exc,
-                )
+                verifier.verify(name, public_key=public_key)
+            except ModelIntegrityError as exc:
+                self._handle_load_failure(name, exc)
+                continue
 
             try:
                 model = load_model_with_compatibility(
                     name,
                     model_dir=self.model_dir,
-                    feature_columns=self.metadata.get("feature_columns") if self.metadata else None,
-                    strict=False,
+                    feature_columns=feature_columns,
+                    strict=True,
                 )
             except ArtifactCompatibilityError as exc:
-                logger.warning(
-                    "Compatibility gate blocked loading %s: %s — falling back to direct load",
-                    name,
-                    exc,
-                )
-                model = joblib.load(path)
-            except FileNotFoundError:
+                self._handle_load_failure(name, exc)
                 continue
 
-            try:
-                artifact.verify_chain(name)
-            except ModelIntegrityError as exc:
-                logger.warning("Artifact integrity check skipped or failed for %s: %s", name, exc)
             models[name] = model
+
+        if attempted and not models:
+            # Artifacts were present but every one failed verification — this
+            # is a tampered/misconfigured production directory, not a benign
+            # pre-training empty state (see `attempted == 0` below), so it
+            # must hard-block rather than degrade to an empty ensemble.
+            raise ModelIntegrityError(
+                f"No model artifacts in {self.model_dir} passed trust-chain/compatibility "
+                "verification. Run `python -m detection.model_training` and promote via "
+                "`detection.model_governance.promote_candidate`, or (incident response only) "
+                "set MODEL_INTEGRITY_OVERRIDE_ACTOR to skip specific failing models."
+            )
         return models
 
     def _load_selected_features(self) -> list[str] | None:
@@ -1046,22 +1165,37 @@ def load_shadow_candidate(candidate_dir: str) -> "RiskScorer":
 
 
 def verify_model_artifact_signature(model_dir: str, version_id: str) -> bool:
-    """Verify the Ed25519 signature of a model artifact before rollback.
+    """Verify the full Ed25519 + transparency-log trust chain for every model
+    artifact in *model_dir* before rollback — the same
+    :class:`~detection.persistence.ModelArtifactVerifier` check
+    ``RiskScorer`` runs at load time, so a directory this returns ``True``
+    for is guaranteed loadable.
 
-    Loads the stored signature from ``{model_dir}/model_signature.json`` and
-    verifies it against the concatenated SHA-256 digests of all ``.joblib``
-    files using the configured trusted public key.
-
-    Returns ``True`` if the signature is valid, ``False`` otherwise.
+    Returns ``True`` if every artifact present verifies, ``False`` otherwise
+    (including when no trusted public key is configured, since that means
+    nothing can be verified).
     """
-    from detection.persistence import ModelArtifact, ModelIntegrityError
+    from detection.model_training import MODEL_REGISTRY
+    from detection.persistence import (
+        ModelArtifactVerifier,
+        ModelIntegrityError,
+        get_default_transparency_log,
+        load_trusted_public_key,
+    )
 
     try:
-        artifact = ModelArtifact(model_dir)
-        from detection.model_training import MODEL_REGISTRY
-
+        public_key = load_trusted_public_key()
+        transparency_log = get_default_transparency_log()
+        verifier = ModelArtifactVerifier(transparency_log, model_dir)
+        checked = 0
         for name in MODEL_REGISTRY:
-            artifact.verify_chain(name)
+            if not os.path.exists(os.path.join(model_dir, f"{name}.joblib")):
+                continue
+            verifier.verify(name, public_key=public_key)
+            checked += 1
+        if checked == 0:
+            logger.error("No model artifacts found in %s for version %s", model_dir, version_id)
+            return False
         logger.info("Artifact integrity verified for version %s in %s", version_id, model_dir)
         return True
     except ModelIntegrityError as exc:
