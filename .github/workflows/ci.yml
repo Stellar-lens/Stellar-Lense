@@ -442,3 +442,24 @@ jobs:
         # Exits 1 (failing the CI step) if fewer than 80% of mutations are killed.
         # Prints surviving mutations so they can be opened as follow-up issues.
         run: python scripts/check_mutation_score.py --threshold 80
+
+      - name: Mutation score CI summary
+        # Visibility only — does not change the pass/fail behaviour above.
+        # Surfaces the headline mutation score and any files with surviving
+        # (below-threshold) mutations in the GitHub Actions job summary so PR
+        # authors don't have to dig through the raw log.
+        if: always()
+        run: |
+          {
+            echo "## Mutation Testing Summary"
+            echo ""
+            if [ -f .mutmut-cache ]; then
+              echo "Headline mutation score and files with surviving (below-threshold) mutations, as reported by \`scripts/check_mutation_score.py\`:"
+              echo ""
+              echo '```'
+              python scripts/check_mutation_score.py --threshold 80 2>&1 || true
+              echo '```'
+            else
+              echo "No \`.mutmut-cache\` was produced in this run; run \`make mutation-test\` to populate mutation results before this summary can be rendered."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

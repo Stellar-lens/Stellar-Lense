@@ -186,6 +186,20 @@ check-cycles:
 	fi
 
 # ---------------------------------------------------------------------------
+# Module dependency / layering rules (config/module_boundaries.yml, Issue #791)
+#
+# Usage:
+#   make check-boundaries                  # check all packages
+#   make check-boundaries PACKAGE=detection  # scope to one package
+#
+# Exit codes: 0 = within declared boundaries, 1 = one or more violations.
+# ---------------------------------------------------------------------------
+
+check-boundaries:
+	@echo "==> Checking module dependency / layering boundaries..."
+	$(PYTHON) scripts/check_module_dependencies.py $(if $(PACKAGE),--package $(PACKAGE),)
+
+# ---------------------------------------------------------------------------
 # Optional dependency probes (Issue #542)
 #
 # Usage:
