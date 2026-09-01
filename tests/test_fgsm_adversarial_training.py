@@ -20,8 +20,9 @@ from detection.adversarial.robustness import (
     run_adversarial_training,
 )
 from detection.model_inference import RiskScorer
-from detection.model_training import save_models, split_features_labels, train_models
+from detection.model_training import split_features_labels, train_models
 from scripts.generate_synthetic_dataset import generate_synthetic_dataset
+from tests.conftest import build_signed_model_dir
 
 # ---------------------------------------------------------------------------
 # Shared fixtures
@@ -33,8 +34,10 @@ def scorer_and_data(tmp_path_factory):
     df = generate_synthetic_dataset(n_wallets=100, seed=42)
     results = train_models(df, test_size=0.2, random_state=42)
     model_dir = str(tmp_path_factory.mktemp("fgsm_models"))
-    save_models(results, model_dir)
-    scorer = RiskScorer(model_dir=model_dir)
+    public_key, transparency_log = build_signed_model_dir(results, model_dir)
+    scorer = RiskScorer(
+        model_dir=model_dir, public_key=public_key, transparency_log=transparency_log
+    )
     return scorer, df
 
 

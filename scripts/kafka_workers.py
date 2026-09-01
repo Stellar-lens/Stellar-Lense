@@ -20,6 +20,7 @@ import time
 from config.contracts import validate_mode
 from detection.model_inference import RiskScorer
 from streaming.alert_dispatcher import AlertDispatcher
+from streaming.alert_ledger import AlertDeliveryLedger
 from streaming.feature_buffer import FeatureBuffer
 from streaming.kafka_worker import KafkaWorker
 from streaming.streaming_scorer import StreamingScorer
@@ -54,6 +55,7 @@ def create_worker(
         channel=os.getenv("ALERT_CHANNEL", "stdout"),
         webhook_url=os.getenv("ALERT_WEBHOOK_URL"),
         alert_cooldown_seconds=int(os.getenv("ALERT_COOLDOWN_SECONDS", "3600")),
+        delivery_ledger=AlertDeliveryLedger(),
     )
 
     worker = KafkaWorker(

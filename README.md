@@ -343,6 +343,11 @@ scale-out, durability, event replay, and backpressure, set
 `sse` backend remains the default and is unchanged — operators without Kafka
 need do nothing.
 
+For a complete, ready-to-uncomment local-dev configuration satisfying the
+`streaming_kafka` contract, see the example block in
+[`.env.example`](.env.example) (search for "streaming_kafka runtime-mode
+config").
+
 ```bash
 # Bring up Zookeeper, Kafka, the producer, 3 scorer replicas, Prometheus + Grafana
 docker-compose up --scale ledgerlens-scorer=3
@@ -516,6 +521,7 @@ make install   # pip install -r requirements.txt
 make lint      # ruff check .
 make format    # black .
 make test      # pytest
+make test-fast # pytest (excludes integration, slow, and fuzz tests)
 make run       # python run_pipeline.py
 ```
 
@@ -638,7 +644,9 @@ It is `NULL` when the wallet is not part of any detected ring, lets the API and
 dashboard group wallets by ring, and is **not** part of the on-chain `RiskScore`
 struct. Databases created before this field was introduced are upgraded with
 `python -m scripts.migrate_add_ring_id` (a backward-compatible `ALTER TABLE`;
-existing rows get `ring_id = NULL`).
+existing rows get `ring_id = NULL`). See
+[docs/ring_id_migration.md](docs/ring_id_migration.md) for the full backup,
+migrate, verify, and rollback runbook.
 
 #### Asset pair identifier
 
