@@ -36,8 +36,17 @@ import os
 import platform
 import subprocess
 import sys
-import tomllib
-from datetime import UTC, datetime
+try:
+    import tomllib
+except ImportError:
+    import tomli as tomllib
+
+from datetime import datetime, timezone
+try:
+    from datetime import UTC
+except ImportError:
+    UTC = timezone.utc
+
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
