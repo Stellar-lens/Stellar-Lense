@@ -590,6 +590,17 @@ def detect_label_poisoning(
     baseline_path = baseline_path or LABEL_DISTRIBUTION_BASELINE_PATH
     threshold = threshold if threshold is not None else config.POISON_LABEL_RATIO_THRESHOLD
 
+    # Issue #740: this threshold is a *fraction* of label-ratio shift (e.g.
+    # 0.15 = 15%). A value like 15 (percent, not fraction) would make the
+    # `abs(...) > threshold` check below effectively unreachable — silently
+    # disabling label-poisoning detection rather than just producing a wrong
+    # number, so this fails loudly rather than warning.
+    if not (0 < threshold <= 1):
+        raise ValueError(
+            f"POISON_LABEL_RATIO_THRESHOLD must be a fraction in (0, 1], got "
+            f"{threshold!r} (e.g. use 0.15 for 15%, not 15)"
+        )
+
     total = sum(label_distribution.values())
     if total == 0:
         return False

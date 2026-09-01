@@ -130,6 +130,46 @@ def test_detect_label_poisoning_returns_false_when_ratio_ok(tmp_path):
     assert not detect_label_poisoning(distribution, baseline_path=baseline_path, threshold=0.15)
 
 
+@pytest.mark.parametrize(
+    "bad_threshold",
+    [
+        15,  # Issue #740's exact motivating mix-up: 15 (percent) instead of 0.15
+        1.5,
+        0,
+        -0.1,
+    ],
+)
+def test_detect_label_poisoning_rejects_out_of_range_threshold(tmp_path, bad_threshold):
+    baseline_path = str(tmp_path / "baseline.json")
+    with open(baseline_path, "w") as f:
+        json.dump({"wash_trade_ratio": 0.10}, f)
+
+    distribution = {0: 70, 1: 30}
+    with pytest.raises(ValueError, match="POISON_LABEL_RATIO_THRESHOLD must be a fraction in \\(0, 1\\]"):
+        detect_label_poisoning(distribution, baseline_path=baseline_path, threshold=bad_threshold)
+
+
+def test_detect_label_poisoning_accepts_boundary_threshold_of_one(tmp_path):
+    """1.0 is the inclusive upper bound — a 100% ratio shift is a valid (if
+    extreme) configuration, not a mix-up like 15 vs 0.15."""
+    baseline_path = str(tmp_path / "baseline.json")
+    with open(baseline_path, "w") as f:
+        json.dump({"wash_trade_ratio": 0.0}, f)
+
+    distribution = {0: 0, 1: 100}
+    assert not detect_label_poisoning(distribution, baseline_path=baseline_path, threshold=1.0)
+
+
+def test_detect_label_poisoning_rejects_bad_config_default(monkeypatch):
+    """The same validation applies when the bad value comes from config
+    (POISON_LABEL_RATIO_THRESHOLD) rather than an explicit override."""
+    import detection.model_training as mt
+
+    monkeypatch.setattr(mt.config, "POISON_LABEL_RATIO_THRESHOLD", 15)
+    with pytest.raises(ValueError, match="POISON_LABEL_RATIO_THRESHOLD must be a fraction in \\(0, 1\\]"):
+        detect_label_poisoning({0: 70, 1: 30})
+
+
 def test_detect_label_poisoning_creates_baseline_when_missing(tmp_path):
     baseline_path = str(tmp_path / "new_baseline.json")
     assert not os.path.exists(baseline_path)
