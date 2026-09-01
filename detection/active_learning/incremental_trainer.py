@@ -309,6 +309,30 @@ class IncrementalTrainer:
         self.historical_data_path = historical_data_path
         self.val_size = val_size
         self.random_state = random_state
+        self._validate_rollback_threshold(config.AL_ROLLBACK_AUC_DROP)
+
+    @staticmethod
+    def _validate_rollback_threshold(value: float) -> None:
+        """Issue #738: AL_ROLLBACK_AUC_DROP gates how much AUC-ROC is allowed
+        to drop before `update()` rolls back to the previous models.
+
+        A negative value is unambiguously invalid (there's no such thing as
+        a negative AUC drop), so it's a hard rejection. A value outside the
+        documented reasonable [0, 0.2] band is not necessarily wrong — an
+        operator may deliberately want a looser or effectively-disabled
+        rollback — but it's exactly the kind of value that results from
+        entering a percentage (e.g. 1 meaning "1%") instead of a fraction
+        (0.01), so it's worth a loud warning rather than blocking startup.
+        """
+        if value < 0:
+            raise ValueError(f"AL_ROLLBACK_AUC_DROP must be non-negative, got {value}")
+        if not (0 <= value <= 0.2):
+            logger.warning(
+                "AL_ROLLBACK_AUC_DROP=%s is outside the documented reasonable range "
+                "[0, 0.2] — if this is meant to be a fraction (e.g. 0.01 for 1%%), "
+                "check it wasn't entered as a percentage instead.",
+                value,
+            )
 
     def _load_models(self) -> dict:
         models = {}
