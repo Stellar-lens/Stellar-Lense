@@ -88,7 +88,7 @@ def get_version() -> str:
         return env_ver.strip()
 
     # 2. pyproject.toml (always present in the source tree)
-    if _PYPROJECT.exists():
+    if _PYPROJECT.exists() and tomllib is not None:
         try:
             with open(_PYPROJECT, "rb") as f:
                 data = tomllib.load(f)
