@@ -516,6 +516,7 @@ make install   # pip install -r requirements.txt
 make lint      # ruff check .
 make format    # black .
 make test      # pytest
+make test-fast # pytest (excludes integration, slow, and fuzz tests)
 make run       # python run_pipeline.py
 ```
 

@@ -31,6 +31,12 @@ format:
 test:
 	$(PYTEST) -q
 
+test-fast:
+	$(PYTEST) -q -m "not integration and not slow" --ignore=tests/fuzz
+
+check-env-example:
+	$(PYTHON) -m scripts.check_env_example
+
 # ---------------------------------------------------------------------------
 # Source package integrity checks (Issue #540)
 #
