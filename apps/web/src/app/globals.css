@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+/* Design tokens, see docs/stellar-lense-design-tokens.md. Tailwind v4
+   generates utility classes directly from @theme variables (--color-x
+   becomes bg-x/text-x/border-x, --font-x becomes font-x), so no separate
+   tailwind.config.ts is needed here. */
+@theme {
+  --color-bg: #0b0c10;
+  --color-surface: #14161b;
+  --color-border: #24262c;
+  --color-text: #edeef0;
+  --color-muted: #8a8f98;
+
+  --color-accent: #5b6ef5; /* brand/interactive only */
+  --color-flag: #e8a33d; /* risk/wash-trading alerts only */
+  --color-up: #22c55e; /* price/data increase only */
+  --color-down: #ef4444; /* price/data decrease only */
+
+  /* next/font (layout.tsx) sets these on <html> at normal cascade
+     priority, which wins over this @theme block (emitted in @layer
+     theme). These are just fallbacks in case that hasn't applied yet. */
+  --font-display: var(--font-display), sans-serif;
+  --font-body: var(--font-body), sans-serif;
+  --font-mono: var(--font-mono), monospace;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
+}

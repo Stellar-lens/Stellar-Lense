@@ -3,3 +3,7 @@ packages:
   - "apps/bot"
   - "packages/sdk-ts"
   - "packages/ui"
+
+allowBuilds:
+  sharp: false
+  unrs-resolver: false
