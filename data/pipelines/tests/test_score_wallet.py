@@ -1,0 +1,357 @@
+import json
+import logging
+from unittest.mock import MagicMock, patch
+
+import pandas as pd
+import pytest
+
+from scripts.score_wallet import InsufficientTradeHistoryError, main
+
+
+@pytest.fixture
+def mock_scorer():
+    with patch("scripts.score_wallet.RiskScorer") as mock:
+        scorer_instance = mock.return_value
+        scorer_instance.score.return_value = {
+            "score": 83,
+            "benford_flag": True,
+            "ml_flag": True,
+            "confidence": 76,
+        }
+        scorer_instance.models = {"random_forest": MagicMock()}
+        yield scorer_instance
+
+
+@pytest.fixture
+def mock_ingestion():
+    with (
+        patch("scripts.score_wallet.load_trades") as m_trades,
+        patch("scripts.score_wallet.load_orderbook_events") as m_events,
+        patch("scripts.score_wallet.trades_to_dataframe") as m_tdf,
+    ):
+        m_trades.return_value = iter([])
+        m_events.return_value = iter([])
+        # A single trade involving the valid test wallet so the scoring path —
+        # not the "insufficient trade history" path — is exercised.
+        wallet = "G" + "A" * 55
+        m_tdf.return_value = pd.DataFrame(
+            [
+                {
+                    "trade_id": "t1",
+                    "ledger_close_time": pd.Timestamp("2024-01-01"),
+                    "base_account": wallet,
+                    "counter_account": "G" + "B" * 55,
+                    "base_asset": "XLM:native",
+                    "counter_asset": "USDC:GBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+                    "amount": 100.0,
+                    "price": 1.0,
+                }
+            ]
+        )
+        yield m_trades, m_events
+
+
+@pytest.fixture
+def mock_explainer():
+    with patch("scripts.score_wallet.ShapExplainer") as mock:
+        explainer_instance = mock.return_value
+        explainer_instance.explain_ensemble.return_value = [
+            {"feature": "benford_mad_24h", "contribution": 0.34, "value": 0.047},
+            {"feature": "counterparty_concentration_ratio", "contribution": 0.29, "value": 0.98},
+            {"feature": "round_trip_frequency", "contribution": 0.21, "value": 0.41},
+            {"feature": "benford_chi_square_168h", "contribution": 0.18, "value": 45.2},
+            {"feature": "account_age_days", "contribution": -0.12, "value": 3.0},
+        ]
+        yield explainer_instance
+
+
+def test_score_wallet_outputs_score_and_shap(capsys, mock_scorer, mock_ingestion, mock_explainer):
+    test_wallet = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    with patch("sys.argv", ["score_wallet.py", "--wallet", test_wallet, "--pair", "USDC:G..."]):
+        main()
+
+    out, _ = capsys.readouterr()
+    assert "Score:    83" in out
+    assert "Benford:  True" in out
+    assert "Top 5 SHAP" in out
+    assert "benford_mad_24h" in out
+
+
+def test_score_wallet_json_output_is_valid_json(
+    capsys, mock_scorer, mock_ingestion, mock_explainer
+):
+    test_wallet = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    with patch(
+        "sys.argv", ["score_wallet.py", "--wallet", test_wallet, "--pair", "USDC:G...", "--json"]
+    ):
+        main()
+
+    out, _ = capsys.readouterr()
+    data = json.loads(out)
+    assert data["wallet"] == test_wallet
+    assert data["score"] == 83
+    assert len(data["shap_explanations"]) == 5
+
+
+def test_score_wallet_flagged_label(capsys, mock_scorer, mock_ingestion, mock_explainer):
+    mock_scorer.score.return_value["score"] = 85
+    test_wallet = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    with patch("sys.argv", ["score_wallet.py", "--wallet", test_wallet, "--pair", "USDC:G..."]):
+        main()
+
+    out, _ = capsys.readouterr()
+    assert "[FLAGGED]" in out
+
+
+def test_score_wallet_ok_label(capsys, mock_scorer, mock_ingestion, mock_explainer):
+    mock_scorer.score.return_value["score"] = 30
+    test_wallet = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    with patch("sys.argv", ["score_wallet.py", "--wallet", test_wallet, "--pair", "USDC:G..."]):
+        main()
+
+    out, _ = capsys.readouterr()
+    assert "[OK]" in out
+
+
+def test_score_wallet_invalid_wallet_address_raises_value_error(capsys):
+    with patch("sys.argv", ["score_wallet.py", "--wallet", "BADID", "--pair", "USDC:G..."]):
+        with pytest.raises(ValueError, match="Invalid Stellar address"):
+            main()
+
+
+def test_score_wallet_missing_models_exits_1(caplog, mock_ingestion):
+    with patch(
+        "scripts.score_wallet.RiskScorer", side_effect=RuntimeError("No trained models found")
+    ):
+        test_wallet = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        with patch("sys.argv", ["score_wallet.py", "--wallet", test_wallet, "--pair", "USDC:G..."]):
+            with caplog.at_level(logging.INFO):
+                with pytest.raises(SystemExit) as excinfo:
+                    main()
+        assert excinfo.value.code == 1
+        assert any("model_training.py" in r.message for r in caplog.records)
+
+
+def test_score_wallet_quiet_outputs_single_json_line_and_no_stderr(
+    capsys, mock_scorer, mock_ingestion, mock_explainer
+):
+    test_wallet = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    with patch(
+        "sys.argv", ["score_wallet.py", "--wallet", test_wallet, "--pair", "USDC:G...", "-q"]
+    ):
+        main()
+
+    out, err = capsys.readouterr()
+    assert err == ""
+
+    lines = out.strip().splitlines()
+    assert len(lines) == 1
+
+    data = json.loads(lines[0])
+    assert data["wallet"] == test_wallet
+    assert data["score"] == 83
+
+
+def test_score_wallet_causal_json_output_includes_causal_section(
+    capsys, mock_scorer, mock_ingestion, mock_explainer
+):
+    test_wallet = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    with patch("scripts.score_wallet.CounterfactualAttributor") as mock_attributor:
+        attributor_instance = mock_attributor.return_value
+        attributor_instance.counterfactual_score.return_value = {
+            "original_score": 83,
+            "counterfactual_score": 41,
+            "score_delta": 42,
+            "features_changed": {"round_trip_frequency": {"original": 0.6, "counterfactual": 0.0}},
+        }
+        with patch(
+            "sys.argv",
+            [
+                "score_wallet.py",
+                "--wallet",
+                test_wallet,
+                "--pair",
+                "USDC:G...",
+                "--json",
+                "--causal",
+            ],
+        ):
+            main()
+
+    out, _ = capsys.readouterr()
+    data = json.loads(out)
+    assert data["wallet"] == test_wallet
+    assert "causal_attribution" in data
+    assert data["causal_attribution"]["counterfactual_score"] == 41
+
+
+def test_score_wallet_what_if_remove_invalid_trade_raises_value_error(
+    mock_scorer, mock_ingestion, mock_explainer
+):
+    test_wallet = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    with patch(
+        "sys.argv",
+        [
+            "score_wallet.py",
+            "--wallet",
+            test_wallet,
+            "--pair",
+            "USDC:G...",
+            "--what-if-remove",
+            "not-a-trade",
+        ],
+    ):
+        with pytest.raises(ValueError):
+            main()
+
+
+def test_score_wallet_json_stdout_has_no_log_noise(
+    capsys, caplog, mock_scorer, mock_ingestion, mock_explainer
+):
+    test_wallet = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    with caplog.at_level(logging.INFO):
+        with patch(
+            "sys.argv",
+            ["score_wallet.py", "--wallet", test_wallet, "--pair", "USDC:G...", "--json"],
+        ):
+            main()
+
+    out, _ = capsys.readouterr()
+
+    # stdout must be nothing but the JSON payload — no status messages mixed in.
+    data = json.loads(out)
+    assert data["score"] == 83
+    assert "Wallet scored" not in out
+
+    # the status message was emitted through logging (routed to stderr), not print().
+    assert any("Wallet scored" in r.message for r in caplog.records)
+
+
+def test_score_wallet_log_level_flag_sets_root_logger_level(
+    capsys, mock_scorer, mock_ingestion, mock_explainer
+):
+    test_wallet = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    with patch(
+        "sys.argv",
+        [
+            "score_wallet.py",
+            "--wallet",
+            test_wallet,
+            "--pair",
+            "USDC:G...",
+            "--log-level",
+            "DEBUG",
+        ],
+    ):
+        main()
+
+    assert logging.getLogger().level == logging.DEBUG
+
+
+def test_validate_pair_format_accepts_canonical_pairs():
+    from scripts.score_wallet import validate_pair_format
+
+    # Full two-sided canonical pair
+    validate_pair_format("USDC:GA5Z.../XLM:native")  # Should not raise
+    # Single half (XLM counter assumed)
+    validate_pair_format("USDC:GA5Z...")  # Should not raise
+
+
+def test_validate_pair_format_missing_issuer_raises_value_error():
+    from scripts.score_wallet import validate_pair_format
+
+    # Missing the ':issuer' half — no separator at all
+    with pytest.raises(ValueError, match="CODE:ISSUER"):
+        validate_pair_format("USDC/XLM")
+
+    # Empty issuer after the separator
+    with pytest.raises(ValueError, match="CODE:ISSUER"):
+        validate_pair_format("USDC:/XLM:native")
+
+    # Empty code before the separator
+    with pytest.raises(ValueError, match="CODE:ISSUER"):
+        validate_pair_format(":GA5Z/XLM:native")
+
+    # Too many separators
+    with pytest.raises(ValueError, match="CODE:ISSUER"):
+        validate_pair_format("USDC:GA5Z/XLM:native/EXTRA:issuer")
+
+
+def test_score_wallet_malformed_pair_raises_value_error():
+    test_wallet = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    with patch("sys.argv", ["score_wallet.py", "--wallet", test_wallet, "--pair", "USDC/XLM"]):
+        with pytest.raises(ValueError, match="CODE:ISSUER"):
+            main()
+
+
+def test_validate_wallet_address():
+    from scripts.score_wallet import validate_wallet_address
+
+    # Valid
+    valid_addr = "G" + "A" * 55
+    validate_wallet_address(valid_addr)  # Should not raise
+
+    # Too short
+    with pytest.raises(ValueError, match="Invalid Stellar address"):
+        validate_wallet_address("G" + "A" * 54)
+
+    # Too long
+    with pytest.raises(ValueError, match="Invalid Stellar address"):
+        validate_wallet_address("G" + "A" * 56)
+
+    # Lowercase
+    with pytest.raises(ValueError, match="Invalid Stellar address"):
+        validate_wallet_address("g" + "a" * 55)
+
+    # Wrong prefix
+    with pytest.raises(ValueError, match="Invalid Stellar address"):
+        validate_wallet_address("X" + "A" * 55)
+
+
+# ---------------------------------------------------------------------------
+# Issue #744 — three distinct outcomes
+# ---------------------------------------------------------------------------
+
+
+def test_invalid_address_format_distinct_from_other_outcomes():
+    """Outcome 1: a malformed address yields a clear format error."""
+    from scripts.score_wallet import validate_wallet_address
+
+    with pytest.raises(ValueError, match="Invalid Stellar address"):
+        validate_wallet_address("G" + "A" * 54)
+
+
+def test_insufficient_trade_history_is_distinct(capsys):
+    """Outcome 2: valid address with no trade history is distinct from a failure."""
+    wallet = "G" + "A" * 55
+    with patch("scripts.score_wallet.RiskScorer") as mock_scorer:
+        mock_scorer.return_value.list_override.check.return_value = None
+        with (
+            patch("scripts.score_wallet.load_trades", return_value=iter([])),
+            patch("scripts.score_wallet.load_orderbook_events", return_value=iter([])),
+            patch("scripts.score_wallet.trades_to_dataframe", return_value=pd.DataFrame()),
+            patch(
+                "sys.argv",
+                ["score_wallet.py", "--wallet", wallet, "--pair", "USDC:G..."],
+            ),
+        ):
+            with pytest.raises(InsufficientTradeHistoryError, match="no trade history"):
+                main()
+
+
+def test_genuine_scoring_failure_is_distinct(capsys, mock_ingestion):
+    """Outcome 3: a real scoring failure is clearly worded and exits nonzero."""
+    wallet = "G" + "A" * 55
+    with patch("scripts.score_wallet.RiskScorer") as mock_scorer:
+        mock_scorer.return_value.list_override.check.return_value = None
+        mock_scorer.return_value.score.side_effect = RuntimeError("inference crashed")
+        with patch(
+            "sys.argv",
+            ["score_wallet.py", "--wallet", wallet, "--pair", "USDC:G..."],
+        ):
+            with pytest.raises(SystemExit) as excinfo:
+                main()
+
+    assert excinfo.value.code == 1
+    _, err = capsys.readouterr()
+    assert "Scoring failed" in err
