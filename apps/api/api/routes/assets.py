@@ -1,12 +1,14 @@
 """GET /assets/risk-ranking — asset pairs ranked by aggregate risk.
 GET /assets/{pair}/scores — every wallet scored on one pair, for the asset
 detail view's drill-down (each entry carries the same SHAP attributions
-as GET /score/{wallet}/{pair})."""
+as GET /score/{wallet}/{pair}).
+GET /assets/{pair}/score-history — the pair's derived score history, for
+correlating against news timing (see api.storage.pair_score_history)."""
 
 from fastapi import APIRouter, HTTPException
 
 from api import storage
-from api.schemas import AssetRiskRanking, RiskScore
+from api.schemas import AssetRiskRanking, RiskScore, ScoreHistoryPoint
 
 router = APIRouter(prefix="/assets", tags=["assets"])
 
@@ -29,3 +31,11 @@ def get_pair_scores(pair: str) -> list[RiskScore]:
     ]
     results.sort(key=lambda r: r["score"], reverse=True)
     return [RiskScore.from_storage_result(r) for r in results]
+
+
+@router.get("/{pair:path}/score-history", response_model=list[ScoreHistoryPoint])
+def get_pair_score_history(pair: str) -> list[ScoreHistoryPoint]:
+    """Return `pair`'s derived aggregate score history, oldest first."""
+    if pair not in storage.known_pairs():
+        raise HTTPException(status_code=404, detail=f"Unknown asset pair: {pair}")
+    return [ScoreHistoryPoint(**p) for p in storage.pair_score_history(pair)]

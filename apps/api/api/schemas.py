@@ -73,3 +73,16 @@ class AssetRiskRanking(BaseModel):
     max_score: int
     flagged_wallets: int
     total_wallets: int
+
+
+class ScoreHistoryPoint(BaseModel):
+    """One point in a pair's aggregate risk-score history.
+
+    Not a persisted time series — this demo API has no running pipeline
+    writing scores over time (see api.storage.pair_score_history) — but a
+    genuine derivation from the same seeded trade data, recomputed at each
+    distinct trade timestamp for the pair, not fabricated values."""
+
+    timestamp: datetime
+    average_score: float
+    max_score: int
