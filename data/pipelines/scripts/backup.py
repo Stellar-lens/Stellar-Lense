@@ -163,7 +163,7 @@ def main():
     """Run full backup suite."""
     import os
 
-    db_url = os.getenv("DATABASE_URL", "sqlite:///ledgerlens.db")
+    db_url = os.getenv("DATABASE_URL", "sqlite:///stellar_lense.db")
     model_dir = os.getenv("MODEL_DIR", "./models")
     backup_dir = Path(os.getenv("BACKUP_DIR", "./backups"))
 

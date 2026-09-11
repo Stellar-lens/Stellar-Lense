@@ -561,7 +561,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     yield
 
 
-app = FastAPI(title="LedgerLens Federated Coordinator", lifespan=lifespan)
+app = FastAPI(title="StellarLense Federated Coordinator", lifespan=lifespan)
 
 
 # ---------------------------------------------------------------------------

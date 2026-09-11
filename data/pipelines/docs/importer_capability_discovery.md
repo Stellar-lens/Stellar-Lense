@@ -9,7 +9,7 @@
 
 ## Overview
 
-The Importer Capability Discovery System is a durable, reusable infrastructure capability that enables runtime discovery, validation, and querying of all data source importers in LedgerLens-data. This system provides a typed, protocol-based registry that makes it easy to:
+The Importer Capability Discovery System is a durable, reusable infrastructure capability that enables runtime discovery, validation, and querying of all data source importers in StellarLense-data. This system provides a typed, protocol-based registry that makes it easy to:
 
 - **Discover** what importers are available without reading source code
 - **Query** importers by their capabilities, data types, or sources
@@ -595,7 +595,7 @@ registry.unregister("test_importer")
 
 ## References
 
-- **Issue:** [#486 Build importer capability discovery](https://github.com/product-labo/Ledgerlens-data/issues/486)
+- **Issue:** [#486 Build importer capability discovery](https://github.com/product-labo/StellarLense-data/issues/486)
 - **Implementation:** `ingestion/importer_registry.py`, `ingestion/registered_importers.py`
 - **Tests:** `tests/test_importer_registry.py`
 - **CLI Tool:** `scripts/inspect_importers.py`

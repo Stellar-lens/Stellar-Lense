@@ -36,7 +36,7 @@ logger = get_logger(__name__)
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m scripts.stream",
-        description="LedgerLens real-time streaming risk-scoring pipeline",
+        description="StellarLense real-time streaming risk-scoring pipeline",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
@@ -150,7 +150,7 @@ def main() -> None:
     # --- Startup banner ---
     pair_count = len(config.WATCHED_ASSET_PAIRS)
     logger.info(
-        "LedgerLens streaming pipeline starting — backend=%s role=%s, "
+        "StellarLense streaming pipeline starting — backend=%s role=%s, "
         "%d pair(s), channel=%s, min_trades=%d",
         args.backend,
         args.role,

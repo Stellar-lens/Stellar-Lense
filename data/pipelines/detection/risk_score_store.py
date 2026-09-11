@@ -1,7 +1,7 @@
 """Repository for reading and writing `RiskScoreRecord`s.
 
 Used by `run_pipeline.py` to persist `RiskScorer.score()` output for
-`ledgerlens-api` to read, and to look up previously flagged wallets.
+`stellar-lense-api` to read, and to look up previously flagged wallets.
 """
 
 import time

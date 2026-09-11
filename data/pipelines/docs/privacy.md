@@ -1,6 +1,6 @@
-# Differential Privacy in LedgerLens
+# Differential Privacy in Stellar Lense
 
-LedgerLens applies differential privacy (DP) noise to aggregate statistics computed during training data preparation. This prevents individual wallet activity from being reconstructed from logged or shared statistics.
+Stellar Lense applies differential privacy (DP) noise to aggregate statistics computed during training data preparation. This prevents individual wallet activity from being reconstructed from logged or shared statistics.
 
 ## Overview
 

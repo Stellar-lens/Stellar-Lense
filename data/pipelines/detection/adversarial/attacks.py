@@ -1,4 +1,4 @@
-"""Adversarial attack strategies for probing the LedgerLens ensemble.
+"""Adversarial attack strategies for probing the StellarLense ensemble.
 
 Each attack implements ``AttackStrategy.perturb(trades_df) -> pd.DataFrame``
 that modifies a trades DataFrame while preserving its schema.

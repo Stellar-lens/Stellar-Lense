@@ -2,7 +2,7 @@
 
 ## Problem
 
-Ledgerlens-data has ~15 top-level Python packages (`utils`, `config`,
+StellarLense-data has ~15 top-level Python packages (`utils`, `config`,
 `detection`, `ingestion`, `api`, `scripts`, `streaming`, ...) with no
 machine-checked rule preventing accidental coupling -- e.g. a low-level
 package like `utils` growing a dependency on `detection`, or a domain

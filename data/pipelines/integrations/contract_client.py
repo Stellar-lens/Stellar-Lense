@@ -1,11 +1,11 @@
-"""Client for the `ledgerlens-score` Soroban contract.
+"""Client for the `stellar-lense-score` Soroban contract.
 
 Wraps `stellar_sdk.contract.ContractClient` to call the two functions
 documented in the README's "Shared Contracts" section:
 
   - `submit_score(wallet, asset_pair, score, benford_flag, ml_flag,
     timestamp, confidence)` — writes a `RiskScore` record on-chain. Requires
-    `LEDGERLENS_SUBMITTER_SECRET` (an authorized service-account secret key).
+    `STELLARLENSE_SUBMITTER_SECRET` (an authorized service-account secret key).
     - `submit_score_with_commitment(...)` — writes the same score plus a
         deterministic commitment and attestation metadata.
   - `get_score(wallet, asset_pair)` — permissionless read of the on-chain
@@ -35,8 +35,8 @@ _NETWORK_PASSPHRASES = {
 }
 
 
-class LedgerLensContractClient:
-    """Thin wrapper around the `ledgerlens-score` contract's invocations."""
+class StellarLenseContractClient:
+    """Thin wrapper around the `stellar-lense-score` contract's invocations."""
 
     def __init__(
         self,
@@ -45,15 +45,15 @@ class LedgerLensContractClient:
         network_passphrase: str | None = None,
         submitter_secret: str | None = None,
     ):
-        self.contract_id = contract_id or config.LEDGERLENS_CONTRACT_ID
+        self.contract_id = contract_id or config.STELLARLENSE_CONTRACT_ID
         if not self.contract_id:
-            raise ValueError("LEDGERLENS_CONTRACT_ID is not configured")
+            raise ValueError("STELLARLENSE_CONTRACT_ID is not configured")
 
         self.rpc_url = rpc_url or config.SOROBAN_RPC_URL
         self.network_passphrase = network_passphrase or _NETWORK_PASSPHRASES.get(
             config.STELLAR_NETWORK, Network.TESTNET_NETWORK_PASSPHRASE
         )
-        self.submitter_secret = submitter_secret or config.LEDGERLENS_SUBMITTER_SECRET
+        self.submitter_secret = submitter_secret or config.STELLARLENSE_SUBMITTER_SECRET
 
         self._client = ContractClient(
             contract_id=self.contract_id,
@@ -76,10 +76,10 @@ class LedgerLensContractClient:
 
         When `commitment` is provided, the client calls the attested contract
         entry point and includes the commitment metadata alongside the score.
-        Returns the parsed contract result. Requires `LEDGERLENS_SUBMITTER_SECRET`.
+        Returns the parsed contract result. Requires `STELLARLENSE_SUBMITTER_SECRET`.
         """
         if not self.submitter_secret:
-            raise ValueError("LEDGERLENS_SUBMITTER_SECRET is not configured")
+            raise ValueError("STELLARLENSE_SUBMITTER_SECRET is not configured")
 
         signer = Keypair.from_secret(self.submitter_secret)
 
@@ -129,7 +129,7 @@ class LedgerLensContractClient:
         Passes ``score_lower`` and ``score_upper`` as additional Soroban i128
         fields (scaled x100 for integer representation).
 
-        NOTE: The ``ledgerlens-contract`` repo's ``RiskScore`` struct must be
+        NOTE: The ``stellar-lense-contract`` repo's ``RiskScore`` struct must be
         extended with:
 
         .. code-block:: rust
@@ -145,11 +145,11 @@ class LedgerLensContractClient:
                 pub coverage_guarantee: u32,  // NEW — percentage 0-100
             }
 
-        See https://github.com/Ledger-Lenz/ledgerlens-contract/issues/... for
+        See https://github.com/Ledger-Lenz/stellar-lense-contract/issues/... for
         the matching change.
         """
         if not self.submitter_secret:
-            raise ValueError("LEDGERLENS_SUBMITTER_SECRET is not configured")
+            raise ValueError("STELLARLENSE_SUBMITTER_SECRET is not configured")
 
         signer = Keypair.from_secret(self.submitter_secret)
 
@@ -348,7 +348,7 @@ class LedgerLensContractClient:
         and compare the embedded SHA-256 to the report on disk.
         """
         if not self.submitter_secret:
-            raise ValueError("LEDGERLENS_SUBMITTER_SECRET is not configured")
+            raise ValueError("STELLARLENSE_SUBMITTER_SECRET is not configured")
 
         signer = Keypair.from_secret(self.submitter_secret)
 

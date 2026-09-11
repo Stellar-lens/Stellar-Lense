@@ -1,6 +1,6 @@
-# LedgerLens Model Artifacts
+# Stellar Lense Model Artifacts
 
-This directory contains trained model artifacts for the LedgerLens fraud-detection
+This directory contains trained model artifacts for the Stellar Lense fraud-detection
 pipeline. All artifacts are integrity-protected: every `.joblib` and `.pt` file has its
 SHA-256 recorded in `metrics.json`, which is signed with an Ed25519 key. `RiskScorer`
 (the production inference path, `detection/model_inference.py`) verifies the full

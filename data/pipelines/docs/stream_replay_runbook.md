@@ -225,12 +225,12 @@ Export before/after scores and compare:
 
 ```bash
 # Before replay (backup current scores)
-sqlite3 ledgerlens.db "SELECT wallet, asset_pair, score FROM risk_scores LIMIT 100" > before.csv
+sqlite3 stellar_lense.db "SELECT wallet, asset_pair, score FROM risk_scores LIMIT 100" > before.csv
 
 # Run replay
 
 # After replay (export new scores)
-sqlite3 ledgerlens.db "SELECT wallet, asset_pair, score FROM risk_scores LIMIT 100" > after.csv
+sqlite3 stellar_lense.db "SELECT wallet, asset_pair, score FROM risk_scores LIMIT 100" > after.csv
 
 # Compare
 diff before.csv after.csv
@@ -267,7 +267,7 @@ Historical Kafka Topic
     ↓
 Seek to timestamp/offset (--from-timestamp)
     ↓
-StreamReplayer Consumer (group: ledgerlens-replay)
+StreamReplayer Consumer (group: stellar-lense-replay)
     ├─ Poll batches of messages
     ├─ Reconstruct Trade objects
     ├─ Update FeatureBuffer (per-wallet history)
@@ -285,7 +285,7 @@ Risk Score DB (persisted)
    - Prevents alert fatigue from historical scores
    - Distinguishes replay from live scoring
 
-2. **Separate Consumer Group**: `ledgerlens-replay`
+2. **Separate Consumer Group**: `stellar-lense-replay`
    - Tracks replay offsets independently
    - Allows resume without losing progress
    - Live scoring unaffected
@@ -331,7 +331,7 @@ For typical streaming:
 
 1. **Check Kafka**: brokers healthy? Lag acceptable?
    ```bash
-   kafka-consumer-groups.sh --group ledgerlens-replay --describe
+   kafka-consumer-groups.sh --group stellar-lense-replay --describe
    ```
 
 2. **Profile model inference**: Which scorer is slow?
@@ -353,7 +353,7 @@ For typical streaming:
 
 Before running replay in production:
 
-- [ ] **Backup DB**: `sqlite3 ledgerlens.db ".backup backup.db"`
+- [ ] **Backup DB**: `sqlite3 stellar_lense.db ".backup backup.db"`
 - [ ] **Start with `--dry-run`**: Validate logic without side effects
 - [ ] **Review replay window**: Does time range make sense?
 - [ ] **Check Kafka retention**: Is data still available?
@@ -407,10 +407,10 @@ python -m scripts.replay_stream \
 ### Step 5: Post-Replay Validation
 ```bash
 # Check final scores
-sqlite3 ledgerlens.db "SELECT COUNT(*) FROM risk_scores WHERE score >= 70"
+sqlite3 stellar_lense.db "SELECT COUNT(*) FROM risk_scores WHERE score >= 70"
 
 # Monitor for anomalies
-sqlite3 ledgerlens.db "SELECT COUNT(*) FROM risk_scores WHERE score = 0"
+sqlite3 stellar_lense.db "SELECT COUNT(*) FROM risk_scores WHERE score = 0"
 ```
 
 ### Step 6: Deploy to Production
@@ -432,7 +432,7 @@ sqlite3 ledgerlens.db "SELECT COUNT(*) FROM risk_scores WHERE score = 0"
 **Diagnosis**:
 ```bash
 # Check Kafka lag
-kafka-consumer-groups.sh --group ledgerlens-replay --describe
+kafka-consumer-groups.sh --group stellar-lense-replay --describe
 
 # Check broker connectivity
 kafka-topics.sh --list --bootstrap-server localhost:9092

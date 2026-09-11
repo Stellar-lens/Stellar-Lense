@@ -18,7 +18,7 @@ def _write(path, content: str):
 
 
 def test_defaults_used_when_no_files_or_env(config_dir, monkeypatch):
-    monkeypatch.delenv("LEDGERLENS_LOG_LEVEL", raising=False)
+    monkeypatch.delenv("STELLARLENSE_LOG_LEVEL", raising=False)
     cfg = LayeredConfig({"log_level": "INFO"}, environment="local", config_dir=config_dir)
     assert cfg.get("log_level") == "INFO"
     assert cfg.source("log_level") == ConfigSource.DEFAULT
@@ -43,7 +43,7 @@ def test_env_specific_file_overrides_base_file(config_dir):
 
 def test_env_var_overrides_files_and_coerces_int(config_dir, monkeypatch):
     _write(config_dir / "base.yaml", "db_pool_size: 5\n")
-    monkeypatch.setenv("LEDGERLENS_DB_POOL_SIZE", "20")
+    monkeypatch.setenv("STELLARLENSE_DB_POOL_SIZE", "20")
     cfg = LayeredConfig({"db_pool_size": 5}, environment="local", config_dir=config_dir)
     assert cfg.get("db_pool_size") == 20
     assert isinstance(cfg.get("db_pool_size"), int)
@@ -51,8 +51,8 @@ def test_env_var_overrides_files_and_coerces_int(config_dir, monkeypatch):
 
 
 def test_env_var_coerces_bool_and_list(config_dir, monkeypatch):
-    monkeypatch.setenv("LEDGERLENS_FEATURE_FLAG", "true")
-    monkeypatch.setenv("LEDGERLENS_TAGS", "a, b, c")
+    monkeypatch.setenv("STELLARLENSE_FEATURE_FLAG", "true")
+    monkeypatch.setenv("STELLARLENSE_TAGS", "a, b, c")
     cfg = LayeredConfig(
         {"feature_flag": False, "tags": []}, environment="local", config_dir=config_dir
     )
@@ -61,7 +61,7 @@ def test_env_var_coerces_bool_and_list(config_dir, monkeypatch):
 
 
 def test_unknown_env_var_key_is_captured_as_string(config_dir, monkeypatch):
-    monkeypatch.setenv("LEDGERLENS_NEW_SETTING", "hello")
+    monkeypatch.setenv("STELLARLENSE_NEW_SETTING", "hello")
     cfg = LayeredConfig({}, environment="local", config_dir=config_dir)
     assert cfg.get("new_setting") == "hello"
     assert cfg.source("new_setting") == ConfigSource.ENV_VAR
@@ -69,7 +69,7 @@ def test_unknown_env_var_key_is_captured_as_string(config_dir, monkeypatch):
 
 def test_explicit_override_has_highest_precedence(config_dir, monkeypatch):
     _write(config_dir / "base.yaml", "log_level: WARNING\n")
-    monkeypatch.setenv("LEDGERLENS_LOG_LEVEL", "ERROR")
+    monkeypatch.setenv("STELLARLENSE_LOG_LEVEL", "ERROR")
     cfg = LayeredConfig(
         {"log_level": "INFO"},
         environment="local",
@@ -115,19 +115,19 @@ def test_explain_lists_every_key_with_its_source(config_dir):
 
 
 def test_detect_environment_prefers_explicit_var(monkeypatch):
-    monkeypatch.setenv("LEDGERLENS_ENV", "staging")
+    monkeypatch.setenv("STELLARLENSE_ENV", "staging")
     monkeypatch.setenv("CI", "true")
     assert detect_environment() == "staging"
 
 
 def test_detect_environment_falls_back_to_ci_indicator(monkeypatch):
-    monkeypatch.delenv("LEDGERLENS_ENV", raising=False)
+    monkeypatch.delenv("STELLARLENSE_ENV", raising=False)
     monkeypatch.setenv("GITHUB_ACTIONS", "true")
     assert detect_environment() == "ci"
 
 
 def test_detect_environment_defaults_to_local(monkeypatch):
-    monkeypatch.delenv("LEDGERLENS_ENV", raising=False)
+    monkeypatch.delenv("STELLARLENSE_ENV", raising=False)
     monkeypatch.delenv("CI", raising=False)
     monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
     assert detect_environment() == "local"

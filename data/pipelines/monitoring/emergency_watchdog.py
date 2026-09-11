@@ -4,7 +4,7 @@ Monitors the stream of risk scores produced by the local scoring pipeline.
 If more than ``ANOMALY_RATE_THRESHOLD`` (default 90%) of scores in a
 rolling one-minute window exceed ``ANOMALY_SCORE_THRESHOLD`` (default 95),
 the watchdog proposes an emergency pause to the two human emergency keyholders
-by calling ``LedgerLensContractClient.initiate_emergency_pause``.
+by calling ``StellarLenseContractClient.initiate_emergency_pause``.
 
 The watchdog does NOT apply the pause itself — it only submits the *proposal*.
 Two human keyholders must independently call ``approve_emergency_pause`` for
@@ -163,9 +163,9 @@ class EmergencyWatchdog:
 
     def _propose_pause(self, reason: str) -> None:
         try:
-            from integrations.contract_client import LedgerLensContractClient
+            from integrations.contract_client import StellarLenseContractClient
 
-            client = LedgerLensContractClient(
+            client = StellarLenseContractClient(
                 contract_id="",  # not used for pause calls
                 rpc_url=self._rpc_url,
             )

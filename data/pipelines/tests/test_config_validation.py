@@ -2,7 +2,7 @@
 
 `--dry-run` must run every pipeline stage (ingestion, feature engineering,
 scoring) while suppressing all writes: no `RiskScoreStore.upsert` and no
-`LedgerLensContractClient.submit_score`. Flagged wallets are still logged.
+`StellarLenseContractClient.submit_score`. Flagged wallets are still logged.
 """
 
 import logging
@@ -70,9 +70,9 @@ def test_dry_run_skips_submit_onchain():
     # config/contracts.py), so the on-chain vars must be set even though this
     # is a dry run and submit_score() is never actually called.
     with (
-        patch.object(Config, "LEDGERLENS_CONTRACT_ID", "contract-id"),
-        patch.object(Config, "LEDGERLENS_SUBMITTER_SECRET", "secret"),
-        patch("integrations.contract_client.LedgerLensContractClient.submit_score") as submit_score,
+        patch.object(Config, "STELLARLENSE_CONTRACT_ID", "contract-id"),
+        patch.object(Config, "STELLARLENSE_SUBMITTER_SECRET", "secret"),
+        patch("integrations.contract_client.StellarLenseContractClient.submit_score") as submit_score,
     ):
         _run_dry_run(["--dry-run", "--submit-onchain", "--no-orderbook"])
     submit_score.assert_not_called()
@@ -86,9 +86,9 @@ def test_submit_onchain_without_contract_id_raises():
     non-onchain contract and silently let submission proceed unconfigured.
     """
     with (
-        patch.object(Config, "LEDGERLENS_CONTRACT_ID", ""),
-        patch.object(Config, "LEDGERLENS_SUBMITTER_SECRET", ""),
-        pytest.raises(OSError, match="LEDGERLENS_CONTRACT_ID"),
+        patch.object(Config, "STELLARLENSE_CONTRACT_ID", ""),
+        patch.object(Config, "STELLARLENSE_SUBMITTER_SECRET", ""),
+        pytest.raises(OSError, match="STELLARLENSE_CONTRACT_ID"),
     ):
         _run_dry_run(["--dry-run", "--submit-onchain", "--no-orderbook"])
 

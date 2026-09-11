@@ -1,6 +1,6 @@
 # Contributor Guide: Adding a New ML Feature
 
-This guide covers everything you need to add a new feature to the LedgerLens
+This guide covers everything you need to add a new feature to the Stellar Lense
 ML pipeline end-to-end: from writing the computation function all the way
 through registration, validation, dataset documentation, and testing.
 

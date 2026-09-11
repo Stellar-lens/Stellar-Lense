@@ -8,7 +8,7 @@
 
 ## Summary
 
-This PR introduces a comprehensive numeric precision guard system for LedgerLens-data, replacing float arithmetic with exact Decimal arithmetic for all financial calculations. This foundation-level capability prevents precision errors that can corrupt fraud detection analysis, particularly Benford's Law digit extraction which requires exact arithmetic.
+This PR introduces a comprehensive numeric precision guard system for StellarLense-data, replacing float arithmetic with exact Decimal arithmetic for all financial calculations. This foundation-level capability prevents precision errors that can corrupt fraud detection analysis, particularly Benford's Law digit extraction which requires exact arithmetic.
 
 **Impact:** Repository-wide improvement to calculation accuracy and reliability. This is a durable capability that raises the long-term quality bar for the entire codebase.
 
@@ -30,7 +30,7 @@ For fraud detection analyzing Stellar blockchain transactions:
 - **Stellar uses 7-decimal stroops precision** - float cannot represent this exactly
 - **False positives/negatives** - precision errors trigger incorrect anomaly alerts
 
-### Specific Impact on LedgerLens
+### Specific Impact on Stellar Lense
 
 1. **Benford Analysis** (`detection/benford_engine.py`)
    - `leading_digits()` uses `np.log10()` - float precision loss
@@ -548,4 +548,4 @@ Conclusion: Correctness > performance for financial calculations
 
 **Ready for Review**
 
-This PR represents a substantial, well-tested foundation for exact financial arithmetic in LedgerLens-data. All acceptance criteria for the 200-point Stellar Wave advanced build issue are met.
+This PR represents a substantial, well-tested foundation for exact financial arithmetic in StellarLense-data. All acceptance criteria for the 200-point Stellar Wave advanced build issue are met.

@@ -6,7 +6,7 @@
 
 ## Intended Use
 
-Wash-trade risk scoring for Stellar DEX asset pairs, as an input to the LedgerLens ensemble scorer.
+Wash-trade risk scoring for Stellar DEX asset pairs, as an input to the Stellar Lense ensemble scorer.
 
 ## Out-of-Scope Uses
 

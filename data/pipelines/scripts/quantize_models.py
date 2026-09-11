@@ -60,7 +60,7 @@ from typing import Any
 import joblib
 import numpy as np
 
-logger = logging.getLogger("ledgerlens.quantize")
+logger = logging.getLogger("stellar_lense.quantize")
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s %(message)s",
@@ -959,7 +959,7 @@ def run_all(
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Quantise and prune LedgerLens models for edge deployment.",
+        description="Quantise and prune StellarLense models for edge deployment.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )

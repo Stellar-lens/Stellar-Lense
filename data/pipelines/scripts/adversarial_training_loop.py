@@ -1,4 +1,4 @@
-"""Generative Adversarial Training Loop (GAN-style) for the LedgerLens
+"""Generative Adversarial Training Loop (GAN-style) for the StellarLense
 Wash Trade Simulation Engine.
 
 Round 0:  train the detector on a NaiveAttacker-generated dataset

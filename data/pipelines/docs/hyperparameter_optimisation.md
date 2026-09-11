@@ -1,6 +1,6 @@
 # Hyperparameter Optimisation
 
-LedgerLens uses **BOHB-style automated hyperparameter optimisation** (Bayesian
+Stellar Lense uses **BOHB-style automated hyperparameter optimisation** (Bayesian
 Optimisation + HyperBand) via [Optuna](https://optuna.readthedocs.io/) to find
 near-optimal hyperparameters for the three ensemble classifiers — Random Forest,
 XGBoost, and LightGBM — faster and more reliably than manual tuning or grid search.

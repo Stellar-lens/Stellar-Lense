@@ -12,11 +12,11 @@ from prometheus_client import Counter
 FEATURE_STORE_TTL_SECONDS = 300
 SCHEMA_VERSION = "1"
 
-ledgerlens_feature_cache_hits_total = Counter(
-    "ledgerlens_feature_cache_hits_total", "Total feature cache hits"
+stellar_lense_feature_cache_hits_total = Counter(
+    "stellar_lense_feature_cache_hits_total", "Total feature cache hits"
 )
-ledgerlens_feature_cache_misses_total = Counter(
-    "ledgerlens_feature_cache_misses_total", "Total feature cache misses"
+stellar_lense_feature_cache_misses_total = Counter(
+    "stellar_lense_feature_cache_misses_total", "Total feature cache misses"
 )
 
 logger = logging.getLogger(__name__)
@@ -61,14 +61,14 @@ class WalletFeatureStore:
             if cached:
                 data = msgpack.unpackb(cached, raw=False)
                 if data.get("schema_version") == SCHEMA_VERSION:
-                    ledgerlens_feature_cache_hits_total.inc()
+                    stellar_lense_feature_cache_hits_total.inc()
                     return data["features"]
                 else:
                     self.redis.delete(key)
         except Exception as e:
             logger.warning(f"Redis cache read failed: {e}, falling back to compute")
 
-        ledgerlens_feature_cache_misses_total.inc()
+        stellar_lense_feature_cache_misses_total.inc()
         features = compute_fn()
         payload = {"schema_version": SCHEMA_VERSION, "features": features}
         try:
@@ -95,10 +95,10 @@ class WalletFeatureStore:
                     data = msgpack.unpackb(cached, raw=False)
                     if data.get("schema_version") == SCHEMA_VERSION:
                         results[(wallet, pair)] = data["features"]
-                        ledgerlens_feature_cache_hits_total.inc()
+                        stellar_lense_feature_cache_hits_total.inc()
                         continue
                 except Exception:
                     pass
             results[(wallet, pair)] = None
-            ledgerlens_feature_cache_misses_total.inc()
+            stellar_lense_feature_cache_misses_total.inc()
         return results

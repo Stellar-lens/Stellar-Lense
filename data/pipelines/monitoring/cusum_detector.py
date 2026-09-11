@@ -1,7 +1,7 @@
 """CUSUM (Cumulative Sum) control chart for online change-point detection (issue #289).
 
 Detects sustained upward or downward shifts in a streaming metric (e.g. the
-LedgerLens risk score stream) in O(1) time and O(1) space per update.
+StellarLense risk score stream) in O(1) time and O(1) space per update.
 
 Theory
 ------
@@ -37,12 +37,12 @@ from config import config
 logger = logging.getLogger(__name__)
 
 _cusum_alarm_gauge = Gauge(
-    "ledgerlens_cusum_alarm",
+    "stellar_lense_cusum_alarm",
     "CUSUM change-point alarm (1=alarm, 0=in-control)",
     ["metric"],
 )
 
-_REDIS_KEY_PREFIX = "ledgerlens:cusum:"
+_REDIS_KEY_PREFIX = "stellar_lense:cusum:"
 
 
 class CUSUMDetector:

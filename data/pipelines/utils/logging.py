@@ -248,7 +248,7 @@ def set_level(level: str) -> None:
     logging.getLogger().setLevel(level.upper())
 
 
-def setup_logger(name: str = "ledgerlens", level: int = logging.INFO) -> logging.Logger:
+def setup_logger(name: str = "stellar_lense", level: int = logging.INFO) -> logging.Logger:
     """Standalone logger with secret redaction, independent of the root config."""
     logger = logging.getLogger(name)
     logger.setLevel(level)

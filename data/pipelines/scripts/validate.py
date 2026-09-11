@@ -3,7 +3,7 @@
 Issue #558 — Build contributor-facing commands for advanced validation suites
 =============================================================================
 
-This script is the single entry-point for all LedgerLens data-quality and
+This script is the single entry-point for all StellarLense data-quality and
 structural validation checks.  It is designed to be run by contributors
 locally and in CI::
 
@@ -381,7 +381,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="validate",
         description=(
-            "LedgerLens contributor validation suite.\n\n"
+            "StellarLense contributor validation suite.\n\n"
             "Run all data-quality, parsing-contract, and reconciliation checks "
             "without requiring a live Horizon connection."
         ),
@@ -486,7 +486,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if not args.quiet:
         print(
-            f"LedgerLens Validation Suite — {datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')} UTC"
+            f"StellarLense Validation Suite — {datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')} UTC"
         )
         print(f"Suites: {', '.join(suite_names)}")
 

@@ -1,4 +1,4 @@
-"""Automated model card generator for LedgerLens trained models.
+"""Automated model card generator for StellarLense trained models.
 
 Reads the JSON metadata produced at training time and renders a Model Card
 (Markdown or HTML) following the Google Model Card specification.
@@ -44,7 +44,7 @@ def _validate_metadata(metadata: dict) -> None:
 
 def _render_markdown(metadata: dict) -> str:
     name = metadata["model_name"]
-    version = metadata.get("ledgerlens_version", "unknown")
+    version = metadata.get("stellar_lense_version", "unknown")
     trained_at = metadata.get("training_date", metadata.get("trained_at", "unknown"))
     dataset_version = metadata["dataset_version"]
     intended_use = metadata["intended_use"]

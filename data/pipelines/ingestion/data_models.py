@@ -2,7 +2,7 @@
 
 These models are the shared contract between the ingestion layer and the
 detection layer (Benford engine + feature engineering). Keep field names
-stable — downstream code and the `ledgerlens-core` shared types mirror them.
+stable — downstream code and the `stellar-lense-core` shared types mirror them.
 
 Precision Handling
 ------------------

@@ -1,4 +1,4 @@
-"""Tests for integrations.offline_stubs — offline dev stand-ins for LedgerLensContractClient."""
+"""Tests for integrations.offline_stubs — offline dev stand-ins for StellarLenseContractClient."""
 
 import pytest
 
@@ -69,13 +69,13 @@ def test_get_contract_client_returns_stub_when_offline_true():
 
 
 def test_get_contract_client_respects_env_var(monkeypatch):
-    monkeypatch.setenv("LEDGERLENS_OFFLINE", "1")
+    monkeypatch.setenv("STELLARLENSE_OFFLINE", "1")
     client = get_contract_client()
     assert isinstance(client, StubContractClient)
 
 
 def test_get_contract_client_defaults_to_real_client(monkeypatch):
-    monkeypatch.delenv("LEDGERLENS_OFFLINE", raising=False)
+    monkeypatch.delenv("STELLARLENSE_OFFLINE", raising=False)
     client = get_contract_client(
         offline=False,
         contract_id="CCONTRACT",
@@ -83,6 +83,6 @@ def test_get_contract_client_defaults_to_real_client(monkeypatch):
         network_passphrase="Test SDF Network ; September 2015",
         submitter_secret="SAUQSDM4BPSOWVJJM7RAHPSGXDX5YLRYNZCZ5QP33EVB6WDAAVJJRJHG",
     )
-    from integrations.contract_client import LedgerLensContractClient
+    from integrations.contract_client import StellarLenseContractClient
 
-    assert isinstance(client, LedgerLensContractClient)
+    assert isinstance(client, StellarLenseContractClient)

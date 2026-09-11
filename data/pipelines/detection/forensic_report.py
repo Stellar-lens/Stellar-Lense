@@ -1,4 +1,4 @@
-"""Forensic Reporting Engine for LedgerLens risk scores.
+"""Forensic Reporting Engine for StellarLense risk scores.
 
 Produces tamper-evident, auditable ForensicReport objects that document
 exactly how a risk score was computed, with an optional on-chain anchor
@@ -423,7 +423,7 @@ def _enrich_shap(
 
 def _default_model_metadata() -> dict:
     return {
-        "name": "LedgerLens Ensemble",
+        "name": "StellarLense Ensemble",
         "version": "unknown",
         "training_dataset_sha256": "unknown",
         "feature_schema_version": "unknown",

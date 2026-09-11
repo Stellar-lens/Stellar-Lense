@@ -34,7 +34,7 @@ class TokenBucketLimiter:
     def __init__(
         self,
         redis_url: str | None = None,
-        key: str = "ledgerlens:horizon_rate_limiter",
+        key: str = "stellar_lense:horizon_rate_limiter",
         capacity: int | None = None,
         refill_rate_per_sec: float | None = None,
         poll_interval_seconds: float = 0.02,

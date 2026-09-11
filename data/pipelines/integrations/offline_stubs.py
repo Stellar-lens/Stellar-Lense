@@ -1,18 +1,18 @@
 """Offline stubs for integration development workflows.
 
-Developing against `LedgerLensContractClient` normally requires a funded
-Testnet keypair and a deployed `ledgerlens-score` contract (see
+Developing against `StellarLenseContractClient` normally requires a funded
+Testnet keypair and a deployed `stellar-lense-score` contract (see
 `scripts/testnet_setup.py` and `tests/integration/README.md`) — high friction
 for iterating on code that merely *calls* the contract client (new scripts,
 alert dispatch, manual smoke-testing). `StubContractClient` is a drop-in,
 in-memory stand-in with the same public method surface as
-`LedgerLensContractClient` — no network, no `stellar_sdk`, no Testnet setup.
+`StellarLenseContractClient` — no network, no `stellar_sdk`, no Testnet setup.
 
 Usage:
     from integrations.offline_stubs import get_contract_client
 
-    # Real client if LEDGERLENS_CONTRACT_ID/LEDGERLENS_SUBMITTER_SECRET are
-    # set, StubContractClient if LEDGERLENS_OFFLINE=1 is set.
+    # Real client if STELLARLENSE_CONTRACT_ID/STELLARLENSE_SUBMITTER_SECRET are
+    # set, StubContractClient if STELLARLENSE_OFFLINE=1 is set.
     client = get_contract_client()
 
     # Or force one explicitly:
@@ -28,7 +28,7 @@ _STUB_SECRET = "SSTUBSTUBSTUBSTUBSTUBSTUBSTUBSTUBSTUBSTUBSTUBSTUBSTUBSTUBSTUB"
 
 
 class StubContractClient:
-    """In-memory stand-in for `LedgerLensContractClient`. No network calls.
+    """In-memory stand-in for `StellarLenseContractClient`. No network calls.
 
     Mirrors `submit_score` / `submit_score_with_commitment` /
     `submit_score_with_uncertainty` / `get_score` /
@@ -66,7 +66,7 @@ class StubContractClient:
         model_version_hash: str | None = None,
     ) -> dict:
         if not self.submitter_secret:
-            raise ValueError("LEDGERLENS_SUBMITTER_SECRET is not configured")
+            raise ValueError("STELLARLENSE_SUBMITTER_SECRET is not configured")
         if commitment is not None and (trade_data_hash is None or model_version_hash is None):
             raise ValueError(
                 "trade_data_hash and model_version_hash are required when commitment is set"
@@ -105,7 +105,7 @@ class StubContractClient:
         self, wallet: str, asset_pair: str, risk_score_dict: dict
     ) -> dict:
         if not self.submitter_secret:
-            raise ValueError("LEDGERLENS_SUBMITTER_SECRET is not configured")
+            raise ValueError("STELLARLENSE_SUBMITTER_SECRET is not configured")
         self.calls.append(
             ("submit_score_with_uncertainty", {"wallet": wallet, "asset_pair": asset_pair})
         )
@@ -140,18 +140,18 @@ class StubContractClient:
 
 
 def get_contract_client(*, offline: bool | None = None, **kwargs: Any) -> Any:
-    """Return a real `LedgerLensContractClient`, or `StubContractClient` when offline.
+    """Return a real `StellarLenseContractClient`, or `StubContractClient` when offline.
 
-    `offline` defaults to the `LEDGERLENS_OFFLINE` env var (true for "1" or
+    `offline` defaults to the `STELLARLENSE_OFFLINE` env var (true for "1" or
     "true", case-insensitive). Extra `kwargs` are forwarded to whichever
     client is constructed.
     """
     if offline is None:
-        offline = os.getenv("LEDGERLENS_OFFLINE", "").strip().lower() in ("1", "true")
+        offline = os.getenv("STELLARLENSE_OFFLINE", "").strip().lower() in ("1", "true")
 
     if offline:
         return StubContractClient(**kwargs)
 
-    from integrations.contract_client import LedgerLensContractClient
+    from integrations.contract_client import StellarLenseContractClient
 
-    return LedgerLensContractClient(**kwargs)
+    return StellarLenseContractClient(**kwargs)

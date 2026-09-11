@@ -16,8 +16,8 @@ For explicit secrets management::
 
     from utils.secrets_config import get_secret, rotate_secret
 
-    submitter_secret = get_secret("LEDGERLENS_SUBMITTER_SECRET", required=True)
-    rotate_secret("LEDGERLENS_SUBMITTER_SECRET", new_value)
+    submitter_secret = get_secret("STELLARLENSE_SUBMITTER_SECRET", required=True)
+    rotate_secret("STELLARLENSE_SUBMITTER_SECRET", new_value)
 
 Migration
 ---------
@@ -33,17 +33,17 @@ from utils.secrets_manager import (
     SecretType,
     SecretValidationError,
     get_secrets_manager,
-    register_ledgerlens_secrets,
+    register_stellar_lense_secrets,
 )
 
 # Initialize and configure the global secrets manager
 _secrets_manager = get_secrets_manager()
-register_ledgerlens_secrets(_secrets_manager)
+register_stellar_lense_secrets(_secrets_manager)
 
 
 # Map of config attribute names to their secret types
 _SECRET_ATTRIBUTES = {
-    "LEDGERLENS_SUBMITTER_SECRET": SecretType.STELLAR_SECRET,
+    "STELLARLENSE_SUBMITTER_SECRET": SecretType.STELLAR_SECRET,
     "KAFKA_SASL_PASSWORD": SecretType.PASSWORD,
     "KAFKA_SASL_USERNAME": SecretType.RAW,  # Username is not sensitive
     "MODEL_SIGNING_PRIVATE_KEY_PATH": SecretType.FILEPATH,

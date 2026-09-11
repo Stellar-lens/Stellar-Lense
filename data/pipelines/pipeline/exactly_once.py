@@ -161,7 +161,7 @@ class RedisExactlyOnceBackend:
         self,
         redis_url: str,
         *,
-        key_prefix: str = "ledgerlens:dedup:",
+        key_prefix: str = "stellar_lense:dedup:",
         client: Any = None,
     ) -> None:
         self._redis_url = redis_url

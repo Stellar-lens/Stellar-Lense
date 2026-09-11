@@ -1,4 +1,4 @@
-"""LedgerLens database migration scaffolding.
+"""StellarLense database migration scaffolding.
 
 Every migration lives in ``migrations/versions/`` as a numbered Python module
 (e.g. ``0001_add_ring_id.py``).  Migrations are discovered, ordered, and

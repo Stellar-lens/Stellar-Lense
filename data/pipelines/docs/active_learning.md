@@ -1,6 +1,6 @@
 # Active Learning Pipeline
 
-LedgerLens uses an active learning (AL) pipeline to maximise detection
+Stellar Lense uses an active learning (AL) pipeline to maximise detection
 improvement per analyst-hour. Rather than retraining on all data periodically,
 the pipeline selects the wallets that will teach the model the most, routes
 them to an analyst for labelling, and incrementally updates the ensemble.
@@ -47,7 +47,7 @@ Select with `--strategy <name>` in `run_active_learning.py` or set
 ### CommitteeDisagreement efficiency
 
 `CommitteeDisagreement` is the recommended default because it exploits the
-three-model ensemble already present in LedgerLens. Wallets where all three
+three-model ensemble already present in Stellar Lense. Wallets where all three
 models disagree are those the ensemble is most uncertain about — labelling
 them yields maximum information gain. This is equivalent to Query by Committee
 (QBC) with KL-divergence-like disagreement measured via variance of

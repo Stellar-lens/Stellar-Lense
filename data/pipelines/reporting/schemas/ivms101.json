@@ -1,8 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://ledgerlens.io/schemas/ivms101-ledgerlens-1.0.json",
-  "title": "IVMS101 LedgerLens Risk Export",
-  "description": "IVMS101-compatible JSON-LD structure for FATF Travel Rule compliance reporting. Extends the IVMS101 1.0 data standard with LedgerLens-specific risk indicators and pseudonymised wallet identifiers.",
+  "$id": "https://stellar-lense.io/schemas/ivms101-stellar-lense-1.0.json",
+  "title": "IVMS101 Stellar Lense Risk Export",
+  "description": "IVMS101-compatible JSON-LD structure for FATF Travel Rule compliance reporting. Extends the IVMS101 1.0 data standard with StellarLense-specific risk indicators and pseudonymised wallet identifiers.",
   "type": "object",
   "required": [
     "@context",
@@ -124,7 +124,7 @@
         "reportId": {
           "type": "string",
           "minLength": 1,
-          "description": "Unique identifier of the originating LedgerLens forensic report."
+          "description": "Unique identifier of the originating Stellar Lense forensic report."
         },
         "generatedAt": {
           "type": "string",
@@ -137,7 +137,7 @@
         },
         "schemaVersion": {
           "type": "string",
-          "description": "IVMS101 LedgerLens export schema version."
+          "description": "IVMS101 Stellar Lense export schema version."
         },
         "sourceReportSha256": {}
       }
@@ -192,7 +192,7 @@
     },
     "riskIndicators": {
       "type": "array",
-      "description": "FATF risk indicator codes derived from LedgerLens detection output.",
+      "description": "FATF risk indicator codes derived from Stellar Lense detection output.",
       "items": { "$ref": "#/definitions/riskIndicator" }
     },
     "transactionReference": {

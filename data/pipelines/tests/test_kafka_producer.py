@@ -14,8 +14,8 @@ from ingestion.avro_codec import deserialize, load_schema
 from ingestion.data_models import Asset, Trade
 from ingestion.kafka_producer import (
     HorizonKafkaProducer,
-    ledgerlens_ingestion_trades_failed_total,
-    ledgerlens_ingestion_trades_produced_total,
+    stellar_lense_ingestion_trades_failed_total,
+    stellar_lense_ingestion_trades_produced_total,
 )
 
 USDC_ISSUER = "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN"
@@ -55,7 +55,7 @@ def test_produced_message_round_trips():
     mock.produce.assert_called_once()
     kwargs = mock.produce.call_args.kwargs
     # Topic is per-pair and sanitised; key is the base account (wallet_id).
-    assert kwargs["topic"] == f"ledgerlens.trades.USDC_{USDC_ISSUER}_XLM_native"
+    assert kwargs["topic"] == f"stellar_lense.trades.USDC_{USDC_ISSUER}_XLM_native"
     assert kwargs["key"] == b"WALLETBASE123"
 
     decoded = deserialize(kwargs["value"], load_schema())
@@ -113,11 +113,11 @@ def test_serialisation_failure_routes_to_dlq():
 
     mock.produce.assert_called_once()
     kwargs = mock.produce.call_args.kwargs
-    assert kwargs["topic"] == "ledgerlens.trades.dlq"
+    assert kwargs["topic"] == "stellar_lense.trades.dlq"
 
     # No message was produced to any main per-pair topic.
     for call in mock.produce.call_args_list:
-        assert call.kwargs["topic"] == "ledgerlens.trades.dlq"
+        assert call.kwargs["topic"] == "stellar_lense.trades.dlq"
 
     # The DLQ envelope carries the raw payload and the failure reason.
     envelope = json.loads(kwargs["value"].decode("utf-8"))
@@ -132,13 +132,13 @@ def test_serialisation_failure_routes_to_dlq():
 
 
 @pytest.mark.skipif(
-    ledgerlens_ingestion_trades_produced_total is None, reason="prometheus_client not installed"
+    stellar_lense_ingestion_trades_produced_total is None, reason="prometheus_client not installed"
 )
 def test_metrics_incremented_on_produce():
     producer, mock = _producer_with_mock()
 
-    before = ledgerlens_ingestion_trades_produced_total.labels(
-        topic=f"ledgerlens.trades.USDC_{USDC_ISSUER}_XLM_native"
+    before = stellar_lense_ingestion_trades_produced_total.labels(
+        topic=f"stellar_lense.trades.USDC_{USDC_ISSUER}_XLM_native"
     )._value.get()
     producer.produce_trade(make_trade())
 
@@ -146,32 +146,32 @@ def test_metrics_incremented_on_produce():
     from ingestion.kafka_producer import _on_delivery
 
     mock_msg = MagicMock()
-    mock_msg.topic.return_value = f"ledgerlens.trades.USDC_{USDC_ISSUER}_XLM_native"
+    mock_msg.topic.return_value = f"stellar_lense.trades.USDC_{USDC_ISSUER}_XLM_native"
     _on_delivery(None, mock_msg)
 
-    after = ledgerlens_ingestion_trades_produced_total.labels(
-        topic=f"ledgerlens.trades.USDC_{USDC_ISSUER}_XLM_native"
+    after = stellar_lense_ingestion_trades_produced_total.labels(
+        topic=f"stellar_lense.trades.USDC_{USDC_ISSUER}_XLM_native"
     )._value.get()
     assert after - before == 1
 
 
 @pytest.mark.skipif(
-    ledgerlens_ingestion_trades_failed_total is None, reason="prometheus_client not installed"
+    stellar_lense_ingestion_trades_failed_total is None, reason="prometheus_client not installed"
 )
 def test_metrics_incremented_on_failure():
     producer, mock = _producer_with_mock()
 
-    before_serial = ledgerlens_ingestion_trades_failed_total.labels(
+    before_serial = stellar_lense_ingestion_trades_failed_total.labels(
         reason="serialisation_error"
     )._value.get()
     with patch("ingestion.kafka_producer.serialize", side_effect=ValueError("bad field")):
         producer.produce_trade(make_trade())
-    after_serial = ledgerlens_ingestion_trades_failed_total.labels(
+    after_serial = stellar_lense_ingestion_trades_failed_total.labels(
         reason="serialisation_error"
     )._value.get()
     assert after_serial - before_serial == 1
 
-    before_delivery = ledgerlens_ingestion_trades_failed_total.labels(
+    before_delivery = stellar_lense_ingestion_trades_failed_total.labels(
         reason="kafka_delivery_error"
     )._value.get()
     from ingestion.kafka_producer import _on_delivery
@@ -179,7 +179,7 @@ def test_metrics_incremented_on_failure():
     mock_msg = MagicMock()
     mock_msg.topic.return_value = "some_topic"
     _on_delivery(Exception("delivery failed"), mock_msg)
-    after_delivery = ledgerlens_ingestion_trades_failed_total.labels(
+    after_delivery = stellar_lense_ingestion_trades_failed_total.labels(
         reason="kafka_delivery_error"
     )._value.get()
     assert after_delivery - before_delivery == 1

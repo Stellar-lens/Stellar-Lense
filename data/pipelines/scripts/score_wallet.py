@@ -552,7 +552,7 @@ def _generate_report(args, result, shap_explanations, trades_df, feature_row, sc
     model_metadata = {}
     if scorer.metadata:
         model_metadata = {
-            "name": "LedgerLens Ensemble",
+            "name": "StellarLense Ensemble",
             "version": scorer.metadata.get("model_version", "unknown"),
             "training_dataset_sha256": scorer.metadata.get("training_dataset_sha256", "unknown"),
             "feature_schema_version": scorer.metadata.get("feature_schema_hash", "unknown"),
@@ -570,9 +570,9 @@ def _generate_report(args, result, shap_explanations, trades_df, feature_row, sc
     # Optional on-chain anchoring — only when --anchor is set
     if args.anchor:
         try:
-            from integrations.contract_client import LedgerLensContractClient
+            from integrations.contract_client import StellarLenseContractClient
 
-            client = LedgerLensContractClient()
+            client = StellarLenseContractClient()
             tx_hash = client.anchor_report(report)
             logger.info("Anchored to Soroban", extra={"tx_hash": tx_hash})
         except Exception as e:

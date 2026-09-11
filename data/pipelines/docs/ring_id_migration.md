@@ -16,7 +16,7 @@ Take a backup before running any schema change, even an additive one.
 pg_dump "$RISK_SCORE_DB_URL" > risk_scores_backup_$(date +%Y%m%d).sql
 
 # SQLite
-cp ledgerlens.db ledgerlens.db.bak
+cp stellar_lense.db stellar_lense.db.bak
 ```
 
 ## 2. Run the migration
@@ -64,7 +64,7 @@ You can also confirm the column exists directly:
 psql "$RISK_SCORE_DB_URL" -c "\d risk_scores" | grep ring_id
 
 # SQLite
-sqlite3 ledgerlens.db "PRAGMA table_info(risk_scores);" | grep ring_id
+sqlite3 stellar_lense.db "PRAGMA table_info(risk_scores);" | grep ring_id
 ```
 
 Existing rows will have `ring_id = NULL` until the next pipeline run

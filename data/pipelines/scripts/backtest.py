@@ -1,4 +1,4 @@
-"""Historical Backtesting Framework for LedgerLens.
+"""Historical Backtesting Framework for StellarLense.
 
 Evaluates detection performance against known Stellar DEX market manipulation events
 by replaying Horizon trade history, scoring wallets with time-appropriate model versions,
@@ -710,7 +710,7 @@ def _write_markdown_report(report: dict[str, Any], path: Path) -> None:
 def build_cli() -> argparse.ArgumentParser:
     """Build the CLI argument parser."""
     parser = argparse.ArgumentParser(
-        description="LedgerLens Historical Backtesting Framework",
+        description="StellarLense Historical Backtesting Framework",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "Examples:\n"

@@ -1,7 +1,7 @@
-"""Live integration tests for LedgerLensContractClient against Testnet.
+"""Live integration tests for StellarLenseContractClient against Testnet.
 
 Run with:
-    LEDGERLENS_INTEGRATION_TESTS=1 pytest tests/integration/test_contract_client_live.py -v
+    STELLARLENSE_INTEGRATION_TESTS=1 pytest tests/integration/test_contract_client_live.py -v
 """
 
 import time
@@ -12,7 +12,7 @@ import pytest
 pytestmark = pytest.mark.integration
 
 # Stable testnet wallet + pair used across all tests in this module.
-_WALLET = "GBTESTWALLETLEDGERLENS0000000000000000000000000000000001"
+_WALLET = "GBTESTWALLETSTELLARLENSE0000000000000000000000000000000001"
 _PAIR = "USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVV/XLM:native"
 
 _RETRIES = 3

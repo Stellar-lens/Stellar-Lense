@@ -124,7 +124,7 @@ def _print_ndjson(records: list[dict[str, Any]]) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Query the LedgerLens federated learning audit trail.",
+        description="Query the StellarLense federated learning audit trail.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
@@ -187,7 +187,7 @@ def main() -> int:
         "--db-url",
         default=None,
         metavar="URL",
-        help="SQLAlchemy DB URL (default: RISK_SCORE_DB_URL env var / sqlite:///ledgerlens.db).",
+        help="SQLAlchemy DB URL (default: RISK_SCORE_DB_URL env var / sqlite:///stellar_lense.db).",
     )
 
     args = parser.parse_args()

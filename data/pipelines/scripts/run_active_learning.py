@@ -1,4 +1,4 @@
-"""Active learning loop integration for LedgerLens.
+"""Active learning loop integration for StellarLense.
 
 Queries the pool of unscored wallets from the last Horizon bulk load,
 applies the configured query strategy to select the most informative
@@ -135,7 +135,7 @@ def run_active_learning(
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="LedgerLens active learning loop")
+    parser = argparse.ArgumentParser(description="StellarLense active learning loop")
     parser.add_argument("--pool", required=True, help="Path to unscored wallet feature parquet/csv")
     parser.add_argument("--strategy", default=config.AL_QUERY_STRATEGY)
     parser.add_argument("--batch-size", type=int, default=config.AL_BATCH_SIZE)

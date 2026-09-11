@@ -1,4 +1,4 @@
-"""Package-boundary contracts for the LedgerLens platform.
+"""Package-boundary contracts for the StellarLense platform.
 
 Formal types and protocols that define the interfaces between packages.
 Every cross-package data flow should be typed through this module so

@@ -145,7 +145,7 @@ def main():
     import sys
 
     backup_dir = Path(os.getenv("BACKUP_DIR", "./backups"))
-    db_url = os.getenv("DATABASE_URL", "sqlite:///ledgerlens.db")
+    db_url = os.getenv("DATABASE_URL", "sqlite:///stellar_lense.db")
     model_dir = Path(os.getenv("MODEL_DIR", "./models"))
 
     if not backup_dir.exists():

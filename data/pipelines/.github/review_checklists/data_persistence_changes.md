@@ -17,7 +17,7 @@
 - [ ] `Asset.pair_id()` format unchanged (`CODE:ISSUER/CODE:ISSUER`)
 - [ ] Updated schema documented in `docs/ingestion.md` or inline docstrings
 - [ ] Existing serialisation tests pass (`tests/test_factories.py`)
-- [ ] If `pair_id` format changed: linked PRs in `ledgerlens-api` and `ledgerlens-contract`
+- [ ] If `pair_id` format changed: linked PRs in `stellar-lense-api` and `stellar-lense-contract`
 
 ---
 

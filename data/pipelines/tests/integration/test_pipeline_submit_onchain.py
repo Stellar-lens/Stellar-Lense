@@ -1,7 +1,7 @@
 """Integration test: run_pipeline.main() with --submit-onchain against Testnet.
 
 Run with:
-    LEDGERLENS_INTEGRATION_TESTS=1 pytest tests/integration/test_pipeline_submit_onchain.py -v
+    STELLARLENSE_INTEGRATION_TESTS=1 pytest tests/integration/test_pipeline_submit_onchain.py -v
 """
 
 import importlib
@@ -26,7 +26,7 @@ _RETRY_DELAY = 5
 def test_full_pipeline_submit_onchain(live_client, contract_id, submitter_secret, rpc_url):
     """run_pipeline.main() --submit-onchain stores at least one score on-chain."""
 
-    wallet = "GPIPELINETESTWALLETLEDGERLENS00000000000000000000000000001"
+    wallet = "GPIPELINETESTWALLETSTELLARLENSE00000000000000000000000000001"
     asset_pair = "USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVV/XLM:native"
 
     trades = pd.DataFrame(
@@ -58,8 +58,8 @@ def test_full_pipeline_submit_onchain(live_client, contract_id, submitter_secret
     fake_scorer.score_matrix.return_value = scored
 
     env_overrides = {
-        "LEDGERLENS_CONTRACT_ID": contract_id,
-        "LEDGERLENS_SUBMITTER_SECRET": submitter_secret,
+        "STELLARLENSE_CONTRACT_ID": contract_id,
+        "STELLARLENSE_SUBMITTER_SECRET": submitter_secret,
         "SOROBAN_RPC_URL": rpc_url,
         "WATCHED_ASSET_PAIRS": "USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVV",
         "RISK_SCORE_FLAG_THRESHOLD": "70",
@@ -107,15 +107,15 @@ def test_full_pipeline_submit_onchain(live_client, contract_id, submitter_secret
 
 
 def test_pipeline_submit_onchain_fails_immediately_without_secret():
-    """Verify --submit-onchain fails at startup with missing LEDGERLENS_SUBMITTER_SECRET.
+    """Verify --submit-onchain fails at startup with missing STELLARLENSE_SUBMITTER_SECRET.
 
     This test confirms that the pipeline fails immediately during main() startup
     (during validate_mode call), before any ingestion or scoring work is invoked.
     It uses spies to ensure ingestion/scoring functions are never called.
     """
     env_overrides = {
-        "LEDGERLENS_CONTRACT_ID": "contract-id",
-        "LEDGERLENS_SUBMITTER_SECRET": "",  # Empty — missing the required secret
+        "STELLARLENSE_CONTRACT_ID": "contract-id",
+        "STELLARLENSE_SUBMITTER_SECRET": "",  # Empty — missing the required secret
         "SOROBAN_RPC_URL": "https://soroban-testnet.stellar.org",
         "STELLAR_NETWORK": "TESTNET",
         "WATCHED_ASSET_PAIRS": "USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVV",
@@ -152,6 +152,6 @@ def test_pipeline_submit_onchain_fails_immediately_without_secret():
             run_pipeline.main()
 
         error_msg = str(exc.value)
-        assert "LEDGERLENS_SUBMITTER_SECRET" in error_msg
+        assert "STELLARLENSE_SUBMITTER_SECRET" in error_msg
         # Verify ingestion was never started (validate_mode failed first)
         load_pair_spy.assert_not_called()

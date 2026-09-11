@@ -1,4 +1,4 @@
-"""Active learning package for LedgerLens."""
+"""Active learning package for StellarLense."""
 
 from detection.active_learning.annotation_queue import AnnotationQueue, StoppingCriterion
 from detection.active_learning.coreset_selector import CoresetSelector

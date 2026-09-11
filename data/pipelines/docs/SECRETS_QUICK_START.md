@@ -1,6 +1,6 @@
 # Secrets Management Quick Start
 
-5-minute guide to using the LedgerLens secrets management system.
+5-minute guide to using the Stellar Lense secrets management system.
 
 ## Installation
 
@@ -14,7 +14,7 @@ No installation needed - the system is included in the repository.
 from utils.secrets_config import get_secret
 
 # Required secret (raises if missing)
-secret = get_secret("LEDGERLENS_SUBMITTER_SECRET", required=True)
+secret = get_secret("STELLARLENSE_SUBMITTER_SECRET", required=True)
 
 # Optional secret with default
 api_key = get_secret("OPENAI_API_KEY", required=False, default=None)
@@ -59,7 +59,7 @@ python -c "import secrets; print('sk_' + secrets.token_urlsafe(32))"
 
 ```bash
 # Set secrets as environment variables
-export LEDGERLENS_SUBMITTER_SECRET="SBZVF2CT..."
+export STELLARLENSE_SUBMITTER_SECRET="SBZVF2CT..."
 export ANNOTATION_HMAC_SECRET="a1b2c3d4..."
 ```
 
@@ -71,8 +71,8 @@ mkdir -p /run/secrets
 chmod 700 /run/secrets
 
 # 2. Store secrets (one per file)
-echo "SBZVF2..." > /run/secrets/LEDGERLENS_SUBMITTER_SECRET
-chmod 600 /run/secrets/LEDGERLENS_SUBMITTER_SECRET
+echo "SBZVF2..." > /run/secrets/STELLARLENSE_SUBMITTER_SECRET
+chmod 600 /run/secrets/STELLARLENSE_SUBMITTER_SECRET
 
 # 3. Configure application
 export SECRETS_DIR=/run/secrets
@@ -85,7 +85,7 @@ export SECRETS_DIR=/run/secrets
 export SECRETS_AUDIT_HMAC_KEY=$(python -c "import secrets; print(secrets.token_hex(32))")
 
 # Set audit log path (default: data/secrets_audit.ndjson)
-export SECRETS_AUDIT_LOG=/var/log/ledgerlens/secrets_audit.ndjson
+export SECRETS_AUDIT_LOG=/var/log/stellar_lense/secrets_audit.ndjson
 ```
 
 ## Common Tasks
@@ -137,9 +137,9 @@ for secret_name, error in results.items():
 **Fix**: Set the environment variable or create the secret file
 
 ```bash
-export LEDGERLENS_SUBMITTER_SECRET="your-secret-here"
+export STELLARLENSE_SUBMITTER_SECRET="your-secret-here"
 # or
-echo "your-secret" > /run/secrets/LEDGERLENS_SUBMITTER_SECRET
+echo "your-secret" > /run/secrets/STELLARLENSE_SUBMITTER_SECRET
 ```
 
 ### "Invalid Stellar secret key format"

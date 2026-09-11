@@ -6,7 +6,7 @@ Covers:
     unknown id, missing required config)
   - that a third-party-style plugin can be added without touching any
     in-tree ingestion module (the actual "plugin-ready boundary" claim)
-  - out-of-tree discovery via the `ledgerlens.connectors` entry point group
+  - out-of-tree discovery via the `stellar_lense.connectors` entry point group
   - that all four existing Horizon loaders are reachable as connectors and
     that the adapters enforce their own required kwargs
 """

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "LedgerLens test criticality taxonomy. Maps test file/node-id patterns to CRITICAL, HIGH, or LOW. CRITICAL and HIGH failures block the release gate; LOW is informational only. Patterns use fnmatch glob rules against the pytest node ID.",
+  "description": "Stellar Lense test criticality taxonomy. Maps test file/node-id patterns to CRITICAL, HIGH, or LOW. CRITICAL and HIGH failures block the release gate; LOW is informational only. Patterns use fnmatch glob rules against the pytest node ID.",
   "entries": [
     {
       "pattern": "tests/test_benford.py",

@@ -1,6 +1,6 @@
 # Secrets Management Guide
 
-This document describes the secrets-safe configuration handling system for LedgerLens integrations.
+This document describes the secrets-safe configuration handling system for Stellar Lense integrations.
 
 ## Overview
 
@@ -47,7 +47,7 @@ from utils.secrets_config import get_secret
 
 # Get a secret with automatic validation
 submitter_secret = get_secret(
-    "LEDGERLENS_SUBMITTER_SECRET",
+    "STELLARLENSE_SUBMITTER_SECRET",
     required=True
 )
 
@@ -124,7 +124,7 @@ python -c "import secrets; print(secrets.token_hex(32))"
 
 **Format**: Path to an existing file
 
-**Example**: `/etc/ledgerlens/signing_key.pem`
+**Example**: `/etc/stellar_lense/signing_key.pem`
 
 ## Configuration
 
@@ -150,15 +150,15 @@ Store secrets in individual files:
 
 ```bash
 # Create secrets directory
-mkdir -p /etc/ledgerlens/secrets
-chmod 700 /etc/ledgerlens/secrets
+mkdir -p /etc/stellar_lense/secrets
+chmod 700 /etc/stellar_lense/secrets
 
 # Store secrets (one per file)
-echo "SBZVF2..." > /etc/ledgerlens/secrets/LEDGERLENS_SUBMITTER_SECRET
-chmod 600 /etc/ledgerlens/secrets/LEDGERLENS_SUBMITTER_SECRET
+echo "SBZVF2..." > /etc/stellar_lense/secrets/STELLARLENSE_SUBMITTER_SECRET
+chmod 600 /etc/stellar_lense/secrets/STELLARLENSE_SUBMITTER_SECRET
 
 # Configure application
-export SECRETS_DIR=/etc/ledgerlens/secrets
+export SECRETS_DIR=/etc/stellar_lense/secrets
 ```
 
 ## Migration Guide
@@ -178,11 +178,11 @@ Replace direct `os.getenv()` calls:
 ```python
 # BEFORE
 import os
-submitter_secret = os.getenv("LEDGERLENS_SUBMITTER_SECRET", "")
+submitter_secret = os.getenv("STELLARLENSE_SUBMITTER_SECRET", "")
 
 # AFTER
 from utils.secrets_config import get_secret
-submitter_secret = get_secret("LEDGERLENS_SUBMITTER_SECRET", required=True)
+submitter_secret = get_secret("STELLARLENSE_SUBMITTER_SECRET", required=True)
 ```
 
 ### Step 3: Validate Configuration
@@ -213,7 +213,7 @@ Check all secrets are properly configured:
 python -m scripts.validate_secrets
 
 # Validate specific secrets
-python -m scripts.validate_secrets --secrets LEDGERLENS_SUBMITTER_SECRET
+python -m scripts.validate_secrets --secrets STELLARLENSE_SUBMITTER_SECRET
 
 # Verify audit log integrity
 python -m scripts.validate_secrets --verify-audit-log
@@ -257,7 +257,7 @@ export SECRETS_DIR=/run/secrets  # Docker secrets, Kubernetes secrets
 Always configure HMAC-signed audit trails in production:
 
 ```bash
-export SECRETS_AUDIT_LOG=/var/log/ledgerlens/secrets_audit.ndjson
+export SECRETS_AUDIT_LOG=/var/log/stellar_lense/secrets_audit.ndjson
 export SECRETS_AUDIT_HMAC_KEY=$(python -c "import secrets; print(secrets.token_hex(32))")
 ```
 
@@ -293,7 +293,7 @@ NDJSON (newline-delimited JSON):
 ```json
 {
   "timestamp": "2024-01-15T10:30:00.000Z",
-  "secret_name": "LEDGERLENS_SUBMITTER_SECRET",
+  "secret_name": "STELLARLENSE_SUBMITTER_SECRET",
   "secret_type": "stellar_secret",
   "caller_module": "integrations.contract_client",
   "caller_function": "submit_score",
@@ -324,10 +324,10 @@ if invalid > 0:
 **Solution**:
 ```bash
 # Check if secret is configured
-python -m scripts.validate_secrets --secrets LEDGERLENS_SUBMITTER_SECRET
+python -m scripts.validate_secrets --secrets STELLARLENSE_SUBMITTER_SECRET
 
 # Set the secret
-export LEDGERLENS_SUBMITTER_SECRET="S..."
+export STELLARLENSE_SUBMITTER_SECRET="S..."
 ```
 
 ### "Invalid Stellar secret key format"

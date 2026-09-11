@@ -1,7 +1,7 @@
 """CLI to list registered data connectors and their config health.
 
 Discovers every built-in connector plus any installed out-of-tree plugins
-(entry point group ``ledgerlens.connectors``) and reports, per connector:
+(entry point group ``stellar_lense.connectors``) and reports, per connector:
 id, source, record type, and whether ``validate_config()`` currently
 passes — so a contributor can tell *why* a connector isn't usable without
 reading source or triggering a network call.

@@ -1,4 +1,4 @@
-"""Engineering quality scorecard for LedgerLens (Issue #604).
+"""Engineering quality scorecard for StellarLense (Issue #604).
 
 Overview
 --------
@@ -377,7 +377,7 @@ class QualityReport:
     def summary(self) -> str:
         lines = [
             "=" * 60,
-            "  LedgerLens Engineering Quality Scorecard",
+            "  StellarLense Engineering Quality Scorecard",
             "=" * 60,
         ]
         for m in self.metrics:
@@ -452,7 +452,7 @@ def report_to_csv(report: QualityReport) -> str:
 
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Collect and report LedgerLens engineering quality metrics.",
+        description="Collect and report StellarLense engineering quality metrics.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Exit codes:

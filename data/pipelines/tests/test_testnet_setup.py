@@ -9,7 +9,7 @@ import pytest
 import scripts.testnet_setup as setup
 
 # ---------------------------------------------------------------------------
-# 1. Skips deployment when LEDGERLENS_CONTRACT_ID is already set
+# 1. Skips deployment when STELLARLENSE_CONTRACT_ID is already set
 # ---------------------------------------------------------------------------
 
 
@@ -20,8 +20,8 @@ def test_setup_skips_deployment_if_contract_id_set(tmp_path):
         patch.dict(
             os.environ,
             {
-                "LEDGERLENS_CONTRACT_ID": "CA_ALREADY_DEPLOYED",
-                "LEDGERLENS_SUBMITTER_SECRET": "SAUQSDM4BPSOWVJJM7RAHPSGXDX5YLRYNZCZ5QP33EVB6WDAAVJJRJHG",
+                "STELLARLENSE_CONTRACT_ID": "CA_ALREADY_DEPLOYED",
+                "STELLARLENSE_SUBMITTER_SECRET": "SAUQSDM4BPSOWVJJM7RAHPSGXDX5YLRYNZCZ5QP33EVB6WDAAVJJRJHG",
             },
         ),
         patch("scripts.testnet_setup.load_dotenv"),
@@ -50,7 +50,7 @@ def test_setup_writes_env_file(tmp_path):
 
     with (
         patch.dict(
-            os.environ, {"LEDGERLENS_CONTRACT_ID": "", "LEDGERLENS_SUBMITTER_SECRET": fake_secret}
+            os.environ, {"STELLARLENSE_CONTRACT_ID": "", "STELLARLENSE_SUBMITTER_SECRET": fake_secret}
         ),
         patch("scripts.testnet_setup.load_dotenv"),
         patch("scripts.testnet_setup.fund_account"),
@@ -63,8 +63,8 @@ def test_setup_writes_env_file(tmp_path):
         )
 
     content = open(env_file).read()
-    assert "LEDGERLENS_CONTRACT_ID=CDEPLOYEDCONTRACT123" in content
-    assert "LEDGERLENS_SUBMITTER_SECRET=" in content
+    assert "STELLARLENSE_CONTRACT_ID=CDEPLOYEDCONTRACT123" in content
+    assert "STELLARLENSE_SUBMITTER_SECRET=" in content
 
 
 # ---------------------------------------------------------------------------

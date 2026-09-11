@@ -232,7 +232,7 @@ def test_anchor_report_not_called_without_flag(tmp_path):
         patch("scripts.score_wallet.ShapExplainer") as MockExplainer,
         patch("scripts.score_wallet.ForensicReportGenerator") as MockGen,
         patch("scripts.score_wallet.write_report_secure") as _mock_write,
-        patch("integrations.contract_client.LedgerLensContractClient") as MockClient,
+        patch("integrations.contract_client.StellarLenseContractClient") as MockClient,
     ):
         scorer = MockScorer.return_value
         scorer.score.return_value = RISK_SCORE_DICT
@@ -270,7 +270,7 @@ def test_anchor_report_called_with_flag():
         patch("scripts.score_wallet.ForensicReportGenerator") as MockGen,
         patch("scripts.score_wallet.write_report_secure"),
         # Patch where the name is looked up (inside _generate_report's local import)
-        patch("integrations.contract_client.LedgerLensContractClient") as MockClient,
+        patch("integrations.contract_client.StellarLenseContractClient") as MockClient,
     ):
         scorer = MockScorer.return_value
         scorer.score.return_value = RISK_SCORE_DICT
@@ -294,9 +294,9 @@ def test_anchor_report_called_with_flag():
             anchor=True,
         )
 
-        # Patch the LedgerLensContractClient in the integrations module so the
+        # Patch the StellarLenseContractClient in the integrations module so the
         # local import inside _generate_report picks up the mock
-        with patch("integrations.contract_client.LedgerLensContractClient", MockClient):
+        with patch("integrations.contract_client.StellarLenseContractClient", MockClient):
             _generate_report(
                 args, RISK_SCORE_DICT, [], pd.DataFrame(), pd.Series(dtype=float), scorer
             )

@@ -1,6 +1,6 @@
 """Dead-path detection for retired modules (Issue #547).
 
-LedgerLens has accumulated 150+ modules across its source packages over many
+StellarLense has accumulated 150+ modules across its source packages over many
 merged feature branches. When a feature is superseded (e.g. a scoring
 approach replaced by a newer one) nothing currently tells a contributor that
 the old module is now unreachable — it just sits there, still shipped,

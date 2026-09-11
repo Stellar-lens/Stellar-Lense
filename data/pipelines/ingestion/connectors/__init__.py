@@ -1,4 +1,4 @@
-"""Plugin boundary for LedgerLens data connectors.
+"""Plugin boundary for StellarLense data connectors.
 
 Importing this package registers every built-in connector (SDEX trades, AMM
 pool trades, order-book events, account activity) and exposes the shared

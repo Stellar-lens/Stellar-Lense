@@ -1,7 +1,7 @@
 # Code Review Checklists
 
 This directory contains reviewer checklists for high-risk categories of changes
-in the LedgerLens-data repository. These checklists are triggered automatically
+in the StellarLense-data repository. These checklists are triggered automatically
 by the `.github/workflows/code-review-checklist.yml` workflow, which classifies
 each PR's changed files and activates the relevant checklist jobs.
 

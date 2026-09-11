@@ -1,6 +1,6 @@
 """Source package integrity checks, run before test execution.
 
-LedgerLens has already been bitten once by a class of bug this module exists
+StellarLense has already been bitten once by a class of bug this module exists
 to catch early: a merge on ``config.py`` silently dropped several attributes
 that call sites across the codebase still referenced (see the "Restored
 config attributes" note in config.py). That failure mode — a bad merge or a

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Release readiness checker for LedgerLens-data.
+Release readiness checker for StellarLense-data.
 
 Validates that the repository is in a releasable state by checking:
   - CHANGELOG.md has content under [Unreleased]
@@ -222,7 +222,7 @@ def render_report(results: list[CheckResult], strict: bool) -> tuple[str, int]:
     failed_warnings = [r for r in results if not r.passed and r.severity == "warning"]
 
     lines = [
-        "# LedgerLens Release Readiness Report",
+        "# StellarLense Release Readiness Report",
         f"Generated: {datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S UTC')}",
         "",
         "## Summary",

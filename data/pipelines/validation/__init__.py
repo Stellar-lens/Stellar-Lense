@@ -1,4 +1,4 @@
-"""LedgerLens validation package.
+"""StellarLense validation package.
 
 Provides reusable parsing contracts and reconciliation checks for the
 ingestion and feature pipeline layers.

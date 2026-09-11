@@ -1,4 +1,4 @@
-# LedgerLens Real-Time Streaming Architecture
+# Stellar Lense Real-Time Streaming Architecture
 
 This document describes the end-to-end real-time detection pipeline introduced
 in Issues #012 (Phase 1), #013 (Phase 2), and #014 (Phase 3 — Kafka partitioning).
@@ -191,7 +191,7 @@ uncommitted — the next assignee redelivers and reprocesses it safely.
 **Usage:**
 ```bash
 make scale-workers N=4
-python -m scripts.kafka_workers --num-workers 4 --topic trades --group ledgerlens-workers
+python -m scripts.kafka_workers --num-workers 4 --topic trades --group stellar-lense-workers
 ```
 
 **Behavior:**
@@ -292,7 +292,7 @@ make scale-workers N=4
 
 # Terminal 2: start aggregator (reads from all partitions in separate consumer group)
 python -c "from detection.cross_venue_features import CrossVenueAggregator; \
-  agg = CrossVenueAggregator('trades', group_id='ledgerlens-aggregator'); \
+  agg = CrossVenueAggregator('trades', group_id='stellar-lense-aggregator'); \
   agg.collect_trades(max_batches=1000)"
 ```
 
@@ -373,7 +373,7 @@ These are the same surfaces the code already exposes: Prometheus metrics (`kafka
 |----------|---------|---------|
 | `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` | Kafka broker addresses |
 | `KAFKA_TOPIC` | `trades` | Topic name |
-| `KAFKA_GROUP_ID` | `ledgerlens-workers` | Consumer group |
+| `KAFKA_GROUP_ID` | `stellar-lense-workers` | Consumer group |
 | `ALERT_CHANNEL` | `stdout` | `stdout`, `webhook`, or `websocket` |
 | `ALERT_WEBHOOK_URL` | — | HTTPS endpoint for webhooks |
 | `ALERT_COOLDOWN_SECONDS` | `3600` | Per-wallet dedup window |
@@ -416,7 +416,7 @@ make scale-workers N=2
 python scripts/generate_synthetic_dataset.py | python -m ingestion.kafka_producer
 
 # Monitor alerts
-tail -f /tmp/ledgerlens.log | grep ALERT
+tail -f /tmp/stellar_lense.log | grep ALERT
 ```
 
 ---
@@ -718,10 +718,10 @@ Horizon SSE (one producer thread per pair)
 HorizonKafkaProducer  (ingestion/kafka_producer.py)
       │  key = wallet_id (base_account)
       ▼
-Kafka topics: ledgerlens.trades.{asset_pair_sanitised}     (+ ledgerlens.trades.dlq)
-      │  regex subscription ^ledgerlens\.trades\..*
+Kafka topics: stellar_lense.trades.{asset_pair_sanitised}     (+ stellar_lense.trades.dlq)
+      │  regex subscription ^stellar_lense\.trades\..*
       ▼
-KafkaWorker × N replicas   group.id = "ledgerlens-scorer"   (streaming/kafka_worker.py)
+KafkaWorker × N replicas   group.id = "stellar-lense-scorer"   (streaming/kafka_worker.py)
       │  FeatureBuffer → StreamingScorer → AlertDispatcher
       ▼
 Alerts (stdout / webhook / websocket)  +  Prometheus /metrics
@@ -801,7 +801,7 @@ serialisation; the worker validates again **after** decode. Records that are
 missing fields or have wrong-typed values never reach the scorer:
 
 * On the **producer**, a serialisation/validation failure routes the raw
-  payload plus a `reason` to the dead-letter queue `ledgerlens.trades.dlq`.
+  payload plus a `reason` to the dead-letter queue `stellar_lense.trades.dlq`.
 * On the **consumer**, a decode/validation failure (a poison pill) is logged,
   counted (`kafka_poison_messages_total`), and its offset committed (skipped) so
   one bad record cannot wedge a partition.
@@ -814,8 +814,8 @@ subscription explicitly skips the DLQ topic, and triage is a human task.
 Per-partition lag (high watermark − committed offset) is published as the
 Prometheus gauge `kafka_lag_by_partition`. When lag exceeds
 `KAFKA_LAG_ALERT_THRESHOLD` (default 500) the worker emits a **CRITICAL** log
-and keeps running. Scaling `ledgerlens-scorer` replicas adds consumers to the
-`ledgerlens-scorer` group, redistributing partitions to drain the backlog.
+and keeps running. Scaling `stellar-lense-scorer` replicas adds consumers to the
+`stellar-lense-scorer` group, redistributing partitions to drain the backlog.
 
 ### Security
 
@@ -828,8 +828,8 @@ and keeps running. Scaling `ledgerlens-scorer` replicas adds consumers to the
 
 | Metric | Type | Description |
 |---|---|---|
-| `ledgerlens_ingestion_trades_produced_total` | Counter (`topic`) | Number of trades successfully produced to Kafka |
-| `ledgerlens_ingestion_trades_failed_total` | Counter (`reason`) | Number of trades failed during ingestion |
+| `stellar_lense_ingestion_trades_produced_total` | Counter (`topic`) | Number of trades successfully produced to Kafka |
+| `stellar_lense_ingestion_trades_failed_total` | Counter (`reason`) | Number of trades failed during ingestion |
 | `kafka_messages_consumed_total` | Counter | Trade messages fully processed |
 | `kafka_lag_by_partition` | Gauge (`topic`, `partition`) | Consumer lag |
 | `scoring_latency_ms` | Histogram | Per-wallet scoring latency |
@@ -839,12 +839,12 @@ and keeps running. Scaling `ledgerlens-scorer` replicas adds consumers to the
 ### Deployment
 
 ```bash
-docker-compose up --scale ledgerlens-scorer=3
+docker-compose up --scale stellar-lense-scorer=3
 ```
 
-Brings up Zookeeper, Kafka, one `ledgerlens-producer`, three `ledgerlens-scorer`
+Brings up Zookeeper, Kafka, one `stellar-lense-producer`, three `stellar-lense-scorer`
 replicas, Prometheus (`:9090`), and Grafana (`:3000`, dashboard
-"LedgerLens Kafka Streaming").
+"Stellar Lense Kafka Streaming").
 
 ### Kafka environment variables
 
@@ -854,10 +854,10 @@ replicas, Prometheus (`:9090`), and Grafana (`:3000`, dashboard
 | `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` | Broker list |
 | `KAFKA_SASL_USERNAME` | — | SASL username (env only) |
 | `KAFKA_SASL_PASSWORD` | — | SASL password (env only) |
-| `KAFKA_CONSUMER_GROUP` | `ledgerlens-scorer` | Worker consumer group |
-| `KAFKA_TOPIC_PREFIX` | `ledgerlens.trades` | Per-pair topic prefix |
-| `KAFKA_DLQ_TOPIC` | `ledgerlens.trades.dlq` | Dead-letter topic |
-| `KAFKA_TOPIC_PATTERN` | `^ledgerlens\.trades\..*` | Worker regex subscription |
+| `KAFKA_CONSUMER_GROUP` | `stellar-lense-scorer` | Worker consumer group |
+| `KAFKA_TOPIC_PREFIX` | `stellar_lense.trades` | Per-pair topic prefix |
+| `KAFKA_DLQ_TOPIC` | `stellar_lense.trades.dlq` | Dead-letter topic |
+| `KAFKA_TOPIC_PATTERN` | `^stellar_lense\.trades\..*` | Worker regex subscription |
 | `KAFKA_LAG_ALERT_THRESHOLD` | `500` | Lag (messages) for CRITICAL log |
 | `KAFKA_METRICS_PORT` | `9100` | Prometheus scrape port |
 
@@ -892,7 +892,7 @@ batch_size = clamp(batch_size + Δbatch, min_batch, max_batch)
 | `Ki` | 0.1 | Increase if steady-state offset persists after many seconds. |
 | `Kd` | 0.05 | Increase if the batch size oscillates. |
 
-The defaults target a **p95 latency of 2 seconds** on typical LedgerLens workloads.
+The defaults target a **p95 latency of 2 seconds** on typical Stellar Lense workloads.
 
 ### Tuning for Different Deployment Sizes
 
@@ -918,8 +918,8 @@ python -m scripts.stream --fixed-batch-size 64
 
 | Metric | Type | Description |
 |---|---|---|
-| `ledgerlens_adaptive_batch_size` | Gauge | Current batch size chosen by the PID controller |
-| `ledgerlens_batch_target_latency_seconds` | Gauge | Configured p95 latency target |
+| `stellar_lense_adaptive_batch_size` | Gauge | Current batch size chosen by the PID controller |
+| `stellar_lense_batch_target_latency_seconds` | Gauge | Configured p95 latency target |
 
 ### Configuration
 

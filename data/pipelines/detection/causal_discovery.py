@@ -335,7 +335,7 @@ class WashTradeCausalDiscovery:
         Args:
             max_condition_set_size: Maximum conditioning-set size passed to
                 causal-learn's PC implementation. The default keeps discovery
-                tractable for LedgerLens' wide generated feature tables while
+                tractable for StellarLense' wide generated feature tables while
                 still allowing first- and second-order conditional
                 independence checks. Use ``None`` for causal-learn's unbounded
                 search.

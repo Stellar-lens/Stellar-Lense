@@ -8,7 +8,7 @@ Exercises:
 - verify_stamp() success, version mismatch, content-hash mismatch
 - VersionMismatchError raised in strict mode
 - model_training metadata carries the current version (not hardcoded)
-- model_inference score() result carries ledgerlens_version
+- model_inference score() result carries stellar_lense_version
 - forensic_report to_dict() contains a version stamp
 """
 
@@ -49,7 +49,7 @@ def _fresh_get_version():
 
 class TestGetVersion:
     def test_env_var_takes_priority(self, monkeypatch):
-        monkeypatch.setenv("LEDGERLENS_VERSION", "9.9.9-test")
+        monkeypatch.setenv("STELLARLENSE_VERSION", "9.9.9-test")
         ver = _fresh_get_version()
         assert ver == "9.9.9-test"
 
@@ -59,14 +59,14 @@ class TestGetVersion:
         assert len(ver) > 0
 
     def test_reads_pyproject_when_no_env_var(self, monkeypatch):
-        monkeypatch.delenv("LEDGERLENS_VERSION", raising=False)
+        monkeypatch.delenv("STELLARLENSE_VERSION", raising=False)
         ver = _fresh_get_version()
         # Should be the version from pyproject.toml (0.2.0) or installed pkg
         assert ver != "0.0.0+unknown", "Should resolve from pyproject or pkg metadata"
 
     def test_fallback_string_format(self, monkeypatch, tmp_path):
         """When neither env var, pyproject, nor installed pkg is available."""
-        monkeypatch.delenv("LEDGERLENS_VERSION", raising=False)
+        monkeypatch.delenv("STELLARLENSE_VERSION", raising=False)
 
         import utils.version_stamp as vs
 
@@ -192,7 +192,7 @@ class TestReadStamp:
 
 class TestVerifyStamp:
     def test_ok_when_version_matches_and_hash_intact(self, monkeypatch):
-        monkeypatch.setenv("LEDGERLENS_VERSION", "1.2.3")
+        monkeypatch.setenv("STELLARLENSE_VERSION", "1.2.3")
         from utils import version_stamp as vs
 
         vs.get_version.cache_clear()
@@ -206,7 +206,7 @@ class TestVerifyStamp:
 
     def test_version_mismatch_detected(self, monkeypatch):
         # Stamp with one version, then check with another
-        monkeypatch.setenv("LEDGERLENS_VERSION", "1.0.0")
+        monkeypatch.setenv("STELLARLENSE_VERSION", "1.0.0")
         from utils import version_stamp as vs
 
         vs.get_version.cache_clear()
@@ -215,7 +215,7 @@ class TestVerifyStamp:
         stamp_artifact(artifact)
 
         # Change the running version
-        monkeypatch.setenv("LEDGERLENS_VERSION", "2.0.0")
+        monkeypatch.setenv("STELLARLENSE_VERSION", "2.0.0")
         vs.get_version.cache_clear()
 
         result = verify_stamp(artifact)
@@ -225,7 +225,7 @@ class TestVerifyStamp:
         assert not result["ok"]
 
     def test_strict_mode_raises_on_version_mismatch(self, monkeypatch):
-        monkeypatch.setenv("LEDGERLENS_VERSION", "1.0.0")
+        monkeypatch.setenv("STELLARLENSE_VERSION", "1.0.0")
         from utils import version_stamp as vs
 
         vs.get_version.cache_clear()
@@ -233,14 +233,14 @@ class TestVerifyStamp:
         artifact = {"score": 50}
         stamp_artifact(artifact)
 
-        monkeypatch.setenv("LEDGERLENS_VERSION", "3.0.0")
+        monkeypatch.setenv("STELLARLENSE_VERSION", "3.0.0")
         vs.get_version.cache_clear()
 
         with pytest.raises(VersionMismatchError, match="Version mismatch"):
             verify_stamp(artifact, strict=True)
 
     def test_content_hash_mismatch_detected(self, monkeypatch):
-        monkeypatch.setenv("LEDGERLENS_VERSION", "1.0.0")
+        monkeypatch.setenv("STELLARLENSE_VERSION", "1.0.0")
         from utils import version_stamp as vs
 
         vs.get_version.cache_clear()
@@ -268,7 +268,7 @@ class TestVerifyStamp:
             verify_stamp({"score": 10}, strict=True)
 
     def test_skip_content_hash_verification(self, monkeypatch):
-        monkeypatch.setenv("LEDGERLENS_VERSION", "1.0.0")
+        monkeypatch.setenv("STELLARLENSE_VERSION", "1.0.0")
         from utils import version_stamp as vs
 
         vs.get_version.cache_clear()
@@ -290,7 +290,7 @@ class TestModelTrainingVersionStamp:
     def test_save_training_artifacts_uses_version_stamp(self, tmp_path, monkeypatch):
         """save_training_artifacts should record the current version (from
         get_version) rather than a hardcoded string."""
-        monkeypatch.setenv("LEDGERLENS_VERSION", "5.5.5-test")
+        monkeypatch.setenv("STELLARLENSE_VERSION", "5.5.5-test")
 
         from utils import version_stamp as vs
 
@@ -335,7 +335,7 @@ class TestModelTrainingVersionStamp:
         assert meta_path.exists()
         with open(meta_path) as f:
             meta = json.load(f)
-        assert meta["ledgerlens_version"] == "5.5.5-test"
+        assert meta["stellar_lense_version"] == "5.5.5-test"
 
 
 # ---------------------------------------------------------------------------

@@ -2,7 +2,7 @@
 
 Loads model artifacts from `config.MODEL_DIR`, verifies artifact integrity,
 and combines per-model probabilities using Byzantine-Fault-Tolerant (BFT)
-trimmed-mean voting into the single LedgerLens Risk Score (0–100).
+trimmed-mean voting into the single StellarLense Risk Score (0–100).
 
 BFT voting:
 - Sort the 3 model scores.
@@ -89,18 +89,18 @@ try:
         "bft_divergence_detected_total",
         "Number of times BFT divergence was detected during ensemble scoring",
     )
-    ledgerlens_cluster_scored_total: Counter | None = Counter(
-        "ledgerlens_cluster_scored_total",
+    stellar_lense_cluster_scored_total: Counter | None = Counter(
+        "stellar_lense_cluster_scored_total",
         "Total number of wallet clusters scored by score_cluster()",
     )
-    ledgerlens_canary_score_delta: Summary | None = Summary(
-        "ledgerlens_canary_score_delta_seconds",
+    stellar_lense_canary_score_delta: Summary | None = Summary(
+        "stellar_lense_canary_score_delta_seconds",
         "Absolute score difference between canary and champion model per wallet",
     )
 except Exception:  # pragma: no cover
     bft_divergence_detected_total = None
-    ledgerlens_cluster_scored_total = None
-    ledgerlens_canary_score_delta = None
+    stellar_lense_cluster_scored_total = None
+    stellar_lense_canary_score_delta = None
 
 
 def _increment_bft_counter() -> None:
@@ -639,7 +639,7 @@ class RiskScorer:
         labelled_count: int | None = None,
         caller_id: str = "internal",
     ) -> dict:  # type: ignore[override]
-        """Compute the LedgerLens Risk Score for a single feature row."""
+        """Compute the StellarLense Risk Score for a single feature row."""
         wallet = str(feature_row.get("wallet", ""))
         with _tracer.start_as_current_span("model.scored") as span:
             span.set_attribute("wallet.id", hash_span_id(wallet) if wallet else "unknown")
@@ -650,7 +650,7 @@ class RiskScorer:
             try:
                 from utils.version_stamp import get_version as _ll_version
 
-                result["ledgerlens_version"] = _ll_version()
+                result["stellar_lense_version"] = _ll_version()
             except Exception:
                 pass
             return result
@@ -997,9 +997,9 @@ class ModelCanaryMonitor:
                 "canary_version": self.canary_version,
             }
         )
-        if ledgerlens_canary_score_delta is not None:
+        if stellar_lense_canary_score_delta is not None:
             try:
-                ledgerlens_canary_score_delta.observe(delta)
+                stellar_lense_canary_score_delta.observe(delta)
             except Exception:
                 pass
 
@@ -1274,7 +1274,7 @@ def score_cluster(
     The cluster score is permutation-invariant: the result is the same
     regardless of the order of ``wallet_ids``.
 
-    A Prometheus counter ``ledgerlens_cluster_scored_total`` is incremented
+    A Prometheus counter ``stellar_lense_cluster_scored_total`` is incremented
     on each call.
 
     Parameters
@@ -1307,9 +1307,9 @@ def score_cluster(
     cid = _cluster_id(wallet_ids)
 
     # Increment Prometheus counter
-    if ledgerlens_cluster_scored_total is not None:
+    if stellar_lense_cluster_scored_total is not None:
         try:
-            ledgerlens_cluster_scored_total.inc()
+            stellar_lense_cluster_scored_total.inc()
         except Exception:  # pragma: no cover
             pass
 

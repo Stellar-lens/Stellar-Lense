@@ -1,12 +1,12 @@
 """Adversarial Wash Trade Simulator using a genetic algorithm.
 
-Evolves wash trade strategies that minimise their LedgerLens risk score
+Evolves wash trade strategies that minimise their StellarLense risk score
 while maintaining economic plausibility (volume 1,000–10,000,000 XLM).
 
 Fitness = 1 / (risk_score + 1)  — lower score → higher fitness.
 
 Exposes best-evolved adversarial risk score as Prometheus gauge
-``ledgerlens_adversarial_lowest_score``.
+``stellar_lense_adversarial_lowest_score``.
 
 Usage::
 
@@ -30,7 +30,7 @@ try:
     from prometheus_client import Gauge
 
     adversarial_lowest_score: Any = Gauge(
-        "ledgerlens_adversarial_lowest_score",
+        "stellar_lense_adversarial_lowest_score",
         "Best (lowest) risk score achieved by the adversarial genetic algorithm",
     )
 except Exception:

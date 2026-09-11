@@ -42,7 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   outcome. See `docs/adr/0001-unified-idempotency-finality.md`.
   Migrations `0005` (audit Merkle leaf content) and `0006` (risk-score
   finality). New config: `WORKER_HEALTH_STALE_THRESHOLD_SECONDS`.
-- Typed exceptions for ingestion and validation failures: a `LedgerLensError`
+- Typed exceptions for ingestion and validation failures: a `StellarLenseError`
   base (`utils/exceptions.py`) and the ingestion taxonomy
   (`ingestion/exceptions.py`): `IngestionError` with `InvalidInputError`,
   `RecordValidationError`, `SchemaValidationError`, and
@@ -101,7 +101,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Wallet funding-graph features: `funding_source_similarity` and
   `network_centrality` (`detection/wallet_graph.py`).
 - Soroban contract client (`integrations/contract_client.py`) for
-  `submit_score` / `get_score` against `ledgerlens-score`.
+  `submit_score` / `get_score` against `stellar-lense-score`.
 - Synthetic labelled dataset generator (`scripts/generate_synthetic_dataset.py`,
   with usage docs in `scripts/README.md`) and a `model_training.py` CLI for
   local training/demo runs.

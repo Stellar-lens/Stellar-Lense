@@ -1,7 +1,7 @@
 """Threshold Tuning Workflows for Anomaly Alerts — Issue #535.
 
 Provides automated, data-driven workflows for setting and tuning the
-LedgerLens alert threshold (``RISK_SCORE_FLAG_THRESHOLD``) so operators
+StellarLense alert threshold (``RISK_SCORE_FLAG_THRESHOLD``) so operators
 can replace the hard-coded default of 70 with a value calibrated to their
 precision/recall requirements.
 
@@ -148,7 +148,7 @@ def _compute_metrics(
 
 
 class ThresholdTuner:
-    """Data-driven threshold tuning for LedgerLens anomaly alerts.
+    """Data-driven threshold tuning for StellarLense anomaly alerts.
 
     Parameters
     ----------
@@ -240,7 +240,7 @@ class ThresholdTuner:
         """Minimise a cost function ``FP_weight * FP + FN_weight * FN``.
 
         The asymmetric default (FN costs 5× more than FP) reflects the
-        LedgerLens context where missing a wash-trade ring is worse than
+        StellarLense context where missing a wash-trade ring is worse than
         a false alert.
         """
         eval_points = [
@@ -308,7 +308,7 @@ def save_tuning_report(
 def _render_markdown(result: TuningResult) -> str:
     d = result.to_dict()
     lines = [
-        "# LedgerLens Threshold Tuning Report",
+        "# StellarLense Threshold Tuning Report",
         "",
         f"**Strategy:** `{d['strategy']}`",
         f"**Recommended threshold:** **{d['recommended_threshold']}**",

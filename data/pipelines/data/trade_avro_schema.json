@@ -1,7 +1,7 @@
 {
   "type": "record",
   "name": "Trade",
-  "namespace": "io.ledgerlens",
+  "namespace": "io.stellar_lense",
   "fields": [
     {"name": "trade_id", "type": "string"},
     {"name": "base_account", "type": "string"},

@@ -1,9 +1,9 @@
 """End-to-end Kafka streaming integration test.
 
-Skipped unless ``LEDGERLENS_INTEGRATION_TESTS=1`` (see tests/integration/conftest.py).
+Skipped unless ``STELLARLENSE_INTEGRATION_TESTS=1`` (see tests/integration/conftest.py).
 Requires a running stack — start it with:
 
-    docker-compose up --scale ledgerlens-scorer=3
+    docker-compose up --scale stellar-lense-scorer=3
 
 The test produces 1,000 synthetic trades through ``HorizonKafkaProducer`` and
 asserts that all 1,000 are reflected in the scorer fleet's

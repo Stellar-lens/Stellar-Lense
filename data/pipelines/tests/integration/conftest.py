@@ -1,11 +1,11 @@
 """Integration test fixtures.
 
-All integration tests are skipped unless LEDGERLENS_INTEGRATION_TESTS=1 so
+All integration tests are skipped unless STELLARLENSE_INTEGRATION_TESTS=1 so
 that `make test` never hits the Testnet.  Environment variables (or a
 .env.testnet file) must supply:
 
-    LEDGERLENS_CONTRACT_ID    — deployed testnet contract
-    LEDGERLENS_SUBMITTER_SECRET — funded testnet keypair
+    STELLARLENSE_CONTRACT_ID    — deployed testnet contract
+    STELLARLENSE_SUBMITTER_SECRET — funded testnet keypair
     SOROBAN_RPC_URL           — defaults to https://soroban-testnet.stellar.org
 """
 
@@ -19,8 +19,8 @@ load_dotenv(".env.testnet")
 
 
 def pytest_collection_modifyitems(config, items):  # noqa: ARG001
-    if os.getenv("LEDGERLENS_INTEGRATION_TESTS") != "1":
-        skip = pytest.mark.skip(reason="Set LEDGERLENS_INTEGRATION_TESTS=1 to run")
+    if os.getenv("STELLARLENSE_INTEGRATION_TESTS") != "1":
+        skip = pytest.mark.skip(reason="Set STELLARLENSE_INTEGRATION_TESTS=1 to run")
         for item in items:
             if "integration" in str(item.fspath):
                 item.add_marker(skip)
@@ -28,17 +28,17 @@ def pytest_collection_modifyitems(config, items):  # noqa: ARG001
 
 @pytest.fixture(scope="session")
 def contract_id() -> str:
-    value = os.environ.get("LEDGERLENS_CONTRACT_ID", "")
+    value = os.environ.get("STELLARLENSE_CONTRACT_ID", "")
     if not value:
-        pytest.skip("LEDGERLENS_CONTRACT_ID not set")
+        pytest.skip("STELLARLENSE_CONTRACT_ID not set")
     return value
 
 
 @pytest.fixture(scope="session")
 def submitter_secret() -> str:
-    value = os.environ.get("LEDGERLENS_SUBMITTER_SECRET", "")
+    value = os.environ.get("STELLARLENSE_SUBMITTER_SECRET", "")
     if not value:
-        pytest.skip("LEDGERLENS_SUBMITTER_SECRET not set")
+        pytest.skip("STELLARLENSE_SUBMITTER_SECRET not set")
     return value
 
 
@@ -49,12 +49,12 @@ def rpc_url() -> str:
 
 @pytest.fixture(scope="session")
 def live_client(contract_id, submitter_secret, rpc_url):
-    """A real LedgerLensContractClient pointed at Testnet."""
+    """A real StellarLenseContractClient pointed at Testnet."""
     from stellar_sdk import Network
 
-    from integrations.contract_client import LedgerLensContractClient
+    from integrations.contract_client import StellarLenseContractClient
 
-    return LedgerLensContractClient(
+    return StellarLenseContractClient(
         contract_id=contract_id,
         rpc_url=rpc_url,
         network_passphrase=Network.TESTNET_NETWORK_PASSPHRASE,

@@ -602,7 +602,7 @@ def print_report(issues: list[NormalizationIssue], report: dict[str, Any]) -> No
 def main() -> int:
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(
-        description="Validate currency normalization usage in LedgerLens codebase",
+        description="Validate currency normalization usage in StellarLense codebase",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 

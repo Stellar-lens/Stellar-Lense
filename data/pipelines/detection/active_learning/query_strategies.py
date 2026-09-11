@@ -1,4 +1,4 @@
-"""Active learning query strategies for LedgerLens.
+"""Active learning query strategies for StellarLense.
 
 Each strategy selects the most informative wallets from an unlabelled pool
 for human annotation, maximising model improvement per labelling hour.

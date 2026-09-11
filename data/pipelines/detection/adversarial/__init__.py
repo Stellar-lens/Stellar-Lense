@@ -2,7 +2,7 @@
 
 Provides gradient-based evasion attacks (`FGSMAttack`, `PGDAttack`) that
 estimate how much an operator would have to perturb their on-chain feature
-footprint to push the LedgerLens Risk Score below the alert threshold, plus
+footprint to push the StellarLense Risk Score below the alert threshold, plus
 the evaluation (`robustness`) and adversarial-augmentation (`augmentation`)
 helpers used by `scripts/run_adversarial_eval.py`.
 

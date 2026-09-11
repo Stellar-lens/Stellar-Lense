@@ -6,7 +6,7 @@ window state. On startup, workers assign themselves to a subset of partitions
 gracefully by committing offsets before partition revocation.
 
 Architecture:
-    - Consumer group (e.g., "ledgerlens-workers") with multiple members
+    - Consumer group (e.g., "stellar-lense-workers") with multiple members
     - Each worker subscribes to same topic; Kafka assigns partitions
     - Per-worker state: FeatureBuffer, StreamingScorer, Benford windows
     - Offset commit on interval + on rebalance
@@ -14,14 +14,14 @@ Architecture:
 Usage:
     worker = KafkaWorker(
         topic="trades",
-        group_id="ledgerlens-workers",
+        group_id="stellar-lense-workers",
         bootstrap_servers=["localhost:9092"],
     )
     worker.run()  # Blocks until shutdown
 
 Kafka consumer + scoring worker -- the scale-out half of the streaming backend.
 
-``KafkaWorker`` subscribes (via regex) to every ``ledgerlens.trades.*`` topic,
+``KafkaWorker`` subscribes (via regex) to every ``stellar_lense.trades.*`` topic,
 rebuilds each Avro message into a :class:`~ingestion.data_models.Trade`, feeds an
 in-process :class:`~streaming.feature_buffer.FeatureBuffer`, scores the affected
 wallets, and dispatches alerts.
@@ -143,7 +143,7 @@ class DeduplicationCache:
     ) -> None:
         ttl = ttl_seconds if ttl_seconds is not None else config.KAFKA_DEDUP_TTL_SECONDS
         backend = RedisExactlyOnceBackend(
-            redis_url or config.REDIS_URL, key_prefix="ledgerlens:kafka_dedup:"
+            redis_url or config.REDIS_URL, key_prefix="stellar_lense:kafka_dedup:"
         )
         self._store = ExactlyOnceStore(backend, ttl_seconds=float(ttl))
 

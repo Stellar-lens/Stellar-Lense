@@ -13,7 +13,7 @@ name: high_risk_wallet
 version: "1.0"
 description: >
   Automated first-response playbook for wallets that trigger a high-severity
-  LedgerLens alert.  Designed to preserve evidence, generate a preliminary
+  Stellar Lense alert.  Designed to preserve evidence, generate a preliminary
   report, and route the incident to the on-call team within 60 seconds.
 
 severity_triggers:

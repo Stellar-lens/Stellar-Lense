@@ -6,7 +6,7 @@ The Historical Backtesting Framework (`scripts/backtest.py`) replays Stellar Hor
 history, scores wallets using time-appropriate model versions, and evaluates detection
 performance against a hand-curated ground truth of known market manipulation events.
 
-This answers the question: *"Would LedgerLens have caught the XYZ wash-trade campaign
+This answers the question: *"Would Stellar Lense have caught the XYZ wash-trade campaign
 of March 2024?"*
 
 ## Replay Architecture
@@ -126,7 +126,7 @@ events on Stellar Mainnet with the following columns:
 
 ## Detection Lag
 
-`compute_detection_lag` measures how quickly LedgerLens would have detected
+`compute_detection_lag` measures how quickly Stellar Lense would have detected
 each campaign:
 
 ```
@@ -236,6 +236,6 @@ python -m scripts.backtest \\
 # Unit tests (no Horizon calls)
 pytest tests/test_backtest.py -v
 
-# Integration tests (requires LEDGERLENS_INTEGRATION_TESTS=1)
-LEDGERLENS_INTEGRATION_TESTS=1 pytest tests/test_backtest.py -v -m "" -k integration
+# Integration tests (requires STELLARLENSE_INTEGRATION_TESTS=1)
+STELLARLENSE_INTEGRATION_TESTS=1 pytest tests/test_backtest.py -v -m "" -k integration
 ```

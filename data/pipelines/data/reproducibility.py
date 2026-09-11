@@ -1,6 +1,6 @@
 """Reproducibility snapshots for training datasets — Issue #533.
 
-Provides a deterministic, tamper-evident snapshot mechanism for LedgerLens
+Provides a deterministic, tamper-evident snapshot mechanism for StellarLense
 training datasets.  A snapshot captures:
 
 * A copy of the dataset (Parquet or arbitrary file) under a content-addressed
@@ -124,7 +124,7 @@ class SnapshotManifest:
     columns: list[str]
     created_at: str
     label: str
-    ledgerlens_version: str
+    stellar_lense_version: str
     metadata: dict[str, Any] = field(default_factory=dict)
     signature: str | None = None  # hex Ed25519 signature over canonical JSON
 
@@ -139,7 +139,7 @@ class SnapshotManifest:
             "columns": self.columns,
             "created_at": self.created_at,
             "label": self.label,
-            "ledgerlens_version": self.ledgerlens_version,
+            "stellar_lense_version": self.stellar_lense_version,
             "metadata": self.metadata,
         }
         if self.signature is not None:
@@ -156,7 +156,7 @@ class SnapshotManifest:
             columns=data.get("columns", []),
             created_at=data["created_at"],
             label=data.get("label", ""),
-            ledgerlens_version=data.get("ledgerlens_version", "unknown"),
+            stellar_lense_version=data.get("stellar_lense_version", "unknown"),
             metadata=data.get("metadata", {}),
             signature=data.get("signature"),
         )
@@ -201,9 +201,9 @@ class DatasetSnapshot:
     snapshot_root:
         Directory under which all snapshot sub-directories are created.
         Defaults to ``"data/snapshots"``.
-    ledgerlens_version:
+    stellar_lense_version:
         Version string recorded in every manifest.  Defaults to the value
-        of ``config.ledgerlens_version`` if the config module is importable,
+        of ``config.stellar_lense_version`` if the config module is importable,
         otherwise ``"unknown"``.
     signing_key_path:
         If provided, the file is expected to contain a PEM-encoded Ed25519
@@ -215,25 +215,25 @@ class DatasetSnapshot:
     def __init__(
         self,
         snapshot_root: Path | str = Path("data/snapshots"),
-        ledgerlens_version: str | None = None,
+        stellar_lense_version: str | None = None,
         signing_key_path: Path | str | None = None,
     ) -> None:
         self.snapshot_root = Path(snapshot_root)
         self.snapshot_root.mkdir(parents=True, exist_ok=True)
 
-        if ledgerlens_version is None:
+        if stellar_lense_version is None:
             try:
                 from utils.version_stamp import get_version
 
-                ledgerlens_version = get_version()
+                stellar_lense_version = get_version()
             except Exception:
                 try:
                     from config import config  # type: ignore
 
-                    ledgerlens_version = getattr(config, "LEDGERLENS_VERSION", "unknown")
+                    stellar_lense_version = getattr(config, "STELLARLENSE_VERSION", "unknown")
                 except Exception:
-                    ledgerlens_version = "unknown"
-        self.ledgerlens_version = ledgerlens_version
+                    stellar_lense_version = "unknown"
+        self.stellar_lense_version = stellar_lense_version
 
         self._signing_key = None
         self._verifying_key = None
@@ -307,7 +307,7 @@ class DatasetSnapshot:
             columns=columns,
             created_at=_now_iso(),
             label=label,
-            ledgerlens_version=self.ledgerlens_version,
+            stellar_lense_version=self.stellar_lense_version,
             metadata=metadata or {},
         )
 

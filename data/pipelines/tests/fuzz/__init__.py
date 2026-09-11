@@ -1,4 +1,4 @@
-"""Fuzz testing suite for LedgerLens data ingestion layer.
+"""Fuzz testing suite for StellarLense data ingestion layer.
 
 This package contains libFuzzer targets (via atheris) that systematically
 explore the input space of critical parsing and deserialisation routines to

@@ -43,7 +43,7 @@ def get_asset_supply(
     Returns:
         Circulating supply as a float, or ``None`` if unavailable.
     """
-    cache_key = f"ledgerlens:asset_supply:{asset_code}:{asset_issuer}"
+    cache_key = f"stellar_lense:asset_supply:{asset_code}:{asset_issuer}"
     now_utc = datetime.now(UTC)
 
     # --- check Redis cache ---

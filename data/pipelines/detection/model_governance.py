@@ -1,6 +1,6 @@
 """Single authoritative gate for promoting/rolling back production ML models.
 
-Grand 2 (issue #671) found that LedgerLens had a real cryptographic trust
+Grand 2 (issue #671) found that StellarLense had a real cryptographic trust
 chain (``detection.persistence.ModelArtifact`` / ``ModelArtifactVerifier``)
 that production inference silently bypassed, a separate JSON-manifest
 lifecycle state machine (``detection.artifact_lifecycle.ModelArtifactRegistry``)
@@ -58,7 +58,7 @@ try:
     from prometheus_client import Counter
 
     _promotion_denied_total: Counter | None = Counter(
-        "ledgerlens_promotion_denied_total",
+        "stellar_lense_promotion_denied_total",
         "Number of denied model promotion/rollback attempts (unauthorized, regression, or trust-chain failure)",
         ["action"],
     )

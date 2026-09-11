@@ -24,7 +24,7 @@ API::
         raise SettingsValidationError(report)
 
 Run `python -m config.settings_validator` to validate the live `Config`
-object against the built-in `DEFAULT_LEDGERLENS_SPECS` registry and print a
+object against the built-in `DEFAULT_STELLARLENSE_SPECS` registry and print a
 human-readable report — useful as a pre-flight CI or deploy-time check.
 """
 
@@ -246,7 +246,7 @@ class SettingsValidator:
 # known to cause silent bad behavior when misconfigured, rather than a
 # loud startup failure.
 # ---------------------------------------------------------------------------
-DEFAULT_LEDGERLENS_SPECS: list[SettingSpec] = [
+DEFAULT_STELLARLENSE_SPECS: list[SettingSpec] = [
     SettingSpec(
         "HORIZON_URL",
         str,
@@ -307,7 +307,7 @@ def validate_default_config() -> ValidationReport:
     """Validates the live `config.Config` object against the built-in registry."""
     from config import Config
 
-    return SettingsValidator(DEFAULT_LEDGERLENS_SPECS).validate(Config)
+    return SettingsValidator(DEFAULT_STELLARLENSE_SPECS).validate(Config)
 
 
 def _main() -> int:

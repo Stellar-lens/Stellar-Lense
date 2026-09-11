@@ -1,4 +1,4 @@
-"""CLI tool for verifying the watermark in a LedgerLens model artifact.
+"""CLI tool for verifying the watermark in a StellarLense model artifact.
 
 Usage:
     python -m scripts.verify_watermark --model-path models/random_forest.joblib \\
@@ -22,7 +22,7 @@ import joblib
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Verify the watermark in a LedgerLens model artifact"
+        description="Verify the watermark in a StellarLense model artifact"
     )
     parser.add_argument(
         "--model-path",

@@ -24,7 +24,7 @@ logger = get_logger(__name__)
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="LedgerLens first-time local setup onboarding checks.",
+        description="StellarLense first-time local setup onboarding checks.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
@@ -70,7 +70,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         sep = "─" * 62
         logger.info(f"\n{sep}")
-        logger.info(" LedgerLens Onboarding Checks")
+        logger.info(" StellarLense Onboarding Checks")
         logger.info(sep)
         for result in report.results:
             logger.info(result)

@@ -77,7 +77,7 @@ import logging
 import os
 from typing import Any
 
-logger = logging.getLogger("ledgerlens.mpc_aggregator")
+logger = logging.getLogger("stellar_lense.mpc_aggregator")
 
 # ---------------------------------------------------------------------------
 # mpyc import — graceful absence

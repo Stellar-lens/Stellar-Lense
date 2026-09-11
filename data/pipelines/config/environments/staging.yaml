@@ -5,7 +5,7 @@
 
 database:
   # Staging: PostgreSQL (production-like, but separate instance)
-  # Example: postgresql://user:pass@staging-rds.us-east-1.rds.amazonaws.com:5432/ledgerlens_staging
+  # Example: postgresql://user:pass@staging-rds.us-east-1.rds.amazonaws.com:5432/stellar_lense_staging
   url: "${DATABASE_URL}"
   pool_size: 15
   max_overflow: 20
@@ -26,7 +26,7 @@ risk_scoring:
   flag_threshold: 70
 
 models:
-  directory: "/var/lib/ledgerlens/models"
+  directory: "/var/lib/stellar_lense/models"
   batch_scorer_workers: 15
 
 # Staging has most prod security, but allows additional debugging

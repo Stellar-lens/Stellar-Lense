@@ -112,9 +112,9 @@ def _score_wallet(
     # Optional on-chain anchor
     if anchor:
         try:
-            from integrations.contract_client import LedgerLensContractClient
+            from integrations.contract_client import StellarLenseContractClient
 
-            client = LedgerLensContractClient()
+            client = StellarLenseContractClient()
             client.anchor_report(report)
         except Exception:
             pass  # anchoring failure must not abort report writing

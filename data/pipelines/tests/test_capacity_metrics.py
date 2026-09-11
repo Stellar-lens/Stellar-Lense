@@ -22,9 +22,9 @@ def test_metrics_registered_on_import():
         pytest.skip("prometheus_client not installed")
 
     collector_names = set(REGISTRY._names_to_collectors.keys())  # type: ignore[attr-defined]
-    assert "ledgerlens_cpu_usage_ratio" in collector_names
-    assert "ledgerlens_memory_usage_bytes" in collector_names
-    assert "ledgerlens_trades_per_second" in collector_names
+    assert "stellar_lense_cpu_usage_ratio" in collector_names
+    assert "stellar_lense_memory_usage_bytes" in collector_names
+    assert "stellar_lense_trades_per_second" in collector_names
 
 
 def test_set_cpu_usage_updates_gauge():

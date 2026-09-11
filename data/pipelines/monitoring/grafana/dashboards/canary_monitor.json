@@ -34,7 +34,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "rate(ledgerlens_canary_score_delta_seconds_sum[5m]) / rate(ledgerlens_canary_score_delta_seconds_count[5m])",
+          "expr": "rate(stellar_lense_canary_score_delta_seconds_sum[5m]) / rate(stellar_lense_canary_score_delta_seconds_count[5m])",
           "legendFormat": "Mean absolute score delta (5m)",
           "refId": "A"
         }
@@ -71,7 +71,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "ledgerlens_canary_score_delta_seconds_count > 0",
+          "expr": "stellar_lense_canary_score_delta_seconds_count > 0",
           "legendFormat": "Pairs logged",
           "refId": "A"
         }
@@ -108,7 +108,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "histogram_quantile(0.95, rate(ledgerlens_canary_score_delta_seconds_bucket[10m]))",
+          "expr": "histogram_quantile(0.95, rate(stellar_lense_canary_score_delta_seconds_bucket[10m]))",
           "legendFormat": "p95 delta",
           "refId": "A"
         }
@@ -133,19 +133,19 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "histogram_quantile(0.50, rate(ledgerlens_canary_score_delta_seconds_bucket[5m]))",
+          "expr": "histogram_quantile(0.50, rate(stellar_lense_canary_score_delta_seconds_bucket[5m]))",
           "legendFormat": "p50 delta",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "histogram_quantile(0.95, rate(ledgerlens_canary_score_delta_seconds_bucket[5m]))",
+          "expr": "histogram_quantile(0.95, rate(stellar_lense_canary_score_delta_seconds_bucket[5m]))",
           "legendFormat": "p95 delta",
           "refId": "B"
         },
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "histogram_quantile(0.99, rate(ledgerlens_canary_score_delta_seconds_bucket[5m]))",
+          "expr": "histogram_quantile(0.99, rate(stellar_lense_canary_score_delta_seconds_bucket[5m]))",
           "legendFormat": "p99 delta",
           "refId": "C"
         }
@@ -156,7 +156,7 @@
   ],
   "refresh": "30s",
   "schemaVersion": 38,
-  "tags": ["ledgerlens", "canary", "model-deployment"],
+  "tags": ["stellar_lense", "canary", "model-deployment"],
   "templating": {
     "list": [
       {
@@ -175,7 +175,7 @@
   "time": { "from": "now-1h", "to": "now" },
   "timepicker": {},
   "timezone": "browser",
-  "title": "LedgerLens Canary Model Monitor",
-  "uid": "ledgerlens-canary-monitor",
+  "title": "Stellar Lense Canary Model Monitor",
+  "uid": "stellar-lense-canary-monitor",
   "version": 1
 }

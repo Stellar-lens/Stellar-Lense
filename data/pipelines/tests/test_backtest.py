@@ -463,8 +463,8 @@ def test_random_baseline_returns_finite_value(sample_ground_truth: pd.DataFrame)
 
 
 @pytest.mark.skipif(
-    not os.environ.get("LEDGERLENS_INTEGRATION_TESTS"),
-    reason="Set LEDGERLENS_INTEGRATION_TESTS=1 to run integration tests",
+    not os.environ.get("STELLARLENSE_INTEGRATION_TESTS"),
+    reason="Set STELLARLENSE_INTEGRATION_TESTS=1 to run integration tests",
 )
 def test_integration_replay_testnet():
     """Integration test: replay 7 days of testnet history for known testnet wallets."""

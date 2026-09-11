@@ -47,7 +47,7 @@ def test_pause_proposed_above_anomaly_rate():
     for i in range(5):
         watchdog.record_score(f"hash_lo{i}", 10)
 
-    with patch("integrations.contract_client.LedgerLensContractClient") as MockClient:
+    with patch("integrations.contract_client.StellarLenseContractClient") as MockClient:
         instance = MockClient.return_value
         instance.initiate_emergency_pause.return_value = 42
 
@@ -72,7 +72,7 @@ def test_pause_proposed_latency_budget_breached():
     for i in range(5):
         watchdog.record_score(f"hash_lo{i}", 50, e2e_latency_ms=100)
 
-    with patch("integrations.contract_client.LedgerLensContractClient") as MockClient:
+    with patch("integrations.contract_client.StellarLenseContractClient") as MockClient:
         instance = MockClient.return_value
         instance.initiate_emergency_pause.return_value = 84
 
@@ -90,7 +90,7 @@ def test_pause_proposed_only_once():
     for i in range(100):
         watchdog.record_score(f"hash{i}", 99)
 
-    with patch("integrations.contract_client.LedgerLensContractClient") as MockClient:
+    with patch("integrations.contract_client.StellarLenseContractClient") as MockClient:
         instance = MockClient.return_value
         instance.initiate_emergency_pause.return_value = 1
 
@@ -130,10 +130,10 @@ def test_contract_paused_event_emitted(tmp_path):
     """initiate_emergency_pause must call the contract's initiate_pause entry point."""
     from unittest.mock import patch as _patch
 
-    from integrations.contract_client import LedgerLensContractClient
+    from integrations.contract_client import StellarLenseContractClient
 
     with _patch("integrations.contract_client.ContractClient"):
-        client = LedgerLensContractClient(
+        client = StellarLenseContractClient(
             contract_id="CCONTRACT",
             rpc_url="https://soroban-testnet.stellar.org",
             network_passphrase="Test SDF Network ; September 2015",

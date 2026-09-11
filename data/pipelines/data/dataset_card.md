@@ -1,4 +1,4 @@
-# Dataset Card — LedgerLens Labelled Stellar SDEX Wash-Trade Dataset
+# Dataset Card — Stellar Lense Labelled Stellar SDEX Wash-Trade Dataset
 
 ## Dataset Summary
 
@@ -13,7 +13,7 @@ plus ground-truth labels and provenance metadata.
 |---|---|
 | **Version** | 1.0.0 |
 | **Release date** | 2026-06-19 |
-| **Licence** | MIT (same as the LedgerLens project) |
+| **Licence** | MIT (same as the Stellar Lense project) |
 | **Data source** | Stellar Horizon public API |
 | **Data window** | 2024-01-01 to 2024-06-30 |
 | **Asset pairs covered** | USDC/XLM, BTC/XLM, AQUA/XLM |
@@ -213,8 +213,8 @@ is to improve the quality of wash-trade detection for the benefit of the Stellar
 If you use this dataset, please cite:
 
 ```
-LedgerLens Data (2026). Labelled Stellar SDEX Wash-Trade Dataset v1.0.0.
-https://github.com/Ledger-Lenz/Ledgerlens-data
+Stellar Lense Data (2026). Labelled Stellar SDEX Wash-Trade Dataset v1.0.0.
+https://github.com/Stellar-lens/Stellar-Lense
 ```
 
 ## Licence

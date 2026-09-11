@@ -1,4 +1,4 @@
-# ownership.yml — LedgerLens-data ownership metadata for critical subsystems
+# ownership.yml — StellarLense-data ownership metadata for critical subsystems
 #
 # This file is the machine-readable source of truth for subsystem ownership.
 # It supplements the .github/CODEOWNERS file with richer metadata:
@@ -44,18 +44,18 @@ subsystems:
       - "ingestion/**"
       - "run_pipeline.py"
     team: "@Ledger-Lenz/data-core"
-    tech_lead: "@ledgerlens-data-lead"
-    on_call: "@ledgerlens-data-lead"
+    tech_lead: "@stellar-lense-data-lead"
+    on_call: "@stellar-lense-data-lead"
     risk: critical
     slo:
       availability: "99.5%"
       latency_p99_ms: 10000
     escalation:
       - level: 1
-        contact: "@ledgerlens-data-lead"
+        contact: "@stellar-lense-data-lead"
         after_minutes: 15
       - level: 2
-        contact: "@ledgerlens-maintainer"
+        contact: "@stellar-lense-maintainer"
         after_minutes: 60
     runbook: "docs/ingestion.md"
     last_reviewed: "2026-06-13"
@@ -65,7 +65,7 @@ subsystems:
     description: >
       Computes Benford's Law metrics, extracts 36+ on-chain features, and
       runs the Random Forest / XGBoost / LightGBM ensemble to produce
-      the LedgerLens Risk Score (0–100).
+      the Stellar Lense Risk Score (0–100).
     paths:
       - "detection/benford_engine.py"
       - "detection/feature_engineering.py"
@@ -76,18 +76,18 @@ subsystems:
       - "detection/drift_monitor.py"
       - "detection/ensemble_calibrator.py"
     team: "@Ledger-Lenz/ml-core"
-    tech_lead: "@ledgerlens-ml-lead"
-    on_call: "@ledgerlens-ml-lead"
+    tech_lead: "@stellar-lense-ml-lead"
+    on_call: "@stellar-lense-ml-lead"
     risk: critical
     slo:
       availability: "99.9%"
       latency_p99_ms: 200
     escalation:
       - level: 1
-        contact: "@ledgerlens-ml-lead"
+        contact: "@stellar-lense-ml-lead"
         after_minutes: 10
       - level: 2
-        contact: "@ledgerlens-maintainer"
+        contact: "@stellar-lense-maintainer"
         after_minutes: 30
     runbook: "docs/model_rollback_runbook.md"
     last_reviewed: "2026-06-13"
@@ -105,18 +105,18 @@ subsystems:
       - "utils/field_encryption.py"
       - "privacy/**"
     team: "@Ledger-Lenz/security"
-    tech_lead: "@ledgerlens-security-lead"
-    on_call: "@ledgerlens-security-lead"
+    tech_lead: "@stellar-lense-security-lead"
+    on_call: "@stellar-lense-security-lead"
     risk: critical
     slo:
       availability: "99.9%"
       latency_p99_ms: 500
     escalation:
       - level: 1
-        contact: "@ledgerlens-security-lead"
+        contact: "@stellar-lense-security-lead"
         after_minutes: 5
       - level: 2
-        contact: "@ledgerlens-maintainer"
+        contact: "@stellar-lense-maintainer"
         after_minutes: 20
     runbook: "docs/privacy.md"
     last_reviewed: "2026-06-13"
@@ -132,18 +132,18 @@ subsystems:
       - "scripts/adversarial_eval.py"
       - "scripts/adversarial_training_loop.py"
     team: "@Ledger-Lenz/security"
-    tech_lead: "@ledgerlens-security-lead"
-    on_call: "@ledgerlens-security-lead"
+    tech_lead: "@stellar-lense-security-lead"
+    on_call: "@stellar-lense-security-lead"
     risk: high
     slo:
       availability: "99.0%"
       latency_p99_ms: 5000
     escalation:
       - level: 1
-        contact: "@ledgerlens-security-lead"
+        contact: "@stellar-lense-security-lead"
         after_minutes: 30
       - level: 2
-        contact: "@ledgerlens-maintainer"
+        contact: "@stellar-lense-maintainer"
         after_minutes: 120
     runbook: "docs/adversarial_robustness.md"
     last_reviewed: "2026-06-13"
@@ -159,18 +159,18 @@ subsystems:
       - "scripts/stream.py"
       - "scripts/kafka_workers.py"
     team: "@Ledger-Lenz/data-core"
-    tech_lead: "@ledgerlens-data-lead"
-    on_call: "@ledgerlens-data-lead"
+    tech_lead: "@stellar-lense-data-lead"
+    on_call: "@stellar-lense-data-lead"
     risk: high
     slo:
       availability: "99.5%"
       latency_p99_ms: 5000
     escalation:
       - level: 1
-        contact: "@ledgerlens-data-lead"
+        contact: "@stellar-lense-data-lead"
         after_minutes: 15
       - level: 2
-        contact: "@ledgerlens-infra-lead"
+        contact: "@stellar-lense-infra-lead"
         after_minutes: 45
     runbook: "docs/streaming_architecture.md"
     last_reviewed: "2026-06-13"
@@ -178,23 +178,23 @@ subsystems:
   soroban_integration:
     name: "Soroban Contract Integration"
     description: >
-      Submits and reads risk scores from the ledgerlens-score Soroban smart
+      Submits and reads risk scores from the stellar-lense-score Soroban smart
       contract, handles ZK attestation and governance contract interactions.
     paths:
       - "integrations/**"
     team: "@Ledger-Lenz/contracts"
-    tech_lead: "@ledgerlens-contracts-lead"
-    on_call: "@ledgerlens-contracts-lead"
+    tech_lead: "@stellar-lense-contracts-lead"
+    on_call: "@stellar-lense-contracts-lead"
     risk: critical
     slo:
       availability: "99.0%"
       latency_p99_ms: 10000
     escalation:
       - level: 1
-        contact: "@ledgerlens-contracts-lead"
+        contact: "@stellar-lense-contracts-lead"
         after_minutes: 15
       - level: 2
-        contact: "@ledgerlens-maintainer"
+        contact: "@stellar-lense-maintainer"
         after_minutes: 60
     runbook: "docs/scoring.md"
     last_reviewed: "2026-06-13"
@@ -210,18 +210,18 @@ subsystems:
       - "scripts/migrate_add_ring_id.py"
       - "models/**"
     team: "@Ledger-Lenz/ml-core"
-    tech_lead: "@ledgerlens-ml-lead"
-    on_call: "@ledgerlens-ml-lead"
+    tech_lead: "@stellar-lense-ml-lead"
+    on_call: "@stellar-lense-ml-lead"
     risk: critical
     slo:
       availability: "99.9%"
       latency_p99_ms: 100
     escalation:
       - level: 1
-        contact: "@ledgerlens-ml-lead"
+        contact: "@stellar-lense-ml-lead"
         after_minutes: 10
       - level: 2
-        contact: "@ledgerlens-maintainer"
+        contact: "@stellar-lense-maintainer"
         after_minutes: 30
     runbook: "docs/model_governance.md"
     last_reviewed: "2026-06-13"
@@ -238,18 +238,18 @@ subsystems:
       - "Makefile"
       - "monitoring/**"
     team: "@Ledger-Lenz/infra"
-    tech_lead: "@ledgerlens-infra-lead"
-    on_call: "@ledgerlens-infra-lead"
+    tech_lead: "@stellar-lense-infra-lead"
+    on_call: "@stellar-lense-infra-lead"
     risk: high
     slo:
       availability: "99.0%"
       latency_p99_ms: null
     escalation:
       - level: 1
-        contact: "@ledgerlens-infra-lead"
+        contact: "@stellar-lense-infra-lead"
         after_minutes: 30
       - level: 2
-        contact: "@ledgerlens-maintainer"
+        contact: "@stellar-lense-maintainer"
         after_minutes: 120
     runbook: "docs/monitoring.md"
     last_reviewed: "2026-06-13"
@@ -265,18 +265,18 @@ subsystems:
       - "scripts/list_model_versions.py"
       - ".github/workflows/retrain.yml"
     team: "@Ledger-Lenz/ml-core"
-    tech_lead: "@ledgerlens-ml-lead"
-    on_call: "@ledgerlens-ml-lead"
+    tech_lead: "@stellar-lense-ml-lead"
+    on_call: "@stellar-lense-ml-lead"
     risk: high
     slo:
       availability: "99.0%"
       latency_p99_ms: null
     escalation:
       - level: 1
-        contact: "@ledgerlens-ml-lead"
+        contact: "@stellar-lense-ml-lead"
         after_minutes: 60
       - level: 2
-        contact: "@ledgerlens-maintainer"
+        contact: "@stellar-lense-maintainer"
         after_minutes: 240
     runbook: "docs/drift_detection.md"
     last_reviewed: "2026-06-13"
@@ -294,18 +294,18 @@ subsystems:
       - "scripts/generate_reports.py"
       - "scripts/score_wallet.py"
     team: "@Ledger-Lenz/maintainers"
-    tech_lead: "@ledgerlens-maintainer"
-    on_call: "@ledgerlens-maintainer"
+    tech_lead: "@stellar-lense-maintainer"
+    on_call: "@stellar-lense-maintainer"
     risk: high
     slo:
       availability: "99.0%"
       latency_p99_ms: 2000
     escalation:
       - level: 1
-        contact: "@ledgerlens-maintainer"
+        contact: "@stellar-lense-maintainer"
         after_minutes: 30
       - level: 2
-        contact: "@ledgerlens-security-lead"
+        contact: "@stellar-lense-security-lead"
         after_minutes: 120
     runbook: "docs/forensic_reporting.md"
     last_reviewed: "2026-06-13"

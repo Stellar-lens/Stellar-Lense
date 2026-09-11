@@ -73,19 +73,19 @@ def test_pipeline_reports_each_missing_var_on_its_own_line(monkeypatch):
 
 def test_pipeline_onchain_requires_contract_vars_even_though_pipeline_does_not(monkeypatch):
     _set_pipeline_baseline(monkeypatch)
-    monkeypatch.setattr(Config, "LEDGERLENS_CONTRACT_ID", "")
-    monkeypatch.setattr(Config, "LEDGERLENS_SUBMITTER_SECRET", "")
+    monkeypatch.setattr(Config, "STELLARLENSE_CONTRACT_ID", "")
+    monkeypatch.setattr(Config, "STELLARLENSE_SUBMITTER_SECRET", "")
 
     validate_mode("pipeline")  # not required for the plain pipeline mode
 
-    with pytest.raises(OSError, match="LEDGERLENS_CONTRACT_ID"):
+    with pytest.raises(OSError, match="STELLARLENSE_CONTRACT_ID"):
         validate_mode("pipeline_onchain")
 
 
 def test_pipeline_onchain_passes_once_fully_configured(monkeypatch):
     _set_pipeline_baseline(monkeypatch)
-    monkeypatch.setattr(Config, "LEDGERLENS_CONTRACT_ID", "contract-id")
-    monkeypatch.setattr(Config, "LEDGERLENS_SUBMITTER_SECRET", "secret")
+    monkeypatch.setattr(Config, "STELLARLENSE_CONTRACT_ID", "contract-id")
+    monkeypatch.setattr(Config, "STELLARLENSE_SUBMITTER_SECRET", "secret")
     monkeypatch.setattr(Config, "SOROBAN_RPC_URL", "https://soroban-testnet.stellar.org")
     monkeypatch.setattr(Config, "STELLAR_NETWORK", "TESTNET")
 
@@ -94,8 +94,8 @@ def test_pipeline_onchain_passes_once_fully_configured(monkeypatch):
 
 def test_pipeline_onchain_rejects_invalid_stellar_network(monkeypatch):
     _set_pipeline_baseline(monkeypatch)
-    monkeypatch.setattr(Config, "LEDGERLENS_CONTRACT_ID", "contract-id")
-    monkeypatch.setattr(Config, "LEDGERLENS_SUBMITTER_SECRET", "secret")
+    monkeypatch.setattr(Config, "STELLARLENSE_CONTRACT_ID", "contract-id")
+    monkeypatch.setattr(Config, "STELLARLENSE_SUBMITTER_SECRET", "secret")
     monkeypatch.setattr(Config, "SOROBAN_RPC_URL", "https://soroban-testnet.stellar.org")
     monkeypatch.setattr(Config, "STELLAR_NETWORK", "MAINNET")  # not a real Stellar network name
 
@@ -104,14 +104,14 @@ def test_pipeline_onchain_rejects_invalid_stellar_network(monkeypatch):
 
 
 def test_pipeline_onchain_fails_fast_without_submitter_secret(monkeypatch):
-    """Verify that --submit-onchain without LEDGERLENS_SUBMITTER_SECRET fails at startup.
+    """Verify that --submit-onchain without STELLARLENSE_SUBMITTER_SECRET fails at startup.
 
     This test confirms that the error message specifically names the missing variable,
     and occurs before any pipeline work (ingestion/scoring) is invoked.
     """
     _set_pipeline_baseline(monkeypatch)
-    monkeypatch.setattr(Config, "LEDGERLENS_CONTRACT_ID", "contract-id")
-    monkeypatch.setattr(Config, "LEDGERLENS_SUBMITTER_SECRET", "")  # Empty secret
+    monkeypatch.setattr(Config, "STELLARLENSE_CONTRACT_ID", "contract-id")
+    monkeypatch.setattr(Config, "STELLARLENSE_SUBMITTER_SECRET", "")  # Empty secret
     monkeypatch.setattr(Config, "SOROBAN_RPC_URL", "https://soroban-testnet.stellar.org")
     monkeypatch.setattr(Config, "STELLAR_NETWORK", "TESTNET")
 
@@ -119,7 +119,7 @@ def test_pipeline_onchain_fails_fast_without_submitter_secret(monkeypatch):
         validate_mode("pipeline_onchain")
 
     error_msg = str(exc.value)
-    assert "LEDGERLENS_SUBMITTER_SECRET" in error_msg
+    assert "STELLARLENSE_SUBMITTER_SECRET" in error_msg
     assert "not set" in error_msg
 
 
@@ -430,8 +430,8 @@ def test_pipeline_onchain_multi_variable_missing_lists_all_vars_and_runtime_mode
     are reported in a single message alongside mode='pipeline_onchain'.
     """
     _set_pipeline_baseline(monkeypatch)
-    monkeypatch.setattr(Config, "LEDGERLENS_CONTRACT_ID", "")
-    monkeypatch.setattr(Config, "LEDGERLENS_SUBMITTER_SECRET", "")
+    monkeypatch.setattr(Config, "STELLARLENSE_CONTRACT_ID", "")
+    monkeypatch.setattr(Config, "STELLARLENSE_SUBMITTER_SECRET", "")
     monkeypatch.setattr(Config, "STELLAR_NETWORK", "INVALID_NET")
 
     with pytest.raises(OSError) as exc_info:
@@ -439,7 +439,7 @@ def test_pipeline_onchain_multi_variable_missing_lists_all_vars_and_runtime_mode
 
     err_msg = str(exc_info.value)
     assert "mode='pipeline_onchain'" in err_msg
-    assert "LEDGERLENS_CONTRACT_ID is not set" in err_msg
-    assert "LEDGERLENS_SUBMITTER_SECRET is not set" in err_msg
+    assert "STELLARLENSE_CONTRACT_ID is not set" in err_msg
+    assert "STELLARLENSE_SUBMITTER_SECRET is not set" in err_msg
     assert "STELLAR_NETWORK" in err_msg
 

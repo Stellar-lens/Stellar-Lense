@@ -39,7 +39,7 @@ class CrossVenueAggregator:
     def __init__(
         self,
         topic: str,
-        group_id: str = "ledgerlens-aggregator",
+        group_id: str = "stellar-lense-aggregator",
         bootstrap_servers: list[str] | str = "localhost:9092",
     ):
         """Initialize aggregator consumer.

@@ -249,7 +249,7 @@ value came from the expected trade window.
 
 ```bash
 # Seed a synthetic risk-score record in a local SQLite database.
-RISK_SCORE_DB_URL=sqlite:////tmp/ledgerlens-risk.db \
+RISK_SCORE_DB_URL=sqlite:////tmp/stellar-lense-risk.db \
 python - <<'PY'
 from detection.persistence import Base, RiskScoreRecord, get_engine
 from sqlalchemy.orm import Session
@@ -272,7 +272,7 @@ with Session(engine) as session:
 PY
 
 # Trace one feature for that wallet.
-RISK_SCORE_DB_URL=sqlite:////tmp/ledgerlens-risk.db \
+RISK_SCORE_DB_URL=sqlite:////tmp/stellar-lense-risk.db \
 python -m scripts.trace_feature \
     --wallet GCRN5Q6QK6SP3U2PB5UD2JJJ5K3T2EC2KSN3FV7RO4DVK2G4MYA6V3E \
     --feature benford_chi_square_24h \

@@ -206,8 +206,8 @@ jobs:
               print("   Required actions:")
               print("   1. Bump the version and update model_metadata.json feature_schema_hash")
               print("   2. Retrain all three ensemble models")
-              print("   3. Update ledgerlens-core feature type definitions")
-              print("   4. Open linked PRs in ledgerlens-api and ledgerlens-dashboard")
+              print("   3. Update stellar-lense-core feature type definitions")
+              print("   4. Open linked PRs in stellar-lense-api and stellar-lense-dashboard")
           else:
               print("✅ No feature column removals detected")
           EOF
@@ -626,7 +626,7 @@ jobs:
           if missing_fields:
               print(f"⚠️  RiskScore fields possibly missing from contract_client.py: {missing_fields}")
               print("   The on-chain struct and the Python client must stay in sync")
-              print("   Cross-check with ledgerlens-contract's RiskScore definition")
+              print("   Cross-check with stellar-lense-contract's RiskScore definition")
           else:
               print("✅ All expected RiskScore fields present in contract_client.py")
           EOF
@@ -654,12 +654,12 @@ jobs:
           echo "   python -m scripts.testnet_setup"
           echo "   python run_pipeline.py --submit-onchain --dry-run"
           echo ""
-          echo "2. Confirm ledgerlens-contract ABI matches this client"
+          echo "2. Confirm stellar-lense-contract ABI matches this client"
           echo ""
           echo "3. If RiskScore struct changed:"
-          echo "   - Open a linked PR in ledgerlens-contract"
-          echo "   - Update ledgerlens-core shared types"
-          echo "   - Notify ledgerlens-api and ledgerlens-dashboard teams"
+          echo "   - Open a linked PR in stellar-lense-contract"
+          echo "   - Update stellar-lense-core shared types"
+          echo "   - Notify stellar-lense-api and stellar-lense-dashboard teams"
 
   generate-review-summary:
     name: Generate Review Summary

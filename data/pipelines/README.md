@@ -1,22 +1,22 @@
-# LedgerLens Data 🔍 ...
+# Stellar Lense Data 🔍 ...
 
-[![CI](https://github.com/Ledger-Lenz/Ledgerlens-data/actions/workflows/ci.yml/badge.svg)](https://github.com/Ledger-Lenz/Ledgerlens-data/actions/workflows/ci.yml)
+[![CI](https://github.com/Stellar-lens/Stellar-Lense/actions/workflows/ci.yml/badge.svg)](https://github.com/Stellar-lens/Stellar-Lense/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Built on Stellar](https://img.shields.io/badge/Built%20on-Stellar-blue?logo=stellar)](https://stellar.org)
 [![Soroban Smart Contracts](https://img.shields.io/badge/Smart%20Contracts-Soroban-purple)](https://soroban.stellar.org)
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](Dockerfile)
 
-Data ingestion, fraud-detection engine, and feature pipeline for **LedgerLens** — a hybrid on-chain fraud detection system for the Stellar DEX that combines **Benford's Law digit analysis** with **ensemble machine learning** to detect wash trading and artificial volume.
+Data ingestion, fraud-detection engine, and feature pipeline for **Stellar Lense** — a hybrid on-chain fraud detection system for the Stellar DEX that combines **Benford's Law digit analysis** with **ensemble machine learning** to detect wash trading and artificial volume.
 
-> *"On a transparent ledger, every transaction is visible. LedgerLens makes them legible."*
+> *"On a transparent ledger, every transaction is visible. Stellar Lense makes them legible."*
 
 ## Overview
 
-This repository holds the data and detection layer of LedgerLens: the pipelines that pull trade data from the Stellar Horizon API, compute Benford's Law anomaly metrics, extract on-chain ML features, train and run the ensemble classifiers, and produce the **LedgerLens Risk Score (0–100)** consumed by the API, dashboard, and Soroban contract layer.
+This repository holds the data and detection layer of Stellar Lense: the pipelines that pull trade data from the Stellar Horizon API, compute Benford's Law anomaly metrics, extract on-chain ML features, train and run the ensemble classifiers, and produce the **Stellar Lense Risk Score (0–100)** consumed by the API, dashboard, and Soroban contract layer.
 
 ## The Problem
 
-Wash trading — simultaneously buying and selling the same asset to artificially inflate volume — is one of the most pervasive forms of market manipulation in DeFi. Stellar's 3–5 second settlement finality and sub-cent fees make wash trading cheap to execute at scale, while the sheer volume of on-chain activity makes manual detection impossible. No production-grade, open-source detection system exists for the Stellar DEX — LedgerLens fills that gap.
+Wash trading — simultaneously buying and selling the same asset to artificially inflate volume — is one of the most pervasive forms of market manipulation in DeFi. Stellar's 3–5 second settlement finality and sub-cent fees make wash trading cheap to execute at scale, while the sheer volume of on-chain activity makes manual detection impossible. No production-grade, open-source detection system exists for the Stellar DEX — Stellar Lense fills that gap.
 
 ## What This Repo Does
 
@@ -53,19 +53,19 @@ Wash trading — simultaneously buying and selling the same asset to artificiall
 │             │                              │                   │
 │             └──────────┬───────────────────┘                  │
 │                         ▼                                      │
-│              LedgerLens Risk Score (0–100)                    │
+│              Stellar Lense Risk Score (0–100)                    │
 └──────────────────────────┬────────────────────────────────────┘
                             │
                             ▼
             Consumed by the API, dashboard, and the
-            ledgerlens-score Soroban contract
+            stellar-lense-score Soroban contract
 ```
 
 ## Benford's Law on the Blockchain
 
 Benford's Law states that in many naturally occurring numerical datasets, the leading digit 1 appears ~30.1% of the time, declining to ~4.6% for digit 9. Genuine trading activity produces a wide, unbiased spread of transaction sizes that conforms to this distribution. Wash trading — typically driven by bots using fixed lot sizes, round numbers, or algorithmically generated amounts — deviates systematically from it.
 
-LedgerLens applies three Benford metrics over rolling time windows (1h, 4h, 24h, 7d, 30d):
+Stellar Lense applies three Benford metrics over rolling time windows (1h, 4h, 24h, 7d, 30d):
 
 | Metric | What it measures |
 |---|---|
@@ -195,7 +195,7 @@ perturbed test set. See `scripts/run_adversarial_eval.py`.
 ## Repository Structure
 
 ```
-ledgerlens-data/
+stellar-lense-data/
 │
 ├── README.md                         ← This file
 ├── requirements.txt                  ← Python dependencies
@@ -224,7 +224,7 @@ ledgerlens-data/
 │   └── risk_score_store.py           ← RiskScore upsert/read repository
 │
 ├── integrations/
-│   └── contract_client.py            ← ledgerlens-score Soroban contract client
+│   └── contract_client.py            ← stellar-lense-score Soroban contract client
 │
 ├── streaming/
 │   ├── feature_buffer.py             ← FeatureBuffer (rolling per-wallet trade buffer)
@@ -275,7 +275,7 @@ python -m scripts.score_wallet --wallet <G...> --pair "USDC:<G...>/XLM:native"
 `config.py` centralizes every environment variable this repo reads, but
 different entry points depend on different subsets of it — the REST API
 needs `API_KEYS`; the Kafka streaming worker needs `TRADE_AVRO_SCHEMA_PATH`;
-`--submit-onchain` needs `LEDGERLENS_CONTRACT_ID`. `config/contracts.py`
+`--submit-onchain` needs `STELLARLENSE_CONTRACT_ID`. `config/contracts.py`
 defines one **runtime-mode contract** per entry point (`pipeline`,
 `pipeline_onchain`, `api`, `streaming_sse`, `streaming_kafka`, `ws_server`,
 `training`) and every entry point validates its contract at startup, so a
@@ -351,16 +351,16 @@ config").
 
 ```bash
 # Bring up Zookeeper, Kafka, the producer, 3 scorer replicas, Prometheus + Grafana
-docker-compose up --scale ledgerlens-scorer=3
+docker-compose up --scale stellar-lense-scorer=3
 ```
 
 Architecture: a `HorizonKafkaProducer` serialises each Horizon SSE trade to Avro
 (`data/trade_avro_schema.json`) and produces it to
-`ledgerlens.trades.{asset_pair}`, keyed by `wallet_id` so per-wallet ordering is
-preserved. `KafkaWorker` replicas in the shared `ledgerlens-scorer` consumer
+`stellar_lense.trades.{asset_pair}`, keyed by `wallet_id` so per-wallet ordering is
+preserved. `KafkaWorker` replicas in the shared `stellar-lense-scorer` consumer
 group consume via a wildcard subscription, score wallets, dispatch alerts, and
 commit offsets only after dispatch (at-least-once). Serialisation failures go to
-a dead-letter queue (`ledgerlens.trades.dlq`); they are never auto-retried.
+a dead-letter queue (`stellar_lense.trades.dlq`); they are never auto-retried.
 
 | Variable | Default | Description |
 |---|---|---|
@@ -385,7 +385,7 @@ for the Kafka topology, partition strategy, and at-least-once semantics.
 | `--no-persist` | Skip writing scored wallets to `RISK_SCORE_DB_URL` |
 | `--no-orderbook` | Skip loading order-book events (faster; `order_cancellation_rate` stays `0`) |
 | `--no-graph` | Skip loading account activity and building the wallet funding graph (faster; `funding_source_similarity` and `network_centrality` stay `0`) |
-| `--submit-onchain` | Submit flagged wallets' `RiskScore` to the `ledgerlens-score` contract via `integrations/contract_client.py` |
+| `--submit-onchain` | Submit flagged wallets' `RiskScore` to the `stellar-lense-score` contract via `integrations/contract_client.py` |
 | `--dry-run` | Run all pipeline stages but skip every write — no DB persistence and no on-chain submission (implies `--no-persist`; silently skips `--submit-onchain`). Flagged wallets are still printed. |
 | `--checkpoint-file <path>` | Path to a JSON checkpoint file enabling resumable per-pair processing. Pairs already completed are skipped; failed pairs are retried on the next run instead of aborting the whole pipeline. Ignored with `--dry-run`. |
 | `--fresh` | Discard an existing `--checkpoint-file` and start over. No effect without `--checkpoint-file`. |
@@ -412,7 +412,7 @@ Every training run produces a `model_metadata.json` sidecar file. This is used b
   "feature_contract_hash": "sha256:<hash-of-versioned-ordered-names-and-dtypes>",
   "model_names": ["random_forest", "xgboost", "lightgbm"],
   "python_version": "3.11.9",
-  "ledgerlens_version": "0.2.0"
+  "stellar_lense_version": "0.2.0"
 }
 ```
 
@@ -436,7 +436,7 @@ contract and rollout policy.
 
 ## Continuous Retraining Pipeline
 
-LedgerLens includes an automated retraining pipeline that detects feature drift
+Stellar Lense includes an automated retraining pipeline that detects feature drift
 using the **Population Stability Index (PSI)** and safely promotes new models
 without disrupting production.
 
@@ -487,7 +487,7 @@ See [`scripts/README.md`](scripts/README.md) for detailed usage of:
 
 ## Active Learning
 
-LedgerLens includes an active learning pipeline that intelligently selects the most informative
+Stellar Lense includes an active learning pipeline that intelligently selects the most informative
 wallets for analyst annotation, minimising labelling effort while maximising model improvement.
 
 ```bash
@@ -536,7 +536,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full dev setup and PR process.
 
 ## Organization Map
 
-This section orients agents and contributors working across the LedgerLens
+This section orients agents and contributors working across the Stellar Lense
 organization. It describes how the six repos fit together, what each one
 owns, and the shared contracts/interfaces that let them be developed
 independently while staying integrated.
@@ -546,11 +546,11 @@ independently while staying integrated.
 | Repo | Role | Primary stack |
 |---|---|---|
 | **`.github`** | Org-wide config: shared GitHub Actions workflows, issue/PR templates, CODEOWNERS, security policy | YAML / Actions |
-| **`ledgerlens-data`** *(this repo)* | Ingestion + detection: pulls Stellar DEX trade data, computes Benford's Law metrics and ML features, trains/runs the ensemble, produces the **LedgerLens Risk Score** | Python (pandas, scikit-learn, XGBoost, LightGBM, SHAP) |
-| **`ledgerlens-core`** | Shared types, schemas, and SDK code used by `api`, `dashboard`, and `contract` (e.g. `RiskScore`, asset pair identifiers, scoring constants) | TypeScript / Python (shared package) |
-| **`ledgerlens-api`** | Public REST API — serves risk scores, alerts, asset rankings; reads from this repo's output store and the on-chain contract | TypeScript (FastAPI/Express-style) |
-| **`ledgerlens-dashboard`** | Web dashboard — visualizes risk scores, flagged wallets/pairs, SHAP explanations | React/Vite |
-| **`ledgerlens-contract`** (`ledgerlens-score`) | Soroban smart contract — on-chain truth layer for risk scores (`submit_score`, `get_score`) | Rust / Soroban SDK |
+| **`stellar-lense-data`** *(this repo)* | Ingestion + detection: pulls Stellar DEX trade data, computes Benford's Law metrics and ML features, trains/runs the ensemble, produces the **Stellar Lense Risk Score** | Python (pandas, scikit-learn, XGBoost, LightGBM, SHAP) |
+| **`stellar-lense-core`** | Shared types, schemas, and SDK code used by `api`, `dashboard`, and `contract` (e.g. `RiskScore`, asset pair identifiers, scoring constants) | TypeScript / Python (shared package) |
+| **`stellar-lense-api`** | Public REST API — serves risk scores, alerts, asset rankings; reads from this repo's output store and the on-chain contract | TypeScript (FastAPI/Express-style) |
+| **`stellar-lense-dashboard`** | Web dashboard — visualizes risk scores, flagged wallets/pairs, SHAP explanations | React/Vite |
+| **`stellar-lense-contract`** (`stellar-lense-score`) | Soroban smart contract — on-chain truth layer for risk scores (`submit_score`, `get_score`) | Rust / Soroban SDK |
 
 ### End-to-End Data Flow
 
@@ -559,7 +559,7 @@ independently while staying integrated.
         │
         ▼
 ┌───────────────────┐
-│  ledgerlens-data   │  ingestion/ → detection/ → RiskScore records
+│  stellar-lense-data   │  ingestion/ → detection/ → RiskScore records
 │  (this repo)       │
 └─────────┬──────────┘
           │ writes scored records (DB / object store / queue)
@@ -567,7 +567,7 @@ independently while staying integrated.
           ├──────────────────────────────┐
           ▼                               ▼
 ┌───────────────────┐          ┌────────────────────────┐
-│  ledgerlens-contract│ ◄────── │   ledgerlens-api        │
+│  stellar-lense-contract│ ◄────── │   stellar-lense-api        │
 │  submit_score()     │  calls  │   reads RiskScore store │
 │  get_score()        │         │   reads on-chain scores │
 └─────────┬──────────┘          └───────────┬────────────┘
@@ -576,25 +576,25 @@ independently while staying integrated.
           │ used by other Soroban contracts) │
           ▼                                  ▼
    Other Soroban protocols          ┌────────────────────┐
-   (AMMs, lending, aggregators)     │ ledgerlens-dashboard│
+   (AMMs, lending, aggregators)     │ stellar-lense-dashboard│
                                      └────────────────────┘
 
-ledgerlens-core: shared types/SDK imported by api, dashboard, contract clients
+stellar-lense-core: shared types/SDK imported by api, dashboard, contract clients
 .github: CI/CD workflows + policies shared by all of the above
 ```
 
 **Summary of the handoff points:**
 
-1. **`ledgerlens-data` → `ledgerlens-api`**: this repo's pipeline output (the
+1. **`stellar-lense-data` → `stellar-lense-api`**: this repo's pipeline output (the
    `RiskScore` feature/score records from `detection/model_inference.py`)
-   is written to a shared store (`RISK_SCORE_DB_URL`). `ledgerlens-api`
+   is written to a shared store (`RISK_SCORE_DB_URL`). `stellar-lense-api`
    reads from that store to serve `/score/{wallet}/{pair}`,
    `/alerts/recent`, and `/assets/risk-ranking`.
-2. **`ledgerlens-data` / `ledgerlens-api` → `ledgerlens-contract`**: an
+2. **`stellar-lense-data` / `stellar-lense-api` → `stellar-lense-contract`**: an
    authorized service account calls `submit_score(wallet, asset_pair,
    score, timestamp)` to register scores on-chain. Any contract can then
    call `get_score(wallet, asset_pair)` permissionlessly.
-3. **`ledgerlens-core` → everyone**: defines the canonical `RiskScore`
+3. **`stellar-lense-core` → everyone**: defines the canonical `RiskScore`
    shape, asset-pair identifier format, and risk thresholds so all repos
    agree on field names and units without copy-pasting types.
 4. **`.github` → everyone**: shared CI workflows (lint/test/build per
@@ -603,7 +603,7 @@ ledgerlens-core: shared types/SDK imported by api, dashboard, contract clients
 ### Shared Contracts
 
 These are the data shapes and conventions every repo must agree on. If you
-change one of these in `ledgerlens-data`, update `ledgerlens-core` and open
+change one of these in `stellar-lense-data`, update `stellar-lense-core` and open
 linked issues/PRs in the consuming repos.
 
 #### `RiskScore` (on-chain + API shape)
@@ -623,8 +623,8 @@ pub struct RiskScore {
 
 Produced in this repo by `detection/model_inference.py::RiskScorer.score()`
 (uncertainty fields via `RiskScorer.score_with_uncertainty()`).
-Mirrors `ledgerlens-contract`'s `submit_score` payload and
-`ledgerlens-api`'s `/score/{wallet}/{pair}` response.
+Mirrors `stellar-lense-contract`'s `submit_score` payload and
+`stellar-lense-api`'s `/score/{wallet}/{pair}` response.
 
 ##### Uncertainty Fields
 
@@ -677,15 +677,15 @@ The 36+ feature columns produced by
 input for `detection/model_training.py`. Any new feature column must be
 added to both the training pipeline and `model_inference.py`'s
 `FEATURE_COLUMNS_EXCLUDE`-aware scoring path, and documented in
-`ledgerlens-core` if other repos need to display feature attributions
+`stellar-lense-core` if other repos need to display feature attributions
 (SHAP output from `detection/shap_explainer.py`). Cross-asset coordination
 features require that `all_pairs_df` be passed to `build_feature_matrix`;
 if not provided, these features default to 0.0.
 
-### This Repo (`ledgerlens-data`) — Current State
+### This Repo (`stellar-lense-data`) — Current State
 
 ```
-ledgerlens-data/
+stellar-lense-data/
 ├── config.py                  ← env-driven configuration
 ├── run_pipeline.py            ← pipeline entry point (ingest → features → score → persist/submit)
 ├── ingestion/
@@ -705,7 +705,7 @@ ledgerlens-data/
 │   ├── persistence.py           ← SQLAlchemy RiskScore model + engine
 │   └── risk_score_store.py      ← RiskScore upsert/read repository
 ├── integrations/
-│   └── contract_client.py      ← ledgerlens-score Soroban contract client
+│   └── contract_client.py      ← stellar-lense-score Soroban contract client
 ├── scripts/
 │   ├── generate_synthetic_dataset.py ← synthetic labelled dataset generator
 │   └── run_adversarial_eval.py  ← adversarial robustness report (FGSM/PGD)
@@ -717,16 +717,16 @@ ledgerlens-data/
 - `model_training.py` trains on `scripts/generate_synthetic_dataset.py`'s
   synthetic data by default; the real labelled wash-trade dataset is still
   the "Open dataset release" roadmap item.
-- `--submit-onchain` assumes a deployed `ledgerlens-score` contract and a
-  funded `LEDGERLENS_SUBMITTER_SECRET`; it has unit test coverage via mocks
+- `--submit-onchain` assumes a deployed `stellar-lense-score` contract and a
+  funded `STELLARLENSE_SUBMITTER_SECRET`; it has unit test coverage via mocks
   but hasn't been exercised against a live Soroban network from this repo.
 
-When picking up one of these, check whether `ledgerlens-core` already
+When picking up one of these, check whether `stellar-lense-core` already
 defines the relevant shared type before inventing a new one.
 
 ## Historical Backtesting
 
-LedgerLens includes a **Historical Backtesting Framework** (`scripts/backtest.py`)
+Stellar Lense includes a **Historical Backtesting Framework** (`scripts/backtest.py`)
 that replays Stellar Horizon trade history, scores wallets using trained models,
 and evaluates detection performance against a hand-curated ground truth of 25
 known market manipulation events.
@@ -791,7 +791,7 @@ in the report.
 
 ## Security
 
-LedgerLens includes a hardened inference stack to protect against adversarial attacks on the model layer itself. See [`docs/security.md`](docs/security.md) for full details.
+Stellar Lense includes a hardened inference stack to protect against adversarial attacks on the model layer itself. See [`docs/security.md`](docs/security.md) for full details.
 
 ### Artifact Integrity (Ed25519 Trust Chain)
 
@@ -822,11 +822,11 @@ Each annotation in `data/annotation_queue.json` is protected by an HMAC-SHA256 c
 
 ## Why This Matters
 
-A DEX where volume figures cannot be trusted is one that institutional participants and serious traders will avoid. LedgerLens is an **open-source public good** — its scores, methodology, and training data are fully transparent and auditable, and will always be free to query.
+A DEX where volume figures cannot be trusted is one that institutional participants and serious traders will avoid. Stellar Lense is an **open-source public good** — its scores, methodology, and training data are fully transparent and auditable, and will always be free to query.
 
 ## Compliance & Forensic Reporting
 
-LedgerLens risk scores are designed to support regulatory compliance workflows
+Stellar Lense risk scores are designed to support regulatory compliance workflows
 including FATF Travel Rule reviews, SEC market-manipulation investigations, and
 FinCEN Suspicious Activity Report (SAR) filings.
 
@@ -899,7 +899,7 @@ MIT
 
 <div align="center">
 
-**LedgerLens** — Making the Stellar ledger legible.
+**Stellar Lense** — Making the Stellar ledger legible.
 
 *Built for the Stellar ecosystem. Open source. Community owned.*
 

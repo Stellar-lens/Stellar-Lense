@@ -100,8 +100,8 @@ gates:
       - "ingestion/data_models.py"
       - "detection/model_inference.py"
     prompt: >-
-      These shapes are mirrored by `ledgerlens-core` and consumed by
-      `ledgerlens-api`, `ledgerlens-contract`, and `ledgerlens-dashboard`. Name
+      These shapes are mirrored by `stellar-lense-core` and consumed by
+      `stellar-lense-api`, `stellar-lense-contract`, and `stellar-lense-dashboard`. Name
       the fields that changed and link the downstream issues or PRs. If errors
       are raised at an ingestion boundary, confirm they carry enough context to
       triage (which source, which record, underlying cause) and follow the

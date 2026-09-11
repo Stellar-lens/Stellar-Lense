@@ -48,12 +48,12 @@ logger = get_logger(__name__)
 #
 # Separate from the governance/pause polling above: this section listens for
 # score-oracle contract events (``score_read``, ``score_updated``,
-# ``threshold_updated``) emitted by the on-chain LedgerLens score consumer
+# ``threshold_updated``) emitted by the on-chain StellarLense score consumer
 # contract, persists them (with wallet/consumer addresses HMAC-hashed for
 # privacy) and raises a "stale score consumption" alert when a caller reads a
 # score that has since drifted materially from the current score.
 
-EVENT_HMAC_SECRET = os.getenv("EVENT_HMAC_SECRET", "ledgerlens-soroban-event-hmac-default")
+EVENT_HMAC_SECRET = os.getenv("EVENT_HMAC_SECRET", "stellar-lense-soroban-event-hmac-default")
 
 STALE_SCORE_ALERT_THRESHOLD = 20
 

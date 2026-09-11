@@ -1,9 +1,9 @@
 """Typed exceptions for the ingestion and validation layer.
 
-The hierarchy is rooted at :class:`~utils.exceptions.LedgerLensError` so other
+The hierarchy is rooted at :class:`~utils.exceptions.StellarLenseError` so other
 packages can eventually share a single base without depending on ``ingestion/``:
 
-    LedgerLensError                     (utils/exceptions.py)
+    StellarLenseError                     (utils/exceptions.py)
     └── IngestionError
         ├── InvalidInputError           (also a ValueError)
         ├── RecordValidationError
@@ -61,7 +61,7 @@ from contextlib import contextmanager
 from typing import Any, ClassVar
 
 from utils.decimal_guards import PrecisionError
-from utils.exceptions import LedgerLensError
+from utils.exceptions import StellarLenseError
 
 # Failure modes raised while turning an untrusted upstream record into a typed
 # model. pydantic's ValidationError subclasses ValueError, so it is covered.
@@ -89,7 +89,7 @@ def safe_raw(record: Mapping[str, Any] | None) -> dict[str, Any] | None:
     }
 
 
-class IngestionError(LedgerLensError):
+class IngestionError(StellarLenseError):
     """Base class for ingestion and validation failures.
 
     Args:

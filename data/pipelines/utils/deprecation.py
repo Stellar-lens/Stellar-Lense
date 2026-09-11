@@ -63,7 +63,7 @@ def deprecated(
 
     Args:
         reason: Why the symbol is deprecated (shown in the warning message).
-        removal_version: The `ledgerlens-data` version (matching the
+        removal_version: The `stellar-lense-data` version (matching the
             `pyproject.toml` ``[project] version`` scheme, e.g. ``"0.4.0"``)
             in which the symbol is planned to be removed.
         replacement: Optional name of the symbol to use instead.

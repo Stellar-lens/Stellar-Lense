@@ -2,7 +2,7 @@
 
 ## Overview
 
-LedgerLens caches several layers of *derived* data on top of raw ingested
+Stellar Lense caches several layers of *derived* data on top of raw ingested
 events: per-wallet feature matrices (`detection/feature_cache.py`), feature
 store rows (`features/feature_store.py`), Benford window statistics, and
 wallet-graph aggregates. Each of these derived values is computed from one

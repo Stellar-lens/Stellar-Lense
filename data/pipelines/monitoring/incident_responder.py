@@ -1,4 +1,4 @@
-"""Automated incident response for high-severity LedgerLens alerts.
+"""Automated incident response for high-severity StellarLense alerts.
 
 When the detection system fires a high-severity alert (risk score > 90,
 Benford MAD > 0.05, or emergency_drift alert type), IncidentResponder:

@@ -3,7 +3,7 @@
 Every Horizon / AMM-pool loader converts a raw external API record (JSON
 from a REST response or an SSE event) into one of the domain models in
 `ingestion.data_models`. Those records originate from a network service
-LedgerLens does not control -- a misbehaving relay, a MITM'd HTTP proxy, or
+StellarLense does not control -- a misbehaving relay, a MITM'd HTTP proxy, or
 a Horizon fork with a bug can all hand back a record that is *structurally*
 valid JSON but semantically nonsense (a NaN amount, a zero-denominator
 price fraction, a 10 KB "asset code", an account ID that isn't a real
@@ -39,13 +39,13 @@ from ingestion.data_models import AccountActivity, OrderBookEvent, Trade
 try:
     from prometheus_client import Counter
 
-    ledgerlens_untrusted_records_rejected_total: Counter | None = Counter(
-        "ledgerlens_untrusted_records_rejected_total",
+    stellar_lense_untrusted_records_rejected_total: Counter | None = Counter(
+        "stellar_lense_untrusted_records_rejected_total",
         "Total records from untrusted external sources rejected at the ingestion boundary",
         ["source", "field"],
     )
 except ImportError:  # pragma: no cover - exercised only without prometheus_client installed
-    ledgerlens_untrusted_records_rejected_total = None
+    stellar_lense_untrusted_records_rejected_total = None
 
 # Defense-in-depth string length cap. Stellar identifiers are all well under
 # this; anything longer signals either a malformed upstream or an attempt to
@@ -77,8 +77,8 @@ class UntrustedInputError(ValueError):
 
 
 def _reject(field: str, reason: str, *, source: str) -> NoReturn:
-    if ledgerlens_untrusted_records_rejected_total is not None:
-        ledgerlens_untrusted_records_rejected_total.labels(source=source, field=field).inc()
+    if stellar_lense_untrusted_records_rejected_total is not None:
+        stellar_lense_untrusted_records_rejected_total.labels(source=source, field=field).inc()
     raise UntrustedInputError(field, reason, source=source)
 
 

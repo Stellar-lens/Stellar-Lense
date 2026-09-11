@@ -1,4 +1,4 @@
-"""Data modules package for Ledgerlens-data."""
+"""Data modules package for StellarLense-data."""
 
 from data.lineage import (
     DataArtifactMetadata,

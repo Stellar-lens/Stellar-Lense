@@ -1,6 +1,6 @@
 """Typed configuration fixtures for named deployment modes.
 
-LedgerLens' ``Config`` (config.py) is a flat, env-var-driven surface with
+StellarLense' ``Config`` (config.py) is a flat, env-var-driven surface with
 500+ attributes. Nothing enforces that a given *deployment mode* — local
 development, Testnet staging, or Public-network production — actually sets
 a coherent, valid combination of those attributes. In practice contributors
@@ -45,11 +45,11 @@ from typing import Any
 #: Environment variable naming the deployment mode a process is running under.
 #: Absent means :attr:`DeploymentMode.LOCAL` -- safety checks that harden
 #: production must therefore be *opt-in to relax*, never opt-in to enforce.
-DEPLOYMENT_MODE_ENV_VAR = "LEDGERLENS_DEPLOYMENT_MODE"
+DEPLOYMENT_MODE_ENV_VAR = "STELLARLENSE_DEPLOYMENT_MODE"
 
 
 class DeploymentMode(StrEnum):
-    """Closed set of deployment modes LedgerLens ships fixtures for."""
+    """Closed set of deployment modes StellarLense ships fixtures for."""
 
     LOCAL = "local"
     TESTNET = "testnet"
@@ -114,12 +114,12 @@ DEPLOYMENT_MODE_FIXTURES: dict[DeploymentMode, DeploymentModeFixture] = {
             "HORIZON_URL": "https://horizon-testnet.stellar.org",
             "HORIZON_DEV_MODE": True,
             "STREAMING_BACKEND": "sse",
-            "RISK_SCORE_DB_URL": "sqlite:///ledgerlens.local.db",
+            "RISK_SCORE_DB_URL": "sqlite:///stellar_lense.local.db",
             "ALERT_CHANNEL": "stdout",
             "WATCHED_ASSET_PAIRS": [("USDC", "native")],
             "MODEL_DIR": "./models",
-            "LEDGERLENS_CONTRACT_ID": "",
-            "LEDGERLENS_SUBMITTER_SECRET": "",
+            "STELLARLENSE_CONTRACT_ID": "",
+            "STELLARLENSE_SUBMITTER_SECRET": "",
         },
         require_onchain=False,
     ),
@@ -128,7 +128,7 @@ DEPLOYMENT_MODE_FIXTURES: dict[DeploymentMode, DeploymentModeFixture] = {
         description=(
             "Shared Testnet staging deployment — Kafka streaming backend, "
             "on-chain score submission enabled against the Testnet "
-            "ledgerlens-score contract, webhook alerting."
+            "stellar-lense-score contract, webhook alerting."
         ),
         overrides={
             "STELLAR_NETWORK": "TESTNET",
@@ -136,12 +136,12 @@ DEPLOYMENT_MODE_FIXTURES: dict[DeploymentMode, DeploymentModeFixture] = {
             "HORIZON_DEV_MODE": False,
             "STREAMING_BACKEND": "kafka",
             "SOROBAN_RPC_URL": "https://soroban-testnet.stellar.org",
-            "RISK_SCORE_DB_URL": "postgresql://ledgerlens:ledgerlens@localhost:5432/ledgerlens_staging",
+            "RISK_SCORE_DB_URL": "postgresql://stellar_lense:stellar_lense@localhost:5432/stellar_lense_staging",
             "ALERT_CHANNEL": "webhook",
             "WATCHED_ASSET_PAIRS": [("USDC", "native")],
             "MODEL_DIR": "./models",
-            "LEDGERLENS_CONTRACT_ID": "testnet-contract-placeholder",
-            "LEDGERLENS_SUBMITTER_SECRET": "testnet-secret-placeholder",
+            "STELLARLENSE_CONTRACT_ID": "testnet-contract-placeholder",
+            "STELLARLENSE_SUBMITTER_SECRET": "testnet-secret-placeholder",
         },
         require_onchain=True,
     ),
@@ -158,14 +158,14 @@ DEPLOYMENT_MODE_FIXTURES: dict[DeploymentMode, DeploymentModeFixture] = {
             "HORIZON_DEV_MODE": False,
             "STREAMING_BACKEND": "kafka",
             "SOROBAN_RPC_URL": "https://soroban-rpc.stellar.org",
-            "RISK_SCORE_DB_URL": "postgresql://ledgerlens:ledgerlens@localhost:5432/ledgerlens_production",
+            "RISK_SCORE_DB_URL": "postgresql://stellar_lense:stellar_lense@localhost:5432/stellar_lense_production",
             "ALERT_CHANNEL": "webhook",
             "WATCHED_ASSET_PAIRS": [
                 ("USDC", "GA5ZSEJYBY3RJRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN")
             ],
             "MODEL_DIR": "./models",
-            "LEDGERLENS_CONTRACT_ID": "production-contract-placeholder",
-            "LEDGERLENS_SUBMITTER_SECRET": "production-secret-placeholder",
+            "STELLARLENSE_CONTRACT_ID": "production-contract-placeholder",
+            "STELLARLENSE_SUBMITTER_SECRET": "production-secret-placeholder",
         },
         require_onchain=True,
     ),

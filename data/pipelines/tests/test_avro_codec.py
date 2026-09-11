@@ -186,7 +186,7 @@ def test_deserialize_rejects_a_payload_encoded_against_a_different_schema(schema
     other_schema = {
         "type": "record",
         "name": "Trade",
-        "namespace": "io.ledgerlens",
+        "namespace": "io.stellar_lense",
         "fields": [{"name": "completely_different", "type": "string"}],
     }
     payload = serialize({"completely_different": "surprise"}, other_schema)

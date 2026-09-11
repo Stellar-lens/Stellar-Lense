@@ -2,7 +2,7 @@
 """Enforce the module layering/dependency rules declared in
 ``config/module_boundaries.yml``.
 
-Ledgerlens-data has grown into ~15 top-level packages (utils, config,
+StellarLense-data has grown into ~15 top-level packages (utils, config,
 detection, ingestion, api, scripts, ...) with no machine-checked rule
 preventing, say, ``utils`` from quietly depending on ``detection``, or a
 domain package from reaching into the HTTP API layer. That kind of drift is

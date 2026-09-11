@@ -2,7 +2,7 @@
 
 ## Summary
 
-This PR implements a production-ready secrets management system for LedgerLens-data that addresses security vulnerabilities in how sensitive credentials (Stellar keys, API keys, HMAC secrets, passwords) are handled throughout the codebase.
+This PR implements a production-ready secrets management system for StellarLense-data that addresses security vulnerabilities in how sensitive credentials (Stellar keys, API keys, HMAC secrets, passwords) are handled throughout the codebase.
 
 **Status**: ✅ Implementation Complete, Ready for Review
 
@@ -81,7 +81,7 @@ Backward-compatible wrapper providing:
 - `rotate_secret(name, new_value, new_version)` - Rotation interface
 - `verify_secrets()` - Validation of all registered secrets
 - `is_secret_configured(name)` - Check without accessing
-- Pre-registered definitions for all LedgerLens secrets
+- Pre-registered definitions for all Stellar Lense secrets
 
 #### 3. `scripts/validate_secrets.py` (250 lines)
 
@@ -94,11 +94,11 @@ CLI tool for validation and troubleshooting:
 
 ### Registered Secrets
 
-All LedgerLens secrets pre-registered with appropriate types:
+All Stellar Lense secrets pre-registered with appropriate types:
 
 | Secret | Type | Required | Description |
 |--------|------|----------|-------------|
-| `LEDGERLENS_SUBMITTER_SECRET` | Stellar Secret | Conditional | Soroban contract submission |
+| `STELLARLENSE_SUBMITTER_SECRET` | Stellar Secret | Conditional | Soroban contract submission |
 | `KAFKA_SASL_PASSWORD` | Password | Conditional | Kafka authentication |
 | `MODEL_SIGNING_PRIVATE_KEY_PATH` | File Path | Conditional | Model artifact signing |
 | `ANNOTATION_HMAC_SECRET` | HMAC Secret | Conditional | Annotation queue integrity |
@@ -141,7 +141,7 @@ All LedgerLens secrets pre-registered with appropriate types:
 
 ✅ **Integration Tests** (4 tests):
 - Full lifecycle with audit trail
-- LedgerLens secrets registration
+- Stellar Lense secrets registration
 - Global manager singleton
 
 ✅ **Security Tests** (3 tests):
@@ -198,7 +198,7 @@ Real-world integration examples:
 from utils.secrets_config import get_secret
 
 # Required secret with validation
-submitter_secret = get_secret("LEDGERLENS_SUBMITTER_SECRET", required=True)
+submitter_secret = get_secret("STELLARLENSE_SUBMITTER_SECRET", required=True)
 
 # Optional secret with default
 api_key = get_secret("OPENAI_API_KEY", required=False, default=None)
@@ -304,8 +304,8 @@ mkdir -p /run/secrets
 chmod 700 /run/secrets
 
 # Store secrets (one per file)
-echo "SBZVF2..." > /run/secrets/LEDGERLENS_SUBMITTER_SECRET
-chmod 600 /run/secrets/LEDGERLENS_SUBMITTER_SECRET
+echo "SBZVF2..." > /run/secrets/STELLARLENSE_SUBMITTER_SECRET
+chmod 600 /run/secrets/STELLARLENSE_SUBMITTER_SECRET
 
 # Configure application
 export SECRETS_DIR=/run/secrets
@@ -424,7 +424,7 @@ Future enhancements (not required for this PR):
 mkdir -p /tmp/test_secrets
 
 # 2. Store test secrets
-echo "SBZVF2CTUDTHHDKJP3UEKQRC2XLUJMCG3DL5HGJ2YPTPZXC7QCMQW2W3" > /tmp/test_secrets/LEDGERLENS_SUBMITTER_SECRET
+echo "SBZVF2CTUDTHHDKJP3UEKQRC2XLUJMCG3DL5HGJ2YPTPZXC7QCMQW2W3" > /tmp/test_secrets/STELLARLENSE_SUBMITTER_SECRET
 echo "$(python -c 'import secrets; print(secrets.token_hex(32))')" > /tmp/test_secrets/ANNOTATION_HMAC_SECRET
 
 # 3. Configure and validate

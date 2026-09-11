@@ -300,10 +300,10 @@ def cmd_report(args: argparse.Namespace) -> int:
     importers = registry.list_all()
 
     lines = []
-    lines.append("# LedgerLens Data Importers")
+    lines.append("# StellarLense Data Importers")
     lines.append("")
     lines.append("This document provides a comprehensive overview of all data source")
-    lines.append("importers available in LedgerLens-data.")
+    lines.append("importers available in StellarLense-data.")
     lines.append("")
     lines.append(f"**Total Importers:** {len(importers)}")
     lines.append("")
@@ -447,7 +447,7 @@ def cmd_list_names(args: argparse.Namespace) -> int:
 def main() -> int:
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(
-        description="Inspect and query the LedgerLens importer registry",
+        description="Inspect and query the StellarLense importer registry",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )

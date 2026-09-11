@@ -24,8 +24,8 @@ This document records the execution of the backup and restore procedures to veri
 ```
 Timestamp: 2026-08-31T14:30:00Z
 Environment: staging
-Database: postgresql://staging-rds/ledgerlens_staging
-Models Directory: /var/lib/ledgerlens/models
+Database: postgresql://staging-rds/stellar_lense_staging
+Models Directory: /var/lib/stellar_lense/models
 Backup Destination: ./backups
 
 [OK] Starting backup suite...
@@ -62,7 +62,7 @@ Backup Destination: ./backups
 ```
 Timestamp: 2026-08-31T15:00:00Z
 Backup Source: ./backups
-Target Database: postgresql://test-restore/ledgerlens_restored
+Target Database: postgresql://test-restore/stellar_lense_restored
 
 [OK] Loading backup manifest from: ./backups
 [OK] Checksum verified: 7f3a9e2caa8... (database)

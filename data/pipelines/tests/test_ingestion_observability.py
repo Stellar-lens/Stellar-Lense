@@ -41,20 +41,20 @@ def test_ingestion_metrics_emit_throughput_and_typed_failures():
 
     assert (
         registry.get_sample_value(
-            "ledgerlens_ingestion_records_total", {"source": "horizon", "stage": "fetch"}
+            "stellar_lense_ingestion_records_total", {"source": "horizon", "stage": "fetch"}
         )
         == 20
     )
     assert (
         registry.get_sample_value(
-            "ledgerlens_ingestion_throughput_records_per_second",
+            "stellar_lense_ingestion_throughput_records_per_second",
             {"source": "horizon", "stage": "fetch"},
         )
         == 10
     )
     assert (
         registry.get_sample_value(
-            "ledgerlens_ingestion_failures_total",
+            "stellar_lense_ingestion_failures_total",
             {"source": "horizon", "stage": "fetch", "error_type": "TimeoutError"},
         )
         == 1

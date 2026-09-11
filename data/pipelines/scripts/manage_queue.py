@@ -329,7 +329,7 @@ def cmd_stats(args: argparse.Namespace) -> None:
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Manage the LedgerLens active learning annotation queue."
+        description="Manage the StellarLense active learning annotation queue."
     )
     parser.add_argument(
         "--queue",

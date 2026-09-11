@@ -1,8 +1,8 @@
-# LedgerLens Forensic Reporting
+# Stellar Lense Forensic Reporting
 
 This document describes the Forensic Reporting Engine: the report schema,
 the on-chain anchoring workflow, and the step-by-step verification guide
-a regulator can use to independently validate any LedgerLens report.
+a regulator can use to independently validate any Stellar Lense report.
 
 ---
 
@@ -31,7 +31,7 @@ Every forensic report is a JSON object with the following top-level fields.
 | `generated_at` | string (ISO 8601 UTC) | Timestamp the report was created. |
 | `wallet` | string | The Stellar account ID (G…) being assessed. |
 | `asset_pair` | string | The asset pair in `CODE:ISSUER/CODE:ISSUER` format. |
-| `risk_score` | integer 0–100 | The LedgerLens ensemble risk score. |
+| `risk_score` | integer 0–100 | The Stellar Lense ensemble risk score. |
 | `score_lower` | integer 0–100 | Lower bound of the conformal prediction interval. |
 | `score_upper` | integer 0–100 | Upper bound of the conformal prediction interval. |
 | `verdict` | `"clean"` \| `"suspicious"` \| `"wash_trade"` | Human-readable classification. |
@@ -113,7 +113,7 @@ SHA-256(to_dict minus sha256 field) ──► stored in report.report_sha256
 anchor_report(report_id, report_sha256)
         │
         ▼
-Soroban ledgerlens-score contract
+Soroban stellar-lense-score contract
 anchor_report(report_id: String, sha256: String)
         │
         ▼
@@ -142,7 +142,7 @@ compliance reviewers and regulators.
 
 ---
 
-### LedgerLens Forensic Report
+### Stellar Lense Forensic Report
 
 **Report ID:** `550e8400-e29b-41d4-a716-446655440000` | **Generated:** 2025-08-28T14:32:17Z
 
@@ -165,7 +165,7 @@ and FATF Recommendation 20.
 | Conformal Lower Bound | 78 |
 | Conformal Upper Bound | 86 |
 | Verdict | wash_trade |
-| Model Name | LedgerLens Ensemble v2.1 |
+| Model Name | Stellar Lense Ensemble v2.1 |
 | Model Version | 2.1.3 |
 | Training Dataset SHA-256 | `a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6` |
 | Feature Schema Version | 1.8 |
@@ -278,7 +278,7 @@ and shows a `tqdm` progress bar.
 
 ## Regulator Verification Guide
 
-A regulator or compliance officer can independently verify any LedgerLens
+A regulator or compliance officer can independently verify any Stellar Lense
 forensic report in three steps.
 
 ### Step 1 — Verify the report's internal integrity
@@ -443,8 +443,8 @@ Security note: `top_interactions` is an internal forensic report field. It is
 | `REPORT_CONCURRENCY` | `4` | Number of parallel workers for bulk report generation. |
 | `RISK_SCORE_FLAG_THRESHOLD` | `70` | Score at or above which verdict is `suspicious`. |
 | `SOROBAN_RPC_URL` | `https://soroban-testnet.stellar.org` | Soroban RPC endpoint for on-chain anchoring. |
-| `LEDGERLENS_CONTRACT_ID` | _(required for anchoring)_ | Contract ID of the `ledgerlens-score` Soroban contract. |
-| `LEDGERLENS_SUBMITTER_SECRET` | _(required for anchoring)_ | Secret key of the service account authorised to anchor reports. |
+| `STELLARLENSE_CONTRACT_ID` | _(required for anchoring)_ | Contract ID of the `stellar-lense-score` Soroban contract. |
+| `STELLARLENSE_SUBMITTER_SECRET` | _(required for anchoring)_ | Secret key of the service account authorised to anchor reports. |
 | `SHAP_INTERACTIONS_ENABLED` | `false` | Enable SHAP pairwise interaction values in forensic reports (O(n·d²) cost). |
 
 ---

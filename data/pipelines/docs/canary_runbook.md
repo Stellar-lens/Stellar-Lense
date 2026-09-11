@@ -1,4 +1,4 @@
-# LedgerLens Canary Deployment Runbook
+# Stellar Lense Canary Deployment Runbook
 
 ## Overview
 
@@ -9,7 +9,7 @@ the Grafana dashboard and make a data-driven promotion decision.
 
 ## Dashboard
 
-Open **LedgerLens Canary Model Monitor** in Grafana
+Open **Stellar Lense Canary Model Monitor** in Grafana
 (`monitoring/grafana/dashboards/canary_monitor.json`).
 
 | Panel | What to look for |
@@ -68,11 +68,11 @@ is ≤ 15 and the canary AUC is higher, promotion is still appropriate.
 
 ## Prometheus Metric
 
-The Prometheus Summary metric `ledgerlens_canary_score_delta_seconds` exposes
+The Prometheus Summary metric `stellar_lense_canary_score_delta_seconds` exposes
 the quantile distribution of absolute score deltas.  Alert if:
 
 ```
-histogram_quantile(0.95, rate(ledgerlens_canary_score_delta_seconds_bucket[10m])) > 15
+histogram_quantile(0.95, rate(stellar_lense_canary_score_delta_seconds_bucket[10m])) > 15
 ```
 
 ## Rollback

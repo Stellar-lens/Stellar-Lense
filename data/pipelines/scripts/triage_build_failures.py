@@ -256,7 +256,7 @@ def build_triage_report(
 def render_markdown(report: dict[str, Any]) -> str:
     """Render a human-readable Markdown summary of the triage report."""
     lines = [
-        "# LedgerLens Build Failure Triage Report",
+        "# StellarLense Build Failure Triage Report",
         "",
         f"**Generated:** {report['generated_at']}",
         f"**Source:** `{report['source_file']}`",

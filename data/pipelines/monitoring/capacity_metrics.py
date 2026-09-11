@@ -3,9 +3,9 @@
 Registers three gauges scraped by Prometheus on the internal
 /metrics endpoint (not exposed externally):
 
-  - ledgerlens_cpu_usage_ratio    labelled by component
-  - ledgerlens_memory_usage_bytes (process-wide)
-  - ledgerlens_trades_per_second  labelled by asset_pair
+  - stellar_lense_cpu_usage_ratio    labelled by component
+  - stellar_lense_memory_usage_bytes (process-wide)
+  - stellar_lense_trades_per_second  labelled by asset_pair
 
 Import this module to register the metrics; call the update helpers
 periodically from the main process loop.
@@ -38,40 +38,40 @@ if _PROM_AVAILABLE:
         from prometheus_client import REGISTRY
 
         # Guard against duplicate registration in test re-imports.
-        if "ledgerlens_cpu_usage_ratio" not in REGISTRY._names_to_collectors:  # type: ignore[attr-defined]
+        if "stellar_lense_cpu_usage_ratio" not in REGISTRY._names_to_collectors:  # type: ignore[attr-defined]
             CPU_USAGE_RATIO = Gauge(
-                "ledgerlens_cpu_usage_ratio",
+                "stellar_lense_cpu_usage_ratio",
                 "CPU usage ratio (0.0–1.0) per component",
                 ["component"],
             )
         else:
-            CPU_USAGE_RATIO = REGISTRY._names_to_collectors["ledgerlens_cpu_usage_ratio"]  # type: ignore[attr-defined]
+            CPU_USAGE_RATIO = REGISTRY._names_to_collectors["stellar_lense_cpu_usage_ratio"]  # type: ignore[attr-defined]
 
-        if "ledgerlens_memory_usage_bytes" not in REGISTRY._names_to_collectors:  # type: ignore[attr-defined]
+        if "stellar_lense_memory_usage_bytes" not in REGISTRY._names_to_collectors:  # type: ignore[attr-defined]
             MEMORY_USAGE_BYTES = Gauge(
-                "ledgerlens_memory_usage_bytes",
+                "stellar_lense_memory_usage_bytes",
                 "Process resident-set-size memory usage in bytes",
             )
         else:
-            MEMORY_USAGE_BYTES = REGISTRY._names_to_collectors["ledgerlens_memory_usage_bytes"]  # type: ignore[attr-defined]
+            MEMORY_USAGE_BYTES = REGISTRY._names_to_collectors["stellar_lense_memory_usage_bytes"]  # type: ignore[attr-defined]
 
-        if "ledgerlens_trades_per_second" not in REGISTRY._names_to_collectors:  # type: ignore[attr-defined]
+        if "stellar_lense_trades_per_second" not in REGISTRY._names_to_collectors:  # type: ignore[attr-defined]
             TRADES_PER_SECOND = Gauge(
-                "ledgerlens_trades_per_second",
+                "stellar_lense_trades_per_second",
                 "Observed trade-event ingestion rate (events/s) per asset pair",
                 ["asset_pair"],
             )
         else:
-            TRADES_PER_SECOND = REGISTRY._names_to_collectors["ledgerlens_trades_per_second"]  # type: ignore[attr-defined]
+            TRADES_PER_SECOND = REGISTRY._names_to_collectors["stellar_lense_trades_per_second"]  # type: ignore[attr-defined]
 
-        if "ledgerlens_e2e_latency_seconds" not in REGISTRY._names_to_collectors:  # type: ignore[attr-defined]
+        if "stellar_lense_e2e_latency_seconds" not in REGISTRY._names_to_collectors:  # type: ignore[attr-defined]
             E2E_LATENCY_SECONDS = Histogram(
-                "ledgerlens_e2e_latency_seconds",
+                "stellar_lense_e2e_latency_seconds",
                 "End-to-end latency from ingestion to consumer decision",
                 buckets=[0.1, 0.5, 1.0, 2.0, 5.0, 10.0],
             )
         else:
-            E2E_LATENCY_SECONDS = REGISTRY._names_to_collectors["ledgerlens_e2e_latency_seconds"]  # type: ignore[attr-defined]
+            E2E_LATENCY_SECONDS = REGISTRY._names_to_collectors["stellar_lense_e2e_latency_seconds"]  # type: ignore[attr-defined]
 
     except Exception as exc:  # pragma: no cover
         logger.warning("Failed to register capacity metrics: %s", exc)

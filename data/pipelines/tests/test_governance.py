@@ -2,10 +2,10 @@
 
 from unittest.mock import MagicMock, patch
 
-from integrations.contract_client import LedgerLensContractClient
+from integrations.contract_client import StellarLenseContractClient
 
 
-def make_client(**kwargs) -> LedgerLensContractClient:
+def make_client(**kwargs) -> StellarLenseContractClient:
     defaults = {
         "contract_id": "CCONTRACT",
         "rpc_url": "https://soroban-testnet.stellar.org",
@@ -14,7 +14,7 @@ def make_client(**kwargs) -> LedgerLensContractClient:
     }
     defaults.update(kwargs)
     with patch("integrations.contract_client.ContractClient"):
-        return LedgerLensContractClient(**defaults)
+        return StellarLenseContractClient(**defaults)
 
 
 _PROPOSER_SECRET = "SAUQSDM4BPSOWVJJM7RAHPSGXDX5YLRYNZCZ5QP33EVB6WDAAVJJRJHG"

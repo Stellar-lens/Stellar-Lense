@@ -21,7 +21,7 @@ from ingestion.exceptions import (
 )
 from ingestion.horizon_fetcher import HorizonRateLimitExceeded
 from ingestion.kafka_producer import _to_canonical_pair_id
-from utils.exceptions import LedgerLensError
+from utils.exceptions import StellarLenseError
 
 VALID_POOL_ID = "a" * 64
 
@@ -32,17 +32,17 @@ VALID_POOL_ID = "a" * 64
 
 
 def test_base_error_str_is_the_message():
-    exc = LedgerLensError("something failed")
+    exc = StellarLenseError("something failed")
     assert str(exc) == "something failed"
 
 
 def test_base_error_context_defaults_to_empty_dict():
-    assert LedgerLensError("boom").context == {}
+    assert StellarLenseError("boom").context == {}
 
 
 def test_base_error_copies_context_so_later_mutation_does_not_leak():
     ctx = {"source": "loader"}
-    exc = LedgerLensError("boom", context=ctx)
+    exc = StellarLenseError("boom", context=ctx)
     ctx["source"] = "mutated"
 
     assert exc.context == {"source": "loader"}
@@ -59,7 +59,7 @@ def test_base_error_copies_context_so_later_mutation_does_not_leak():
 )
 def test_taxonomy_descends_from_shared_base(cls):
     assert issubclass(cls, IngestionError)
-    assert issubclass(cls, LedgerLensError)
+    assert issubclass(cls, StellarLenseError)
 
 
 def test_schema_validation_error_is_a_record_validation_error():

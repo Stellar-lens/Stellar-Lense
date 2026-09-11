@@ -1,4 +1,4 @@
-"""OpenTelemetry distributed tracing helpers for LedgerLens.
+"""OpenTelemetry distributed tracing helpers for StellarLense.
 
 Provides a single :func:`get_tracer` entry point that returns a configured
 OTel tracer pointing at the OTLP endpoint defined by the
@@ -47,7 +47,7 @@ def _ensure_provider() -> None:
     endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317")
     sampling_rate = float(os.getenv("OTEL_SAMPLING_RATE", "0.1"))
 
-    resource = Resource.create({"service.name": "ledgerlens"})
+    resource = Resource.create({"service.name": "stellar_lense"})
     sampler = ParentBased(root=TraceIdRatioBased(sampling_rate))
     provider = TracerProvider(resource=resource, sampler=sampler)
 

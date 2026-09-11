@@ -282,7 +282,7 @@ the `DriftMonitorHeartbeatStale` alert fires (see
 has stopped running or is failing on every invocation, which is distinct
 from (and more serious than) "no drift detected": no retraining trigger can
 fire until this is resolved, even if drift is actually occurring. Check
-`ledgerlens_drift_monitor_check_failures_total` and the process logs for the
+`stellar_lense_drift_monitor_check_failures_total` and the process logs for the
 periodic drift-check job for the underlying exception.
 
 ## Alert: Unauthorized promotion attempts {#authorization-failures}

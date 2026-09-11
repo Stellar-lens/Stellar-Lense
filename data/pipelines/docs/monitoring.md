@@ -1,4 +1,4 @@
-# LedgerLens Monitoring
+# Stellar Lense Monitoring
 
 ## CUSUM Change-Point Detection (`monitoring/cusum_detector.py`)
 
@@ -7,7 +7,7 @@
 The **CUSUM (Cumulative Sum) control chart** (Page, 1954) detects sustained
 shifts in the mean of a metric stream in O(1) time and O(1) space per update.
 
-LedgerLens uses a **two-sided CUSUM** applied to the stream of risk scores
+Stellar Lense uses a **two-sided CUSUM** applied to the stream of risk scores
 produced by the pipeline:
 
 ```
@@ -42,14 +42,14 @@ non-negative; `CUSUM_DECISION_THRESHOLD` must be strictly positive. A
 
 ### Prometheus metric
 
-`ledgerlens_cusum_alarm{metric="risk_score"}` — Gauge: **1** when alarming, **0** in-control.
+`stellar_lense_cusum_alarm{metric="risk_score"}` — Gauge: **1** when alarming, **0** in-control.
 
 The metric is emitted by `monitoring/cusum_detector.py` via `prometheus_client`.
 
 ### Alarm state persistence
 
 Alarm state is persisted to Redis under the key
-`ledgerlens:cusum:{metric_name}:alarm` so it survives worker restarts.
+`stellar_lense:cusum:{metric_name}:alarm` so it survives worker restarts.
 When Redis is unavailable, state is in-memory only (lost on restart).
 
 ### Alarm response procedure
@@ -68,7 +68,7 @@ When Redis is unavailable, state is in-memory only (lost on restart).
 
 ### Theory
 
-LedgerLens operates with strict latency budgets from data ingestion (Horizon) to consumer decision (scoring and alerting). Exceeding this budget undermines the relevance of risk scores in fast-moving markets.
+Stellar Lense operates with strict latency budgets from data ingestion (Horizon) to consumer decision (scoring and alerting). Exceeding this budget undermines the relevance of risk scores in fast-moving markets.
 
 ### Configuration
 
@@ -78,7 +78,7 @@ Latency budgets are governed by:
 
 ### Prometheus Metrics
 
-- `ledgerlens_e2e_latency_seconds` — Histogram tracking end-to-end latency for successfully scored events.
+- `stellar_lense_e2e_latency_seconds` — Histogram tracking end-to-end latency for successfully scored events.
 
 ### Emergency Watchdog
 

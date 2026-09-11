@@ -3,7 +3,7 @@
 Issue #560 — Build repository maturity tracking for advanced engineering goals
 ===============================================================================
 
-This script evaluates the LedgerLens-data repository against a configurable
+This script evaluates the StellarLense-data repository against a configurable
 maturity model and produces a scored report.  It is designed to run:
 
 * Locally by contributors to assess the health of their branch::
@@ -512,7 +512,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="repo_maturity",
         description=(
-            "LedgerLens repository maturity tracker.\n\n"
+            "StellarLense repository maturity tracker.\n\n"
             "Evaluates the repository against a five-dimension maturity model "
             "and reports a composite score (0–100)."
         ),
@@ -568,7 +568,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if not args.quiet:
         print(
-            f"LedgerLens Repository Maturity Report — "
+            f"StellarLense Repository Maturity Report — "
             f"{datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')} UTC"
         )
         print(f"Root: {root}\n")

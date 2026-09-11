@@ -20,14 +20,14 @@ Kafka producer that publishes Horizon SSE trades as Avro to per-pair topics.
   1. Converts the :class:`~ingestion.data_models.Trade` to the Avro record
      defined in ``data/trade_avro_schema.json``.
   2. Serialises it to schemaless Avro binary.
-  3. Produces it to ``ledgerlens.trades.{asset_pair_sanitised}`` keyed by the
+  3. Produces it to ``stellar_lense.trades.{asset_pair_sanitised}`` keyed by the
      base account (``wallet_id``) so every trade for a wallet lands in the same
      partition — preserving per-wallet ordering for feature computation.
 
 Failure handling
 ----------------
 * Serialisation failures (poison-pill input) are routed to the dead-letter
-  queue ``ledgerlens.trades.dlq`` with the raw payload and a ``reason`` — they
+  queue ``stellar_lense.trades.dlq`` with the raw payload and a ``reason`` — they
   are **never** retried automatically and require human review.
 * Transient ``KafkaException`` errors on produce are retried with exponential
   backoff via :func:`utils.retry.retry_with_backoff`.
@@ -56,19 +56,19 @@ logger = get_logger(__name__)
 try:
     from prometheus_client import Counter
 
-    ledgerlens_ingestion_trades_produced_total = Counter(
-        "ledgerlens_ingestion_trades_produced_total",
+    stellar_lense_ingestion_trades_produced_total = Counter(
+        "stellar_lense_ingestion_trades_produced_total",
         "Number of trades successfully produced to Kafka",
         ["topic"],
     )
-    ledgerlens_ingestion_trades_failed_total = Counter(
-        "ledgerlens_ingestion_trades_failed_total",
+    stellar_lense_ingestion_trades_failed_total = Counter(
+        "stellar_lense_ingestion_trades_failed_total",
         "Number of trades failed during ingestion",
         ["reason"],
     )
 except ImportError:
-    ledgerlens_ingestion_trades_produced_total = None
-    ledgerlens_ingestion_trades_failed_total = None
+    stellar_lense_ingestion_trades_produced_total = None
+    stellar_lense_ingestion_trades_failed_total = None
 
 _SANITISE_RE = re.compile(r"[^a-zA-Z0-9._-]+")
 
@@ -211,8 +211,8 @@ class HorizonKafkaProducer:
                     record.get("trade_id"),
                     exc,
                 )
-                if ledgerlens_ingestion_trades_failed_total:
-                    ledgerlens_ingestion_trades_failed_total.labels(
+                if stellar_lense_ingestion_trades_failed_total:
+                    stellar_lense_ingestion_trades_failed_total.labels(
                         reason="serialisation_error"
                     ).inc()
                 self._produce_to_dlq(record, reason=str(exc))
@@ -320,8 +320,8 @@ class HorizonKafkaProducer:
             )
             self._producer.poll(0)
         except (KafkaException, BufferError) as exc:
-            if ledgerlens_ingestion_trades_failed_total:
-                ledgerlens_ingestion_trades_failed_total.labels(reason="dlq_produce_error").inc()
+            if stellar_lense_ingestion_trades_failed_total:
+                stellar_lense_ingestion_trades_failed_total.labels(reason="dlq_produce_error").inc()
             logger.critical("Failed to write to DLQ topic %s: %s", self._dlq_topic, exc)
 
 
@@ -336,11 +336,11 @@ def _safe_raw(record: dict) -> dict:
 def _on_delivery(err, msg) -> None:
     if err is not None:
         logger.warning("Delivery failed for topic %s: %s", msg.topic() if msg else "?", err)
-        if ledgerlens_ingestion_trades_failed_total:
-            ledgerlens_ingestion_trades_failed_total.labels(reason="kafka_delivery_error").inc()
+        if stellar_lense_ingestion_trades_failed_total:
+            stellar_lense_ingestion_trades_failed_total.labels(reason="kafka_delivery_error").inc()
     else:
-        if ledgerlens_ingestion_trades_produced_total and msg and msg.topic():
-            ledgerlens_ingestion_trades_produced_total.labels(topic=msg.topic()).inc()
+        if stellar_lense_ingestion_trades_produced_total and msg and msg.topic():
+            stellar_lense_ingestion_trades_produced_total.labels(topic=msg.topic()).inc()
 
 
 def _build_producer_conf(bootstrap_servers: str) -> dict:

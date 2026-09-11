@@ -1,4 +1,4 @@
-"""Full LedgerLens detection pipeline entry point.
+"""Full StellarLense detection pipeline entry point.
 
 Usage:
     python run_pipeline.py --since 2024-01-01
@@ -68,7 +68,7 @@ def _iso_date(value: str) -> datetime:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run the LedgerLens detection pipeline")
+    parser = argparse.ArgumentParser(description="Run the StellarLense detection pipeline")
     parser.add_argument(
         "--since",
         type=_iso_date,
@@ -94,7 +94,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--submit-onchain",
         action="store_true",
-        help="Submit flagged wallets' RiskScore to the ledgerlens-score contract",
+        help="Submit flagged wallets' RiskScore to the stellar-lense-score contract",
     )
     parser.add_argument(
         "--dry-run",
@@ -242,7 +242,7 @@ def main() -> None:
     args = parse_args()
     # Validated *after* parsing --submit-onchain: calling this before parsing
     # args always validated the non-onchain contract, silently skipping the
-    # LEDGERLENS_CONTRACT_ID / LEDGERLENS_SUBMITTER_SECRET checks even when
+    # STELLARLENSE_CONTRACT_ID / STELLARLENSE_SUBMITTER_SECRET checks even when
     # --submit-onchain was passed.
     validate_mode("pipeline_onchain" if args.submit_onchain else "pipeline")
 
@@ -395,10 +395,10 @@ def main() -> None:
 
 
 def submit_flagged_onchain(flagged: pd.DataFrame, pair_id: str) -> None:
-    """Submit each flagged wallet's `RiskScore` to the `ledgerlens-score` contract."""
-    from integrations.contract_client import LedgerLensContractClient
+    """Submit each flagged wallet's `RiskScore` to the `stellar-lense-score` contract."""
+    from integrations.contract_client import StellarLenseContractClient
 
-    client = LedgerLensContractClient()
+    client = StellarLenseContractClient()
     timestamp = int(datetime.now(UTC).timestamp())
 
     for _, row in flagged.iterrows():

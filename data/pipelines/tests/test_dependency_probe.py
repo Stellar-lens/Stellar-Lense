@@ -33,7 +33,7 @@ def test_probe_package_present():
 
 
 def test_probe_package_missing():
-    result = _probe_package("_ledgerlens_nonexistent_xyz", "nonexistent-pkg")
+    result = _probe_package("_stellar_lense_nonexistent_xyz", "nonexistent-pkg")
     assert result.available is False
     assert result.error is not None
 

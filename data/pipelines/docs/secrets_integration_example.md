@@ -1,6 +1,6 @@
 # Secrets Management Integration Example
 
-This document demonstrates how to integrate the secrets management system into LedgerLens integrations.
+This document demonstrates how to integrate the secrets management system into Stellar Lense integrations.
 
 ## Example: Contract Client Integration
 
@@ -11,14 +11,14 @@ This document demonstrates how to integrate the secrets management system into L
 import os
 from config import config
 
-class LedgerLensContractClient:
+class StellarLenseContractClient:
     def __init__(self, submitter_secret: str | None = None):
         # Direct environment variable access - no validation
-        self.submitter_secret = submitter_secret or os.getenv("LEDGERLENS_SUBMITTER_SECRET", "")
+        self.submitter_secret = submitter_secret or os.getenv("STELLARLENSE_SUBMITTER_SECRET", "")
         
     def submit_score(self, wallet: str, asset_pair: str, risk_score: dict) -> object:
         if not self.submitter_secret:
-            raise ValueError("LEDGERLENS_SUBMITTER_SECRET is not configured")
+            raise ValueError("STELLARLENSE_SUBMITTER_SECRET is not configured")
         
         # Use secret...
 ```
@@ -37,19 +37,19 @@ from utils.secrets_config import get_secret
 from utils.secrets_manager import SecretType, SecretValidationError
 from config import config
 
-class LedgerLensContractClient:
+class StellarLenseContractClient:
     def __init__(self, submitter_secret: str | None = None):
         if submitter_secret is None:
             # Use secrets manager with validation
             try:
                 self.submitter_secret = get_secret(
-                    "LEDGERLENS_SUBMITTER_SECRET",
+                    "STELLARLENSE_SUBMITTER_SECRET",
                     secret_type=SecretType.STELLAR_SECRET,
                     required=False  # Only required when submitting
                 )
             except SecretValidationError as e:
                 raise ValueError(
-                    f"Invalid LEDGERLENS_SUBMITTER_SECRET: {e}. "
+                    f"Invalid STELLARLENSE_SUBMITTER_SECRET: {e}. "
                     "Must be a valid Stellar secret key (S... format, 56 chars)"
                 ) from e
         else:
@@ -58,7 +58,7 @@ class LedgerLensContractClient:
     def submit_score(self, wallet: str, asset_pair: str, risk_score: dict) -> object:
         if not self.submitter_secret:
             raise ValueError(
-                "LEDGERLENS_SUBMITTER_SECRET is not configured. "
+                "STELLARLENSE_SUBMITTER_SECRET is not configured. "
                 "Set the environment variable or use file-based secrets."
             )
         
@@ -186,9 +186,9 @@ class Config:
     
     # Use secrets manager for sensitive values
     @property
-    def LEDGERLENS_SUBMITTER_SECRET(self) -> str:
+    def STELLARLENSE_SUBMITTER_SECRET(self) -> str:
         return get_secret(
-            "LEDGERLENS_SUBMITTER_SECRET",
+            "STELLARLENSE_SUBMITTER_SECRET",
             secret_type=SecretType.STELLAR_SECRET,
             required=False,
             default=""
@@ -236,11 +236,11 @@ def test_contract_client_with_secrets(secrets_manager):
     
     # Set a valid test secret
     test_secret = "SBZVF2CTUDTHHDKJP3UEKQRC2XLUJMCG3DL5HGJ2YPTPZXC7QCMQW2W3"
-    provider.set("LEDGERLENS_SUBMITTER_SECRET", test_secret)
+    provider.set("STELLARLENSE_SUBMITTER_SECRET", test_secret)
     
     # Test code should retrieve and use the secret
-    from integrations.contract_client import LedgerLensContractClient
-    client = LedgerLensContractClient()
+    from integrations.contract_client import StellarLenseContractClient
+    client = StellarLenseContractClient()
     
     assert client.submitter_secret == test_secret
 ```
@@ -258,9 +258,9 @@ def test_contract_client_with_secrets(secrets_manager):
 ### Production Configuration
 
 ```bash
-# /etc/ledgerlens/secrets.env
+# /etc/stellar_lense/secrets.env
 export SECRETS_DIR=/run/secrets
-export SECRETS_AUDIT_LOG=/var/log/ledgerlens/secrets_audit.ndjson
+export SECRETS_AUDIT_LOG=/var/log/stellar_lense/secrets_audit.ndjson
 export SECRETS_AUDIT_HMAC_KEY=<generate-with-secrets.token_hex(32)>
 export SECRETS_VALIDATION_ENABLED=true
 ```
@@ -287,7 +287,7 @@ export SECRETS_VALIDATION_ENABLED=true
 
 ```python
 # Required - raises if missing
-stellar_secret = get_secret("LEDGERLENS_SUBMITTER_SECRET", required=True)
+stellar_secret = get_secret("STELLARLENSE_SUBMITTER_SECRET", required=True)
 
 # Optional - returns None if missing
 api_key = get_secret("OPENAI_API_KEY", required=False)

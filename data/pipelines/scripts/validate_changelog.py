@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Changelog validator for LedgerLens-data.
+Changelog validator for StellarLense-data.
 
 Validates that CHANGELOG.md is correctly formatted (Keep a Changelog standard)
 and that pull requests touching high-impact paths have corresponding changelog

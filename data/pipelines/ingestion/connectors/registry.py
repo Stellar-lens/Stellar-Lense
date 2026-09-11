@@ -1,4 +1,4 @@
-"""Registry for LedgerLens data connectors — the plugin lookup boundary.
+"""Registry for StellarLense data connectors — the plugin lookup boundary.
 
 Two ways to make a connector available through the registry:
 
@@ -8,16 +8,16 @@ Two ways to make a connector available through the registry:
    ``ingestion/connectors/__init__.py`` so the decorator runs.
 
 2. **Out-of-tree plugin**: ship a separate installable Python package that
-   declares an entry point in the ``ledgerlens.connectors`` group, pointing
+   declares an entry point in the ``stellar_lense.connectors`` group, pointing
    at a ``DataConnector`` subclass:
 
    .. code-block:: toml
 
        # a third-party package's pyproject.toml
-       [project.entry-points."ledgerlens.connectors"]
+       [project.entry-points."stellar_lense.connectors"]
        my-exchange-trades = "my_package.connectors:MyExchangeTradeConnector"
 
-   No change to ``ledgerlens-data`` source is required — installing the
+   No change to ``stellar-lense-data`` source is required — installing the
    plugin package into the same environment is enough. ``registry.get()``
    / ``registry.list_metadata()`` discover it automatically the first time
    they're called. See ``docs/connectors.md`` for a full worked example.
@@ -38,7 +38,7 @@ from ingestion.connectors.base import (
 
 logger = logging.getLogger(__name__)
 
-PLUGIN_ENTRY_POINT_GROUP = "ledgerlens.connectors"
+PLUGIN_ENTRY_POINT_GROUP = "stellar_lense.connectors"
 
 
 class ConnectorRegistry:
@@ -93,7 +93,7 @@ class ConnectorRegistry:
         self._connectors.pop(connector_id, None)
 
     def discover_plugins(self) -> list[str]:
-        """Load connectors published via the ``ledgerlens.connectors`` entry
+        """Load connectors published via the ``stellar_lense.connectors`` entry
         point group. Returns the connector ids that were newly registered.
 
         A single misbehaving plugin (import error, wrong base class, id

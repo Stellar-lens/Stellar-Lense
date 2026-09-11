@@ -1,6 +1,6 @@
 # Model Governance
 
-LedgerLens generates a **Model Card** after every training run to ensure model documentation is always current and auditable.
+Stellar Lense generates a **Model Card** after every training run to ensure model documentation is always current and auditable.
 
 ## Model Card Standard
 
@@ -38,7 +38,7 @@ The input schema is defined in `reporting/schemas/model_metadata.json` (JSON Sch
 |---|---|---|
 | `dataset_fingerprint` | string | SHA-256 of training Parquet file (computed at training time, not accepted as input) |
 | `shap_importance_chart_path` | string | Relative path to SHAP chart image |
-| `ledgerlens_version` | string | LedgerLens codebase version at training time |
+| `stellar_lense_version` | string | Stellar Lense codebase version at training time |
 | `regulatory_contact` | string | Contact for regulatory enquiries |
 | `data_retention_policy` | string | Data retention description |
 

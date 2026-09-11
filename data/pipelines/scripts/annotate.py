@@ -1,4 +1,4 @@
-"""Interactive CLI annotation interface for the LedgerLens active learning pipeline.
+"""Interactive CLI annotation interface for the StellarLense active learning pipeline.
 
 Usage:
     # Annotate next pending wallets in the queue:
@@ -115,7 +115,7 @@ def _label_map_get(answer: str) -> int:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="LedgerLens annotation CLI")
+    parser = argparse.ArgumentParser(description="StellarLense annotation CLI")
     parser.add_argument(
         "--annotator-id",
         default="",

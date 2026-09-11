@@ -43,7 +43,7 @@ def _avro_value(trade_id: str = "trade-001") -> bytes:
     return serialize(record, load_schema())
 
 
-def _make_msg(*, offset: int = 5, topic: str = "ledgerlens.trades.USDC_X") -> MagicMock:
+def _make_msg(*, offset: int = 5, topic: str = "stellar_lense.trades.USDC_X") -> MagicMock:
     msg = MagicMock()
     msg.topic.return_value = topic
     msg.partition.return_value = 0
@@ -160,7 +160,7 @@ def test_dlq_topic_is_skipped_not_scored():
     consumer = MagicMock()
     worker, scorer, dispatcher = _make_worker(consumer, score=None)
 
-    msg = _make_msg(topic="ledgerlens.trades.dlq")
+    msg = _make_msg(topic="stellar_lense.trades.dlq")
     worker.process_message(msg)
 
     scorer.score_wallet.assert_not_called()

@@ -1,9 +1,9 @@
-"""Environment configuration contracts, one per LedgerLens runtime mode.
+"""Environment configuration contracts, one per StellarLense runtime mode.
 
 `config.py` centralizes ~150 environment variables, but historically only
 `run_pipeline.py` called `Config.validate()` — and it called it *before*
-parsing `--submit-onchain`, so the on-chain-only vars (`LEDGERLENS_CONTRACT_ID`,
-`LEDGERLENS_SUBMITTER_SECRET`) were never actually enforced. Every other entry
+parsing `--submit-onchain`, so the on-chain-only vars (`STELLARLENSE_CONTRACT_ID`,
+`STELLARLENSE_SUBMITTER_SECRET`) were never actually enforced. Every other entry
 point (the REST API, the SSE/Kafka streaming pipelines, the WebSocket server,
 training scripts) read `config.*` directly with no startup check at all, so a
 missing var surfaced as a `KeyError`/`FileNotFoundError`/auth-that-always-fails
@@ -308,8 +308,8 @@ _CORE_PIPELINE_ATTRS: list[str] = [
 ]
 
 _CORE_PIPELINE_ATTRS_ONCHAIN: list[str] = [
-    "LEDGERLENS_CONTRACT_ID",
-    "LEDGERLENS_SUBMITTER_SECRET",
+    "STELLARLENSE_CONTRACT_ID",
+    "STELLARLENSE_SUBMITTER_SECRET",
 ]
 
 
@@ -414,6 +414,6 @@ def validate_mode(mode: str, *, config_cls: type[Config] = Config, **context: An
 
     if errors:
         raise OSError(
-            f"LedgerLens configuration errors for mode={mode!r} ({contract.description}):\n- "
+            f"StellarLense configuration errors for mode={mode!r} ({contract.description}):\n- "
             + "\n- ".join(errors)
         )

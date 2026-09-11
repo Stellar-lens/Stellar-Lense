@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""LedgerLens Streaming Pipeline Load Test Driver.
+"""StellarLense Streaming Pipeline Load Test Driver.
 
 Publishes synthetic trade events at a configurable rate and measures
 end-to-end latency, Kafka consumer lag, worker memory, and Benford
@@ -74,7 +74,7 @@ P99_LATENCY_THRESHOLD_S = 10.0  # seconds
 MEMORY_THRESHOLD_BYTES = 1024**3  # 1 GB per worker
 
 # Default Kafka topic prefix (matches config.KAFKA_TOPIC_PREFIX)
-DEFAULT_TOPIC_PREFIX = "ledgerlens.trades"
+DEFAULT_TOPIC_PREFIX = "stellar_lense.trades"
 
 
 # ---------------------------------------------------------------------------
@@ -631,7 +631,7 @@ def write_report(
     """Write a structured JSON report to *output_path*."""
     report = {
         "meta": {
-            "tool": "ledgerlens-load-test",
+            "tool": "stellar-lense-load-test",
             "version": "1.0.0",
             "timestamp": datetime.now(UTC).isoformat(),
             "parameters": {
@@ -694,7 +694,7 @@ def print_summary(metrics: Metrics) -> None:
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python scripts/load_test_pipeline.py",
-        description="LedgerLens streaming pipeline load test",
+        description="StellarLense streaming pipeline load test",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
@@ -760,7 +760,7 @@ def main() -> None:
         )
         args.ramp_time = args.duration
 
-    print("LedgerLens Load Test")
+    print("StellarLense Load Test")
     print(
         f"  Rate:     {args.rate} tps  |  Duration: {args.duration}s  |  "
         f"Ramp: {args.ramp_time}s"

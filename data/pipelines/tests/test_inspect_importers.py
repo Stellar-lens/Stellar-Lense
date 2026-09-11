@@ -56,7 +56,7 @@ class TestInspectImportersCLI:
             [sys.executable, "-m", "scripts.inspect_importers", "--list"],
             capture_output=True,
             text=True,
-            cwd="/home/ajidokwu/Desktop/Drips/Jambox/Ledgerlens-data",
+            cwd="/home/ajidokwu/Desktop/Drips/Jambox/StellarLense-data",
         )
 
         assert result.returncode == 0, f"Command failed: {result.stderr}"
@@ -77,7 +77,7 @@ class TestInspectImportersCLI:
             [sys.executable, "-m", "scripts.inspect_importers", "--list"],
             capture_output=True,
             text=True,
-            cwd="/home/ajidokwu/Desktop/Drips/Jambox/Ledgerlens-data",
+            cwd="/home/ajidokwu/Desktop/Drips/Jambox/StellarLense-data",
         )
 
         assert result.returncode == 0, f"Command failed: {result.stderr}"
@@ -106,7 +106,7 @@ class TestInspectImportersCLI:
             [sys.executable, "-m", "scripts.inspect_importers", "--list"],
             capture_output=True,
             text=True,
-            cwd="/home/ajidokwu/Desktop/Drips/Jambox/Ledgerlens-data",
+            cwd="/home/ajidokwu/Desktop/Drips/Jambox/StellarLense-data",
         )
 
         assert result.returncode == 0
@@ -138,7 +138,7 @@ class TestInspectImportersCLI:
             [sys.executable, "-m", "scripts.inspect_importers", "list"],
             capture_output=True,
             text=True,
-            cwd="/home/ajidokwu/Desktop/Drips/Jambox/Ledgerlens-data",
+            cwd="/home/ajidokwu/Desktop/Drips/Jambox/StellarLense-data",
         )
 
         assert result.returncode == 0

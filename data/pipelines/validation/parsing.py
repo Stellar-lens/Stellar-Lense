@@ -1,10 +1,10 @@
-"""Robust CSV and JSON parsing contracts for LedgerLens.
+"""Robust CSV and JSON parsing contracts for StellarLense.
 
 Issue #552 — Build robust CSV and JSON parsing contracts
 =========================================================
 
 This module provides *typed, validated* parsers for the two primary data
-formats used by the LedgerLens ingestion and detection layers:
+formats used by the StellarLense ingestion and detection layers:
 
 * **CSV** – tabular trade history, known manipulation events, annotation
   queues, and wallet score exports.

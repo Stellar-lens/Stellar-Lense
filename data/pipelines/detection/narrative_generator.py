@@ -87,7 +87,7 @@ def _build_user_prompt(report_dict: dict) -> str:
     n_trades = len(report_dict.get("trade_evidence", []))
 
     prompt = textwrap.dedent(f"""
-        Please write a regulatory narrative for the following LedgerLens forensic finding.
+        Please write a regulatory narrative for the following StellarLense forensic finding.
 
         --- FINDINGS ---
         Report date     : {generated_at}
@@ -210,7 +210,7 @@ class NarrativeGenerator:
         n_trades = len(report_dict.get("trade_evidence", []))
         return (
             f"[STUB NARRATIVE] Wallet {wallet} trading pair {pair} received a "
-            f"LedgerLens risk score of {score}/100 (verdict: {verdict}). "
+            f"StellarLense risk score of {score}/100 (verdict: {verdict}). "
             f"{n_trades} anomalous trade(s) were identified as supporting evidence. "
             "This stub narrative was generated without an LLM backend. "
             "Set NARRATIVE_LLM_BACKEND=openai or anthropic and supply the "
@@ -225,7 +225,7 @@ def _cli() -> None:
     import argparse
 
     parser = argparse.ArgumentParser(
-        description="Generate a regulatory narrative from a LedgerLens forensic report JSON."
+        description="Generate a regulatory narrative from a StellarLense forensic report JSON."
     )
     parser.add_argument("--report", required=True, help="Path to forensic report JSON file.")
     parser.add_argument(

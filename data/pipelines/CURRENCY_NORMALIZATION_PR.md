@@ -8,7 +8,7 @@
 
 ## Summary
 
-This PR introduces a comprehensive currency and amount normalization system for LedgerLens-data, enabling meaningful cross-asset comparisons in fraud detection. This foundation-level capability allows comparing volumes, detecting anomalies, and performing Benford analysis across different trading pairs on Stellar DEX.
+This PR introduces a comprehensive currency and amount normalization system for StellarLense-data, enabling meaningful cross-asset comparisons in fraud detection. This foundation-level capability allows comparing volumes, detecting anomalies, and performing Benford analysis across different trading pairs on Stellar DEX.
 
 **Impact:** Repository-wide capability for standardizing amounts across hundreds of asset pairs, critical for accurate fraud detection across the entire Stellar DEX.
 
@@ -30,7 +30,7 @@ norm_btc = normalize_to_xlm(0.5, "BTC")       # 300,000 XLM
 # Now clear: BTC volume is ~3.5x larger
 ```
 
-### Specific Impact on LedgerLens
+### Specific Impact on Stellar Lense
 
 1. **Benford Analysis** - Cannot analyze digit distributions across mixed currencies
 2. **Volume Anomaly Detection** - Cannot identify unusual trading volumes across pairs
@@ -477,4 +477,4 @@ Potential follow-ups (not in this PR):
 
 **Ready for Review**
 
-This PR represents a substantial, well-tested foundation for currency normalization in LedgerLens-data. All acceptance criteria for the 200-point Stellar Wave advanced build issue are met.
+This PR represents a substantial, well-tested foundation for currency normalization in StellarLense-data. All acceptance criteria for the 200-point Stellar Wave advanced build issue are met.

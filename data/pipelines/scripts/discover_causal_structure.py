@@ -1,4 +1,4 @@
-"""Script to discover causal structure in LedgerLens data and generate visualizations and metrics."""
+"""Script to discover causal structure in StellarLense data and generate visualizations and metrics."""
 
 import argparse
 import os
@@ -15,7 +15,7 @@ from scripts.generate_synthetic_dataset import generate_synthetic_dataset
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Discover causal structure from LedgerLens data")
+    parser = argparse.ArgumentParser(description="Discover causal structure from StellarLense data")
     parser.add_argument(
         "--data-path",
         default="data/synthetic_dataset.parquet",
@@ -91,7 +91,7 @@ def main() -> None:
     nx.draw_networkx_labels(dag, pos, font_size=8, font_family="sans-serif")
     nx.draw_networkx_edges(dag, pos, arrowstyle="->", arrowsize=15, edge_color="grey")
 
-    plt.title("Causal DAG for Wash Trading Discovery (LedgerLens)", fontsize=14)
+    plt.title("Causal DAG for Wash Trading Discovery (StellarLense)", fontsize=14)
     plt.tight_layout()
     plt.savefig(args.img_output, dpi=300)
     plt.close()

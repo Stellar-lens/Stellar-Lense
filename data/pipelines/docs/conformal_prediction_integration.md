@@ -2,7 +2,7 @@
 
 ## Overview
 
-LedgerLens now provides **distribution-free prediction intervals** for all risk scores using **split conformal prediction**. These intervals guarantee a configurable coverage level (default 90%) *regardless of the underlying model or data distribution*, providing investigators and downstream consumers with principled uncertainty quantification.
+Stellar Lense now provides **distribution-free prediction intervals** for all risk scores using **split conformal prediction**. These intervals guarantee a configurable coverage level (default 90%) *regardless of the underlying model or data distribution*, providing investigators and downstream consumers with principled uncertainty quantification.
 
 When you receive a risk score of 75, you also get `score_lower=65` and `score_upper=85` with a 90% guarantee that the true score (under repeated independent draws from the same distribution) falls within this interval.
 
@@ -69,7 +69,7 @@ print(risk_dict)
 
 ```bash
 # GET /score/{wallet}/{pair}?uncertainty=true
-curl "https://api.ledgerlens.example.com/score/G...ABC/USDC:GA.../XLM:native?uncertainty=true"
+curl "https://api.stellar_lense.example.com/score/G...ABC/USDC:GA.../XLM:native?uncertainty=true"
 
 # Response:
 {

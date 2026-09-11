@@ -1,6 +1,6 @@
-"""FATF Travel Rule IVMS101 export for LedgerLens forensic reports.
+"""FATF Travel Rule IVMS101 export for StellarLense forensic reports.
 
-Maps the proprietary LedgerLens forensic report format to JSON-LD conforming
+Maps the proprietary StellarLense forensic report format to JSON-LD conforming
 to the IVMS101 1.0 data standard so exchange compliance teams can submit
 flagged wallet reports to regulators and partner VASPs without manual
 reformatting.
@@ -39,7 +39,7 @@ from reporting.fatf_risk_codes import RiskCode, map_to_risk_codes
 _SCHEMA_PATH = Path(__file__).parent / "schemas" / "ivms101.json"
 _IVMS101_CONTEXT = "https://intervasp.org/ivms101"
 _IVMS101_TYPE = "ivms101:IdentityPayload"
-_REPORTING_ENTITY = "LedgerLens"
+_REPORTING_ENTITY = "StellarLense"
 _SCHEMA_VERSION = "1.0"
 
 
@@ -102,7 +102,7 @@ def _build_natural_person(account_ref: str | dict) -> dict:
     """Build an IVMS101 naturalPerson block.
 
     Personal identification data (name, address, national ID, DoB) is
-    unavailable in LedgerLens detection output, which operates on pseudonymous
+    unavailable in StellarLense detection output, which operates on pseudonymous
     on-chain wallet addresses.  All such fields are emitted as
     data-unavailable sentinels so downstream parsers receive a complete
     object instead of missing keys.
@@ -218,7 +218,7 @@ def export_ivms101(
     forensic_report: dict,
     reveal_addresses: bool = False,
 ) -> dict:
-    """Map a LedgerLens forensic report dict to an IVMS101-compatible JSON-LD document.
+    """Map a StellarLense forensic report dict to an IVMS101-compatible JSON-LD document.
 
     The ``risk_score`` field (integer 0–100) is normalised to the [0, 1]
     range required by the IVMS101 schema.  Wallet addresses are pseudonymised
@@ -236,7 +236,7 @@ def export_ivms101(
             ``FATF_ADMIN_TOKEN`` to be set; raises ``PermissionError`` otherwise.
 
     Returns:
-        JSON-LD dict conforming to the IVMS101 LedgerLens 1.0 schema.
+        JSON-LD dict conforming to the IVMS101 StellarLense 1.0 schema.
 
     Raises:
         PermissionError: If ``reveal_addresses=True`` without admin auth.

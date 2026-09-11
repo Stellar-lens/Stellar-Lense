@@ -1,13 +1,13 @@
-"""Testnet account and contract setup for LedgerLens integration testing.
+"""Testnet account and contract setup for StellarLense integration testing.
 
 Usage:
-    python -m scripts.testnet_setup --wasm-path ledgerlens_score.wasm [options]
+    python -m scripts.testnet_setup --wasm-path stellar_lense_score.wasm [options]
 
 Steps:
     1. Fund submitter account via Horizon Testnet Friendbot.
     2. Verify WASM SHA-256 hash against --wasm-sha256 (required unless --skip-hash-check).
-    3. Deploy ledgerlens-score contract (skip if LEDGERLENS_CONTRACT_ID already set).
-    4. Write LEDGERLENS_CONTRACT_ID and LEDGERLENS_SUBMITTER_SECRET to .env.testnet.
+    3. Deploy stellar-lense-score contract (skip if STELLARLENSE_CONTRACT_ID already set).
+    4. Write STELLARLENSE_CONTRACT_ID and STELLARLENSE_SUBMITTER_SECRET to .env.testnet.
     5. Print the contract ID to stdout.
 """
 
@@ -77,10 +77,10 @@ def deploy_contract(
 
 
 def write_env_file(contract_id: str, submitter_secret: str, path: str = ".env.testnet") -> None:
-    """Write LEDGERLENS_CONTRACT_ID and LEDGERLENS_SUBMITTER_SECRET to `path`."""
+    """Write STELLARLENSE_CONTRACT_ID and STELLARLENSE_SUBMITTER_SECRET to `path`."""
     with open(path, "w") as f:
-        f.write(f"LEDGERLENS_CONTRACT_ID={contract_id}\n")
-        f.write(f"LEDGERLENS_SUBMITTER_SECRET={submitter_secret}\n")
+        f.write(f"STELLARLENSE_CONTRACT_ID={contract_id}\n")
+        f.write(f"STELLARLENSE_SUBMITTER_SECRET={submitter_secret}\n")
 
 
 def run(
@@ -96,7 +96,7 @@ def run(
     load_dotenv()
 
     # 1. Resolve or generate the submitter keypair
-    submitter_secret = os.getenv("LEDGERLENS_SUBMITTER_SECRET", "")
+    submitter_secret = os.getenv("STELLARLENSE_SUBMITTER_SECRET", "")
     if submitter_secret:
         keypair = Keypair.from_secret(submitter_secret)
     else:
@@ -109,10 +109,10 @@ def run(
     fund_account(keypair.public_key)
 
     # 3. Check if contract is already deployed
-    contract_id = os.getenv("LEDGERLENS_CONTRACT_ID", "")
+    contract_id = os.getenv("STELLARLENSE_CONTRACT_ID", "")
     if contract_id:
         print(
-            f"LEDGERLENS_CONTRACT_ID already set ({contract_id}), skipping deployment.",
+            f"STELLARLENSE_CONTRACT_ID already set ({contract_id}), skipping deployment.",
             file=sys.stderr,
         )
     else:
@@ -145,8 +145,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Set up testnet account and deploy contract")
     parser.add_argument(
         "--wasm-path",
-        default="ledgerlens_score.wasm",
-        help="Path to the pre-compiled ledgerlens-score WASM file",
+        default="stellar_lense_score.wasm",
+        help="Path to the pre-compiled stellar-lense-score WASM file",
     )
     parser.add_argument(
         "--wasm-sha256", default=None, help="Expected SHA-256 hash of the WASM file (hex string)"

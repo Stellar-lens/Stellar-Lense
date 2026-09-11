@@ -252,7 +252,7 @@ def test_main_quiet_flag(tmp_path, capsys):
 
 def test_real_repo_no_import_cycles():
     """
-    Smoke-test against the actual LedgerLens codebase.
+    Smoke-test against the actual StellarLense codebase.
     Fails if a real circular import is introduced.
     """
     repo_root = pathlib.Path(__file__).parent.parent.resolve()

@@ -1,9 +1,9 @@
-# LedgerLens Incident Response — Emergency Pause Runbook
+# Stellar Lense Incident Response — Emergency Pause Runbook
 
 ## Purpose
 
 This runbook covers the procedure for activating the **emergency pause**
-on the `ledgerlens-score` Soroban oracle contract when a critical defect in
+on the `stellar-lense-score` Soroban oracle contract when a critical defect in
 the scoring pipeline is detected (e.g. scores are wildly incorrect, the
 pipeline has been compromised, or downstream applications are being harmed
 by bad data).
@@ -41,9 +41,9 @@ keyholder can manually initiate.
 ### Step 2 — Initiate the pause (Keyholder 1)
 
 ```python
-from integrations.contract_client import LedgerLensContractClient
+from integrations.contract_client import StellarLenseContractClient
 
-client = LedgerLensContractClient(
+client = StellarLenseContractClient(
     contract_id="<score_contract_id>",
     rpc_url="https://soroban-testnet.stellar.org",
 )

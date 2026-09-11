@@ -16,7 +16,7 @@ Validate all registered secrets::
 
 Validate specific secrets::
 
-    python -m scripts.validate_secrets --secrets LEDGERLENS_SUBMITTER_SECRET KAFKA_SASL_PASSWORD
+    python -m scripts.validate_secrets --secrets STELLARLENSE_SUBMITTER_SECRET KAFKA_SASL_PASSWORD
 
 Check audit log integrity::
 
@@ -43,7 +43,7 @@ from utils.logging import get_logger
 from utils.secrets_config import is_secret_configured
 from utils.secrets_manager import (
     get_secrets_manager,
-    register_ledgerlens_secrets,
+    register_stellar_lense_secrets,
 )
 
 logger = get_logger(__name__)
@@ -77,7 +77,7 @@ def validate_all_secrets(secrets_filter: list[str] | None = None) -> tuple[int, 
         Tuple of (valid_count, warning_count, error_count)
     """
     manager = get_secrets_manager()
-    register_ledgerlens_secrets(manager)
+    register_stellar_lense_secrets(manager)
 
     results = manager.verify_all_secrets()
 
@@ -179,7 +179,7 @@ def generate_report(output_path: Path | None = None) -> dict[str, Any]:
         Report dictionary
     """
     manager = get_secrets_manager()
-    register_ledgerlens_secrets(manager)
+    register_stellar_lense_secrets(manager)
 
     report = {
         "timestamp": str(Path.ctime(Path(__file__))),

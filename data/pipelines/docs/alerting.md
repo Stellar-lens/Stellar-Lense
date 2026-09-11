@@ -1,6 +1,6 @@
 # Alerting Architecture
 
-LedgerLens uses a consensus-driven alert escalation model to reduce false positives while maintaining sensitivity.
+Stellar Lense uses a consensus-driven alert escalation model to reduce false positives while maintaining sensitivity.
 
 ## Consensus Escalation
 

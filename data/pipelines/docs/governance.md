@@ -1,4 +1,4 @@
-# LedgerLens On-Chain Governance
+# Stellar Lense On-Chain Governance
 
 ## Overview
 
@@ -19,7 +19,7 @@ transactions.
 
 Private keys **never touch the Python client**.  Keyholders sign Stellar
 transactions on their HSM or hardware wallet and pass the resulting signed
-XDR to `LedgerLensContractClient.propose_threshold_change` /
+XDR to `StellarLenseContractClient.propose_threshold_change` /
 `approve_threshold_change`.
 
 ## Changing the Threshold
@@ -37,9 +37,9 @@ XDR to `LedgerLensContractClient.propose_threshold_change` /
    at runtime without requiring a service restart.
 
 ```python
-from integrations.contract_client import LedgerLensContractClient
+from integrations.contract_client import StellarLenseContractClient
 
-client = LedgerLensContractClient(...)
+client = StellarLenseContractClient(...)
 
 # Keyholder A proposes
 proposal_id = client.propose_threshold_change(

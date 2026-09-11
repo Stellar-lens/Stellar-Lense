@@ -1,4 +1,4 @@
-// Soroban contract: 2-of-3 emergency pause for the ledgerlens-score oracle.
+// Soroban contract: 2-of-3 emergency pause for the stellar-lense-score oracle.
 //
 // When paused the contract rejects all submit_score / get_score calls and
 // emits a `contract_paused` event consumed by the Python event listener to

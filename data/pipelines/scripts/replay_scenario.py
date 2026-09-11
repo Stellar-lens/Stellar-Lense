@@ -347,7 +347,7 @@ def cmd_regression(args: argparse.Namespace, store: ScenarioStore) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        description="Scenario replay tooling for LedgerLens historical anomaly cases.",
+        description="Scenario replay tooling for StellarLense historical anomaly cases.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )

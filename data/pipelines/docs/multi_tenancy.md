@@ -1,6 +1,6 @@
 # Multi-Tenant Namespace Isolation
 
-LedgerLens supports multi-tenant deployments where each exchange client operates with isolated risk score configurations.
+Stellar Lense supports multi-tenant deployments where each exchange client operates with isolated risk score configurations.
 
 ## Architecture
 

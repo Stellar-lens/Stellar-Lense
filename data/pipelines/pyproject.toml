@@ -1,7 +1,7 @@
 [project]
-name = "ledgerlens-data"
+name = "stellar-lense-data"
 version = "0.2.0"
-description = "Data ingestion, fraud-detection engine, and feature pipeline for LedgerLens"
+description = "Data ingestion, fraud-detection engine, and feature pipeline for Stellar Lense"
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.11"

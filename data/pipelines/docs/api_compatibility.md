@@ -7,7 +7,7 @@ Seven packages (`analysis`, `detection`, `ingestion`, `privacy`,
 `__init__.py` -- that's the intended public contract for anything doing
 `from detection import ...`, whether the caller is another package in this
 repo, a notebook, `run_pipeline.py`, or an external consumer that depends on
-`ledgerlens-data` as a library. Nothing previously stopped an edit to one of
+`stellar-lense-data` as a library. Nothing previously stopped an edit to one of
 those exported functions' signatures from silently breaking every caller.
 
 ## Design
