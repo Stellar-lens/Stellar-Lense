@@ -21,17 +21,17 @@ use soroban_sdk::{
     Address, Bytes, Env, Vec,
 };
 
-use crate::{LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreSubmission};
+use crate::{StellarLenseScoreContract, StellarLenseScoreContractClient, ScoreSubmission};
 
 const BASE_TS: u64 = 1_700_000_000;
 const COOLDOWN: u64 = 3_601;
 
-fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>) {
+fn setup<'a>() -> (Env, StellarLenseScoreContractClient<'a>) {
     let env = Env::default();
     env.mock_all_auths();
     env.ledger().with_mut(|l| l.timestamp = BASE_TS);
-    let id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &id);
+    let id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &id);
     client.initialize(&Address::generate(&env), &Address::generate(&env));
     (env, client)
 }
@@ -40,7 +40,7 @@ fn just(env: &Env, msg: &[u8]) -> Bytes {
     Bytes::from_slice(env, msg)
 }
 
-fn submit(env: &Env, client: &LedgerLensScoreContractClient, wallet: &Address, score: u32) {
+fn submit(env: &Env, client: &StellarLenseScoreContractClient, wallet: &Address, score: u32) {
     env.ledger().with_mut(|l| l.timestamp += COOLDOWN);
     client.submit_score(
         &Vec::new(env),

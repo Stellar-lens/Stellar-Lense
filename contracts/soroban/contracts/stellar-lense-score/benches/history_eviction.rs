@@ -1,7 +1,7 @@
 //! Criterion benchmark comparing the worst-case score-history ring eviction
 //! against the steady-state cost of an ordinary ring push (issue #424).
 //!
-//! Run: `cargo bench -p ledgerlens-score --bench history_eviction`
+//! Run: `cargo bench -p stellar_lense-score --bench history_eviction`
 //!
 //! `push_score_history` (see `storage.rs`) evicts from the front of the ring
 //! whenever it exceeds `HistoryMaxDepth`. In steady state that is at most one
@@ -24,7 +24,7 @@
 //! than unbounded.
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
 use soroban_sdk::{
     symbol_short,
     testutils::{Address as _, Ledger as _},
@@ -34,13 +34,13 @@ use soroban_sdk::{
 const MAX_HISTORY_DEPTH: u32 = 50;
 const PARAM_CHANGE_DELAY: u64 = 86_401;
 
-fn setup(env: &Env) -> (LedgerLensScoreContractClient<'_>, Address, Symbol) {
+fn setup(env: &Env) -> (StellarLenseScoreContractClient<'_>, Address, Symbol) {
     env.mock_all_auths();
     env.budget().reset_unlimited();
     env.ledger().with_mut(|l| l.timestamp = 1_700_000_000);
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(env, &contract_id);
     let admin = Address::generate(env);
     let service = Address::generate(env);
     client.initialize(&admin, &service);
@@ -52,7 +52,7 @@ fn setup(env: &Env) -> (LedgerLensScoreContractClient<'_>, Address, Symbol) {
 
 fn fill_history(
     env: &Env,
-    client: &LedgerLensScoreContractClient,
+    client: &StellarLenseScoreContractClient,
     wallet: &Address,
     asset_pair: &Symbol,
     count: u32,
@@ -76,7 +76,7 @@ fn fill_history(
 
 fn submit_one(
     env: &Env,
-    client: &LedgerLensScoreContractClient,
+    client: &StellarLenseScoreContractClient,
     wallet: &Address,
     asset_pair: &Symbol,
 ) -> (u64, u64) {
@@ -102,7 +102,7 @@ fn submit_one(
 /// and evicts exactly one entry — the ordinary per-call cost.
 fn steady_state_cost(
     env: &Env,
-    client: &LedgerLensScoreContractClient,
+    client: &StellarLenseScoreContractClient,
     wallet: &Address,
     asset_pair: &Symbol,
 ) -> (u64, u64) {
@@ -115,7 +115,7 @@ fn steady_state_cost(
 /// submission's eviction loop removes 49 entries in a single pass.
 fn worst_case_cost(
     env: &Env,
-    client: &LedgerLensScoreContractClient,
+    client: &StellarLenseScoreContractClient,
     wallet: &Address,
     asset_pair: &Symbol,
 ) -> (u64, u64) {

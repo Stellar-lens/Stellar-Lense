@@ -6,13 +6,13 @@ use soroban_sdk::{
     Address, Env, IntoVal, Vec,
 };
 
-use crate::{Error, LedgerLensScoreContract, LedgerLensScoreContractClient};
+use crate::{Error, StellarLenseScoreContract, StellarLenseScoreContractClient};
 
-fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address) {
+fn setup<'a>() -> (Env, StellarLenseScoreContractClient<'a>, Address) {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
     client.initialize(&admin, &service);
@@ -30,8 +30,8 @@ fn test_set_staleness_window_happy_path() {
 #[test]
 fn test_set_staleness_window_emits_event() {
     let (env, client, _admin) = setup();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let c2 = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let c2 = StellarLenseScoreContractClient::new(&env, &contract_id);
     c2.initialize(&Address::generate(&env), &Address::generate(&env));
     let empty: Vec<Address> = Vec::new(&env);
     c2.set_staleness_window(&empty, &7_200);
@@ -56,8 +56,8 @@ fn test_set_staleness_window_rejects_zero() {
 #[test]
 fn test_set_staleness_window_non_admin_rejected() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
     // initialize without mocking all auths, then only mock admin for init
@@ -66,7 +66,7 @@ fn test_set_staleness_window_non_admin_rejected() {
 
     // Now use a fresh env without mock_all_auths so auth check actually fires
     let env2 = Env::default();
-    let c2 = LedgerLensScoreContractClient::new(&env2, &contract_id);
+    let c2 = StellarLenseScoreContractClient::new(&env2, &contract_id);
     let non_admin: Vec<Address> = Vec::new(&env2);
     let result = c2.try_set_staleness_window(&non_admin, &3_600);
     assert!(result.is_err());

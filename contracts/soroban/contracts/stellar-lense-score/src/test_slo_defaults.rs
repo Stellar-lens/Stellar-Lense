@@ -8,7 +8,7 @@ use soroban_sdk::{
     Address, Env,
 };
 
-use crate::{constants, LedgerLensScoreContract, LedgerLensScoreContractClient};
+use crate::{constants, StellarLenseScoreContract, StellarLenseScoreContractClient};
 
 // Values below are copied from docs/slo-operational-targets.md — keep in sync.
 const DOC_HEARTBEAT_ALERT_THRESHOLD_SECS: u64 = 3_600;
@@ -46,8 +46,8 @@ fn fresh_service_reports_alive_and_gate_reports_unpaused() {
     env.mock_all_auths();
     env.ledger().with_mut(|l| l.timestamp = 1_700_000_000);
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
@@ -65,8 +65,8 @@ fn service_silent_past_heartbeat_threshold_reports_dead() {
     env.mock_all_auths();
     env.ledger().with_mut(|l| l.timestamp = 1_700_000_000);
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
     let service = Address::generate(&env);

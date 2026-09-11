@@ -26,19 +26,19 @@ use soroban_sdk::{
     Address, Env, Symbol, Vec,
 };
 
-use crate::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+use crate::{StellarLenseScoreContract, StellarLenseScoreContractClient};
 
 const START_TS: u64 = 1_700_000_000;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-fn make_env<'a>() -> (Env, LedgerLensScoreContractClient<'a>) {
+fn make_env<'a>() -> (Env, StellarLenseScoreContractClient<'a>) {
     let env = Env::default();
     env.mock_all_auths();
     env.budget().reset_unlimited();
     env.ledger().with_mut(|l| l.timestamp = START_TS);
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
     client.initialize(&admin, &service);
@@ -58,7 +58,7 @@ fn pair_sym(env: &Env, i: u32) -> Symbol {
     }
 }
 
-fn submit(env: &Env, client: &LedgerLensScoreContractClient, wallet: &Address, pair: &Symbol, score: u32) {
+fn submit(env: &Env, client: &StellarLenseScoreContractClient, wallet: &Address, pair: &Symbol, score: u32) {
     env.ledger().with_mut(|l| l.timestamp += 3_601);
     client.submit_score(
         &Vec::new(env),
@@ -74,7 +74,7 @@ fn submit(env: &Env, client: &LedgerLensScoreContractClient, wallet: &Address, p
     );
 }
 
-fn aggregate(client: &LedgerLensScoreContractClient, wallet: &Address) -> u32 {
+fn aggregate(client: &StellarLenseScoreContractClient, wallet: &Address) -> u32 {
     client
         .get_aggregate_score(wallet)
         .expect("get_aggregate_score failed")

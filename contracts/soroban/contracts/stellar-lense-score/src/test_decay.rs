@@ -4,16 +4,16 @@
     Address, Env, Vec,
 };
 
-use crate::{Error, LedgerLensScoreContract, LedgerLensScoreContractClient};
+use crate::{Error, StellarLenseScoreContract, StellarLenseScoreContractClient};
 
 const START_TS: u64 = 1_700_000_000;
 
-fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
+fn setup<'a>() -> (Env, StellarLenseScoreContractClient<'a>, Address, Address) {
     let env = Env::default();
     env.mock_all_auths();
     env.ledger().with_mut(|l| l.timestamp = START_TS);
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
     client.initialize(&admin, &service);
@@ -22,7 +22,7 @@ fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
 
 fn submit_pair(
     env: &Env,
-    client: &LedgerLensScoreContractClient,
+    client: &StellarLenseScoreContractClient,
     wallet: &Address,
     pair: &soroban_sdk::Symbol,
     score: u32,
@@ -189,8 +189,8 @@ fn test_decay_applies_consistently_across_pairs() {
 fn test_set_decay_rate_not_initialized_rejected() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, crate::LedgerLensScoreContract);
-    let client = crate::LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, crate::StellarLenseScoreContract);
+    let client = crate::StellarLenseScoreContractClient::new(&env, &contract_id);
     // Contract not yet initialized — must return NotInitialized
     assert_eq!(client.try_set_decay_rate(&1, &1000), Err(Ok(Error::NotInitialized)));
 }
@@ -200,8 +200,8 @@ fn test_set_decay_rate_not_initialized_rejected() {
 fn test_set_decay_rate_non_admin_rejected() {
     let env = Env::default();
     // No mock_all_auths — auth must be provided explicitly
-    let contract_id = env.register_contract(None, crate::LedgerLensScoreContract);
-    let client = crate::LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, crate::StellarLenseScoreContract);
+    let client = crate::StellarLenseScoreContractClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
     env.mock_all_auths();

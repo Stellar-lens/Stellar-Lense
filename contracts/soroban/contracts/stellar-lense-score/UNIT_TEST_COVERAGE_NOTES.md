@@ -1,7 +1,7 @@
 # Unit test coverage additions — execute_upgrade / flash protection / is_epoch_open
 
 This note documents four small, targeted unit tests added to close direct
-coverage gaps called out against `contracts/ledgerlens-score/src/lib.rs`,
+coverage gaps called out against `contracts/stellar-lense-score/src/lib.rs`,
 per CONTRIBUTING.md's requirement that public `lib.rs` functions get direct
 unit coverage in `src/test_*.rs`, not just incidental coverage from
 integration-style tests.
@@ -63,6 +63,6 @@ registers the contract without calling `initialize` and asserts
 
 ## Result
 
-`cargo test -p ledgerlens-score` (whole workspace) passes with these four
+`cargo test -p stellar-lense-score` (whole workspace) passes with these four
 new tests included; no existing test files or production code were
 modified.

@@ -14,14 +14,14 @@ use soroban_sdk::{
     symbol_short, testutils::Address as _, Address, Bytes, BytesN, Env, Symbol, Vec,
 };
 
-use crate::{Error, LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreAttestation, ScoreAttestationInput, MaybeScoreAttestation, MaybeThresholdAttestation};
+use crate::{Error, StellarLenseScoreContract, StellarLenseScoreContractClient, ScoreAttestation, ScoreAttestationInput, MaybeScoreAttestation, MaybeThresholdAttestation};
 
-fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
+fn setup<'a>() -> (Env, StellarLenseScoreContractClient<'a>, Address, Address) {
     let env = Env::default();
     env.mock_all_auths();
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
@@ -29,7 +29,7 @@ fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
     (env, client, admin, service)
 }
 
-fn initialized<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
+fn initialized<'a>() -> (Env, StellarLenseScoreContractClient<'a>, Address, Address) {
     let (env, client, admin, service) = setup();
     client.initialize(&admin, &service);
     (env, client, admin, service)
@@ -68,7 +68,7 @@ fn commitment(
     contract_version: u32,
 ) -> [u8; 32] {
     env.as_contract(contract_id, || {
-        LedgerLensScoreContract::compute_commitment(
+        StellarLenseScoreContract::compute_commitment(
             env,
             wallet,
             pair,
@@ -524,16 +524,16 @@ fn test_attestation_signed_for_one_instance_rejected_on_another_instance() {
     let key = signing_key(1);
     let pubkey = pubkey_bytes(&env, &key, true);
 
-    let contract_a = env.register_contract(None, LedgerLensScoreContract);
-    let client_a = LedgerLensScoreContractClient::new(&env, &contract_a);
+    let contract_a = env.register_contract(None, StellarLenseScoreContract);
+    let client_a = StellarLenseScoreContractClient::new(&env, &contract_a);
     client_a.initialize(&admin, &service);
     client_a.set_service_pubkey(&Vec::new(&env), &pubkey);
 
-    let contract_b = env.register_contract(None, LedgerLensScoreContract);
-    let client_b = LedgerLensScoreContractClient::new(&env, &contract_b);
+    let contract_b = env.register_contract(None, StellarLenseScoreContract);
+    let client_b = StellarLenseScoreContractClient::new(&env, &contract_b);
     client_b.initialize(&admin, &service);
     // Same service pubkey registered on both instances — the realistic
-    // failure mode where multiple `ledgerlens-score` shards trust one key.
+    // failure mode where multiple `stellar_lense-score` shards trust one key.
     client_b.set_service_pubkey(&Vec::new(&env), &pubkey);
 
     let wallet = Address::generate(&env);

@@ -1,6 +1,6 @@
 //! Criterion benchmarks for `get_wallet_cluster` (issue #1021).
 //!
-//! Run: `cargo bench -p ledgerlens-score --bench wallet_cluster`
+//! Run: `cargo bench -p stellar_lense-score --bench wallet_cluster`
 //!
 //! Measures CPU instructions and memory byte costs for `get_wallet_cluster`
 //! across different wallet profile states:
@@ -13,7 +13,7 @@
 //! storage cache behavior are measured across uninitialized vs populated states.
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
 use soroban_sdk::{
     symbol_short,
     testutils::{Address as _, Ledger as _},
@@ -22,13 +22,13 @@ use soroban_sdk::{
 
 const START_TS: u64 = 1_700_000_000;
 
-fn setup(env: &Env) -> (LedgerLensScoreContractClient<'_>, Address, Address) {
+fn setup(env: &Env) -> (StellarLenseScoreContractClient<'_>, Address, Address) {
     env.mock_all_auths();
     env.budget().reset_unlimited();
     env.ledger().with_mut(|l| l.timestamp = START_TS);
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(env, &contract_id);
     let admin = Address::generate(env);
     let service = Address::generate(env);
     client.initialize(&admin, &service);
@@ -45,7 +45,7 @@ fn setup(env: &Env) -> (LedgerLensScoreContractClient<'_>, Address, Address) {
 
 fn submit_score(
     env: &Env,
-    client: &LedgerLensScoreContractClient,
+    client: &StellarLenseScoreContractClient,
     wallet: &Address,
     pair: &Symbol,
     score: u32,

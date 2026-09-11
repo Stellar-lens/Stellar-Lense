@@ -10,7 +10,7 @@ use soroban_sdk::{symbol_short, testutils::Address as _, Address, Env};
 use crate::{
     invariants, storage,
     types::{DataKey, RiskScore},
-    LedgerLensScoreContract,
+    StellarLenseScoreContract,
 };
 
 fn make_env() -> Env {
@@ -35,10 +35,10 @@ fn sample_score(v: u32) -> RiskScore {
 }
 
 fn register(env: &Env) -> Address {
-    let id = env.register_contract(None, LedgerLensScoreContract);
+    let id = env.register_contract(None, StellarLenseScoreContract);
     let admin = Address::generate(env);
     let service = Address::generate(env);
-    let client = crate::LedgerLensScoreContractClient::new(env, &id);
+    let client = crate::StellarLenseScoreContractClient::new(env, &id);
     client.initialize(&admin, &service);
     id
 }

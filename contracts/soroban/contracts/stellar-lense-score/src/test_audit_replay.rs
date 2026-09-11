@@ -10,7 +10,7 @@ mod test_audit_replay {
     };
 
     use crate::{
-        event_causality::EventCausality, LedgerLensScoreContract, LedgerLensScoreContractClient,
+        event_causality::EventCausality, StellarLenseScoreContract, StellarLenseScoreContractClient,
     };
 
     /// Test that off-chain auditors can reconstruct score history from events alone
@@ -19,8 +19,8 @@ mod test_audit_replay {
         let env = Env::default();
         env.mock_all_auths();
 
-        let contract_id = env.register_contract(None, LedgerLensScoreContract);
-        let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+        let contract_id = env.register_contract(None, StellarLenseScoreContract);
+        let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
         // Setup contract
         let admin = Address::generate(&env);
@@ -85,8 +85,8 @@ mod test_audit_replay {
         let env = Env::default();
         env.mock_all_auths();
 
-        let contract_id = env.register_contract(None, LedgerLensScoreContract);
-        let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+        let contract_id = env.register_contract(None, StellarLenseScoreContract);
+        let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
         let admin = Address::generate(&env);
         let service = Address::generate(&env);
@@ -331,8 +331,8 @@ mod test_audit_replay {
         let env = Env::default();
         env.mock_all_auths();
 
-        let contract_id = env.register_contract(None, LedgerLensScoreContract);
-        let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+        let contract_id = env.register_contract(None, StellarLenseScoreContract);
+        let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
         let admin = Address::generate(&env);
         let service = Address::generate(&env);

@@ -1,6 +1,6 @@
 use soroban_sdk::{symbol_short, testutils::Address as _, Address, Env};
 
-use crate::{storage, types::RiskScore, LedgerLensScoreContract};
+use crate::{storage, types::RiskScore, StellarLenseScoreContract};
 
 fn sample_score(value: u32) -> RiskScore {
     RiskScore {
@@ -29,7 +29,7 @@ fn sample_score(value: u32) -> RiskScore {
 #[test]
 fn test_get_admin_panics_if_never_set() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
 
     assert!(!env.as_contract(&contract_id, || storage::has_admin(&env)));
 }
@@ -38,7 +38,7 @@ fn test_get_admin_panics_if_never_set() {
 #[should_panic]
 fn test_get_admin_before_set_admin_panics() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
 
     env.as_contract(&contract_id, || {
         storage::get_admin(&env);
@@ -49,7 +49,7 @@ fn test_get_admin_before_set_admin_panics() {
 #[should_panic]
 fn test_get_service_before_set_service_panics() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
 
     env.as_contract(&contract_id, || {
         storage::get_service(&env);
@@ -59,7 +59,7 @@ fn test_get_service_before_set_service_panics() {
 #[test]
 fn test_set_admin_is_idempotent_overwrite() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
     let first = Address::generate(&env);
     let second = Address::generate(&env);
 
@@ -81,7 +81,7 @@ fn test_set_admin_is_idempotent_overwrite() {
 #[test]
 fn test_push_score_history_bounded_by_max_depth() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
 

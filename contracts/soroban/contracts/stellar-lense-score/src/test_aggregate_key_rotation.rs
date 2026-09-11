@@ -14,18 +14,18 @@ use soroban_sdk::{
 };
 
 use crate::{
-    Error, LedgerLensScoreContract, LedgerLensScoreContractClient, MaybeScoreAttestation,
+    Error, StellarLenseScoreContract, StellarLenseScoreContractClient, MaybeScoreAttestation,
     MaybeThresholdAttestation, ScoreAttestationInput, ThresholdAttestation,
 };
 
 const START_TS: u64 = 1_700_000_000;
 
-fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
+fn setup<'a>() -> (Env, StellarLenseScoreContractClient<'a>, Address, Address) {
     let env = Env::default();
     env.mock_all_auths();
     env.ledger().with_mut(|l| l.timestamp = START_TS);
-    let id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &id);
+    let id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &id);
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
     client.initialize(&admin, &service);
@@ -54,7 +54,7 @@ fn threshold_attest(
 ) -> ThresholdAttestation {
     let contract_id_zero = BytesN::from_array(env, &[0u8; 32]);
     let digest = env.as_contract(contract_id, || {
-        LedgerLensScoreContract::compute_commitment(
+        StellarLenseScoreContract::compute_commitment(
             env,
             wallet,
             pair,
@@ -85,7 +85,7 @@ fn threshold_attest(
 }
 
 fn submit(
-    client: &LedgerLensScoreContractClient,
+    client: &StellarLenseScoreContractClient,
     env: &Env,
     wallet: &Address,
     pair: &Symbol,
@@ -313,8 +313,8 @@ fn test_rotate_aggregate_service_pubkey_rejects_invalid_length() {
 fn test_rotate_aggregate_service_pubkey_before_initialize_fails_not_initialized() {
     let env = Env::default();
     env.mock_all_auths();
-    let id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &id);
+    let id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &id);
 
     let new_key = signing_key(1);
     let result = client.try_rotate_aggregate_service_pubkey(

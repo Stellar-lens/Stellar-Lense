@@ -31,17 +31,17 @@ use soroban_sdk::{
     Address, Env, Vec,
 };
 
-use crate::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+use crate::{StellarLenseScoreContract, StellarLenseScoreContractClient};
 
 // ── Test setup ────────────────────────────────────────────────────────────────
 
-fn make_env<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address) {
+fn make_env<'a>() -> (Env, StellarLenseScoreContractClient<'a>, Address) {
     let env = Env::default();
     env.mock_all_auths();
     env.budget().reset_unlimited();
     env.ledger().with_mut(|l| l.timestamp = 1_700_000_000);
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
     client.initialize(&admin, &service);
@@ -51,7 +51,7 @@ fn make_env<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address) {
 /// Submit one score for a fresh wallet on the XLM_USDC pair.
 fn submit_score(
     env: &Env,
-    client: &LedgerLensScoreContractClient,
+    client: &StellarLenseScoreContractClient,
     wallet: &Address,
     score: u32,
     confidence: u32,

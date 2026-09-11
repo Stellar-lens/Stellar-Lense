@@ -3,7 +3,7 @@
 //! UpgradeGovernance, EmergencyPause, SignerAdmin}` gets its own optional
 //! separate-approver policy (configured via `set_policy_approval`),
 //! disjoint from routine admin quorum and from every other policy's
-//! approver — see `LedgerLensScoreContract::require_policy_auth` in
+//! approver — see `StellarLenseScoreContract::require_policy_auth` in
 //! `lib.rs`. `Policy::DataDeletion` continues to use the pre-existing
 //! `set_deletion_approval_policy` (see `test_deletion_policy.rs`).
 
@@ -12,13 +12,13 @@ use soroban_sdk::{
     Address, Env, IntoVal, Vec,
 };
 
-use crate::{Error, LedgerLensScoreContract, LedgerLensScoreContractClient, Policy};
+use crate::{Error, StellarLenseScoreContract, StellarLenseScoreContractClient, Policy};
 
-fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
+fn setup<'a>() -> (Env, StellarLenseScoreContractClient<'a>, Address, Address) {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
     client.initialize(&admin, &service);

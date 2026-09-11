@@ -27,17 +27,17 @@ use crate::{
         GOV_ACTION_PROPOSE_UPGRADE, GOV_ACTION_RESERVED, GOV_ACTION_SET_ADMIN_THRESHOLD,
         GOV_ACTION_SET_SERVICE, GOV_ACTION_UNPAUSE,
     },
-    LedgerLensScoreContract, LedgerLensScoreContractClient,
+    StellarLenseScoreContract, StellarLenseScoreContractClient,
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
+fn setup<'a>() -> (Env, StellarLenseScoreContractClient<'a>, Address, Address) {
     let env = Env::default();
     env.mock_all_auths();
     env.ledger().with_mut(|l| l.timestamp = 100_000);
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
     client.initialize(&admin, &service);
@@ -284,8 +284,8 @@ fn test_reserved_discriminant_is_not_known() {
 fn test_genesis_chain_head_is_zero() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
     client.initialize(&admin, &service);

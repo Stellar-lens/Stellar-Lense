@@ -1,19 +1,19 @@
 use soroban_sdk::{testutils::Address as _, Address, Env, Vec};
 
-use crate::{Error, LedgerLensScoreContract, LedgerLensScoreContractClient};
+use crate::{Error, StellarLenseScoreContract, StellarLenseScoreContractClient};
 
-fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
+fn setup<'a>() -> (Env, StellarLenseScoreContractClient<'a>, Address, Address) {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
     client.initialize(&admin, &service);
     (env, client, admin, service)
 }
 
-fn add_signer(env: &Env, client: &LedgerLensScoreContractClient, signer: &Address) {
+fn add_signer(env: &Env, client: &StellarLenseScoreContractClient, signer: &Address) {
     client.add_service_signer(&Vec::new(env), signer);
 }
 
@@ -72,8 +72,8 @@ fn test_bulk_set_signer_tier_too_large_rejected() {
 fn test_bulk_set_signer_tier_not_initialized_rejected() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     let mut entries: Vec<(Address, u32, u32)> = Vec::new(&env);
     entries.push_back((Address::generate(&env), 0u32, 100u32));
     assert_eq!(
@@ -87,8 +87,8 @@ fn test_bulk_set_signer_tier_not_initialized_rejected() {
 fn test_bulk_set_signer_tier_non_admin_rejected() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
     client.initialize(&admin, &service);

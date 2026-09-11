@@ -1,8 +1,8 @@
-# Verkle Commitment Scheme for LedgerLens
+# Verkle Commitment Scheme for Stellar Lense
 
 ## Overview
 
-LedgerLens maintains an **incremental Verkle-tree-style commitment** over the full live contract state — every `(wallet, asset_pair, score)` triple. This commitment enables three capabilities without reading the entire state:
+Stellar Lense maintains an **incremental Verkle-tree-style commitment** over the full live contract state — every `(wallet, asset_pair, score)` triple. This commitment enables three capabilities without reading the entire state:
 
 | Capability | Description |
 |---|---|

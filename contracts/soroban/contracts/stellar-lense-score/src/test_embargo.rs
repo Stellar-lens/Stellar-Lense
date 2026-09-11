@@ -8,18 +8,18 @@ use soroban_sdk::{
 };
 
 use crate::{
-    constants::MAX_EMBARGOED_WALLETS, Error, LedgerLensScoreContract,
-    LedgerLensScoreContractClient, ScoreSubmission,
+    constants::MAX_EMBARGOED_WALLETS, Error, StellarLenseScoreContract,
+    StellarLenseScoreContractClient, ScoreSubmission,
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
+fn setup<'a>() -> (Env, StellarLenseScoreContractClient<'a>, Address, Address) {
     let env = Env::default();
     env.mock_all_auths();
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
@@ -30,7 +30,7 @@ fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
 
 fn submit(
     env: &Env,
-    client: &LedgerLensScoreContractClient,
+    client: &StellarLenseScoreContractClient,
     wallet: &Address,
     pair: &soroban_sdk::Symbol,
     score: u32,
@@ -398,8 +398,8 @@ fn test_embargo_is_per_wallet() {
 fn test_set_embargo_requires_init() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     let wallet = Address::generate(&env);
     let r = client.try_set_score_embargo(&wallet, &None);
     assert_eq!(r, Err(Ok(Error::NotInitialized)));
@@ -409,8 +409,8 @@ fn test_set_embargo_requires_init() {
 fn test_lift_embargo_requires_init() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     let wallet = Address::generate(&env);
     let r = client.try_lift_score_embargo(&wallet);
     assert_eq!(r, Err(Ok(Error::NotInitialized)));
@@ -538,8 +538,8 @@ fn test_revoke_all_embargoes_also_clears_already_expired_timed_entries() {
 fn test_revoke_all_embargoes_requires_init() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     let r = client.try_revoke_all_embargoes(&Vec::new(&env));
     assert_eq!(r, Err(Ok(Error::NotInitialized)));
 }

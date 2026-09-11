@@ -26,7 +26,7 @@ use soroban_sdk::{
 };
 
 use crate::{
-    BatchAttestation, Error, LedgerLensScoreContract, LedgerLensScoreContractClient,
+    BatchAttestation, Error, StellarLenseScoreContract, StellarLenseScoreContractClient,
     ScoreAttestation, ScoreSubmission, ScoreSubmissionWithProof,
 };
 
@@ -39,12 +39,12 @@ use alloc::vec::Vec as StdVec;
 
 // ── Test infrastructure ─────────────────────────────────────────────────────
 
-fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
+fn setup<'a>() -> (Env, StellarLenseScoreContractClient<'a>, Address, Address) {
     let env = Env::default();
     env.mock_all_auths();
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
@@ -52,7 +52,7 @@ fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
     (env, client, admin, service)
 }
 
-fn initialized<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
+fn initialized<'a>() -> (Env, StellarLenseScoreContractClient<'a>, Address, Address) {
     let (env, client, admin, service) = setup();
     client.initialize(&admin, &service);
     (env, client, admin, service)
@@ -81,7 +81,7 @@ fn pubkey_bytes(env: &Env, key: &SigningKey, compressed: bool) -> Bytes {
 
 /// Hash a 32-byte underlying commitment with the **leaf** domain
 /// separator (`0x00`) per the RFC 9162 scheme. Mirrors
-/// [`LedgerLensScoreContract::compute_merkle_leaf`].
+/// [`StellarLenseScoreContract::compute_merkle_leaf`].
 fn merkle_leaf(env: &Env, commitment_bytes: &[u8; 32]) -> [u8; 32] {
     let mut preimage = [0u8; 33];
     preimage[0] = 0x00;
@@ -118,7 +118,7 @@ fn payload_commitment(
     model_version: u32,
 ) -> [u8; 32] {
     env.as_contract(contract_id, || {
-        LedgerLensScoreContract::compute_commitment(
+        StellarLenseScoreContract::compute_commitment(
             env,
             wallet,
             pair,
@@ -283,7 +283,7 @@ fn test_valid_merkle_batch_accepted() {
     // Sanity-check that the contract agrees with our construction.
     let leaf0 = env.as_contract(&client.address, || {
         let leaf =
-            LedgerLensScoreContract::compute_merkle_leaf(&env, submissions_vec.get(0).unwrap())
+            StellarLenseScoreContract::compute_merkle_leaf(&env, submissions_vec.get(0).unwrap())
                 .unwrap();
         leaf.to_bytes().to_array()
     });
@@ -523,7 +523,7 @@ fn test_service_pubkey_not_set_rejects() {
 fn test_domain_prefix_hash_correctness() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
     _ = contract_id; // kept for symmetry with test 8; not exercised here
 
     // Hand-picked, hand-computed expected outputs.
@@ -578,7 +578,7 @@ fn test_domain_prefix_hash_correctness() {
 fn test_verify_merkle_proof_standalone() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
 
     // 8-Leaf (3-level) tree: hand-built off-chain with the same
     // hash helpers the contract uses. Each leaf commitment is a
@@ -602,7 +602,7 @@ fn test_verify_merkle_proof_standalone() {
         env.as_contract(&contract_id, || {
             // Wrong root: proof must NOT verify.
             let wrong_root = BytesN::from_array(&env, &[0xFFu8; 32]);
-            let result = LedgerLensScoreContract::verify_merkle_proof(
+            let result = StellarLenseScoreContract::verify_merkle_proof(
                 &env,
                 &leaf_bn,
                 &proof,
@@ -612,7 +612,7 @@ fn test_verify_merkle_proof_standalone() {
             assert!(!result, "proof should not verify against a different root");
 
             // Correct root: proof MUST verify.
-            let result = LedgerLensScoreContract::verify_merkle_proof(
+            let result = StellarLenseScoreContract::verify_merkle_proof(
                 &env, &leaf_bn, &proof, flags, &root_bn,
             );
             assert!(result, "proof must verify against the canonical root for index {index}");
@@ -721,8 +721,8 @@ fn test_batch_attested_requires_service_auth() {
     let env = Env::default();
     env.mock_all_auths();
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
 

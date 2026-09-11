@@ -1,11 +1,11 @@
 # WASM Size Budget and Analysis Guide
 
-This document establishes the baseline WebAssembly (WASM) binary size breakdown for the `ledgerlens-score` contract and documents local reproduction steps for tracking size regression.
+This document establishes the baseline WebAssembly (WASM) binary size breakdown for the `stellar-lense-score` contract and documents local reproduction steps for tracking size regression.
 
 ## Baseline Overview
 
-- **Target Contract**: `ledgerlens-score`
-- **WASM Binary Path**: `target/wasm32-unknown-unknown/release/ledgerlens_score.wasm`
+- **Target Contract**: `stellar-lense-score`
+- **WASM Binary Path**: `target/wasm32-unknown-unknown/release/stellar_lense_score.wasm`
 - **Total Binary Size**: 599,000 bytes (~585 KB)
 - **Tolerance**: 5%
 
@@ -89,17 +89,17 @@ You can also run `twiggy` directly against the release binary:
 
 ```bash
 # 1. Build the release WASM target
-cargo build --target wasm32-unknown-unknown --release -p ledgerlens-score
+cargo build --target wasm32-unknown-unknown --release -p stellar-lense-score
 
 # 2. View top shallow size items
-twiggy top -n 10 target/wasm32-unknown-unknown/release/ledgerlens_score.wasm
+twiggy top -n 10 target/wasm32-unknown-unknown/release/stellar_lense_score.wasm
 
 # 3. View top retained size / dominator tree
-twiggy dominators -r 10 target/wasm32-unknown-unknown/release/ledgerlens_score.wasm
+twiggy dominators -r 10 target/wasm32-unknown-unknown/release/stellar_lense_score.wasm
 ```yaml
 
 ---
 
 ## CI Integration
 
-The WASM size report is automatically executed in GitHub Actions (`.github/workflows/ci.yml`) on pull requests and main branch builds. The resulting analysis document is uploaded as a build artifact named `ledgerlens-score-wasm-size-report`.
+The WASM size report is automatically executed in GitHub Actions (`.github/workflows/ci.yml`) on pull requests and main branch builds. The resulting analysis document is uploaded as a build artifact named `stellar-lense-score-wasm-size-report`.

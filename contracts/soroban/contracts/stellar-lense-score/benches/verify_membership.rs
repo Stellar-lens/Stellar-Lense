@@ -1,6 +1,6 @@
 //! Criterion benchmarks for `verify_membership` (issue #1019).
 //!
-//! Run: `cargo bench -p ledgerlens-score --bench verify_membership`
+//! Run: `cargo bench -p stellar_lense-score --bench verify_membership`
 //!
 //! Measures Verkle / polynomial state commitment opening proof verification.
 //! Proof verification involves:
@@ -19,7 +19,7 @@
 //! regardless of total contract state size due to the constant-size polynomial commitment proof structure.
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
 use soroban_sdk::{
     symbol_short,
     testutils::{Address as _, Ledger as _},
@@ -28,13 +28,13 @@ use soroban_sdk::{
 
 const START_TS: u64 = 1_700_000_000;
 
-fn setup(env: &Env) -> (LedgerLensScoreContractClient<'_>, Address, Address) {
+fn setup(env: &Env) -> (StellarLenseScoreContractClient<'_>, Address, Address) {
     env.mock_all_auths();
     env.budget().reset_unlimited();
     env.ledger().with_mut(|l| l.timestamp = START_TS);
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(env, &contract_id);
     let admin = Address::generate(env);
     let service = Address::generate(env);
     client.initialize(&admin, &service);
@@ -44,7 +44,7 @@ fn setup(env: &Env) -> (LedgerLensScoreContractClient<'_>, Address, Address) {
 
 fn populate_entries(
     env: &Env,
-    client: &LedgerLensScoreContractClient,
+    client: &StellarLenseScoreContractClient,
     count: usize,
 ) -> (Address, Symbol, u32, u64) {
     let mut target_wallet = Address::generate(env);

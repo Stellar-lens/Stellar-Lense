@@ -1,6 +1,6 @@
 # Batch Attestation — Merkle-Root Verification Spec
 
-**Status:** Stable · **Contract:** `LedgerLensScoreContract` · introduced in
+**Status:** Stable · **Contract:** `StellarLenseScoreContract` · introduced in
 `CONTRACT_VERSION` 3.
 
 `submit_scores_batch_attested` is the cryptographic-payload-integrity

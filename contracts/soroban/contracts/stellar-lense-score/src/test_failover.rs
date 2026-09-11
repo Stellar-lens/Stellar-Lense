@@ -1,6 +1,6 @@
 //! Integration tests for the failover protocol.
 //!
-//! Tests register two `LedgerLensScoreContract` instances in the same Soroban
+//! Tests register two `StellarLenseScoreContract` instances in the same Soroban
 //! `Env` and verify that the primary transparently delegates to the secondary
 //! when paused, subject to the `FAILOVER_STALENESS_WINDOW` guard.
 
@@ -11,7 +11,7 @@ use soroban_sdk::{
 };
 
 use crate::{
-    constants::FAILOVER_STALENESS_WINDOW, LedgerLensScoreContract, LedgerLensScoreContractClient,
+    constants::FAILOVER_STALENESS_WINDOW, StellarLenseScoreContract, StellarLenseScoreContractClient,
 };
 
 const START_TS: u64 = 1_700_000_000;
@@ -19,16 +19,16 @@ const START_TS: u64 = 1_700_000_000;
 /// Set up two independent contract instances in the same `Env`.
 /// Returns `(env, primary_client, secondary_client, admin, service)`.
 fn setup_two<'a>(
-) -> (Env, LedgerLensScoreContractClient<'a>, LedgerLensScoreContractClient<'a>, Address, Address) {
+) -> (Env, StellarLenseScoreContractClient<'a>, StellarLenseScoreContractClient<'a>, Address, Address) {
     let env = Env::default();
     env.mock_all_auths();
     env.ledger().with_mut(|l| l.timestamp = START_TS);
 
-    let primary_id = env.register_contract(None, LedgerLensScoreContract);
-    let secondary_id = env.register_contract(None, LedgerLensScoreContract);
+    let primary_id = env.register_contract(None, StellarLenseScoreContract);
+    let secondary_id = env.register_contract(None, StellarLenseScoreContract);
 
-    let primary = LedgerLensScoreContractClient::new(&env, &primary_id);
-    let secondary = LedgerLensScoreContractClient::new(&env, &secondary_id);
+    let primary = StellarLenseScoreContractClient::new(&env, &primary_id);
+    let secondary = StellarLenseScoreContractClient::new(&env, &secondary_id);
 
     let admin = Address::generate(&env);
     let service = Address::generate(&env);

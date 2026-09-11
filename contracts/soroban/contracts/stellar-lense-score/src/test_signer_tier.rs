@@ -11,21 +11,21 @@
 
 use soroban_sdk::{testutils::Address as _, Address, Env, Vec};
 
-use ledgerlens_test_support::generate_score_roles;
+use stellar_lense_test_support::generate_score_roles;
 
-use crate::{Error, LedgerLensScoreContract, LedgerLensScoreContractClient};
+use crate::{Error, StellarLenseScoreContract, StellarLenseScoreContractClient};
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
-fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>) {
+fn setup<'a>() -> (Env, StellarLenseScoreContractClient<'a>) {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     (env, client)
 }
 
-fn initialized<'a>() -> (Env, LedgerLensScoreContractClient<'a>) {
+fn initialized<'a>() -> (Env, StellarLenseScoreContractClient<'a>) {
     let (env, client) = setup();
     let (admin, service) = generate_score_roles(&env);
     client.initialize(&admin, &service);

@@ -1,6 +1,6 @@
-# LedgerLens Contributor Security Review Checklists
+# Stellar Lense Contributor Security Review Checklists
 
-This document provides mandatory security review checklists organized by change category. Every Pull Request (PR) submitted to the `LedgerLens` smart contract suite must be audited against the applicable checklists before merging.
+This document provides mandatory security review checklists organized by change category. Every Pull Request (PR) submitted to the `Stellar Lense` smart contract suite must be audited against the applicable checklists before merging.
 
 ---
 

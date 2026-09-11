@@ -15,15 +15,15 @@ use soroban_sdk::{
     Address, BytesN, Env, Symbol, Vec,
 };
 
-use crate::{Error, LedgerLensScoreContract, LedgerLensScoreContractClient};
+use crate::{Error, StellarLenseScoreContract, StellarLenseScoreContractClient};
 
-fn setup() -> (Env, LedgerLensScoreContractClient<'static>, Address, Address) {
+fn setup() -> (Env, StellarLenseScoreContractClient<'static>, Address, Address) {
     let env = Env::default();
     env.mock_all_auths();
     env.budget().reset_unlimited();
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
@@ -31,7 +31,7 @@ fn setup() -> (Env, LedgerLensScoreContractClient<'static>, Address, Address) {
     (env, client, admin, service)
 }
 
-fn initialized() -> (Env, LedgerLensScoreContractClient<'static>, Address, Address) {
+fn initialized() -> (Env, StellarLenseScoreContractClient<'static>, Address, Address) {
     let (env, client, admin, service) = setup();
     env.ledger().with_mut(|l| l.timestamp = 100_000);
     client.initialize(&admin, &service);
@@ -40,7 +40,7 @@ fn initialized() -> (Env, LedgerLensScoreContractClient<'static>, Address, Addre
 
 fn submit_dummy_score(
     env: &Env,
-    client: &LedgerLensScoreContractClient<'static>,
+    client: &StellarLenseScoreContractClient<'static>,
     wallet: &Address,
     pair: &soroban_sdk::Symbol,
 ) {

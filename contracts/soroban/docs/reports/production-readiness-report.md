@@ -4,7 +4,7 @@ Run ID: pending
 
 Generated UTC: pending
 
-Repository: Ledger-Lenz/Ledgerlens-contract
+Repository: Stellar-lens/Stellar-Lense
 
 Commit: pending
 

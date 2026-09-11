@@ -1,12 +1,12 @@
-# `ledgerlens-score` module ownership boundaries
+# `stellar-lense-score` module ownership boundaries
 
 This document records the current ownership boundaries for issue #806 before
 further refactors move logic around.
 
 ## Current concrete behavior
 
-`ledgerlens-score` exposes one large contract implementation in
-`contracts/ledgerlens-score/src/lib.rs`, with supporting modules providing
+`stellar-lense-score` exposes one large contract implementation in
+`contracts/stellar-lense-score/src/lib.rs`, with supporting modules providing
 constants, errors, storage keys, event payloads, governance helpers, and a few
 specialized algorithms.
 

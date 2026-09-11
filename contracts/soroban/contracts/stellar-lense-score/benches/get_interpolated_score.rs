@@ -1,7 +1,7 @@
 //! Criterion benchmark for `get_interpolated_score` at varying score-history
 //! sizes (issue #1024).
 //!
-//! Run: `cargo bench -p ledgerlens-score --bench get_interpolated_score`
+//! Run: `cargo bench -p stellar_lense-score --bench get_interpolated_score`
 //!
 //! The function does an exact-match linear scan over the full history
 //! followed by (on a miss) a second linear scan to find the bracketing pair
@@ -9,7 +9,7 @@
 //! `MAX_HISTORY_DEPTH` (50) cap.
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
 use soroban_sdk::{
     testutils::{Address as _, Ledger as _},
     Address, Env, Symbol, Vec,
@@ -17,13 +17,13 @@ use soroban_sdk::{
 
 const MAX_HISTORY_DEPTH: u32 = 50;
 
-fn setup(env: &Env) -> (LedgerLensScoreContractClient<'_>, Address, Symbol) {
+fn setup(env: &Env) -> (StellarLenseScoreContractClient<'_>, Address, Symbol) {
     env.mock_all_auths();
     env.budget().reset_unlimited();
     env.ledger().with_mut(|l| l.timestamp = 1_700_000_000);
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(env, &contract_id);
     let admin = Address::generate(env);
     let service = Address::generate(env);
     client.initialize(&admin, &service);
@@ -39,7 +39,7 @@ fn setup(env: &Env) -> (LedgerLensScoreContractClient<'_>, Address, Symbol) {
 /// the bracketing scan finds a match near the start of the ring.
 fn interpolate_cost(
     env: &Env,
-    client: &LedgerLensScoreContractClient,
+    client: &StellarLenseScoreContractClient,
     wallet: &Address,
     asset_pair: &Symbol,
     count: u32,

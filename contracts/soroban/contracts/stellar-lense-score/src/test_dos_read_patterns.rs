@@ -2,7 +2,7 @@
 //!
 //! These tests exercise scenarios that a hostile caller could use to probe for
 //! panics, unbounded work, or unexpected state mutations in the read-only
-//! functions of `LedgerLensScoreContract`.  Each test proves that the contract
+//! functions of `StellarLenseScoreContract`.  Each test proves that the contract
 //! either:
 //! - Returns a documented error (safe failure), or
 //! - Returns a bounded result (bounded work).
@@ -38,24 +38,24 @@ use soroban_sdk::{
 
 use crate::{
     constants::{BATCH_READ_MAX, MAX_EXPIRING_ENTRIES_PER_CALL},
-    Error, LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreQuery,
+    Error, StellarLenseScoreContract, StellarLenseScoreContractClient, ScoreQuery,
 };
 
 const START_TS: u64 = 1_700_000_000;
 
-fn setup(env: &Env) -> LedgerLensScoreContractClient<'_> {
+fn setup(env: &Env) -> StellarLenseScoreContractClient<'_> {
     env.mock_all_auths();
     env.budget().reset_unlimited();
     env.ledger().with_mut(|l| l.timestamp = START_TS);
-    let id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(env, &id);
+    let id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(env, &id);
     let admin = Address::generate(env);
     let service = Address::generate(env);
     client.initialize(&admin, &service);
     client
 }
 
-fn submit(env: &Env, client: &LedgerLensScoreContractClient, wallet: &Address, score: u32) {
+fn submit(env: &Env, client: &StellarLenseScoreContractClient, wallet: &Address, score: u32) {
     client.submit_score(
         &Vec::new(env),
         wallet,

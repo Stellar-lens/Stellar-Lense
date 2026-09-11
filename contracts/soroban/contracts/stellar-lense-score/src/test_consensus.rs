@@ -8,19 +8,19 @@ use soroban_sdk::{
 };
 
 use crate::{
-    Error, LedgerLensScoreContract, LedgerLensScoreContractClient, ModelSubmission,
+    Error, StellarLenseScoreContract, StellarLenseScoreContractClient, ModelSubmission,
     ScoreAttestation,
 };
 
 const START_TS: u64 = 1_700_000_000;
 
-fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>) {
+fn setup<'a>() -> (Env, StellarLenseScoreContractClient<'a>) {
     let env = Env::default();
     env.mock_all_auths();
     env.ledger().with_mut(|l| l.timestamp = START_TS);
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
@@ -73,7 +73,7 @@ fn commitment(
     model_version: u32,
 ) -> [u8; 32] {
     env.as_contract(contract_id, || {
-        LedgerLensScoreContract::compute_commitment(
+        StellarLenseScoreContract::compute_commitment(
             env,
             wallet,
             pair,
@@ -107,7 +107,7 @@ fn attest(env: &Env, key: &SigningKey, digest: [u8; 32]) -> ScoreAttestation {
 #[allow(clippy::too_many_arguments)]
 fn model_submission(
     env: &Env,
-    client: &LedgerLensScoreContractClient<'_>,
+    client: &StellarLenseScoreContractClient<'_>,
     key: &SigningKey,
     model_address: &Address,
     wallet: &Address,
@@ -144,7 +144,7 @@ fn model_submission(
 
 fn do_consensus(
     env: &Env,
-    client: &LedgerLensScoreContractClient<'_>,
+    client: &StellarLenseScoreContractClient<'_>,
     wallet: &Address,
     pair: &Symbol,
     submissions: &Vec<ModelSubmission>,
@@ -167,7 +167,7 @@ fn do_consensus(
 
 fn try_do_consensus(
     env: &Env,
-    client: &LedgerLensScoreContractClient<'_>,
+    client: &StellarLenseScoreContractClient<'_>,
     wallet: &Address,
     pair: &Symbol,
     submissions: &Vec<ModelSubmission>,

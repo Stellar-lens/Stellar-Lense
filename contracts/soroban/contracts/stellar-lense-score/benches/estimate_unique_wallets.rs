@@ -1,6 +1,6 @@
 #! // Criterion benchmark for `estimate_unique_wallets`.
 //!
-//! Run: `cargo bench -p ledgerlens-score --bench estimate_unique_wallets`
+//! Run: `cargo bench -p stellar_lense-score --bench estimate_unique_wallets`
 //!
 //! Measures the CPU/memory cost of estimating the number of unique wallets
 //! scored for an asset pair using HyperLogLog.  The cost scales with the
@@ -20,7 +20,7 @@
 //! wallet count for an asset pair.
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
 use soroban_sdk::{
     testutils::{Address as _, Ledger as _},
     Address, Env, Symbol, Vec,
@@ -28,13 +28,13 @@ use soroban_sdk::{
 
 const START_TS: u64 = 1_700_000_000;
 
-fn setup(env: &Env) -> (LedgerLensScoreContractClient<'_>, Symbol) {
+fn setup(env: &Env) -> (StellarLenseScoreContractClient<'_>, Symbol) {
     env.mock_all_auths();
     env.budget().reset_unlimited();
     env.ledger().with_mut(|l| l.timestamp = START_TS);
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(env, &contract_id);
     let admin = Address::generate(env);
     let service = Address::generate(env);
     client.initialize(&admin, &service);
@@ -45,7 +45,7 @@ fn setup(env: &Env) -> (LedgerLensScoreContractClient<'_>, Symbol) {
 
 fn submit_wallets(
     env: &Env,
-    client: &LedgerLensScoreContractClient,
+    client: &StellarLenseScoreContractClient,
     asset_pair: &Symbol,
     count: u32,
 ) {

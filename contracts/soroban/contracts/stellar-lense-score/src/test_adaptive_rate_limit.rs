@@ -14,19 +14,19 @@ use soroban_sdk::{
 };
 
 use crate::{
-    constants::DEFAULT_COOLDOWN_SECS, AdaptiveRateLimit, Error, LedgerLensScoreContract,
-    LedgerLensScoreContractClient,
+    constants::DEFAULT_COOLDOWN_SECS, AdaptiveRateLimit, Error, StellarLenseScoreContract,
+    StellarLenseScoreContractClient,
 };
 
 const START_TS: u64 = 1_700_000_000;
 
-fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address) {
+fn setup<'a>() -> (Env, StellarLenseScoreContractClient<'a>, Address) {
     let env = Env::default();
     env.mock_all_auths();
     env.ledger().with_mut(|l| l.timestamp = START_TS);
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
@@ -40,7 +40,7 @@ fn advance_to(env: &Env, ts: u64) {
 }
 
 /// Submit a score at the current ledger timestamp.
-fn submit(env: &Env, client: &LedgerLensScoreContractClient, wallet: &Address, pair: &soroban_sdk::Symbol, score: u32) -> Result<(), crate::Error> {
+fn submit(env: &Env, client: &StellarLenseScoreContractClient, wallet: &Address, pair: &soroban_sdk::Symbol, score: u32) -> Result<(), crate::Error> {
     let ts = env.ledger().timestamp();
     client.try_submit_score(
         &Vec::new(env),
@@ -90,8 +90,8 @@ fn test_set_and_get_adaptive_rate_limit() {
 fn test_set_adaptive_rate_limit_requires_init() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     let result = client.try_set_adaptive_rate_limit(&Vec::new(&env), &true, &100);
     assert_eq!(result, Err(Ok(Error::NotInitialized)));
 }

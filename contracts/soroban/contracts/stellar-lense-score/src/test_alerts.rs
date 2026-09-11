@@ -18,20 +18,20 @@ use soroban_sdk::{
 };
 
 use crate::{
-    AlertAckRecord, AlertType, Error, LedgerLensScoreContract, LedgerLensScoreContractClient,
+    AlertAckRecord, AlertType, Error, StellarLenseScoreContract, StellarLenseScoreContractClient,
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 const START_TS: u64 = 1_700_000_000;
 
-fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
+fn setup<'a>() -> (Env, StellarLenseScoreContractClient<'a>, Address, Address) {
     let env = Env::default();
     env.mock_all_auths();
     env.ledger().with_mut(|l| l.timestamp = START_TS);
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
@@ -199,8 +199,8 @@ fn test_acknowledge_alert_requires_initialization() {
     // Contract has not been initialized — must return NotInitialized.
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
     let result = client.try_acknowledge_alert(
         &Vec::new(&env),
@@ -213,8 +213,8 @@ fn test_acknowledge_alert_requires_initialization() {
 #[test]
 fn test_acknowledge_alert_rejects_unauthorized_caller() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
     let service = Address::generate(&env);

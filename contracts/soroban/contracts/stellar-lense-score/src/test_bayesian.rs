@@ -6,18 +6,18 @@ use soroban_sdk::{
     Address, Env, Vec,
 };
 
-use crate::{Error, LedgerLensScoreContract, LedgerLensScoreContractClient};
+use crate::{Error, StellarLenseScoreContract, StellarLenseScoreContractClient};
 
 const START_TS: u64 = 1_700_000_000;
 /// Fixed-point scale: 1_000_000 == 1.0
 const SCALE: u64 = 1_000_000;
 
-fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>) {
+fn setup<'a>() -> (Env, StellarLenseScoreContractClient<'a>) {
     let env = Env::default();
     env.mock_all_auths();
     env.ledger().with_mut(|l| l.timestamp = START_TS);
-    let id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &id);
+    let id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &id);
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
     client.initialize(&admin, &service);
@@ -27,7 +27,7 @@ fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>) {
 /// Submit a score with a specific model_version, advancing time past cooldown.
 fn submit(
     env: &Env,
-    client: &LedgerLensScoreContractClient<'_>,
+    client: &StellarLenseScoreContractClient<'_>,
     wallet: &Address,
     pair: &soroban_sdk::Symbol,
     score: u32,

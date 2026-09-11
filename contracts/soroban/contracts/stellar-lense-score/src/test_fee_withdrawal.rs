@@ -14,7 +14,7 @@ use soroban_sdk::{
     Address, Env, IntoVal, Vec,
 };
 
-use crate::{Error, LedgerLensScoreContract, LedgerLensScoreContractClient};
+use crate::{Error, StellarLenseScoreContract, StellarLenseScoreContractClient};
 
 // ── Test helpers ──────────────────────────────────────────────────────────────
 
@@ -22,12 +22,12 @@ use crate::{Error, LedgerLensScoreContract, LedgerLensScoreContractClient};
 /// The mock token is minted with `initial_balance` stroops to the contract.
 fn setup_with_token<'a>(
     initial_balance: i128,
-) -> (Env, LedgerLensScoreContractClient<'a>, Address, Address, Address) {
+) -> (Env, StellarLenseScoreContractClient<'a>, Address, Address, Address) {
     let env = Env::default();
     env.mock_all_auths();
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
@@ -46,12 +46,12 @@ fn setup_with_token<'a>(
 }
 
 /// Returns (env, client, admin) with no token configured.
-fn setup_no_token<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address) {
+fn setup_no_token<'a>() -> (Env, StellarLenseScoreContractClient<'a>, Address) {
     let env = Env::default();
     env.mock_all_auths();
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
@@ -74,8 +74,8 @@ fn test_set_fee_token_success() {
 fn test_set_fee_token_not_initialized() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     let token = Address::generate(&env);
     let result = client.try_set_fee_token(&token);
     assert_eq!(result, Err(Ok(Error::NotInitialized)));
@@ -116,8 +116,8 @@ fn test_set_fee_recipient_success() {
 fn test_set_fee_recipient_not_initialized() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     let recipient = Address::generate(&env);
     let result = client.try_set_fee_recipient(&Vec::new(&env), &recipient);
     assert_eq!(result, Err(Ok(Error::NotInitialized)));
@@ -186,8 +186,8 @@ fn test_withdraw_fees_full_balance() {
 fn test_withdraw_fees_not_initialized() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     let recipient = Address::generate(&env);
     let result = client.try_withdraw_fees(&Vec::new(&env), &recipient, &100);
     assert_eq!(result, Err(Ok(Error::NotInitialized)));

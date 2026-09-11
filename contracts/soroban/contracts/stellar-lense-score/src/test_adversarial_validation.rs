@@ -18,13 +18,13 @@ use soroban_sdk::{
 };
 
 #[cfg(test)]
-use crate::LedgerLensScoreContract;
+use crate::StellarLenseScoreContract;
 
 /// Shared test setup: returns (env, contract_client, admin, service, wallet, pair).
 #[cfg(test)]
 fn setup() -> (
     Env,
-    crate::LedgerLensScoreContractClient<'static>,
+    crate::StellarLenseScoreContractClient<'static>,
     Address,
     Address,
     Address,
@@ -32,8 +32,8 @@ fn setup() -> (
 ) {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = crate::LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = crate::StellarLenseScoreContractClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
     client.initialize(&admin, &service);

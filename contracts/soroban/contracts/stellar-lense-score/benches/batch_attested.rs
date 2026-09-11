@@ -2,7 +2,7 @@
 //! sizes, profiled against plain `submit_scores_batch` (`batch_submit.rs`)
 //! at the same batch sizes (issue #419).
 //!
-//! Run: `cargo bench -p ledgerlens-score --bench batch_attested`
+//! Run: `cargo bench -p stellar_lense-score --bench batch_attested`
 //!
 //! Benches are separate binaries that only see the crate's public API, so
 //! this can't call the contract's private `compute_commitment` directly
@@ -36,8 +36,8 @@
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use k256::ecdsa::SigningKey;
-use ledgerlens_score::{
-    BatchAttestation, LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreSubmission,
+use stellar_lense_score::{
+    BatchAttestation, StellarLenseScoreContract, StellarLenseScoreContractClient, ScoreSubmission,
     ScoreSubmissionWithProof,
 };
 use soroban_sdk::{
@@ -176,13 +176,13 @@ fn next_pow2(n: u32) -> u32 {
     p
 }
 
-fn setup(env: &Env) -> (LedgerLensScoreContractClient<'_>, Symbol, SigningKey) {
+fn setup(env: &Env) -> (StellarLenseScoreContractClient<'_>, Symbol, SigningKey) {
     env.mock_all_auths();
     env.budget().reset_unlimited();
     env.ledger().with_mut(|l| l.timestamp = 1_700_000_000);
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(env, &contract_id);
     let admin = Address::generate(env);
     let service = Address::generate(env);
     client.initialize(&admin, &service);
@@ -201,7 +201,7 @@ fn setup(env: &Env) -> (LedgerLensScoreContractClient<'_>, Symbol, SigningKey) {
 /// the tree shape.
 fn build_chunk(
     env: &Env,
-    client: &LedgerLensScoreContractClient,
+    client: &StellarLenseScoreContractClient,
     asset_pair: &Symbol,
     key: &SigningKey,
     count: u32,
@@ -259,7 +259,7 @@ fn build_chunk(
 /// execution cost of the `submit_scores_batch_attested` calls themselves.
 fn submit_n_entries(
     env: &Env,
-    client: &LedgerLensScoreContractClient,
+    client: &StellarLenseScoreContractClient,
     asset_pair: &Symbol,
     key: &SigningKey,
     total: u32,

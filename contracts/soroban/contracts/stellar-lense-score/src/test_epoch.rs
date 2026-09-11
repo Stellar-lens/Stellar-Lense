@@ -2,22 +2,22 @@
 
 use soroban_sdk::{symbol_short, testutils::Address as _, Address, Env, Vec};
 
-use crate::{Error, LedgerLensScoreContract, LedgerLensScoreContractClient};
+use crate::{Error, StellarLenseScoreContract, StellarLenseScoreContractClient};
 
 const START_TS: u64 = 1_700_000_000;
 
-fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>) {
+fn setup<'a>() -> (Env, StellarLenseScoreContractClient<'a>) {
     let env = Env::default();
     env.mock_all_auths();
-    let id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &id);
+    let id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &id);
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
     client.initialize(&admin, &service);
     (env, client)
 }
 
-fn submit(client: &LedgerLensScoreContractClient, env: &Env, wallet: &Address) -> Result<(), Error> {
+fn submit(client: &StellarLenseScoreContractClient, env: &Env, wallet: &Address) -> Result<(), Error> {
     client
         .try_submit_score(
             &Vec::new(env),
@@ -102,8 +102,8 @@ fn test_epoch_transitions() {
 fn test_close_epoch_before_initialize_fails() {
     let env = Env::default();
     env.mock_all_auths();
-    let id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &id);
+    let id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &id);
 
     let result = client.try_close_epoch(&Vec::new(&env));
     assert_eq!(result, Err(Ok(Error::NotInitialized)));
@@ -137,8 +137,8 @@ fn test_get_current_epoch_persists_after_close_of_nonzero_epoch() {
 fn test_is_epoch_open_defaults_true_before_initialize() {
     let env = Env::default();
     env.mock_all_auths();
-    let id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &id);
+    let id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &id);
 
     assert!(client.is_epoch_open());
 }

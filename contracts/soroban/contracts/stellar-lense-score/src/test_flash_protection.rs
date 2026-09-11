@@ -6,15 +6,15 @@ use soroban_sdk::{
     Address, Env, IntoVal, Symbol, Vec,
 };
 
-use crate::{Error, FlashProtectionMode, LedgerLensScoreContract, LedgerLensScoreContractClient};
+use crate::{Error, FlashProtectionMode, StellarLenseScoreContract, StellarLenseScoreContractClient};
 
 const START_TS: u64 = 1_700_000_000;
 
-fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>) {
+fn setup<'a>() -> (Env, StellarLenseScoreContractClient<'a>) {
     let env = Env::default();
     env.mock_all_auths();
-    let id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &id);
+    let id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &id);
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
     client.initialize(&admin, &service);
@@ -23,7 +23,7 @@ fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>) {
 }
 
 fn submit(
-    client: &LedgerLensScoreContractClient,
+    client: &StellarLenseScoreContractClient,
     env: &Env,
     wallet: &Address,
 ) -> Result<(), Error> {
@@ -136,8 +136,8 @@ fn test_get_flash_protection_mode_default_before_any_set() {
 fn test_set_flash_protection_mode_before_initialize_rejected() {
     let env = Env::default();
     env.mock_all_auths();
-    let id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &id);
+    let id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &id);
 
     let result = client.try_set_flash_protection_mode(&Vec::new(&env), &FlashProtectionMode::Reject);
     assert_eq!(result, Err(Ok(Error::NotInitialized)));

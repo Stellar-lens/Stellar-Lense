@@ -5,7 +5,7 @@ use soroban_sdk::{
 };
 
 use crate::{
-    test_builders::ContractStateBuilder, Error, LedgerLensScoreContract, LedgerLensScoreContractClient,
+    test_builders::ContractStateBuilder, Error, StellarLenseScoreContract, StellarLenseScoreContractClient,
     ModelSubmission, ScoreAttestation,
 };
 
@@ -19,7 +19,7 @@ struct ErrorSnapshot {
 }
 
 fn snapshot_for(
-    client: &LedgerLensScoreContractClient,
+    client: &StellarLenseScoreContractClient,
     context: &'static str,
     error: Error,
     wallet: &Address,
@@ -66,8 +66,8 @@ fn snapshot_consensus_input_empty_uses_dedicated_error_code() {
     let env = Env::default();
     env.mock_all_auths();
     env.ledger().with_mut(|ledger| ledger.timestamp = 100_000);
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
     client.initialize(&admin, &service);
@@ -117,8 +117,8 @@ fn snapshot_reveal_window_elapsed_preserves_live_score_state() {
     let env = Env::default();
     env.mock_all_auths();
     env.ledger().with_mut(|ledger| ledger.timestamp = 100_000);
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
     client.initialize(&admin, &service);
@@ -168,8 +168,8 @@ fn snapshot_reveal_window_elapsed_preserves_live_score_state() {
 fn snapshot_invalid_attestation_does_not_create_score() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
     client.initialize(&admin, &service);

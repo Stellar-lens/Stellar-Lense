@@ -3,8 +3,8 @@
 **Tracks issue:** #762  
 **Source file:** [`examples/typed_client_examples.rs`](../examples/typed_client_examples.rs)
 
-This document walks through the four canonical LedgerLens integration flows
-using the generated `LedgerLensScoreContractClient`. Every snippet is a
+This document walks through the four canonical Stellar Lense integration flows
+using the generated `StellarLenseScoreContractClient`. Every snippet is a
 copy-pasteable starting point that covers both the success path and the most
 important failure modes.
 
@@ -21,10 +21,10 @@ or API layer needs to read them back.
 ### Submit a single score
 
 ```rust
-use ledgerlens_score::LedgerLensScoreContractClient;
+use stellar_lense_score::StellarLenseScoreContractClient;
 use soroban_sdk::{symbol_short, Address, Env, Vec};
 
-let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
 client.submit_score(
     &Vec::new(&env),        // signers: empty = single-service mode
@@ -67,11 +67,11 @@ free**. Drop it into a guard clause without a `try_*` wrapper.
 ### Basic swap guard
 
 ```rust
-use ledgerlens_score::LedgerLensScoreContractClient;
+use stellar_lense_score::StellarLenseScoreContractClient;
 use soroban_sdk::{symbol_short, Address, Env};
 
 fn swap(env: Env, user: Address) -> Result<(), MyError> {
-    let client = LedgerLensScoreContractClient::new(&env, &ledgerlens_contract_id);
+    let client = StellarLenseScoreContractClient::new(&env, &stellar_lense_contract_id);
 
     // No try_, no ?, no error handling — the gate cannot fail.
     let is_safe = client.query_risk_gate(
@@ -208,13 +208,13 @@ The examples compile as library crates (they are Soroban contracts, not `main`
 binaries):
 
 ```bash
-cargo build --example typed_client_examples -p ledgerlens-score
+cargo build --example typed_client_examples -p stellar-lense-score
 ```yaml
 
 All tests inside the example are standard `#[test]` functions and run with:
 
 ```bash
-cargo test --example typed_client_examples -p ledgerlens-score
+cargo test --example typed_client_examples -p stellar-lense-score
 
 ## See Also
 

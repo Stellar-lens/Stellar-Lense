@@ -13,14 +13,14 @@ use soroban_sdk::{
     Address, Bytes, Env, Symbol, Vec,
 };
 
-use crate::{Error, LedgerLensScoreContract, LedgerLensScoreContractClient};
+use crate::{Error, StellarLenseScoreContract, StellarLenseScoreContractClient};
 
 const CHALLENGE_PERIOD_SECS: u64 = 604_800; // DISPUTE_CHALLENGE_PERIOD_SECS
 const BONUS_PCT: i128 = 10; // DISPUTE_BONUS_PCT
 
 struct Fixture<'a> {
     env: Env,
-    client: LedgerLensScoreContractClient<'a>,
+    client: StellarLenseScoreContractClient<'a>,
     admin: Address,
     service: Address,
     challenger: Address,
@@ -36,8 +36,8 @@ fn setup<'a>(contract_reserve: i128, challenger_funds: i128) -> Fixture<'a> {
     let env = Env::default();
     env.mock_all_auths();
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
@@ -161,8 +161,8 @@ fn test_open_dispute_duplicate_rejected() {
 fn test_open_dispute_fee_token_not_set() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
     client.initialize(&admin, &service);

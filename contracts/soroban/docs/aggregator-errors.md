@@ -1,8 +1,8 @@
 # Aggregator Error Codes
 
-The `ledgerlens-aggregator` contract defines its own `Error` enum (annotated
+The `stellar-lense-aggregator` contract defines its own `Error` enum (annotated
 with `#[contracterror]`) instead of reusing error codes from
-`ledgerlens-score`. This gives each aggregator-specific failure condition its
+`stellar-lense-score`. This gives each aggregator-specific failure condition its
 own stable, meaningful numeric code.
 
 ## Error Variants

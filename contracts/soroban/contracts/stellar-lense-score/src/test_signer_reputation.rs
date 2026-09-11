@@ -7,16 +7,16 @@ use soroban_sdk::{
     Address, Bytes, BytesN, Env, Symbol, Vec,
 };
 
-use crate::{LedgerLensScoreContract, LedgerLensScoreContractClient, ModelSubmission, ScoreAttestation};
+use crate::{StellarLenseScoreContract, StellarLenseScoreContractClient, ModelSubmission, ScoreAttestation};
 
 const START_TS: u64 = 1_700_000_000;
 
-fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>) {
+fn setup<'a>() -> (Env, StellarLenseScoreContractClient<'a>) {
     let env = Env::default();
     env.mock_all_auths();
     env.ledger().with_mut(|l| l.timestamp = START_TS);
-    let cid = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &cid);
+    let cid = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &cid);
     client.initialize(&Address::generate(&env), &Address::generate(&env));
     (env, client)
 }
@@ -49,7 +49,7 @@ fn attest(env: &Env, key: &SigningKey, digest: [u8; 32]) -> ScoreAttestation {
 
 fn make_submission(
     env: &Env,
-    client: &LedgerLensScoreContractClient<'_>,
+    client: &StellarLenseScoreContractClient<'_>,
     key: &SigningKey,
     model: &Address,
     wallet: &Address,
@@ -59,7 +59,7 @@ fn make_submission(
     model_version: u32,
 ) -> ModelSubmission {
     let digest = env.as_contract(&client.address, || {
-        LedgerLensScoreContract::compute_commitment(
+        StellarLenseScoreContract::compute_commitment(
             env, wallet, pair, score, false, false, ts, 80, model_version,
             &BytesN::from_array(env, &[0u8; 32]), 0,
         )
@@ -81,7 +81,7 @@ fn make_submission(
 /// Commit all submissions then reveal; returns normally or panics.
 fn do_consensus(
     env: &Env,
-    client: &LedgerLensScoreContractClient<'_>,
+    client: &StellarLenseScoreContractClient<'_>,
     wallet: &Address,
     pair: &Symbol,
     submissions: &Vec<ModelSubmission>,

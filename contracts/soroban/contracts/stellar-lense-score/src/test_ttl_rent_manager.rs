@@ -6,7 +6,7 @@ use soroban_sdk::{
 
 use crate::constants::SCORE_TTL_THRESHOLD;
 use crate::{
-    storage, types::RiskScore, Error, LedgerLensScoreContract, LedgerLensScoreContractClient,
+    storage, types::RiskScore, Error, StellarLenseScoreContract, StellarLenseScoreContractClient,
 };
 
 fn dormant_score() -> RiskScore {
@@ -26,12 +26,12 @@ fn dormant_score() -> RiskScore {
 
 const START_SEQ: u32 = 1_000;
 
-fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
+fn setup<'a>() -> (Env, StellarLenseScoreContractClient<'a>, Address, Address) {
     let env = Env::default();
     env.mock_all_auths();
     env.ledger().set_sequence_number(START_SEQ);
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
     client.initialize(&admin, &service);
@@ -231,8 +231,8 @@ fn test_extend_entry_ttls_oversized_batch_rejected() {
 fn test_extend_entry_ttls_before_init_fails() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     assert_eq!(
         client.try_extend_entry_ttls(&Vec::new(&env), &Vec::new(&env)),
         Err(Ok(Error::NotInitialized))

@@ -8,19 +8,19 @@ use soroban_sdk::{
 };
 
 use crate::{
-    constants::MAX_PAUSED_PAIRS, BatchResult, Error, LedgerLensScoreContract,
-    LedgerLensScoreContractClient, ScoreSubmission,
+    constants::MAX_PAUSED_PAIRS, BatchResult, Error, StellarLenseScoreContract,
+    StellarLenseScoreContractClient, ScoreSubmission,
 };
 
 /// Ledger timestamp the tests start from (an arbitrary fixed instant).
 const START_TS: u64 = 1_700_000_000;
 
-fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address) {
+fn setup<'a>() -> (Env, StellarLenseScoreContractClient<'a>, Address) {
     let env = Env::default();
     env.mock_all_auths();
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
@@ -248,8 +248,8 @@ fn test_set_pair_paused_requires_admin() {
     // Deliberately no `env.mock_all_auths()` here: `initialize` never calls
     // `require_auth`, so it still succeeds, but `set_pair_paused`'s
     // `admin.require_auth()` has nothing to authorize against and must panic.
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
     let service = Address::generate(&env);

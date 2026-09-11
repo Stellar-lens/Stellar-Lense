@@ -1,14 +1,14 @@
 # Historical WASM compatibility
 
-This suite freezes a production-shaped `ledgerlens-score` release WASM and
+This suite freezes a production-shaped `stellar-lense-score` release WASM and
 executes it against the consumers compiled from the current workspace. It is a
-regression gate for the stable `ILedgerLensScore` surface, not a replacement
+regression gate for the stable `IStellarLenseScore` surface, not a replacement
 for upgrade or migration testing.
 
 ## Fixture and trust assumptions
 
 The fixture at
-`tests/fixtures/historical/ledgerlens-score-v3-8336828.wasm` is the locked
+`tests/fixtures/historical/stellar-lense-score-v3-8336828.wasm` is the locked
 Rust 1.85 release build of commit
 `8336828159b7e7ff05d018200ce7f7a385bdade5`. That revision is the final v3
 main-line contract before the v4 storage and ABI changes and already contains

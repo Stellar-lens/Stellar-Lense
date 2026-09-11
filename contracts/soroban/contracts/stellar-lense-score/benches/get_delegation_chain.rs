@@ -1,6 +1,6 @@
 #! // Criterion benchmark for `get_delegation_chain`.
 //!
-//! Run: `cargo bench -p ledgerlens-score --bench get_delegation_chain`
+//! Run: `cargo bench -p stellar_lense-score --bench get_delegation_chain`
 //!
 //! Measures the CPU/memory cost of walking the full delegation chain for a
 //! wallet using `get_delegation_chain`.  The cost scales with the number of
@@ -17,7 +17,7 @@
 //! is a key component of delegation-related resource billing.
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use ledgerlens_score::LedgerLensScoreContractClient;
+use stellar_lense_score::StellarLenseScoreContractClient;
 use soroban_sdk::{
     testutils::{Address as _, Ledger as _},
     Address, Env,
@@ -25,13 +25,13 @@ use soroban_sdk::{
 
 const START_TS: u64 = 1_700_000_000;
 
-fn setup_client(env: &Env) -> LedgerLensScoreContractClient<'_> {
+fn setup_client(env: &Env) -> StellarLenseScoreContractClient<'_> {
     env.mock_all_auths();
     env.budget().reset_unlimited();
     env.ledger().with_mut(|l| l.timestamp = START_TS);
 
-    let contract_id = env.register_contract(None, ledgerlens_score::LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(env, &contract_id);
+    let contract_id = env.register_contract(None, stellar_lense_score::StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(env, &contract_id);
     let admin = Address::generate(env);
     let service = Address::generate(env);
     client.initialize(&admin, &service);

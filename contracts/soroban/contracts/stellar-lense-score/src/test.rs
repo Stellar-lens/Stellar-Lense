@@ -6,24 +6,24 @@ use soroban_sdk::{
 
 use crate::storage;
 use crate::{
-    BatchResult, DeletionAuditWarning, Error, LedgerLensScoreContract,
-    LedgerLensScoreContractClient, ScoreQuery, ScoreSubmission,
+    BatchResult, DeletionAuditWarning, Error, StellarLenseScoreContract,
+    StellarLenseScoreContractClient, ScoreQuery, ScoreSubmission,
 };
-use ledgerlens_test_support::{
+use stellar_lense_test_support::{
     generate_score_roles, set_ledger_timestamp, test_env_with_unlimited_budget,
 };
 
 // ── Test helpers ──────────────────────────────────────────────────────────────
 
-pub fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
+pub fn setup<'a>() -> (Env, StellarLenseScoreContractClient<'a>, Address, Address) {
     let env = test_env_with_unlimited_budget();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     let (admin, service) = generate_score_roles(&env);
     (env, client, admin, service)
 }
 
-pub fn initialized<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
+pub fn initialized<'a>() -> (Env, StellarLenseScoreContractClient<'a>, Address, Address) {
     let (env, client, admin, service) = setup();
     set_ledger_timestamp(&env, 100_000);
     client.initialize(&admin, &service);
@@ -51,8 +51,8 @@ fn test_initialize_twice_fails() {
 #[test]
 fn test_initialize_requires_nominated_admin_and_rolls_back() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
 
@@ -1882,7 +1882,7 @@ fn test_set_pair_weight_batch_too_large_returns_error() {
 /// Helper: add N signers and set threshold M on an already-initialized client.
 fn setup_multisig(
     env: &Env,
-    client: &LedgerLensScoreContractClient<'_>,
+    client: &StellarLenseScoreContractClient<'_>,
     n: u32,
     m: u32,
 ) -> Vec<Address> {
@@ -3751,8 +3751,8 @@ fn test_arch_owner_management() {
     let env = Env::default();
     env.mock_all_auths();
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
     let service_address = Address::generate(&env);
@@ -3778,8 +3778,8 @@ fn test_mandatory_reviewers_validation() {
     let env = Env::default();
     env.mock_all_auths();
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
     let service_address = Address::generate(&env);

@@ -1,4 +1,4 @@
-use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
 use mock_amm::{FailPolicy as AmmFailPolicy, MockAmm, MockAmmClient, MockAmmError};
 use serde::Deserialize;
 use soroban_sdk::{
@@ -44,11 +44,11 @@ fn sdk_conformance() {
         let env = Env::default();
         env.mock_all_auths();
 
-        let ledgerlens_id = env.register_contract(None, LedgerLensScoreContract);
-        let ledgerlens = LedgerLensScoreContractClient::new(&env, &ledgerlens_id);
+        let stellar_lense_id = env.register_contract(None, StellarLenseScoreContract);
+        let stellar_lense = StellarLenseScoreContractClient::new(&env, &stellar_lense_id);
         let admin = Address::generate(&env);
         let service = Address::generate(&env);
-        ledgerlens.initialize(&admin, &service);
+        stellar_lense.initialize(&admin, &service);
 
         let amm_id = env.register_contract(None, MockAmm);
         let amm = MockAmmClient::new(&env, &amm_id);
@@ -71,7 +71,7 @@ fn sdk_conformance() {
                 if v.is_number() {
                     v.as_u64().unwrap() as u32
                 } else if v.is_string() && v.as_str().unwrap() == "current_plus_one" {
-                    ledgerlens.get_contract_version() + 1
+                    stellar_lense.get_contract_version() + 1
                 } else {
                     panic!("Unknown required_oracle_version format in case {}", case.name)
                 }
@@ -79,7 +79,7 @@ fn sdk_conformance() {
             None => fixture_data.default_config.required_oracle_version,
         };
 
-        amm.initialize(&admin, &ledgerlens_id, &gate_threshold);
+        amm.initialize(&admin, &stellar_lense_id, &gate_threshold);
         amm.set_liquidity_gate_config(
             &admin,
             &gate_threshold,
@@ -118,7 +118,7 @@ fn sdk_conformance() {
             env.ledger().with_mut(|l| l.timestamp += 3_601);
             let submission_time = env.ledger().timestamp();
 
-            ledgerlens.submit_score(
+            stellar_lense.submit_score(
                 &Vec::new(&env),
                 &wallet,
                 &symbol_short!("XLM_USDC"),

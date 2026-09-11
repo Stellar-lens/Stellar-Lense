@@ -14,19 +14,19 @@ use soroban_sdk::{
 
 use crate::{
     constants::{DEFAULT_COOLDOWN_SECS, MAX_COOLDOWN_SECS, MIN_COOLDOWN_SECS},
-    Error, LedgerLensScoreContract, LedgerLensScoreContractClient, ModelSubmission,
+    Error, StellarLenseScoreContract, StellarLenseScoreContractClient, ModelSubmission,
     ScoreAttestation, ScoreSubmission,
 };
 
 const START_TS: u64 = 1_700_000_000;
 
-fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address) {
+fn setup<'a>() -> (Env, StellarLenseScoreContractClient<'a>, Address) {
     let env = Env::default();
     env.mock_all_auths();
     env.ledger().with_mut(|l| l.timestamp = START_TS);
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
@@ -41,7 +41,7 @@ fn advance_to(env: &Env, ts: u64) {
 
 fn submit(
     env: &Env,
-    client: &LedgerLensScoreContractClient<'_>,
+    client: &StellarLenseScoreContractClient<'_>,
     wallet: &Address,
     pair: &Symbol,
     score: u32,
@@ -85,7 +85,7 @@ fn submit(
 
 fn try_submit(
     env: &Env,
-    client: &LedgerLensScoreContractClient<'_>,
+    client: &StellarLenseScoreContractClient<'_>,
     wallet: &Address,
     pair: &Symbol,
     score: u32,
@@ -155,7 +155,7 @@ fn commitment(
     model_version: u32,
 ) -> [u8; 32] {
     env.as_contract(contract_id, || {
-        LedgerLensScoreContract::compute_commitment(
+        StellarLenseScoreContract::compute_commitment(
             env,
             wallet,
             pair,
@@ -190,7 +190,7 @@ fn attest(env: &Env, key: &SigningKey, digest: [u8; 32]) -> ScoreAttestation {
 
 fn consensus_pair(
     env: &Env,
-    client: &LedgerLensScoreContractClient<'_>,
+    client: &StellarLenseScoreContractClient<'_>,
     key: &SigningKey,
     wallet: &Address,
     pair: &Symbol,

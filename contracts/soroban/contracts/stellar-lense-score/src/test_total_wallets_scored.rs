@@ -11,19 +11,19 @@ use soroban_sdk::{
 };
 
 use crate::{
-    constants::DEFAULT_COOLDOWN_SECS, LedgerLensScoreContract, LedgerLensScoreContractClient,
+    constants::DEFAULT_COOLDOWN_SECS, StellarLenseScoreContract, StellarLenseScoreContractClient,
     ScoreSubmission,
 };
 
 const START_TS: u64 = 1_700_000_000;
 
-fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>) {
+fn setup<'a>() -> (Env, StellarLenseScoreContractClient<'a>) {
     let env = Env::default();
     env.mock_all_auths();
     env.ledger().with_mut(|l| l.timestamp = START_TS);
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
@@ -38,7 +38,7 @@ fn advance(env: &Env, delta: u64) {
 
 fn submit(
     env: &Env,
-    client: &LedgerLensScoreContractClient<'_>,
+    client: &StellarLenseScoreContractClient<'_>,
     wallet: &Address,
     pair: &soroban_sdk::Symbol,
     score: u32,
