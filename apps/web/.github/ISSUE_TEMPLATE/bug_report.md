@@ -22,7 +22,7 @@ What you expected to happen instead.
 
 - Browser + version:
 - `dashboard/config.js` `LEDGERLENS_API` value (or "default"):
-- Ledegerlens-api version/commit you're pointed at, if known:
+- Stellar-Lense-api version/commit you're pointed at, if known:
 
 **Screenshots**
 If applicable.

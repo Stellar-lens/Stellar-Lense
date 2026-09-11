@@ -42,7 +42,7 @@ element, a state update that doesn't reach the DOM) without a human in the loop.
 ## Data flow
 
 ```
-Ledegerlens-api  ──HTTP──▶  dashboard/js/api.js  ──▶  dashboard/js/app.js  ──▶  dashboard/js/render.js  ──▶  DOM
+Stellar-Lense-api  ──HTTP──▶  dashboard/js/api.js  ──▶  dashboard/js/app.js  ──▶  dashboard/js/render.js  ──▶  DOM
                                                               │
                                                     localStorage (theme, last lookup)
 ```
@@ -57,7 +57,7 @@ since it's a single user-initiated request worth being resilient about.
 
 `dashboard/js/api.js` and the field names in `render.js` (`asset_pair`, `average_score`,
 `flagged_wallets`, `reason` on alerts — not `asset_code`/`avg_score`/`flagged_wallet_count`/
-`benford_flag`+`ml_flag`) match [Ledegerlens-api](https://github.com/Ledger-Lenz/Ledegerlens-api)'s
+`benford_flag`+`ml_flag`) match [Stellar-Lense-api](https://github.com/Stellar-lens/Stellar-Lense)'s
 **actual** deployed contract, not the aspirational one described in earlier drafts of the
 main README. If you're adding a feature that needs a field the API doesn't return, that's
 an API repo change first — see the note in the README's API Reference section (§11).
