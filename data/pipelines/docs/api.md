@@ -1,6 +1,6 @@
-# LedgerLens REST API
+# Stellar Lense REST API
 
-The LedgerLens REST API exposes wallet risk scores over HTTP. It is served by `api/app.py` (FastAPI).
+The Stellar Lense REST API exposes wallet risk scores over HTTP. It is served by `api/app.py` (FastAPI).
 
 ## Base URL
 

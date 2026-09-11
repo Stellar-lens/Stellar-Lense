@@ -7,10 +7,10 @@ Testnet. They are **not** executed by `make test` and require explicit opt-in.
 
 ## Developing offline
 
-If you're iterating on code that *calls* `LedgerLensContractClient` (a new
+If you're iterating on code that *calls* `StellarLenseContractClient` (a new
 script, alert dispatch, manual smoke-testing) and don't need to hit the real
 contract, use `integrations.offline_stubs.get_contract_client()` instead of
-running through the Testnet setup below. Set `LEDGERLENS_OFFLINE=1` (or pass
+running through the Testnet setup below. Set `STELLARLENSE_OFFLINE=1` (or pass
 `offline=True`) to get an in-memory `StubContractClient` with the same
 `submit_score` / `get_score` / governance method surface — no Friendbot
 funding or contract deploy required. See `integrations/offline_stubs.py` and
@@ -33,8 +33,8 @@ funding or contract deploy required. See `integrations/offline_stubs.py` and
 | Requirement | How to satisfy |
 |---|---|
 | Funded Testnet keypair | Run `scripts/testnet_setup.py` (funds via Friendbot) |
-| Deployed `ledgerlens-score` contract | Run `scripts/testnet_setup.py --wasm-path ledgerlens_score.wasm` |
-| `LEDGERLENS_INTEGRATION_TESTS=1` env var | Set in shell or CI |
+| Deployed `stellar-lense-score` contract | Run `scripts/testnet_setup.py --wasm-path stellar_lense_score.wasm` |
+| `STELLARLENSE_INTEGRATION_TESTS=1` env var | Set in shell or CI |
 
 ---
 
@@ -42,9 +42,9 @@ funding or contract deploy required. See `integrations/offline_stubs.py` and
 
 | Variable | Required | Default |
 |---|---|---|
-| `LEDGERLENS_INTEGRATION_TESTS` | Yes (must be `1`) | — |
-| `LEDGERLENS_CONTRACT_ID` | Yes | — |
-| `LEDGERLENS_SUBMITTER_SECRET` | Yes | — |
+| `STELLARLENSE_INTEGRATION_TESTS` | Yes (must be `1`) | — |
+| `STELLARLENSE_CONTRACT_ID` | Yes | — |
+| `STELLARLENSE_SUBMITTER_SECRET` | Yes | — |
 | `SOROBAN_RPC_URL` | No | `https://soroban-testnet.stellar.org` |
 | `HORIZON_URL` | No | `https://horizon-testnet.stellar.org` |
 | `RISK_SCORE_DB_URL` | No | `sqlite:///./testnet_scores.db` |
@@ -53,7 +53,7 @@ Populate them by sourcing `.env.testnet` (written by `scripts/testnet_setup.py`)
 
 ```bash
 export $(grep -v '^#' .env.testnet | xargs)
-export LEDGERLENS_INTEGRATION_TESTS=1
+export STELLARLENSE_INTEGRATION_TESTS=1
 ```
 
 ---
@@ -63,13 +63,13 @@ export LEDGERLENS_INTEGRATION_TESTS=1
 ```bash
 # 1. Deploy contract (once per testnet reset or keypair rotation)
 python -m scripts.testnet_setup \
-    --wasm-path ledgerlens_score.wasm \
+    --wasm-path stellar_lense_score.wasm \
     --wasm-sha256 <sha256-from-release> \
     --salt ci-testnet
 
 # 2. Source the generated env file
 export $(grep -v '^#' .env.testnet | xargs)
-export LEDGERLENS_INTEGRATION_TESTS=1
+export STELLARLENSE_INTEGRATION_TESTS=1
 
 # 3. Run all integration tests
 pytest tests/integration/ -v --timeout=120
@@ -109,23 +109,23 @@ The E2E test (`test_full_pipeline_e2e.py`) validates the full pipeline:
 
 ## WASM artifact
 
-The `ledgerlens-score` WASM is built from the
-[`ledgerlens-contract`](https://github.com/Ledger-Lenz/ledgerlens-contract)
+The `stellar-lense-score` WASM is built from the
+[`stellar-lense-contract`](https://github.com/Ledger-Lenz/stellar-lense-contract)
 repository. Always verify the SHA-256 hash before deploying.
 
 | Field | Value |
 |---|---|
-| **Repository** | `Ledger-Lenz/ledgerlens-contract` |
-| **WASM file** | `ledgerlens_score.wasm` |
+| **Repository** | `Ledger-Lenz/stellar-lense-contract` |
+| **WASM file** | `stellar_lense_score.wasm` |
 | **Version / tag** | `v0.1.0` (update this when the contract is released) |
 | **Commit hash** | _To be filled in after first release_ |
-| **SHA-256** | _To be filled in after first release — verify with `sha256sum ledgerlens_score.wasm`_ |
+| **SHA-256** | _To be filled in after first release — verify with `sha256sum stellar_lense_score.wasm`_ |
 
 The CI workflow downloads the WASM via:
 ```bash
 gh release download v0.1.0 \
-  --repo Ledger-Lenz/ledgerlens-contract \
-  --pattern 'ledgerlens_score.wasm'
+  --repo Ledger-Lenz/stellar-lense-contract \
+  --pattern 'stellar_lense_score.wasm'
 ```
 
 ---
@@ -162,10 +162,10 @@ The exact fee is resource-dependent; the figures above are for a typical
 
 `submit_score` requires the submitter's account to be authorized. Authorization
 is handled via standard Soroban invoker auth: the transaction is signed by the
-submitter keypair (`LEDGERLENS_SUBMITTER_SECRET`) before submission. There is no
+submitter keypair (`STELLARLENSE_SUBMITTER_SECRET`) before submission. There is no
 separate admin-call requirement — the contract constructor bakes in the
 authorized submitter address at deploy time (or the contract uses invoker
-authorization only). Consult the `ledgerlens-contract` source for the exact
+authorization only). Consult the `stellar-lense-contract` source for the exact
 model.
 
 ---
@@ -175,7 +175,7 @@ model.
 Integration tests are completely separate from the main `ci.yml` workflow:
 
 - `make test` → runs `pytest tests/` → **skips** `tests/integration/` unless
-  `LEDGERLENS_INTEGRATION_TESTS=1` is set (enforced via `conftest.py`).
+  `STELLARLENSE_INTEGRATION_TESTS=1` is set (enforced via `conftest.py`).
 - `testnet-integration.yml` → triggers on `workflow_dispatch` and weekly schedule
   only; never blocks PRs.
 - Each CI run deploys with `--salt ci-testnet` for a deterministic contract ID
@@ -185,8 +185,8 @@ Integration tests are completely separate from the main `ci.yml` workflow:
 
 ## Troubleshooting
 
-- **`LEDGERLENS_INTEGRATION_TESTS not set`** — set `export LEDGERLENS_INTEGRATION_TESTS=1`.
-- **`LEDGERLENS_CONTRACT_ID not set`** — run `scripts/testnet_setup.py` first.
+- **`STELLARLENSE_INTEGRATION_TESTS not set`** — set `export STELLARLENSE_INTEGRATION_TESTS=1`.
+- **`STELLARLENSE_CONTRACT_ID not set`** — run `scripts/testnet_setup.py` first.
 - **`Friendbot rate limit (429)`** — the setup script retries 3 times with a
   5-second delay automatically.
 - **Test timeout** — each test has a 120-second timeout enforced by

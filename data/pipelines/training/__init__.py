@@ -1,1 +1,1 @@
-"""LedgerLens training modules (Platt calibration, train entry point)."""
+"""StellarLense training modules (Platt calibration, train entry point)."""

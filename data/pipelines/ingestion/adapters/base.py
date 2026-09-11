@@ -1,6 +1,6 @@
 """Normalized event contract for blockchain ingestion adapters.
 
-LedgerLens ingests raw data from Stellar Horizon today (``ingestion/
+StellarLense ingests raw data from Stellar Horizon today (``ingestion/
 horizon_fetcher.py``, ``ingestion/historical_loader.py``) and produces
 chain-specific Pydantic models (``ingestion/data_models.py``: ``Trade``,
 ``OrderBookEvent``, ``AccountActivity``). Downstream feature engineering

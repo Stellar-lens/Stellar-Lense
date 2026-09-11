@@ -35,7 +35,7 @@ minimal set of feature changes needed to achieve a target (non-flagged) score.
 ## Implementation Details
 
 Implements the DICE (Diverse Counterfactual Explanations) method for the
-LedgerLens ensemble model.
+StellarLense ensemble model.
 
 Key design decisions
 --------------------
@@ -304,7 +304,7 @@ def _interpret_action(feature: str, old: float, new: float) -> str:
 
 
 class CounterfactualExplainer:
-    """Diverse counterfactual explanation generator for the LedgerLens ensemble.
+    """Diverse counterfactual explanation generator for the StellarLense ensemble.
 
     Uses a fast gradient-free coordinate search as the primary backend and
     optionally augments results with DICE (dice-ml) if available and time

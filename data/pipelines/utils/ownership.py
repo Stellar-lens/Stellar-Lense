@@ -172,7 +172,7 @@ class OwnershipRegistry:
     """Registry that combines CODEOWNERS rules with subsystem metadata.
 
     Provides a unified interface for querying ownership information across
-    the LedgerLens repository.
+    the StellarLense repository.
     """
 
     codeowners_entries: list[CodeOwnersEntry] = field(default_factory=list)

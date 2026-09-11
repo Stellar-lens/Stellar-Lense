@@ -7,7 +7,7 @@
 
 ## Overview
 
-This document describes the currency and amount normalization system for LedgerLens-data, a comprehensive solution for standardizing amounts across different asset pairs to enable meaningful cross-asset comparisons in fraud detection.
+This document describes the currency and amount normalization system for StellarLense-data, a comprehensive solution for standardizing amounts across different asset pairs to enable meaningful cross-asset comparisons in fraud detection.
 
 ### Why This Matters
 
@@ -1026,7 +1026,7 @@ for code, amount in portfolio.items():
 ## Support
 
 For issues or questions:
-- GitHub Issues: [LedgerLens-data/issues](https://github.com/product-labo/Ledgerlens-data/issues)
+- GitHub Issues: [StellarLense-data/issues](https://github.com/product-labo/StellarLense-data/issues)
 - Documentation: `docs/currency_normalization.md`
 - Tests: `tests/test_currency_normalization.py`
 - Code: `utils/currency_normalization.py`

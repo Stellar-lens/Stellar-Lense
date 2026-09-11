@@ -24,7 +24,7 @@ Configuration:
     DATASET_STORE_BACKEND=local            # "local" (default) | "object"
     DATASET_STORE_BASE_PATH=./data         # root dir / bucket prefix
     DATASET_STORE_FORMAT=parquet           # "parquet" | "csv" | "json"
-    DATASET_STORE_OBJECT_STORE_URL=s3://my-bucket/ledgerlens   # for "object" backend
+    DATASET_STORE_OBJECT_STORE_URL=s3://my-bucket/stellar_lense   # for "object" backend
 
 Usage::
 
@@ -324,7 +324,7 @@ class ObjectStoreDatasetStore:
     Parameters
     ----------
     url:
-        Object store root URI, e.g. ``s3://my-bucket/ledgerlens`` or
+        Object store root URI, e.g. ``s3://my-bucket/stellar_lense`` or
         ``gcs://my-bucket/datasets``.  When empty, falls back to local.
     fmt:
         Default file format.

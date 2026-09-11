@@ -1,6 +1,6 @@
 # Causal Analysis of Wallet Features
 
-`analysis/causal_discovery.py` runs the **PC algorithm** on the LedgerLens feature matrix to produce a Directed Acyclic Graph (DAG) identifying which features causally influence the risk score and which are downstream effects of shared confounders.
+`analysis/causal_discovery.py` runs the **PC algorithm** on the Stellar Lense feature matrix to produce a Directed Acyclic Graph (DAG) identifying which features causally influence the risk score and which are downstream effects of shared confounders.
 
 ## Why Causal Discovery?
 

@@ -1,4 +1,4 @@
-# LedgerLens Security Threat Model (STRIDE)
+# Stellar Lense Security Threat Model (STRIDE)
 
 ## System Boundary Diagram
 
@@ -9,7 +9,7 @@
 └────────────┬──────────────┬──────────────┬──────────────────────────┘
              │              │              │
 ┌────────────▼──────────────▼──────────────▼──────────────────────────┐
-│                   LEDGERLENS DATA BOUNDARY                           │
+│                   STELLARLENSE DATA BOUNDARY                           │
 │                                                                      │
 │  ┌──────────────────────┐  ┌─────────────────────────────────────┐ │
 │  │  INGESTION LAYER     │  │  DETECTION & SCORING LAYER          │ │
@@ -156,7 +156,7 @@ TRUST BOUNDARIES:
 
 | Category | Threat | Impact | Current Mitigation | Strength | Recommendation |
 |----------|--------|--------|---------------------|----------|-----------------|
-| **S** (Spoofing) | Attacker publishes trades to `ledgerlens.trades.*` topics | Fraudulent trades ingested; scores corrupted | Kafka SASL/SSL authentication (KAFKA_SASL_USERNAME/PASSWORD in env) | Medium | Require SASL/SCRAM with TLS; validate broker certificate; use service account with least privilege |
+| **S** (Spoofing) | Attacker publishes trades to `stellar_lense.trades.*` topics | Fraudulent trades ingested; scores corrupted | Kafka SASL/SSL authentication (KAFKA_SASL_USERNAME/PASSWORD in env) | Medium | Require SASL/SCRAM with TLS; validate broker certificate; use service account with least privilege |
 | **T** (Tampering) | Message intercepted and modified in-flight | Trade amount changed; feature calculation skewed | TLS encryption in transit (enforce TLS_REQUIRED) | High | Implement HMAC-SHA256 over message payload; validate in consumer; reject if verification fails |
 | **R** (Repudiation) | Producer denies sending a specific trade | Audit trail broken; cannot identify source | Kafka broker stores producer ID + timestamp per message | Low | Sign each message with producer key; store signed message in Soroban contract (anchor) |
 | **I** (Information Disclosure) | Kafka broker unencrypted; network traffic sniffed | Trade data exposed in plaintext | TLS in transit; no at-rest encryption on broker | Medium | Enable Kafka broker-side encryption (KMS if AWS MSK); implement network segmentation (VPC) |
@@ -174,16 +174,16 @@ TRUST BOUNDARIES:
 
 | Category | Threat | Impact | Current Mitigation | Strength | Recommendation |
 |----------|--------|--------|---------------------|----------|-----------------|
-| **S** (Spoofing) | Attacker forges contract invocation | False risk scores published on-chain | Soroban contract validates caller signature (via Stellar auth) | High | Verify contract ID matches LEDGERLENS_CONTRACT_ID in config; implement contract version check |
+| **S** (Spoofing) | Attacker forges contract invocation | False risk scores published on-chain | Soroban contract validates caller signature (via Stellar auth) | High | Verify contract ID matches STELLARLENSE_CONTRACT_ID in config; implement contract version check |
 | **T** (Tampering) | Network partition delays score submission | On-chain score stale; outdated by 5+ minutes | No retry mechanism; relies on Soroban RPC availability | Low | Implement exponential backoff + replay logic; store pending submissions in local queue |
 | **R** (Repudiation) | Contract denies receiving score submission | Risk score disputes | Soroban logs transaction on-chain; immutable proof | High | Store submission transaction hash in local DB; implement audit report from contract state |
 | **I** (Information Disclosure) | RPC endpoint observes all submitted risk scores | Privacy violation; attacker learns scoring patterns | Soroban RPC endpoint in config; no TLS pinning | Medium | Require TLS for RPC connection; use private RPC endpoint; implement rate limiting at RPC level |
 | **D** (Denial of Service) | Soroban RPC endpoint unresponsive | Score submissions hang indefinitely | Timeout (10 sec) in contract_client.py; exceptions bubbled to caller | Medium | Implement circuit breaker; queue submissions if RPC down; async batch submission with retry |
-| **E** (Elevation of Privilege) | LEDGERLENS_SUBMITTER_SECRET exposed in GitHub Actions logs | Attacker uses secret to submit arbitrary scores | Secret stored in GitHub Actions (masked in logs); rotation manual | Medium | Use OIDC to generate short-lived tokens instead of long-lived secrets; rotate secret quarterly |
+| **E** (Elevation of Privilege) | STELLARLENSE_SUBMITTER_SECRET exposed in GitHub Actions logs | Attacker uses secret to submit arbitrary scores | Secret stored in GitHub Actions (masked in logs); rotation manual | Medium | Use OIDC to generate short-lived tokens instead of long-lived secrets; rotate secret quarterly |
 
 **File References:**
 - `integrations/contract_client.py` — Contract invocation, error handling
-- `config.py` — LEDGERLENS_CONTRACT_ID, SOROBAN_RPC_URL, LEDGERLENS_SUBMITTER_SECRET
+- `config.py` — STELLARLENSE_CONTRACT_ID, SOROBAN_RPC_URL, STELLARLENSE_SUBMITTER_SECRET
 
 ---
 

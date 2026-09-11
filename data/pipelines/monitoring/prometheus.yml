@@ -4,10 +4,10 @@ global:
 
 scrape_configs:
   # Scrape every scorer replica's /metrics endpoint. docker-compose service DNS
-  # resolves "ledgerlens-scorer" to all replica IPs via dns_sd.
-  - job_name: ledgerlens-scorer
+  # resolves "stellar-lense-scorer" to all replica IPs via dns_sd.
+  - job_name: stellar-lense-scorer
     dns_sd_configs:
       - names:
-          - ledgerlens-scorer
+          - stellar-lense-scorer
         type: A
         port: 9100

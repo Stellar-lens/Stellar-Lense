@@ -2,7 +2,7 @@
 
 ## Overview
 
-LedgerLens uses a **Population Stability Index (PSI)** based drift detection
+Stellar Lense uses a **Population Stability Index (PSI)** based drift detection
 system to monitor when the production feature distribution diverges from the
 training-time distribution. When significant drift is detected, the system
 automatically retrains the ensemble models and, if the new models meet quality

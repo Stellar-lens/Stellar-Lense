@@ -1,4 +1,4 @@
-# Fuzz Testing for LedgerLens Data Ingestion
+# Fuzz Testing for Stellar Lense Data Ingestion
 
 This directory contains libFuzzer targets (via [atheris](https://github.com/google/atheris)) that systematically explore the input space of critical parsing and deserialization routines to detect crashes, buffer overflows, and algorithmic complexity attacks.
 
@@ -97,7 +97,7 @@ This is the recommended way to run fuzz testing in CI/CD.
 
 ### Continuous Fuzzing (OSS-Fuzz)
 
-LedgerLens is designed to integrate with [OSS-Fuzz](https://github.com/google/oss-fuzz) for continuous fuzzing. See `.github/workflows/oss-fuzz.yml` for the integration.
+Stellar Lense is designed to integrate with [OSS-Fuzz](https://github.com/google/oss-fuzz) for continuous fuzzing. See `.github/workflows/oss-fuzz.yml` for the integration.
 
 ## Corpus Management
 

@@ -67,7 +67,7 @@ def test_since_filter_excludes_earlier_events(tmp_path, monkeypatch):
         ],
         capture_output=True,
         text=True,
-        cwd="/home/ajidokwu/Desktop/Drips/Fred/Ledgerlens-data",
+        cwd="/home/ajidokwu/Desktop/Drips/Fred/StellarLense-data",
         env={**subprocess.os.environ, "RISK_SCORE_DB_URL": db_url}
     )
 
@@ -126,7 +126,7 @@ def test_until_filter_excludes_later_events(tmp_path, monkeypatch):
         ],
         capture_output=True,
         text=True,
-        cwd="/home/ajidokwu/Desktop/Drips/Fred/Ledgerlens-data",
+        cwd="/home/ajidokwu/Desktop/Drips/Fred/StellarLense-data",
         env={**subprocess.os.environ, "RISK_SCORE_DB_URL": db_url}
     )
 
@@ -183,7 +183,7 @@ def test_since_and_until_together(tmp_path, monkeypatch):
         ],
         capture_output=True,
         text=True,
-        cwd="/home/ajidokwu/Desktop/Drips/Fred/Ledgerlens-data",
+        cwd="/home/ajidokwu/Desktop/Drips/Fred/StellarLense-data",
         env={**subprocess.os.environ, "RISK_SCORE_DB_URL": db_url}
     )
 
@@ -230,7 +230,7 @@ def test_omitting_filters_shows_all_events(tmp_path, monkeypatch):
         ],
         capture_output=True,
         text=True,
-        cwd="/home/ajidokwu/Desktop/Drips/Fred/Ledgerlens-data",
+        cwd="/home/ajidokwu/Desktop/Drips/Fred/StellarLense-data",
         env={**subprocess.os.environ, "RISK_SCORE_DB_URL": db_url}
     )
 

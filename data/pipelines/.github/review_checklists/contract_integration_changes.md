@@ -20,8 +20,8 @@
   - `score_lower` (u32, ×100 scaled)
   - `score_upper` (u32, ×100 scaled)
   - `coverage_guarantee` (u32 — percentage, e.g. 90)
-- [ ] Field types and encodings match `ledgerlens-contract`'s Rust definition
-- [ ] No new on-chain fields added without linked PR in `ledgerlens-contract`
+- [ ] Field types and encodings match `stellar-lense-contract`'s Rust definition
+- [ ] No new on-chain fields added without linked PR in `stellar-lense-contract`
 - [ ] `ring_id` is **not** submitted on-chain (API/storage only)
 
 ---
@@ -30,8 +30,8 @@
 
 - [ ] `submit_score(wallet, asset_pair, score, timestamp)` signature unchanged
 - [ ] Asset pair string uses canonical format: `CODE:ISSUER/CODE:ISSUER`
-- [ ] Signed by `LEDGERLENS_SUBMITTER_SECRET` (never hardcoded, loaded from env)
-- [ ] Submission fee estimated and within budget (LEDGERLENS_MAX_FEE_STROOPS)
+- [ ] Signed by `STELLARLENSE_SUBMITTER_SECRET` (never hardcoded, loaded from env)
+- [ ] Submission fee estimated and within budget (STELLARLENSE_MAX_FEE_STROOPS)
 - [ ] Retry with exponential backoff on transient Horizon errors
 - [ ] Idempotent: re-submitting same score for same wallet/pair doesn't create duplicates
 
@@ -61,7 +61,7 @@
 ### 5. ZK attestation (`integrations/zk_attestor.py`)
 
 - [ ] Proof generation and verification still pass (`tests/test_zk_attestor.py`)
-- [ ] If Soroban proof contract updated, linked PR in `ledgerlens-contract`
+- [ ] If Soroban proof contract updated, linked PR in `stellar-lense-contract`
 - [ ] ZK proof schema version bump documented if format changed
 
 ---
@@ -77,10 +77,10 @@
 
 ### 7. Security
 
-- [ ] `LEDGERLENS_SUBMITTER_SECRET` never logged, never in error messages
+- [ ] `STELLARLENSE_SUBMITTER_SECRET` never logged, never in error messages
 - [ ] All secret keys in `.env.example` (values masked), not in `config.py`
 - [ ] `STELLAR_NETWORK_PASSPHRASE` correct for target network (Testnet vs Mainnet)
-- [ ] No hardcoded contract IDs (use `LEDGERLENS_CONTRACT_ID` env var)
+- [ ] No hardcoded contract IDs (use `STELLARLENSE_CONTRACT_ID` env var)
 
 ---
 
@@ -98,10 +98,10 @@ This change may require linked PRs in:
 
 | Repo | Impact | Linked PR |
 |------|--------|-----------|
-| `ledgerlens-contract` | Rust RiskScore struct or ABI changed | ☐ |
-| `ledgerlens-core` | Shared Python/TS types updated | ☐ |
-| `ledgerlens-api` | API reads on-chain scores | ☐ |
-| `ledgerlens-dashboard` | Dashboard displays on-chain scores | ☐ |
+| `stellar-lense-contract` | Rust RiskScore struct or ABI changed | ☐ |
+| `stellar-lense-core` | Shared Python/TS types updated | ☐ |
+| `stellar-lense-api` | API reads on-chain scores | ☐ |
+| `stellar-lense-dashboard` | Dashboard displays on-chain scores | ☐ |
 
 ---
 

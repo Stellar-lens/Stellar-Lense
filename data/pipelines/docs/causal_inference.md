@@ -1,6 +1,6 @@
-# Causal Inference for LedgerLens
+# Causal Inference for Stellar Lense
 
-This document describes the causal attribution layer added to LedgerLens on top of the existing feature pipeline and ensemble scorer.
+This document describes the causal attribution layer added to Stellar Lense on top of the existing feature pipeline and ensemble scorer.
 
 ## Why Causal Attribution
 
@@ -10,7 +10,7 @@ That distinction matters in investigations. A wallet can be high-risk because a 
 
 ## Structural Causal Model
 
-LedgerLens builds a lightweight SCM from the existing feature vector:
+Stellar Lense builds a lightweight SCM from the existing feature vector:
 
 - Nodes are features.
 - Edges represent simple structural dependencies between features computed from the same trade set.

@@ -288,7 +288,7 @@ def _warm_start_update(
 
 
 class IncrementalTrainer:
-    """Incrementally update LedgerLens ensemble models with new annotations.
+    """Incrementally update StellarLense ensemble models with new annotations.
 
     Args:
         model_dir:           Directory containing trained .joblib artifacts.

@@ -6,7 +6,7 @@ rebalancing protocol.
 
 Usage:
     python -m scripts.kafka_workers --num-workers 4
-    python -m scripts.kafka_workers --num-workers 4 --topic trades --group ledgerlens-workers
+    python -m scripts.kafka_workers --num-workers 4 --topic trades --group stellar-lense-workers
     python -m scripts.kafka_workers --num-workers 4 --bootstrap-servers localhost:9092,localhost:9093
 """
 
@@ -196,7 +196,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--group",
-        default="ledgerlens-workers",
+        default="stellar-lense-workers",
         help="Kafka consumer group ID",
     )
     parser.add_argument(

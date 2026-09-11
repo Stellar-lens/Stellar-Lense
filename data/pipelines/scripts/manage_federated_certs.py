@@ -25,7 +25,7 @@ Environment variables
 ---------------------
     FEDERATED_CA_KEY_PEM      — PEM-encoded CA private key (required for issue/revoke/rotate)
     FEDERATED_CA_CERT_PATH    — Path to CA certificate PEM file
-    RISK_SCORE_DB_URL         — SQLAlchemy DB URL (default sqlite:///ledgerlens.db)
+    RISK_SCORE_DB_URL         — SQLAlchemy DB URL (default sqlite:///stellar_lense.db)
     PARTICIPANT_CERT_OUT_DIR  — Directory to write issued participant cert PEMs
                                 (default ./certs/participants)
 """
@@ -50,7 +50,7 @@ from detection.federated.cert_authority import (
     rotate_certificate,
 )
 
-_DB_URL = os.getenv("RISK_SCORE_DB_URL", "sqlite:///ledgerlens.db")
+_DB_URL = os.getenv("RISK_SCORE_DB_URL", "sqlite:///stellar_lense.db")
 _CA_CERT_PATH = os.getenv("FEDERATED_CA_CERT_PATH", "certs/ca.crt")
 _OUT_DIR = Path(os.getenv("PARTICIPANT_CERT_OUT_DIR", "certs/participants"))
 
@@ -224,7 +224,7 @@ def cmd_check_expiry(args: argparse.Namespace) -> None:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m scripts.manage_federated_certs",
-        description="Manage LedgerLens federated learning participant certificates",
+        description="Manage StellarLense federated learning participant certificates",
     )
     sub = parser.add_subparsers(dest="command", required=True)
 

@@ -2,8 +2,8 @@
   "annotations": {"list": []},
   "editable": true,
   "schemaVersion": 39,
-  "title": "LedgerLens — Capacity Planning",
-  "tags": ["ledgerlens", "capacity", "infrastructure"],
+  "title": "Stellar Lense — Capacity Planning",
+  "tags": ["stellar_lense", "capacity", "infrastructure"],
   "timezone": "browser",
   "time": {"from": "now-7d", "to": "now"},
   "refresh": "5m",
@@ -30,7 +30,7 @@
       },
       "targets": [
         {
-          "expr": "ledgerlens_cpu_usage_ratio",
+          "expr": "stellar_lense_cpu_usage_ratio",
           "legendFormat": "{{component}}"
         }
       ]
@@ -47,7 +47,7 @@
       },
       "targets": [
         {
-          "expr": "ledgerlens_memory_usage_bytes",
+          "expr": "stellar_lense_memory_usage_bytes",
           "legendFormat": "RSS"
         }
       ]
@@ -64,7 +64,7 @@
       },
       "targets": [
         {
-          "expr": "ledgerlens_trades_per_second",
+          "expr": "stellar_lense_trades_per_second",
           "legendFormat": "{{asset_pair}}"
         }
       ]
@@ -84,20 +84,20 @@
       },
       "targets": [
         {
-          "expr": "avg(ledgerlens_cpu_usage_ratio)",
+          "expr": "avg(stellar_lense_cpu_usage_ratio)",
           "legendFormat": "Current (avg)"
         },
         {
-          "expr": "predict_linear(ledgerlens_cpu_usage_ratio[7d], 86400 * 30)",
+          "expr": "predict_linear(stellar_lense_cpu_usage_ratio[7d], 86400 * 30)",
           "legendFormat": "Projected (30d)"
         },
         {
-          "expr": "predict_linear(ledgerlens_cpu_usage_ratio[7d], 86400 * 30) + 1.96 * stddev_over_time(ledgerlens_cpu_usage_ratio[7d])",
+          "expr": "predict_linear(stellar_lense_cpu_usage_ratio[7d], 86400 * 30) + 1.96 * stddev_over_time(stellar_lense_cpu_usage_ratio[7d])",
           "legendFormat": "CI upper (95%)",
           "custom": {"fillOpacity": 10, "lineWidth": 0}
         },
         {
-          "expr": "predict_linear(ledgerlens_cpu_usage_ratio[7d], 86400 * 30) - 1.96 * stddev_over_time(ledgerlens_cpu_usage_ratio[7d])",
+          "expr": "predict_linear(stellar_lense_cpu_usage_ratio[7d], 86400 * 30) - 1.96 * stddev_over_time(stellar_lense_cpu_usage_ratio[7d])",
           "legendFormat": "CI lower (95%)",
           "custom": {"fillOpacity": 10, "lineWidth": 0}
         },
@@ -133,7 +133,7 @@
       },
       "targets": [
         {
-          "expr": "ledgerlens:capacity_days_to_80pct_cpu",
+          "expr": "stellar_lense:capacity_days_to_80pct_cpu",
           "legendFormat": "Days to 80% CPU"
         }
       ]
@@ -155,7 +155,7 @@
       },
       "targets": [
         {
-          "expr": "deriv(ledgerlens_memory_usage_bytes[7d])",
+          "expr": "deriv(stellar_lense_memory_usage_bytes[7d])",
           "legendFormat": "Memory growth (bytes/s)"
         }
       ]

@@ -47,14 +47,14 @@ try:
     from prometheus_client import Gauge
 
     _batch_size_gauge: Gauge | None = _PROM_REGISTRY._names_to_collectors.get(
-        "ledgerlens_adaptive_batch_size"
+        "stellar_lense_adaptive_batch_size"
     ) or Gauge(  # type: ignore[attr-defined]
-        "ledgerlens_adaptive_batch_size", "Current adaptive micro-batch size"
+        "stellar_lense_adaptive_batch_size", "Current adaptive micro-batch size"
     )
     _target_latency_gauge: Gauge | None = _PROM_REGISTRY._names_to_collectors.get(
-        "ledgerlens_batch_target_latency_seconds"
+        "stellar_lense_batch_target_latency_seconds"
     ) or Gauge(  # type: ignore[attr-defined]
-        "ledgerlens_batch_target_latency_seconds",
+        "stellar_lense_batch_target_latency_seconds",
         "Target p95 latency for adaptive batch controller (seconds)",
     )
 except Exception:  # pragma: no cover

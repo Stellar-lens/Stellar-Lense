@@ -5,7 +5,7 @@
 
 database:
   # PRODUCTION: Must be PostgreSQL with TLS and credentials from environment
-  # Example: postgresql://user:pass@prod-rds.us-east-1.rds.amazonaws.com:5432/ledgerlens
+  # Example: postgresql://user:pass@prod-rds.us-east-1.rds.amazonaws.com:5432/stellar_lense
   # Set via DATABASE_URL environment variable; empty here as it comes from secrets
   url: "${DATABASE_URL}"
   pool_size: 20
@@ -27,7 +27,7 @@ risk_scoring:
   flag_threshold: 70
 
 models:
-  directory: "/var/lib/ledgerlens/models"  # Persistent volume in prod
+  directory: "/var/lib/stellar_lense/models"  # Persistent volume in prod
   batch_scorer_workers: 20  # Higher for prod load
 
 # Security hardening

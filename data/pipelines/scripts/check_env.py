@@ -97,7 +97,7 @@ def _format_error_group(error: str) -> list[str]:
 
     ``validate_mode()`` raises one OSError whose message is::
 
-        LedgerLens configuration errors for mode='api' (uvicorn api.app:app):
+        StellarLense configuration errors for mode='api' (uvicorn api.app:app):
         - RISK_SCORE_DB_URL is not set ...
         - API_KEYS is not set ...
 
@@ -117,7 +117,7 @@ def _format_error_group(error: str) -> list[str]:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Validate LedgerLens runtime-mode config contracts"
+        description="Validate StellarLense runtime-mode config contracts"
     )
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument(

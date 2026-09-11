@@ -52,8 +52,8 @@ procedure.
 
 **Fires on:** `ingestion/data_models.py`, `detection/model_inference.py`
 
-These shapes are mirrored by `ledgerlens-core` and consumed by
-`ledgerlens-api`, `ledgerlens-contract`, and `ledgerlens-dashboard`. State:
+These shapes are mirrored by `stellar-lense-core` and consumed by
+`stellar-lense-api`, `stellar-lense-contract`, and `stellar-lense-dashboard`. State:
 
 - Which fields changed, and whether the change is additive.
 - Links to the downstream issues or PRs.

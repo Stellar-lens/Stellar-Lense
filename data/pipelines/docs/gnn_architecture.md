@@ -2,7 +2,7 @@
 
 ## Overview
 
-LedgerLens augments its tabular feature vector with **learned graph embeddings**
+Stellar Lense augments its tabular feature vector with **learned graph embeddings**
 from a 2-layer GraphSAGE encoder.  The encoder transforms each wallet node into a
 dense vector (default 32 dimensions) that captures multi-hop structural patterns in
 the wallet funding and co-trade graph — patterns that pairwise Jaccard similarity
@@ -304,7 +304,7 @@ allows cluster scores to be deduplicated in the database.
 ### Prometheus Counter
 
 ```
-ledgerlens_cluster_scored_total  ← incremented on each score_cluster() call
+stellar_lense_cluster_scored_total  ← incremented on each score_cluster() call
 ```
 
 ### Testing

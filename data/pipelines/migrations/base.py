@@ -1,4 +1,4 @@
-"""Base class for all LedgerLens database migrations.
+"""Base class for all StellarLense database migrations.
 
 Every migration module in ``migrations/versions/`` must expose a module-level
 instance named ``migration`` that is a :class:`Migration` subclass.  The

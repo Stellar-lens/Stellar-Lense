@@ -7,7 +7,7 @@ and storage previously surfaced as bare `ValueError` / `RuntimeError`
 instances with ad-hoc messages, forcing on-call to read a stack trace and
 guess which subsystem failed and whether retrying makes sense.
 
-`utils/errors.py` defines a small hierarchy rooted at `LedgerLensError`.
+`utils/errors.py` defines a small hierarchy rooted at `StellarLenseError`.
 Every raised error carries a namespaced `code`, a `category`, structured
 `context`, an optional `remediation` hint, a `retryable` flag, and the
 original triggering exception (chained via `raise ... from cause`).
@@ -60,7 +60,7 @@ from utils.errors import format_diagnostic
 
 try:
     run_pipeline()
-except LedgerLensError as exc:
+except StellarLenseError as exc:
     logger.error(format_diagnostic(exc))
     if exc.retryable:
         schedule_retry()

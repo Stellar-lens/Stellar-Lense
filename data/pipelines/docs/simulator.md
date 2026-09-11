@@ -1,12 +1,12 @@
 # Wash-Trade Simulators and Realism Evaluation
 
-LedgerLens ships three related tools for producing and grading synthetic
+Stellar Lense ships three related tools for producing and grading synthetic
 wash-trading data:
 
 | Script | Role |
 |---|---|
 | [`scripts/wash_trade_simulator.py`](../scripts/wash_trade_simulator.py) | Library of hand-written attacker *strategy profiles* (Wash Trade Simulation Engine). |
-| [`scripts/adversarial_wash_trade_simulator.py`](../scripts/adversarial_wash_trade_simulator.py) | Genetic algorithm that *evolves* a strategy to minimise its LedgerLens risk score. |
+| [`scripts/adversarial_wash_trade_simulator.py`](../scripts/adversarial_wash_trade_simulator.py) | Genetic algorithm that *evolves* a strategy to minimise its Stellar Lense risk score. |
 | [`scripts/evaluate_simulator_realism.py`](../scripts/evaluate_simulator_realism.py) | Measures how close simulated data is to real (Testnet) wash-trade data. |
 
 The synthetic data these tools produce is used for local training, demos,
@@ -45,11 +45,11 @@ Each profile is a dataclass subclassing `BaseAttackerProfile` and implementing
 `AdversarialWashTradeSimulator` runs a genetic algorithm over a strategy genome
 (`n_trades`, `amount_mean`, `amount_std`, `inter_trade_seconds`,
 `n_counterparties`, `jitter_fraction`, `use_round_numbers`). Fitness is
-`1 / (risk_score + 1)`, so lower LedgerLens risk scores are selected for, subject
+`1 / (risk_score + 1)`, so lower Stellar Lense risk scores are selected for, subject
 to an economic-plausibility constraint (total volume 1,000–10,000,000 XLM). If no
 trained model is found under `--model-dir`, it falls back to a heuristic scorer.
 The best (lowest) score reached is exported as the Prometheus gauge
-`ledgerlens_adversarial_lowest_score`.
+`stellar_lense_adversarial_lowest_score`.
 
 ---
 

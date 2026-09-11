@@ -1,4 +1,4 @@
-"""LedgerLens first-time local setup onboarding checks.
+"""StellarLense first-time local setup onboarding checks.
 
 Validates that a fresh checkout has everything it needs to run ``make test``
 and ``python run_pipeline.py`` successfully.  Checks are grouped into:
@@ -154,8 +154,8 @@ _REQUIRED_ENV_VARS: list[tuple[str, str]] = [
 
 # Optional but common env vars — missing → WARNING
 _OPTIONAL_ENV_VARS: list[tuple[str, str]] = [
-    ("LEDGERLENS_CONTRACT_ID", "Soroban contract ID for on-chain submission"),
-    ("LEDGERLENS_SUBMITTER_SECRET", "Secret key for Soroban contract calls"),
+    ("STELLARLENSE_CONTRACT_ID", "Soroban contract ID for on-chain submission"),
+    ("STELLARLENSE_SUBMITTER_SECRET", "Secret key for Soroban contract calls"),
     ("MODEL_SIGNING_PRIVATE_KEY_PATH", "Ed25519 private key for signing model artifacts"),
     ("ALERT_WEBHOOK_URL", "Webhook URL for streaming alert delivery"),
 ]
@@ -182,7 +182,7 @@ def check_python_version() -> CheckResult:
         return _ok("python-version", f"Python {v[0]}.{v[1]} (>= {_MIN_PYTHON[0]}.{_MIN_PYTHON[1]})")
     return _error(
         "python-version",
-        f"Python {v[0]}.{v[1]} detected — LedgerLens requires >= {_MIN_PYTHON[0]}.{_MIN_PYTHON[1]}",
+        f"Python {v[0]}.{v[1]} detected — StellarLense requires >= {_MIN_PYTHON[0]}.{_MIN_PYTHON[1]}",
         fix_hint=f"Install Python {_MIN_PYTHON[0]}.{_MIN_PYTHON[1]}+ and re-create your virtual environment.",
     )
 
@@ -499,7 +499,7 @@ def run_all_checks(
     Parameters
     ----------
     repo_root:
-        Root of the LedgerLens repository.  Defaults to the directory
+        Root of the StellarLense repository.  Defaults to the directory
         two levels above this file (i.e. the repo root).
     fix:
         When True, attempt auto-fixes for trivial problems (copy .env,

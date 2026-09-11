@@ -1,11 +1,11 @@
-"""Per-asset-pair Prometheus metrics for LedgerLens (issue #276).
+"""Per-asset-pair Prometheus metrics for StellarLense (issue #276).
 
 Defines the canonical per-pair metrics emitted by the scoring pipeline:
-  - ledgerlens_score_duration_seconds  (Histogram)
-  - ledgerlens_benford_computation_total  (Counter)
-  - ledgerlens_risk_score_distribution  (Histogram)
-  - ledgerlens_confirmed_wash_trades_total  (Counter) — for SLO dashboard (#197)
-  - ledgerlens_confirmed_clean_wallets_total  (Counter) — for SLO dashboard (#197)
+  - stellar_lense_score_duration_seconds  (Histogram)
+  - stellar_lense_benford_computation_total  (Counter)
+  - stellar_lense_risk_score_distribution  (Histogram)
+  - stellar_lense_confirmed_wash_trades_total  (Counter) — for SLO dashboard (#197)
+  - stellar_lense_confirmed_clean_wallets_total  (Counter) — for SLO dashboard (#197)
 
 All metrics carry an ``asset_pair`` label using the canonical format
 ``CODE:ISSUER/CODE:ISSUER`` sorted alphabetically.  Labels never include
@@ -38,46 +38,46 @@ _confirmed_clean_wallets: object = None
 try:
     from prometheus_client import Counter, Histogram
 
-    ledgerlens_score_duration_seconds = Histogram(
-        "ledgerlens_score_duration_seconds",
+    stellar_lense_score_duration_seconds = Histogram(
+        "stellar_lense_score_duration_seconds",
         "Per-asset-pair scoring latency in seconds",
         ["asset_pair"],
         buckets=(0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5),
     )
-    ledgerlens_benford_computation_total = Counter(
-        "ledgerlens_benford_computation_total",
+    stellar_lense_benford_computation_total = Counter(
+        "stellar_lense_benford_computation_total",
         "Total Benford computations completed per asset pair",
         ["asset_pair", "status"],
     )
-    ledgerlens_risk_score_distribution = Histogram(
-        "ledgerlens_risk_score_distribution",
+    stellar_lense_risk_score_distribution = Histogram(
+        "stellar_lense_risk_score_distribution",
         "Distribution of risk scores (0-100) per asset pair",
         ["asset_pair"],
         buckets=(0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100),
     )
     # SLO dashboard counters (issue #197)
-    ledgerlens_confirmed_wash_trades_total = Counter(
-        "ledgerlens_confirmed_wash_trades_total",
+    stellar_lense_confirmed_wash_trades_total = Counter(
+        "stellar_lense_confirmed_wash_trades_total",
         "Total confirmed wash trades detected per asset pair",
         ["asset_pair"],
     )
-    ledgerlens_confirmed_clean_wallets_total = Counter(
-        "ledgerlens_confirmed_clean_wallets_total",
+    stellar_lense_confirmed_clean_wallets_total = Counter(
+        "stellar_lense_confirmed_clean_wallets_total",
         "Total confirmed clean (non-fraudulent) wallets per asset pair",
         ["asset_pair"],
     )
-    _score_duration = ledgerlens_score_duration_seconds
-    _benford_computation = ledgerlens_benford_computation_total
-    _risk_score_dist = ledgerlens_risk_score_distribution
-    _confirmed_wash_trades = ledgerlens_confirmed_wash_trades_total
-    _confirmed_clean_wallets = ledgerlens_confirmed_clean_wallets_total
+    _score_duration = stellar_lense_score_duration_seconds
+    _benford_computation = stellar_lense_benford_computation_total
+    _risk_score_dist = stellar_lense_risk_score_distribution
+    _confirmed_wash_trades = stellar_lense_confirmed_wash_trades_total
+    _confirmed_clean_wallets = stellar_lense_confirmed_clean_wallets_total
     _metrics_available = True
 except Exception:
-    ledgerlens_score_duration_seconds = None  # type: ignore[assignment]
-    ledgerlens_benford_computation_total = None  # type: ignore[assignment]
-    ledgerlens_risk_score_distribution = None  # type: ignore[assignment]
-    ledgerlens_confirmed_wash_trades_total = None  # type: ignore[assignment]
-    ledgerlens_confirmed_clean_wallets_total = None  # type: ignore[assignment]
+    stellar_lense_score_duration_seconds = None  # type: ignore[assignment]
+    stellar_lense_benford_computation_total = None  # type: ignore[assignment]
+    stellar_lense_risk_score_distribution = None  # type: ignore[assignment]
+    stellar_lense_confirmed_wash_trades_total = None  # type: ignore[assignment]
+    stellar_lense_confirmed_clean_wallets_total = None  # type: ignore[assignment]
 
 
 def canonical_pair(asset_pair: str) -> str:

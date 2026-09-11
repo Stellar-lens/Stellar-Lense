@@ -1,6 +1,6 @@
 """End-to-end integration test: Testnet trades flowing through to risk scores.
 
-This test exercises the full LedgerLens pipeline:
+This test exercises the full StellarLense pipeline:
   1. Generate known testnet trades between controlled wallets via testnet_setup
   2. Start the streaming pipeline against Testnet Horizon SSE
   3. Wait up to 60 seconds for risk scores to appear in the DB
@@ -12,13 +12,13 @@ Three distinct trade patterns are tested:
   - Same-amount repeated trades (high wash-trading signal): expected score > 60
 
 Requirements:
-  - LEDGERLENS_INTEGRATION_TESTS=1 environment variable must be set
-  - LEDGERLENS_CONTRACT_ID and LEDGERLENS_SUBMITTER_SECRET must be set
+  - STELLARLENSE_INTEGRATION_TESTS=1 environment variable must be set
+  - STELLARLENSE_CONTRACT_ID and STELLARLENSE_SUBMITTER_SECRET must be set
   - Requires a funded Testnet keypair (provided by testnet_setup.py)
   - Database must be accessible and writable
 
 Run with:
-    export LEDGERLENS_INTEGRATION_TESTS=1
+    export STELLARLENSE_INTEGRATION_TESTS=1
     export $(grep -v '^#' .env.testnet | xargs)
     make test-e2e
 """
@@ -30,7 +30,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 # Only load these if running integration tests
-if os.getenv("LEDGERLENS_INTEGRATION_TESTS") == "1":
+if os.getenv("STELLARLENSE_INTEGRATION_TESTS") == "1":
     from sqlalchemy import select
     from sqlalchemy.orm import Session
 
@@ -39,8 +39,8 @@ if os.getenv("LEDGERLENS_INTEGRATION_TESTS") == "1":
 
 
 @pytest.mark.skipif(
-    os.getenv("LEDGERLENS_INTEGRATION_TESTS") != "1",
-    reason="Integration tests require LEDGERLENS_INTEGRATION_TESTS=1",
+    os.getenv("STELLARLENSE_INTEGRATION_TESTS") != "1",
+    reason="Integration tests require STELLARLENSE_INTEGRATION_TESTS=1",
 )
 class TestFullPipelineE2E:
     """End-to-end pipeline test with Testnet trades flowing to risk scores."""

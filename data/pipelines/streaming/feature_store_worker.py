@@ -56,11 +56,11 @@ try:
     from prometheus_client import Counter
 
     _refreshed_total = Counter(
-        "ledgerlens_feature_store_refreshed_total",
+        "stellar_lense_feature_store_refreshed_total",
         "Number of feature vectors refreshed in Redis by the background worker",
     )
     _refresh_errors_total = Counter(
-        "ledgerlens_feature_store_refresh_errors_total",
+        "stellar_lense_feature_store_refresh_errors_total",
         "Number of errors during background feature refresh",
     )
 except Exception:  # pragma: no cover

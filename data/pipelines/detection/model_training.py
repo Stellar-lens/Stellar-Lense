@@ -1,4 +1,4 @@
-"""Train the LedgerLens ensemble classifiers (RF, XGBoost, LightGBM).
+"""Train the StellarLense ensemble classifiers (RF, XGBoost, LightGBM).
 
 Run as a script against a labelled feature matrix (see
 `scripts/generate_synthetic_dataset.py` for a synthetic one, or the
@@ -65,7 +65,7 @@ from detection.model_compatibility import (
 from detection.model_contracts import FEATURE_COLUMNS_EXCLUDE
 from detection.model_contracts import compute_feature_schema_hash as _compute_feature_schema_hash
 from utils.logging import get_logger
-from utils.version_stamp import get_version as _get_ledgerlens_version
+from utils.version_stamp import get_version as _get_stellar_lense_version
 
 logger = get_logger(__name__)
 
@@ -1042,7 +1042,7 @@ def save_training_artifacts(
         ),
         "model_names": list(results.keys()),
         "python_version": sys.version.split()[0],
-        "ledgerlens_version": _get_ledgerlens_version(),
+        "stellar_lense_version": _get_stellar_lense_version(),
         "feature_distributions": feature_distributions,
     }
 
@@ -1055,7 +1055,7 @@ def save_training_artifacts(
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Train the LedgerLens ensemble classifiers")
+    parser = argparse.ArgumentParser(description="Train the StellarLense ensemble classifiers")
     parser.add_argument("--data-path", required=True)
     parser.add_argument("--model-dir", default=None)
     parser.add_argument("--test-size", type=float, default=0.2)
@@ -1528,7 +1528,7 @@ def main() -> None:
         if os.path.exists(metadata_path):
             with open(metadata_path) as _f:
                 _md = json.load(_f)
-            version = _md.get("ledgerlens_version", "unknown")
+            version = _md.get("stellar_lense_version", "unknown")
             for model_name in results:
                 # Build per-model metadata overlay
                 metrics = results[model_name]["metrics"]

@@ -16,8 +16,8 @@ Design choices
   ``rediss://`` URL) to encrypt the connection.
 - **Fallback**: when Redis is unavailable, ``get()`` returns ``None`` and
   ``put()`` is a no-op.  Callers fall back to direct feature computation.
-- **Prometheus counters**: ``ledgerlens_feature_cache_hits_total`` /
-  ``ledgerlens_feature_cache_misses_total``.
+- **Prometheus counters**: ``stellar_lense_feature_cache_hits_total`` /
+  ``stellar_lense_feature_cache_misses_total``.
 
 Key schema
 ----------
@@ -53,17 +53,17 @@ try:
     from prometheus_client import Counter
 
     _cache_hits = Counter(
-        "ledgerlens_feature_cache_hits_total",
+        "stellar_lense_feature_cache_hits_total",
         "Total Redis feature store cache hits",
         ["store"],
     )
     _cache_misses = Counter(
-        "ledgerlens_feature_cache_misses_total",
+        "stellar_lense_feature_cache_misses_total",
         "Total Redis feature store cache misses",
         ["store"],
     )
     _fallback_total = Counter(
-        "ledgerlens_feature_store_fallback_total",
+        "stellar_lense_feature_store_fallback_total",
         "Number of times feature store fell back to direct computation",
         ["store"],
     )

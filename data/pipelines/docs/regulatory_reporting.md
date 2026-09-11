@@ -4,7 +4,7 @@
 
 Regulatory bodies and partner VASPs increasingly require wallet risk data in standardised formats.  The FATF Travel Rule (Recommendation 16) mandates that virtual asset service providers share originator and beneficiary information on transfers above prescribed thresholds.
 
-`reporting/fatf_exporter.py` maps LedgerLens detection output to the **IVMS101 1.0** (Inter-VASP Messaging Standard) data standard, producing JSON-LD documents that exchange compliance teams can submit directly to regulators and partner VASPs without manual reformatting.
+`reporting/fatf_exporter.py` maps Stellar Lense detection output to the **IVMS101 1.0** (Inter-VASP Messaging Standard) data standard, producing JSON-LD documents that exchange compliance teams can submit directly to regulators and partner VASPs without manual reformatting.
 
 ```python
 from reporting.fatf_exporter import export_ivms101, export_batch_ivms101
@@ -20,13 +20,13 @@ docs = export_batch_ivms101([r.to_dict() for r in high_risk_reports])
 
 ## IVMS101 Field Mapping
 
-The table below documents how LedgerLens forensic report fields map to IVMS101 data elements.  Fields with no detection equivalent are populated with a **data-unavailable sentinel** (see below) rather than being omitted, ensuring downstream parsers receive structurally complete documents.
+The table below documents how Stellar Lense forensic report fields map to IVMS101 data elements.  Fields with no detection equivalent are populated with a **data-unavailable sentinel** (see below) rather than being omitted, ensuring downstream parsers receive structurally complete documents.
 
-| IVMS101 Field | LedgerLens Source | Notes |
+| IVMS101 Field | Stellar Lense Source | Notes |
 |---|---|---|
 | `payloadMetadata.reportId` | `report_id` | UUID v4 from the forensic report |
 | `payloadMetadata.generatedAt` | `generated_at` | ISO 8601 UTC timestamp |
-| `payloadMetadata.reportingEntity` | Constant `"LedgerLens"` | |
+| `payloadMetadata.reportingEntity` | Constant `"Stellar Lense"` | |
 | `payloadMetadata.schemaVersion` | Constant `"1.0"` | |
 | `payloadMetadata.sourceReportSha256` | `report_sha256` | Tamper-evidence chain |
 | `originator.accountNumber[0]` | `wallet` | Masked or revealed (see address policy) |
@@ -38,7 +38,7 @@ The table below documents how LedgerLens forensic report fields map to IVMS101 d
 | `originator.originatorPersons[].naturalPerson.countryOfResidence` | — | Data unavailable |
 | `beneficiary` | — | All sub-fields data unavailable (see note) |
 | `beneficiaryVASP` | — | Data unavailable |
-| `originatingVASP.legalPerson.name` | Constant `"LedgerLens"` | |
+| `originatingVASP.legalPerson.name` | Constant `"Stellar Lense"` | |
 | `riskIndicators[].code` | `verdict` + SHAP features | FATF VA-xxx codes |
 | `riskIndicators[].severity` | Derived from code taxonomy | |
 | `transactionReference.reportId` | `report_id` | |
@@ -48,7 +48,7 @@ The table below documents how LedgerLens forensic report fields map to IVMS101 d
 | `transactionReference.scoreConfidenceInterval.lower` | `score_lower / 100` | |
 | `transactionReference.scoreConfidenceInterval.upper` | `score_upper / 100` | |
 
-> **Note on beneficiary**: LedgerLens detection operates on flagged originator wallets.  In wash-trading ring scenarios, many counterparties may be involved; there is no single designated "beneficiary" in the Travel Rule sense.  All beneficiary sub-fields use the data-unavailable sentinel.
+> **Note on beneficiary**: Stellar Lense detection operates on flagged originator wallets.  In wash-trading ring scenarios, many counterparties may be involved; there is no single designated "beneficiary" in the Travel Rule sense.  All beneficiary sub-fields use the data-unavailable sentinel.
 
 ---
 
@@ -180,7 +180,7 @@ A schema violation raises `ExportValidationError` with the failing path and mess
 The typical integration workflow for exchange compliance teams:
 
 ```
-1. LedgerLens scores wallets in real time
+1. Stellar Lense scores wallets in real time
 2. Flagged reports (risk_score >= 85) are collected
 3. export_batch_ivms101(reports) produces IVMS101 JSON-LD documents
 4. Documents are forwarded to:
@@ -189,4 +189,4 @@ The typical integration workflow for exchange compliance teams:
    c. Internal compliance database for SAR/STR filing support
 ```
 
-The `sourceReportSha256` field in `payloadMetadata` chains the IVMS101 document back to the original tamper-evident LedgerLens forensic report, providing an auditable link between the regulatory submission and the underlying detection evidence.
+The `sourceReportSha256` field in `payloadMetadata` chains the IVMS101 document back to the original tamper-evident Stellar Lense forensic report, providing an auditable link between the regulatory submission and the underlying detection evidence.

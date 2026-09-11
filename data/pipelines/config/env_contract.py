@@ -1,7 +1,7 @@
 """Environment contract docs generated from config schemas (Issue #544).
 
 ``config.py`` is the single source of truth for every environment variable
-LedgerLens reads — but that truth is scattered across 500+ lines as
+StellarLense reads — but that truth is scattered across 500+ lines as
 ``os.getenv(...)`` calls with inline comments, and nothing keeps a
 human-readable contract of it in sync. New contributors (and operators
 writing a ``.env`` for a new deployment) either read the whole file or

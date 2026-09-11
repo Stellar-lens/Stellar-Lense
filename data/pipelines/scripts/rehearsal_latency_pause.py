@@ -38,7 +38,7 @@ def run_drill():
     )
 
     # 2. Mock the ContractClient to simulate on-chain proposal without real network calls in drill
-    with patch("monitoring.emergency_watchdog.LedgerLensContractClient") as MockClient:
+    with patch("monitoring.emergency_watchdog.StellarLenseContractClient") as MockClient:
         instance = MockClient.return_value
         instance.initiate_emergency_pause.return_value = 101
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Repository health diagnostics CLI.
 
-Comprehensive health check system for the LedgerLens-data repository. Checks
+Comprehensive health check system for the StellarLense-data repository. Checks
 configuration, dependencies, code quality, data artifacts, and runtime readiness.
 
 Usage:
@@ -54,7 +54,7 @@ logger = get_logger(__name__)
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="LedgerLens repository health diagnostics",
+        description="StellarLense repository health diagnostics",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )

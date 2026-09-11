@@ -25,10 +25,10 @@ class TestSecretsSafety(unittest.TestCase):
         self.assertEqual(mask_secret(""), "")
 
     def test_sanitize_url(self):
-        db_url = "postgresql://db_user:super_secret_pass@localhost:5432/ledgerlens"
+        db_url = "postgresql://db_user:super_secret_pass@localhost:5432/stellar_lense"
         sanitized = sanitize_url(db_url)
         self.assertNotIn("super_secret_pass", sanitized)
-        self.assertIn("db_user:****@localhost:5432/ledgerlens", sanitized)
+        self.assertIn("db_user:****@localhost:5432/stellar_lense", sanitized)
 
     def test_sanitize_text_patterns(self):
         text = "Failed connect with api_key=secret_key_abc123 and Bearer eyJhbGciOiJIUzI1NiIn1"

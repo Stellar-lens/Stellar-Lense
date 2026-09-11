@@ -1,4 +1,4 @@
-# LedgerLens Test Suite
+# Stellar Lense Test Suite
 
 ## Test Data Factory
 

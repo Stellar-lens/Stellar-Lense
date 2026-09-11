@@ -1,6 +1,6 @@
-"""Base exception type shared across LedgerLens packages.
+"""Base exception type shared across StellarLense packages.
 
-``LedgerLensError`` distinguishes errors raised deliberately by LedgerLens code
+``StellarLenseError`` distinguishes errors raised deliberately by StellarLense code
 from stdlib/third-party exceptions that pass through unchanged. It carries an
 optional ``context`` mapping so failures arrive at a log line or a dead-letter
 queue with the structured detail needed to triage them.
@@ -10,9 +10,9 @@ This module intentionally has no repo-internal imports, so any package
 creating a dependency edge onto another domain package.
 
 Usage:
-    from utils.exceptions import LedgerLensError
+    from utils.exceptions import StellarLenseError
 
-    raise LedgerLensError("thing failed", context={"source": "loader"})
+    raise StellarLenseError("thing failed", context={"source": "loader"})
 
 Domain packages should subclass this rather than raising it directly — see
 ``ingestion/exceptions.py`` for the ingestion taxonomy.
@@ -24,8 +24,8 @@ from collections.abc import Mapping
 from typing import Any
 
 
-class LedgerLensError(Exception):
-    """Base class for errors raised by LedgerLens code.
+class StellarLenseError(Exception):
+    """Base class for errors raised by StellarLense code.
 
     Args:
         message: Human-readable description; becomes ``str(exc)``.

@@ -1,7 +1,7 @@
 """CLI entry point for automated hyperparameter optimisation (Issue #213).
 
 Runs BOHB-style TPE / NSGA-II optimisation via Optuna for each of the three
-LedgerLens ensemble models (Random Forest, XGBoost, LightGBM), then writes
+StellarLense ensemble models (Random Forest, XGBoost, LightGBM), then writes
 ``models/best_hyperparams.json`` and optionally integrates the results into the
 training pipeline.
 
@@ -74,7 +74,7 @@ _DEFAULT_SEED = int(os.getenv("HPARAM_RANDOM_STATE", "42"))
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Optimise LedgerLens ensemble hyperparameters with Optuna (BOHB/TPE).",
+        description="Optimise StellarLense ensemble hyperparameters with Optuna (BOHB/TPE).",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(

@@ -5,7 +5,7 @@ Usage:
         --model-name rf \\
         --model-dir ./models \\
         --private-key-path /secrets/signing_key.pem \\
-        --db-url sqlite:///ledgerlens.db
+        --db-url sqlite:///stellar_lense.db
 
 Security requirements:
     - The signing private key must be stored in an HSM or encrypted secrets

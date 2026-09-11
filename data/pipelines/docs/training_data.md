@@ -2,7 +2,7 @@
 
 ## Reservoir Sampler
 
-LedgerLens uses a `DriftAwareReservoirSampler` to maintain a fixed-size training
+Stellar Lense uses a `DriftAwareReservoirSampler` to maintain a fixed-size training
 buffer that adapts to evolving Stellar DEX trading patterns without unbounded
 storage growth.
 

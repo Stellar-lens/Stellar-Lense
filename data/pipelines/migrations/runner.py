@@ -320,7 +320,7 @@ class MigrationStatus:
 
 
 class MigrationRunner:
-    """Discover and apply LedgerLens schema migrations.
+    """Discover and apply StellarLense schema migrations.
 
     Parameters
     ----------

@@ -534,7 +534,7 @@ def print_report(issues: list[PrecisionIssue], report: dict[str, Any]) -> None:
 def main() -> int:
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(
-        description="Validate numeric precision in LedgerLens codebase",
+        description="Validate numeric precision in StellarLense codebase",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )

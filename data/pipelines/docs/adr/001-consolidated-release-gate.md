@@ -2,7 +2,7 @@
 
 **Status:** Accepted  
 **Date:** 2026-08-31  
-**Author:** LedgerLens Team
+**Author:** Stellar Lense Team
 
 ## Context
 

@@ -24,17 +24,17 @@ logger = logging.getLogger(__name__)
 try:
     from prometheus_client import Counter, Gauge
 
-    _drift_gauge = Gauge("ledgerlens_feature_drift_detected", "1=drift detected, 0=stable")
+    _drift_gauge = Gauge("stellar_lense_feature_drift_detected", "1=drift detected, 0=stable")
     _drift_monitor_last_success_gauge: Gauge | None = Gauge(
-        "ledgerlens_drift_monitor_last_success_unixtime",
+        "stellar_lense_drift_monitor_last_success_unixtime",
         "Unix timestamp of the last successful CovarianceShiftDetector.detect() call",
     )
     _drift_monitor_failures_total: Counter | None = Counter(
-        "ledgerlens_drift_monitor_check_failures_total",
+        "stellar_lense_drift_monitor_check_failures_total",
         "Number of CovarianceShiftDetector.detect() calls that raised an exception",
     )
     _drift_monitor_stale_gauge: Gauge | None = Gauge(
-        "ledgerlens_drift_monitor_stale",
+        "stellar_lense_drift_monitor_stale",
         "1=drift monitor heartbeat is stale (drift-check failed alert), 0=healthy",
     )
 except Exception:  # pragma: no cover

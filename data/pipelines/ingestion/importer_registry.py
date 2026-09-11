@@ -1,7 +1,7 @@
 """Importer capability discovery system for supported data sources.
 
 This module provides a durable, reusable system for discovering, validating,
-and querying the capabilities of all data source importers in LedgerLens-data.
+and querying the capabilities of all data source importers in StellarLense-data.
 
 Architecture
 ------------

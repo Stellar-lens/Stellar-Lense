@@ -407,7 +407,7 @@ def run_adversarial_training(
             test_size=0.0 if len(current_train) < 5 else 0.1,
             random_state=random_state,
         )
-        tmp_dir = model_dir or tempfile.mkdtemp(prefix="ledgerlens_adv_train_")
+        tmp_dir = model_dir or tempfile.mkdtemp(prefix="stellar_lense_adv_train_")
         epoch_dir = os.path.join(tmp_dir, f"epoch_{epoch}")
         save_models(results, epoch_dir)
         # require_trust_chain=False: `epoch_dir` holds a disposable model

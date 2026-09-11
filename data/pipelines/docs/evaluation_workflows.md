@@ -2,7 +2,7 @@
 
 ## Overview
 
-LedgerLens already has two independent evaluation primitives:
+Stellar Lense already has two independent evaluation primitives:
 
 - `evaluation/backtest.py` -- replays a labelled dataset through the
   detection pipeline and reports precision/recall/F1/ROC-AUC/average
@@ -52,7 +52,7 @@ failure, so it can be dropped directly into a CI promotion-gate step.
   both reports' output. Fixing a bug in PSI math or backtest metrics
   happens in one place, not two.
 - **Quantile (equal-frequency) binning for the reference distribution**,
-  not equal-width. LedgerLens features (trade amounts, wallet-graph
+  not equal-width. Stellar Lense features (trade amounts, wallet-graph
   degree) are typically heavy-tailed; equal-width bins would put nearly
   all reference mass in one bin, making PSI nearly blind to drift within
   it. The outermost bin edges are extended to +/-inf so out-of-range

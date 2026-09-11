@@ -1,7 +1,7 @@
 """Secrets-safe configuration handling for integrations.
 
 This module provides a secure, auditable, and rotation-ready secrets management
-system for the LedgerLens data pipeline. It replaces direct `os.getenv()` calls
+system for the StellarLense data pipeline. It replaces direct `os.getenv()` calls
 for sensitive credentials with a typed, validated provider layer.
 
 Architecture
@@ -19,12 +19,12 @@ Usage
 Replace direct environment variable access::
 
     # OLD (insecure)
-    submitter_secret = os.getenv("LEDGERLENS_SUBMITTER_SECRET", "")
+    submitter_secret = os.getenv("STELLARLENSE_SUBMITTER_SECRET", "")
 
     # NEW (secure)
     from utils.secrets_manager import get_secrets_manager
     mgr = get_secrets_manager()
-    submitter_secret = mgr.get_secret("LEDGERLENS_SUBMITTER_SECRET")
+    submitter_secret = mgr.get_secret("STELLARLENSE_SUBMITTER_SECRET")
 
 The manager automatically validates the secret format, logs the access event,
 and raises `SecretValidationError` if the secret is malformed or missing when
@@ -626,12 +626,12 @@ def configure_secrets_manager(manager: SecretsManager) -> None:
 # ---------------------------------------------------------------------------
 
 
-def register_ledgerlens_secrets(manager: SecretsManager) -> None:
-    """Register all LedgerLens secrets with the manager."""
+def register_stellar_lense_secrets(manager: SecretsManager) -> None:
+    """Register all StellarLense secrets with the manager."""
 
     secrets = [
         SecretDefinition(
-            name="LEDGERLENS_SUBMITTER_SECRET",
+            name="STELLARLENSE_SUBMITTER_SECRET",
             secret_type=SecretType.STELLAR_SECRET,
             required=False,  # Only required for on-chain submission
             description="Stellar secret key for submitting scores to Soroban contract",

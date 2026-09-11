@@ -16,7 +16,7 @@ from detection.privacy.budget_tracker import DPBudgetTracker
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Query LedgerLens DP privacy budget status")
+    parser = argparse.ArgumentParser(description="Query StellarLense DP privacy budget status")
     parser.add_argument("--json", action="store_true", help="Output raw JSON")
     parser.add_argument(
         "--total-epsilon",

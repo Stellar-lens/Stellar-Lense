@@ -2,8 +2,8 @@
   "annotations": {"list": []},
   "editable": true,
   "schemaVersion": 39,
-  "title": "LedgerLens — SLO Dashboard",
-  "tags": ["ledgerlens", "slo", "observability"],
+  "title": "Stellar Lense — SLO Dashboard",
+  "tags": ["stellar_lense", "slo", "observability"],
   "timezone": "browser",
   "time": {"from": "now-24h", "to": "now"},
   "refresh": "30s",
@@ -14,7 +14,7 @@
         "type": "query",
         "label": "Asset Pair (optional)",
         "datasource": {"type": "prometheus", "uid": "prometheus"},
-        "query": "label_values(ledgerlens_risk_score_distribution_bucket, asset_pair)",
+        "query": "label_values(stellar_lense_risk_score_distribution_bucket, asset_pair)",
         "refresh": 2,
         "sort": 1,
         "includeAll": true,
@@ -34,17 +34,17 @@
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, sum(rate(ledgerlens_score_duration_seconds_bucket{asset_pair=~\"$asset_pair\"}[5m])) by (le))",
+          "expr": "histogram_quantile(0.50, sum(rate(stellar_lense_score_duration_seconds_bucket{asset_pair=~\"$asset_pair\"}[5m])) by (le))",
           "legendFormat": "p50",
           "refId": "A"
         },
         {
-          "expr": "histogram_quantile(0.95, sum(rate(ledgerlens_score_duration_seconds_bucket{asset_pair=~\"$asset_pair\"}[5m])) by (le))",
+          "expr": "histogram_quantile(0.95, sum(rate(stellar_lense_score_duration_seconds_bucket{asset_pair=~\"$asset_pair\"}[5m])) by (le))",
           "legendFormat": "p95",
           "refId": "B"
         },
         {
-          "expr": "histogram_quantile(0.99, sum(rate(ledgerlens_score_duration_seconds_bucket{asset_pair=~\"$asset_pair\"}[5m])) by (le))",
+          "expr": "histogram_quantile(0.99, sum(rate(stellar_lense_score_duration_seconds_bucket{asset_pair=~\"$asset_pair\"}[5m])) by (le))",
           "legendFormat": "p99",
           "refId": "C"
         }
@@ -79,7 +79,7 @@
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [
         {
-          "expr": "(\n  sum(increase(ledgerlens_confirmed_wash_trades_total{asset_pair=~\"$asset_pair\"}[24h]))\n  /\n  (\n    sum(increase(ledgerlens_confirmed_wash_trades_total{asset_pair=~\"$asset_pair\"}[24h]))\n    + sum(increase(ledgerlens_false_negative_wash_trades_total{asset_pair=~\"$asset_pair\"}[24h]))\n    + 0.0001\n  )\n)",
+          "expr": "(\n  sum(increase(stellar_lense_confirmed_wash_trades_total{asset_pair=~\"$asset_pair\"}[24h]))\n  /\n  (\n    sum(increase(stellar_lense_confirmed_wash_trades_total{asset_pair=~\"$asset_pair\"}[24h]))\n    + sum(increase(stellar_lense_false_negative_wash_trades_total{asset_pair=~\"$asset_pair\"}[24h]))\n    + 0.0001\n  )\n)",
           "legendFormat": "recall",
           "refId": "A"
         }
@@ -121,7 +121,7 @@
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [
         {
-          "expr": "(\n  sum(increase(ledgerlens_false_positive_wallets_total{asset_pair=~\"$asset_pair\"}[24h]))\n  /\n  (\n    sum(increase(ledgerlens_confirmed_clean_wallets_total{asset_pair=~\"$asset_pair\"}[24h]))\n    + 0.0001\n  )\n)",
+          "expr": "(\n  sum(increase(stellar_lense_false_positive_wallets_total{asset_pair=~\"$asset_pair\"}[24h]))\n  /\n  (\n    sum(increase(stellar_lense_confirmed_clean_wallets_total{asset_pair=~\"$asset_pair\"}[24h]))\n    + 0.0001\n  )\n)",
           "legendFormat": "false_positive_rate",
           "refId": "A"
         }
@@ -163,7 +163,7 @@
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [
         {
-          "expr": "sum(rate(ledgerlens_benford_computation_total{asset_pair=~\"$asset_pair\"}[5m])) by (asset_pair)",
+          "expr": "sum(rate(stellar_lense_benford_computation_total{asset_pair=~\"$asset_pair\"}[5m])) by (asset_pair)",
           "legendFormat": "{{asset_pair}}",
           "refId": "A"
         }
@@ -188,7 +188,7 @@
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [
         {
-          "expr": "(\n  ledgerlens_rl_threshold_current{asset_pair=~\"$asset_pair\"}\n  -\n  avg_over_time(ledgerlens_rl_threshold_current{asset_pair=~\"$asset_pair\"}[30d])\n)",
+          "expr": "(\n  stellar_lense_rl_threshold_current{asset_pair=~\"$asset_pair\"}\n  -\n  avg_over_time(stellar_lense_rl_threshold_current{asset_pair=~\"$asset_pair\"}[30d])\n)",
           "legendFormat": "{{asset_pair}}",
           "refId": "A"
         }
@@ -212,7 +212,7 @@
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [
         {
-          "expr": "sum(increase(ledgerlens_confirmed_wash_trades_total{asset_pair=~\"$asset_pair\"}[24h]))",
+          "expr": "sum(increase(stellar_lense_confirmed_wash_trades_total{asset_pair=~\"$asset_pair\"}[24h]))",
           "legendFormat": "confirmed_wash_trades",
           "refId": "A"
         }
@@ -236,7 +236,7 @@
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [
         {
-          "expr": "sum(increase(ledgerlens_confirmed_clean_wallets_total{asset_pair=~\"$asset_pair\"}[24h]))",
+          "expr": "sum(increase(stellar_lense_confirmed_clean_wallets_total{asset_pair=~\"$asset_pair\"}[24h]))",
           "legendFormat": "confirmed_clean_wallets",
           "refId": "A"
         }
@@ -260,7 +260,7 @@
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [
         {
-          "expr": "sum(increase(ledgerlens_scoring_errors_total{asset_pair=~\"$asset_pair\"}[24h]))",
+          "expr": "sum(increase(stellar_lense_scoring_errors_total{asset_pair=~\"$asset_pair\"}[24h]))",
           "legendFormat": "errors",
           "refId": "A"
         }

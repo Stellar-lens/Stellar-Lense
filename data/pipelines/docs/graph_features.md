@@ -40,7 +40,7 @@ paymaster — a classic sock-puppet / [ring](#g-ring) signal.
 ### <a id="g-community"></a>Community
 
 A group of wallets that are far more densely connected to each other than to the
-rest of the graph. LedgerLens finds communities with the **Louvain** algorithm,
+rest of the graph. Stellar Lense finds communities with the **Louvain** algorithm,
 which greedily maximises modularity; a fixed random seed keeps the partition
 deterministic in CI.
 *See `detect_communities()` in [`detection/community_detector.py`](../detection/community_detector.py).*

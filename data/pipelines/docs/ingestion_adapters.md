@@ -2,7 +2,7 @@
 
 ## Overview
 
-LedgerLens ingests data from Stellar Horizon (`ingestion/horizon_fetcher.py`,
+Stellar Lense ingests data from Stellar Horizon (`ingestion/horizon_fetcher.py`,
 `ingestion/historical_loader.py`, `ingestion/horizon_streamer.py`) into
 Stellar-specific Pydantic models (`ingestion/data_models.py`: `Trade`,
 `OrderBookEvent`, `AccountActivity`). Feature engineering and detection code

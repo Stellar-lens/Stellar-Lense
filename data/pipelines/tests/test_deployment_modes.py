@@ -118,7 +118,7 @@ def test_local_deployment_config_fixture(local_deployment_config):
 def test_testnet_deployment_config_fixture(testnet_deployment_config):
     assert testnet_deployment_config.mode is DeploymentMode.TESTNET
     assert Config.STELLAR_NETWORK == "TESTNET"
-    assert Config.LEDGERLENS_CONTRACT_ID
+    assert Config.STELLARLENSE_CONTRACT_ID
 
 
 def test_production_deployment_config_fixture(production_deployment_config):

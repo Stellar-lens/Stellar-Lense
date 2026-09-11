@@ -64,7 +64,7 @@ def create_test_jwt(
     private_key: str,
     client_id: str = "test-client",
     scope: str = "scores:read:all",
-    issuer: str = "ledgerlens-api",
+    issuer: str = "stellar-lense-api",
     expires_in_seconds: int = 3600,
 ) -> str:
     """Create a test JWT token.

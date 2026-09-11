@@ -1,7 +1,7 @@
 """Data retention controls for sensitive intermediate files — Issue #530.
 
 Provides a policy-driven, auditable framework for purging intermediate files
-produced by the LedgerLens pipeline (raw feature matrices, intermediate Parquet
+produced by the StellarLense pipeline (raw feature matrices, intermediate Parquet
 shards, SHAP explanation caches, drift snapshots, etc.) that contain sensitive
 on-chain data and should not be retained indefinitely.
 
@@ -80,7 +80,7 @@ logger = logging.getLogger(__name__)
 # HMAC secret — read from environment; used to sign audit-log entries.
 # ---------------------------------------------------------------------------
 
-_DEFAULT_HMAC_SECRET = "ledgerlens-retention-dev-secret-not-for-production"
+_DEFAULT_HMAC_SECRET = "stellar-lense-retention-dev-secret-not-for-production"
 _HMAC_SECRET: str = os.environ.get("RETENTION_HMAC_SECRET", _DEFAULT_HMAC_SECRET)
 
 
@@ -463,10 +463,10 @@ class FileRetentionManager:
 
 
 # ---------------------------------------------------------------------------
-# Default policy set — opinionated defaults for the LedgerLens pipeline
+# Default policy set — opinionated defaults for the StellarLense pipeline
 # ---------------------------------------------------------------------------
 
-#: Ready-to-use policies for the standard LedgerLens pipeline layout.
+#: Ready-to-use policies for the standard StellarLense pipeline layout.
 #: Callers may extend or override this list via ``FileRetentionManager``.
 DEFAULT_POLICIES: list[RetentionPolicy] = [
     RetentionPolicy(

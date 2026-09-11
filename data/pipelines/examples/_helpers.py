@@ -190,7 +190,7 @@ def _benford_to_feature_row(benford_result: dict[str, Any]) -> pd.Series:
 
 def print_result(result: dict[str, Any], *, label: str = "") -> None:
     sep = "─" * 60
-    header = f" LedgerLens Detection Result {'─ ' + label if label else ''}".rstrip()
+    header = f" StellarLense Detection Result {'─ ' + label if label else ''}".rstrip()
     print(f"\n{sep}")
     print(header)
     print(sep)

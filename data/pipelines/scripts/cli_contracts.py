@@ -1,4 +1,4 @@
-"""Declarative CLI contracts for Ledgerlens-data's operational scripts.
+"""Declarative CLI contracts for StellarLense-data's operational scripts.
 
 ``scripts/`` has ~49 standalone entry points used for on-call/operational
 workflows (scoring a wallet on demand, replaying a Kafka topic, running a

@@ -3,7 +3,7 @@
 States: CLOSED (normal) → OPEN (failing, rejecting) → HALF_OPEN (testing recovery) → CLOSED.
 
 Thread-safe: all state transitions are protected by a single lock.
-When a circuit opens, a ``ledgerlens_circuit_open`` Prometheus gauge is emitted
+When a circuit opens, a ``stellar_lense_circuit_open`` Prometheus gauge is emitted
 (labelled by component name).  Falls back to an in-process dict if
 ``prometheus_client`` is not installed.
 """
@@ -34,7 +34,7 @@ try:
     from prometheus_client import Gauge as _PromGauge
 
     _CIRCUIT_OPEN_GAUGE = _PromGauge(
-        "ledgerlens_circuit_open",
+        "stellar_lense_circuit_open",
         "1 when the circuit breaker for a component is OPEN, 0 when CLOSED",
         ["component"],
     )
@@ -50,7 +50,7 @@ def _set_gauge(component: str, value: int) -> None:
 
 
 def get_open_gauges() -> dict[str, int]:
-    """Snapshot of current ``ledgerlens_circuit_open`` gauge values (keyed by component)."""
+    """Snapshot of current ``stellar_lense_circuit_open`` gauge values (keyed by component)."""
     with _GAUGES_LOCK:
         return dict(_OPEN_GAUGES)
 

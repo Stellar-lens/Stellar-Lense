@@ -152,7 +152,7 @@ class ConformalCalibrator:
 
         ``coverage_guarantee`` is surfaced as a probability in every
         ``RiskScore`` record and consumed by the API/dashboard and
-        ``ledgerlens-core``'s shared type. A configured ``alpha`` outside
+        ``stellar-lense-core``'s shared type. A configured ``alpha`` outside
         ``[0, 1]`` would yield a nonsensical coverage value, so it is clamped
         here with a logged warning rather than propagated downstream.
         """

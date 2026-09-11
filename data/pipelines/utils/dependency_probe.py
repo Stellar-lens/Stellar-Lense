@@ -443,7 +443,7 @@ def require(group: str) -> ProbeResult:
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Probe optional LedgerLens dependency groups.",
+        description="Probe optional StellarLense dependency groups.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(

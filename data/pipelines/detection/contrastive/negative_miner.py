@@ -38,14 +38,14 @@ import os
 
 import numpy as np
 
-logger = logging.getLogger("ledgerlens.negative_miner")
+logger = logging.getLogger("stellar_lense.negative_miner")
 
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
 
 CONTRASTIVE_CURRICULUM_EPOCHS: int = int(os.getenv("CONTRASTIVE_CURRICULUM_EPOCHS", "5"))
-EVENT_HMAC_SECRET: str = os.getenv("EVENT_HMAC_SECRET", "ledgerlens-event-hmac-default")
+EVENT_HMAC_SECRET: str = os.getenv("EVENT_HMAC_SECRET", "stellar-lense-event-hmac-default")
 
 # FAISS HNSW build parameters
 _HNSW_M: int = 32  # number of bi-directional links per node

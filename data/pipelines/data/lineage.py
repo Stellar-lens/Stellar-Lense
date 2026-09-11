@@ -158,7 +158,7 @@ class LineageNode:
 class LineageTracker:
     """DAG Lineage tracker for datasets, features, and model training inputs."""
 
-    def __init__(self, graph_name: str = "ledgerlens_lineage") -> None:
+    def __init__(self, graph_name: str = "stellar_lense_lineage") -> None:
         self.graph_name = graph_name
         self.nodes: dict[str, LineageNode] = {}
         self.created_at: str = datetime.datetime.now(tz=datetime.UTC).isoformat()
@@ -359,7 +359,7 @@ class LineageTracker:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> LineageTracker:
         """Deserialize LineageTracker from dict."""
-        tracker = cls(graph_name=data.get("graph_name", "ledgerlens_lineage"))
+        tracker = cls(graph_name=data.get("graph_name", "stellar_lense_lineage"))
         tracker.created_at = data.get("created_at", tracker.created_at)
         nodes_dict = data.get("nodes", {})
         for nid, n_data in nodes_dict.items():

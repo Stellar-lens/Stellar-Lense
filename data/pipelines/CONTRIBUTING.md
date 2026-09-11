@@ -1,9 +1,9 @@
-# Contributing to ledgerlens-data
+# Contributing to stellar-lense-data
 
-Thanks for your interest in contributing to LedgerLens! This repo holds the
+Thanks for your interest in contributing to Stellar Lense! This repo holds the
 data ingestion and fraud-detection layer — see the README's
 [Organization Map](README.md#organization-map) for how it fits with the
-other LedgerLens repos.
+other Stellar Lense repos.
 
 ## Security
 
@@ -12,8 +12,8 @@ Before implementing changes that touch API endpoints, model loading, training da
 ## Development setup
 
 ```bash
-git clone https://github.com/<org>/ledgerlens-data.git
-cd ledgerlens-data
+git clone https://github.com/<org>/stellar-lense-data.git
+cd stellar-lense-data
 python -m venv .venv && source .venv/bin/activate
 make install
 cp .env.example .env  # then edit as needed
@@ -39,19 +39,19 @@ pre-commit install
 
 `make test` runs `pytest tests/` and **never** hits the Testnet. All tests
 under `tests/integration/` are automatically skipped unless
-`LEDGERLENS_INTEGRATION_TESTS=1` is set.
+`STELLARLENSE_INTEGRATION_TESTS=1` is set.
 
 To run the live Testnet integration tests locally:
 
 ```bash
 # 1. Deploy the contract (once per testnet reset / keypair rotation)
 python -m scripts.testnet_setup \
-    --wasm-path ledgerlens_score.wasm \
+    --wasm-path stellar_lense_score.wasm \
     --wasm-sha256 <sha256-from-release> \
     --salt ci-testnet
 
 # 2. Run integration tests
-export LEDGERLENS_INTEGRATION_TESTS=1
+export STELLARLENSE_INTEGRATION_TESTS=1
 export $(grep -v '^#' .env.testnet | xargs)
 pytest tests/integration/ -v --timeout=120
 ```
@@ -85,7 +85,7 @@ slow'` to exclude both):
 
 | Marker | Meaning |
 |---|---|
-| `integration` | Live Testnet integration tests — deselect with `-m "not integration"` (also skipped automatically unless `LEDGERLENS_INTEGRATION_TESTS=1` is set, see above) |
+| `integration` | Live Testnet integration tests — deselect with `-m "not integration"` (also skipped automatically unless `STELLARLENSE_INTEGRATION_TESTS=1` is set, see above) |
 | `slow` | Tests that run PPO training — deselect with `-m "not slow"` |
 | `concurrency` | Concurrency validation tests for streaming workers — included by default |
 
@@ -100,8 +100,8 @@ slow'` to exclude both):
   checks on Python 3.11 and 3.12.
 - If you change a shared contract (`RiskScore` shape, asset pair ID format,
   feature schema — see the README's "Shared Contracts" section), call that
-  out in the PR description so consuming repos (`ledgerlens-core`,
-  `ledgerlens-api`, `ledgerlens-contract`, `ledgerlens-dashboard`) can be
+  out in the PR description so consuming repos (`stellar-lense-core`,
+  `stellar-lense-api`, `stellar-lense-contract`, `stellar-lense-dashboard`) can be
   updated.
 
 ### Changelog entries
@@ -187,7 +187,7 @@ that's usually enough to reproduce a Benford/feature calculation locally.
 
 ## Mutation testing
 
-LedgerLens uses [mutmut](https://github.com/boxed/mutmut) to measure test
+Stellar Lense uses [mutmut](https://github.com/boxed/mutmut) to measure test
 *effectiveness*, not just coverage. A mutation score of **≥ 80%** is
 enforced in CI on the core scoring path:
 

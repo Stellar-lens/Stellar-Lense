@@ -1,7 +1,7 @@
 """Partitioning strategies for large historical datasets — Issue #527.
 
 Provides a reusable, strategy-based API for writing and reading partitioned
-Parquet datasets from the LedgerLens data pipeline.  Three built-in strategies
+Parquet datasets from the StellarLense data pipeline.  Three built-in strategies
 are included:
 
 * ``TimePartitionStrategy``   — partition by calendar period (year/month/day/hour)

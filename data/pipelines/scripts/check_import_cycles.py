@@ -1,7 +1,7 @@
 """
 scripts/check_import_cycles.py — Import Cycle Detection (Issue #546)
 =====================================================================
-Detects circular imports across the LedgerLens Python package architecture
+Detects circular imports across the StellarLense Python package architecture
 by statically analysing ``import`` and ``from … import`` statements without
 executing any code.
 
@@ -325,7 +325,7 @@ def _write_json_report(
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Detect circular imports in the LedgerLens Python codebase.",
+        description="Detect circular imports in the StellarLense Python codebase.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )

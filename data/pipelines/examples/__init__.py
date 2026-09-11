@@ -1,7 +1,7 @@
-"""End-to-end detection workflow examples for LedgerLens.
+"""End-to-end detection workflow examples for StellarLense.
 
 This package contains runnable examples that exercise the full detection
-pipeline from raw trade data through to a LedgerLens Risk Score, without
+pipeline from raw trade data through to a StellarLense Risk Score, without
 requiring a live Stellar Horizon connection.  Each example:
 
 - Generates synthetic trade data that mimics a specific on-chain pattern

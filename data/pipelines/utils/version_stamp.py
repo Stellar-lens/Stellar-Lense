@@ -1,4 +1,4 @@
-"""LedgerLens version stamping for generated outputs and artifacts.
+"""StellarLense version stamping for generated outputs and artifacts.
 
 Every trained model artifact, forensic report, scored output, and data
 export should carry a consistent set of provenance fields so that:
@@ -13,7 +13,7 @@ Single source of truth
 ────────────────────────
 The canonical version string is read (in priority order) from:
 
-1. The ``LEDGERLENS_VERSION`` environment variable — set by CI/CD.
+1. The ``STELLARLENSE_VERSION`` environment variable — set by CI/CD.
 2. The ``version`` field in ``pyproject.toml`` — always present in the repo.
 3. The installed package metadata (``importlib.metadata``) — available when
    the package is installed via ``pip install -e .`` or a release wheel.
@@ -74,16 +74,16 @@ STAMP_KEY = "_version_stamp"
 
 @lru_cache(maxsize=1)
 def get_version() -> str:
-    """Return the canonical LedgerLens version string.
+    """Return the canonical StellarLense version string.
 
     Resolved in priority order:
-    1. ``LEDGERLENS_VERSION`` environment variable.
+    1. ``STELLARLENSE_VERSION`` environment variable.
     2. ``pyproject.toml`` ``[project] version`` field.
-    3. ``importlib.metadata.version("ledgerlens-data")``.
+    3. ``importlib.metadata.version("stellar-lense-data")``.
     4. ``"0.0.0+unknown"`` fallback.
     """
     # 1. Env var override (CI, Docker builds)
-    env_ver = os.getenv("LEDGERLENS_VERSION")
+    env_ver = os.getenv("STELLARLENSE_VERSION")
     if env_ver:
         return env_ver.strip()
 
@@ -102,7 +102,7 @@ def get_version() -> str:
     try:
         from importlib.metadata import version as pkg_version
 
-        return pkg_version("ledgerlens-data")
+        return pkg_version("stellar-lense-data")
     except Exception:
         pass
 
@@ -161,7 +161,7 @@ def build_stamp(
     ============== =========================================================
     Field          Description
     ============== =========================================================
-    version        LedgerLens version string (from :func:`get_version`)
+    version        StellarLense version string (from :func:`get_version`)
     python_version Python ``sys.version`` string
     platform       ``platform.platform()`` (OS + arch)
     generated_at   ISO-8601 UTC timestamp of artifact generation

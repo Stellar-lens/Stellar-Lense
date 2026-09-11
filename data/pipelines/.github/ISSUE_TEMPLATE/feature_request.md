@@ -17,8 +17,8 @@ What you'd like to see implemented.
 ## Shared contract impact
 
 Does this change `RiskScore`, the asset pair identifier format, or the
-feature schema consumed by other LedgerLens repos? If so, note what needs
-to change in `ledgerlens-core` and which repos to notify.
+feature schema consumed by other Stellar Lense repos? If so, note what needs
+to change in `stellar-lense-core` and which repos to notify.
 
 ## Alternatives considered
 

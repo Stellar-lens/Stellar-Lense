@@ -37,15 +37,15 @@ What does this PR change and why?
 <!-- If model_training.py, model_inference.py, or models/* changed: -->
 - [ ] No model changes
 - [ ] Model retrained — include before/after AUC-ROC / F1 in the summary above
-- [ ] Inference API changed — update ledgerlens-core if RiskScore shape changed
+- [ ] Inference API changed — update stellar-lense-core if RiskScore shape changed
 - [ ] Feature schema hash will change — all consumers need to reload models
 
 ### Downstream impact
 <!-- Check any systems affected by this change -->
-- [ ] `ledgerlens-api` — REST API response shape may change
-- [ ] `ledgerlens-dashboard` — visualization or SHAP field names may change
-- [ ] `ledgerlens-contract` — on-chain RiskScore struct may change
-- [ ] `ledgerlens-core` — shared types or thresholds may change
+- [ ] `stellar-lense-api` — REST API response shape may change
+- [ ] `stellar-lense-dashboard` — visualization or SHAP field names may change
+- [ ] `stellar-lense-contract` — on-chain RiskScore struct may change
+- [ ] `stellar-lense-core` — shared types or thresholds may change
 - [ ] None
 
 ## Checklist
@@ -55,7 +55,7 @@ What does this PR change and why?
 - [ ] New/changed behavior has test coverage
 - [ ] Added a `CHANGELOG.md` entry under `[Unreleased]`, or this PR is exempt because it only touches docs/CI/tests (see [Changelog entries](CONTRIBUTING.md#changelog-entries))
 - [ ] If a shared contract changed (`RiskScore`, asset pair format, feature
-      schema), linked issues/PRs in `ledgerlens-core` and downstream repos
+      schema), linked issues/PRs in `stellar-lense-core` and downstream repos
 
 <!--
 If this PR touches a high-risk path (wire schema, shared contracts, feature

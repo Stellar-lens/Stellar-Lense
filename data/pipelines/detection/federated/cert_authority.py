@@ -1,7 +1,7 @@
 """Certificate Authority for federated learning participants.
 
 Issues, revokes, and rotates X.509 client certificates signed by the
-LedgerLens CA.  The CA private key must be stored in an HSM or encrypted
+StellarLense CA.  The CA private key must be stored in an HSM or encrypted
 secrets manager (see docs/security.md); this module expects the key material
 to be passed in at runtime, never stored on disk by this code.
 
@@ -10,7 +10,7 @@ is its opaque participant identifier (e.g. ``participant-A``).  The SAN
 extension encodes the allowed model IDs as a comma-separated string in the
 ``organizationalUnitName`` (OU) field for easy extraction during auth.
 
-Revocation is stored in a SQLite table (same DB as the rest of LedgerLens) and
+Revocation is stored in a SQLite table (same DB as the rest of StellarLense) and
 is reloaded by the coordinator every ≤60 seconds.
 """
 
@@ -31,7 +31,7 @@ from utils.logging import get_logger
 
 logger = get_logger(__name__)
 
-_DB_URL = os.getenv("RISK_SCORE_DB_URL", "sqlite:///ledgerlens.db")
+_DB_URL = os.getenv("RISK_SCORE_DB_URL", "sqlite:///stellar_lense.db")
 
 # ---------------------------------------------------------------------------
 # ORM
@@ -74,8 +74,8 @@ def generate_ca_keypair() -> tuple[ec.EllipticCurvePrivateKey, x509.Certificate]
     ca_key = ec.generate_private_key(ec.SECP256R1())
     subject = issuer = x509.Name(
         [
-            x509.NameAttribute(NameOID.ORGANIZATION_NAME, "LedgerLens"),
-            x509.NameAttribute(NameOID.COMMON_NAME, "LedgerLens Federated CA"),
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, "StellarLense"),
+            x509.NameAttribute(NameOID.COMMON_NAME, "StellarLense Federated CA"),
         ]
     )
     now = datetime.datetime.now(datetime.UTC)
@@ -132,7 +132,7 @@ def issue_certificate(
     models_str = ",".join(allowed_models)
     subject = x509.Name(
         [
-            x509.NameAttribute(NameOID.ORGANIZATION_NAME, "LedgerLens Participant"),
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, "StellarLense Participant"),
             x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, models_str),
             x509.NameAttribute(NameOID.COMMON_NAME, cn),
         ]

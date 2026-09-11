@@ -1,4 +1,4 @@
-# Module dependency / layering rules for Ledgerlens-data.
+# Module dependency / layering rules for StellarLense-data.
 #
 # Enforced by scripts/check_module_dependencies.py (see `make check-deps` and
 # the "Check module dependency rules" step in .github/workflows/ci.yml).

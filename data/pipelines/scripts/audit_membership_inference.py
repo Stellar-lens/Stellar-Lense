@@ -199,7 +199,7 @@ def run_audit(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Membership inference auditor for LedgerLens models"
+        description="Membership inference auditor for StellarLense models"
     )
     parser.add_argument(
         "--model-path",

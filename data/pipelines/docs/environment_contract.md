@@ -24,15 +24,15 @@ Auto-generated from `config.py` by `scripts/generate_env_contract_docs.py` (Issu
 | `ALERT_DEDUP_WINDOW_SECONDS` | `ALERT_DEDUP_WINDOW_SECONDS` | `int` | No | `'60'` | Silence window for correlated alert deduplication (alerts/deduplicator.py). |
 | `RISK_SCORE_FLAG_THRESHOLD` | `RISK_SCORE_FLAG_THRESHOLD` | `int` | No | `'70'` | — |
 | `THRESHOLD_RL_PINNED` | `THRESHOLD_RL_PINNED` | `int` | No | `'0'` | Set to a non-zero integer to pin the alert threshold and disable the RL agent. E.g. THRESHOLD_RL_PINNED=75 → agent is bypassed, threshold is fixed at 75. |
-| `RISK_SCORE_DB_URL` | `RISK_SCORE_DB_URL` | `str` | No | `'sqlite:///ledgerlens.db'` | — |
+| `RISK_SCORE_DB_URL` | `RISK_SCORE_DB_URL` | `str` | No | `'sqlite:///stellar_lense.db'` | — |
 | `DB_POOL_SIZE` | `DB_POOL_SIZE` | `int` | No | `'5'` | Database connection pooling |
 | `DB_MAX_OVERFLOW` | `DB_MAX_OVERFLOW` | `int` | No | `'10'` | — |
 | `DB_POOL_TIMEOUT` | `DB_POOL_TIMEOUT` | `int` | No | `'30'` | — |
 | `MODEL_DIR` | `MODEL_DIR` | `str` | No | `'./models'` | — |
 | `BATCH_SCORER_WORKERS` | `BATCH_SCORER_WORKERS` | `int` | No | `10` | — |
-| `SOROBAN_RPC_URL` | `SOROBAN_RPC_URL` | `str` | No | `'https://soroban-testnet.stellar.org'` | ledgerlens-score Soroban contract |
-| `LEDGERLENS_CONTRACT_ID` | `LEDGERLENS_CONTRACT_ID` | `str` | No | `''` | — |
-| `LEDGERLENS_SUBMITTER_SECRET` | `LEDGERLENS_SUBMITTER_SECRET` | `str` | No | `''` | — |
+| `SOROBAN_RPC_URL` | `SOROBAN_RPC_URL` | `str` | No | `'https://soroban-testnet.stellar.org'` | stellar-lense-score Soroban contract |
+| `STELLARLENSE_CONTRACT_ID` | `STELLARLENSE_CONTRACT_ID` | `str` | No | `''` | — |
+| `STELLARLENSE_SUBMITTER_SECRET` | `STELLARLENSE_SUBMITTER_SECRET` | `str` | No | `''` | — |
 | `SOLANA_RPC_URL` | `SOLANA_RPC_URL` | `str` | No | `'https://api.mainnet-beta.solana.com'` | Solana RPC endpoint for cross-chain resolution |
 | `MIN_TRADES_FOR_SCORING` | `MIN_TRADES_FOR_SCORING` | `int` | No | `'20'` | — |
 | `LIST_RELOAD_INTERVAL_SECONDS` | `LIST_RELOAD_INTERVAL_SECONDS` | `int` | No | `'60'` | — |
@@ -55,17 +55,17 @@ Auto-generated from `config.py` by `scripts/generate_env_contract_docs.py` (Issu
 | `KAFKA_BOOTSTRAP_SERVERS` | `KAFKA_BOOTSTRAP_SERVERS` | `str` | No | `'localhost:9092'` | Kafka — credentials are read from env vars only, never committed. |
 | `KAFKA_SASL_USERNAME` | `KAFKA_SASL_USERNAME` | `str | None` | Yes | — | — |
 | `KAFKA_SASL_PASSWORD` | `KAFKA_SASL_PASSWORD` | `str | None` | Yes | — | — |
-| `KAFKA_CONSUMER_GROUP` | `KAFKA_CONSUMER_GROUP` | `str` | No | `'ledgerlens-scorer'` | — |
-| `KAFKA_TOPIC_PREFIX` | `KAFKA_TOPIC_PREFIX` | `str` | No | `'ledgerlens.trades'` | — |
-| `KAFKA_DLQ_TOPIC` | `KAFKA_DLQ_TOPIC` | `str` | No | `'ledgerlens.trades.dlq'` | — |
-| `KAFKA_TOPIC_PATTERN` | `KAFKA_TOPIC_PATTERN` | `str` | No | `'^ledgerlens\\.trades\\..*'` | Regex subscription (librdkafka treats a leading '^' as a pattern). Picks up new per-pair topics without a consumer restart; the DLQ topic is skipped in the worker so failed messages are never auto-replayed. |
+| `KAFKA_CONSUMER_GROUP` | `KAFKA_CONSUMER_GROUP` | `str` | No | `'stellar-lense-scorer'` | — |
+| `KAFKA_TOPIC_PREFIX` | `KAFKA_TOPIC_PREFIX` | `str` | No | `'stellar_lense.trades'` | — |
+| `KAFKA_DLQ_TOPIC` | `KAFKA_DLQ_TOPIC` | `str` | No | `'stellar_lense.trades.dlq'` | — |
+| `KAFKA_TOPIC_PATTERN` | `KAFKA_TOPIC_PATTERN` | `str` | No | `'^stellar_lense\\.trades\\..*'` | Regex subscription (librdkafka treats a leading '^' as a pattern). Picks up new per-pair topics without a consumer restart; the DLQ topic is skipped in the worker so failed messages are never auto-replayed. |
 | `KAFKA_LAG_ALERT_THRESHOLD` | `KAFKA_LAG_ALERT_THRESHOLD` | `int` | No | `'500'` | — |
 | `KAFKA_METRICS_PORT` | `KAFKA_METRICS_PORT` | `int` | No | `'9100'` | — |
 | `TRADE_AVRO_SCHEMA_PATH` | `TRADE_AVRO_SCHEMA_PATH` | `str` | No | `'data/trade_avro_schema.json'` | — |
 | `WORKER_HEALTH_STALE_THRESHOLD_SECONDS` | `WORKER_HEALTH_STALE_THRESHOLD_SECONDS` | `float` | No | `'120'` | Worker health monitoring (streaming/health.py::WorkerHealthMonitor). A worker is marked UNHEALTHY when it has not heartbeat within this many seconds — should comfortably exceed the poll-loop interval plus the slowest expected per-message processing time. |
 | `E2E_LATENCY_BUDGET_MS` | `E2E_LATENCY_BUDGET_MS` | `int` | No | `'2000'` | End-to-end latency budget (Issue #124) |
 | `LATENCY_ANOMALY_RATE_THRESHOLD` | `LATENCY_ANOMALY_RATE_THRESHOLD` | `float` | No | `'0.90'` | — |
-| `METADATA_TOPIC` | `METADATA_TOPIC` | `str` | No | `'ledgerlens.account_metadata'` | Account metadata streaming join (streaming/account_metadata_stream.py, streaming/pipeline.py MetadataJoinState) METADATA_TOPIC: dedicated Kafka topic for account metadata update events. |
+| `METADATA_TOPIC` | `METADATA_TOPIC` | `str` | No | `'stellar_lense.account_metadata'` | Account metadata streaming join (streaming/account_metadata_stream.py, streaming/pipeline.py MetadataJoinState) METADATA_TOPIC: dedicated Kafka topic for account metadata update events. |
 | `METADATA_JOIN_WINDOW_SECONDS` | `METADATA_JOIN_WINDOW_SECONDS` | `int` | No | `'3600'` | METADATA_JOIN_WINDOW_SECONDS: how long (seconds) a metadata update enriches incoming trade events.  After this window the update is considered stale and must be refreshed by a subsequent Horizon effect.  Default: 3600 (1 hour). |
 | `METADATA_ACTIVE_WALLET_TTL_SECONDS` | `METADATA_ACTIVE_WALLET_TTL_SECONDS` | `int` | No | `'86400'` | METADATA_ACTIVE_WALLET_TTL_SECONDS: wallets that have had no trade activity for this many seconds are pruned from join state to keep memory bounded. Default: 86400 (24 hours) — matches the requirement spec. |
 | `ALERT_CHANNEL` | `ALERT_CHANNEL` | `str` | No | `'stdout'` | — |
@@ -205,7 +205,7 @@ Auto-generated from `config.py` by `scripts/generate_env_contract_docs.py` (Issu
 | `KAFKA_MAX_RETRIES` | `KAFKA_MAX_RETRIES` | `int` | No | `'5'` | — |
 | `KAFKA_DEAD_LETTER_TOPIC` | `KAFKA_DEAD_LETTER_TOPIC` | `str` | No | `KAFKA_DLQ_TOPIC` | — |
 | `KAFKA_DEDUP_TTL_SECONDS` | `KAFKA_DEDUP_TTL_SECONDS` | `int` | No | `'3600'` | — |
-| `KAFKA_TRANSACTIONAL_ID_PREFIX` | `KAFKA_TRANSACTIONAL_ID_PREFIX` | `str` | No | `'ledgerlens-producer'` | Producer transactional-ID prefix — deliberately not the hostname (ingestion/kafka_producer.py). |
+| `KAFKA_TRANSACTIONAL_ID_PREFIX` | `KAFKA_TRANSACTIONAL_ID_PREFIX` | `str` | No | `'stellar-lense-producer'` | Producer transactional-ID prefix — deliberately not the hostname (ingestion/kafka_producer.py). |
 | `KAFKA_TRANSACTION_TIMEOUT_MS` | `KAFKA_TRANSACTION_TIMEOUT_MS` | `int` | No | `'60000'` | — |
 | `MODEL_WATERMARK_KEY` | `MODEL_WATERMARK_KEY` | `str` | No | `''` | Model watermarking for IP theft detection (detection/model_training.py) |
 | `MODEL_WATERMARK_TRIGGER_COUNT` | `MODEL_WATERMARK_TRIGGER_COUNT` | `int` | No | `'10'` | — |
@@ -214,7 +214,7 @@ Auto-generated from `config.py` by `scripts/generate_env_contract_docs.py` (Issu
 | `FATF_EXPORT_THRESHOLD` | `FATF_EXPORT_THRESHOLD` | `float` | No | `'0.85'` | FATF regulatory export filter (reporting/fatf_exporter.py) — confirmed by tests/test_fatf_exporter.py, do not change without updating that test. |
 | `RISK_PROP_CONVERGENCE_THRESHOLD` | `RISK_PROP_CONVERGENCE_THRESHOLD` | `float` | No | `'0.01'` | Weighted personalised PageRank convergence (detection/risk_propagation.py) |
 | `TRADE_DEDUP_TTL_SECONDS` | `TRADE_DEDUP_TTL_SECONDS` | `int` | No | `str(24 * 3600)` | Trade ingestion dedup cache (ingestion/trade_deduplicator.py) |
-| `TRADE_DEDUP_CACHE_KEY_PREFIX` | `TRADE_DEDUP_CACHE_KEY_PREFIX` | `str` | No | `'ledgerlens:trades:'` | — |
+| `TRADE_DEDUP_CACHE_KEY_PREFIX` | `TRADE_DEDUP_CACHE_KEY_PREFIX` | `str` | No | `'stellar_lense:trades:'` | — |
 | `PARALLEL_EXECUTOR_BACKEND` | `PARALLEL_EXECUTOR_BACKEND` | `str` | No | `'process'` | Parallel processing controls — Issue #528 (ingestion/parallel_executor.py) Executor backend: "process" uses ProcessPoolExecutor (bypasses the GIL, best for CPU-heavy Benford / feature engineering work); "thread" uses ThreadPoolExecutor (lower overhead for I/O-bound tasks). |
 | `PARALLEL_EXECUTOR_MAX_WORKERS` | `PARALLEL_EXECUTOR_MAX_WORKERS` | `int` | No | `str(max(1, (os.cpu_count() or 2) - 1))` | Maximum number of worker processes/threads.  Defaults to CPU count − 1 (≥ 1). |
 | `PARALLEL_EXECUTOR_MAX_PENDING` | `PARALLEL_EXECUTOR_MAX_PENDING` | `int` | No | `'64'` | Maximum number of futures that may be in-flight simultaneously (back-pressure). 0 disables the limit. |
@@ -223,7 +223,7 @@ Auto-generated from `config.py` by `scripts/generate_env_contract_docs.py` (Issu
 | `DATASET_STORE_BACKEND` | `DATASET_STORE_BACKEND` | `str` | No | `'local'` | Dataset storage abstraction — Issue #529 (ingestion/dataset_store.py) Storage backend: "local" (default) writes Parquet/CSV/JSON to the local filesystem; "object" routes through fsspec (S3, GCS, Azure Blob, …). |
 | `DATASET_STORE_BASE_PATH` | `DATASET_STORE_BASE_PATH` | `str` | No | `'./data'` | Root directory (local backend) or bucket prefix (object backend). |
 | `DATASET_STORE_FORMAT` | `DATASET_STORE_FORMAT` | `str` | No | `'parquet'` | Default serialisation format for generated datasets. |
-| `DATASET_STORE_OBJECT_STORE_URL` | `DATASET_STORE_OBJECT_STORE_URL` | `str` | No | `''` | Object store URI for the "object" backend, e.g. s3://my-bucket/ledgerlens. Leave empty to fall back to LocalDatasetStore even when backend="object". |
+| `DATASET_STORE_OBJECT_STORE_URL` | `DATASET_STORE_OBJECT_STORE_URL` | `str` | No | `''` | Object store URI for the "object" backend, e.g. s3://my-bucket/stellar_lense. Leave empty to fall back to LocalDatasetStore even when backend="object". |
 | `MODEL_INPUT_VALIDATOR_STRICTNESS` | `MODEL_INPUT_VALIDATOR_STRICTNESS` | `str` | No | `'warn'` | Model input validators — Issue #531 (detection/model_input_validator.py) Strictness level for schema and range validation at inference time. "raise"   — raise ValueError on the first issue found. "warn"    — log warnings and return cleaned data (default). "coerce"  — silently drop / fix violating rows, no logging. "ignore"  — pass data through unchanged (validation disabled). |
 | `MODEL_INPUT_VALIDATOR_RANGES_PATH` | `MODEL_INPUT_VALIDATOR_RANGES_PATH` | `str` | No | `'data/feature_ranges.json'` | Path to feature_ranges.json, which supplies per-feature [min, max] bounds. |
 | `MODEL_INPUT_VALIDATOR_NAN_STRATEGY` | `MODEL_INPUT_VALIDATOR_NAN_STRATEGY` | `str` | No | `'drop'` | Strategy for handling NaN / ±Inf values before model scoring. "drop"           — drop rows containing NaN / Inf (default). "impute_zero"    — replace NaN / Inf with 0. "impute_median"  — replace NaN / Inf with the column median. "raise"          — raise ValueError if any NaN / Inf is present. |

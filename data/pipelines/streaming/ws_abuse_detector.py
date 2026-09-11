@@ -1,4 +1,4 @@
-"""WebSocket abuse detection for LedgerLens (issue #223).
+"""WebSocket abuse detection for StellarLense (issue #223).
 
 Detects two abuse patterns:
 1. Request-rate abuse — a client exceeds WS_ABUSE_MAX_REQUESTS_PER_MINUTE

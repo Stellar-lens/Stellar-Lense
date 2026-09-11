@@ -18,8 +18,8 @@ from utils.logging import get_logger
 
 logger = get_logger(__name__)
 
-ledgerlens_alerts_deduplicated_total = Counter(
-    "ledgerlens_alerts_deduplicated_total",
+stellar_lense_alerts_deduplicated_total = Counter(
+    "stellar_lense_alerts_deduplicated_total",
     "Total number of raw alerts folded into an existing group instead of "
     "being emitted as a standalone alert",
 )
@@ -137,5 +137,5 @@ def deduplicate(
 
 def _flush(group: _Group) -> dict[str, Any]:
     if group.raw_count > 1:
-        ledgerlens_alerts_deduplicated_total.inc(group.raw_count - 1)
+        stellar_lense_alerts_deduplicated_total.inc(group.raw_count - 1)
     return group.flush()

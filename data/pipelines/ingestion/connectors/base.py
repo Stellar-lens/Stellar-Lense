@@ -1,4 +1,4 @@
-"""Typed plugin contract for LedgerLens data connectors.
+"""Typed plugin contract for StellarLense data connectors.
 
 A "connector" is the boundary between an external data source (Horizon
 REST/SSE today; a different exchange API or chain indexer tomorrow) and the

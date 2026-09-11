@@ -29,18 +29,18 @@ logger = get_logger(__name__)
 try:
     from prometheus_client import Counter
 
-    ledgerlens_duplicate_events_total = Counter(
-        "ledgerlens_duplicate_events_total",
+    stellar_lense_duplicate_events_total = Counter(
+        "stellar_lense_duplicate_events_total",
         "Total number of duplicate trade events discarded",
         ["asset_pair"],
     )
-    ledgerlens_dedup_cache_hits_total = Counter(
-        "ledgerlens_dedup_cache_hits_total",
+    stellar_lense_dedup_cache_hits_total = Counter(
+        "stellar_lense_dedup_cache_hits_total",
         "Total cache hits in trade deduplication",
     )
 except ImportError:
-    ledgerlens_duplicate_events_total = None
-    ledgerlens_dedup_cache_hits_total = None
+    stellar_lense_duplicate_events_total = None
+    stellar_lense_dedup_cache_hits_total = None
 
 
 class SeenEventCache:
@@ -94,10 +94,10 @@ class SeenEventCache:
 
         if decision.state is DedupState.COMMITTED:
             logger.debug("Trade duplicate detected: %s (%s…)", trade_id, key.external_id[:8])
-            if ledgerlens_duplicate_events_total:
-                ledgerlens_duplicate_events_total.labels(asset_pair=asset_pair).inc()
-            if ledgerlens_dedup_cache_hits_total:
-                ledgerlens_dedup_cache_hits_total.inc()
+            if stellar_lense_duplicate_events_total:
+                stellar_lense_duplicate_events_total.labels(asset_pair=asset_pair).inc()
+            if stellar_lense_dedup_cache_hits_total:
+                stellar_lense_dedup_cache_hits_total.inc()
             return True
 
         # NEW, STAGED (redo), or TTL_EXPIRED_REVERIFY: not yet committed. This

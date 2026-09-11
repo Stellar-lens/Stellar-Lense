@@ -2,7 +2,7 @@
 
 This document describes the compatibility rules, versioning procedure, and
 migration path for `data/trade_avro_schema.json` — the Avro schema used by the
-LedgerLens Kafka ingestion layer.
+Stellar Lense Kafka ingestion layer.
 
 ---
 
@@ -13,7 +13,7 @@ The trade event schema is shared by:
 - `ingestion/kafka_producer.py` (writer) — serialises `Trade` objects to Avro.
 - `streaming/kafka_worker.py` (reader) — deserialises Avro messages back to `Trade`.
 
-When the Stellar Horizon API evolves (new fields in responses) or when LedgerLens
+When the Stellar Horizon API evolves (new fields in responses) or when Stellar Lense
 adds new feature fields, the schema must evolve while remaining compatible with
 messages already in the Kafka topic that were written under earlier schema versions.
 

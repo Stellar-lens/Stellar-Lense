@@ -1,4 +1,4 @@
-# Load Testing the LedgerLens Streaming Pipeline
+# Load Testing the Stellar Lense Streaming Pipeline
 
 This document explains how to run the load test harness, interpret its output,
 and understand the pass/fail thresholds.
@@ -108,7 +108,7 @@ in the environment or as a Make variable to enable it.
 | `--ramp-time` | `30` | Linear ramp from 1 tps → target over this many seconds |
 | `--no-kafka` | off | Drive in-process `FeatureBuffer` only; no broker required |
 | `--bootstrap-servers` | `localhost:9092` | Kafka bootstrap servers |
-| `--topic-prefix` | `ledgerlens.trades` | Kafka topic prefix |
+| `--topic-prefix` | `stellar_lense.trades` | Kafka topic prefix |
 | `--seed` | `42` | RNG seed for reproducible synthetic data |
 | `--output` | `reports/load_test_results.json` | Path for the JSON report |
 | `--fail-on-threshold` | off | Exit 1 if pass/fail criteria are not met |

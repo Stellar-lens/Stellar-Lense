@@ -246,7 +246,7 @@ class FeatureCompatibilityChecker:
         # Flag version metadata for informational context
         trained_at = self._target_meta.get("trained_at", "unknown")
         python_ver = self._target_meta.get("python_version", "unknown")
-        ll_ver = self._target_meta.get("ledgerlens_version", "unknown")
+        ll_ver = self._target_meta.get("stellar_lense_version", "unknown")
         report.issues.append(
             CompatibilityIssue(
                 severity="info",
@@ -254,7 +254,7 @@ class FeatureCompatibilityChecker:
                 feature="",
                 message=(
                     f"Target model '{self._target_label}' trained at {trained_at}, "
-                    f"Python {python_ver}, LedgerLens {ll_ver}."
+                    f"Python {python_ver}, StellarLense {ll_ver}."
                 ),
             )
         )

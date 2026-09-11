@@ -25,25 +25,25 @@ jobs:
           pip install -r requirements.txt
           pip install ruff black pytest-timeout
 
-      - name: Download ledgerlens-score WASM
+      - name: Download stellar-lense-score WASM
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release download v0.1.0 \
-            --repo Ledger-Lenz/ledgerlens-contract \
-            --pattern 'ledgerlens_score.wasm' \
+            --repo Ledger-Lenz/stellar-lense-contract \
+            --pattern 'stellar_lense_score.wasm' \
             --dir .
 
       - name: Set up Testnet account and deploy contract
         env:
           # Re-use a funded keypair from secrets if available; otherwise
           # testnet_setup.py generates a fresh one and funds it via Friendbot.
-          LEDGERLENS_SUBMITTER_SECRET: ${{ secrets.LEDGERLENS_TESTNET_SUBMITTER_SECRET }}
-          LEDGERLENS_CONTRACT_ID: ${{ secrets.LEDGERLENS_TESTNET_CONTRACT_ID }}
-          WASM_SHA256: ${{ vars.LEDGERLENS_WASM_SHA256 }}
+          STELLARLENSE_SUBMITTER_SECRET: ${{ secrets.STELLARLENSE_TESTNET_SUBMITTER_SECRET }}
+          STELLARLENSE_CONTRACT_ID: ${{ secrets.STELLARLENSE_TESTNET_CONTRACT_ID }}
+          WASM_SHA256: ${{ vars.STELLARLENSE_WASM_SHA256 }}
         run: |
           python -m scripts.testnet_setup \
-            --wasm-path ledgerlens_score.wasm \
+            --wasm-path stellar_lense_score.wasm \
             --wasm-sha256 "${WASM_SHA256:-}" \
             --salt ci-testnet \
             --env-file .env.testnet \
@@ -51,7 +51,7 @@ jobs:
 
       - name: Run integration tests
         env:
-          LEDGERLENS_INTEGRATION_TESTS: "1"
+          STELLARLENSE_INTEGRATION_TESTS: "1"
         run: |
           # Source the env file written by testnet_setup.py
           set -a && source .env.testnet && set +a

@@ -1,4 +1,4 @@
-"""Train the LedgerLens transformer sequence model (#182).
+"""Train the StellarLense transformer sequence model (#182).
 
 Loads the synthetic (or real) labelled dataset, reconstructs per-wallet trade
 sequences, and trains :class:`~detection.trade_sequence_transformer.TradeSequenceTransformer`

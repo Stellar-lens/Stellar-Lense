@@ -2,8 +2,8 @@
   "annotations": {"list": []},
   "editable": true,
   "schemaVersion": 39,
-  "title": "LedgerLens — Per-Asset-Pair Health",
-  "tags": ["ledgerlens", "per-pair", "health"],
+  "title": "Stellar Lense — Per-Asset-Pair Health",
+  "tags": ["stellar_lense", "per-pair", "health"],
   "timezone": "browser",
   "time": {"from": "now-6h", "to": "now"},
   "refresh": "30s",
@@ -14,7 +14,7 @@
         "type": "query",
         "label": "Asset Pair",
         "datasource": {"type": "prometheus", "uid": "prometheus"},
-        "query": "label_values(ledgerlens_risk_score_distribution_bucket, asset_pair)",
+        "query": "label_values(stellar_lense_risk_score_distribution_bucket, asset_pair)",
         "refresh": 2,
         "sort": 1,
         "includeAll": true,
@@ -33,7 +33,7 @@
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum(rate(ledgerlens_score_duration_seconds_bucket{asset_pair=~\"$asset_pair\"}[5m])) by (le, asset_pair))",
+          "expr": "histogram_quantile(0.95, sum(rate(stellar_lense_score_duration_seconds_bucket{asset_pair=~\"$asset_pair\"}[5m])) by (le, asset_pair))",
           "legendFormat": "{{asset_pair}}",
           "refId": "A"
         }
@@ -53,7 +53,7 @@
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [
         {
-          "expr": "ledgerlens_benford_mad_gauge{asset_pair=~\"$asset_pair\"}",
+          "expr": "stellar_lense_benford_mad_gauge{asset_pair=~\"$asset_pair\"}",
           "legendFormat": "{{asset_pair}}",
           "refId": "A"
         }
@@ -83,12 +83,12 @@
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [
         {
-          "expr": "sum(rate(ledgerlens_benford_computation_total{asset_pair=~\"$asset_pair\", status=\"alert_confirmed\"}[10m])) by (asset_pair)",
+          "expr": "sum(rate(stellar_lense_benford_computation_total{asset_pair=~\"$asset_pair\", status=\"alert_confirmed\"}[10m])) by (asset_pair)",
           "legendFormat": "confirmed {{asset_pair}}",
           "refId": "A"
         },
         {
-          "expr": "sum(rate(ledgerlens_benford_computation_total{asset_pair=~\"$asset_pair\", status=\"false_positive\"}[10m])) by (asset_pair)",
+          "expr": "sum(rate(stellar_lense_benford_computation_total{asset_pair=~\"$asset_pair\", status=\"false_positive\"}[10m])) by (asset_pair)",
           "legendFormat": "false_positive {{asset_pair}}",
           "refId": "B"
         }
@@ -112,7 +112,7 @@
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [
         {
-          "expr": "clamp_max(clamp_min(\n  (\n    (1 - clamp_max(histogram_quantile(0.95, sum(rate(ledgerlens_score_duration_seconds_bucket{asset_pair=~\"$asset_pair\"}[5m])) by (le, asset_pair)) / 0.5, 1)) * 0.4\n    +\n    (1 - clamp_max(ledgerlens_benford_mad_gauge{asset_pair=~\"$asset_pair\"} / 0.03, 1)) * 0.4\n    +\n    (1 - clamp_max(\n      sum(rate(ledgerlens_benford_computation_total{asset_pair=~\"$asset_pair\", status=\"false_positive\"}[10m])) by (asset_pair)\n      /\n      (sum(rate(ledgerlens_benford_computation_total{asset_pair=~\"$asset_pair\", status=\"alert_confirmed\"}[10m])) by (asset_pair) + 0.001)\n    , 1)) * 0.2\n  ),\n  0), 1)",
+          "expr": "clamp_max(clamp_min(\n  (\n    (1 - clamp_max(histogram_quantile(0.95, sum(rate(stellar_lense_score_duration_seconds_bucket{asset_pair=~\"$asset_pair\"}[5m])) by (le, asset_pair)) / 0.5, 1)) * 0.4\n    +\n    (1 - clamp_max(stellar_lense_benford_mad_gauge{asset_pair=~\"$asset_pair\"} / 0.03, 1)) * 0.4\n    +\n    (1 - clamp_max(\n      sum(rate(stellar_lense_benford_computation_total{asset_pair=~\"$asset_pair\", status=\"false_positive\"}[10m])) by (asset_pair)\n      /\n      (sum(rate(stellar_lense_benford_computation_total{asset_pair=~\"$asset_pair\", status=\"alert_confirmed\"}[10m])) by (asset_pair) + 0.001)\n    , 1)) * 0.2\n  ),\n  0), 1)",
           "legendFormat": "health {{asset_pair}}",
           "refId": "A"
         }
@@ -142,7 +142,7 @@
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [
         {
-          "expr": "sum(increase(ledgerlens_risk_score_distribution_bucket{asset_pair=~\"$asset_pair\"}[1h])) by (le, asset_pair)",
+          "expr": "sum(increase(stellar_lense_risk_score_distribution_bucket{asset_pair=~\"$asset_pair\"}[1h])) by (le, asset_pair)",
           "legendFormat": "{{asset_pair}} le={{le}}",
           "refId": "A"
         }

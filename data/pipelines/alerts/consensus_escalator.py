@@ -9,11 +9,11 @@ from prometheus_client import Counter
 MIN_DETECTOR_CONSENSUS = 2
 CONSENSUS_WINDOW_SECONDS = 120
 
-ledgerlens_consensus_alerts_total = Counter(
-    "ledgerlens_consensus_alerts_total", "Total consensus alerts fired"
+stellar_lense_consensus_alerts_total = Counter(
+    "stellar_lense_consensus_alerts_total", "Total consensus alerts fired"
 )
-ledgerlens_single_detector_alerts_total = Counter(
-    "ledgerlens_single_detector_alerts_total", "Total single-detector alerts fired"
+stellar_lense_single_detector_alerts_total = Counter(
+    "stellar_lense_single_detector_alerts_total", "Total single-detector alerts fired"
 )
 
 DETECTOR_ALLOWLIST = {
@@ -69,7 +69,7 @@ class EscalationPolicy:
         if len(valid_signals) >= self.consensus_threshold:
             detectors = list(valid_signals.keys())
             time_span = max(valid_signals.values()) - min(valid_signals.values())
-            ledgerlens_consensus_alerts_total.inc()
+            stellar_lense_consensus_alerts_total.inc()
             return EscalatedAlert(
                 wallet=wallet,
                 pair=pair,
@@ -81,4 +81,4 @@ class EscalationPolicy:
 
     def emit_single_detector_alert(self, wallet: str, pair: str, detector: str) -> None:
         self._validate_detector(detector)
-        ledgerlens_single_detector_alerts_total.inc()
+        stellar_lense_single_detector_alerts_total.inc()

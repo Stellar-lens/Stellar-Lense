@@ -81,7 +81,7 @@ class TestSnapshotManifest:
             columns=["a", "b"],
             created_at="2024-06-01T00:00:00Z",
             label="test",
-            ledgerlens_version="0.2.0",
+            stellar_lense_version="0.2.0",
         )
 
     def test_to_dict_round_trip(self):

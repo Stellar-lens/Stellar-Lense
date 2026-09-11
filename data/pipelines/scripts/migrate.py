@@ -1,4 +1,4 @@
-"""CLI entry point for the LedgerLens migration runner.
+"""CLI entry point for the StellarLense migration runner.
 
 Usage::
 
@@ -32,7 +32,7 @@ logger = get_logger(__name__)
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Apply LedgerLens database migrations.",
+        description="Apply StellarLense database migrations.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )

@@ -41,7 +41,7 @@ class JWTAuthenticator:
         Validates:
         - Signature using RS256 and the public key
         - exp (expiry time must be in the future)
-        - iss (issuer must be "ledgerlens-api")
+        - iss (issuer must be "stellar-lense-api")
         - sub (client ID must be present)
         - scope (must contain "scores:read")
 
@@ -62,7 +62,7 @@ class JWTAuthenticator:
                 token,
                 self._public_key,
                 algorithms=["RS256"],
-                issuer="ledgerlens-api",
+                issuer="stellar-lense-api",
                 options={"verify_exp": True},
             )
 

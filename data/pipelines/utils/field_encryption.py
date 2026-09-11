@@ -43,7 +43,7 @@ _TAG_LENGTH = 16  # 128-bit authentication tag
 #: protect. Deliberately awkward and loudly logged: the point is that running
 #: unencrypted in production becomes a recorded decision rather than the
 #: accidental consequence of an unset variable.
-_ALLOW_PLAINTEXT_ENV_VAR = "LEDGERLENS_ALLOW_PLAINTEXT_PII"
+_ALLOW_PLAINTEXT_ENV_VAR = "STELLARLENSE_ALLOW_PLAINTEXT_PII"
 
 
 class EncryptionKeyMissingError(RuntimeError):

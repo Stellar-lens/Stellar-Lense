@@ -1,6 +1,6 @@
 # Repository Health Diagnostics
 
-Comprehensive developer diagnostics command for assessing the health and readiness of the LedgerLens-data repository.
+Comprehensive developer diagnostics command for assessing the health and readiness of the StellarLense-data repository.
 
 ## Quick Start
 

@@ -1,4 +1,4 @@
-"""Interactive HTML forensic report export for LedgerLens.
+"""Interactive HTML forensic report export for StellarLense.
 
 Generates a self-contained HTML file (no external CDN dependencies) that
 compliance teams can open offline.  The report includes:
@@ -271,7 +271,7 @@ def _render_html(
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LedgerLens Forensic Report — {report_id}</title>
+<title>StellarLense Forensic Report — {report_id}</title>
 <style>
   body {{ font-family: monospace; background: #1a1a2e; color: #eee; margin: 0; padding: 20px; }}
   h1, h2, h3 {{ color: #e94560; }}
@@ -290,7 +290,7 @@ def _render_html(
 </style>
 </head>
 <body>
-<h1>LedgerLens Interactive Forensic Report</h1>
+<h1>StellarLense Interactive Forensic Report</h1>
 <div class="key-notice">&#128274; Wallet identifiers are encrypted. Enter your operator key when prompted to reveal them.</div>
 
 <h2>Report Metadata</h2>

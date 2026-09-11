@@ -1,10 +1,10 @@
-# LedgerLens Security
+# Stellar Lense Security
 
 See [`docs/security_threat_model.md`](security_threat_model.md) for a comprehensive STRIDE-based threat model covering data ingestion, model inference, persistence, SHAP interpretability, and on-chain integration.
 
 ## Threat Model: Model Poisoning
 
-LedgerLens is a fraud-detection system — making it a high-value target for adversaries who want their wash trading to go undetected. Three attack vectors are in scope:
+Stellar Lense is a fraud-detection system — making it a high-value target for adversaries who want their wash trading to go undetected. Three attack vectors are in scope:
 
 | Threat | Description |
 |---|---|
@@ -127,7 +127,7 @@ python -m scripts.publish_model_artifact \
     --model-name rf \
     --model-dir ./models \
     --private-key-path /secrets/signing_key.pem \
-    --db-url sqlite:///ledgerlens.db
+    --db-url sqlite:///stellar_lense.db
 ```
 
 This script:

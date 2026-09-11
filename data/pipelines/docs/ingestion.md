@@ -54,7 +54,7 @@ carries enough context to triage without reproducing it.
 ### Hierarchy
 
 ```
-LedgerLensError                     utils/exceptions.py
+StellarLenseError                     utils/exceptions.py
 └── IngestionError                  ingestion/exceptions.py
     ├── InvalidInputError           (also a ValueError)
     ├── RecordValidationError
@@ -67,7 +67,7 @@ LedgerLensError                     utils/exceptions.py
 The base lives in `utils/exceptions.py` and the domain taxonomy in
 `ingestion/exceptions.py` because `utils/` is the repo's home for
 cross-cutting infrastructure with no upward dependencies: other packages can
-adopt `LedgerLensError` later without importing `ingestion/`.
+adopt `StellarLenseError` later without importing `ingestion/`.
 
 * `InvalidInputError` -- a caller-supplied argument failed validation before
   any I/O was attempted. Also inherits `ValueError` so existing

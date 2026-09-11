@@ -329,13 +329,13 @@ def test_simultaneous_order_pair_non_overlapping():
 
 
 # ---------------------------------------------------------------------------
-# Integration test (skipped unless LEDGERLENS_INTEGRATION_TESTS=1)
+# Integration test (skipped unless STELLARLENSE_INTEGRATION_TESTS=1)
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.skipif(
-    __import__("os").getenv("LEDGERLENS_INTEGRATION_TESTS") != "1",
-    reason="Integration tests disabled — set LEDGERLENS_INTEGRATION_TESTS=1 to run",
+    __import__("os").getenv("STELLARLENSE_INTEGRATION_TESTS") != "1",
+    reason="Integration tests disabled — set STELLARLENSE_INTEGRATION_TESTS=1 to run",
 )
 def test_integration_backfill_amm_testnet():
     """Backfill 7 days of AMM data for known Testnet pools and verify features."""

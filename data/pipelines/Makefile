@@ -115,8 +115,8 @@ fuzz:
 	@echo "Fuzz testing complete."
 
 test-e2e:
-	@echo "Running end-to-end integration tests (requires LEDGERLENS_INTEGRATION_TESTS=1)..."
-	LEDGERLENS_INTEGRATION_TESTS=1 $(PYTEST) tests/integration/test_full_pipeline_e2e.py -v --timeout=120
+	@echo "Running end-to-end integration tests (requires STELLARLENSE_INTEGRATION_TESTS=1)..."
+	STELLARLENSE_INTEGRATION_TESTS=1 $(PYTEST) tests/integration/test_full_pipeline_e2e.py -v --timeout=120
 
 run:
 	python run_pipeline.py

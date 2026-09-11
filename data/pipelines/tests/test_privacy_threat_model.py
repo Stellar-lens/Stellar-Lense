@@ -107,7 +107,7 @@ except ImportError:
 # base32check variant.  They always start with "G" and are 56 characters long.
 STELLAR_ADDR_RE = re.compile(r"^G[A-Z2-7]{55}$")
 
-# Canonical set of sensitive attribute field names in LedgerLens ledger records.
+# Canonical set of sensitive attribute field names in StellarLense ledger records.
 SENSITIVE_WALLET_FIELDS = frozenset(
     {
         "base_account",
@@ -149,7 +149,7 @@ assert len(SAMPLE_WALLET_B) == 56 and all(c in _B32 for c in SAMPLE_WALLET_B)
 assert len(SAMPLE_WALLET_C) == 56 and all(c in _B32 for c in SAMPLE_WALLET_C)
 
 # Default HMAC key used in test suite (never use this in production!)
-TEST_HMAC_KEY = b"test-privacy-key-for-ledgerlens-issue-481"
+TEST_HMAC_KEY = b"test-privacy-key-for-stellar-lense-issue-481"
 
 # Bucket size for amount generalization (mirrors production default)
 AMOUNT_BUCKET_SIZE = 1000.0

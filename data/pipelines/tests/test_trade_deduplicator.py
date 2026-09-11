@@ -36,7 +36,7 @@ def fake_redis_cache():
     cache = SeenEventCache(
         redis_url="redis://localhost:6379/0",
         ttl_seconds=86400,
-        key_prefix="ledgerlens:trades:",
+        key_prefix="stellar_lense:trades:",
     )
     cache._backend._redis = fake_redis_instance
     cache._backend._init_error = None

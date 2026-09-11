@@ -7,7 +7,7 @@ This module implements the ingestion side of the streaming metadata join:
 2. Each received effect is validated against the ``AccountMetadataUpdate``
    schema (malformed events are discarded and logged).
 3. Valid events are serialised to JSON and produced to
-   ``METADATA_TOPIC`` (default: ``ledgerlens.account_metadata``), keyed by
+   ``METADATA_TOPIC`` (default: ``stellar_lense.account_metadata``), keyed by
    ``wallet_id`` so all updates for a wallet land in the same partition.
 
 Security

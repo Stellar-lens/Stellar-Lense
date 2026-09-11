@@ -15,10 +15,10 @@ by downstream tooling and dashboards. None of that is useful if a newly
 trained artifact can silently replace an older one with:
 
 - feature columns the running inference code still depends on removed,
-- a `ledgerlens_version` that regresses instead of advancing, or
+- a `stellar_lense_version` that regresses instead of advancing, or
 - recorded metrics (e.g. `auc_roc`) that regress well beyond noise.
 
-This mirrors the compatibility contract LedgerLens already enforces for the
+This mirrors the compatibility contract Stellar Lense already enforces for the
 Avro trade schema — see [`data/schema_evolution.md`](../data/schema_evolution.md)
 — applied to trained-model artifacts instead of message schemas.
 
@@ -26,10 +26,10 @@ Avro trade schema — see [`data/schema_evolution.md`](../data/schema_evolution.
 
 | Change | Result |
 |---|---|
-| Required metadata field (`feature_schema_hash`, `feature_columns`, `ledgerlens_version`) missing from the candidate | ❌ Breaking |
+| Required metadata field (`feature_schema_hash`, `feature_columns`, `stellar_lense_version`) missing from the candidate | ❌ Breaking |
 | Feature column present in the baseline but removed from the candidate | ❌ Breaking |
 | Feature column added in the candidate | ⚠️ Warning (informational) |
-| `ledgerlens_version` regresses (candidate < baseline) | ❌ Breaking |
+| `stellar_lense_version` regresses (candidate < baseline) | ❌ Breaking |
 | Per-model metric (default `auc_roc`) regresses beyond `--max-metric-drop` (default `0.02`) | ❌ Breaking |
 | Per-model metric regresses within the allowed budget | ⚠️ Warning |
 

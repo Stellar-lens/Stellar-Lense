@@ -1,10 +1,10 @@
-# Kafka streaming stack for LedgerLens (STREAMING_BACKEND=kafka).
+# Kafka streaming stack for Stellar Lense (STREAMING_BACKEND=kafka).
 #
-#   docker-compose up --scale ledgerlens-scorer=3
+#   docker-compose up --scale stellar-lense-scorer=3
 #
 # Brings up Zookeeper + Kafka, one producer that ingests Horizon SSE trades into
 # per-pair Avro topics, N scorer replicas consuming from the shared consumer
-# group "ledgerlens-scorer", and Prometheus + Grafana for lag / latency.
+# group "stellar-lense-scorer", and Prometheus + Grafana for lag / latency.
 version: "3.8"
 
 services:
@@ -60,7 +60,7 @@ services:
       timeout: 10s
       retries: 10
 
-  ledgerlens-producer:
+  stellar-lense-producer:
     build: .
     depends_on:
       kafka:
@@ -77,7 +77,7 @@ services:
     entrypoint: []
     command: ["python", "-m", "scripts.stream", "--backend", "kafka", "--role", "producer"]
 
-  ledgerlens-scorer:
+  stellar-lense-scorer:
     build: .
     depends_on:
       kafka:
@@ -88,7 +88,7 @@ services:
       STREAMING_BACKEND: kafka
       ROLE: worker
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-      KAFKA_CONSUMER_GROUP: ledgerlens-scorer
+      KAFKA_CONSUMER_GROUP: stellar-lense-scorer
       KAFKA_METRICS_PORT: 9100
       KAFKA_LAG_ALERT_THRESHOLD: ${KAFKA_LAG_ALERT_THRESHOLD:-500}
       FEATURE_STORE_REDIS_URL: redis://redis:6379/1
@@ -102,7 +102,7 @@ services:
   prometheus:
     image: prom/prometheus:v2.53.0
     depends_on:
-      - ledgerlens-scorer
+      - stellar-lense-scorer
     ports:
       - "9090:9090"
     volumes:

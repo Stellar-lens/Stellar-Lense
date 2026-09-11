@@ -90,7 +90,7 @@ def _make_report(**overrides) -> dict:
             },
         ],
         "model_metadata": {
-            "name": "LedgerLens Ensemble",
+            "name": "StellarLense Ensemble",
             "version": "2.1.0",
             "training_dataset_sha256": "abc123",
         },

@@ -1,6 +1,6 @@
 """Threshold Tuning CLI — Issue #535.
 
-Runs data-driven threshold tuning workflows for LedgerLens anomaly alerts and
+Runs data-driven threshold tuning workflows for StellarLense anomaly alerts and
 writes calibrated threshold recommendations to ``reports/threshold_tuning/``.
 
 Three strategies are available (see ``detection/threshold_tuner.py`` for
@@ -160,7 +160,7 @@ def _find_latest_backtest() -> Path | None:
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(
-        description="Tune LedgerLens alert thresholds from evaluation data.",
+        description="Tune StellarLense alert thresholds from evaluation data.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )

@@ -1,4 +1,4 @@
-"""Recursive Feature Elimination with Cross-Validation (RFECV) for LedgerLens.
+"""Recursive Feature Elimination with Cross-Validation (RFECV) for StellarLense.
 
 Runs RFECV on the training dataset using RandomForestClassifier as the
 estimator, optimising AUC-ROC with 5-fold stratified cross-validation.
@@ -122,7 +122,7 @@ def run_rfecv(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run RFECV feature selection for LedgerLens")
+    parser = argparse.ArgumentParser(description="Run RFECV feature selection for StellarLense")
     parser.add_argument("--data-path", default="data/synthetic_dataset.parquet")
     parser.add_argument("--model-dir", default="./models")
     parser.add_argument("--output", default="models/selected_features.json")

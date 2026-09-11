@@ -7,7 +7,7 @@ from utils.errors import (
     ErrorCategory,
     ExternalServiceError,
     IngestionError,
-    LedgerLensError,
+    StellarLenseError,
     StorageError,
     TransformError,
     ValidationError,
@@ -106,7 +106,7 @@ def test_format_diagnostic_walks_full_cause_chain():
 
 
 def test_base_class_defaults_apply_when_no_subclass_used():
-    exc = LedgerLensError("000", "unspecified failure")
+    exc = StellarLenseError("000", "unspecified failure")
     assert exc.code == "GEN-000"
     assert exc.category == ErrorCategory.VALIDATION
     assert exc.retryable is False

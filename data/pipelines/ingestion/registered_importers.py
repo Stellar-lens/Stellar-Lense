@@ -1,4 +1,4 @@
-"""Registry of all LedgerLens data importers with capability metadata.
+"""Registry of all StellarLense data importers with capability metadata.
 
 This module registers all existing importers with the capability discovery system.
 Import this module to populate the global importer registry.

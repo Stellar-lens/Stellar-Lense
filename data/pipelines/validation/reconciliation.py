@@ -9,7 +9,7 @@ with the raw data they were computed from.
 
 Why reconciliation?
 -------------------
-The LedgerLens pipeline has three distinct data layers:
+The StellarLense pipeline has three distinct data layers:
 
 1. **Raw** – Horizon trade records, order-book events, account activity.
 2. **Derived (features)** – per-wallet feature vectors built by

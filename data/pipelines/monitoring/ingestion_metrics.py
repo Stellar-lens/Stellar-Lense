@@ -36,32 +36,32 @@ class IngestionMetricsEmitter:
 
         self.records = self._metric(
             Counter,
-            "ledgerlens_ingestion_records_total",
+            "stellar_lense_ingestion_records_total",
             "Total records successfully emitted by ingestion",
             ["source", "stage"],
         )
         self.failures = self._metric(
             Counter,
-            "ledgerlens_ingestion_failures_total",
+            "stellar_lense_ingestion_failures_total",
             "Total ingestion failures grouped by exception type",
             ["source", "stage", "error_type"],
         )
         self.throughput = self._metric(
             Gauge,
-            "ledgerlens_ingestion_throughput_records_per_second",
+            "stellar_lense_ingestion_throughput_records_per_second",
             "Most recently observed ingestion batch throughput",
             ["source", "stage"],
         )
         self.duration = self._metric(
             Histogram,
-            "ledgerlens_ingestion_duration_seconds",
+            "stellar_lense_ingestion_duration_seconds",
             "Ingestion operation duration in seconds",
             ["source", "stage"],
             buckets=(0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60),
         )
         self.last_success = self._metric(
             Gauge,
-            "ledgerlens_ingestion_last_success_timestamp_seconds",
+            "stellar_lense_ingestion_last_success_timestamp_seconds",
             "Unix timestamp of the last successful ingestion operation",
             ["source", "stage"],
         )

@@ -1,6 +1,6 @@
 """Example: full end-to-end detection pipeline.
 
-Exercises all major stages of the LedgerLens detection stack in sequence:
+Exercises all major stages of the StellarLense detection stack in sequence:
 
 1. Synthetic data generation (mimics ``scripts/generate_synthetic_dataset.py``)
 2. Feature engineering (``detection/feature_engineering.py``)
@@ -11,7 +11,7 @@ Exercises all major stages of the LedgerLens detection stack in sequence:
 7. Persistence to an in-memory SQLite DB (``detection/persistence.py``)
 
 This is the most comprehensive example and can be used as a reference for
-integrating LedgerLens into an external pipeline.
+integrating StellarLense into an external pipeline.
 
 Run::
 
@@ -88,7 +88,7 @@ def main() -> None:
     sep = "=" * 62
 
     print(f"\n{sep}")
-    print(" LedgerLens — Full End-to-End Pipeline Example")
+    print(" StellarLense — Full End-to-End Pipeline Example")
     print(sep)
 
     # ── Step 1: Generate synthetic data ──────────────────────────────────

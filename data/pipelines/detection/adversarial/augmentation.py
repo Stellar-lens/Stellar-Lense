@@ -173,7 +173,7 @@ def _persist(results: dict, model_dir: str | None, suffix: str) -> str:
     import os
     import tempfile
 
-    base = model_dir or tempfile.mkdtemp(prefix="ledgerlens_adv_")
+    base = model_dir or tempfile.mkdtemp(prefix="stellar_lense_adv_")
     target = os.path.join(base, suffix)
     save_models(results, target)
     return target

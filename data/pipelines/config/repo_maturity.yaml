@@ -1,4 +1,4 @@
-# LedgerLens Repository Maturity Configuration
+# Stellar Lense Repository Maturity Configuration
 # =============================================
 # Issue #560 — Repository maturity tracking
 #
@@ -10,7 +10,7 @@
 # The weights below sum to 1.00.
 
 version: "1.0"
-description: "LedgerLens repository maturity model (five dimensions, 0–100 each)"
+description: "Stellar Lense repository maturity model (five dimensions, 0–100 each)"
 
 # Minimum composite score for the CI advisory gate to pass (exit 0).
 default_threshold: 60

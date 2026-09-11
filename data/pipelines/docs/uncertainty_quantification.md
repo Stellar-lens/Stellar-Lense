@@ -2,7 +2,7 @@
 
 ## What It Is
 
-Every LedgerLens risk score is now accompanied by a **prediction interval** —
+Every Stellar Lense risk score is now accompanied by a **prediction interval** —
 a range `[score_lower, score_upper]` that is guaranteed to contain the
 "true" risk score with at least **90% probability** (configurable via the
 `alpha` parameter, default 0.10).
@@ -22,7 +22,7 @@ that provides:
 - **Finite-sample validity** — the guarantee holds for any sample size
 - **Model-agnostic** — works with any classifier or regressor
 
-This is especially important for LedgerLens because:
+This is especially important for Stellar Lense because:
 
 1. **Class imbalance** — wash trades are rare (~5% of the dataset)
 2. **Distribution shift** — the synthetic training data may not perfectly

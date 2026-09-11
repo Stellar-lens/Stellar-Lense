@@ -10,12 +10,12 @@ Supported layer types
 - ReLU              — element-wise max(0, x)
 - BatchNorm(γ, β, μ, σ²) — normalise then scale/shift
 
-These cover all differentiable layers in the LedgerLens neural-network
+These cover all differentiable layers in the StellarLense neural-network
 components (NeuralProcess, DANNEncoder).
 
 Certification complexity is O(L · d) per sample where L is the number of
 layers and d is the feature dimension, completing in < 1 ms per sample for
-LedgerLens model sizes — well within the 10 ms budget.
+StellarLense model sizes — well within the 10 ms budget.
 
 Security note
 -------------
@@ -193,7 +193,7 @@ def certify_ibp(
 
 
 # ---------------------------------------------------------------------------
-# Layer extraction helpers for LedgerLens models
+# Layer extraction helpers for StellarLense models
 # ---------------------------------------------------------------------------
 
 

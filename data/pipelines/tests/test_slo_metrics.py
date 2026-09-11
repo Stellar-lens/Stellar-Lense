@@ -2,37 +2,37 @@
 
 
 def test_confirmed_wash_trades_counter_registered():
-    """Verify that ledgerlens_confirmed_wash_trades_total counter is registered."""
-    from detection.per_pair_metrics import ledgerlens_confirmed_wash_trades_total
+    """Verify that stellar_lense_confirmed_wash_trades_total counter is registered."""
+    from detection.per_pair_metrics import stellar_lense_confirmed_wash_trades_total
 
-    assert ledgerlens_confirmed_wash_trades_total is not None
+    assert stellar_lense_confirmed_wash_trades_total is not None
 
 
 def test_confirmed_clean_wallets_counter_registered():
-    """Verify that ledgerlens_confirmed_clean_wallets_total counter is registered."""
-    from detection.per_pair_metrics import ledgerlens_confirmed_clean_wallets_total
+    """Verify that stellar_lense_confirmed_clean_wallets_total counter is registered."""
+    from detection.per_pair_metrics import stellar_lense_confirmed_clean_wallets_total
 
-    assert ledgerlens_confirmed_clean_wallets_total is not None
+    assert stellar_lense_confirmed_clean_wallets_total is not None
 
 
 def test_record_confirmed_wash_trade_increments_counter():
     """Verify that record_confirmed_wash_trade increments the counter."""
     from detection.per_pair_metrics import (
-        ledgerlens_confirmed_wash_trades_total,
+        stellar_lense_confirmed_wash_trades_total,
         record_confirmed_wash_trade,
     )
 
     asset_pair = "USDC:GA5Z/XLM:native"
 
     # Get initial value
-    initial_samples = list(ledgerlens_confirmed_wash_trades_total.collect())[0].samples
+    initial_samples = list(stellar_lense_confirmed_wash_trades_total.collect())[0].samples
     initial_count = sum(1 for s in initial_samples if "GA5Z" in str(s))
 
     # Record a wash trade
     record_confirmed_wash_trade(asset_pair)
 
     # Get new value
-    new_samples = list(ledgerlens_confirmed_wash_trades_total.collect())[0].samples
+    new_samples = list(stellar_lense_confirmed_wash_trades_total.collect())[0].samples
     new_count = sum(1 for s in new_samples if "GA5Z" in str(s))
 
     # Counter should have incremented
@@ -42,21 +42,21 @@ def test_record_confirmed_wash_trade_increments_counter():
 def test_record_confirmed_clean_wallet_increments_counter():
     """Verify that record_confirmed_clean_wallet increments the counter."""
     from detection.per_pair_metrics import (
-        ledgerlens_confirmed_clean_wallets_total,
+        stellar_lense_confirmed_clean_wallets_total,
         record_confirmed_clean_wallet,
     )
 
     asset_pair = "BTC:GA5Z/XLM:native"
 
     # Get initial value
-    initial_samples = list(ledgerlens_confirmed_clean_wallets_total.collect())[0].samples
+    initial_samples = list(stellar_lense_confirmed_clean_wallets_total.collect())[0].samples
     initial_count = sum(1 for s in initial_samples if "GA5Z" in str(s))
 
     # Record a clean wallet
     record_confirmed_clean_wallet(asset_pair)
 
     # Get new value
-    new_samples = list(ledgerlens_confirmed_clean_wallets_total.collect())[0].samples
+    new_samples = list(stellar_lense_confirmed_clean_wallets_total.collect())[0].samples
     new_count = sum(1 for s in new_samples if "GA5Z" in str(s))
 
     # Counter should have incremented

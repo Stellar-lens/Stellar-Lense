@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "LedgerLens Model Metadata",
-  "description": "Metadata schema for LedgerLens trained model cards (Google Model Card specification).",
+  "title": "Stellar Lense Model Metadata",
+  "description": "Metadata schema for Stellar Lense trained model cards (Google Model Card specification).",
   "type": "object",
   "required": [
     "model_name",
@@ -62,9 +62,9 @@
       "type": "string",
       "description": "Relative path to a SHAP feature importance chart image."
     },
-    "ledgerlens_version": {
+    "stellar_lense_version": {
       "type": "string",
-      "description": "LedgerLens codebase version at training time."
+      "description": "Stellar Lense codebase version at training time."
     },
     "regulatory_contact": {
       "type": "string",

@@ -1584,7 +1584,7 @@ FEATURE_RANGES: dict[str, tuple[float, float]] = {
 #: URL prefix used to build per-feature hyperlinks in SHAP output.
 #: Points to the feature dictionary inside the repository.
 FEATURE_DICT_BASE_URL: str = (
-    "https://github.com/Ledger-Lenz/Ledgerlens-data/blob/main/data/feature_dictionary.md"
+    "https://github.com/Stellar-lens/Stellar-Lense/blob/main/data/feature_dictionary.md"
 )
 
 #: Mapping from feature name to the markdown anchor in feature_dictionary.md.
@@ -1649,7 +1649,7 @@ def feature_dict_url(feature_name: str) -> str | None:
     Example::
 
         >>> feature_dict_url("benford_mad_24h")
-        'https://github.com/Ledger-Lenz/Ledgerlens-data/blob/main/data/feature_dictionary.md#12--benford_mad_hh'
+        'https://github.com/Stellar-lens/Stellar-Lense/blob/main/data/feature_dictionary.md#12--benford_mad_hh'
     """
     anchor = _FEATURE_ANCHORS.get(feature_name)
     if anchor is None:

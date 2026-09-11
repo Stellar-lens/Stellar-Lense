@@ -1,9 +1,9 @@
 # Local development environment
-# DATABASE_URL: sqlite:///ledgerlens_local.db (SQLite for single-machine development)
+# DATABASE_URL: sqlite:///stellar_lense_local.db (SQLite for single-machine development)
 
 database:
   # SQLite for local development; no auth required
-  url: "sqlite:///ledgerlens_local.db"
+  url: "sqlite:///stellar_lense_local.db"
   pool_size: 1
   max_overflow: 0
 
@@ -17,8 +17,8 @@ feature_drift:
 # Local environment defaults to DEBUG mode and SQLite
 # No hardened authentication required
 # Local-development overlay. Applied on top of base.yaml when
-# LEDGERLENS_ENV=local (the default when no CI indicator is present).
+# STELLARLENSE_ENV=local (the default when no CI indicator is present).
 
 log_level: DEBUG
 log_format: text
-risk_score_db_url: sqlite:///ledgerlens_local.db
+risk_score_db_url: sqlite:///stellar_lense_local.db

@@ -28,8 +28,8 @@
 - [ ] Old feature name still aliased or gracefully ignored (backward compat)
 - [ ] `feature_schema_hash` in `model_metadata.json` will change — acknowledged
 - [ ] Models must be retrained — scheduled retrain confirmed
-- [ ] `ledgerlens-core` feature type definitions updated
-- [ ] Linked PRs opened in `ledgerlens-api` and `ledgerlens-dashboard`
+- [ ] `stellar-lense-core` feature type definitions updated
+- [ ] Linked PRs opened in `stellar-lense-api` and `stellar-lense-dashboard`
 - [ ] Version bump included (minor for addition, major for removal/rename)
 - [ ] CHANGELOG.md entry explicitly states which columns changed
 

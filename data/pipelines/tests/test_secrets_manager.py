@@ -28,7 +28,7 @@ from utils.secrets_manager import (
     SecretValidator,
     configure_secrets_manager,
     get_secrets_manager,
-    register_ledgerlens_secrets,
+    register_stellar_lense_secrets,
 )
 
 # ---------------------------------------------------------------------------
@@ -643,13 +643,13 @@ class TestSecretsManagerIntegration:
         assert valid == 2  # Two access events
         assert invalid == 0
 
-    def test_register_ledgerlens_secrets(self, secrets_manager):
-        """Register all LedgerLens secrets."""
-        register_ledgerlens_secrets(secrets_manager)
+    def test_register_stellar_lense_secrets(self, secrets_manager):
+        """Register all StellarLense secrets."""
+        register_stellar_lense_secrets(secrets_manager)
 
         # Verify all expected secrets are registered
         expected_secrets = [
-            "LEDGERLENS_SUBMITTER_SECRET",
+            "STELLARLENSE_SUBMITTER_SECRET",
             "KAFKA_SASL_PASSWORD",
             "MODEL_SIGNING_PRIVATE_KEY_PATH",
             "ANNOTATION_HMAC_SECRET",

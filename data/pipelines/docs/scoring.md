@@ -1,6 +1,6 @@
 # Scoring Architecture
 
-LedgerLens normalises anomaly scores per asset pair to enable fair comparison across different trading patterns.
+Stellar Lense normalises anomaly scores per asset pair to enable fair comparison across different trading patterns.
 
 ## Per-Pair Normalisation
 
@@ -32,7 +32,7 @@ When fewer than `SCORE_NORM_MIN_SAMPLES` exist for a pair, normalisation is skip
 
 ## Explainability: SHAP vs Counterfactual
 
-Every LedgerLens score is accompanied by explainability outputs that help auditors,
+Every Stellar Lense score is accompanied by explainability outputs that help auditors,
 compliance teams, and regulators understand *why* a wallet was scored as risky.
 
 ### SHAP Attribution (Diagnostic)

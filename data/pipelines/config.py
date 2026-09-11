@@ -102,7 +102,7 @@ class Config:
     # E.g. THRESHOLD_RL_PINNED=75 → agent is bypassed, threshold is fixed at 75.
     THRESHOLD_RL_PINNED: int = int(os.getenv("THRESHOLD_RL_PINNED", "0"))
 
-    RISK_SCORE_DB_URL: str = os.getenv("RISK_SCORE_DB_URL", "sqlite:///ledgerlens.db")
+    RISK_SCORE_DB_URL: str = os.getenv("RISK_SCORE_DB_URL", "sqlite:///stellar_lense.db")
 
     # Database connection pooling
     DB_POOL_SIZE: int = int(os.getenv("DB_POOL_SIZE", "5"))
@@ -112,10 +112,10 @@ class Config:
     MODEL_DIR: str = os.getenv("MODEL_DIR", "./models")
     BATCH_SCORER_WORKERS: int = int(os.getenv("BATCH_SCORER_WORKERS", 10))
 
-    # ledgerlens-score Soroban contract
+    # stellar-lense-score Soroban contract
     SOROBAN_RPC_URL: str = os.getenv("SOROBAN_RPC_URL", "https://soroban-testnet.stellar.org")
-    LEDGERLENS_CONTRACT_ID: str = os.getenv("LEDGERLENS_CONTRACT_ID", "")
-    LEDGERLENS_SUBMITTER_SECRET: str = os.getenv("LEDGERLENS_SUBMITTER_SECRET", "")
+    STELLARLENSE_CONTRACT_ID: str = os.getenv("STELLARLENSE_CONTRACT_ID", "")
+    STELLARLENSE_SUBMITTER_SECRET: str = os.getenv("STELLARLENSE_SUBMITTER_SECRET", "")
 
     # Solana RPC endpoint for cross-chain resolution
     SOLANA_RPC_URL: str = os.getenv("SOLANA_RPC_URL", "https://api.mainnet-beta.solana.com")
@@ -164,13 +164,13 @@ class Config:
     KAFKA_BOOTSTRAP_SERVERS: str = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
     KAFKA_SASL_USERNAME: str | None = os.getenv("KAFKA_SASL_USERNAME")
     KAFKA_SASL_PASSWORD: str | None = os.getenv("KAFKA_SASL_PASSWORD")
-    KAFKA_CONSUMER_GROUP: str = os.getenv("KAFKA_CONSUMER_GROUP", "ledgerlens-scorer")
-    KAFKA_TOPIC_PREFIX: str = os.getenv("KAFKA_TOPIC_PREFIX", "ledgerlens.trades")
-    KAFKA_DLQ_TOPIC: str = os.getenv("KAFKA_DLQ_TOPIC", "ledgerlens.trades.dlq")
+    KAFKA_CONSUMER_GROUP: str = os.getenv("KAFKA_CONSUMER_GROUP", "stellar-lense-scorer")
+    KAFKA_TOPIC_PREFIX: str = os.getenv("KAFKA_TOPIC_PREFIX", "stellar_lense.trades")
+    KAFKA_DLQ_TOPIC: str = os.getenv("KAFKA_DLQ_TOPIC", "stellar_lense.trades.dlq")
     # Regex subscription (librdkafka treats a leading '^' as a pattern). Picks up
     # new per-pair topics without a consumer restart; the DLQ topic is skipped
     # in the worker so failed messages are never auto-replayed.
-    KAFKA_TOPIC_PATTERN: str = os.getenv("KAFKA_TOPIC_PATTERN", "^ledgerlens\\.trades\\..*")
+    KAFKA_TOPIC_PATTERN: str = os.getenv("KAFKA_TOPIC_PATTERN", "^stellar_lense\\.trades\\..*")
     KAFKA_LAG_ALERT_THRESHOLD: int = int(os.getenv("KAFKA_LAG_ALERT_THRESHOLD", "500"))
     KAFKA_METRICS_PORT: int = int(os.getenv("KAFKA_METRICS_PORT", "9100"))
     TRADE_AVRO_SCHEMA_PATH: str = os.getenv("TRADE_AVRO_SCHEMA_PATH", "data/trade_avro_schema.json")
@@ -192,7 +192,7 @@ class Config:
     # Account metadata streaming join (streaming/account_metadata_stream.py,
     # streaming/pipeline.py MetadataJoinState)
     # METADATA_TOPIC: dedicated Kafka topic for account metadata update events.
-    METADATA_TOPIC: str = os.getenv("METADATA_TOPIC", "ledgerlens.account_metadata")
+    METADATA_TOPIC: str = os.getenv("METADATA_TOPIC", "stellar_lense.account_metadata")
     # METADATA_JOIN_WINDOW_SECONDS: how long (seconds) a metadata update enriches
     # incoming trade events.  After this window the update is considered stale and
     # must be refreshed by a subsequent Horizon effect.  Default: 3600 (1 hour).
@@ -526,7 +526,7 @@ class Config:
     KAFKA_DEDUP_TTL_SECONDS: int = int(os.getenv("KAFKA_DEDUP_TTL_SECONDS", "3600"))
     # Producer transactional-ID prefix — deliberately not the hostname (ingestion/kafka_producer.py).
     KAFKA_TRANSACTIONAL_ID_PREFIX: str = os.getenv(
-        "KAFKA_TRANSACTIONAL_ID_PREFIX", "ledgerlens-producer"
+        "KAFKA_TRANSACTIONAL_ID_PREFIX", "stellar-lense-producer"
     )
     KAFKA_TRANSACTION_TIMEOUT_MS: int = int(os.getenv("KAFKA_TRANSACTION_TIMEOUT_MS", "60000"))
 
@@ -552,7 +552,7 @@ class Config:
     # Trade ingestion dedup cache (ingestion/trade_deduplicator.py)
     TRADE_DEDUP_TTL_SECONDS: int = int(os.getenv("TRADE_DEDUP_TTL_SECONDS", str(24 * 3600)))
     TRADE_DEDUP_CACHE_KEY_PREFIX: str = os.getenv(
-        "TRADE_DEDUP_CACHE_KEY_PREFIX", "ledgerlens:trades:"
+        "TRADE_DEDUP_CACHE_KEY_PREFIX", "stellar_lense:trades:"
     )
 
     # ---------------------------------------------------------------------------
@@ -588,7 +588,7 @@ class Config:
     DATASET_STORE_BASE_PATH: str = os.getenv("DATASET_STORE_BASE_PATH", "./data")
     # Default serialisation format for generated datasets.
     DATASET_STORE_FORMAT: str = os.getenv("DATASET_STORE_FORMAT", "parquet")
-    # Object store URI for the "object" backend, e.g. s3://my-bucket/ledgerlens.
+    # Object store URI for the "object" backend, e.g. s3://my-bucket/stellar_lense.
     # Leave empty to fall back to LocalDatasetStore even when backend="object".
     DATASET_STORE_OBJECT_STORE_URL: str = os.getenv("DATASET_STORE_OBJECT_STORE_URL", "")
 
@@ -653,11 +653,11 @@ class Config:
             errors.append("DP_AGGREGATOR_DELTA must be in (0, 0.5).")
 
         if require_onchain:
-            if not cls.LEDGERLENS_CONTRACT_ID.strip():
-                errors.append("LEDGERLENS_CONTRACT_ID is not set.")
+            if not cls.STELLARLENSE_CONTRACT_ID.strip():
+                errors.append("STELLARLENSE_CONTRACT_ID is not set.")
 
-            if not cls.LEDGERLENS_SUBMITTER_SECRET.strip():
-                errors.append("LEDGERLENS_SUBMITTER_SECRET is not set.")
+            if not cls.STELLARLENSE_SUBMITTER_SECRET.strip():
+                errors.append("STELLARLENSE_SUBMITTER_SECRET is not set.")
 
         return errors
 
@@ -666,7 +666,7 @@ class Config:
         errors = cls._core_errors(require_onchain)
 
         if errors:
-            raise OSError("LedgerLens configuration errors:\n- " + "\n- ".join(errors))
+            raise OSError("StellarLense configuration errors:\n- " + "\n- ".join(errors))
 
     @classmethod
     def load_asset_benford_windows(cls):

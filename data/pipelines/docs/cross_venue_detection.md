@@ -237,7 +237,7 @@ make lint      # ruff + black
 
 Integration tests (require live Testnet access):
 ```bash
-LEDGERLENS_INTEGRATION_TESTS=1 pytest tests/test_cross_venue_features.py -k integration
+STELLARLENSE_INTEGRATION_TESTS=1 pytest tests/test_cross_venue_features.py -k integration
 ```
 
 ## Cross-Chain Bridge Transaction Detection

@@ -177,7 +177,7 @@ def _load_all_archive_versions() -> list[tuple[str, dict[str, Any]]]:
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(
-        description="Check feature compatibility across LedgerLens model versions.",
+        description="Check feature compatibility across StellarLense model versions.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )

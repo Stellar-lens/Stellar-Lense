@@ -2,7 +2,7 @@
 
 ## Overview
 
-The active learning pipeline in LedgerLens is vulnerable to data poisoning attacks: a malicious annotator could inject backdoor-poisoned examples (wash trades with a specific trigger pattern) labelled as clean, causing the model to misclassify any input containing that trigger. This document describes the Activation Clustering (AC) defence used to detect and quarantine poisoned samples before training.
+The active learning pipeline in Stellar Lense is vulnerable to data poisoning attacks: a malicious annotator could inject backdoor-poisoned examples (wash trades with a specific trigger pattern) labelled as clean, causing the model to misclassify any input containing that trigger. This document describes the Activation Clustering (AC) defence used to detect and quarantine poisoned samples before training.
 
 ## Activation Clustering (AC) Defence
 
@@ -265,13 +265,13 @@ If this holds at the chosen ε, the model is **certifiably robust** at that radi
    - **BatchNorm** (inference mode): treated as a per-feature affine transform; negative scale flips the interval.
 3. **Certification check** — if the output interval confirms the correct class, return ε; otherwise binary-search for the largest certified radius.
 
-Complexity is O(L × d) per sample (L layers, d features) — well under 10 ms for LedgerLens model sizes.
+Complexity is O(L × d) per sample (L layers, d features) — well under 10 ms for Stellar Lense model sizes.
 
 ### Limitations of IBP
 
 IBP is **conservative**: the returned certified radius is a provable lower bound, not the true robustness. The true robustness may be larger because IBP over-approximates the reachable output set (it includes non-reachable corner cases from the interval arithmetic). Methods such as CROWN or α-CROWN produce tighter bounds at higher computational cost.
 
-**IBP vs. randomised smoothing**: Randomised smoothing certifies robustness in the L2 norm and scales well to high-dimensional inputs, but requires many forward passes (hundreds) per sample and provides probabilistic rather than deterministic guarantees. IBP is deterministic and extremely fast (< 1 ms per sample) but only certifies L∞ robustness and becomes loose for deep networks. For LedgerLens's shallow 2–3 layer MLP ensemble, IBP provides useful tight bounds; for deeper architectures, CROWN would be preferred.
+**IBP vs. randomised smoothing**: Randomised smoothing certifies robustness in the L2 norm and scales well to high-dimensional inputs, but requires many forward passes (hundreds) per sample and provides probabilistic rather than deterministic guarantees. IBP is deterministic and extremely fast (< 1 ms per sample) but only certifies L∞ robustness and becomes loose for deep networks. For Stellar Lense's shallow 2–3 layer MLP ensemble, IBP provides useful tight bounds; for deeper architectures, CROWN would be preferred.
 
 ### Evaluation Integration
 

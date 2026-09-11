@@ -1,4 +1,4 @@
-"""Automated hyperparameter optimisation for the LedgerLens ensemble models (Issue #213).
+"""Automated hyperparameter optimisation for the StellarLense ensemble models (Issue #213).
 
 This module implements BOHB-style optimisation using Optuna with a TPE sampler
 (Tree-structured Parzen Estimator — functionally equivalent to BOHB's Bayesian
@@ -355,7 +355,7 @@ def run_study(
 
     try:
         study = optuna.create_study(
-            study_name=f"ledgerlens_{model_name}",
+            study_name=f"stellar_lense_{model_name}",
             storage=storage_url,
             sampler=sampler,
             pruner=pruner,
@@ -446,7 +446,7 @@ def run_multiobjective_study(
 
     try:
         study = optuna.create_study(
-            study_name=f"ledgerlens_{model_name}_mo",
+            study_name=f"stellar_lense_{model_name}_mo",
             storage=storage_url,
             sampler=NSGAIISampler(seed=random_state),
             directions=["maximize", "minimize"],

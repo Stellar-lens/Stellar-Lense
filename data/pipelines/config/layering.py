@@ -16,8 +16,8 @@ DEFAULT_ENVIRONMENT = "local"
 
 
 def _get_environment() -> str:
-    """Get the active environment from LEDGERLENS_ENV or default to local."""
-    return os.getenv("LEDGERLENS_ENV", DEFAULT_ENVIRONMENT).lower()
+    """Get the active environment from STELLARLENSE_ENV or default to local."""
+    return os.getenv("STELLARLENSE_ENV", DEFAULT_ENVIRONMENT).lower()
 
 
 def _load_yaml_file(path: Path) -> dict:
@@ -53,7 +53,7 @@ def load_config() -> dict:
 
     if env not in ("local", "production", "staging"):
         raise ValueError(
-            f"Invalid LEDGERLENS_ENV={env!r}. "
+            f"Invalid STELLARLENSE_ENV={env!r}. "
             "Must be 'local', 'production', or 'staging'."
         )
 
@@ -65,9 +65,9 @@ def load_config() -> dict:
 
     if env != "local" and not env_path.exists():
         raise RuntimeError(
-            f"LEDGERLENS_ENV={env} requires {env_path} to exist. "
+            f"STELLARLENSE_ENV={env} requires {env_path} to exist. "
             "Fail-closed: refusing to run in {env} mode without explicit config. "
-            "Create {env_path} or set LEDGERLENS_ENV=local."
+            "Create {env_path} or set STELLARLENSE_ENV=local."
         )
 
     base_config = _load_yaml_file(base_path)
@@ -164,7 +164,7 @@ class ConfigSource(StrEnum):
     OVERRIDE = "override"
 
 
-def detect_environment(env_var: str = "LEDGERLENS_ENV") -> str:
+def detect_environment(env_var: str = "STELLARLENSE_ENV") -> str:
     """Infer the running environment name.
 
     Precedence: an explicit `{env_var}` wins; otherwise standard CI
@@ -215,7 +215,7 @@ class LayeredConfig:
         *,
         environment: str,
         config_dir: str | os.PathLike = "config/environments",
-        env_prefix: str = "LEDGERLENS_",
+        env_prefix: str = "STELLARLENSE_",
         overrides: dict[str, Any] | None = None,
     ):
         self.environment = environment

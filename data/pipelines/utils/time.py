@@ -1,6 +1,6 @@
 """Deterministic time and timezone handling utilities (Issue #482).
 
-All production code in LedgerLens must express timestamps as **timezone-aware
+All production code in StellarLense must express timestamps as **timezone-aware
 UTC datetimes**. Naive datetimes (no ``tzinfo``) are an endemic source of bugs:
 they silently compare wrong across DST transitions, produce inconsistent ledger
 sequences when replayed in a different local timezone, and are rejected by

@@ -1,6 +1,6 @@
 # data/causal_priors.yaml
 #
-# Domain-expert prior knowledge constraints for the LedgerLens causal discovery
+# Domain-expert prior knowledge constraints for the Stellar Lense causal discovery
 # module (Issue #192).  These constraints prevent the PC algorithm from
 # producing causal edges that violate known temporal or structural facts about
 # the Stellar DEX wash-trade domain.

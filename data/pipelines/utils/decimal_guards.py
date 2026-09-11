@@ -1,7 +1,7 @@
 """Numeric precision guards for financial calculations.
 
 This module provides precision-safe arithmetic for financial data processing
-in LedgerLens. Stellar uses 7 decimal places (stroops), and fraud detection
+in StellarLense. Stellar uses 7 decimal places (stroops), and fraud detection
 requires exact decimal arithmetic to avoid floating-point errors that could
 mask anomalies or produce false positives.
 

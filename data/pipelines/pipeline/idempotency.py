@@ -2,7 +2,7 @@
 
 Overview
 --------
-Re-running the LedgerLens pipeline with the same inputs (same asset pair,
+Re-running the StellarLense pipeline with the same inputs (same asset pair,
 same time window, same feature snapshot) must produce the same observable
 output and must *never* double-write to the risk-score store.
 

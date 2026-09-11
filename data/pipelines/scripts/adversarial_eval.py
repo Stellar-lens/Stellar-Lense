@@ -1,4 +1,4 @@
-"""Adversarial robustness evaluation for the LedgerLens ensemble ML models.
+"""Adversarial robustness evaluation for the StellarLense ensemble ML models.
 
 Implements three adversarial attacks against the wash-trading detection ensemble:
   1. Gradient feature attack (white-box PGD)

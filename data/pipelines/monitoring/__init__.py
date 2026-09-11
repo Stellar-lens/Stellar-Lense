@@ -1,4 +1,4 @@
-"""LedgerLens monitoring modules (CUSUM detector and operational metrics)."""
+"""StellarLense monitoring modules (CUSUM detector and operational metrics)."""
 
 from monitoring.ingestion_metrics import (
     INGESTION_METRICS,

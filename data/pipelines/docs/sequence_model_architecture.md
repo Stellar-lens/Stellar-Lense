@@ -2,7 +2,7 @@
 
 ## Overview
 
-The LedgerLens transformer sequence model captures **temporal wash-trading patterns** that are invisible to the aggregate 37-feature vector consumed by the Random Forest / XGBoost / LightGBM ensemble.
+The Stellar Lense transformer sequence model captures **temporal wash-trading patterns** that are invisible to the aggregate 37-feature vector consumed by the Random Forest / XGBoost / LightGBM ensemble.
 
 Wash-trading manifests as sequential structure:
 
@@ -44,7 +44,7 @@ FeatureBuffer (streaming/feature_buffer.py)
                                               Ensemble (RF / XGBoost / LightGBM)
                                                               │
                                                               ▼
-                                                LedgerLens Risk Score (0–100)
+                                                Stellar Lense Risk Score (0–100)
 ```
 
 ---

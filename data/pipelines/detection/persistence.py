@@ -92,7 +92,7 @@ class RiskScoreRecord(Base):
     def to_risk_score(self) -> dict:
         # NOTE: `finality` and `certified_robust` are deliberately excluded —
         # this dict mirrors the on-chain/API RiskScore shape shared with
-        # ledgerlens-core, and unilaterally changing that wire shape from
+        # stellar-lense-core, and unilaterally changing that wire shape from
         # this repo would silently break cross-repo ABI compatibility. Read
         # `finality` via the record attribute or `RiskScoreStore` instead.
         result = {

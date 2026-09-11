@@ -1,4 +1,4 @@
-"""FastAPI REST API exposing LedgerLens wallet risk scores.
+"""FastAPI REST API exposing StellarLense wallet risk scores.
 
 Endpoints:
     GET /v1/wallets/{address}/scores   — paginated risk score history
@@ -75,7 +75,7 @@ async def _lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="LedgerLens Risk Score API",
+    title="StellarLense Risk Score API",
     version="1.0.0",
     description="Wallet risk scores for Stellar DEX wash-trade detection.",
     lifespan=_lifespan,

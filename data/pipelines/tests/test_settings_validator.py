@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from config.settings_validator import (
-    DEFAULT_LEDGERLENS_SPECS,
+    DEFAULT_STELLARLENSE_SPECS,
     SettingSpec,
     SettingsValidationError,
     SettingsValidator,
@@ -126,7 +126,7 @@ class TestSettingsValidator:
 
 class TestRiskThresholdSpecs:
     def _spec(self, name: str) -> SettingSpec:
-        return next(s for s in DEFAULT_LEDGERLENS_SPECS if s.name == name)
+        return next(s for s in DEFAULT_STELLARLENSE_SPECS if s.name == name)
 
     def test_risk_score_flag_threshold_rejects_out_of_range(self):
         spec = self._spec("RISK_SCORE_FLAG_THRESHOLD")
@@ -152,10 +152,10 @@ class TestRiskThresholdSpecs:
         assert spec.check(0.015, present=True) == []
 
 
-def test_default_ledgerlens_specs_validate_against_live_config():
+def test_default_stellar_lense_specs_validate_against_live_config():
     from config import Config
 
-    report = SettingsValidator(DEFAULT_LEDGERLENS_SPECS).validate(Config)
+    report = SettingsValidator(DEFAULT_STELLARLENSE_SPECS).validate(Config)
     # The live Config module ships sane defaults; this is a regression guard
     # so a future default change gets caught here with a named setting.
     assert report.ok, report.render()

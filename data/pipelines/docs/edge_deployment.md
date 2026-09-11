@@ -1,6 +1,6 @@
 # Edge Deployment Guide
 
-This guide explains how to deploy LedgerLens fraud-detection models on
+This guide explains how to deploy Stellar Lense fraud-detection models on
 resource-constrained devices such as mobile wallets, lightweight DEX nodes,
 or ARM single-board computers. It covers the quantisation and pruning
 pipeline, the accuracy–size trade-off, and step-by-step deployment
@@ -29,7 +29,7 @@ instructions.
 
 ## Why edge deployment?
 
-The default LedgerLens inference stack runs on server infrastructure with
+The default Stellar Lense inference stack runs on server infrastructure with
 adequate RAM and CPU. Two scenarios require running detection **on the
 device**:
 
@@ -73,14 +73,14 @@ backend) or on ARM CPUs with NEON integer SIMD.
   projections while leaving the graph convolution passes in float32.
 
 **Accuracy.** INT8 quantisation introduces rounding noise at inference
-time. For the DANN and GNN encoders in LedgerLens:
+time. For the DANN and GNN encoders in Stellar Lense:
 - Output activations differ from full-precision by < 0.05 absolute value
   on ≥ 95 % of inputs (verified by `tests/test_quantize_models.py::TestDANNOutputAgreement`).
 - End-to-end AUC degradation is < 1 % on the hold-out test set.
 
 **Post-training vs quantisation-aware training (QAT).**
 Post-training static quantisation (PTQ) was chosen because:
-- LedgerLens models are small (< 100 KB) so calibration noise is low even
+- Stellar Lense models are small (< 100 KB) so calibration noise is low even
   without fine-tuning.
 - QAT requires access to the full training set and additional training
   epochs, which conflicts with the CI/CD retraining pipeline timeline.
@@ -351,10 +351,10 @@ pip install scikit-learn xgboost lightgbm joblib
 # 2. Copy only the compressed artifacts:
 rsync -av --include="*_int8.pt" --include="*_leafq.joblib" \
     --include="metrics.json" --include="metrics.json.sig" \
-    --exclude="*" models/ user@pi:/opt/ledgerlens/models/
+    --exclude="*" models/ user@pi:/opt/stellar_lense/models/
 
 # 3. Set the model directory and run inference:
-MODEL_DIR=/opt/ledgerlens/models python -m detection.model_inference
+MODEL_DIR=/opt/stellar_lense/models python -m detection.model_inference
 ```
 
 On ARM Cortex-A72 (Raspberry Pi 4), INT8 inference is ≈ 2× faster than

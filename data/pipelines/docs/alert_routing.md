@@ -80,7 +80,7 @@ rules:
     stop_on_match: true
     destinations:
       - channel: pagerduty
-        target: "ledgerlens-critical"
+        target: "stellar-lense-critical"
 
 default_destinations:
   - channel: webhook

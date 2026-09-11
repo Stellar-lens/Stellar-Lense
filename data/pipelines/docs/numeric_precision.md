@@ -7,7 +7,7 @@
 
 ## Overview
 
-This document describes the numeric precision guard system for LedgerLens-data, a comprehensive solution for handling financial calculations with exact decimal arithmetic. The system prevents precision loss errors common with floating-point arithmetic and provides Stellar blockchain-specific features for handling stroops (7-decimal precision).
+This document describes the numeric precision guard system for StellarLense-data, a comprehensive solution for handling financial calculations with exact decimal arithmetic. The system prevents precision loss errors common with floating-point arithmetic and provides Stellar blockchain-specific features for handling stroops (7-decimal precision).
 
 ### Why This Matters
 
@@ -772,7 +772,7 @@ Potential improvements for future iterations:
 ## Support
 
 For issues or questions:
-- GitHub Issues: [LedgerLens-data/issues](https://github.com/product-labo/Ledgerlens-data/issues)
+- GitHub Issues: [StellarLense-data/issues](https://github.com/product-labo/StellarLense-data/issues)
 - Documentation: `docs/numeric_precision.md`
 - Tests: `tests/test_decimal_guards.py`
 - Code: `utils/decimal_guards.py`

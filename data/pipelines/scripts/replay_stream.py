@@ -42,7 +42,7 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 # Replay-specific consumer group to track replay offsets separately
-DEFAULT_REPLAY_GROUP = "ledgerlens-replay"
+DEFAULT_REPLAY_GROUP = "stellar-lense-replay"
 
 # Replay model version tag
 REPLAY_MODEL_VERSION_TAG = "replay"

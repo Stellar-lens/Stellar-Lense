@@ -7,7 +7,7 @@ triage slow: on-call has to read a stack trace and guess which subsystem
 failed, whether it's retryable, and what to check first.
 
 This module defines a small exception hierarchy rooted at
-``LedgerLensError`` where every raised error carries:
+``StellarLenseError`` where every raised error carries:
 
 - a namespaced ``code`` (e.g. ``"ING-001"``) that is stable and greppable
   across logs, dashboards, and runbooks;
@@ -54,7 +54,7 @@ class ErrorCategory(StrEnum):
     STREAMING = "streaming"
 
 
-class LedgerLensError(Exception):
+class StellarLenseError(Exception):
     """Base class for all taxonomy errors. Do not raise directly — use a subclass."""
 
     category: ErrorCategory = ErrorCategory.VALIDATION
@@ -103,7 +103,7 @@ class LedgerLensError(Exception):
         }
 
 
-class IngestionError(LedgerLensError):
+class IngestionError(StellarLenseError):
     """Failures reading/parsing source data (Horizon, Kafka, files)."""
 
     category = ErrorCategory.INGESTION
@@ -111,7 +111,7 @@ class IngestionError(LedgerLensError):
     default_retryable = True
 
 
-class ValidationError(LedgerLensError):
+class ValidationError(StellarLenseError):
     """Data that was read successfully but fails schema/semantic validation."""
 
     category = ErrorCategory.VALIDATION
@@ -119,7 +119,7 @@ class ValidationError(LedgerLensError):
     default_retryable = False
 
 
-class TransformError(LedgerLensError):
+class TransformError(StellarLenseError):
     """Failures during feature engineering / data transformation."""
 
     category = ErrorCategory.TRANSFORM
@@ -127,7 +127,7 @@ class TransformError(LedgerLensError):
     default_retryable = False
 
 
-class ModelError(LedgerLensError):
+class ModelError(StellarLenseError):
     """Failures during model training or inference."""
 
     category = ErrorCategory.MODEL
@@ -135,7 +135,7 @@ class ModelError(LedgerLensError):
     default_retryable = False
 
 
-class StorageError(LedgerLensError):
+class StorageError(StellarLenseError):
     """Failures reading/writing durable storage (DB, Redis, filesystem)."""
 
     category = ErrorCategory.STORAGE
@@ -143,7 +143,7 @@ class StorageError(LedgerLensError):
     default_retryable = True
 
 
-class ConfigurationError(LedgerLensError):
+class ConfigurationError(StellarLenseError):
     """Invalid or missing configuration detected at startup or runtime."""
 
     category = ErrorCategory.CONFIGURATION
@@ -151,7 +151,7 @@ class ConfigurationError(LedgerLensError):
     default_retryable = False
 
 
-class ExternalServiceError(LedgerLensError):
+class ExternalServiceError(StellarLenseError):
     """Failures calling out to an external service (Horizon API, Soroban RPC, etc)."""
 
     category = ErrorCategory.EXTERNAL_SERVICE
@@ -159,7 +159,7 @@ class ExternalServiceError(LedgerLensError):
     default_retryable = True
 
 
-class StreamingError(LedgerLensError):
+class StreamingError(StellarLenseError):
     """Failures in the streaming pipeline (Kafka consumer/producer, WS server)."""
 
     category = ErrorCategory.STREAMING
@@ -169,7 +169,7 @@ class StreamingError(LedgerLensError):
 
 @contextmanager
 def wrap_errors(
-    error_cls: type[LedgerLensError],
+    error_cls: type[StellarLenseError],
     code_suffix: str,
     *,
     context: dict[str, Any] | None = None,
@@ -216,7 +216,7 @@ def format_diagnostic(exc: BaseException) -> str:
     depth = 0
     while current is not None:
         indent = "  " * depth
-        if isinstance(current, LedgerLensError):
+        if isinstance(current, StellarLenseError):
             lines.append(f"{indent}[{current.code}] ({current.category.value}) {current.message}")
             if current.context:
                 for k, v in current.context.items():

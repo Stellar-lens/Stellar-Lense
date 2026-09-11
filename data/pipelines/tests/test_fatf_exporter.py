@@ -37,7 +37,7 @@ _HIGH_SCORE_REPORT = {
         "24": {"chi_square": 42.1, "mad": 0.14, "mad_nonconforming": True, "sample_size": 300}
     },
     "trade_evidence": [],
-    "model_metadata": {"name": "LedgerLens Ensemble", "version": "1.0"},
+    "model_metadata": {"name": "StellarLense Ensemble", "version": "1.0"},
     "report_sha256": "abc123def456abc123def456abc123def456abc123def456abc123def456abc1",
     "soroban_anchor_tx": None,
 }
@@ -209,7 +209,7 @@ class TestExportIvms101:
         doc = export_ivms101(_HIGH_SCORE_REPORT)
         meta = doc["payloadMetadata"]
         assert meta["reportId"] == _HIGH_SCORE_REPORT["report_id"]
-        assert meta["reportingEntity"] == "LedgerLens"
+        assert meta["reportingEntity"] == "StellarLense"
         assert meta["schemaVersion"] == "1.0"
         assert meta["generatedAt"] == _HIGH_SCORE_REPORT["generated_at"]
 

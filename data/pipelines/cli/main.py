@@ -14,7 +14,7 @@ def setup_logging(verbose: bool = False):
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="ledgerlens-ops", description="Operational Harness for LedgerLens Data Pipelines"
+        prog="stellar-lense-ops", description="Operational Harness for StellarLense Data Pipelines"
     )
     parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose debug logging")
 

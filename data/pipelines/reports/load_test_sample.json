@@ -1,6 +1,6 @@
 {
   "meta": {
-    "tool": "ledgerlens-load-test",
+    "tool": "stellar-lense-load-test",
     "version": "1.0.0",
     "timestamp": "2026-06-29T00:00:00+00:00",
     "parameters": {
@@ -9,7 +9,7 @@
       "ramp_time_s": 30,
       "no_kafka": true,
       "bootstrap": "localhost:9092",
-      "topic_prefix": "ledgerlens.trades",
+      "topic_prefix": "stellar_lense.trades",
       "seed": 42
     }
   },

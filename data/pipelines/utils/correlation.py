@@ -57,7 +57,7 @@ _correlation_extra: contextvars.ContextVar[dict[str, Any] | None] = contextvars.
 
 
 class PipelineStage:
-    """Canonical names for the LedgerLens detection pipeline stages."""
+    """Canonical names for the StellarLense detection pipeline stages."""
 
     INGESTION = "ingestion"
     DETECTION = "detection"

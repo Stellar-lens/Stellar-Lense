@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a dependency risk report for LedgerLens core packages.
+"""Build a dependency risk report for StellarLense core packages.
 
 The default mode is deterministic and offline: it reads direct requirements from
 ``requirements.txt`` and pinned versions from ``requirements.lock``.  Use

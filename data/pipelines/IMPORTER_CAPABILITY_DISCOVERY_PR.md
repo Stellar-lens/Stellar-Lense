@@ -8,7 +8,7 @@
 
 ## Summary
 
-This PR introduces a comprehensive **Importer Capability Discovery System** for LedgerLens-data, enabling runtime discovery, validation, and querying of all data source importers. This foundation-level capability moves the repository toward a more mature, scalable, and contributor-friendly engineering baseline.
+This PR introduces a comprehensive **Importer Capability Discovery System** for StellarLense-data, enabling runtime discovery, validation, and querying of all data source importers. This foundation-level capability moves the repository toward a more mature, scalable, and contributor-friendly engineering baseline.
 
 **Impact:** Repository-wide infrastructure capability that makes importers discoverable, queryable, and validatable without reading source code or trial-and-error imports.
 
@@ -594,7 +594,7 @@ No migration needed - system is 100% backward compatible.
 
 ## Ready for Review
 
-This PR represents a substantial, well-tested foundation for importer capability discovery in LedgerLens-data. All acceptance criteria for the 200-point Stellar Wave advanced build issue are met.
+This PR represents a substantial, well-tested foundation for importer capability discovery in StellarLense-data. All acceptance criteria for the 200-point Stellar Wave advanced build issue are met.
 
 **Reviewers:** Please run validation commands:
 

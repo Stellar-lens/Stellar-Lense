@@ -1,5 +1,5 @@
 """
-Threshold Strategy Framework for Ledgerlens-data
+Threshold Strategy Framework for StellarLense-data
 
 This module provides a framework for determining the optimal risk score threshold
 for flagging transactions or entities. It supports three strategies:

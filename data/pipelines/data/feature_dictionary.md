@@ -1,4 +1,4 @@
-# LedgerLens Feature Dictionary
+# Stellar Lense Feature Dictionary
 
 Every feature produced by `detection/feature_engineering.py` is documented here.
 Each entry states what the feature measures, how it is computed, its expected
@@ -69,7 +69,7 @@ against the theoretical Benford distribution. Computed by
 
 Mean Absolute Deviation between observed and expected digit frequencies over the
 trailing `h`-hour window. The non-conformity threshold `MAD_NONCONFORMITY_THRESHOLD = 0.015`
-is the standard Nigrini (2012) cutoff used throughout LedgerLens.
+is the standard Nigrini (2012) cutoff used throughout Stellar Lense.
 
 ---
 

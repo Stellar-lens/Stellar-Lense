@@ -37,7 +37,7 @@ def _validate_data_path(path: str) -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Run PC-algorithm causal discovery on a LedgerLens feature Parquet file."
+        description="Run PC-algorithm causal discovery on a StellarLense feature Parquet file."
     )
     parser.add_argument(
         "--data",

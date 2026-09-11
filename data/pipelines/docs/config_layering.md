@@ -17,7 +17,7 @@ Precedence (lowest to highest):
 2. `config/environments/base.yaml` — checked-in shared defaults
 3. `config/environments/{environment}.yaml` — environment-specific overlay
    (`local.yaml`, `ci.yaml`; add `staging.yaml`/`production.yaml` as needed)
-4. `LEDGERLENS_*` environment variables
+4. `STELLARLENSE_*` environment variables
 5. `overrides` — explicit runtime overrides (tests, CLI flags)
 
 This module does not replace `config.Config` — it's for new subsystems (or
@@ -32,12 +32,12 @@ redesigning the existing env-var-only settings class.
   (`CFG-001`, from [[error_taxonomy]]) naming the offending path.
 - Environment variables are coerced to match the *type* of the value
   already resolved for that key (bool/int/float/comma-list), so
-  `LEDGERLENS_DB_POOL_SIZE=20` becomes `int(20)`, not the string `"20"`.
+  `STELLARLENSE_DB_POOL_SIZE=20` becomes `int(20)`, not the string `"20"`.
 - `require(*keys)` batches every missing/empty required key into a single
   `ConfigurationError` (`CFG-002`) with a `missing_keys` list in `context`,
   instead of failing one key at a time across repeated CI runs.
 - `.source(key)` and `.explain()` expose provenance for diagnostics.
-- `detect_environment()` picks `LEDGERLENS_ENV` if set, else `"ci"` when
+- `detect_environment()` picks `STELLARLENSE_ENV` if set, else `"ci"` when
   `CI`/`GITHUB_ACTIONS` are present (matching the same signal
   `tests/conftest.py` already uses to select the Hypothesis profile), else
   `"local"`.
@@ -78,34 +78,34 @@ practice.
 3. **`config/environments/local.yaml`** sets `log_level: DEBUG` — overrides
    `base.yaml` because the environment-specific overlay is layer 3, above
    layer 2.
-4. **`LEDGERLENS_LOG_LEVEL` environment variable** — if set (e.g.
-   `LEDGERLENS_LOG_LEVEL=WARNING` in a shell or `.env`), it overrides
+4. **`STELLARLENSE_LOG_LEVEL` environment variable** — if set (e.g.
+   `STELLARLENSE_LOG_LEVEL=WARNING` in a shell or `.env`), it overrides
    `local.yaml`'s `DEBUG` because actual OS environment variables sit at
    layer 4, above every YAML layer.
 5. **`overrides`** passed explicitly by the caller (tests, CLI flags) — if
    given, this wins over everything else, including environment variables.
 
-So with no `LEDGERLENS_LOG_LEVEL` set and no explicit `overrides`, running
+So with no `STELLARLENSE_LOG_LEVEL` set and no explicit `overrides`, running
 locally resolves `log_level` to `"DEBUG"` from `local.yaml`:
 
 ```
-$ LEDGERLENS_ENV=local python -c "from config.layering import LayeredConfig; \
+$ STELLARLENSE_ENV=local python -c "from config.layering import LayeredConfig; \
   cfg = LayeredConfig({'log_level': 'INFO'}, environment='local'); \
   print(cfg.get('log_level'), '<-', cfg.source('log_level'))"
 DEBUG <- env_file
 ```
 
-If `LEDGERLENS_LOG_LEVEL=WARNING` is set in the shell, it wins over
+If `STELLARLENSE_LOG_LEVEL=WARNING` is set in the shell, it wins over
 `local.yaml`'s `DEBUG`:
 
 ```
-$ LEDGERLENS_ENV=local LEDGERLENS_LOG_LEVEL=WARNING python -c "from config.layering import LayeredConfig; \
+$ STELLARLENSE_ENV=local STELLARLENSE_LOG_LEVEL=WARNING python -c "from config.layering import LayeredConfig; \
   cfg = LayeredConfig({'log_level': 'INFO'}, environment='local'); \
   print(cfg.get('log_level'), '<-', cfg.source('log_level'))"
 WARNING <- env_var
 ```
 
-**Where OS environment variables fit:** actual `LEDGERLENS_*` OS environment
+**Where OS environment variables fit:** actual `STELLARLENSE_*` OS environment
 variables are layer 4 — they override both `base.yaml` and every
 environment-specific YAML overlay (`local.yaml`, `ci.yaml`, etc.), but they
 are themselves overridden by explicit `overrides` passed in code (layer 5,
