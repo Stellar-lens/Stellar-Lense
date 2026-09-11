@@ -154,3 +154,38 @@ def asset_risk_ranking() -> list[dict]:
         )
     rankings.sort(key=lambda r: r["average_score"], reverse=True)
     return rankings
+
+
+def pair_score_history(pair_id: str) -> list[dict]:
+    """Coarse historical view of a pair's aggregate risk score.
+
+    This demo API has no running ingestion pipeline persisting scores over
+    time (unlike packages/core/detection/storage.py's get_score_history,
+    which reads a real risk_scores table a live pipeline writes to) — so
+    there's no genuine time series to read. This derives one instead: at
+    each distinct trade timestamp for the pair, recompute every wallet's
+    score using only trades up to that point, exactly like
+    asset_risk_ranking() does for the *current* moment. The result is real
+    variation grounded in the actual seeded trade data, not fabricated
+    numbers — just a simulation of history rather than a persisted one.
+    """
+    trades = trades_for_pair(pair_id)
+    if not trades:
+        return []
+
+    cutoffs = sorted({t.ledger_close_time for t in trades})
+    history = []
+    for cutoff in cutoffs:
+        window = [t for t in trades if t.ledger_close_time <= cutoff]
+        wallets = {w for t in window for w in (t.base_account, t.counter_account)}
+        scores = [score_wallet(window, w)["score"] for w in wallets]
+        if not scores:
+            continue
+        history.append(
+            {
+                "timestamp": cutoff,
+                "average_score": round(sum(scores) / len(scores), 2),
+                "max_score": max(scores),
+            }
+        )
+    return history

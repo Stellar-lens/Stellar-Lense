@@ -83,3 +83,41 @@ def test_asset_risk_ranking():
     # Ranking should be sorted descending by average score.
     scores = [r["average_score"] for r in body]
     assert scores == sorted(scores, reverse=True)
+
+
+def test_pair_scores():
+    pair = storage.known_pairs()[0]
+    response = client.get(f"/assets/{pair}/scores")
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == len(storage.wallets_for_pair(pair))
+    scores = [r["score"] for r in body]
+    assert scores == sorted(scores, reverse=True)
+    for r in body:
+        assert r["asset_pair"] == pair
+        assert "features" in r
+        assert "benford" in r
+
+
+def test_pair_scores_unknown_pair_returns_404():
+    response = client.get("/assets/NOT/A/REAL/PAIR/scores")
+    assert response.status_code == 404
+
+
+def test_pair_score_history():
+    pair = storage.known_pairs()[0]
+    response = client.get(f"/assets/{pair}/score-history")
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) > 0
+    # Chronological, oldest first.
+    timestamps = [p["timestamp"] for p in body]
+    assert timestamps == sorted(timestamps)
+    for p in body:
+        assert 0 <= p["average_score"] <= 100
+        assert 0 <= p["max_score"] <= 100
+
+
+def test_pair_score_history_unknown_pair_returns_404():
+    response = client.get("/assets/NOT/A/REAL/PAIR/score-history")
+    assert response.status_code == 404
