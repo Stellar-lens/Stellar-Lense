@@ -1,0 +1,34 @@
+# Sample Phase-1 strategy: classic fast/slow SMA crossover.
+# Run against the committed fixture:
+#   pnpm --filter @stellar-lense/bot backtest -- \
+#     --strategy strategies/sma-crossover.example.yaml \
+#     --data fixtures/xlm-usdc-5m.ndjson
+
+name: sma-crossover-xlm-usdc
+pair:
+  base: XLM
+  counter: USDC
+
+indicators:
+  - id: fast
+    type: sma
+    period: 3
+  - id: slow
+    type: sma
+    period: 8
+
+rules:
+  - when: crosses_above
+    left: fast
+    right: slow
+    action: buy
+    sizePct: 1.0
+  - when: crosses_below
+    left: fast
+    right: slow
+    action: sell
+    sizePct: 1.0
+
+risk:
+  initialCash: 10000
+  feeBps: 10
