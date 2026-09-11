@@ -7,6 +7,11 @@ venv/
 .coverage
 htmlcov/
 
+# Real env files (secrets) — .env.example is the tracked template.
+.env
+.env.local
+.env.*.local
+
 # Rust / Soroban
 contracts/**/target/
 Cargo.lock

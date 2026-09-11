@@ -3,6 +3,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from api.config import cors_allowed_origins
 from api.routes import alerts, assets, scores
 
 app = FastAPI(
@@ -16,11 +17,13 @@ app = FastAPI(
 
 # Public read-only API consumed directly from the browser by apps/web (and
 # any other dashboard) — no cookies/auth headers involved, so a permissive
-# origin list is fine here. Tighten this once apps/web's deployed origin is
-# known instead of local dev ports.
+# *method* list is fine, but the origin list is still explicit and
+# environment-driven (CORS_ALLOWED_ORIGINS — see api/config.py) rather than
+# hardcoded, so a real deployment can restrict it to apps/web's actual
+# domain instead of local dev ports.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=cors_allowed_origins(),
     allow_methods=["GET"],
     allow_headers=["*"],
 )

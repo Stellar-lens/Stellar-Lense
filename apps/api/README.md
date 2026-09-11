@@ -238,6 +238,33 @@ pytest
 The API will be available at `http://127.0.0.1:8000`, with interactive
 docs at `http://127.0.0.1:8000/docs`.
 
+## Deployment
+
+Containerized for deployment to a container host (Railway/Fly.io/Render).
+
+```bash
+# Build context is the MONOREPO ROOT, not apps/api — this service is a
+# member of the shared uv workspace rooted there (one pyproject.toml +
+# uv.lock covering apps/api and packages/core together). Run from the
+# repo root:
+docker build -f apps/api/Dockerfile -t stellar-lense-api .
+docker run -p 8000:8000 -e CORS_ALLOWED_ORIGINS=https://your-deployed-web-domain stellar-lense-api
+```
+
+On Railway/Fly/Render, point the platform's Dockerfile path at
+`apps/api/Dockerfile` and its build context / root directory at the repo
+root (not `apps/api`) for the same reason. See the comment at the top of
+that Dockerfile for the exact rationale.
+
+Configuration is entirely environment-variable driven — see
+`apps/api/.env.example` for the full, exhaustive list (there are only two
+things this service actually reads: `CORS_ALLOWED_ORIGINS`, and `PORT`,
+which the platform sets itself). Nothing is hardcoded. This service has no
+database and doesn't call CryptoPanic/CoinDesk — see the notes in that file
+for why, and where those actually live (`apps/web`).
+
+`GET /health` returns `{"status": "ok"}` for the platform's health checks.
+
 ## Batch Scoring Pipeline
 
 `run_pipeline.py` runs the detection pipeline offline against live Horizon

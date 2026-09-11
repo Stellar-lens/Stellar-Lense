@@ -1,0 +1,40 @@
+# Root-level .dockerignore — used by apps/api/Dockerfile, which builds
+# from the repo root (it needs the shared uv workspace lockfile; see the
+# comment at the top of apps/api/Dockerfile). Keeps the build context small
+# by excluding everything not actually COPYed into that image; add
+# exclusions here for any other service that later builds from the root
+# the same way.
+
+.git/
+node_modules/
+**/node_modules/
+
+# Python virtualenvs and caches, wherever they live in the monorepo.
+.venv/
+**/.venv/
+venv/
+**/venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+**/.pytest_cache/
+.mypy_cache/
+**/.mypy_cache/
+
+# packages/core is a uv workspace member apps/api's Docker build needs to
+# know *about* (its pyproject.toml, for workspace resolution) but does not
+# actually depend on or run — its full source (~600MB+, including data/
+# models/notebooks) would otherwise bloat the build context for no reason.
+packages/core/**
+!packages/core/pyproject.toml
+
+# Not needed to build/run apps/api.
+apps/web/
+apps/bot/
+data/
+contracts/
+docs/
+*.md
+
+.DS_Store
