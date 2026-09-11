@@ -202,3 +202,29 @@ def test_horizon_normalization_defaults_empty_base_code_to_xlm(
     )
     trade = _to_trade(record)
     assert trade.base_asset.code == "XLM"
+
+
+def test_horizon_normalization_handles_omitted_base_code_key():
+    """Real Horizon records omit base_asset_code/base_asset_issuer entirely
+    for native-asset legs (only base_asset_type: "native" is present) —
+    unlike _raw_horizon_record()'s fixture above, which always includes the
+    key (as "" for native assets). That mismatch let a KeyError ship: _to_trade
+    indexed record["base_asset_code"] directly instead of using .get(), so
+    every native-asset trade — most trades on the SDEX — crashed. Regression
+    test for that specific, real record shape."""
+    record = {
+        "id": "1",
+        "ledger_close_time": "2024-01-01T00:00:00Z",
+        "base_account": "GAAAAAABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890",
+        "counter_account": "GBBBBBBCDEFGHIJKLMNOPQRSTUVWXYZ1234567890",
+        "base_asset_type": "native",
+        # base_asset_code / base_asset_issuer intentionally absent.
+        "counter_asset_code": "USDC",
+        "counter_asset_issuer": "GA5ZSEJYBY3RJRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
+        "base_amount": "100.5",
+        "counter_amount": "50.0",
+        "price": {"n": 1, "d": 2},
+    }
+    trade = _to_trade(record)
+    assert trade.base_asset.code == "XLM"
+    assert trade.base_asset.issuer is None
