@@ -1,0 +1,10 @@
+{
+  "name": "@stellar-lense/bot",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Stellar Lense trading bot service (phased: backtest -> signal -> auto-execution)",
+  "scripts": {
+    "lint": "echo \"[bot] no lint configured yet\"",
+    "test": "echo \"[bot] no tests configured yet\""
+  }
+}

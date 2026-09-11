@@ -1,0 +1,10 @@
+{
+  "name": "@stellar-lense/web",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Stellar Lense product website (Next.js) — replaces Ledgerlens-dashboard",
+  "scripts": {
+    "lint": "echo \"[web] no lint configured yet\"",
+    "test": "echo \"[web] no tests configured yet\""
+  }
+}
