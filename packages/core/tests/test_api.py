@@ -1,0 +1,875 @@
+"""Tests for the local read-only API (api/main.py).
+
+Isolation strategy
+------------------
+Every test uses the ``client`` fixture, which:
+  1. Creates a fresh tmp_path DB for the test.
+  2. Patches ``config.settings.settings.ledgerlens_db_path`` via
+     ``object.__setattr__`` (pydantic-safe) so every module that imports
+     ``settings`` (api.main, detection.storage, detection.api_key_store …)
+     sees the same isolated path.
+  3. Does NOT re-import ``api.main.app`` — the singleton app object is
+     imported once at module load; route handlers read ``settings.db_path``
+     at call time, so isolation is maintained without re-importing.
+
+Removed cross-test-file coupling
+---------------------------------
+``test_robustness_endpoint_with_report`` previously imported
+``tests.test_robustness_eval.make_df`` and ``tests.test_adversarial_attack.DummyModel``,
+creating hidden inter-test-file coupling.  The minimal helpers required by
+those tests are now defined inline in this module.
+"""
+
+from __future__ import annotations
+
+import base64
+import os
+from datetime import datetime, timedelta, timezone
+
+import numpy as np
+import pandas as pd
+import pytest
+from fastapi.testclient import TestClient
+
+from api.main import app
+from detection.risk_score import RiskScore
+from detection.storage import save_scores
+
+
+# ---------------------------------------------------------------------------
+# Minimal helpers inlined from formerly-coupled test files
+# (replaces ``from tests.test_robustness_eval import make_df`` and
+#  ``from tests.test_adversarial_attack import DummyModel``)
+# ---------------------------------------------------------------------------
+
+
+class _DummyModel:
+    """Minimal stand-in model for robustness-report tests."""
+
+    def __init__(self, w: float = 5.0, b: float = -1.0) -> None:
+        self.w = w
+        self.b = b
+
+    def predict_proba(self, X):  # noqa: N803
+        s = np.sum(X.values, axis=1) * self.w + self.b
+        probs = 1 / (1 + np.exp(-s))
+        return np.vstack([(1 - probs), probs]).T
+
+
+def _make_robustness_df() -> pd.DataFrame:
+    """Create a tiny labelled feature DataFrame for robustness evaluation."""
+    from detection.feature_engineering import FEATURE_NAMES
+
+    rows = [{f: 0.2 for f in FEATURE_NAMES} for _ in range(10)]
+    df = pd.DataFrame(rows)
+    df["label"] = 1
+    return df
+
+
+# ---------------------------------------------------------------------------
+# Robustness endpoint tests (admin-key gated, dependency-override pattern)
+# ---------------------------------------------------------------------------
+
+
+def test_robustness_endpoint_no_report():
+    """When no robustness report exists, the endpoint returns 404 or 200."""
+    from api.main import require_admin_key
+
+    app.dependency_overrides[require_admin_key] = lambda: None
+    client = TestClient(app)
+    try:
+        resp = client.get("/v1/admin/robustness-report")
+        assert resp.status_code in (404, 200)
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_robustness_endpoint_with_report():
+    """After persisting a report, the endpoint returns 200 with model_version."""
+    from api.main import require_admin_key
+    from detection.robustness_eval import compute_robustness_report
+
+    app.dependency_overrides[require_admin_key] = lambda: None
+    client = TestClient(app)
+    try:
+        models = {"dummy": _DummyModel(w=5.0, b=-1.0)}
+        df = _make_robustness_df()
+        compute_robustness_report(models, df, n_samples=10, epsilon=0.05, steps=3, seed=2)
+
+        resp = client.get("/v1/admin/robustness-report")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "model_version" in data
+    finally:
+        app.dependency_overrides.clear()
+
+
+# ---------------------------------------------------------------------------
+# Shared autouse fixture: LEDGERLENS_WEBHOOK_ENCRYPTION_KEY
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def webhook_env(monkeypatch):
+    key = base64.b64encode(os.urandom(32)).decode()
+    monkeypatch.setenv("LEDGERLENS_WEBHOOK_ENCRYPTION_KEY", key)
+
+
+# ---------------------------------------------------------------------------
+# Primary client fixture — fully isolated DB per test
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def client(tmp_path, monkeypatch):
+    """TestClient with an isolated DB.  Settings are patched via
+    ``object.__setattr__`` so every module that imports the singleton
+    ``config.settings.settings`` sees the tmp-path DB.
+    """
+    db_path = str(tmp_path / "ledgerlens.db")
+    monkeypatch.setenv("LEDGERLENS_DB_PATH", db_path)
+
+    import config.settings as settings_module
+
+    object.__setattr__(settings_module.settings, "ledgerlens_db_path", db_path)
+
+    # Initialise schema so SELECT 1 succeeds in the health check
+    from detection.storage import init_db
+    init_db()
+
+    return TestClient(app)
+
+
+# ---------------------------------------------------------------------------
+# read:scores API-key header for wallet-detail endpoint
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def read_scores_headers(client):
+    """`X-LedgerLens-Api-Key` header for a key scoped to `read:scores`.
+
+    The fixture depends on ``client`` so ``settings.db_path`` is already
+    patched to the tmp DB before ``create_api_key`` is called.
+    """
+    from detection.api_key_store import create_api_key
+
+    key = create_api_key(scopes=["read:scores"])
+    return {"X-LedgerLens-Api-Key": key["plaintext_key"]}
+
+
+# ---------------------------------------------------------------------------
+# Score factory helper
+# ---------------------------------------------------------------------------
+
+
+def _score(
+    wallet,
+    asset_pair,
+    score,
+    *,
+    benford_flag=None,
+    ml_flag=None,
+    confidence=90,
+    timestamp=None,
+) -> RiskScore:
+    return RiskScore(
+        wallet=wallet,
+        asset_pair=asset_pair,
+        score=score,
+        benford_flag=score > 50 if benford_flag is None else benford_flag,
+        ml_flag=score > 50 if ml_flag is None else ml_flag,
+        confidence=confidence,
+        timestamp=timestamp or datetime.now(timezone.utc),
+    )
+
+
+# ---------------------------------------------------------------------------
+# /v1/health
+# ---------------------------------------------------------------------------
+
+
+def test_health(client, tmp_path, monkeypatch):
+    """Healthy path: DB reachable and all model stub files present → 200 ok."""
+    import config.settings as settings_module
+    import ingestion.horizon_streamer as horizon_streamer
+    from detection.model_inference import _MODEL_FILENAMES
+    from utils.circuit_breaker import CircuitBreaker
+
+    model_dir = tmp_path / "models"
+    model_dir.mkdir()
+    for filename in _MODEL_FILENAMES.values():
+        (model_dir / filename).write_bytes(b"stub")
+
+    object.__setattr__(settings_module.settings, "model_dir", str(model_dir))
+    closed_circuit = CircuitBreaker(
+        name="horizon_test", failure_threshold=5, recovery_timeout=60
+    )
+    monkeypatch.setattr(horizon_streamer, "horizon_circuit", closed_circuit)
+
+    response = client.get("/v1/health")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "ok"
+    assert body["db"] == "ok"
+    assert body["models"] == "ok"
+    assert body["circuits"] == {
+        "horizon": "closed",
+        "feature_store_redis": "closed",
+    }
+
+
+def test_health_open_circuit_is_degraded_not_failed(client, tmp_path, monkeypatch):
+    """An OPEN circuit → status='degraded' with HTTP 200 (not 503).
+
+    Tests /v1/health directly (not the legacy /health redirect).
+    """
+    import config.settings as settings_module
+    import ingestion.horizon_streamer as horizon_streamer
+    from detection.model_inference import _MODEL_FILENAMES
+    from utils.circuit_breaker import CircuitBreaker
+
+    model_dir = tmp_path / "models"
+    model_dir.mkdir()
+    for filename in _MODEL_FILENAMES.values():
+        (model_dir / filename).write_bytes(b"stub")
+    object.__setattr__(settings_module.settings, "model_dir", str(model_dir))
+
+    open_circuit = CircuitBreaker(
+        name="horizon", failure_threshold=1, recovery_timeout=60
+    )
+    open_circuit.record_failure()
+    monkeypatch.setattr(horizon_streamer, "horizon_circuit", open_circuit)
+
+    response = client.get("/v1/health")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "degraded"
+    assert body["circuits"]["horizon"] == "open"
+
+
+# ---------------------------------------------------------------------------
+# /v1/scores  (list)
+# ---------------------------------------------------------------------------
+
+
+def test_list_scores_empty(client):
+    response = client.get("/v1/scores")
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_list_scores_and_filter_by_min_score(client):
+    import detection.storage as storage_module
+
+    save_scores(
+        [
+            _score("G" + "A" * 55, "XLM/USDC", 80),
+            _score("G" + "B" * 55, "XLM/USDC", 20),
+        ],
+        storage_module.settings.db_path,
+    )
+
+    response = client.get("/v1/scores")
+    assert response.status_code == 200
+    assert len(response.json()) == 2
+
+    response = client.get("/v1/scores?min_score=50")
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["wallet"] == "G" + "A" * 55
+
+
+@pytest.mark.parametrize("min_score", [0, 50, 100])
+def test_list_scores_accepts_min_score_within_bounds(client, min_score):
+    response = client.get("/v1/scores", params={"min_score": min_score})
+
+    assert response.status_code == 200
+
+
+@pytest.mark.parametrize("min_score", [-5, 101])
+def test_list_scores_rejects_min_score_outside_bounds(client, min_score):
+    response = client.get("/v1/scores", params={"min_score": min_score})
+
+    assert response.status_code == 422
+    assert any(
+        error["loc"][-1] == "min_score"
+        for error in response.json()["detail"]
+    )
+
+
+def test_list_scores_filters_by_benford_flag(client):
+    import detection.storage as storage_module
+
+    save_scores(
+        [
+            _score("G" + "B" * 55, "XLM/USDC", 60, benford_flag=True, ml_flag=False),
+            _score("G" + "C" * 55, "XLM/USDC", 95, benford_flag=False, ml_flag=True),
+        ],
+        storage_module.settings.db_path,
+    )
+
+    response = client.get("/v1/scores?benford_flag=true")
+    assert response.status_code == 200
+    body = response.json()
+    assert [item["wallet"] for item in body] == ["G" + "B" * 55]
+
+
+def test_list_scores_filters_by_ml_flag_false(client):
+    import detection.storage as storage_module
+
+    save_scores(
+        [
+            _score("G" + "M" * 55, "XLM/USDC", 95, benford_flag=False, ml_flag=True),
+            _score("G" + "N" * 55, "XLM/USDC", 60, benford_flag=True, ml_flag=False),
+        ],
+        storage_module.settings.db_path,
+    )
+
+    response = client.get("/v1/scores?ml_flag=false")
+    assert response.status_code == 200
+    body = response.json()
+    assert [item["wallet"] for item in body] == ["G" + "N" * 55]
+
+
+def test_list_scores_combines_flag_filters_and_min_score(client):
+    import detection.storage as storage_module
+
+    save_scores(
+        [
+            _score("G" + "M" * 55, "XLM/USDC", 80, benford_flag=True, ml_flag=False),
+            _score("G" + "L" * 55, "XLM/USDC", 40, benford_flag=True, ml_flag=False),
+            _score("G" + "W" * 55, "XLM/USDC", 95, benford_flag=True, ml_flag=True),
+        ],
+        storage_module.settings.db_path,
+    )
+
+    response = client.get("/v1/scores?min_score=50&benford_flag=true&ml_flag=false")
+    assert response.status_code == 200
+    body = response.json()
+    assert [item["wallet"] for item in body] == ["G" + "M" * 55]
+
+
+def test_list_scores_sorts_by_confidence(client):
+    import detection.storage as storage_module
+
+    save_scores(
+        [
+            _score("G" + "L" * 55, "XLM/USDC", 95, confidence=20),
+            _score("G" + "H" * 55, "XLM/USDC", 80, confidence=99),
+        ],
+        storage_module.settings.db_path,
+    )
+
+    response = client.get("/v1/scores?sort_by=confidence")
+    assert response.status_code == 200
+    body = response.json()
+    assert [item["wallet"] for item in body] == ["G" + "H" * 55, "G" + "L" * 55]
+
+
+def test_list_scores_sorts_by_timestamp(client):
+    import detection.storage as storage_module
+
+    now = datetime.now(timezone.utc)
+    save_scores(
+        [
+            _score(
+                "G" + "O" * 55, "XLM/USDC", 95,
+                timestamp=now - timedelta(minutes=10),
+            ),
+            _score("G" + "N" * 55, "XLM/USDC", 80, timestamp=now),
+        ],
+        storage_module.settings.db_path,
+    )
+
+    response = client.get("/v1/scores?sort_by=timestamp")
+    assert response.status_code == 200
+    body = response.json()
+    assert [item["wallet"] for item in body] == ["G" + "N" * 55, "G" + "O" * 55]
+
+
+def test_list_scores_rejects_invalid_sort_by(client):
+    response = client.get("/v1/scores?sort_by=invalid")
+    assert response.status_code == 422
+
+
+def test_list_scores_accepts_limit_offset(client):
+    import detection.storage as storage_module
+
+    save_scores(
+        [
+            _score("G" + "W1" + "A" * 52, "XLM/USDC", 10),
+            _score("G" + "W2" + "A" * 52, "XLM/USDC", 20),
+            _score("G" + "W3" + "A" * 52, "XLM/USDC", 30),
+        ],
+        storage_module.settings.db_path,
+    )
+
+    resp = client.get("/v1/scores?limit=2&offset=1")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body) == 2
+    assert [row["wallet"] for row in body] == [
+        "G" + "W2" + "A" * 52,
+        "G" + "W1" + "A" * 52,
+    ]
+
+
+def test_limit_offset_out_of_range_returns_422(client):
+    resp = client.get("/v1/scores?limit=0&offset=0")
+    assert resp.status_code == 422
+
+    resp = client.get("/v1/scores?limit=1001&offset=0")
+    assert resp.status_code == 422
+
+    resp = client.get("/v1/scores?limit=10&offset=-1")
+    assert resp.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# /v1/scores/{wallet}
+# ---------------------------------------------------------------------------
+
+
+def test_wallet_scores_not_found(client, read_scores_headers):
+    response = client.get("/v1/scores/" + "G" + "A" * 55, headers=read_scores_headers)
+    assert response.status_code == 404
+
+
+def test_wallet_scores_found(client, read_scores_headers):
+    import detection.storage as storage_module
+
+    save_scores(
+        [_score("G" + "A" * 55, "XLM/USDC", 80)],
+        storage_module.settings.db_path,
+    )
+
+    response = client.get("/v1/scores/" + "G" + "A" * 55, headers=read_scores_headers)
+    assert response.status_code == 200
+    body = response.json()
+    assert "scores" in body
+    assert len(body["scores"]) == 1
+    assert body["scores"][0]["wallet"] == "G" + "A" * 55
+    assert "cross_chain_links" in body
+
+
+def test_wallet_scores_validates_format(client, read_scores_headers):
+    valid_address = "G" + "A" * 55
+    response = client.get(f"/v1/scores/{valid_address}", headers=read_scores_headers)
+    assert response.status_code in (200, 404)
+
+
+def test_wallet_scores_rejects_too_short(client, read_scores_headers):
+    response = client.get("/v1/scores/G" + "A" * 54, headers=read_scores_headers)
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Invalid Stellar wallet address format."
+
+
+def test_wallet_scores_rejects_too_long(client, read_scores_headers):
+    response = client.get("/v1/scores/G" + "A" * 56, headers=read_scores_headers)
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Invalid Stellar wallet address format."
+
+
+def test_wallet_scores_rejects_non_g_start(client, read_scores_headers):
+    response = client.get("/v1/scores/" + "A" * 56, headers=read_scores_headers)
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Invalid Stellar wallet address format."
+
+
+def test_wallet_scores_rejects_lowercase(client, read_scores_headers):
+    response = client.get("/v1/scores/G" + "a" * 55, headers=read_scores_headers)
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Invalid Stellar wallet address format."
+
+
+def test_wallet_scores_rejects_invalid_character(client, read_scores_headers):
+    address = "G" + "A" * 27 + "0" + "A" * 27
+    response = client.get(f"/v1/scores/{address}", headers=read_scores_headers)
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Invalid Stellar wallet address format."
+
+
+def test_wallet_scores_rejects_empty_string(client, read_scores_headers):
+    response = client.get("/v1/scores/%20", headers=read_scores_headers)
+    assert response.status_code == 400
+
+
+def test_wallet_scores_cross_chain_links_present_when_bridge_data_exists(
+    client, read_scores_headers
+):
+    """GET /v1/scores/{wallet} includes cross_chain_links when bridge transfers exist."""
+    import detection.storage as storage_module
+    from ingestion.data_models import BridgeTransfer
+    from detection.storage import save_bridge_transfer
+
+    db = storage_module.settings.db_path
+    stellar_wallet = "G" + "C" * 55
+    evm_wallet = "0xAb5801a7D398351b8bE11C439e05C5B3259aeC9B"
+
+    save_scores([_score(stellar_wallet, "XLM/USDC", 75)], db)
+    save_bridge_transfer(
+        BridgeTransfer(
+            chain="ethereum",
+            direction="evm_to_stellar",
+            evm_wallet=evm_wallet,
+            stellar_wallet=stellar_wallet,
+            amount_usd=500.0,
+            token="USDC",
+            tx_hash_evm="0x" + "aa" * 32,
+            tx_hash_stellar=None,
+            timestamp=datetime.now(timezone.utc),
+        ),
+        db_path=db,
+    )
+
+    response = client.get(
+        f"/v1/scores/{stellar_wallet}", headers=read_scores_headers
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert "cross_chain_links" in body
+    links = body["cross_chain_links"]
+    assert len(links) == 1
+    assert links[0]["chain"] == "ethereum"
+    assert links[0]["evm_wallet"] == evm_wallet
+    assert "last_bridge_at" in links[0]
+
+
+# ---------------------------------------------------------------------------
+# /v1/alerts
+# ---------------------------------------------------------------------------
+
+
+def test_alerts_filters_by_threshold(client):
+    import config.settings as settings_module
+    import detection.storage as storage_module
+
+    object.__setattr__(settings_module.settings, "risk_score_threshold", 70)
+
+    save_scores(
+        [
+            _score("G" + "A" * 55, "XLM/USDC", 80),
+            _score("G" + "B" * 55, "XLM/USDC", 20),
+        ],
+        storage_module.settings.db_path,
+    )
+
+    response = client.get("/v1/alerts")
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["wallet"] == "G" + "A" * 55
+
+
+def test_alerts_accepts_limit_offset(client):
+    import config.settings as settings_module
+    import detection.storage as storage_module
+
+    object.__setattr__(settings_module.settings, "risk_score_threshold", 0)
+
+    save_scores(
+        [
+            _score("G" + "W1" + "A" * 52, "XLM/USDC", 10),
+            _score("G" + "W2" + "A" * 52, "XLM/USDC", 20),
+            _score("G" + "W3" + "A" * 52, "XLM/USDC", 30),
+        ],
+        storage_module.settings.db_path,
+    )
+
+    resp = client.get("/v1/alerts?limit=2&offset=0")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body) == 2
+    assert [row["wallet"] for row in body] == [
+        "G" + "W3" + "A" * 52,
+        "G" + "W2" + "A" * 52,
+    ]
+
+
+# ---------------------------------------------------------------------------
+# /v1/assets/risk-ranking
+# ---------------------------------------------------------------------------
+
+
+def test_asset_risk_ranking(client):
+    import detection.storage as storage_module
+
+    save_scores(
+        [
+            _score("G" + "A" * 55, "XLM/USDC", 80),
+            _score("G" + "B" * 55, "XLM/USDC", 40),
+            _score("G" + "D" * 55, "BTC/USDC", 10),
+        ],
+        storage_module.settings.db_path,
+    )
+
+    response = client.get("/v1/assets/risk-ranking")
+    assert response.status_code == 200
+    body = response.json()
+    assert body[0]["asset_pair"] == "XLM/USDC"
+    assert body[0]["average_score"] == 60.0
+    assert body[0]["wallet_count"] == 2
+
+
+# ---------------------------------------------------------------------------
+# /v1/webhooks
+# ---------------------------------------------------------------------------
+
+
+def test_create_webhook(client):
+    response = client.post(
+        "/v1/webhooks",
+        json={"url": "https://example.com/webhook", "secret": "whsec_test", "min_score": 70},
+    )
+    assert response.status_code == 201
+    body = response.json()
+    assert "subscriber_id" in body
+    assert len(body["subscriber_id"]) == 36
+
+
+def test_create_webhook_rejects_http(client):
+    response = client.post(
+        "/v1/webhooks",
+        json={"url": "http://evil.com/webhook", "secret": "whsec_test"},
+    )
+    assert response.status_code == 422
+
+
+def test_list_webhooks(client):
+    client.post(
+        "/v1/webhooks",
+        json={"url": "https://example.com/webhook", "secret": "whsec_test"},
+    )
+    response = client.get("/v1/webhooks")
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["url"] == "https://example.com/webhook"
+    assert "****" in body[0]["secret"]
+    assert "whsec_test" not in body[0]["secret"]
+
+
+def test_list_webhooks_empty(client):
+    response = client.get("/v1/webhooks")
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_delete_webhook(client):
+    resp = client.post(
+        "/v1/webhooks",
+        json={"url": "https://example.com/webhook", "secret": "whsec_test"},
+    )
+    sid = resp.json()["subscriber_id"]
+    response = client.delete(f"/v1/webhooks/{sid}")
+    assert response.status_code == 200
+    assert response.json() == {"status": "deactivated"}
+    assert len(client.get("/v1/webhooks").json()) == 0
+
+
+def test_delete_webhook_not_found(client):
+    response = client.delete("/v1/webhooks/nonexistent")
+    assert response.status_code == 404
+
+
+def test_dead_letters_endpoint(client):
+    response = client.get("/v1/webhooks/dead-letters")
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_create_webhook_with_filters(client):
+    response = client.post(
+        "/v1/webhooks",
+        json={
+            "url": "https://example.com/webhook",
+            "secret": "whsec_test",
+            "min_score": 80,
+            "wallet_filter": "G" + "A" * 55 + ",G" + "D" * 55,
+            "asset_pair_filter": "XLM/USDC",
+        },
+    )
+    assert response.status_code == 201
+    body = client.get("/v1/webhooks").json()
+    assert len(body) == 1
+    assert body[0]["wallet_filter"] == "G" + "A" * 55 + ",G" + "D" * 55
+    assert body[0]["asset_pair_filter"] == "XLM/USDC"
+    assert body[0]["min_score"] == 80
+
+
+# ---------------------------------------------------------------------------
+# /v1/correlations
+# ---------------------------------------------------------------------------
+
+
+def test_correlations_empty(client):
+    resp = client.get("/v1/correlations")
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+def test_correlations_returns_stored_data(client):
+    import detection.storage as storage_module
+
+    storage_module.save_pair_correlations(
+        [("XLM/USDC", "XLM/AQUA", 0.88)],
+        method="spearman",
+        shared_wallet_counts={("XLM/USDC", "XLM/AQUA"): 3},
+        db_path=storage_module.settings.db_path,
+    )
+
+    resp = client.get("/v1/correlations")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body) == 1
+    row = body[0]
+    assert row["pair_a"] == "XLM/USDC"
+    assert row["pair_b"] == "XLM/AQUA"
+    assert abs(row["correlation_r"] - 0.88) < 1e-6
+    assert row["method"] == "spearman"
+    assert row["shared_wallet_count"] == 3
+
+
+def test_correlations_returns_only_latest_run(client):
+    import time as _time
+    import detection.storage as storage_module
+
+    db = storage_module.settings.db_path
+
+    storage_module.save_pair_correlations(
+        [("XLM/USDC", "XLM/AQUA", 0.80)], method="spearman", db_path=db
+    )
+    _time.sleep(0.01)
+    storage_module.save_pair_correlations(
+        [("XLM/USDC", "XLM/yXLM", 0.91)], method="spearman", db_path=db
+    )
+
+    resp = client.get("/v1/correlations")
+    body = resp.json()
+    pairs = {(r["pair_a"], r["pair_b"]) for r in body}
+    assert ("XLM/USDC", "XLM/yXLM") in pairs
+    assert ("XLM/USDC", "XLM/AQUA") not in pairs
+
+
+# ---------------------------------------------------------------------------
+# /v1/rings
+# ---------------------------------------------------------------------------
+
+
+def test_rings_empty(client):
+    import detection.storage as storage_module
+
+    storage_module.init_db()
+    resp = client.get("/v1/rings")
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+def test_rings_returns_stored_data(client):
+    import detection.storage as storage_module
+
+    storage_module.init_db()
+    storage_module.save_rings(
+        [
+            {
+                "accounts": ["A", "B", "C"],
+                "total_volume": 300.0,
+                "cycle_volume": 100.0,
+                "avg_trade_count": 1.0,
+                "timing_tightness": 0.0,
+                "truncated": False,
+            }
+        ],
+        db_path=storage_module.settings.db_path,
+    )
+
+    resp = client.get("/v1/rings")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body) == 1
+    row = body[0]
+    assert row["accounts"] == ["A", "B", "C"]
+    assert row["total_volume"] == 300.0
+    assert row["cycle_volume"] == 100.0
+    assert row["detected_at"]
+
+
+# ---------------------------------------------------------------------------
+# API versioning — legacy redirect and deprecation header tests
+# ---------------------------------------------------------------------------
+
+
+def test_legacy_path_redirects_to_v1(client):
+    """Bare /health redirects to /v1/health with 302."""
+    response = client.get("/health", follow_redirects=False)
+    assert response.status_code == 302
+    assert response.headers["location"].endswith("/v1/health")
+
+
+def test_legacy_path_has_deprecation_headers(client):
+    """/health redirect response carries Deprecation and Sunset headers."""
+    response = client.get("/health", follow_redirects=False)
+    assert "Deprecation" in response.headers
+    assert "Sunset" in response.headers
+    assert "Link" in response.headers
+    assert "/v1/health" in response.headers["Link"]
+
+
+def test_v1_path_has_no_deprecation_headers(client, tmp_path, monkeypatch):
+    """Direct /v1/health calls do NOT carry Deprecation headers."""
+    import config.settings as settings_module
+    from detection.model_inference import _MODEL_FILENAMES
+
+    model_dir = tmp_path / "models"
+    model_dir.mkdir()
+    for filename in _MODEL_FILENAMES.values():
+        (model_dir / filename).write_bytes(b"stub")
+    object.__setattr__(settings_module.settings, "model_dir", str(model_dir))
+
+    response = client.get("/v1/health")
+    assert response.status_code == 200
+    assert "Deprecation" not in response.headers
+
+
+def test_legacy_scores_redirects(client):
+    """/scores redirects to /v1/scores preserving query string."""
+    response = client.get("/scores?min_score=50", follow_redirects=False)
+    assert response.status_code == 302
+    assert "/v1/scores" in response.headers["location"]
+    assert "min_score=50" in response.headers["location"]
+
+
+def test_get_scores_min_score_bounds(client):
+    """Test GET /v1/scores min_score parameter bounds validation (#682)."""
+    # Valid min_score values (200 OK)
+    response_valid_zero = client.get("/v1/scores?min_score=0")
+    assert response_valid_zero.status_code == 200
+
+    response_valid_hundred = client.get("/v1/scores?min_score=100")
+    assert response_valid_hundred.status_code == 200
+
+    # Out-of-bounds min_score values (422 Unprocessable Entity)
+    response_below = client.get("/v1/scores?min_score=-5")
+    assert response_below.status_code == 422
+
+    response_above = client.get("/v1/scores?min_score=101")
+    assert response_above.status_code == 422
+
+
+def test_list_scores_min_score_bounds_validation(client):
+    """Verify GET /v1/scores validates min_score bounds [0, 100] (Issue #682)."""
+    # Valid min_score queries (should return 200 OK)
+    res_valid_zero = client.get("/v1/scores?min_score=0")
+    assert res_valid_zero.status_code in (200, 404)  # 200 or 404 depending on db state, not 422
+
+    res_valid_100 = client.get("/v1/scores?min_score=100")
+    assert res_valid_100.status_code in (200, 404)
+
+    # Out-of-bounds min_score queries (must return 422 Unprocessable Entity)
+    res_invalid_negative = client.get("/v1/scores?min_score=-5")
+    assert res_invalid_negative.status_code == 422
+
+    res_invalid_high = client.get("/v1/scores?min_score=101")
+    assert res_invalid_high.status_code == 422

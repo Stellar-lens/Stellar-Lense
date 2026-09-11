@@ -1,0 +1,62 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+node_modules/
+
+# Environment
+.env
+
+# Data & models (large/binary artifacts, not checked into core)
+data/
+models/*.pkl
+models/*.joblib
+models/optuna_studies/
+
+# Local RiskScore store
+*.db
+
+# Runtime state / generated output
+horizon_cursor.txt
+drift_reports/
+reports/*.csv
+reports/*.txt
+reports/*.html
+reports/*.pdf
+
+# MkDocs build output
+site/
+
+# Rust build output
+target/
+test_snapshots/
+
+# cargo-fuzz crash artifacts (corpus/ seed files ARE committed; artifacts/ are not)
+fuzz/artifacts/
+
+# Editors
+.vscode/
+.idea/
+
+# Project specific
+somzilla.md
+
+
+*.nbi
+*.nbc
+
+.tools/
+.venv312/
+node_modules/
+.DS_Store
+
+# Machine-local development audit-chain signing secret, generated on first use
+# by storage/audit_log.py when LEDGERLENS_AUDIT_SECRET is unset. Never commit.
+.ledgerlens_audit_secret

@@ -1,0 +1,54 @@
+name: Nightly Red-Team Campaign
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  red-team:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]" --quiet
+
+      - name: Train models (if not cached)
+        run: python cli.py train --n-normal-accounts 200 --n-wash-rings 30
+        continue-on-error: true
+        env:
+          # Newer mlflow refuses its legacy filesystem tracking backend
+          # (the ./mlruns dir train_ensemble logs to) unless this is set.
+          MLFLOW_ALLOW_FILE_STORE: "true"
+          # Saving a trained model HMAC-signs it; the red-team step below
+          # needs the same key set to load these models back.
+          LEDGERLENS_MODEL_SIGNING_KEY: "red-team-ci-test-signing-key"
+
+      - name: Run red-team campaigns
+        id: red_team
+        run: python cli.py red-team --report-dir ./red_team_reports --n-samples 200
+        continue-on-error: true
+        env:
+          # Must match the training step's key to load the models it signed.
+          LEDGERLENS_MODEL_SIGNING_KEY: "red-team-ci-test-signing-key"
+
+      - name: Upload campaign report
+        uses: actions/upload-artifact@v4
+        with:
+          name: red-team-report
+          path: red_team_reports/
+
+      - name: Alert on evasion gate failure
+        if: steps.red_team.outcome == 'failure'
+        run: |
+          echo "::error::Red-team evasion gate failed — one or more attack types exceeded 5% evasion rate."
+          exit 1

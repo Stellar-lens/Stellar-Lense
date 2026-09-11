@@ -1,0 +1,74 @@
+name: Nightly Python Fuzz Campaign
+
+on:
+  schedule:
+    - cron: "30 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements/fuzz.txt
+
+      - name: Restore fuzz corpus cache
+        uses: actions/cache@v4
+        with:
+          path: fuzz/corpus/
+          key: fuzz-corpus-${{ github.run_id }}
+          restore-keys: fuzz-corpus-
+
+      - name: Install from fuzz lockfile
+        run: |
+          pip install --upgrade pip==24.0
+          pip install -r requirements/fuzz.txt
+          pip install -e . --no-deps
+
+      - name: Create corpus directories
+        run: |
+          for harness in fuzz/fuzz_*.py; do
+            name=$(basename "$harness" .py)
+            mkdir -p "fuzz/corpus/$name"
+          done
+
+      - name: Run fuzz harnesses (300s each)
+        run: |
+          for harness in fuzz/fuzz_*.py; do
+            name=$(basename "$harness" .py)
+            echo "::group::Fuzzing $name"
+            timeout 300 python "$harness" \
+              "fuzz/corpus/$name" \
+              -max_total_time=300 \
+              -print_final_stats=1 \
+              || true
+            echo "::endgroup::"
+          done
+
+      - name: Upload crash artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-crashes
+          path: |
+            fuzz/corpus/**/crash-*
+            fuzz/corpus/**/timeout-*
+            fuzz/corpus/**/oom-*
+          if-no-files-found: ignore
+
+      - name: Fail if crashes were found
+        run: |
+          crashes=$(find fuzz/corpus -name 'crash-*' -o -name 'timeout-*' -o -name 'oom-*' 2>/dev/null | head -1)
+          if [ -n "$crashes" ]; then
+            echo "::error::Fuzz crash(es) detected. Download the 'fuzz-crashes' artifact and reproduce with:"
+            echo "::error::  python fuzz/fuzz_<harness>.py fuzz/corpus/crash-<hash>"
+            exit 1
+          fi

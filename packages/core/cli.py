@@ -1,0 +1,2312 @@
+"""LedgerLens command-line interface.
+
+Convenience wrapper around the pieces of the detection engine that are
+otherwise run as separate scripts/modules:
+
+    python -m cli generate-data   # synthetic trades + labels -> CSV
+    python -m cli train           # train the ensemble on synthetic data
+    python -m cli score            # run the detection pipeline and store scores
+    python -m cli serve            # serve the local FastAPI app
+    python -m cli webhook-worker   # run the webhook delivery worker
+"""
+
+import logging
+import os
+import sys
+import time
+import tomllib
+from pathlib import Path
+
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    try:
+        import tomllib  # type: ignore[no-redef]
+    except ImportError:
+        import tomli as tomllib  # type: ignore[no-redef]
+
+import typer
+
+try:
+    _version_file = Path(__file__).resolve().parent / "pyproject.toml"
+    with open(_version_file, "rb") as _vf:
+        __version__ = tomllib.load(_vf)["project"]["version"]
+except Exception:
+    __version__ = "0.0.0"
+
+app = typer.Typer(help="LedgerLens detection engine CLI")
+logger = logging.getLogger("ledgerlens.cli")
+
+
+def _version_callback(value: bool) -> None:
+    if value:
+        typer.echo(f"ledgerlens-core v{__version__}")
+        raise typer.Exit()
+
+
+@app.callback()
+def _main_callback(
+    version: bool = typer.Option(
+        False,
+        "--version",
+        "-V",
+        help="Show the version and exit.",
+        callback=_version_callback,
+        is_eager=True,
+    ),
+) -> None:
+    """LedgerLens detection engine CLI."""
+    pass
+
+
+@app.command("generate-data")
+def generate_data(
+    out_dir: str = typer.Option("./data/synthetic", help="Directory to write trades.csv and labels.csv to"),
+    n_normal_accounts: int = typer.Option(60, help="Number of normal (non-wash) accounts"),
+    n_wash_rings: int = typer.Option(10, help="Number of wash-trading rings"),
+    ring_size: int = typer.Option(3, help="Accounts per wash ring"),
+    seed: int = typer.Option(42, help="Random seed for reproducibility"),
+) -> None:
+    """Generate a synthetic trade dataset with labelled wash-trading rings."""
+    import os
+
+    import pandas as pd
+
+    from ingestion.synthetic_data import generate_synthetic_dataset
+
+    trades, account_metadata, events, labels = generate_synthetic_dataset(
+        n_normal_accounts=n_normal_accounts, n_wash_rings=n_wash_rings, ring_size=ring_size, seed=seed
+    )
+
+    os.makedirs(out_dir, exist_ok=True)
+    trades.to_csv(os.path.join(out_dir, "trades.csv"), index=False)
+    events.to_csv(os.path.join(out_dir, "order_book_events.csv"), index=False)
+    pd.DataFrame(
+        [{"wallet": w, "label": label, **account_metadata.get(w, {})} for w, label in labels.items()]
+    ).to_csv(os.path.join(out_dir, "labels.csv"), index=False)
+
+    logger.info("Wrote %d trades, %d events, %d labelled accounts to %s", len(trades), len(events), len(labels), out_dir)
+
+
+@app.command("generate-adversarial")
+def generate_adversarial(
+    strategy: str = typer.Option(
+        ...,
+        help="Evasion strategy: benford_camouflage | timing_jitter | graph_fragmentation | cross_pair_rotation",
+    ),
+    out_dir: str = typer.Option("./data/adversarial", help="Directory to write the adversarial CSV to"),
+    n_wallets: int = typer.Option(50, help="Number of adversarial wash wallets to generate"),
+    n_trades: int = typer.Option(200, help="Number of adversarial trades to generate"),
+    seed: int = typer.Option(42, help="Random seed for reproducibility"),
+    label_wash: bool = typer.Option(
+        True,
+        "--label-wash/--label-clean",
+        help="Label adversarial trades as wash (1) or override all labels to 0 (--label-clean). "
+             "Unlabelled adversarial data must not silently enter training datasets.",
+    ),
+) -> None:
+    """Generate a labelled adversarial feature dataset with a specific evasion strategy.
+
+    Writes a CSV to OUT_DIR/adversarial_{STRATEGY}.csv with FEATURE_NAMES columns
+    and a 'label' column (1 = wash, 0 = clean). Use --label-clean to produce a
+    baseline dataset with all labels zeroed for false-positive rate benchmarking.
+    """
+    import os
+
+    from ingestion.adversarial_data import AdversarialDataset
+
+    dataset = AdversarialDataset().build(
+        strategy=strategy, n_wallets=n_wallets, n_trades=n_trades, seed=seed
+    )
+
+    if not label_wash:
+        dataset = dataset.copy()
+        dataset["label"] = 0
+
+    os.makedirs(out_dir, exist_ok=True)
+    out_path = os.path.join(out_dir, f"adversarial_{strategy}.csv")
+    dataset.to_csv(out_path, index=False)
+
+    n_wash = int((dataset["label"] == 1).sum())
+    logger.info(
+        "Wrote %d accounts (%d wash-labelled, %d normal) to %s",
+        len(dataset),
+        n_wash,
+        len(dataset) - n_wash,
+        out_path,
+    )
+
+
+@app.command("train")
+def train(
+    n_normal_accounts: int = typer.Option(60, help="Number of normal (non-wash) accounts"),
+    n_wash_rings: int = typer.Option(10, help="Number of wash-trading rings"),
+    ring_size: int = typer.Option(3, help="Accounts per wash ring"),
+    seed: int = typer.Option(42, help="Random seed for reproducibility"),
+    calibrate: bool = typer.Option(True, "--calibrate/--no-calibrate", help="Run conformal calibration after training"),
+    experiment_name: str = typer.Option(None, "--experiment-name", help="MLflow experiment name for tracking"),
+) -> None:
+    """Train the RF/XGBoost/LightGBM ensemble on a synthetic dataset and save it to `MODEL_DIR`.
+
+    Use --optimize to run 100-trial Bayesian hyperparameter optimization (Optuna TPE)
+    before final training. Override trial budget with --n-trials and wall-clock cap
+    with --timeout.
+    """
+    import os
+
+    from config.settings import settings
+    from detection.dataset import build_training_dataset
+    from detection.model_training import save_models, train_ensemble
+    from ingestion.synthetic_data import generate_synthetic_dataset
+
+    logger.info(
+        "Generating synthetic dataset (%d normal accounts, %d wash rings of size %d)...",
+        n_normal_accounts,
+        n_wash_rings,
+        ring_size,
+    )
+    trades, account_metadata, events, labels = generate_synthetic_dataset(
+        n_normal_accounts=n_normal_accounts, n_wash_rings=n_wash_rings, ring_size=ring_size, seed=seed
+    )
+    logger.info("Building training dataset from %d trades...", len(trades))
+    df = build_training_dataset(trades, labels, account_metadata=account_metadata, order_book_events=events)
+
+    # Save training dataset for drift detection reference
+    os.makedirs(settings.model_dir, exist_ok=True)
+    training_dataset_path = os.path.join(settings.model_dir, "training_reference.csv")
+    df.to_csv(training_dataset_path, index=False)
+    logger.info("Saved training reference to %s", training_dataset_path)
+
+    logger.info("Training RF/XGBoost/LightGBM ensemble on %d rows...", len(df))
+    results = train_ensemble(df, calibrate=calibrate, experiment_name=experiment_name)
+    for name, result in results.items():
+        if name.startswith("_") or not isinstance(result, dict) or "auc_roc" not in result:
+            continue
+        logger.info("%s: AUC-ROC=%.3f PR-AUC=%.3f F1=%.3f", name, result["auc_roc"], result["pr_auc"], result["f1"])
+
+    save_models(results, training_dataset_path=training_dataset_path)
+    if calibrate and "_calib" in results:
+        coverage = results["_calib"].get("coverage_avg", 0.0)
+        logger.info("Conformal calibration complete (avg coverage=%.4f)", coverage)
+    logger.info("Saved models to %s", settings.model_dir)
+
+
+@app.command("generate-model-card")
+def generate_model_card_cli(
+    model: str = typer.Option(..., "--model", help="Model name (e.g., random_forest, xgboost)"),
+    version: str = typer.Option(..., "--version", help="Model version string"),
+    output_dir: str = typer.Option(None, "--output-dir", help="Output directory (default: settings.model_card_dir)"),
+) -> None:
+    """Generate a model card for a specific model version on demand."""
+    from config.settings import settings
+    from detection.model_card import generate_model_card, render_markdown, render_pdf
+    from pathlib import Path
+
+    output_dir = output_dir or settings.model_card_dir
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    try:
+        card = generate_model_card(model, version)
+        md_path = output_path / f"{model}_{version}.md"
+        md_path.write_text(render_markdown(card))
+        logger.info("Generated model card Markdown at %s", md_path)
+
+        if settings.model_card_pdf_enabled:
+            pdf_path = output_path / f"{model}_{version}.pdf"
+            render_pdf(card, output_path=str(pdf_path))
+
+        typer.echo(f"Model card generated for {model} v{version} at {md_path}")
+    except Exception as e:
+        typer.echo(
+            f"Error: could not generate a model card for --model={model!r} "
+            f"--version={version!r} ({e}). Check that this model/version was "
+            "actually trained and exists in settings.model_dir.",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+
+@app.command("archive-features")
+def archive_features(
+    cutoff_days: int = typer.Option(
+        0, help="Archive rows older than this many days (0 = use FEATURE_ARCHIVE_CUTOFF_DAYS setting)"
+    ),
+) -> None:
+    """Archive feature distribution snapshots older than cutoff_days to Parquet cold tier.
+
+    Reads qualifying rows from the ``feature_distribution_snapshots`` SQLite table,
+    writes them to date-partitioned Parquet files under FEATURE_ARCHIVE_DIR, then
+    deletes them from SQLite. Safe to interrupt: Parquet is written before SQLite
+    delete, so no data is lost on failure.
+    """
+    from pathlib import Path
+
+    from config.settings import settings
+    from detection.feature_store import FeatureStoreArchiver
+
+    effective_cutoff = cutoff_days if cutoff_days > 0 else settings.feature_archive_cutoff_days
+    archive_dir = Path(settings.feature_archive_dir)
+    archiver = FeatureStoreArchiver(db_path=settings.db_path, archive_dir=archive_dir)
+    n = archiver.archive_old_features(cutoff_days=effective_cutoff)
+    if n:
+        typer.echo(f"Archived {n} rows (cutoff={effective_cutoff} days) → {archive_dir}")
+    else:
+        typer.echo(f"No rows older than {effective_cutoff} days found; nothing to archive.")
+
+
+@app.command("retrain-check")
+def retrain_check(
+    psi_threshold: float = typer.Option(0.20, help="PSI threshold for drift detection"),
+    min_drifted_features: int = typer.Option(3, help="Minimum number of drifted features to trigger retraining"),
+    force_retrain: bool = typer.Option(False, help="Force retraining even if no drift detected"),
+    force_promote: bool = typer.Option(False, "--force-promote", help="Override SHAP stability check and promote models anyway"),
+) -> None:
+    """Check for distribution drift and retrain the ensemble if detected.
+
+    Checks both PSI-based feature distribution drift and analyst-labelled
+    performance degradation. If F1 on recent feedback labels drops more than
+    5 percentage points from the training baseline, retraining is triggered
+    alongside drift-based retraining.
+
+    Computes Population Stability Index (PSI) on recent scored features
+    against the training reference distribution. If drift is detected
+    (>= min_drifted_features with PSI > psi_threshold), triggers a
+    full retraining cycle. New model is promoted only if it matches or
+    outperforms the previous model on AUC-ROC.
+    """
+    import json
+    import os
+    from datetime import datetime
+    from pathlib import Path
+
+    from config.settings import settings
+    from detection.dataset import build_training_dataset
+    from detection.drift_monitor import (
+        check_psi_and_alert,
+        compute_per_feature_psi,
+        is_drift_detected,
+        record_psi_snapshot,
+        run_drift_report,
+    )
+    from detection.model_registry import (
+        get_current_version,
+        rollback_model,
+    )
+    from detection.model_training import save_models, train_ensemble
+    from detection.storage import save_drift_report, save_retrain_run
+    from ingestion.synthetic_data import generate_synthetic_dataset
+
+    # Run archival before drift check to keep hot tier lean
+    try:
+        from detection.feature_store import FeatureStoreArchiver
+
+        _archiver = FeatureStoreArchiver(
+            db_path=settings.db_path,
+            archive_dir=Path(settings.feature_archive_dir),
+        )
+        _archived = _archiver.archive_old_features(cutoff_days=settings.feature_archive_cutoff_days)
+        if _archived:
+            logger.info("retrain-check: archived %d feature snapshot rows before drift check", _archived)
+    except Exception as _exc:
+        logger.warning("retrain-check: archival step failed (%s); continuing without archival", _exc)
+
+    # Read training metadata
+    metadata_path = os.path.join(settings.model_dir, "training_metadata.json")
+    if not os.path.exists(metadata_path):
+        logger.warning("Training metadata not found at %s; cannot run drift check", metadata_path)
+        return
+
+    with open(metadata_path, "r") as f:
+        metadata = json.load(f)
+
+    training_dataset_path = metadata.get("training_dataset_path", "")
+
+    # Run drift report
+    report = run_drift_report(training_dataset_path)
+    if not report:
+        logger.warning("Could not compute drift report; skipping retrain check")
+        return
+
+    logger.info("Drift report: %s", report)
+
+    # Per-feature PSI tracking
+    try:
+        psi_dict = compute_per_feature_psi(training_dataset_path)
+        record_psi_snapshot(psi_dict)
+        check_psi_and_alert(psi_dict, psi_threshold=psi_threshold, min_drifted_features=min_drifted_features)
+        logger.info("Per-feature PSI: %d features computed", len(psi_dict))
+    except FileNotFoundError as exc:
+        logger.warning("Per-feature PSI skipped: %s", exc)
+    except Exception as exc:
+        logger.warning("Per-feature PSI computation failed: %s", exc)
+
+    # Check if drift detected
+    drift_detected = is_drift_detected(report, psi_threshold=psi_threshold, min_drifted_features=min_drifted_features)
+
+    drift_report_id = save_drift_report(
+        drift_detected=drift_detected,
+        psi_report=report,
+        psi_threshold=psi_threshold,
+        min_drifted_features=min_drifted_features,
+    )
+
+    # --- Performance degradation check (Issue-110) ---
+    performance_triggered = False
+    try:
+        from detection.drift_monitor import ModelDegradationAlert, PerformanceMonitor
+
+        monitor = PerformanceMonitor(db_path=settings.db_path)
+        baseline_f1: float = metadata.get("model_metrics", {}).get("random_forest", {}).get("f1", 0.0)
+        # Prefer val_f1_score when available (more representative than train split F1)
+        baseline_f1 = metadata.get("val_f1_score", baseline_f1)
+        if baseline_f1 == 0.0:
+            logger.warning("baseline F1 not available in training_metadata.json; degradation check skipped")
+        else:
+            try:
+                monitor.check_degradation(
+                    baseline_f1=baseline_f1,
+                    f1_threshold_drop=settings.performance_degradation_threshold,
+                )
+            except ModelDegradationAlert as alert:
+                logger.warning("Model degradation detected: %s — triggering retrain", alert)
+                performance_triggered = True
+    except Exception as perf_exc:
+        logger.warning("Performance degradation check failed: %s", perf_exc)
+
+    if not drift_detected and not force_retrain and not performance_triggered:
+        logger.info("No drift detected; skipping retrain")
+        return
+
+    if force_retrain:
+        logger.info("Forcing retrain (force_retrain=True)")
+
+    # Retrain the ensemble
+    logger.info("Starting retrain cycle…")
+    trades, account_metadata, events, labels = generate_synthetic_dataset(
+        n_normal_accounts=60, n_wash_rings=10, ring_size=3, seed=42
+    )
+    df = build_training_dataset(trades, labels, account_metadata=account_metadata, order_book_events=events)
+
+    new_results = train_ensemble(df)
+    model_names = [k for k in new_results if not k.startswith("_") and isinstance(new_results[k], dict) and "auc_roc" in new_results[k]]
+    for name in model_names:
+        result = new_results[name]
+        logger.info("New %s: AUC-ROC=%.3f PR-AUC=%.3f F1=%.3f", name, result["auc_roc"], result["pr_auc"], result["f1"])
+
+    # Compute SHAP importance summaries for new models
+    from detection.feature_engineering import FEATURE_NAMES as _feat_names
+    from detection.model_registry import (
+        compare_importance_stability,
+        compute_shap_summary,
+        save_shap_importances,
+    )
+
+    new_shap: dict[str, list[dict]] = {}
+    feature_cols = [c for c in df.columns if c in _feat_names]
+    X_train = df[feature_cols].fillna(0.0).values
+    for name in model_names:
+        model_obj = new_results[name].get("model")
+        if model_obj is not None:
+            try:
+                new_shap[name] = compute_shap_summary(model_obj, X_train, feature_cols)
+            except Exception as shap_exc:
+                logger.warning("SHAP summary for %s failed: %s", name, shap_exc)
+
+    new_metadata_for_stability = {"version": "new", "shap_importances": new_shap}
+    old_metadata_for_stability = {"version": metadata.get("version", "old"), "shap_importances": metadata.get("shap_importances", {})}
+
+    stability = compare_importance_stability(old_metadata_for_stability, new_metadata_for_stability)
+    if not stability.stable:
+        logger.warning(
+            "Feature importance stability check FAILED: min Spearman rho = %.3f "
+            "(threshold: %.3f). Models NOT auto-promoted. "
+            "Rerun with --force-promote to override.",
+            min(stability.spearman_rho.values()) if stability.spearman_rho else 0.0,
+            0.70,
+        )
+        if not force_promote:
+            logger.info("Skipping promotion due to stability check failure")
+
+    # Compare new models with previous models
+    previous_metrics = metadata.get("model_metrics", {})
+    promoted = False
+    old_versions = {model_name: get_current_version(model_name, settings.model_dir) for model_name in model_names}
+    auc_by_model: dict[str, tuple[float, float]] = {}
+
+    for model_name in model_names:
+        new_result = new_results[model_name]
+        old_auc = previous_metrics.get(model_name, {}).get("auc_roc", 0.0)
+        new_auc = new_result.get("auc_roc", 0.0)
+        auc_by_model[model_name] = (old_auc, new_auc)
+
+        if new_auc >= old_auc:
+            logger.info(
+                "%s: AUC-ROC improved from %.3f to %.3f; promoting",
+                model_name,
+                old_auc,
+                new_auc,
+            )
+            promoted = True
+        else:
+            logger.warning(
+                "%s: AUC-ROC degraded from %.3f to %.3f; reverting to previous version",
+                model_name,
+                old_auc,
+                new_auc,
+            )
+
+    # Block promotion if stability check failed and --force-promote not set
+    if not stability.stable and not force_promote:
+        promoted = False
+
+    # Save models and metadata
+    training_dataset_path = os.path.join(settings.model_dir, "training_reference.csv")
+    df.to_csv(training_dataset_path, index=False)
+
+    if promoted:
+        save_models(new_results, training_dataset_path=training_dataset_path)
+        if new_shap:
+            save_shap_importances(new_shap, settings.model_dir)
+        
+        # Auto-generate model cards if enabled
+        if settings.model_card_auto_generate:
+            from detection.model_card import generate_model_card, render_markdown, render_pdf
+            model_card_dir = Path(settings.model_card_dir)
+            model_card_dir.mkdir(parents=True, exist_ok=True)
+            
+            for model_name in model_names:
+                version = get_current_version(model_name, settings.model_dir)
+                if not version:
+                    continue
+                try:
+                    card = generate_model_card(model_name, version)
+                    md_path = model_card_dir / f"{model_name}_{version}.md"
+                    md_path.write_text(render_markdown(card))
+                    logger.info("Generated model card for %s v%s at %s", model_name, version, md_path)
+                    
+                    if settings.model_card_pdf_enabled:
+                        pdf_path = model_card_dir / f"{model_name}_{version}.pdf"
+                        render_pdf(card, output_path=str(pdf_path))
+                except Exception as e:
+                    logger.warning("Failed to generate model card for %s v%s: %s", model_name, version, e)
+        
+        logger.info("Promoted new models to production")
+    else:
+        logger.info("New models not promoted; keeping previous versions")
+        for model_name, old_version in old_versions.items():
+            if old_version:
+                rollback_model(model_name, old_version, settings.model_dir)
+
+    for model_name in model_names:
+        old_auc, new_auc = auc_by_model[model_name]
+        save_retrain_run(
+            drift_report_id=drift_report_id,
+            model_name=model_name,
+            old_version=old_versions[model_name],
+            new_version=get_current_version(model_name, settings.model_dir),
+            old_auc_roc=old_auc,
+            new_auc_roc=new_auc,
+            promoted=promoted,
+            forced=force_retrain,
+        )
+
+    # Write drift report
+    drift_report_dir = "./drift_reports"
+    os.makedirs(drift_report_dir, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+    report_path = os.path.join(drift_report_dir, f"{timestamp}.json")
+    drifted_features = [f for f, v in report.items() if v > psi_threshold]
+    with open(report_path, "w") as f:
+        json.dump(
+            {
+                "timestamp": timestamp,
+                "drift_detected": drift_detected,
+                "n_drifted_features": len(drifted_features),
+                "psi_report": report,
+                "per_feature_psi": report,
+                "drifted_features": drifted_features,
+                "promoted": promoted,
+                "new_model_metrics": {k: v.get("auc_roc") for k, v in new_results.items()},
+            },
+            f,
+            indent=2,
+        )
+    logger.info("Wrote drift report to %s", report_path)
+
+
+score_app = typer.Typer(help="Scoring commands")
+app.add_typer(score_app, name="score")
+
+
+@score_app.callback(invoke_without_command=True)
+def score(
+    ctx: typer.Context,
+    no_submit: bool = typer.Option(False, "--no-submit", help="Run scoring without on-chain submission"),
+    use_async: bool = typer.Option(False, "--async", help="Use async pipeline for concurrent I/O and batched inference"),
+    bootstrap_threshold: int = typer.Option(
+        None,
+        "--bootstrap-threshold",
+        help="Override BENFORD_BOOTSTRAP_THRESHOLD: wallets with fewer transactions than this use Monte Carlo bootstrap p-values instead of asymptotic chi-square.",
+    ),
+    bootstrap_samples: int = typer.Option(
+        None,
+        "--bootstrap-samples",
+        help="Override BENFORD_BOOTSTRAP_SAMPLES: number of bootstrap replicates for small-sample p-value estimation.",
+    ),
+) -> None:
+    """Run the detection pipeline against live Horizon data and store the resulting scores."""
+    if ctx.invoked_subcommand is not None:
+        return
+    import asyncio
+
+    import run_pipeline
+
+    if bootstrap_threshold is not None:
+        import detection.benford_engine as _be
+        _be.BENFORD_BOOTSTRAP_THRESHOLD = bootstrap_threshold
+        logger.info("Bootstrap threshold overridden to %d", bootstrap_threshold)
+
+    if bootstrap_samples is not None:
+        import detection.benford_engine as _be
+        _be.BENFORD_BOOTSTRAP_SAMPLES = bootstrap_samples
+        logger.info("Bootstrap samples overridden to %d", bootstrap_samples)
+
+    if use_async:
+        scores = asyncio.run(run_pipeline.async_run())
+    else:
+        scores = run_pipeline.run(no_submit=no_submit)
+    for s in scores:
+        logger.info("%s %s -> score=%d (benford=%s, ml=%s, confidence=%d)", s.wallet, s.asset_pair, s.score, s.benford_flag, s.ml_flag, s.confidence)
+
+
+_STELLAR_RE = __import__("re").compile(r"^G[A-Z2-7]{55}$")
+
+
+@score_app.command("bulk")
+def score_bulk(
+    input: Path = typer.Option(..., "--input", "-i", help="Input CSV: one Stellar wallet per row (wallet column required)"),
+    output: Path = typer.Option(..., "--output", "-o", help="Output CSV for scored results"),
+    concurrency: int = typer.Option(4, "--concurrency", "-c", min=1, max=16, help="Parallel workers (max 16)"),
+    min_score: int = typer.Option(0, "--min-score", help="Exclude results with score below this value"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Validate input file and report wallet count without scoring"),
+) -> None:
+    """Score a CSV list of Stellar wallets against the local detection pipeline.
+
+    Input CSV must have a 'wallet' column (one address per row). An optional
+    'label' column is passed through to the output unchanged.  Malformed
+    addresses are skipped with a warning written to stderr.
+
+    Output columns: wallet, score, confidence_lower, confidence_upper,
+    top_features, scored_at, label (if present).
+    """
+    import csv
+    import json
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from datetime import datetime, timezone
+
+    import pandas as pd
+    from rich.progress import BarColumn, MofNCompleteColumn, Progress, SpinnerColumn, TaskProgressColumn, TextColumn, TimeRemainingColumn
+
+    from config.settings import settings as cfg
+    from detection.model_inference import load_models, score_with_uncertainty
+    from detection.storage import get_feature_vector, init_db
+
+    # ── 1. Read input CSV ────────────────────────────────────────────────
+    if not input.exists():
+        typer.echo(f"Error: input file not found: {input}", err=True)
+        raise typer.Exit(1)
+
+    try:
+        df_in = pd.read_csv(input)
+    except Exception as exc:
+        typer.echo(
+            f"Error: could not parse {input} as CSV ({exc}). "
+            "Expected a comma-separated file with a 'wallet' column header.",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    if "wallet" not in df_in.columns:
+        typer.echo("Error: input CSV must have a 'wallet' column", err=True)
+        raise typer.Exit(1)
+
+    has_label = "label" in df_in.columns
+    raw_rows = df_in.to_dict("records")
+
+    # ── 2. Validate addresses ────────────────────────────────────────────
+    valid: list[dict] = []
+    skipped = 0
+    for row in raw_rows:
+        wallet = str(row.get("wallet", "")).strip()
+        if not _STELLAR_RE.match(wallet):
+            typer.echo(f"WARNING: skipping malformed address: {wallet!r}", err=True)
+            skipped += 1
+        else:
+            valid.append(row)
+
+    typer.echo(f"Loaded {len(valid)} valid wallet(s) ({skipped} skipped).")
+
+    if dry_run:
+        typer.echo("[dry-run] Input validation complete — no scoring performed.")
+        return
+
+    if not valid:
+        typer.echo("No valid wallets to score.", err=True)
+        raise typer.Exit(1)
+
+    # ── 3. Load models once ──────────────────────────────────────────────
+    try:
+        models = load_models(cfg.model_dir)
+    except Exception as exc:
+        typer.echo(f"Error loading models: {exc}", err=True)
+        raise typer.Exit(1)
+
+    # ── 4. Initialise DB ─────────────────────────────────────────────────
+    init_db(cfg.db_path)
+
+    # ── 5. Scoring worker ────────────────────────────────────────────────
+    asset_pair = "XLM/USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN"
+    scored_at = datetime.now(timezone.utc).isoformat()
+
+    def _score_wallet(row: dict) -> dict | None:
+        wallet = str(row["wallet"]).strip()
+        fv = get_feature_vector(wallet, asset_pair, db_path=cfg.db_path)
+        if fv is None:
+            from detection.feature_engineering import FEATURE_NAMES
+            fv = {name: 0.0 for name in FEATURE_NAMES}
+        try:
+            result = score_with_uncertainty(models, fv)
+        except Exception as exc:
+            logger.warning("Scoring failed for %s: %s", wallet, exc)
+            return None
+        score_val = int(round(result["score"]))
+        out: dict = {
+            "wallet": wallet,
+            "score": score_val,
+            "confidence_lower": round(result.get("score_lower", 0.0), 2),
+            "confidence_upper": round(result.get("score_upper", 100.0), 2),
+            "top_features": json.dumps(result.get("shap_values", [])),
+            "scored_at": scored_at,
+        }
+        if has_label:
+            out["label"] = row.get("label", "")
+        return out
+
+    # ── 6. Run with progress bar ─────────────────────────────────────────
+    results: list[dict] = []
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        MofNCompleteColumn(),
+        TaskProgressColumn(),
+        TimeRemainingColumn(),
+        refresh_per_second=2,
+    ) as progress:
+        task = progress.add_task("Scoring wallets", total=len(valid))
+        with ThreadPoolExecutor(max_workers=concurrency) as pool:
+            futures = {pool.submit(_score_wallet, row): row for row in valid}
+            for fut in as_completed(futures):
+                result = fut.result()
+                if result is not None and result["score"] >= min_score:
+                    results.append(result)
+                progress.advance(task)
+
+    # ── 7. Write output CSV ──────────────────────────────────────────────
+    if not results:
+        typer.echo("No results to write (all wallets filtered or failed).")
+        return
+
+    fieldnames = ["wallet", "score", "confidence_lower", "confidence_upper", "top_features", "scored_at"]
+    if has_label:
+        fieldnames.append("label")
+
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with open(output, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(results)
+
+    typer.echo(f"Scored {len(results)} wallet(s) → {output}")
+
+
+@app.command("historical-load")
+def historical_load(
+    start: str = typer.Option(..., "--start", help="Inclusive ISO-8601 start time"),
+    end: str = typer.Option(..., "--end", help="Exclusive ISO-8601 end time"),
+    concurrency: int | None = typer.Option(
+        None, "--concurrency", min=1, help="Maximum concurrent Horizon chunks"
+    ),
+    chunk_hours: float | None = typer.Option(
+        None, "--chunk-hours", min=0.01, help="Hours per independent chunk"
+    ),
+    resume: bool = typer.Option(
+        True, "--resume/--no-resume", help="Skip chunks already marked complete"
+    ),
+    asset_pair: str | None = typer.Option(
+        None, "--asset-pair", help="Optional BASE/COUNTER asset pair"
+    ),
+) -> None:
+    """Backfill historical Horizon trades with bounded parallel workers."""
+    import asyncio
+    from datetime import datetime
+
+    from config.settings import settings as cfg
+    from detection.storage import RiskScoreStore
+    from ingestion.historical_loader import ParallelHistoricalLoader
+    from ingestion.http_client import RetryingHorizonClient
+
+    def parse_datetime(value: str, option: str) -> datetime:
+        try:
+            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise typer.BadParameter("must be an ISO-8601 datetime", param_hint=option) from exc
+
+    start_time = parse_datetime(start, "--start")
+    end_time = parse_datetime(end, "--end")
+
+    async def run() -> None:
+        worker_count = concurrency or cfg.historical_loader_concurrency
+        hours = chunk_hours or cfg.historical_chunk_hours
+        logger.info(
+            "Starting historical load %s -> %s (concurrency=%d, chunk_hours=%.2f)...",
+            start_time.isoformat(),
+            end_time.isoformat(),
+            worker_count,
+            hours,
+        )
+        async with RetryingHorizonClient(
+            cfg.horizon_url,
+            max_concurrency=worker_count,
+        ) as client:
+            loader = ParallelHistoricalLoader(
+                client=client,
+                storage=RiskScoreStore(cfg.db_path),
+                concurrency=worker_count,
+                chunk_hours=hours,
+                progress_path=Path(cfg.historical_progress_path),
+            )
+            result = await loader.load(
+                start_time,
+                end_time,
+                asset_pair=asset_pair,
+                resume=resume,
+            )
+            typer.echo(
+                f"completed={result.completed_chunks} failed={result.failed_chunks} "
+                f"skipped={result.skipped_chunks} records={result.total_records} "
+                f"records_per_second={result.records_per_second:.1f}"
+            )
+
+    asyncio.run(run())
+
+
+@app.command("export-parquet")
+def export_parquet(
+    output_dir: str = typer.Option(
+        ..., "--output-dir", help="Root directory for Parquet output (must be inside project root)"
+    ),
+    since: str | None = typer.Option(
+        None, "--since", help="Earliest date to export, ISO-8601 (e.g. 2026-01-01). Default: all."
+    ),
+    until: str | None = typer.Option(
+        None, "--until", help="Latest date to export, ISO-8601 (e.g. 2026-06-30). Default: all."
+    ),
+    asset_pair: str | None = typer.Option(
+        None, "--asset-pair", help="Filter to one asset pair, e.g. XLM/USDC. Default: all pairs."
+    ),
+    force: bool = typer.Option(
+        False, "--force", help="Re-export all partitions even if unchanged (bypass delta detection)."
+    ),
+    compression: str = typer.Option(
+        "snappy", "--compression", help="Parquet compression: snappy | zstd | gzip | none."
+    ),
+) -> None:
+    """Export Trade records from SQLite to date-partitioned Parquet files.
+
+    Writes Hive-style partitions to OUTPUT_DIR and generates a SHA-256
+    manifest.json. Unchanged partitions are skipped automatically
+    (incremental export); use --force to re-export everything.
+
+    The output layout is compatible with the ledgerlens-data repository::
+
+        <output_dir>/
+        ├── manifest.json
+        └── trades/
+            └── year=YYYY/month=MM/day=DD/
+                └── asset_pair=XLM_USDC/
+                    └── trades_YYYYMMDD_XLM_USDC.parquet
+    """
+    import sqlite3
+    from datetime import date as _date
+
+    from config.settings import settings as cfg
+    from ingestion.parquet_exporter import ParquetExporter
+
+    if compression not in ("snappy", "zstd", "gzip", "none"):
+        raise typer.BadParameter(
+            f"Invalid compression '{compression}'. Must be one of: snappy, zstd, gzip, none",
+            param_hint="--compression",
+        )
+
+    def _parse_date(value: str, flag: str) -> _date:
+        try:
+            return _date.fromisoformat(value)
+        except ValueError as exc:
+            raise typer.BadParameter(
+                "must be an ISO-8601 date (YYYY-MM-DD)", param_hint=flag
+            ) from exc
+
+    since_date = _parse_date(since, "--since") if since else None
+    until_date = _parse_date(until, "--until") if until else None
+
+    try:
+        conn = sqlite3.connect(cfg.ledgerlens_db_path)
+        exporter = ParquetExporter(
+            db_conn=conn,
+            output_dir=Path(output_dir),
+            compression=compression,
+        )
+        logger.info(
+            "Exporting trades to %s (since=%s, until=%s, force=%s)...",
+            output_dir,
+            since_date,
+            until_date,
+            force,
+        )
+        result = exporter.export(
+            since=since_date,
+            until=until_date,
+            asset_pair=asset_pair,
+            force=force,
+        )
+        conn.close()
+    except (ValueError, ImportError) as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(1)
+
+    typer.echo(
+        f"Export complete: "
+        f"partitions_exported={result.exported_partitions} "
+        f"partitions_skipped={result.skipped_partitions} "
+        f"records={result.total_records_exported} "
+        f"size_bytes={result.total_size_bytes} "
+        f"duration={result.duration_seconds:.2f}s "
+        f"manifest={result.manifest_path}"
+    )
+
+
+@app.command("eval-robustness")
+def eval_robustness(
+    n_trials: int = typer.Option(5, help="Adversarial dataset repetitions per strategy (more = slower but stabler)"),
+    seed: int = typer.Option(42, help="Random seed"),
+    n_normal_accounts: int = typer.Option(60, help="Normal accounts for training"),
+    n_wash_rings: int = typer.Option(10, help="Wash rings for training"),
+    ring_size: int = typer.Option(3, help="Accounts per ring for training"),
+    adversarial_augment: bool = typer.Option(True, help="Use adversarial augmentation during training"),
+) -> None:
+    """Train the ensemble then evaluate robustness under each evasion strategy.
+
+    Prints a table of AUC-ROC, F1, and Delta-AUC per strategy, plus a row
+    showing performance after adversarial training.
+
+    Target: Delta-AUC for \"all strategies\" must be > -0.10 with adversarial
+    augmentation (i.e. recovery of ≥ 70 % of the performance gap vs. baseline).
+    """
+    from detection.dataset import build_training_dataset
+    from detection.model_training import train_ensemble
+    from detection.robustness_eval import evaluate_robustness
+    from ingestion.synthetic_data import generate_synthetic_dataset
+
+    # Train a baseline model (no augmentation) for comparison
+    logger.info("Training baseline model (no adversarial augmentation)…")
+    trades, meta, events, labels = generate_synthetic_dataset(
+        n_normal_accounts=n_normal_accounts, n_wash_rings=n_wash_rings, ring_size=ring_size, seed=seed
+    )
+    df = build_training_dataset(trades, labels, account_metadata=meta, order_book_events=events)
+    baseline_results = train_ensemble(df, adversarial_augment=False, calibrate=False)
+    baseline_models = {k: v["model"] for k, v in baseline_results.items() if not k.startswith("_") and isinstance(v, dict) and "model" in v}
+
+    logger.info("Evaluating robustness of baseline model…")
+    robustness = evaluate_robustness(baseline_models, n_trials=n_trials, seed=seed)
+
+    # Train an adversarially-augmented model
+    logger.info("Training adversarially-augmented model…")
+    adv_results = train_ensemble(df, adversarial_augment=adversarial_augment, calibrate=False)
+    adv_models = {k: v["model"] for k, v in adv_results.items() if not k.startswith("_") and isinstance(v, dict) and "model" in v}
+
+    logger.info("Evaluating robustness of augmented model…")
+    adv_robustness = evaluate_robustness(adv_models, n_trials=n_trials, seed=seed)
+
+    # --- Print table ---
+    header = f"{'Strategy':<24} {'AUC-ROC':>8} {'F1':>6} {'Delta-AUC':>10}"
+    divider = "─" * len(header)
+    typer.echo(divider)
+    typer.echo(header)
+    typer.echo(divider)
+
+    def _row(label: str, entry: dict, suffix: str = "") -> str:
+        auc = entry.get("auc_roc", float("nan"))
+        f1 = entry.get("f1", float("nan"))
+        delta = entry.get("delta_auc")
+        delta_str = f"{delta:+.3f}" if delta is not None else "—"
+        return f"{label + suffix:<24} {auc:>8.3f} {f1:>6.3f} {delta_str:>10}"
+
+    typer.echo(_row("Baseline", robustness["baseline"]))
+
+    from ingestion.adversarial_data import ALL_STRATEGIES
+    for strategy in ALL_STRATEGIES:
+        if strategy in robustness:
+            label = strategy.replace("_", " ").title()
+            typer.echo(_row(label, robustness[strategy]))
+
+    typer.echo(_row("All strategies", robustness["all_strategies"]))
+    typer.echo(_row("Adv. training", adv_robustness["all_strategies"], " ←"))
+    typer.echo(divider)
+
+    # Check target: delta-AUC for all_strategies with adv training must be > -0.10
+    adv_delta = adv_robustness["all_strategies"].get("delta_auc", float("nan"))
+    if adv_delta > -0.10:
+        typer.echo(f"✅ Target met: adversarial training delta-AUC = {adv_delta:+.3f} (> -0.10)")
+    else:
+        typer.echo(f"⚠️  Target missed: adversarial training delta-AUC = {adv_delta:+.3f} (target > -0.10)")
+
+
+
+@app.command("robustness-eval")
+def robustness_eval(
+    epsilon: float = typer.Option(0.1, help="Attack L2 budget"),
+    steps: int = typer.Option(10, help="PGD steps (max 100)"),
+    n_samples: int = typer.Option(200, help="Number of samples from test split to evaluate"),
+) -> None:
+    """Run PGD attacks on the test split and produce a RobustnessReport saved to DB."""
+    if steps > 100:
+        raise typer.BadParameter("--steps cannot exceed 100 for safety")
+
+    from ingestion.synthetic_data import generate_synthetic_dataset
+    from detection.dataset import build_training_dataset
+    from detection.model_inference import load_models
+    from detection.robustness_eval import compute_robustness_report
+    from config.settings import settings
+
+    trades, account_metadata, events, labels = generate_synthetic_dataset(n_normal_accounts=50, n_wash_rings=10, ring_size=4, seed=42)
+    df = build_training_dataset(trades, labels, account_metadata=account_metadata, order_book_events=events)
+
+    try:
+        models = load_models(settings.model_dir)
+    except FileNotFoundError:
+        # train a temporary ensemble for evaluation
+        from detection.model_training import train_ensemble
+
+        logger.info("No trained models found; training temporary ensemble for robustness evaluation")
+        results = train_ensemble(df, adversarial_augment=False)
+        models = {k: v["model"] for k, v in results.items() if not k.startswith("_") and isinstance(v, dict) and "model" in v}
+
+    report = compute_robustness_report(models, df.sample(n=min(n_samples, len(df)), random_state=42), n_samples=200, epsilon=epsilon, steps=steps)
+    typer.echo(report.model_dump_json(indent=2))
+
+
+@app.command("serve")
+def serve(
+    host: str = typer.Option("127.0.0.1", help="Host to bind to"),
+    port: int = typer.Option(8000, help="Port to bind to"),
+    reload: bool = typer.Option(False, help="Enable auto-reload for development"),
+) -> None:
+    """Serve the local read-only API (`api.main:app`)."""
+    import uvicorn
+
+    uvicorn.run("api.main:app", host=host, port=port, reload=reload)
+
+
+@app.command("stream")
+def stream(
+    batch_size: int = typer.Option(500, "--batch-size", help="Number of trades to accumulate before scoring"),
+    flush_interval: float = typer.Option(30.0, "--flush-interval", help="Maximum seconds to wait before flushing a partial batch"),
+    checkpoint_interval: int = typer.Option(None, envvar="STREAM_CHECKPOINT_INTERVAL", help="Persist cursor + window state together every N trades (default from settings)"),
+    score_delta: int = typer.Option(None, envvar="STREAM_SCORE_DELTA_THRESHOLD", help="Minimum score change to emit an alert (default from settings)"),
+    queue_depth: int = typer.Option(
+        None,
+        "--queue-depth",
+        min=1,
+        envvar="STREAMER_QUEUE_MAXSIZE",
+        help="Maximum number of buffered Horizon trades (default from settings).",
+    ),
+    overflow_strategy: str = typer.Option(
+        None,
+        "--overflow-strategy",
+        envvar="STREAMER_OVERFLOW_STRATEGY",
+        help="Queue overflow policy: block, drop_newest, or drop_oldest.",
+    ),
+    reset_cursor: bool = typer.Option(
+        False,
+        "--reset-cursor",
+        help="Delete the Horizon cursor checkpoint before streaming.",
+    ),
+) -> None:
+    """Stream trades from Horizon SSE and score incrementally per wallet.
+
+    Maintains per-wallet rolling windows (1h/4h/24h), recomputes features on
+    each trade, and emits a RiskScore when the score changes by >= score_delta
+    points. The Horizon cursor and window state are checkpointed together in
+    one atomic SQLite transaction every checkpoint_interval trades or
+    cursor_flush_seconds elapsed, whichever comes first — see
+    docs/ingestion.md for why the two must never desync. Graceful shutdown
+    (SIGTERM/SIGINT) persists all in-memory state.
+    """
+    import signal
+    import threading
+
+    from config.settings import settings as cfg
+    from detection.feature_engineering import FeatureEngineering
+    from detection.model_inference import IncrementalScorer, ModelInference, load_models
+    from detection.rolling_window import RollingWindowState, RollingWindowStore
+    from detection.storage import init_db, save_scores
+    from detection.webhook_queue import enqueue
+    from detection.webhook_registry import get_matching_subscribers
+    from ingestion.checkpoint import CursorCheckpoint, FlushPolicy, resolve_checkpoint_path
+    from ingestion.horizon_streamer import stream_trades_with_cursor
+    from ingestion.stream_checkpoint import StreamCheckpointCoordinator
+    import api.main as api_main
+
+    _chk_interval = checkpoint_interval if checkpoint_interval is not None else cfg.stream_checkpoint_interval
+    _score_delta = score_delta if score_delta is not None else cfg.stream_score_delta_threshold
+    _queue_depth = queue_depth if queue_depth is not None else cfg.streamer_queue_maxsize
+    _overflow_strategy = (
+        overflow_strategy
+        if overflow_strategy is not None
+        else cfg.streamer_overflow_strategy
+    )
+    if _overflow_strategy not in {"block", "drop_newest", "drop_oldest"}:
+        raise typer.BadParameter(
+            "must be block, drop_newest, or drop_oldest",
+            param_hint="--overflow-strategy",
+        )
+    # `cursor_checkpoint` (the legacy JSON file) is kept for two purposes only:
+    # seeding the initial cursor when upgrading a deployment that predates the
+    # unified checkpoint (see StreamCheckpointCoordinator.load_cursor), and the
+    # existing "delete stale checkpoint on HTTP 404/410" fallback inside
+    # stream_trades_with_cursor. It is no longer written by this command —
+    # the SQLite-backed unified checkpoint below is authoritative for cursor
+    # durability. See docs/ingestion.md for the full migration path.
+    cursor_checkpoint = CursorCheckpoint(
+        resolve_checkpoint_path(cfg.cursor_checkpoint_path, cfg.data_dir)
+    )
+
+    init_db()
+    checkpoint_store = RollingWindowStore()
+    window_state = RollingWindowState()
+
+    # Persists the Horizon cursor and the rolling-window state in a single
+    # atomic SQLite transaction, so the cursor can never be durably ahead of
+    # the window state it depends on — see ingestion/stream_checkpoint.py.
+    # The event-count bound reuses `checkpoint_interval` (previously the
+    # window-state-only batch size, preserving amortized-cost checkpointing
+    # under high load); the time bound reuses `cursor_flush_seconds`
+    # (previously the cursor-only durability latency bound), which now also
+    # bounds the combined checkpoint under sustained low/moderate throughput.
+    stream_checkpoint = StreamCheckpointCoordinator(
+        rolling_store=checkpoint_store,
+        flush_policy=FlushPolicy(
+            max_events=_chk_interval, max_seconds=cfg.cursor_flush_seconds
+        ),
+        legacy_cursor_checkpoint=cursor_checkpoint,
+    )
+
+    if reset_cursor:
+        cursor_checkpoint.delete()
+        stream_checkpoint.reset()
+        logger.info("Reset Horizon cursor checkpoint (legacy file and unified checkpoint)")
+
+    checkpoint_store.load_all(window_state)
+    stored_cursor = stream_checkpoint.load_cursor(
+        actual_wallet_count=window_state.active_wallets
+    )
+    cursor = stored_cursor or cfg.horizon_default_cursor
+    if stored_cursor:
+        logger.info("Resuming from cursor %s", cursor)
+    else:
+        logger.info("Starting fresh from cursor %s", cursor)
+
+    try:
+        models = load_models(cfg.model_dir)
+    except FileNotFoundError:
+        logger.error("No trained models found in %s — run `python cli.py train` first", cfg.model_dir)
+        raise typer.Exit(1)
+
+    fe = FeatureEngineering()
+    scorer = IncrementalScorer(
+        window_state=window_state,
+        feature_engineering=fe,
+        model_inference=ModelInference(models),
+        score_delta_threshold=_score_delta,
+    )
+
+    stop_event = threading.Event()
+    last_cursor = cursor
+
+    # Defined and read by `_shutdown` via closure. State it depends on
+    # (`last_cursor`, `scorer`, `stream_checkpoint`) must be initialized
+    # before the signal handlers are registered below, so a signal arriving
+    # before the main loop starts can't observe an undefined value.
+    def _shutdown(signum, frame):
+        logger.info("Shutdown signal received — checkpointing cursor and window state…")
+        stream_checkpoint.flush(last_cursor, scorer.window_state)
+        stop_event.set()
+
+    signal.signal(signal.SIGTERM, _shutdown)
+    signal.signal(signal.SIGINT, _shutdown)
+
+    logger.info(
+        "Starting incremental stream (checkpoint_interval=%d, score_delta=%d, "
+        "queue_depth=%d, overflow_strategy=%s)",
+        _chk_interval,
+        _score_delta,
+        _queue_depth,
+        _overflow_strategy,
+    )
+
+    for trade, event_cursor in stream_trades_with_cursor(
+        cursor=cursor, checkpoint=cursor_checkpoint
+    ):
+        if stop_event.is_set():
+            break
+
+        # Update stream status for /stream/status endpoint
+        api_main._stream_status_update(trade)
+        with api_main._stream_lock:
+            api_main._stream_active_wallets = scorer.window_state.active_wallets
+
+        result = scorer.score_on_trade(trade)
+        if result:
+            save_scores([result])
+            try:
+                subscribers = get_matching_subscribers(result)
+                for sub in subscribers:
+                    enqueue(sub.subscriber_id, result.model_dump(mode="json"))
+            except Exception as exc:  # pragma: no cover
+                logger.warning("Webhook dispatch error: %s", exc)
+
+        last_cursor = event_cursor
+        if stream_checkpoint.on_trade_processed(event_cursor, scorer.window_state):
+            logger.debug(
+                "Checkpointed cursor %s and %d wallet windows",
+                event_cursor,
+                scorer.window_state.active_wallets,
+            )
+
+    # Final checkpoint on clean exit
+    stream_checkpoint.flush(last_cursor, scorer.window_state)
+    logger.info("Stream stopped. Final checkpoint written.")
+
+
+@app.command("db-migrate")
+def db_migrate(
+    db_path: str = typer.Option(None, "--db-path", help="Path to the SQLite database (defaults to LEDGERLENS_DB_PATH)"),
+    consolidate_api_keys: bool = typer.Option(
+        True, "--consolidate-api-keys/--skip-consolidation",
+        help="Consolidate legacy api_keys tables into the canonical detection.api_key_store schema.",
+    ),
+) -> None:
+    """Apply any pending schema migrations to the database and report the result.
+
+    Also consolidates legacy API key tables (from ``api/api_keys_router.py``
+    and ``api/namespace.py``) into the canonical ``detection.api_key_store``
+    schema when ``--consolidate-api-keys`` is set (the default).
+    """
+    from detection.storage import _connect, get_schema_version, migrate_db
+
+    with _connect(db_path) as conn:
+        before = get_schema_version(conn)
+
+    with _connect(db_path) as conn:
+        applied = migrate_db(conn)
+        after = get_schema_version(conn)
+
+    if applied:
+        typer.echo(f"Migrated from version {before} → {after}. Applied: {applied}")
+    else:
+        typer.echo(f"Database already at latest schema version {after}. No migrations applied.")
+
+    if consolidate_api_keys:
+        import sqlite3
+
+        from config.settings import settings
+
+        from detection.api_key_store import migrate_legacy_api_keys
+
+        conn = sqlite3.connect(settings.db_path)
+        try:
+            report = migrate_legacy_api_keys(conn)
+            total = report["migrated"]
+            key_id_updated = report["rows_updated_key_id"]
+            scopes_updated = report["rows_updated_scopes"]
+            if total > 0:
+                typer.echo(
+                    f"API key consolidation: {total} change(s) applied "
+                    f"(key_id_populated={key_id_updated}, scopes_updated={scopes_updated})"
+                )
+            else:
+                typer.echo(
+                    "API key consolidation: no changes needed "
+                    f"(key_id_populated={key_id_updated}, scopes_updated={scopes_updated})"
+                )
+        except Exception as exc:
+            typer.echo(f"API key consolidation failed: {exc}", err=True)
+            raise typer.Exit(1)
+        finally:
+            conn.close()
+
+
+@app.command("dlq-replay")
+def dlq_replay(
+    limit: int = typer.Option(100, help="Max dead letters to replay per run"),
+    dry_run: bool = typer.Option(False, help="Print DLQ contents without submitting"),
+) -> None:
+    """Replay pending Soroban dead-letter submissions.
+
+    Processes oldest-first. Marks each as 'replayed' on success or 'failed'
+    on persistent failure. Never removes rows from the DLQ.
+    """
+    import sqlite3
+    from datetime import datetime, timezone
+
+    from config.settings import settings
+    from detection.soroban_publisher import (
+        SorobanPublisher,
+        SorobanSubmissionError,
+        SorobanCircuitOpenError,
+        get_dlq_entries,
+        init_dlq_schema,
+    )
+    from detection.risk_score import RiskScore
+
+    secret_key = os.environ.get("LEDGERLENS_SERVICE_SECRET_KEY", "")
+    if not secret_key and not dry_run:
+        typer.echo("ERROR: LEDGERLENS_SERVICE_SECRET_KEY is not set. Cannot replay.", err=True)
+        raise typer.Exit(1)
+
+    init_dlq_schema()
+    items, total = get_dlq_entries(status="pending", page=1, page_size=limit)
+
+    if not items:
+        typer.echo("No pending DLQ entries.")
+        return
+
+    if dry_run:
+        typer.echo(f"DRY RUN — {len(items)} pending item(s):")
+        for item in items:
+            typer.echo(f"  [{item['id']}] {item['wallet']}:{item['asset_pair']} score={item['score']} error={item['error_message']}")
+        return
+
+    publisher = SorobanPublisher(
+        contract_id=os.environ.get("LEDGERLENS_SCORE_CONTRACT_ID", ""),
+        secret_key=secret_key,
+        soroban_rpc_url=os.environ.get("SOROBAN_RPC_URL", "https://soroban-testnet.stellar.org"),
+        network_passphrase=os.environ.get("NETWORK_PASSPHRASE", "Test SDF Network ; September 2015"),
+    )
+
+    db_path = settings.db_path
+    replayed = 0
+    failed = 0
+
+    for item in items:
+        score_obj = RiskScore(
+            wallet=item["wallet"],
+            asset_pair=item["asset_pair"],
+            score=item["score"],
+            benford_flag=False,
+            ml_flag=False,
+            confidence=0,
+            timestamp=datetime.fromtimestamp(item["ledger_timestamp"], tz=timezone.utc),
+        )
+        tx_hash = None
+        status = "failed"
+        try:
+            tx_hash = publisher.submit_score(score_obj)
+            status = "replayed"
+            replayed += 1
+            logger.info("DLQ item %d replayed: tx=%s", item["id"], tx_hash)
+        except (SorobanSubmissionError, SorobanCircuitOpenError, Exception) as exc:
+            logger.warning("DLQ item %d replay failed: %s", item["id"], exc)
+            failed += 1
+
+        now_iso = datetime.now(timezone.utc).isoformat()
+        with sqlite3.connect(db_path) as conn:
+            conn.execute(
+                "UPDATE soroban_dead_letters SET status=?, replayed_at=?, replay_tx_hash=? WHERE id=?",
+                (status, now_iso, tx_hash, item["id"]),
+            )
+            conn.commit()
+
+    typer.echo(f"DLQ replay complete: {replayed} replayed, {failed} failed out of {len(items)} items.")
+
+
+@app.command("governance-close-expired")
+def governance_close_expired() -> None:
+    """Close all active governance proposals whose voting period has expired.
+
+    Tallies each expired proposal and sets its status to 'passed' or 'rejected'
+    based on the quorum rule (>50% of committee votes 'for'). Designed to be
+    called on a schedule (e.g., cron or systemd timer).
+    """
+    from detection.storage import init_db
+    from detection.governance import GovernanceEngine
+
+    init_db()
+    engine = GovernanceEngine()
+    closed = engine.close_expired()
+    if not closed:
+        typer.echo("No expired proposals to close.")
+    else:
+        for p in closed:
+            typer.echo(f"Proposal {p.id} ({p.proposal_type}): {p.status}")
+
+
+@app.command("reweight")
+def reweight(
+    days_back: int = typer.Option(7, "--days-back", help="Feedback window in days"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Print proposed weights without writing"),
+) -> None:
+    """Update ensemble weights from recent feedback using Bayesian Model Averaging.
+
+    Loads the last *days_back* days of scoring feedback, computes updated
+    weights via :func:`detection.ensemble_reweighter.compute_updated_weights`,
+    and (unless ``--dry-run``) writes them to ``models/ensemble_weights.json``.
+    """
+    from config.settings import settings
+    from detection.ensemble_reweighter import apply_weights, compute_updated_weights
+    from detection.feedback_store import get_recent_feedback
+
+    feedback = get_recent_feedback(days_back=days_back)
+    logger.info("Loaded %d feedback records from the last %d days", len(feedback), days_back)
+
+    current = {
+        "random_forest": settings.ensemble_weight_rf,
+        "xgboost": settings.ensemble_weight_xgb,
+        "lightgbm": settings.ensemble_weight_lgbm,
+    }
+    proposed = compute_updated_weights(feedback)
+
+    header = f"{'Model':<20} {'Current':>10} {'Proposed':>10}"
+    divider = "─" * len(header)
+    typer.echo(divider)
+    typer.echo(header)
+    typer.echo(divider)
+    for model in ("random_forest", "xgboost", "lightgbm"):
+        typer.echo(f"{model:<20} {current[model]:>10.4f} {proposed[model]:>10.4f}")
+    typer.echo(divider)
+
+    if dry_run:
+        typer.echo("Dry run — ensemble_weights.json not written.")
+        return
+
+    apply_weights(proposed, settings.model_dir)
+    typer.echo("Wrote updated weights to ensemble_weights.json")
+
+
+@app.command("sign-models")
+def sign_models(
+    model_dir: str = typer.Option(None, help="Directory of .joblib model files to sign (defaults to settings.model_dir)"),
+) -> None:
+    """Backfill HMAC-SHA256 signatures for every .joblib in model_dir.
+
+    Idempotent: re-signs files whose content changed, skips already-valid ones.
+    Run this once against trusted committed artifacts after setting
+    LEDGERLENS_MODEL_SIGNING_KEY. Required before loading models with
+    verification enabled.
+    """
+    import glob
+
+    from config.settings import settings
+    from detection.model_signing import ModelIntegrityError, sign_model_file, verify_model_file
+
+    target_dir = model_dir or settings.model_dir
+    signing_key = settings.model_signing_key.encode()
+
+    if not signing_key:
+        typer.echo("ERROR: LEDGERLENS_MODEL_SIGNING_KEY is not set.", err=True)
+        raise typer.Exit(1)
+
+    pattern = os.path.join(target_dir, "*.joblib")
+    paths = glob.glob(pattern)
+    if not paths:
+        typer.echo(f"No .joblib files found in {target_dir}")
+        return
+
+    signed = []
+    skipped = []
+    for path in sorted(paths):
+        try:
+            verify_model_file(path, signing_key)
+            skipped.append(path)
+        except ModelIntegrityError:
+            sign_model_file(path, signing_key)
+            signed.append(path)
+
+    for path in signed:
+        logger.info("Signed: %s", path)
+    for path in skipped:
+        logger.info("Already valid, skipped: %s", path)
+
+    typer.echo(f"Signed {len(signed)} file(s), skipped {len(skipped)} already-valid file(s).")
+
+
+@app.command("generate-signing-key")
+def generate_signing_key() -> None:
+    """Generate a new ED25519 keypair for model signing.
+
+    Prints public key (for settings.py) and private key (for environment).
+    ONLY run this during initial setup or key rotation.
+    """
+    import base64
+
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from cryptography.hazmat.primitives.serialization import (
+        Encoding,
+        NoEncryption,
+        PrivateFormat,
+        PublicFormat,
+    )
+
+    priv = Ed25519PrivateKey.generate()
+    pub = priv.public_key()
+    priv_b64 = base64.b64encode(
+        priv.private_bytes(Encoding.Raw, PrivateFormat.Raw, NoEncryption())
+    ).decode()
+    pub_b64 = base64.b64encode(
+        pub.public_bytes(Encoding.Raw, PublicFormat.Raw)
+    ).decode()
+    typer.echo(
+        f"Public key (embed in config/settings.py as MODEL_SIGNING_PUBLIC_KEY):\n{pub_b64}"
+    )
+    typer.echo(
+        f"\nPrivate key (set as MODEL_SIGNING_PRIVATE_KEY env variable):\n{priv_b64}"
+    )
+    typer.echo("\nWARNING: Store the private key securely. It cannot be recovered.")
+
+
+@app.command("verify-models")
+def verify_models(
+    model_dir: str = typer.Option(None, help="Directory of .joblib model files to verify (defaults to settings.model_dir)"),
+) -> None:
+    """Verify all model artifacts in MODEL_DIR using ED25519 signatures. Exits non-zero if any fail."""
+    from config.settings import settings
+    from detection.model_signing import ModelIntegrityError, get_model_signer
+
+    target_dir = model_dir or settings.model_dir
+    signer = get_model_signer()
+    failures = []
+    for model_file in sorted(Path(target_dir).glob("*.joblib")):
+        try:
+            signer.verify(model_file)
+            typer.echo(f"OK: {model_file.name}")
+        except ModelIntegrityError as e:
+            typer.echo(f"FAIL: {e}", err=True)
+            failures.append(model_file.name)
+    if failures:
+        raise typer.Exit(code=1)
+    if not list(Path(target_dir).glob("*.joblib")):
+        typer.echo(f"No .joblib files found in {target_dir}")
+
+
+@app.command("compute-embeddings")
+def compute_embeddings(
+    window_days: int = typer.Option(30, "--window-days", "-w", help="Number of days of trades to include"),
+    model_version: str = typer.Option(None, help="Model version to use for embeddings (defaults to model file basename)"),
+) -> None:
+    """Compute and store GNN embeddings for all wallets in the last N days of trades."""
+    import sqlite3
+    from types import SimpleNamespace
+    from datetime import datetime, timezone, timedelta
+
+    from config.settings import settings
+    from detection.embedding_store import EmbeddingStore
+    from detection.gnn_ring_detector import GNNRingDetector, build_transaction_graph
+
+    # Load trades
+    end_time = datetime.now(timezone.utc)
+    start_time = end_time - timedelta(days=window_days)
+    cutoff = start_time.isoformat()
+    db_path = settings.db_path
+
+    trades = []
+    try:
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT base_account, counter_account, base_amount,
+                   base_asset_code, counter_asset_code, ledger_close_time
+            FROM trades
+            WHERE ledger_close_time >= ?
+            """,
+            (cutoff,),
+        )
+        rows = cursor.fetchall()
+        conn.close()
+
+        for row in rows:
+            try:
+                ts_str = row["ledger_close_time"]
+                ts = datetime.fromisoformat(ts_str).timestamp() if ts_str else 0.0
+                trades.append(
+                    SimpleNamespace(
+                        base_account=row["base_account"],
+                        counter_account=row["counter_account"],
+                        base_amount=float(row["base_amount"] or 0),
+                        ledger_close_time_ts=ts,
+                        base_asset_code=row["base_asset_code"] or "XLM",
+                        counter_asset_code=row["counter_asset_code"] or "XLM",
+                    )
+                )
+            except Exception:
+                continue
+    except Exception as e:
+        typer.echo(f"Error loading trades: {e}", err=True)
+        raise typer.Exit(1)
+
+    if not trades:
+        typer.echo("No trades found in the window.")
+        return
+    typer.echo(f"Loaded {len(trades)} trades from {start_time.date()} to {end_time.date()}")
+
+    # Build graph
+    def node_feature_fn(w: str):
+        import torch
+        h = abs(hash(w)) % 10000
+        return torch.tensor(
+            [h / 10000.0, len(w) / 60.0, float(w.startswith("G")), 0.0],
+            dtype=torch.float,
+        )
+    data = build_transaction_graph(trades, node_feature_fn)
+    typer.echo(f"Built graph with {data['wallet'].num_nodes} wallets")
+
+    # Load detector and compute embeddings
+    detector = GNNRingDetector()
+    detector.load()
+    if not detector._fitted:
+        typer.echo("GNN model not fitted; using SCC fallback only (no embeddings).", err=True)
+        raise typer.Exit(1)
+    
+    embeddings = detector.get_embeddings(data)
+    wallet_ids = data["wallet"].wallet_list
+    # Convert embeddings to numpy array
+    embeddings = embeddings.cpu().numpy()
+    typer.echo(f"Computed embeddings for {len(wallet_ids)} wallets")
+
+    # Determine model version
+    if model_version is None:
+        model_path = settings.gnn_model_path
+        model_version = Path(model_path).stem
+
+    # Store embeddings
+    store = EmbeddingStore()
+    for wallet, embedding in zip(wallet_ids, embeddings):
+        store.upsert_embedding(wallet, model_version, embedding)
+    typer.echo(f"Stored embeddings for {len(wallet_ids)} wallets with version {model_version}")
+
+
+@app.command("webhook-worker")
+def webhook_worker(
+    interval: float = typer.Option(5.0, "--interval", help="Poll interval in seconds"),
+) -> None:
+    """Run the webhook delivery worker as a foreground process."""
+    import asyncio
+
+    from detection.webhook_worker import run_delivery_worker
+
+    asyncio.run(run_delivery_worker(interval_seconds=interval))
+
+
+@app.command("analyst-lock-sweep")
+def analyst_lock_sweep(
+    interval: float = typer.Option(60.0, "--interval", help="Sweep interval in seconds"),
+) -> None:
+    """Run the analyst case lock expiry sweep as a foreground process.
+
+    Expires stale analyst claims (past ANALYST_LOCK_TIMEOUT_SECONDS) so
+    wallets return to the unassigned queue.  Runs continuously until SIGINT/SIGTERM.
+    """
+    from detection.analyst_store import expire_stale_locks
+    from config.settings import settings as cfg
+
+    sweep_interval = max(interval, 10.0)
+    logger.info(
+        "Starting analyst lock sweep (interval=%ss, lock_timeout=%ss)",
+        sweep_interval,
+        cfg.analyst_lock_timeout_seconds,
+    )
+
+    try:
+        import signal
+        _stop = False
+
+        def _handle_signal(signum, frame):
+            nonlocal _stop
+            logger.info("Shutdown signal received — stopping lock sweep")
+            _stop = True
+
+        signal.signal(signal.SIGTERM, _handle_signal)
+        signal.signal(signal.SIGINT, _handle_signal)
+
+        while not _stop:
+            released = expire_stale_locks()
+            if released:
+                logger.info("Lock sweep: released %d expired lock(s)", released)
+            time.sleep(sweep_interval)
+    except KeyboardInterrupt:
+        pass
+
+    logger.info("Analyst lock sweep stopped.")
+
+
+backtest_app = typer.Typer(help="Backtesting framework for model evaluation")
+app.add_typer(backtest_app, name="backtest")
+
+
+@backtest_app.command("run")
+def backtest_run(
+    dataset: str = typer.Option("data/backtest/known_cases.csv", help="Path to labelled CSV dataset"),
+    threshold: int = typer.Option(70, help="Score threshold for classification (0-100)"),
+    output_dir: str = typer.Option(".", help="Directory to write the backtest report to"),
+    model_dir: str = typer.Option(None, help="Model directory (defaults to settings.model_dir)"),
+) -> None:
+    """Run the backtesting pipeline against a labelled historical dataset.
+
+    Loads the labelled CSV, runs feature extraction and model scoring,
+    and outputs precision/recall/F1/AUC-ROC at the specified threshold.
+    """
+    from backtesting.backtest_runner import run_backtest, save_report
+
+    report = run_backtest(
+        dataset_path=dataset,
+        threshold=threshold,
+        model_dir=model_dir,
+    )
+
+    output_path = save_report(report, output_dir=output_dir)
+
+    typer.echo(f"Backtest complete: {report.total_wallets} wallets evaluated")
+    typer.echo(f"  Threshold: {threshold}")
+    typer.echo(f"  Precision: {report.precision:.3f}")
+    typer.echo(f"  Recall:    {report.recall:.3f}")
+    typer.echo(f"  F1:        {report.f1:.3f}")
+    typer.echo(f"  AUC-ROC:   {report.auc_roc:.3f}")
+    typer.echo(f"  Avg Prec:  {report.average_precision:.3f}")
+    typer.echo(f"Report saved to {output_path}")
+
+    if report.thresholds_sweep:
+        header = f"{'Threshold':>10} {'Precision':>10} {'Recall':>8} {'F1':>6}"
+        typer.echo(header)
+        for t in report.thresholds_sweep:
+            typer.echo(f"{t['threshold']:>10} {t['precision']:>10.3f} {t['recall']:>8.3f} {t['f1']:>6.3f}")
+
+
+federated_app = typer.Typer(help="Federated Learning commands for exchange operators")
+app.add_typer(federated_app, name="federated")
+
+
+@federated_app.command("server")
+def federated_server(
+    host: str = typer.Option(None, help="Host to bind (default from FEDERATED_SERVER_HOST)"),
+    port: int = typer.Option(None, help="Port to bind (default from FEDERATED_SERVER_PORT)"),
+    min_participants: int = typer.Option(None, help="Minimum quorum size before aggregation"),
+) -> None:
+    """Start the federated aggregation server as a standalone process."""
+    logger.warning(
+        "[DEPRECATED] `cli.py federated server` is deprecated and will be removed in a future release. "
+        "Please use the standalone package `ledgerlens-fl-server` instead."
+    )
+    import uvicorn
+
+    from config.settings import settings as cfg
+    from detection.federated.server import FederatedAggregationServer, federated_app as fl_app
+    import detection.federated.server as fed_server_mod
+
+    kwargs: dict = {}
+    if min_participants is not None:
+        kwargs["min_participants"] = min_participants
+    fed_server_mod._server_instance = FederatedAggregationServer(**kwargs)
+
+    bind_host = host or cfg.federated_server_host
+    bind_port = port or cfg.federated_server_port
+    logger.info("Starting federated server on %s:%d", bind_host, bind_port)
+    uvicorn.run(fl_app, host=bind_host, port=bind_port)
+
+
+@federated_app.command("admit")
+def federated_admit(
+    participant_id: str = typer.Argument(..., help="Identifier the operator will register with"),
+    max_n_samples: int = typer.Option(..., "--max-n-samples", help="Ceiling on this participant's claimed dataset size, enforced server-side on every round"),
+    admitted_by: str = typer.Option("operator", "--admitted-by", help="Free-text note recording who approved this admission (for audit)"),
+    db_path: str = typer.Option(None, "--db-path", help="Federated server's SQLite path (defaults to LEDGERLENS_DB_PATH)"),
+) -> None:
+    """Authorize a participant_id to register with the federated server.
+
+    Must be run (by an operator, out-of-band, e.g. after verifying the
+    institution's identity and roughly how much data it holds) before that
+    identity can call `federated join` or POST /federated/register --
+    registration is closed by default (FEDERATED_ADMISSION_REQUIRED=true).
+    `--max-n-samples` bounds the aggregation weight this identity can ever
+    claim, regardless of what it reports in a signed update; see
+    docs/federated_learning.md's "Participant Admission & Weight Bounding".
+    """
+    from detection.federated.admission import admit_participant
+
+    try:
+        record = admit_participant(participant_id, max_n_samples, admitted_by, db_path=db_path)
+    except ValueError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(1)
+    typer.echo(
+        f"Admitted {record.participant_id!r}: max_n_samples={record.max_n_samples}, "
+        f"admitted_by={record.admitted_by!r}, admitted_at={record.admitted_at}"
+    )
+
+
+@federated_app.command("join")
+def federated_join(
+    rounds: int = typer.Option(1, "--rounds", "-r", help="Number of federated rounds to participate in"),
+    data_path: str = typer.Option(None, "--data-path", help="Path to operator's private labelled CSV"),
+    server_url: str = typer.Option(None, "--server-url", help="Federated server URL"),
+    operator_id: str = typer.Option("operator-0", "--operator-id", help="Unique operator identifier"),
+) -> None:
+    """Join the federated training pool as an exchange operator.
+
+    If --data-path is omitted, a synthetic dataset is generated locally
+    (useful for testing the protocol without real private data).
+    """
+    import httpx
+    import base64
+
+    import numpy as np
+
+    from config.settings import settings as cfg
+    from detection.dataset import build_training_dataset
+    from detection.feature_engineering import FEATURE_NAMES
+    from detection.federated.client import FederatedClient, _build_public_dataset
+    from ingestion.synthetic_data import generate_synthetic_dataset
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    server_url = server_url or f"http://{cfg.federated_server_host}:{cfg.federated_server_port}"
+
+    # Load or generate private training data
+    if data_path:
+        import pandas as pd
+        df = pd.read_csv(data_path)
+        X = df[FEATURE_NAMES].fillna(0.0).values.astype(np.float64)
+        y = df["label"].values.astype(int)
+    else:
+        logger.info("No --data-path provided; using synthetic private dataset (seed=99)")
+        trades, meta, events, labels = generate_synthetic_dataset(
+            n_normal_accounts=30, n_wash_rings=5, ring_size=3, seed=99
+        )
+        df = build_training_dataset(trades, labels, account_metadata=meta, order_book_events=events)
+        X = df[FEATURE_NAMES].fillna(0.0).values.astype(np.float64)
+        y = df["label"].values.astype(int)
+
+    private_key = Ed25519PrivateKey.generate()
+    client = FederatedClient(operator_id=operator_id, private_key=private_key)
+
+    with httpx.Client(base_url=server_url, timeout=60.0) as http:
+        # Register with server
+        pub_der_b64 = base64.b64encode(client.public_key_der).decode()
+        resp = http.post("/federated/register", json={
+            "participant_id": operator_id,
+            "public_key_der_b64": pub_der_b64,
+        })
+        if resp.status_code == 403:
+            typer.echo(
+                f"Registration rejected: {resp.json().get('detail', resp.text)}\n"
+                f"An operator must run `cli.py federated admit {operator_id} "
+                f"--max-n-samples <N>` (or POST /federated/admit) first.",
+                err=True,
+            )
+            raise typer.Exit(1)
+        resp.raise_for_status()
+        logger.info("Registered with federated server as %s", operator_id)
+
+        X_pub = _build_public_dataset()
+        client.train_local_models(X, y)
+
+        for round_num in range(rounds):
+            # Fetch current global model
+            resp = http.get("/federated/global-model")
+            resp.raise_for_status()
+            data = resp.json()
+            round_id = data["round_id"]
+
+            if data["global_soft_labels_b64"]:
+                prev_global = np.frombuffer(
+                    base64.b64decode(data["global_soft_labels_b64"]), dtype=np.float64
+                )
+            else:
+                prev_global = np.full(len(X_pub), 0.5)
+
+            soft_labels = client.compute_soft_labels(X_pub)
+            delta = soft_labels - prev_global
+            delta = client._clip_delta(delta)
+            noisy_delta = client.inject_dp_noise(delta)
+            noisy_soft_labels = np.clip(prev_global + noisy_delta, 0.0, 1.0)
+
+            signature = client._sign_payload(noisy_soft_labels, len(y), round_id)
+
+            resp = http.post("/federated/update", json={
+                "participant_id": operator_id,
+                "soft_labels_b64": base64.b64encode(noisy_soft_labels.tobytes()).decode(),
+                "n_samples": len(y),
+                "signature_b64": base64.b64encode(signature).decode(),
+            })
+            resp.raise_for_status()
+            result = resp.json()
+            logger.info("Round %d submitted: %s", round_num + 1, result)
+
+            # Wait and fetch updated global model for distillation
+            resp = http.get("/federated/global-model")
+            resp.raise_for_status()
+            data = resp.json()
+            if data["global_soft_labels_b64"]:
+                global_labels = np.frombuffer(
+                    base64.b64decode(data["global_soft_labels_b64"]), dtype=np.float64
+                )
+                client.update_with_distilled_labels(X, y, X_pub, global_labels)
+                logger.info("Round %d: distillation update applied", round_num + 1)
+
+    logger.info("Federated participation complete (%d round(s))", rounds)
+
+
+@app.command("fuzz-check")
+def fuzz_check(
+    duration: int = typer.Option(30, help="Seconds to run each harness (default: 30)"),
+    corpus_dir: str = typer.Option("fuzz/corpus", help="Root directory for per-harness corpus sub-dirs"),
+    harness_dir: str = typer.Option("fuzz", help="Directory containing fuzz_*.py harnesses"),
+) -> None:
+    """Run each Atheris fuzz harness for a bounded duration and exit non-zero on any crash.
+
+    Requires ``atheris`` to be installed (``pip install atheris``).  Suitable for
+    pre-merge smoke testing without the full nightly budget.
+
+    Example::
+
+        python cli.py fuzz-check --duration 30
+    """
+    import glob
+    import subprocess
+
+    harness_pattern = Path(harness_dir) / "fuzz_*.py"
+    harnesses = sorted(glob.glob(str(harness_pattern)))
+    if not harnesses:
+        typer.echo(f"No harnesses found matching {harness_pattern}", err=True)
+        raise typer.Exit(1)
+
+    corpus_root = Path(corpus_dir)
+    corpus_root.mkdir(parents=True, exist_ok=True)
+
+    any_crash = False
+    for harness in harnesses:
+        name = Path(harness).stem
+        harness_corpus = corpus_root / name
+        harness_corpus.mkdir(parents=True, exist_ok=True)
+        typer.echo(f"  Fuzzing {name} for {duration}s ...")
+        try:
+            subprocess.run(
+                [
+                    sys.executable,
+                    harness,
+                    str(harness_corpus),
+                    f"-max_total_time={duration}",
+                    "-print_final_stats=1",
+                ],
+                timeout=duration + 15,
+            )
+        except subprocess.TimeoutExpired:
+            typer.echo(f"  WARNING: {name} timed out after {duration + 15}s", err=True)
+
+        crash_files = list(harness_corpus.glob("crash-*")) + list(harness_corpus.glob("timeout-*"))
+        if crash_files:
+            typer.echo(f"  CRASH detected in {name}: {[f.name for f in crash_files]}", err=True)
+            any_crash = True
+
+    if any_crash:
+        typer.echo(
+            "fuzz-check: crash(es) detected. Download fuzz-crashes artifact and reproduce with:\n"
+            "  python fuzz/fuzz_<harness>.py fuzz/corpus/crash-<hash>\n"
+            "See fuzz/README.md for minimisation instructions.",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    typer.echo(f"fuzz-check: all {len(harnesses)} harnesses completed without crashes.")
+
+
+@app.command("red-team")
+def red_team(
+    model_dir: str = typer.Option("models", help="Directory containing trained model files"),
+    n_samples: int = typer.Option(100, help="Number of seed samples per attack campaign"),
+    evasion_threshold: float = typer.Option(0.05, help="Maximum allowed evasion rate (5%)"),
+    report_dir: str = typer.Option("./red_team_reports", help="Directory to write campaign reports"),
+    seed: int = typer.Option(42, help="Random seed for reproducibility"),
+) -> None:
+    """Run automated red-team attack campaigns and exit 1 if any campaign fails (CI gate)."""
+    from detection.model_inference import load_models
+    from detection.red_team.runner import RedTeamRunner
+
+    logger.info("Loading models from %s", model_dir)
+    models = load_models(model_dir=model_dir)
+
+    # Build generic feature constraints from model feature list
+    from detection.feature_engineering import FEATURE_NAMES
+    feature_constraints = {f: {"min": 0.0, "max": 1.0, "mutable": True} for f in FEATURE_NAMES}
+
+    runner = RedTeamRunner(
+        model=models,
+        feature_constraints=feature_constraints,
+        evasion_threshold=evasion_threshold,
+        report_dir=report_dir,
+        seed=seed,
+    )
+    summary = runner.run_all_campaigns(n_samples=n_samples)
+    path = runner.write_report(summary)
+    typer.echo(f"Campaign report written to {path}")
+    typer.echo(f"Overall result: {'PASSED' if summary.passed else 'FAILED'}")
+    for c in summary.campaigns:
+        typer.echo(f"  {c.attack_type.value}: evasion_rate={c.evasion_rate:.3f} {'OK' if c.passed else 'FAIL'}")
+
+    if not summary.passed:
+        raise typer.Exit(1)
+
+
+config_app = typer.Typer(help="Configuration commands")
+app.add_typer(config_app, name="config")
+
+db_app = typer.Typer(help="Database commands: migrations, rollback, and data retention")
+app.add_typer(db_app, name="db")
+
+
+@db_app.command("retention")
+def db_retention(
+    dry_run: bool = typer.Option(False, "--dry-run", help="Report what would be archived without making changes"),
+    archive_root: str = typer.Option("./data/archive", "--archive-root", help="Root directory for Parquet archives"),
+    db_path: str = typer.Option(None, "--db-path", help="Path to SQLite database (defaults to LEDGERLENS_DB_PATH)"),
+) -> None:
+    """Archive records older than their TTL to Parquet and purge from SQLite.
+
+    Default TTLs: risk_scores=365d, feature_vectors=90d, alerts=730d.
+    Use --dry-run to preview the archival plan without modifying the database.
+    """
+    import sqlite3
+
+    from config.settings import settings as cfg
+    from storage.retention import RetentionEngine
+
+    resolved_db_path = db_path or cfg.db_path
+    engine = RetentionEngine(db_path=resolved_db_path, archive_root=archive_root)
+    try:
+        report = engine.run(dry_run=dry_run)
+    except sqlite3.OperationalError as exc:
+        typer.echo(
+            f"Error: could not open database at --db-path={resolved_db_path!r} ({exc}). "
+            "Check that the path exists and its parent directory is writable.",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    prefix = "[DRY RUN] " if dry_run else ""
+    for table, info in report.items():
+        archived = info.get("rows_archived", 0)
+        cutoff = info.get("cutoff_date", "")
+        if info.get("skipped"):
+            typer.echo(f"{prefix}{table}: table not found — skipped")
+        elif archived == 0:
+            typer.echo(f"{prefix}{table}: no rows older than {cutoff}")
+        elif dry_run:
+            typer.echo(f"{prefix}{table}: would archive {archived} rows older than {cutoff}")
+        else:
+            path = info.get("archive_path", "")
+            typer.echo(f"{prefix}{table}: archived {archived} rows → {path}")
+
+
+api_app = typer.Typer(help="API utility commands")
+app.add_typer(api_app, name="api")
+
+
+@api_app.command("export-schema")
+def api_export_schema(
+    output: str = typer.Option("docs/openapi.json", "--output", "-o", help="Path to write the OpenAPI JSON schema"),
+) -> None:
+    """Export the auto-generated OpenAPI 3.1 schema to a JSON file."""
+    import json
+    import os
+
+    from api.main import app as fastapi_app
+
+    schema = fastapi_app.openapi()
+    os.makedirs(os.path.dirname(output) or ".", exist_ok=True)
+    with open(output, "w", encoding="utf-8") as f:
+        json.dump(schema, f, indent=2)
+    typer.echo(f"OpenAPI schema written to {output}")
+
+
+@config_app.command("validate")
+def config_validate() -> None:
+    """Load and validate configuration, printing all settings (secrets masked)."""
+    import pydantic
+
+    _SECRETS = {
+        "ledgerlens_service_secret_key",
+        "ledgerlens_admin_api_key",
+        "ledgerlens_compliance_api_key",
+        "ledgerlens_model_signing_key",
+        "ledgerlens_webhook_encryption_key",
+    }
+
+    try:
+        from config.settings import Settings
+        s = Settings()
+    except (pydantic.ValidationError, Exception) as exc:
+        typer.echo(f"❌ Configuration invalid:\n{exc}", err=True)
+        raise typer.Exit(1)
+
+    typer.echo("✅ Configuration is valid\n")
+    for name in Settings.model_fields:
+        raw = getattr(s, name)
+        value = "***" if name in _SECRETS and raw else raw
+        typer.echo(f"  {name}={value}")
+
+
+@db_app.command("migrate")
+def db_migrate_alembic(
+    revision: str = typer.Option("head", "--revision", "-r", help="Target revision (default: head)"),
+) -> None:
+    """Apply pending Alembic migrations (equivalent to `alembic upgrade head`)."""
+    import subprocess
+    import sys
+
+    result = subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", revision],
+        cwd=str(Path(__file__).resolve().parent),
+    )
+    raise typer.Exit(result.returncode)
+
+
+@db_app.command("rollback")
+def db_rollback(
+    revision: str = typer.Option("-1", "--revision", "-r", help="Target revision (default: -1, one step back)"),
+) -> None:
+    """Roll back the most recent Alembic migration (equivalent to `alembic downgrade -1`)."""
+    import subprocess
+    import sys
+
+    result = subprocess.run(
+        [sys.executable, "-m", "alembic", "downgrade", revision],
+        cwd=str(Path(__file__).resolve().parent),
+    )
+    raise typer.Exit(result.returncode)
+
+
+benford_app = typer.Typer(help="Benford baseline calibration commands")
+app.add_typer(benford_app, name="benford")
+
+
+@benford_app.command("calibrate")
+def benford_calibrate(
+    asset_pair: str = typer.Option("XLM/USDC", help="Asset pair to calibrate (e.g. XLM/USDC)"),
+    days: int = typer.Option(30, "--days", help="Rolling window in days"),
+) -> None:
+    """Recompute the Benford digit-frequency baseline for an asset pair from stored trades."""
+    from detection.benford_baseline import BenfordBaselineCalibrator
+
+    calibrator = BenfordBaselineCalibrator()
+    baseline = calibrator.calibrate(asset_pair, window_days=days)
+    typer.echo(
+        f"Calibrated {baseline.asset_pair}: {baseline.trade_count} trades, "
+        f"window={baseline.window_days}d, computed_at={baseline.computed_at.isoformat()}"
+    )
+
+
+@app.command("publish-backlog")
+def publish_backlog(
+    since: str = typer.Option(
+        ...,
+        help="ISO 8601 timestamp to start replay from (e.g., 2026-07-17T00:00:00Z)",
+    ),
+) -> None:
+    """Replay existing SQLite risk_scores rows onto the event bus.
+
+    Used for bootstrapping a new consumer or recovering from an event bus outage.
+    The event bus backend must be configured (i.e. EVENT_BUS_BACKEND != 'none').
+    """
+    from config.settings import settings
+    from detection.event_bus import get_event_bus
+    from detection.storage import get_scores_since
+
+    if settings.event_bus_backend == "none":
+        logger.error("Cannot publish backlog: EVENT_BUS_BACKEND is 'none'")
+        raise typer.Exit(1)
+
+    try:
+        from dateutil.parser import parse
+        parse(since)
+    except Exception:
+        logger.error("Invalid 'since' timestamp format. Use ISO 8601 (e.g. 2026-07-17T00:00:00Z)")
+        raise typer.Exit(1)
+
+    logger.info("Fetching scores since %s...", since)
+    scores = get_scores_since(since)
+    if not scores:
+        logger.info("No scores found since %s.", since)
+        return
+
+    logger.info("Publishing %d scores to event bus (%s)...", len(scores), settings.event_bus_backend)
+    bus = get_event_bus()
+    
+    # Publish in chunks to avoid memory/timeout issues
+    chunk_size = 1000
+    total_published = 0
+    total_failed = 0
+    
+    for i in range(0, len(scores), chunk_size):
+        chunk = scores[i:i+chunk_size]
+        result = bus.publish(chunk)
+        total_published += result.published
+        total_failed += result.failed
+        
+        logger.info(
+            "Progress: %d / %d (published: %d, failed: %d)",
+            min(i + chunk_size, len(scores)),
+            len(scores),
+            result.published,
+            result.failed
+        )
+
+    bus.close()
+    
+    if total_failed > 0:
+        logger.error("Backlog replay finished with %d failures.", total_failed)
+        raise typer.Exit(1)
+    else:
+        logger.info("Successfully published all %d scores.", total_published)
+
+
+@app.command("dedup-audit")
+def dedup_audit(
+    source: str = typer.Option(..., "--source", help="The ingestion source: 'horizon' | 'evm' | 'solana'"),
+    since: str = typer.Option(..., "--since", help="ISO-8601 start datetime (UTC)"),
+) -> None:
+    """Report duplicate-detection statistics and details since a given ISO-8601 datetime."""
+    import json
+    import sqlite3
+    from datetime import datetime, timezone
+    from config.settings import settings
+    from config.correlation import mask_wallet
+    from ingestion.dedup import DeduplicationStats
+
+    try:
+        since_dt = datetime.fromisoformat(since.replace("Z", "+00:00"))
+        if since_dt.tzinfo is None:
+            since_dt = since_dt.replace(tzinfo=timezone.utc)
+    except Exception as e:
+        typer.echo(
+            f"Invalid ISO-8601 datetime for --since: {e}. "
+            "Use a format like 2026-07-17T00:00:00Z.",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    since_str = since_dt.isoformat()
+    conn = sqlite3.connect(settings.db_path)
+    try:
+        # Check if table exists
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='ingestion_dedup_audit'")
+        if not cursor.fetchone():
+            typer.echo("DeduplicationStats(seen_total=0, duplicate_total=0, replay_rejected_total=0, duplicate_rate=0.0)")
+            return
+
+        rows = conn.execute(
+            """
+            SELECT idempotency_key, result, checked_at, metadata_json 
+            FROM ingestion_dedup_audit 
+            WHERE source = ? AND checked_at >= ?
+            ORDER BY checked_at ASC
+            """,
+            (source, since_str),
+        ).fetchall()
+    finally:
+        conn.close()
+
+    seen_total = len(rows)
+    duplicate_total = sum(1 for r in rows if r[1] == "duplicate")
+    replay_rejected_total = sum(1 for r in rows if r[1] == "replay_rejected")
+    rate = (duplicate_total / seen_total) if seen_total > 0 else 0.0
+
+    stats = DeduplicationStats(
+        seen_total=seen_total,
+        duplicate_total=duplicate_total,
+        replay_rejected_total=replay_rejected_total,
+        duplicate_rate=rate,
+    )
+
+    typer.echo(f"DeduplicationStats(seen_total={stats.seen_total}, duplicate_total={stats.duplicate_total}, replay_rejected_total={stats.replay_rejected_total}, duplicate_rate={stats.duplicate_rate})")
+
+    typer.echo("\nDuplicate/Replay Checked Events Details:")
+    for key, result, checked_at, metadata_json in rows:
+        if result in ("duplicate", "replay_rejected"):
+            meta = json.loads(metadata_json) if metadata_json else {}
+            masked_meta = {}
+            for k, v in meta.items():
+                if isinstance(v, str) and ("wallet" in k.lower() or "account" in k.lower() or k in ("pubkey", "address")):
+                    masked_meta[k] = mask_wallet(v)
+                else:
+                    masked_meta[k] = v
+            typer.echo(f"[{checked_at}] Result={result} Key={key[:16]} Metadata={masked_meta}")
+
+
+@app.command("grpc-serve")
+def grpc_serve(
+    port: int = typer.Option(50051, help="Port to listen on for gRPC requests"),
+) -> None:
+    """Run the gRPC Internal Scoring Service sidecar."""
+    from api.grpc_scoring_service import serve
+
+    serve(port=port)
+
+
+@app.command("rotate-sweep")
+def rotate_sweep() -> None:
+    """Revoke keys whose rotation grace period has elapsed."""
+    from detection.api_key_store import sweep_expired_api_keys
+    revoked_count = sweep_expired_api_keys()
+    typer.echo(f"Secret rotation sweep completed. Revoked {revoked_count} expired rotating keys.")
+
+
+@app.command("re-encrypt-webhook-secrets")
+def re_encrypt_webhook_secrets() -> None:
+    """Decrypt webhook secrets using either current or previous keys, and re-encrypt under the current key."""
+    from detection.webhook_registry import _decrypt_secret, _encrypt_secret, _connect, init_db
+    
+    init_db()
+    reencrypted_count = 0
+    with _connect() as conn:
+        rows = conn.execute("SELECT id, secret_encrypted FROM webhook_subscribers").fetchall()
+        for row_id, encrypted_secret in rows:
+            try:
+                # Decrypts trying current first, then previous
+                plaintext = _decrypt_secret(encrypted_secret)
+                # Encrypts strictly under current key
+                new_encrypted = _encrypt_secret(plaintext)
+                if new_encrypted != encrypted_secret:
+                    conn.execute("UPDATE webhook_subscribers SET secret_encrypted = ? WHERE id = ?", (new_encrypted, row_id))
+                    reencrypted_count += 1
+            except Exception as e:
+                typer.echo(f"Failed to re-encrypt subscriber row ID {row_id}: {e}")
+                
+        conn.commit()
+    typer.echo(f"Re-encryption complete. Successfully re-encrypted {reencrypted_count} webhook secrets under the current encryption key.")
+
+
+if __name__ == "__main__":
+    app()
+

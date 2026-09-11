@@ -1,0 +1,10 @@
+# requirements/fuzz.txt
+# ─────────────────────────────────────────────────────────────────────────────
+# AUTO-GENERATED – do not edit manually.
+# Regenerate with: make lock   (or: bash requirements/compile.sh fuzz)
+# ─────────────────────────────────────────────────────────────────────────────
+
+-r base.txt
+
+# [fuzz] extra
+atheris>=2.3.0,<3.0
