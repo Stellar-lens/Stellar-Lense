@@ -6,9 +6,7 @@ export function Hero() {
     <section className="mx-auto grid max-w-6xl items-center gap-10 px-6 py-14 md:grid-cols-2 md:py-20">
       <div>
         <h1 className="animate-rise text-h1 text-text">
-          The Stellar DEX,
-          <br />
-          made legible.
+          See through the wash trades.
         </h1>
         <p
           className="animate-rise mt-4 max-w-md text-body text-muted"

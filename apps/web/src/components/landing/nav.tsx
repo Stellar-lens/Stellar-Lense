@@ -9,13 +9,19 @@ export function Nav() {
         </Link>
         <div className="flex items-center gap-6">
           <a href="#how-it-works" className="text-muted transition-colors hover:text-text">
-            [How it works]
+            [Product]
           </a>
           <Link href="/docs" className="text-muted transition-colors hover:text-text">
             [Docs]
           </Link>
-          <Link href="/app" className="text-accent transition-colors hover:text-text">
-            [Launch App]
+          <Link href="/app" className="text-muted transition-colors hover:text-text">
+            [Risk Registry]
+          </Link>
+          <Link
+            href="/app"
+            className="rounded-md bg-accent px-4 py-2 text-bg transition-opacity hover:opacity-90"
+          >
+            Launch App
           </Link>
         </div>
       </nav>

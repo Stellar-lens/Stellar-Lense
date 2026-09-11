@@ -11,7 +11,7 @@ const SIGNALS = [
   },
   {
     step: "03",
-    title: "Graph-based ring detection",
+    title: "Ring detection",
     body: "Wash trading is rarely one wallet. Circular fund flows between colluding wallets show up as rings in the trade graph — patterns a single wallet's statistics alone would miss.",
   },
 ];
@@ -23,9 +23,7 @@ export function HowItWorks() {
       className="border-t border-border bg-surface/40"
     >
       <div className="mx-auto max-w-6xl px-6 py-14 md:py-20">
-        <h2 className="max-w-lg text-h2 text-text">
-          Three signals, one score.
-        </h2>
+        <h2 className="max-w-lg text-h2 text-text">How detection works</h2>
 
         <div className="mt-10 grid gap-8 md:grid-cols-3 md:gap-6">
           {SIGNALS.map((s) => (
