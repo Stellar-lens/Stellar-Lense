@@ -1,4 +1,4 @@
-# Contributing to Ledgerlens-dashboard
+# Contributing to Stellar-Lense
 
 This repo is a small static site (HTML/CSS/vanilla JS ES modules, no build step, no
 framework). Contributions that keep it that way are strongly preferred over ones that
@@ -8,8 +8,8 @@ for why.
 ## Setup
 
 ```bash
-git clone https://github.com/Ledger-Lenz/Ledgerlens-dashboard.git
-cd Ledgerlens-dashboard
+git clone https://github.com/Stellar-lens/Stellar-Lense.git
+cd Stellar-Lense
 npm install
 ```
 
@@ -20,7 +20,7 @@ cp dashboard/config.js.example dashboard/config.js   # point at your API
 npm run serve                                        # http://localhost:8080
 ```
 
-You'll need a running [Ledgerlens-api](https://github.com/Ledger-Lenz/Ledegerlens-api)
+You'll need a running [Stellar-Lense-api](https://github.com/Stellar-lens/Stellar-Lense)
 instance to see real data — this repo has no backend of its own. To work on styling
 without an API at all, visit `dashboard/styleguide.html` instead — see
 [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md).

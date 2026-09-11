@@ -36,14 +36,14 @@ client, not a monorepo duplicating the other four `Ledger-Lenz` repos.
 ### Changed
 
 - Removed the duplicated `api/`, `ingestion/`, `detection/`, `contracts/`, and their tests
-  — that code belongs in Ledegerlens-api, Ledgerlens-data, Ledgerlens-core, and
-  Ledgerlens-contract respectively.
+  — that code belongs in Stellar-Lense-api, Stellar-Lense-data, Stellar-Lense-core, and
+  Stellar-Lense-contract respectively.
 - Rewrote `dashboard/app.js` (now `dashboard/js/app.js`, split into modules) to match
-  Ledegerlens-api's actual response contract — it previously expected a wrapper shape
+  Stellar-Lense-api's actual response contract — it previously expected a wrapper shape
   and field names the deployed API has never returned.
 - Rewrote the README's Repository Structure, Quick Start, API Reference, Configuration,
   and Testing sections for the dashboard-only scope; fixed dead links to a nonexistent
-  `github.com/Ledger-Lenz/Ledgerlens-api` (real repo is `Ledegerlens-api`) and to a
+  `github.com/Ledger-Lenz/Stellar-Lense-api` (real repo is `Stellar-Lense-api`) and to a
   wrong GitHub org (`Inkman007` → `Ledger-Lenz`).
 
 ### Added
@@ -80,4 +80,4 @@ client, not a monorepo duplicating the other four `Ledger-Lenz` repos.
   Stellar base32 (the alphabet excludes `0`/`1`/`8`/`9`) — caught while writing the
   integration tests, which need an actually-valid example wallet to test against.
 
-[1.0.0]: https://github.com/Ledger-Lenz/Ledgerlens-dashboard/releases/tag/v1.0.0
+[1.0.0]: https://github.com/Stellar-lens/Stellar-Lense/releases/tag/v1.0.0
