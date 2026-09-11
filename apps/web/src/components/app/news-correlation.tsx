@@ -20,7 +20,7 @@ export function NewsCorrelation({ movement }: { movement: ScoreMovement | null }
     return (
       <Link
         href={pairHref}
-        className="inline-flex items-center gap-1.5 font-mono text-xs hover:underline"
+        className="inline-flex items-center gap-1.5 text-data-base hover:underline"
       >
         <span className="text-muted">score {movement.after.toFixed(0)}</span>
         <span className={color}>
@@ -35,7 +35,7 @@ export function NewsCorrelation({ movement }: { movement: ScoreMovement | null }
     return (
       <Link
         href={pairHref}
-        className="inline-flex items-center gap-1.5 font-mono text-xs text-muted hover:underline"
+        className="inline-flex items-center gap-1.5 text-data-base text-muted hover:underline"
       >
         <span>current score</span>
         <span className="text-text">{movement.current.toFixed(0)}</span>

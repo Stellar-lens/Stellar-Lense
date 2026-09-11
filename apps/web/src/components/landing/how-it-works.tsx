@@ -22,26 +22,22 @@ export function HowItWorks() {
       id="how-it-works"
       className="border-t border-border bg-surface/40"
     >
-      <div className="mx-auto max-w-6xl px-6 py-24 md:py-32">
-        <h2 className="max-w-lg font-display text-3xl font-medium text-text md:text-4xl">
+      <div className="mx-auto max-w-6xl px-6 py-14 md:py-20">
+        <h2 className="max-w-lg text-h2 text-text">
           Three signals, one score.
         </h2>
 
-        <div className="mt-16 grid gap-12 md:grid-cols-3 md:gap-8">
+        <div className="mt-10 grid gap-8 md:grid-cols-3 md:gap-6">
           {SIGNALS.map((s) => (
             <div key={s.step}>
-              <span className="font-mono text-sm text-muted">{s.step}</span>
-              <h3 className="mt-3 font-body text-base font-semibold text-text">
-                {s.title}
-              </h3>
-              <p className="mt-3 text-sm leading-relaxed text-muted">
-                {s.body}
-              </p>
+              <span className="text-data-base text-muted">{s.step}</span>
+              <h3 className="mt-2 text-h3 text-text">{s.title}</h3>
+              <p className="mt-2 text-body-sm text-muted">{s.body}</p>
             </div>
           ))}
         </div>
 
-        <p className="mt-16 max-w-2xl border-t border-border pt-8 text-sm text-muted">
+        <p className="mt-10 max-w-2xl border-t border-border pt-6 text-body-sm text-muted">
           All three combine into a single 0–100 risk score, submitted
           on-chain to a Soroban contract — queryable by any wallet, dApp,
           or contract without trusting a centralized API.

@@ -15,11 +15,9 @@ const AUDIENCES = [
 
 export function WhatItDoes() {
   return (
-    <section className="mx-auto max-w-6xl px-6 py-24 md:py-32">
-      <h2 className="max-w-lg font-display text-3xl font-medium text-text md:text-4xl">
-        Every wallet, scored.
-      </h2>
-      <p className="mt-6 max-w-2xl text-lg text-muted">
+    <section className="mx-auto max-w-6xl px-6 py-14 md:py-20">
+      <h2 className="max-w-lg text-h2 text-text">Every wallet, scored.</h2>
+      <p className="mt-4 max-w-2xl text-body text-muted">
         Stellar Lense ingests trade data from the Stellar Horizon API and
         scores every wallet and asset pair on the Stellar DEX for
         wash-trading risk, from 0 to 100. Scores update continuously,
@@ -28,15 +26,11 @@ export function WhatItDoes() {
         smart contract can check a wallet before it matters.
       </p>
 
-      <div className="mt-16 grid gap-12 md:grid-cols-3 md:gap-8">
+      <div className="mt-10 grid gap-8 md:grid-cols-3 md:gap-6">
         {AUDIENCES.map((a) => (
           <div key={a.title}>
-            <h3 className="font-body text-base font-semibold text-text">
-              {a.title}
-            </h3>
-            <p className="mt-3 text-sm leading-relaxed text-muted">
-              {a.body}
-            </p>
+            <h3 className="text-h3 text-text">{a.title}</h3>
+            <p className="mt-2 text-body-sm text-muted">{a.body}</p>
           </div>
         ))}
       </div>

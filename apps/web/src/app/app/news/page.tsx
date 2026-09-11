@@ -25,16 +25,14 @@ export default async function NewsPage({ searchParams }: PageProps) {
 
   return (
     <div>
-      <h1 className="font-display text-xl font-medium text-text">
-        News &amp; DD feed
-      </h1>
-      <p className="mt-1 text-sm text-muted">
+      <h1 className="text-h3 text-text">News &amp; DD feed</h1>
+      <p className="mt-1 text-body-sm text-muted">
         CryptoPanic (sentiment-tagged, primary) and CoinDesk (editorial,
         secondary), cross-referenced against derived risk-score history
         where an asset matches.
       </p>
 
-      <div className="mt-4 flex items-center gap-2">
+      <div className="mt-3 flex items-center gap-2">
         {FILTERS.map((f) => {
           const active = (currency ?? "") === (f.code ?? "");
           const href = f.code ? `/app/news?currency=${f.code}` : "/app/news";
@@ -44,8 +42,8 @@ export default async function NewsPage({ searchParams }: PageProps) {
               href={href}
               className={
                 active
-                  ? "rounded border border-accent/40 bg-accent/10 px-2.5 py-1 font-mono text-xs text-accent"
-                  : "rounded border border-border px-2.5 py-1 font-mono text-xs text-muted hover:text-text"
+                  ? "rounded border border-accent/40 bg-accent/10 px-2.5 py-1 text-label text-accent"
+                  : "rounded border border-border px-2.5 py-1 text-label text-muted hover:text-text"
               }
             >
               {f.label}
@@ -55,14 +53,14 @@ export default async function NewsPage({ searchParams }: PageProps) {
       </div>
 
       {warnings.length > 0 && (
-        <div className="mt-4 rounded border border-border bg-surface px-3 py-2 text-xs text-muted">
+        <div className="mt-3 rounded border border-border bg-surface px-3 py-2 text-body-sm text-muted">
           {warnings.map((w) => (
             <div key={w}>{w}</div>
           ))}
         </div>
       )}
 
-      <ul className="mt-6 divide-y divide-border/60">
+      <ul className="mt-5 divide-y divide-border/60">
         {items.map((item) => {
           const movement = correlateNewsItem(item, correlationIndex);
           return (
@@ -73,29 +71,26 @@ export default async function NewsPage({ searchParams }: PageProps) {
                     href={item.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-sm text-text hover:text-accent"
+                    className="text-body-sm text-text hover:text-accent"
                   >
                     {item.title}
                   </a>
                   <div className="mt-1.5 flex flex-wrap items-center gap-2">
                     <SentimentTag sentiment={item.sentiment} />
-                    <span className="font-mono text-xs text-muted">
+                    <span className="text-label text-muted">
                       {item.source === "cryptopanic"
                         ? item.domain ?? "cryptopanic"
                         : "coindesk"}
                     </span>
                     {item.currencies.map((c) => (
-                      <span
-                        key={c}
-                        className="font-mono text-xs text-muted"
-                      >
+                      <span key={c} className="text-label text-muted">
                         {c}
                       </span>
                     ))}
                   </div>
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-1.5">
-                  <span className="font-mono text-xs text-muted">
+                  <span className="text-label text-muted">
                     {formatTimestamp(item.publishedAt)}
                   </span>
                   <NewsCorrelation movement={movement} />
@@ -105,7 +100,7 @@ export default async function NewsPage({ searchParams }: PageProps) {
           );
         })}
         {items.length === 0 && (
-          <li className="py-8 text-center text-sm text-muted">
+          <li className="py-8 text-center text-body-sm text-muted">
             No news items{currency ? ` for ${currency}` : ""}.
           </li>
         )}

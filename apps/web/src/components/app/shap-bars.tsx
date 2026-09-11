@@ -23,7 +23,7 @@ export function ShapBars({ shap }: { shap: Record<string, number> }) {
             key={name}
             className="grid grid-cols-[176px_1fr_72px] items-center gap-3"
           >
-            <span className="truncate text-xs text-muted">
+            <span className="truncate text-label text-muted">
               {formatFeatureName(name)}
             </span>
             <div className="relative h-2 rounded-sm bg-border/40">
@@ -40,8 +40,8 @@ export function ShapBars({ shap }: { shap: Record<string, number> }) {
             <span
               className={
                 positive
-                  ? "text-right font-mono text-xs text-flag"
-                  : "text-right font-mono text-xs text-muted"
+                  ? "text-right text-data-base text-flag"
+                  : "text-right text-data-base text-muted"
               }
             >
               {value >= 0 ? "+" : ""}

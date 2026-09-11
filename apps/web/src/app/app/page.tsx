@@ -8,31 +8,21 @@ export default async function OverviewPage() {
 
   return (
     <div>
-      <h1 className="font-display text-xl font-medium text-text">
-        Asset risk ranking
-      </h1>
-      <p className="mt-1 text-sm text-muted">
+      <h1 className="text-h3 text-text">Asset risk ranking</h1>
+      <p className="mt-1 text-body-sm text-muted">
         Every asset pair on the Stellar DEX, ranked by average wallet risk
         score.
       </p>
 
-      <table className="mt-6 w-full border-collapse text-left">
+      <table className="mt-5 w-full border-collapse text-left">
         <thead>
-          <tr className="border-b border-border text-xs text-muted">
-            <th className="py-2 pr-4 font-body font-normal">Pair</th>
-            <th className="py-2 pr-4 font-body font-normal">Issuer</th>
-            <th className="py-2 pr-4 text-right font-body font-normal">
-              Avg score
-            </th>
-            <th className="py-2 pr-4 text-right font-body font-normal">
-              Max score
-            </th>
-            <th className="py-2 pr-4 text-right font-body font-normal">
-              Flagged
-            </th>
-            <th className="py-2 text-right font-body font-normal">
-              Wallets
-            </th>
+          <tr className="border-b border-border text-label text-muted">
+            <th className="py-2 pr-4 font-normal">Pair</th>
+            <th className="py-2 pr-4 font-normal">Issuer</th>
+            <th className="py-2 pr-4 text-right font-normal">Avg score</th>
+            <th className="py-2 pr-4 text-right font-normal">Max score</th>
+            <th className="py-2 pr-4 text-right font-normal">Flagged</th>
+            <th className="py-2 text-right font-normal">Wallets</th>
           </tr>
         </thead>
         <tbody>
@@ -44,12 +34,12 @@ export default async function OverviewPage() {
               <td className="py-2.5 pr-4">
                 <Link
                   href={`/app/assets/${encodeURIComponent(r.asset_pair)}`}
-                  className="font-mono text-sm text-text hover:text-accent"
+                  className="text-data-base text-text hover:text-accent"
                 >
                   {pairSymbol(r.asset_pair)}
                 </Link>
               </td>
-              <td className="py-2.5 pr-4 font-mono text-xs text-muted">
+              <td className="py-2.5 pr-4 text-label text-muted">
                 {pairIssuer(r.asset_pair)
                   ? shortenWallet(pairIssuer(r.asset_pair)!)
                   : "—"}
@@ -60,10 +50,10 @@ export default async function OverviewPage() {
               <td className="py-2.5 pr-4 text-right">
                 <ScoreBadge score={r.max_score} />
               </td>
-              <td className="py-2.5 pr-4 text-right font-mono text-sm text-text">
+              <td className="py-2.5 pr-4 text-right text-data-base text-text">
                 {r.flagged_wallets}
               </td>
-              <td className="py-2.5 text-right font-mono text-sm text-muted">
+              <td className="py-2.5 text-right text-data-base text-muted">
                 {r.total_wallets}
               </td>
             </tr>

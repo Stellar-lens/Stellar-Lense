@@ -41,61 +41,53 @@ export default async function AssetDetailPage({
     <div>
       <Link
         href="/app"
-        className="text-xs text-muted transition-colors hover:text-text"
+        className="text-label text-muted transition-colors hover:text-text"
       >
         ← Overview
       </Link>
 
-      <div className="mt-3 flex items-baseline gap-3">
-        <h1 className="font-mono text-xl font-medium text-text">
-          {pairSymbol(pair)}
-        </h1>
+      <div className="mt-2 flex items-baseline gap-3">
+        <h1 className="text-h3 text-text">{pairSymbol(pair)}</h1>
         {pairIssuer(pair) && (
-          <span className="font-mono text-xs text-muted">
+          <span className="text-label text-muted">
             {shortenWallet(pairIssuer(pair)!)}
           </span>
         )}
       </div>
 
-      <dl className="mt-6 grid grid-cols-4 gap-6 border-b border-border pb-6 text-sm">
+      <dl className="mt-5 grid grid-cols-4 gap-5 border-b border-border pb-5">
         <div>
-          <dt className="text-xs text-muted">Avg score</dt>
+          <dt className="text-label text-muted">Avg score</dt>
           <dd className="mt-1">
-            <ScoreBadge score={avgScore} />
+            <ScoreBadge score={avgScore} size="lg" />
           </dd>
         </div>
         <div>
-          <dt className="text-xs text-muted">Max score</dt>
+          <dt className="text-label text-muted">Max score</dt>
           <dd className="mt-1">
-            <ScoreBadge score={maxScore} />
+            <ScoreBadge score={maxScore} size="lg" />
           </dd>
         </div>
         <div>
-          <dt className="text-xs text-muted">Flagged wallets</dt>
-          <dd className="mt-1 font-mono text-text">{flaggedCount}</dd>
+          <dt className="text-label text-muted">Flagged wallets</dt>
+          <dd className="mt-1 text-data-base text-text">{flaggedCount}</dd>
         </div>
         <div>
-          <dt className="text-xs text-muted">Total wallets</dt>
-          <dd className="mt-1 font-mono text-text">{scores.length}</dd>
+          <dt className="text-label text-muted">Total wallets</dt>
+          <dd className="mt-1 text-data-base text-text">{scores.length}</dd>
         </div>
       </dl>
 
-      <div className="mt-6 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-8">
+      <div className="mt-5 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-6">
         <div>
-          <h2 className="font-body text-sm font-medium text-text">Wallets</h2>
-          <table className="mt-3 w-full border-collapse text-left">
+          <h2 className="text-label text-text">Wallets</h2>
+          <table className="mt-2 w-full border-collapse text-left">
             <thead>
-              <tr className="border-b border-border text-xs text-muted">
-                <th className="py-2 pr-4 font-body font-normal">Wallet</th>
-                <th className="py-2 pr-4 text-right font-body font-normal">
-                  Score
-                </th>
-                <th className="py-2 pr-4 text-right font-body font-normal">
-                  Benford
-                </th>
-                <th className="py-2 text-right font-body font-normal">
-                  Confidence
-                </th>
+              <tr className="border-b border-border text-label text-muted">
+                <th className="py-2 pr-4 font-normal">Wallet</th>
+                <th className="py-2 pr-4 text-right font-normal">Score</th>
+                <th className="py-2 pr-4 text-right font-normal">Benford</th>
+                <th className="py-2 text-right font-normal">Confidence</th>
               </tr>
             </thead>
             <tbody>
@@ -111,7 +103,7 @@ export default async function AssetDetailPage({
                   <td className="py-2.5 pr-4">
                     <Link
                       href={`?wallet=${encodeURIComponent(s.wallet)}`}
-                      className="font-mono text-sm text-text hover:text-accent"
+                      className="text-data-base text-text hover:text-accent"
                     >
                       {shortenWallet(s.wallet)}
                     </Link>
@@ -119,10 +111,10 @@ export default async function AssetDetailPage({
                   <td className="py-2.5 pr-4 text-right">
                     <ScoreBadge score={s.score} />
                   </td>
-                  <td className="py-2.5 pr-4 text-right font-mono text-xs text-muted">
+                  <td className="py-2.5 pr-4 text-right text-label text-muted">
                     {s.benford_flag ? "non-conforming" : "conforming"}
                   </td>
-                  <td className="py-2.5 text-right font-mono text-sm text-muted">
+                  <td className="py-2.5 text-right text-data-base text-muted">
                     {s.confidence.toFixed(0)}%
                   </td>
                 </tr>
@@ -133,64 +125,62 @@ export default async function AssetDetailPage({
 
         <div>
           <div className="flex items-baseline justify-between">
-            <h2 className="font-body text-sm font-medium text-text">
-              Score explanation
-            </h2>
-            <span className="font-mono text-xs text-muted">
+            <h2 className="text-label text-text">Score explanation</h2>
+            <span className="text-label text-muted">
               {shortenWallet(active.wallet)}
             </span>
           </div>
 
           {active.shap ? (
-            <div className="mt-4">
+            <div className="mt-3">
               <ShapBars shap={active.shap} />
-              <p className="mt-4 text-xs text-muted">
+              <p className="mt-3 text-body-sm text-muted">
                 SHAP attribution toward the wash-trading classification.
                 Positive values pushed this wallet&apos;s score up.
               </p>
             </div>
           ) : (
-            <p className="mt-4 text-sm text-muted">
+            <p className="mt-3 text-body-sm text-muted">
               No trained model attribution available for this wallet;
               scored on the Benford + heuristic fallback path.
             </p>
           )}
 
-          <div className="mt-6 border-t border-border pt-4">
-            <h3 className="font-body text-sm font-medium text-text">
-              Benford&apos;s Law
-            </h3>
-            <div className="mt-3 grid grid-cols-3 gap-4 text-sm">
+          <div className="mt-5 border-t border-border pt-3">
+            <h3 className="text-label text-text">Benford&apos;s Law</h3>
+            <div className="mt-2 grid grid-cols-3 gap-4">
               <div>
-                <dt className="text-xs text-muted">MAD</dt>
-                <dd className="mt-1 font-mono text-text">
+                <dt className="text-label text-muted">MAD</dt>
+                <dd className="mt-1 text-data-base text-text">
                   {active.benford.mad.toFixed(4)}
                 </dd>
               </div>
               <div>
-                <dt className="text-xs text-muted">Chi-square</dt>
-                <dd className="mt-1 font-mono text-text">
+                <dt className="text-label text-muted">Chi-square</dt>
+                <dd className="mt-1 text-data-base text-text">
                   {active.benford.chi_square.toFixed(2)}
                 </dd>
               </div>
               <div>
-                <dt className="text-xs text-muted">Sample</dt>
-                <dd className="mt-1 font-mono text-text">
+                <dt className="text-label text-muted">Sample</dt>
+                <dd className="mt-1 text-data-base text-text">
                   {active.benford.sample_size}
                 </dd>
               </div>
             </div>
           </div>
 
-          <div className="mt-6 border-t border-border pt-4">
-            <h3 className="font-body text-sm font-medium text-text">
-              Raw features
-            </h3>
-            <dl className="mt-3 space-y-1.5">
+          <div className="mt-5 border-t border-border pt-3">
+            <h3 className="text-label text-text">Raw features</h3>
+            <dl className="mt-2 space-y-1.5">
               {Object.entries(active.features).map(([name, value]) => (
-                <div key={name} className="flex justify-between text-xs">
-                  <dt className="text-muted">{formatFeatureName(name)}</dt>
-                  <dd className="font-mono text-text">{value.toFixed(3)}</dd>
+                <div key={name} className="flex justify-between">
+                  <dt className="text-label text-muted">
+                    {formatFeatureName(name)}
+                  </dt>
+                  <dd className="text-data-base text-text">
+                    {value.toFixed(3)}
+                  </dd>
                 </div>
               ))}
             </dl>

@@ -11,7 +11,7 @@ import type { Sentiment } from "@/lib/news";
 export function SentimentTag({ sentiment }: { sentiment: Sentiment | null }) {
   if (!sentiment) return null;
   return (
-    <span className="rounded border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted">
+    <span className="rounded border border-border px-1.5 py-0.5 text-label text-muted">
       {sentiment}
     </span>
   );

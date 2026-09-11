@@ -3,7 +3,7 @@ import Link from "next/link";
 export function Nav() {
   return (
     <header className="sticky top-0 z-10 border-b border-border/60 bg-bg/80 backdrop-blur">
-      <nav className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5 font-mono text-sm">
+      <nav className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4 text-label">
         <Link href="/" className="text-text">
           [Stellar Lense]
         </Link>
