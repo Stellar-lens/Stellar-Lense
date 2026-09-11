@@ -1,0 +1,35 @@
+# requirements/dev.txt
+# ─────────────────────────────────────────────────────────────────────────────
+# AUTO-GENERATED – do not edit manually.
+# Regenerate with: make lock   (or: bash requirements/compile.sh dev)
+# ─────────────────────────────────────────────────────────────────────────────
+
+-r test.txt
+
+# [dev] extra — linting + mutation testing
+mutmut>=3.0.0,<4.0
+pip-licenses>=4.4.0,<5.0
+ruff>=0.4.0,<1.0
+
+# [fuzz] extra
+atheris>=2.3.0,<3.0
+
+# [ml] extra
+dp-accounting>=0.4.3,<1.0
+mlflow>=2.10.0,<3.0
+# torch and torch-geometric are large; install separately on first local setup:
+#   pip install torch torch-geometric
+# torch>=2.2.0
+# torch-geometric>=2.5.0
+
+# [chain] extra
+kubernetes>=29.0.0,<32.0
+requests>=2.31.0,<3.0
+web3>=6.0.0,<8.0
+
+# [graphql] extra
+slowapi>=0.1.9,<1.0
+strawberry-graphql[fastapi]>=0.243.0,<1.0
+
+# [causal] extra
+dowhy>=0.12,<1.0

@@ -1,0 +1,12 @@
+# requirements/chain.txt
+# ─────────────────────────────────────────────────────────────────────────────
+# AUTO-GENERATED – do not edit manually.
+# Regenerate with: make lock   (or: bash requirements/compile.sh chain)
+# ─────────────────────────────────────────────────────────────────────────────
+
+-r base.txt
+
+# [chain] extra
+kubernetes>=29.0.0,<32.0
+requests>=2.31.0,<3.0
+web3>=6.0.0,<8.0

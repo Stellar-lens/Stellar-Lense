@@ -1,0 +1,1201 @@
+"""Central configuration loaded from environment variables (.env).
+
+At import time, pydantic-settings validates every field. A missing required
+field or type/range violation aborts startup immediately with a human-readable
+error listing every problem at once.
+"""
+
+import logging
+import time
+from pathlib import Path
+
+from pydantic import field_validator, model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def _split_csv(raw: str) -> tuple[str, ...]:
+    return tuple(s.strip() for s in raw.split(",") if s.strip())
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+        case_sensitive=False,
+        populate_by_name=True,
+    )
+
+    feature_engine_jit_enabled: bool = True
+
+    # ── Horizon ───────────────────────────────────────────────────────────────
+    horizon_url: str = "https://horizon.stellar.org"
+    horizon_stream_url: str = "https://horizon.stellar.org"
+    network: str = "testnet"
+
+    # ── Horizon API version guard ─────────────────────────────────────────────
+    # The Stellar Horizon API evolves over time; breaking schema changes
+    # (field renames, type changes, new required fields) can silently corrupt
+    # ingested data if the client is written against a different version.
+    #
+    # VersionGuard reads the ``X-Stellar-Horizon-Version`` response header and
+    # raises ``HorizonVersionError`` when the server version falls outside the
+    # ``[HORIZON_MIN_VERSION, HORIZON_MAX_VERSION)`` range.
+    #
+    # How to update after a Horizon upgrade
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # 1. Review the Horizon changelog for the new version:
+    #    https://github.com/stellar/go/blob/master/services/horizon/CHANGELOG.md
+    # 2. Verify schema compatibility with the current ``data_models.py``.
+    # 3. Update HORIZON_TESTED_VERSION to the new version string.
+    # 4. Widen HORIZON_MIN_VERSION / HORIZON_MAX_VERSION if the new version
+    #    introduces a new supported major version.
+    # 5. If a breaking change requires a data-model update, do that in the same
+    #    change set and bump HORIZON_TESTED_VERSION to the first version that
+    #    carries the new schema.
+    #
+    # Setting HORIZON_VERSION_CHECK_ENABLED=false is an escape hatch for
+    # private or custom Horizon nodes that strip the version header.  It MUST
+    # NOT be used in production without understanding the schema compatibility
+    # implications; a WARNING is logged at startup when disabled.
+    horizon_min_version: str = "2.0.0"
+    """Inclusive lower bound of the supported Horizon server version range."""
+
+    horizon_max_version: str = "4.0.0"
+    """Exclusive upper bound of the supported Horizon server version range."""
+
+    horizon_tested_version: str = "2.28.0"
+    """The specific Horizon version against which the current data models were validated.
+    A WARNING is emitted when the live server reports a different (but in-range) version."""
+
+    horizon_version_check_enabled: bool = True
+    """Set to False to disable Horizon version header validation.
+    Useful for private or custom Horizon nodes that omit the header.
+    A WARNING is logged at startup when this is False."""
+    horizon_default_cursor: str = "now"  # Used when no valid checkpoint exists.
+    data_dir: str = "./data"  # Root allowed to contain runtime data files.
+    cursor_checkpoint_path: str = "./data/horizon_cursor.json"  # Durable SSE offset.
+    cursor_flush_events: int = 100  # Persist after this many processed events.
+    cursor_flush_seconds: float = 10.0  # Persist after this many seconds.
+    horizon_rate_limit: float = 50.0
+    horizon_rate_bucket_capacity: float = 100.0
+
+    # ── Horizon HTTP retry / rate-limit budget ────────────────────────────────
+    # These five variables control RetryingHorizonClient's token-bucket rate
+    # limiter and full-jitter retry loop.
+    #
+    # HORIZON_RATE_LIMIT_RPS is the steady-state request budget in requests per
+    # second.  Set it to a value comfortably below Horizon's documented per-IP
+    # limit (currently 3 500 req/hour ≈ ~0.97 req/s on the public testnet, or
+    # higher on a private node).  The default of 5.0 is appropriate for the
+    # public testnet; raise it when pointing at a dedicated mainnet node.
+    #
+    # HORIZON_RATE_BURST sets the bucket capacity.  A burst of 10 means up to
+    # 10 requests can be dispatched immediately when the bucket is full before
+    # throttling kicks in.  Keep burst ≥ HISTORICAL_LOADER_CONCURRENCY so
+    # the parallel loader can dispatch its first batch without waiting.
+    #
+    # HORIZON_MAX_RETRY_DELAY is a hard upper bound on any single retry sleep,
+    # including values from the server's Retry-After header.  This prevents a
+    # malicious proxy from stalling the pipeline with Retry-After: 999999.
+    horizon_rate_limit_rps: float = 5.0
+    horizon_rate_burst: float = 10.0
+    horizon_max_retries: int = 5
+    horizon_base_retry_delay: float = 1.0
+    horizon_max_retry_delay: float = 60.0
+
+    # ── GNN ring detection ──────────────────────────────────────────────────
+    gnn_model_path: str = "models/gnn_ring_detector.pt"
+    gnn_fallback_to_scc: bool = True
+    gnn_graph_mode: str = "homogeneous"  # homogeneous | heterogeneous
+    gnn_hetero_conv_type: str = "sage"  # sage | hgt
+    gnn_hetero_model_path: str = "models/gnn_ring_detector_hetero.pt"
+    gnn_hetero_checksum_path: str = "models/gnn_ring_detector_hetero.sha256"
+
+    streamer_queue_maxsize: int = 1000  # Hard cap on buffered Horizon trades.
+    streamer_overflow_strategy: str = "drop_oldest"  # block/drop_newest/drop_oldest.
+    streamer_high_water_ratio: float = 0.8  # Begin producer throttling at 80%.
+    rate_restore_seconds: float = 60.0
+    stream_checkpoint_interval: int = 100
+    stream_score_delta_threshold: int = 5
+
+    # ── Polling ───────────────────────────────────────────────────────────────
+    poll_interval_seconds: int = 5
+    trade_history_lookback_days: int = 30
+    cursor_path: str = "./horizon_cursor.txt"
+    # Keep this below Horizon's per-IP request limit divided by average request duration.
+    historical_loader_concurrency: int = 4
+    historical_chunk_hours: float = 6.0
+    historical_progress_path: str = "./data/historical_progress.json"
+    historical_max_lookback_days: int = 365
+
+    # ── Feature Store ─────────────────────────────────────────────────────────
+    redis_url: str = "redis://localhost:6379/0"
+    feature_store_ttl_hours: int = 48
+    feature_store_flush_interval_seconds: int = 300
+
+    # ── Analyst case management (Issue #200 follow-up) ──────────────────────
+    analyst_lock_timeout_seconds: int = 1800  # 30 min soft lock before auto-release
+    analyst_claim_max_active_per_analyst: int = 10  # max concurrent claims per analyst
+
+    # ── Detection ─────────────────────────────────────────────────────────────
+    benford_mad_threshold: float = 0.015
+    benford_rust_accel_enabled: bool = True
+    graph_rust_accel_enabled: bool = True
+    risk_score_threshold: int = 70
+    committee_quorum: int = 3
+    committee_vote_deadline_days: int = 14
+
+    # ── Graph sharding ─────────────────────────────────────────────────────────
+    # When MAX_GRAPH_NODES would be exceeded, automatically shard the trade graph
+    # across multiple workers using community-detection-based partitioning.
+    graph_shard_enabled: bool = True
+    graph_shard_count: int = 8
+    graph_shard_overlap_hops: int = 1
+    graph_shard_max_workers: int = 8
+
+    # ── Ensemble weights ──────────────────────────────────────────────────────
+    ensemble_weight_rf: float = 0.25
+    ensemble_weight_xgb: float = 0.50
+    ensemble_weight_lgbm: float = 0.25
+
+    # ── Score blending ────────────────────────────────────────────────────────
+    temporal_weight: float = 0.3
+    sandwich_score_weight: float = 0.0
+    benford_copula_weight: float = 0.0
+    pdc_discount_weight: float = 0.0
+
+    # ── Storage ───────────────────────────────────────────────────────────────
+    model_dir: str = "./models"
+    ledgerlens_db_url: str = ""
+    ledgerlens_db_path: str = "./ledgerlens.db"
+
+    @property
+    def db_url(self) -> str:
+        if self.ledgerlens_db_url:
+            return self.ledgerlens_db_url
+        return f"sqlite:///{self.ledgerlens_db_path}"
+    ingestion_dedup_enabled: bool = True
+    idempotency_retention_days: int = 90
+    idempotency_replay_window_seconds: float = 3600.0
+
+    # ── Lineage ───────────────────────────────────────────────────────────────
+    lineage_enabled: bool = False
+    lineage_backend: str = "console"
+    openlineage_url: str = ""
+    openlineage_namespace: str = "ledgerlens-core"
+    lineage_queue_maxsize: int = 1000
+
+
+    # ── Event Bus (RiskScore Handoff) ─────────────────────────────────────────
+    event_bus_backend: str = "none"  # none | kafka | nats
+    event_bus_kafka_bootstrap_servers: str = "localhost:9092"
+    event_bus_kafka_topic: str = "ledgerlens.riskscore.v1"
+    event_bus_kafka_sasl_password: str = ""
+    event_bus_nats_servers: str = "nats://localhost:4222"
+    event_bus_nats_subject: str = "ledgerlens.riskscore.v1"
+    event_bus_nats_token: str = ""
+    event_bus_publish_timeout_seconds: float = 5.0
+    event_bus_max_retries: int = 3
+    event_bus_retry_backoff_seconds: float = 1.0
+
+    # ── Downstream services ───────────────────────────────────────────────────
+    ledgerlens_api_url: str = "http://localhost:8000"
+    ledgerlens_score_contract_id: str = ""
+    ledgerlens_service_secret_key: str = ""
+
+    # ── Soroban ───────────────────────────────────────────────────────────────
+    soroban_rpc_url: str = "https://soroban-testnet.stellar.org"
+    network_passphrase: str = "Test SDF Network ; September 2015"
+    soroban_circuit_breaker_threshold: int = 5
+    soroban_circuit_reset_seconds: int = 300
+    # Multi‑region configuration
+    ledgerlens_region_name: str = "us-east-1"
+    ledgerlens_region_role: str = "active"  # active | passive | standby
+    soroban_submission_lease_enabled: bool = True
+    soroban_submission_lease_name: str = "ledgerlens-soroban-submitter"
+    soroban_submission_lease_duration_seconds: int = 30
+
+    # ── API / security ────────────────────────────────────────────────────────
+    ledgerlens_cors_allowed_origins: str = ""
+    ledgerlens_admin_api_key: str = ""
+    ledgerlens_compliance_api_key: str = ""
+    ledgerlens_model_signing_key: str = ""
+    ledgerlens_webhook_encryption_key: str = ""
+    ledgerlens_webhook_encryption_key_previous: str = ""
+    api_key_rotation_grace_seconds: int = 604800
+    ws_max_connections: int = 100
+    api_key_max_age_days: int = 90
+    # Minimum LedgerLens risk score (0-100) required to export a SAR package.
+    compliance_sar_min_score: int = 70
+    # Hourly cap on regulatory exports (SAR + Travel Rule) per `detection.compliance_exporter`.
+    compliance_export_rate_limit_per_hour: int = 10
+
+    # ── ED25519 model signing ────────────────────────────────────────────────
+    # Base64-encoded 32-byte ED25519 public key for model artifact signing.
+    # Generate with: python cli.py generate-signing-key
+    model_signing_public_key: str = ""
+
+    # ── Federated learning ────────────────────────────────────────────────────
+    federated_min_participants: int = 3
+    federated_dp_epsilon: float = 1.0
+    federated_dp_delta: float = 1e-5
+    federated_dp_max_epsilon: float = 10.0
+    gradient_clip_threshold: float = 10.0
+    gradient_outlier_threshold: float = 0.1
+    federated_noise_multiplier: float = 0.0
+    federated_server_host: str = "127.0.0.1"
+    federated_server_port: int = 8001
+    # Require operator admission (detection.federated.admission) before a
+    # participant_id may register a key at all. Secure by default; disabling
+    # this restores the old fully-open self-service registration behaviour
+    # and is strongly discouraged outside of local/offline testing.
+    federated_admission_required: bool = True
+    # No single participant's aggregation weight may exceed this fraction of
+    # a round's total weight, regardless of its (admission-capped) claimed
+    # n_samples -- an interim, defense-in-depth bound on top of admission
+    # control; see docs/federated_learning.md. 1.0 disables it.
+    federated_max_participant_weight_fraction: float = 0.5
+    # A participant's newly claimed n_samples may not exceed this multiple of
+    # its own historical accepted maximum without being flagged/excluded for
+    # that round (cross-round consistency check). Only applies from a
+    # participant's second accepted round onward.
+    federated_max_n_samples_growth_factor: float = 3.0
+    # Default-on: use Krum/Multi-Krum peer-distance selection (see
+    # detection/federated/krum.py, docs/byzantine_resilience.md) at
+    # aggregation time to exclude the most outlying updates *within the same
+    # round*, on top of (not instead of) the existing historical-cosine
+    # heuristic. `f` (Byzantine tolerance) is derived each round from the
+    # live count of valid updates, never a static config value -- see
+    # `FederatedAggregationServer._select_krum_survivors`. Disabling this
+    # falls back to plain weighted FedAvg with no per-round peer-distance
+    # defense (the cosine heuristic still applies if enabled).
+    federated_use_krum: bool = True
+
+    # ── Cross-chain Bayesian linking ─────────────────────────────────────────
+    cross_chain_timing_sigma_seconds: float = 300.0
+    cross_chain_amount_tolerance: float = 0.005
+    cross_chain_min_confidence: float = 0.70
+    cross_chain_confirmed_confidence: float = 0.90
+
+    # ── EVM cross-chain ───────────────────────────────────────────────────────
+    evm_rpc_ethereum: str = "https://eth.llamarpc.com"
+    evm_rpc_base: str = "https://mainnet.base.org"
+    evm_rpc_polygon: str = "https://polygon-rpc.com"
+    evm_lookback_blocks: int = 5760
+    # Store as raw string; parsed tuple exposed via .evm_pool_addresses property
+    evm_pool_addresses: str = ""
+
+    # Multi-provider failover pool (ISSUE-013)
+    # JSON-encoded list of provider objects.  Each object must have:
+    #   chain_id (int), rpc_url (str, https:// only), name (str),
+    #   priority (int, optional), max_requests_per_second (float, optional)
+    # Example:
+    #   EVM_PROVIDERS=[
+    #     {"chain_id": 1, "rpc_url": "https://mainnet.infura.io/v3/KEY",
+    #      "name": "infura", "priority": 0},
+    #     {"chain_id": 1, "rpc_url": "https://eth-mainnet.alchemyapi.io/v2/KEY",
+    #      "name": "alchemy", "priority": 1}
+    #   ]
+    # Leave empty ("[]") to rely solely on the legacy evm_rpc_* settings.
+    evm_providers: str = "[]"
+
+    # Maximum blocks behind the chain head before a provider's health is
+    # considered degraded (also triggers lag alerts when ALL providers lag).
+    evm_max_block_lag: int = 10
+
+    # Seconds between health probe cycles (eth_blockNumber polls).
+    evm_probe_interval_seconds: float = 15.0
+
+    # Consecutive failures before a provider's circuit breaker opens.
+    evm_circuit_breaker_threshold: int = 5
+
+    # ── Runtime config cache TTL ──────────────────────────────────────────────
+    runtime_config_ttl_seconds: int = 60
+
+    # ── MLflow integration ────────────────────────────────────────────────────
+    mlflow_tracking_uri: str = ""
+    mlflow_experiment_name: str = "ledgerlens-training"
+    mlflow_tracking_enabled: bool = False
+
+    # ── Gateway (consolidated auth/quota/logging middleware) ──────────────────
+    gateway_enabled: bool = True
+    gateway_default_daily_quota: int = 100000
+    gateway_default_namespace_daily_quota: int = 0
+    gateway_default_monthly_quota: int = 0
+    gateway_default_namespace_monthly_quota: int = 0
+    # "redis": per-key rate limits are enforced via the shared, distributed
+    #   sliding-window counter in detection/rate_limiter.py — required for
+    #   correct enforcement under the documented multi-replica topology
+    #   (helm/ledgerlens/values.yaml: replicaCount 2, autoscaling to 10) and
+    #   across the REST/gRPC process split. Falls back to a local in-process
+    #   window (logged + metered) if Redis is unreachable.
+    # "sqlite": explicit opt-out — always use the local in-process window,
+    #   never attempt Redis. Only correct for a genuine single-process
+    #   deployment (e.g. local dev); named for backward compatibility with
+    #   the pre-existing setting.
+    gateway_quota_store: str = "redis"
+    gateway_log_body: bool = False
+
+
+    # ── Performance monitoring ────────────────────────────────────────────────
+    performance_min_feedback_samples: int = 20
+    performance_monitoring_window_days: int = 30
+
+    # ── Feature Store Archival ────────────────────────────────────────────────
+    feature_archive_dir: str = "./feature_archive"
+    feature_archive_cutoff_days: int = 30
+
+    # ── Bridge / cross-chain verification ────────────────────────────────────
+    bridge_verify_receipt_timeout_seconds: int = 30
+    bridge_verify_sample_rate: float = 1.0
+
+    # ── Path payment loader ───────────────────────────────────────────────────
+    path_payment_loader_enabled: bool = True
+    path_payment_fetch_effects: bool = True
+
+    # ── Prometheus metrics ─────────────────────────────────────────────────────
+    # Set to False to disable all prometheus_client metric collection.  When
+    # disabled, ingestion/metrics.py returns a _NoOpCollector and GET /metrics
+    # returns HTTP 503.  Useful in lightweight environments where prometheus_client
+    # is not installed.
+    metrics_enabled: bool = True
+    # URL path at which the Prometheus text metrics are served by the local API.
+    # Must start with "/" and contain no dynamic segments.
+    metrics_endpoint: str = "/metrics"
+
+    # ── WAF ────────────────────────────────────────────────────────────────────
+    # Enable the in-process WAF middleware for request validation
+    waf_enabled: bool = True
+    # Maximum allowed request body size in bytes
+    waf_max_body_bytes: int = 1_048_576
+    # Timeout in seconds for slow request mitigation
+    waf_slow_request_timeout_seconds: float = 10.0
+
+    # ── Trace Sampling ──────────────────────────────────────────────────────────
+    # Sampling strategy: "static" (head-based) or "tail" (tail-based)
+    trace_sampling_strategy: str = "static"
+    # Baseline fraction of "boring" traces to keep when using tail sampling
+    trace_tail_baseline_ratio: float = 0.05
+    # Max time to wait for a trace to complete before flushing (tail sampling)
+    trace_tail_buffer_timeout_seconds: float = 30.0
+    # Maximum number of traces to buffer in memory (tail sampling)
+    trace_tail_max_buffered_traces: int = 10_000
+
+    # ── Model Cards ─────────────────────────────────────────────────────────────
+    # Directory to store generated model cards
+    model_card_dir: str = "./model_cards"
+    # Auto-generate model cards when models are promoted
+    model_card_auto_generate: bool = True
+    # Enable PDF rendering for model cards
+    model_card_pdf_enabled: bool = False
+
+    # ── Vector Similarity Search ──────────────────────────────────────────────────────
+    # Vector index backend: faiss_flat | faiss_ivf | pgvector
+    vector_index_backend: str = "faiss_flat"
+    # Dimension of the embedding vectors (64 for GraphSAGE
+    vector_index_dim: int = 64
+    # Number of wallets threshold to switch from flat to IVF index
+    vector_index_ivf_threshold: int = 50000
+    # Seconds between index refresh interval for incremental updates
+    vector_index_refresh_seconds: int = 300
+    # Path to SQLite database for storing embeddings
+    embedding_store_path: str = "./data/wallet_embeddings.db"
+    # Rate limit for similarity queries (per minute)
+    gnn_similarity_rate_limit_per_minute: int = 10
+
+    # ── Parquet export (ledgerlens-data integration) ──────────────────────────
+    # Default root directory for `cli.py export-parquet` output.
+    # Resolved relative to the working directory; must remain inside the project.
+    parquet_export_dir: str = "./data/parquet_export"
+    # Default Parquet compression codec: snappy | zstd | gzip | none
+    parquet_compression: str = "snappy"
+    # Rows per Parquet row group — larger = faster scans, higher write memory.
+    parquet_row_group_size: int = 100_000
+
+    # ── Trade filter pipeline ─────────────────────────────────────────────────
+    # Path to the YAML file that configures the ingestion filter pipeline.
+    # See config/filter_config.yaml.example for the full schema.
+    filter_config_path: str = "./config/filter_config.yaml"
+    # How often (seconds) FilterConfigLoader polls filter_config.yaml for changes.
+    # Set to 0 to disable hot-reload (not recommended in production).
+    filter_config_reload_interval_seconds: int = 60
+    # When True, rejected trades are persisted to the `filtered_trades` SQLite
+    # table so operators can review and tune filter rules without losing data.
+    filter_store_rejected_trades: bool = True
+    # Maximum rows in the `filtered_trades` table before pruning.
+    # When exceeded, the oldest rows are deleted until the count reaches
+    # 90 % of this limit (450 000 rows at the default).
+    filter_rejected_trades_max_rows: int = 500_000
+
+    # ── SLO / Alerting targets ────────────────────────────────────────────────
+    slo_scoring_latency_target_seconds: float = 2.0
+    slo_scoring_latency_target_percent: float = 99.0
+    slo_webhook_delivery_target_percent: float = 99.0
+    slo_soroban_submission_target_percent: float = 99.0
+    slo_window_days: int = 30
+
+    # ── gRPC Internal Scoring Service ─────────────────────────────────────────
+    grpc_enabled: bool = False
+    grpc_port: int = 50051
+    grpc_max_workers: int = 10
+    grpc_tls_cert_path: str = ""
+    grpc_tls_key_path: str = ""
+    grpc_allow_insecure: bool = False
+    grpc_max_message_size_bytes: int = 4194304
+    grpc_max_batch_wallets: int = 1000
+
+    # ── ZK-SNARK Configuration ────────────────────────────────────────────────
+    zk_proof_system: str = "sigma"                      # "sigma" | "snark"
+    zk_snark_circuit_path: str = "circuits/score_range_proof.circom"
+    zk_snark_proving_key_path: str = "circuits/keys/score_range_proof.zkey"
+    zk_snark_verification_key_path: str = "circuits/keys/verification_key.json"
+    zk_snark_prover_timeout_seconds: float = 10.0
+
+    # ── Cost & Capacity ─────────────────────────────────────
+    cost_per_vcpu_hour_usd: float = 0.0416
+    """Cost per vCPU-hour in USD (operator-configurable coefficient)."""
+    cost_per_gb_memory_hour_usd: float = 0.0056
+    """Cost per GB memory-hour in USD (operator-configurable coefficient)."""
+    cost_per_gb_storage_month_usd: float = 0.10
+    """Cost per GB storage per month in USD (operator-configurable coefficient)."""
+    capacity_projection_window_days: int = 7
+    """Number of days to look back for capacity trend projection (must be >= 1)."""
+    capacity_projection_lead_time_days: int = 14
+    """Number of days ahead to alert for capacity shortfall (must be >= 1)."""
+
+    # ── Validators ────────────────────────────────────────────────────────────
+
+    @field_validator("poll_interval_seconds", "trade_history_lookback_days",
+                     "feature_store_ttl_hours", "feature_store_flush_interval_seconds",
+                     "soroban_circuit_reset_seconds", "evm_lookback_blocks",
+                     "committee_quorum", "committee_vote_deadline_days",
+                     "federated_min_participants", "cursor_flush_events",
+                     "stream_checkpoint_interval", "streamer_queue_maxsize",
+                     "historical_loader_concurrency", "historical_max_lookback_days",
+                     "analyst_lock_timeout_seconds", "analyst_claim_max_active_per_analyst",
+                     "grpc_max_workers", "grpc_max_message_size_bytes", "grpc_max_batch_wallets",
+                     mode="before", check_fields=False)
+    @classmethod
+    def must_be_positive(cls, v: object) -> object:
+        if int(v) <= 0:
+            raise ValueError("must be a positive integer")
+        return v
+
+    @field_validator("slo_scoring_latency_target_percent",
+                     "slo_webhook_delivery_target_percent",
+                     "slo_soroban_submission_target_percent",
+                     mode="before")
+    @classmethod
+    def valid_slo_percent(cls, v: object) -> object:
+        val = float(v)
+        if not (0.0 <= val <= 100.0):
+            raise ValueError("must be between 0.0 and 100.0")
+        return val
+
+    @field_validator("slo_scoring_latency_target_seconds", mode="before")
+    @classmethod
+    def positive_slo_seconds(cls, v: object) -> object:
+        val = float(v)
+        if val <= 0:
+            raise ValueError("must be positive")
+        return val
+
+    @field_validator("federated_server_port", "grpc_port", mode="before")
+    @classmethod
+    def valid_port(cls, v: object) -> object:
+        port = int(v)
+        if not (1 <= port <= 65535):
+            raise ValueError(f"port {port} is out of range 1-65535")
+        return v
+
+    @field_validator("risk_score_threshold", mode="before")
+    @classmethod
+    def valid_score_threshold(cls, v: object) -> object:
+        val = int(v)
+        if not (0 <= val <= 100):
+            raise ValueError(f"RISK_SCORE_THRESHOLD {val} must be 0-100")
+        return v
+
+    @field_validator("graph_shard_count", "graph_shard_max_workers", mode="before")
+    @classmethod
+    def valid_shard_count(cls, v: object) -> object:
+        val = int(v)
+        if val < 1:
+            raise ValueError("must be >= 1")
+        return val
+
+    @field_validator("graph_shard_overlap_hops", mode="before")
+    @classmethod
+    def valid_overlap_hops(cls, v: object) -> object:
+        val = int(v)
+        if not (0 <= val <= 3):
+            raise ValueError("GRAPH_SHARD_OVERLAP_HOPS must be 0-3")
+        return val
+
+    @field_validator("soroban_circuit_breaker_threshold", mode="before")
+    @classmethod
+    def valid_circuit_threshold(cls, v: object) -> object:
+        if int(v) < 1:
+            raise ValueError("SOROBAN_CIRCUIT_BREAKER_THRESHOLD must be >= 1")
+        return v
+
+    @field_validator("compliance_sar_min_score", mode="before", check_fields=False)
+    @classmethod
+    def valid_sar_min_score(cls, v: object) -> object:
+        val = int(v)
+        if not (0 <= val <= 100):
+            raise ValueError(f"COMPLIANCE_SAR_MIN_SCORE {val} must be 0-100")
+        return v
+
+    @field_validator("compliance_export_rate_limit_per_hour", mode="before", check_fields=False)
+    @classmethod
+    def valid_export_rate_limit(cls, v: object) -> object:
+        if int(v) < 1:
+            raise ValueError("COMPLIANCE_EXPORT_RATE_LIMIT_PER_HOUR must be >= 1")
+        return v
+
+    @field_validator("federated_max_participant_weight_fraction", mode="before")
+    @classmethod
+    def valid_max_participant_weight_fraction(cls, v: object) -> object:
+        val = float(v)
+        if not (0.0 < val <= 1.0):
+            raise ValueError(
+                f"FEDERATED_MAX_PARTICIPANT_WEIGHT_FRACTION {val} must be in (0.0, 1.0]"
+            )
+        return v
+
+    @field_validator("federated_max_n_samples_growth_factor", mode="before")
+    @classmethod
+    def valid_max_n_samples_growth_factor(cls, v: object) -> object:
+        if float(v) <= 1.0:
+            raise ValueError("FEDERATED_MAX_N_SAMPLES_GROWTH_FACTOR must be > 1.0")
+        return v
+
+    @field_validator("gateway_default_daily_quota", "gateway_default_namespace_daily_quota", mode="before")
+    @classmethod
+    def non_negative_gateway_quota(cls, v: object) -> object:
+        if int(v) < 0:
+            raise ValueError("must be >= 0")
+        return v
+
+    @field_validator("gateway_quota_store", mode="before")
+    @classmethod
+    def valid_gateway_quota_store(cls, v: object) -> object:
+        val = str(v).strip().lower()
+        if val not in ("sqlite", "redis"):
+            raise ValueError(f"GATEWAY_QUOTA_STORE must be 'sqlite' or 'redis', got {v!r}")
+        return val
+
+    @field_validator("benford_mad_threshold", "temporal_weight",
+                     "sandwich_score_weight", "benford_copula_weight",
+                     "pdc_discount_weight", mode="before")
+    @classmethod
+    def non_negative_float(cls, v: object) -> object:
+        if float(v) < 0:
+            raise ValueError("must be >= 0")
+        return v
+
+    @field_validator("cursor_flush_seconds", "historical_chunk_hours", mode="before")
+    @classmethod
+    def positive_float_gt_zero(cls, v: object) -> object:
+        if float(v) <= 0:
+            raise ValueError("must be positive")
+        return v
+
+    @field_validator("streamer_overflow_strategy", mode="before")
+    @classmethod
+    def valid_streamer_overflow_strategy(cls, v: object) -> object:
+        strategy = str(v).strip().lower()
+        if strategy not in {"block", "drop_newest", "drop_oldest"}:
+            raise ValueError(
+                "STREAMER_OVERFLOW_STRATEGY must be block, drop_newest, or drop_oldest"
+            )
+        return strategy
+
+    @field_validator("streamer_high_water_ratio", mode="before")
+    @classmethod
+    def valid_streamer_high_water_ratio(cls, v: object) -> object:
+        ratio = float(v)
+        if not 0 < ratio <= 1:
+            raise ValueError("STREAMER_HIGH_WATER_RATIO must be in (0, 1]")
+        return ratio
+
+    @field_validator("horizon_default_cursor", mode="before")
+    @classmethod
+    def valid_horizon_default_cursor(cls, v: object) -> object:
+        import re
+
+        cursor = str(v).strip()
+        if cursor != "now" and re.fullmatch(r"\d+-\d+", cursor) is None:
+            raise ValueError("HORIZON_DEFAULT_CURSOR must be 'now' or a paging token")
+        return cursor
+
+    @field_validator("ensemble_weight_rf", "ensemble_weight_xgb", "ensemble_weight_lgbm",
+                     mode="before")
+    @classmethod
+    def non_negative_weight(cls, v: object) -> object:
+        if float(v) < 0:
+            raise ValueError("Ensemble weights must be non-negative")
+        return v
+
+    @field_validator("horizon_url", "horizon_stream_url", "soroban_rpc_url",
+                     "ledgerlens_api_url", "redis_url",
+                     "evm_rpc_ethereum", "evm_rpc_base", "evm_rpc_polygon",
+                     mode="before")
+    @classmethod
+    def valid_url(cls, v: object) -> object:
+        s = str(v).strip()
+        if not s:
+            raise ValueError("must be a non-empty URL")
+        if not (s.startswith("http://") or s.startswith("https://")
+                or s.startswith("redis://") or s.startswith("rediss://")):
+            raise ValueError(f"{s!r} is not a valid URL (expected http/https/redis scheme)")
+        return s
+
+    @field_validator("zk_proof_system", mode="before")
+    @classmethod
+    def valid_zk_proof_system(cls, v: object) -> object:
+        s = str(v).strip().lower()
+        if s not in {"sigma", "snark"}:
+            raise ValueError("zk_proof_system must be 'sigma' or 'snark'")
+        return s
+
+
+    @field_validator("network", mode="before")
+    @classmethod
+    def valid_network(cls, v: object) -> object:
+        val = str(v).strip().lower()
+        if val not in ("testnet", "mainnet"):
+            raise ValueError(f"NETWORK must be 'testnet' or 'mainnet', got {v!r}")
+        return val
+
+    @model_validator(mode="after")
+    def ensemble_weights_not_all_zero(self) -> "Settings":
+        if self.ensemble_weight_rf == 0 and self.ensemble_weight_xgb == 0 and self.ensemble_weight_lgbm == 0:
+            raise ValueError("At least one ensemble weight must be positive")
+        return self
+
+    @model_validator(mode="after")
+    def no_wildcard_cors(self) -> "Settings":
+        if "*" in _split_csv(self.ledgerlens_cors_allowed_origins):
+            raise ValueError(
+                "LEDGERLENS_CORS_ALLOWED_ORIGINS must not contain '*'. "
+                "Specify an explicit origin list instead."
+            )
+        return self
+
+    @field_validator("feature_archive_cutoff_days", mode="before")
+    @classmethod
+    def valid_archive_cutoff(cls, v: object) -> object:
+        if int(v) < 1:
+            raise ValueError("FEATURE_ARCHIVE_CUTOFF_DAYS must be >= 1")
+        return v
+
+    @field_validator("metrics_endpoint", mode="before")
+    @classmethod
+    def valid_metrics_endpoint(cls, v: object) -> object:
+        s = str(v).strip()
+        if not s.startswith("/"):
+            raise ValueError("METRICS_ENDPOINT must start with '/'")
+        if "{" in s or "}" in s:
+            raise ValueError("METRICS_ENDPOINT must not contain dynamic path segments")
+        return s
+
+    @field_validator("parquet_compression", mode="before")
+    @classmethod
+    def valid_parquet_compression(cls, v: object) -> object:
+        val = str(v).strip().lower()
+        allowed = {"snappy", "zstd", "gzip", "none"}
+        if val not in allowed:
+            raise ValueError(
+                f"PARQUET_COMPRESSION must be one of {sorted(allowed)}, got {v!r}"
+            )
+        return val
+
+    @field_validator("parquet_row_group_size", mode="before")
+    @classmethod
+    def valid_parquet_row_group_size(cls, v: object) -> object:
+        val = int(v)
+        if val < 1:
+            raise ValueError("PARQUET_ROW_GROUP_SIZE must be >= 1")
+        return val
+
+    @field_validator("filter_config_reload_interval_seconds", mode="before")
+    @classmethod
+    def valid_filter_reload_interval(cls, v: object) -> object:
+        val = int(v)
+        if val < 0:
+            raise ValueError("FILTER_CONFIG_RELOAD_INTERVAL_SECONDS must be >= 0")
+        return val
+
+    @field_validator("filter_rejected_trades_max_rows", mode="before")
+    @classmethod
+    def valid_filter_max_rows(cls, v: object) -> object:
+        val = int(v)
+        if val < 1:
+            raise ValueError("FILTER_REJECTED_TRADES_MAX_ROWS must be >= 1")
+        return val
+
+    @field_validator("cost_per_vcpu_hour_usd", "cost_per_gb_memory_hour_usd",
+                     "cost_per_gb_storage_month_usd", mode="before")
+    @classmethod
+    def non_negative_cost(cls, v: object) -> object:
+        val = float(v)
+        if val < 0:
+            raise ValueError("Cost coefficients must be non-negative")
+        return val
+
+    @field_validator("capacity_projection_window_days",
+                     "capacity_projection_lead_time_days", mode="before")
+    @classmethod
+    def positive_capacity_days(cls, v: object) -> object:
+        val = int(v)
+        if val < 1:
+            raise ValueError("Capacity projection days must be >= 1")
+        return val
+
+    @model_validator(mode="after")
+    def parquet_export_dir_no_traversal(self) -> "Settings":
+        cwd = Path.cwd().resolve()
+        candidate = Path(self.parquet_export_dir).expanduser()
+        if not candidate.is_absolute():
+            candidate = (cwd / candidate).resolve()
+        else:
+            candidate = candidate.resolve()
+        try:
+            candidate.relative_to(cwd)
+        except ValueError as exc:
+            raise ValueError(
+                "PARQUET_EXPORT_DIR must be within the application working directory"
+            ) from exc
+        return self
+
+    @model_validator(mode="after")
+    def feature_archive_dir_no_traversal(self) -> "Settings":
+        cwd = Path.cwd().resolve()
+        candidate = Path(self.feature_archive_dir).expanduser()
+        if not candidate.is_absolute():
+            candidate = (cwd / candidate).resolve()
+        else:
+            candidate = candidate.resolve()
+        try:
+            candidate.relative_to(cwd)
+        except ValueError as exc:
+            raise ValueError(
+                "FEATURE_ARCHIVE_DIR must be within the application working directory"
+            ) from exc
+        return self
+
+    @model_validator(mode="after")
+    def checkpoint_path_is_inside_data_directory(self) -> "Settings":
+        data_root = Path(self.data_dir).expanduser().resolve()
+        for field_name, raw_path in (
+            ("CURSOR_CHECKPOINT_PATH", self.cursor_checkpoint_path),
+            ("HISTORICAL_PROGRESS_PATH", self.historical_progress_path),
+        ):
+            candidate = Path(raw_path).expanduser()
+            if not candidate.is_absolute():
+                candidate = (Path.cwd() / candidate).resolve()
+            else:
+                candidate = candidate.resolve()
+            try:
+                candidate.relative_to(data_root)
+            except ValueError as exc:
+                raise ValueError(f"{field_name} must remain inside DATA_DIR") from exc
+        return self
+
+    @model_validator(mode="after")
+    def valid_evm_pool_addresses(self) -> "Settings":
+        addrs = _split_csv(self.evm_pool_addresses)
+        if not addrs:
+            return self
+        from web3 import Web3
+        for addr in addrs:
+            if len(addr) != 42 or not addr.startswith("0x"):
+                raise ValueError(f"EVM_POOL_ADDRESSES malformed address: {addr!r}")
+            if not Web3.is_checksum_address(addr):
+                raise ValueError(f"EVM_POOL_ADDRESSES non-checksummed address: {addr!r}")
+        return self
+
+    @field_validator("evm_max_block_lag", mode="before")
+    @classmethod
+    def valid_evm_max_block_lag(cls, v: object) -> object:
+        val = int(v)
+        if val < 1:
+            raise ValueError("EVM_MAX_BLOCK_LAG must be >= 1")
+        return val
+
+    @field_validator("evm_probe_interval_seconds", mode="before")
+    @classmethod
+    def valid_evm_probe_interval(cls, v: object) -> object:
+        val = float(v)
+        if val <= 0:
+            raise ValueError("EVM_PROBE_INTERVAL_SECONDS must be positive")
+        return val
+
+    @field_validator("evm_circuit_breaker_threshold", mode="before")
+    @classmethod
+    def valid_evm_circuit_breaker_threshold(cls, v: object) -> object:
+        val = int(v)
+        if val < 1:
+            raise ValueError("EVM_CIRCUIT_BREAKER_THRESHOLD must be >= 1")
+        return val
+
+    @model_validator(mode="after")
+    def valid_evm_providers_json(self) -> "Settings":
+        """Validate EVM_PROVIDERS is a well-formed JSON list of provider objects.
+
+        Each entry must have:
+          - ``chain_id``: positive integer
+          - ``rpc_url``: https:// URL (API keys in plaintext over http:// are rejected)
+          - ``name``: non-empty string
+
+        Optional fields: ``priority`` (int), ``max_requests_per_second`` (float > 0).
+        """
+        import json
+
+        raw = self.evm_providers.strip()
+        if not raw or raw == "[]":
+            return self
+
+        try:
+            entries = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"EVM_PROVIDERS is not valid JSON: {exc}") from exc
+
+        if not isinstance(entries, list):
+            raise ValueError("EVM_PROVIDERS must be a JSON array")
+
+        for i, entry in enumerate(entries):
+            if not isinstance(entry, dict):
+                raise ValueError(f"EVM_PROVIDERS[{i}] must be a JSON object")
+
+            # chain_id
+            chain_id = entry.get("chain_id")
+            if not isinstance(chain_id, int) or chain_id <= 0:
+                raise ValueError(
+                    f"EVM_PROVIDERS[{i}].chain_id must be a positive integer, "
+                    f"got {chain_id!r}"
+                )
+
+            # rpc_url — must be https:// to protect embedded API keys
+            rpc_url = entry.get("rpc_url", "")
+            if not isinstance(rpc_url, str) or not rpc_url:
+                raise ValueError(f"EVM_PROVIDERS[{i}].rpc_url must be a non-empty string")
+            if not rpc_url.startswith("https://"):
+                raise ValueError(
+                    f"EVM_PROVIDERS[{i}].rpc_url must use https:// scheme. "
+                    f"HTTP endpoints transmit API keys in plaintext."
+                )
+
+            # name
+            name = entry.get("name", "")
+            if not isinstance(name, str) or not name.strip():
+                raise ValueError(
+                    f"EVM_PROVIDERS[{i}].name must be a non-empty string"
+                )
+
+            # optional priority
+            if "priority" in entry:
+                if not isinstance(entry["priority"], int):
+                    raise ValueError(f"EVM_PROVIDERS[{i}].priority must be an integer")
+
+            # optional max_requests_per_second
+            if "max_requests_per_second" in entry:
+                mrps = entry["max_requests_per_second"]
+                if not isinstance(mrps, (int, float)) or float(mrps) <= 0:
+                    raise ValueError(
+                        f"EVM_PROVIDERS[{i}].max_requests_per_second must be > 0"
+                    )
+
+        return self
+
+    # ── Backward-compat properties ────────────────────────────────────────────
+
+    @property
+    def db_path(self) -> str:
+        return self.ledgerlens_db_path
+
+    @db_path.setter
+    def db_path(self, value: str) -> None:
+        object.__setattr__(self, "ledgerlens_db_path", value)
+
+    @property
+    def score_contract_id(self) -> str:
+        return self.ledgerlens_score_contract_id
+
+    @property
+    def service_secret_key(self) -> str:
+        return self.ledgerlens_service_secret_key
+
+    @property
+    def cors_allowed_origins(self) -> tuple[str, ...]:
+        return _split_csv(self.ledgerlens_cors_allowed_origins)
+
+    @property
+    def admin_api_key(self) -> str:
+        return self.ledgerlens_admin_api_key
+
+    @property
+    def compliance_api_key(self) -> str:
+        return self.ledgerlens_compliance_api_key
+
+    @property
+    def model_signing_key(self) -> str:
+        return self.ledgerlens_model_signing_key
+
+    @model_signing_key.setter
+    def model_signing_key(self, value: str) -> None:
+        object.__setattr__(self, "ledgerlens_model_signing_key", value)
+
+    @property
+    def _default_risk_score_threshold(self) -> int:
+        return self.risk_score_threshold
+
+    @_default_risk_score_threshold.setter
+    def _default_risk_score_threshold(self, value: int) -> None:
+        object.__setattr__(self, "risk_score_threshold", value)
+
+    @property
+    def _runtime_cache_ttl_seconds(self) -> int:
+        return self.runtime_config_ttl_seconds
+
+
+settings = Settings()
+
+logger = logging.getLogger("ledgerlens.config")
+
+
+# ── Runtime config cache ──────────────────────────────────────────────────────
+#
+# Consistency model: EVENTUALLY CONSISTENT.
+#
+# `runtime_config` (SQLite, same database as everything else) is the durable
+# source of truth, written by governance proposal execution
+# (`detection.governance.SettingsReloader.apply`) and by `PATCH
+# /admin/config`. Every process independently polls it through a local TTL
+# cache (`RUNTIME_CONFIG_TTL_SECONDS`, default 60s) so a governance-approved
+# change is guaranteed visible to every process within that many seconds --
+# a hard, documented worst-case bound -- even with no other infrastructure
+# configured.
+#
+# When `REDIS_URL` is configured and reachable, propagation is bounded far
+# tighter than the TTL: every write bumps a shared Redis counter
+# (`bump_config_version`), and each process's next config read compares its
+# last-seen counter value against the shared one -- a single cheap Redis GET,
+# not a new poll cycle -- and re-reads `runtime_config` immediately if the
+# counter moved, regardless of how much local TTL remains. In practice this
+# means propagation completes on the very next scoring call / API request /
+# ingestion batch in any process that reads governed settings, typically
+# well under a second.
+#
+# This is a versioned-config-epoch pattern (not literal pub/sub): no
+# background subscriber thread is needed, which matters because several
+# consumers (`run_pipeline.py`, CLI batch jobs) are not long-running daemons
+# and could never host a subscriber loop anyway. It degrades gracefully --
+# falling back to TTL-only polling, identical to this module's pre-existing
+# behavior -- when Redis is unconfigured or unreachable (e.g. local
+# docker-compose's default profile, which does not run Redis at all).
+
+_CONFIG_VERSION_REDIS_KEY = "ledgerlens:config:version"
+_CONFIG_VERSION_FAILURE_THRESHOLD = 3
+_CONFIG_VERSION_RECOVERY_TIMEOUT_SECONDS = 30.0
+
+_config_redis_client = None
+_config_redis_attempted = False
+_config_redis_circuit = None
+
+
+def _get_config_redis_client():
+    """Lazily connect to Redis for the config-version counter.
+
+    Returns ``None`` (and keeps returning ``None`` for the rest of the
+    process's life -- connection is attempted at most once, matching this
+    codebase's existing Redis-client conventions in
+    ``detection.feature_store`` / ``detection.rate_limiter``) when
+    ``redis_url`` isn't configured or the connection fails. Callers must
+    treat ``None`` as "no fast-path available, use the TTL fallback," not as
+    an error.
+    """
+    global _config_redis_client, _config_redis_attempted, _config_redis_circuit
+
+    if _config_redis_attempted:
+        return _config_redis_client
+    _config_redis_attempted = True
+
+    redis_url = getattr(settings, "redis_url", None)
+    if not redis_url:
+        return None
+
+    from utils.circuit_breaker import CircuitBreaker
+
+    _config_redis_circuit = CircuitBreaker(
+        name="config_propagation_redis",
+        failure_threshold=_CONFIG_VERSION_FAILURE_THRESHOLD,
+        recovery_timeout=_CONFIG_VERSION_RECOVERY_TIMEOUT_SECONDS,
+    )
+    try:
+        import redis
+
+        client = redis.from_url(redis_url, socket_connect_timeout=0.5, socket_timeout=0.5)
+        client.ping()
+        _config_redis_client = client
+        logger.info("Config propagation: connected to Redis at %s", redis_url)
+    except Exception as exc:
+        logger.warning(
+            "Config propagation: Redis connection failed (%s); falling back to "
+            "%ds TTL-only polling for runtime_config",
+            exc,
+            settings.runtime_config_ttl_seconds,
+        )
+        _config_redis_client = None
+    return _config_redis_client
+
+
+def _get_remote_config_version() -> int | None:
+    """Return the shared config-version counter, or ``None`` if unavailable."""
+    client = _get_config_redis_client()
+    if client is None or _config_redis_circuit is None or not _config_redis_circuit.allow_request():
+        return None
+    try:
+        raw = client.get(_CONFIG_VERSION_REDIS_KEY)
+        _config_redis_circuit.record_success()
+        return int(raw) if raw is not None else 0
+    except Exception as exc:
+        _config_redis_circuit.record_failure()
+        logger.warning("Config propagation: Redis version check failed (%s)", exc)
+        return None
+
+
+def bump_config_version() -> None:
+    """Signal every process to bypass its local TTL and re-poll ``runtime_config``.
+
+    Call this after any write to the ``runtime_config`` table (governance
+    proposal execution, ``PATCH /admin/config``). No-ops silently when Redis
+    isn't configured/reachable -- those processes still converge, just
+    bounded by ``runtime_config_ttl_seconds`` instead of near-instantly.
+    """
+    client = _get_config_redis_client()
+    if client is None:
+        return
+    try:
+        client.incr(_CONFIG_VERSION_REDIS_KEY)
+        if _config_redis_circuit is not None:
+            _config_redis_circuit.record_success()
+    except Exception as exc:
+        if _config_redis_circuit is not None:
+            _config_redis_circuit.record_failure()
+        logger.warning("Config propagation: failed to bump version (%s)", exc)
+
+
+class _RuntimeConfigCache:
+    """TTL-cached view of the ``runtime_config`` table.
+
+    Invalidated early by the shared Redis version counter when available
+    (see the module-level consistency-model docstring above). Each instance
+    holds independent local state (``_ts``/``_config``/``_seen_version``),
+    so multiple instances constructed against the same backing SQLite
+    database and Redis behave like independent OS processes sharing only
+    that backing store -- this is what lets tests simulate the real
+    multi-replica topology without spawning real processes.
+    """
+
+    def __init__(self) -> None:
+        self._ts = 0.0
+        self._config: dict[str, str] = {}
+        self._seen_version: int | None = None
+
+    def get(self) -> dict[str, str]:
+        now = time.time()
+        ttl = settings._runtime_cache_ttl_seconds
+
+        remote_version = _get_remote_config_version()
+        stale = remote_version is not None and remote_version != self._seen_version
+
+        if not stale and self._ts + ttl > now and self._config:
+            return self._config
+
+        import sqlite3
+
+        config: dict[str, str] = {}
+        try:
+            conn = sqlite3.connect(settings.db_path)
+            cur = conn.execute("SELECT key, value FROM runtime_config")
+            for k, v in cur.fetchall():
+                config[k] = v
+            conn.close()
+        except Exception:
+            config = {}
+
+        self._ts = now
+        self._config = config
+        if remote_version is not None:
+            self._seen_version = remote_version
+        return config
+
+    def invalidate(self) -> None:
+        """Force the next `get()` call to re-read from the DB immediately."""
+        self._ts = 0.0
+        self._config = {}
+
+
+_default_runtime_cache = _RuntimeConfigCache()
+
+
+def load_runtime_config() -> dict:
+    """Load runtime overrides from the `runtime_config` table with a TTL cache.
+
+    See the consistency-model docstring above `_CONFIG_VERSION_REDIS_KEY` for
+    the full propagation-latency guarantee.
+    """
+    return _default_runtime_cache.get()
+
+
+def invalidate_runtime_config_cache() -> None:
+    """Force this process's next `load_runtime_config()` call to re-read the DB.
+
+    Call this immediately after writing to `runtime_config` directly (e.g.
+    `PATCH /admin/config`) so the writing process itself doesn't have to wait
+    out its own local TTL. Pair with `bump_config_version()` to also notify
+    other processes.
+    """
+    _default_runtime_cache.invalidate()
+
+
+def get_runtime_risk_score_threshold() -> int:
+    cfg = load_runtime_config()
+    try:
+        return int(cfg["risk_score_threshold"])
+    except (KeyError, ValueError):
+        return settings._default_risk_score_threshold
+
+
+def get_governed_config_status() -> dict:
+    """Return this process's currently-active governed config state.
+
+    Exposed via ``GET /health`` so operators can confirm a governance-
+    approved change (or a ``PATCH /admin/config`` change) has actually
+    propagated to *this* process, rather than assuming it did.
+    ``risk_score_threshold_version`` is the ``runtime_config`` row's
+    ``updated_at`` timestamp -- ``None`` means no override has ever been
+    written and this process is still running the env-configured default.
+    """
+    import sqlite3
+
+    threshold = get_runtime_risk_score_threshold()
+    version: str | None = None
+    try:
+        conn = sqlite3.connect(settings.db_path)
+        row = conn.execute(
+            "SELECT updated_at FROM runtime_config WHERE key = 'risk_score_threshold'"
+        ).fetchone()
+        conn.close()
+        if row:
+            version = row[0]
+    except Exception:
+        pass
+
+    return {
+        "risk_score_threshold": threshold,
+        "risk_score_threshold_version": version,
+    }

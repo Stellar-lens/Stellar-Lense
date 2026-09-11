@@ -1,0 +1,13 @@
+# requirements/ml.txt
+# ─────────────────────────────────────────────────────────────────────────────
+# AUTO-GENERATED – do not edit manually.
+# Regenerate with: make lock   (or: bash requirements/compile.sh ml)
+# ─────────────────────────────────────────────────────────────────────────────
+
+-r base.txt
+
+# [ml] extra
+dp-accounting>=0.4.3,<1.0
+mlflow>=2.10.0,<3.0
+torch>=2.2.0
+torch-geometric>=2.5.0

@@ -1,0 +1,2698 @@
+"""Local read-only API for `RiskScore` records produced by `run_pipeline.py`.
+
+This is a lightweight stand-in for the `ledgerlens-api` repo, useful for
+local development and demos: it serves whatever has been written to the
+local SQLite store (`detection.storage`) by `run_pipeline.py` or
+`cli.py score`. `ledgerlens-api` will eventually own the canonical,
+production version of these endpoints (`/score`, `/alerts`,
+`/assets/risk-ranking`) — see README's "LedgerLens Organization" section.
+
+Also exposes webhook subscriber management endpoints.
+
+Run with:
+
+    uvicorn api.main:app --reload
+"""
+
+import json
+import logging
+import os
+import re
+import sqlite3
+import time
+from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
+from contextlib import asynccontextmanager
+from datetime import datetime, timezone
+from typing import Optional
+
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
+from fastapi.routing import APIRouter
+from pydantic import BaseModel, Field
+
+from api.auth import require_admin_key, require_compliance_key
+from api.api_key_router import router as api_key_router, require_scope
+from api.admin_router import router as admin_router
+from api.analyst import router as analyst_router
+from api.api_keys_router import router as api_keys_router
+from api.export_router import router as export_router
+from api.batch_router import router as batch_router
+from api.cross_chain_router import router as cross_chain_router
+from api.namespace import list_namespaces
+from api.gateway import GatewayMiddleware
+from config.settings import get_runtime_risk_score_threshold, settings
+from detection.tracing import (
+    configure_tracing,
+    start_span,
+)
+from detection.amm_engine import pool_risk_from_trade_rows
+from detection.feedback_store import ScoringFeedback, record_feedback
+from detection.risk_score import RiskScore
+from detection.counterfactual_engine import generate_counterfactuals
+from detection.counterfactual_translator import translate_counterfactual
+from detection.storage import (
+    get_alerts,
+    get_bridge_transfers,
+    get_circular_routes,
+    get_drift_reports,
+    get_feature_vector,
+    get_latest_scores,
+    get_liquidity_pool_trades,
+    get_pair_correlations,
+    get_retrain_runs,
+    get_rings,
+)
+from detection.dispute_store import submit_dispute, get_dispute, cast_vote
+from detection.feedback_store import AnalystFeedbackStore
+from detection.governance import (
+    GovernanceEngine,
+    GovernanceError,
+    create_proposal,
+    list_open_proposals,
+    cast_proposal_vote,
+)
+from detection.webhook_queue import get_dead_letters
+from detection.webhook_registry import deactivate_subscriber, list_subscribers, register_subscriber
+
+logger = logging.getLogger("ledgerlens.api")
+
+_STELLAR_ADDRESS_PATTERN = re.compile(r"^G[A-Z2-7]{55}$")
+
+# ---------------------------------------------------------------------------
+# Shared in-process sliding-window rate limiter helper
+# ---------------------------------------------------------------------------
+
+_RATE_WINDOW = 60.0
+
+
+def _check_sliding_window_rate_limit(
+    buckets: dict[str, list[float]],
+    client_ip: str,
+    max_requests: int,
+    window: float = _RATE_WINDOW,
+    detail: str = "Rate limit exceeded",
+) -> None:
+    """Raise HTTP 429 if ``client_ip`` has exceeded the sliding-window rate limit.
+
+    Uses a sliding window: only timestamps within the last ``window`` seconds
+    are counted. Mutates ``buckets`` in-place to evict stale entries.
+    """
+    now = time.monotonic()
+    bucket = buckets[client_ip]
+    buckets[client_ip] = [t for t in bucket if now - t < window]
+    if len(buckets[client_ip]) >= max_requests:
+        raise HTTPException(
+            status_code=429,
+            detail=detail,
+        )
+    buckets[client_ip].append(now)
+
+
+# ---------------------------------------------------------------------------
+# Causal-explanation rate limiter (10 req/min per IP)
+# ---------------------------------------------------------------------------
+_CAUSAL_RATE_LIMIT = 10
+_causal_rate_buckets: dict[str, list[float]] = defaultdict(list)
+
+
+def _check_causal_rate_limit(client_ip: str) -> None:
+    _check_sliding_window_rate_limit(
+        _causal_rate_buckets,
+        client_ip,
+        _CAUSAL_RATE_LIMIT,
+        detail=(
+            f"Rate limit exceeded: causal-explanation endpoint allows "
+            f"{_CAUSAL_RATE_LIMIT} requests per minute per IP."
+        ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# GNN similarity rate limiter (configurable rate/min per IP)
+# ---------------------------------------------------------------------------
+_gnn_similarity_rate_buckets: dict[str, list[float]] = defaultdict(list)
+
+
+def _check_gnn_similarity_rate_limit(client_ip: str) -> None:
+    _check_sliding_window_rate_limit(
+        _gnn_similarity_rate_buckets,
+        client_ip,
+        settings.gnn_similarity_rate_limit_per_minute,
+        detail=(
+            f"Rate limit exceeded: similar-wallets endpoint allows "
+            f"{settings.gnn_similarity_rate_limit_per_minute} requests per minute per IP."
+        ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Causal engine singleton — fitted lazily on first request.
+# ---------------------------------------------------------------------------
+_causal_engine = None
+_causal_engine_lock = __import__("threading").Lock()
+
+
+def validate_stellar_address(wallet: str) -> None:
+    """Validate that `wallet` is a valid Stellar account ID.
+
+    Stellar account IDs are exactly 56 characters long, start with 'G', and contain
+    only base32 characters (A-Z and 2-7).
+
+    Raises:
+        HTTPException: 400 with generic message if validation fails.
+    """
+    if not _STELLAR_ADDRESS_PATTERN.match(wallet):
+        raise HTTPException(status_code=400, detail="Invalid Stellar wallet address format.")
+
+# ---------------------------------------------------------------------------
+# Model loading — done once at startup so request handlers stay fast.
+# ---------------------------------------------------------------------------
+
+_models: dict = {}
+
+# ---------------------------------------------------------------------------
+# Graceful shutdown state
+# ---------------------------------------------------------------------------
+_shutting_down: bool = False
+SHUTDOWN_TIMEOUT = int(os.environ.get("SHUTDOWN_TIMEOUT", "30"))
+_inflight_requests: int = 0
+_inflight_lock = __import__("threading").Lock()
+
+
+async def _nightly_retention_task() -> None:
+    """Async background task: run the data retention job once per night at midnight UTC."""
+    import asyncio
+    from datetime import datetime, timedelta, timezone
+
+    while True:
+        now = datetime.now(timezone.utc)
+        next_midnight = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+        sleep_seconds = (next_midnight - now).total_seconds()
+        await asyncio.sleep(sleep_seconds)
+        try:
+            from storage.retention import RetentionEngine
+            engine = RetentionEngine(db_path=settings.db_path)
+            report = engine.run(dry_run=False)
+            for table, info in report.items():
+                archived = info.get("rows_archived", 0)
+                if archived:
+                    logger.info("[retention] %s: archived %d row(s) to %s", table, archived, info.get("archive_path"))
+        except Exception as exc:
+            logger.error("[retention] Nightly job failed: %s", exc)
+
+
+@asynccontextmanager
+async def _lifespan(application: FastAPI):
+    """Load trained models at startup; drain requests and clean up on shutdown."""
+    global _models, _shutting_down
+    configure_tracing()
+
+    # ── Cost metrics initialization ───────────────────────────────────────
+    # Initialize cost coefficient gauges for Prometheus recording rules.
+    # These gauges are static (set once from settings.py) and referenced by
+    # cost recording rules in monitoring/recording_rules_cost.yml.
+    try:
+        from config.cost_exporter import init_cost_metrics
+        init_cost_metrics()
+        logger.info(
+            "Cost metrics initialized: vCPU=$%.4f/hr, Memory=$%.4f/GB-hr, Storage=$%.4f/GB-month",
+            settings.cost_per_vcpu_hour_usd,
+            settings.cost_per_gb_memory_hour_usd,
+            settings.cost_per_gb_storage_month_usd,
+        )
+    except Exception as e:
+        logger.warning("Failed to initialize cost metrics: %s", e)
+
+    # ── Metrics startup check ─────────────────────────────────────────────
+    # Warn operators if /metrics is exposed without an admin key — metrics can
+    # reveal operational intelligence (queue depths, error rates) that should
+    # not be publicly accessible in production deployments.
+    try:
+        from config.settings import settings as _s  # noqa: PLC0415
+        if getattr(_s, "metrics_enabled", True) and not _s.ledgerlens_admin_api_key:
+            logger.warning(
+                "SECURITY WARNING: METRICS_ENABLED=True but LEDGERLENS_ADMIN_API_KEY "
+                "is unset. The /metrics endpoint is publicly accessible and may expose "
+                "operational intelligence. Set LEDGERLENS_ADMIN_API_KEY to protect it."
+            )
+    except Exception:
+        pass
+    try:
+        from detection.model_inference import load_models
+        _models = load_models(settings.model_dir)
+        logger.info("Loaded %d model(s) from %s", len(_models), settings.model_dir)
+    except (FileNotFoundError, RuntimeError) as e:
+        logger.warning("No trained models loaded from %s (%s) — /explain will return 503", settings.model_dir, e)
+        _models = {}
+
+    import asyncio as _asyncio
+    _retention_task = _asyncio.create_task(_nightly_retention_task())
+    yield
+
+    # ── Shutdown sequence ────────────────────────────────────────────────
+    import asyncio
+
+    _retention_task.cancel()
+
+    _shutting_down = True
+    logger.info("[shutdown] Stopping new requests (returning 503)")
+
+    # Wait for in-flight requests to drain
+    deadline = time.monotonic() + SHUTDOWN_TIMEOUT
+    while time.monotonic() < deadline:
+        with _inflight_lock:
+            count = _inflight_requests
+        if count == 0:
+            logger.info("[shutdown] All in-flight requests drained")
+            break
+        await asyncio.sleep(0.25)
+    else:
+        with _inflight_lock:
+            count = _inflight_requests
+        if count > 0:
+            logger.warning("[shutdown] Timed out with %d in-flight requests", count)
+
+    # Close WebSocket connections
+    from api.ws_router import manager as _ws_manager
+    await _ws_manager.close_all()
+    logger.info("[shutdown] WebSocket connections closed")
+
+    # SQLite WAL checkpoint
+    try:
+        from detection.storage import _connect
+        with _connect() as conn:
+            conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        logger.info("[shutdown] SQLite WAL checkpoint complete")
+    except Exception as exc:
+        logger.warning("[shutdown] SQLite WAL checkpoint failed: %s", exc)
+
+    # Flush Redis connection if available
+    try:
+        from detection.feature_store import FeatureStore
+        fs = FeatureStore.__dict__.get("_instance")
+        if fs and hasattr(fs, "_redis") and fs._redis:
+            fs._redis.close()
+            logger.info("[shutdown] Redis connection closed")
+    except Exception as exc:
+        logger.warning("[shutdown] Redis cleanup failed: %s", exc)
+
+    logger.info("[shutdown] Shutdown sequence complete")
+
+
+app = FastAPI(
+    title="LedgerLens API",
+    description=(
+        "LedgerLens REST API for Stellar wallet risk scoring, alert management, "
+        "AMM pool risk, cross-chain linking, and compliance exports. "
+        "See [ReDoc](/redoc) for an alternative documentation view."
+    ),
+    version="1.0.0",
+    openapi_version="3.1.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
+    lifespan=_lifespan,
+    openapi_tags=[
+        {"name": "Scores", "description": "Wallet risk score retrieval and explanation."},
+        {"name": "Alerts", "description": "Typed manipulation alerts (sandwich, wash-trading, etc.)."},
+        {"name": "AMM / Pools", "description": "Automated market maker pool risk metrics."},
+        {"name": "Governance", "description": "On-chain governance proposals and voting."},
+        {"name": "Webhooks", "description": "Webhook subscriber management and dead-letter queue."},
+        {"name": "Disputes", "description": "Score dispute submission and committee voting."},
+        {"name": "Admin", "description": "Model governance, drift monitoring, and runtime config (admin-key gated)."},
+        {"name": "Allowlist / Denylist", "description": "Wallet override management with full audit trail."},
+        {"name": "API Key Management", "description": "Scoped API key lifecycle (create, list, revoke)."},
+        {"name": "Compliance", "description": "FATF / SAR regulatory exports (compliance-key gated)."},
+    ],
+)
+
+
+# Add WAF middleware first
+from api.waf_middleware import WAFMiddleware
+app.add_middleware(WAFMiddleware)
+
+
+@app.middleware("http")
+async def _metrics_middleware(request: Request, call_next):
+    """Record FastAPI request duration metrics."""
+    from config.settings import settings as _s
+    if not getattr(_s, "metrics_enabled", True):
+        return await call_next(request)
+
+    import time
+    start_time = time.perf_counter()
+    response = None
+    try:
+        response = await call_next(request)
+        return response
+    finally:
+        duration = time.perf_counter() - start_time
+        status_code = str(response.status_code) if response else "500"
+        route = request.scope.get("route")
+        endpoint = route.path if route else request.url.path
+        try:
+            from api.metrics import api_request_duration_seconds
+            api_request_duration_seconds.labels(
+                method=request.method,
+                endpoint=endpoint,
+                status_code=status_code,
+            ).observe(duration)
+        except Exception:
+            pass
+
+
+@app.middleware("http")
+async def _shutdown_guard_middleware(request: Request, call_next):
+    """Reject new requests during shutdown; track in-flight count."""
+    global _inflight_requests
+    if _shutting_down and not request.url.path.startswith("/health"):
+        return JSONResponse(
+            status_code=503,
+            content={"detail": "Server is shutting down."},
+            headers={"Retry-After": "5"},
+        )
+    with _inflight_lock:
+        _inflight_requests += 1
+    try:
+        response = await call_next(request)
+        return response
+    finally:
+        with _inflight_lock:
+            _inflight_requests -= 1
+
+
+@app.exception_handler(sqlite3.OperationalError)
+async def _sqlite_operational_error_handler(request: Request, exc: sqlite3.OperationalError):
+    """Return 503 with Retry-After when SQLite is locked or unavailable."""
+    logger.error("SQLite operational error: %s", exc)
+    return JSONResponse(
+        status_code=503,
+        content={"detail": "Database temporarily unavailable. Please retry."},
+        headers={"Retry-After": "5"},
+    )
+
+
+app.include_router(analyst_router)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=list(settings.cors_allowed_origins),
+    allow_methods=["GET", "POST", "DELETE"],
+    allow_headers=["*"],
+    allow_credentials=False,
+)
+
+# ── Gateway middleware (auth, quota, logging) ────────────────────────────────
+app.add_middleware(GatewayMiddleware)
+
+# ── Router registration ──────────────────────────────────────────────────────
+from api.ws_router import router as _ws_router  # noqa: E402
+app.include_router(_ws_router)
+
+app.include_router(admin_router)
+app.include_router(api_key_router)
+
+app.include_router(batch_router)
+
+app.include_router(export_router)
+
+
+app.include_router(cross_chain_router)
+
+# ── New feature routers (Issues #295, #296, #297, #298) ──────────────────────
+from api.gnn_router import router as gnn_router  # noqa: E402
+from api.audit_router import router as audit_router  # noqa: E402
+from api.temporal_router import router as temporal_router  # noqa: E402
+from api.streaming_router import router as streaming_router  # noqa: E402
+
+app.include_router(gnn_router)
+app.include_router(audit_router)
+app.include_router(temporal_router)
+app.include_router(streaming_router)
+class WebhookCreate(BaseModel):
+    url: str
+    secret: str
+    min_score: int = 70
+    wallet_filter: str | None = None
+    asset_pair_filter: str | None = None
+
+
+class DisputeCreate(BaseModel):
+    wallet: str
+    asset_pair: str
+    evidence_url: str | None = None
+
+
+class VoteBody(BaseModel):
+    voter_key_hash: str
+    vote: str
+
+
+v1_router = APIRouter(prefix="/v1")
+
+_health_feature_store = None
+
+
+def _get_health_feature_store():
+    """Lazily-constructed, process-wide `FeatureStore` singleton for `/health`.
+
+    Cached across requests so the health check reuses the same Redis circuit
+    breaker state (and connection) instead of reconnecting on every poll.
+    """
+    global _health_feature_store
+    if _health_feature_store is None:
+        from detection.feature_store import FeatureStore
+
+        _health_feature_store = FeatureStore()
+    return _health_feature_store
+
+
+@v1_router.get(
+    "/health",
+    tags=["System"],
+    summary="Health check",
+    description="Returns 200 (ok/degraded) or 503. Checks DB, model files, circuit breakers, and governed config version.",
+)
+def health() -> JSONResponse:
+    """Returns 200 when healthy, 503 when any hard-failure component check fails.
+
+    Checks:
+    - DB connectivity: executes SELECT 1 via the existing _connect helper.
+    - Model files: each expected .joblib file exists and is non-empty.
+    - Circuit breakers: Horizon ingestion and the Redis feature store each
+      have a breaker (see `utils.circuit_breaker`). An OPEN/HALF_OPEN
+      circuit marks the response "degraded" but keeps returning 200 (the
+      service is still serving traffic in a reduced-functionality state,
+      not failed) — only DB/model failures return 503.
+    - Governed config: `status["config"]` reports this process's currently
+      active `risk_score_threshold` and the `runtime_config` row's
+      `updated_at` as its version, so operators can confirm a governance
+      proposal (or `PATCH /admin/config`) has actually propagated to this
+      process rather than assuming it did. See
+      `docs/governance_protocol.md` for the propagation consistency model.
+
+    Returns 503 when any check fails or when soroban_circuit_status=="open",
+    drift_status=="drifted", or webhook_dead_letter_count > 0.
+    """
+    from detection.model_inference import _MODEL_FILENAMES
+    from detection.storage import _connect
+    from ingestion.horizon_streamer import horizon_circuit
+    from utils.circuit_breaker import CircuitState
+
+    status: dict[str, object] = {}
+    healthy = True
+    degraded = False
+
+    # --- DB check ---
+    with start_span("db.health_check"):
+        try:
+            with _connect() as conn:
+                conn.execute("SELECT 1")
+            status["db"] = "ok"
+        except sqlite3.Error as exc:
+            logger.error("Health check: DB connectivity failure: %s", exc)
+            status["db"] = "error: database unreachable"
+            healthy = False
+
+    # --- Model files check (existence + non-zero size only; no deserialization) ---
+    # temporal_lstm/gnn/sequence_model are trained only when torch (+
+    # torch_geometric for gnn) is installed — see the try/except around LSTM
+    # training in detection/model_training.py and use_gnn defaulting to
+    # False. They're absent by design on the base "runtime" image/a plain
+    # `cli.py train` run, so their absence is reported but doesn't fail the
+    # health check the way a missing core ensemble model does.
+    with start_span("models.health_check"):
+        missing = [
+            name
+            for name, filename in _MODEL_FILENAMES.items()
+            if not _model_file_ok(os.path.join(settings.model_dir, filename))
+        ]
+    missing_required = [name for name in missing if name not in _OPTIONAL_MODEL_NAMES]
+    if missing_required:
+        status["models"] = f"missing: {', '.join(sorted(missing_required))}"
+        healthy = False
+    elif missing:
+        status["models"] = f"ok (optional missing: {', '.join(sorted(missing))})"
+        degraded = True
+    else:
+        status["models"] = "ok"
+
+    # --- Circuit breakers (open/half-open => degraded, not failed) ---
+    try:
+        feature_store_circuit_state = _get_health_feature_store().circuit_state
+    except Exception as exc:
+        logger.error("Health check: feature store circuit lookup failed: %s", exc)
+        feature_store_circuit_state = CircuitState.OPEN.value
+    circuits = {
+        "horizon": horizon_circuit.state.value,
+        "feature_store_redis": feature_store_circuit_state,
+    }
+    status["circuits"] = circuits
+    if any(state != CircuitState.CLOSED.value for state in circuits.values()):
+        degraded = True
+
+    # --- Event Bus ---
+    if settings.event_bus_backend != "none":
+        from detection.event_bus import get_event_bus
+        bus_health = get_event_bus().get_health()
+        if bus_health:
+            status["event_bus"] = bus_health
+            if bus_health.get("status") != "ok":
+                degraded = True
+
+    # --- Governed config (governance / PATCH /admin/config propagation) ---
+    from config.settings import get_governed_config_status
+    status["config"] = get_governed_config_status()
+
+    if healthy:
+        status["status"] = "degraded" if degraded else "ok"
+        http_status = 200
+    else:
+        status["status"] = "degraded"
+        http_status = 503
+    return JSONResponse(content=status, status_code=http_status)
+
+
+# Trained only when torch (+ torch_geometric for "gnn") is installed —
+# absent by design on a base (non-ML-extras) deployment or a plain
+# `cli.py train` run. See the health() model-files check above.
+_OPTIONAL_MODEL_NAMES = frozenset({"temporal_lstm", "gnn", "sequence_model"})
+
+
+def _model_file_ok(path: str) -> bool:
+    """Return True iff `path` exists as a non-empty regular file."""
+    try:
+        return os.path.isfile(path) and os.path.getsize(path) > 0
+    except OSError:
+        return False
+
+
+@v1_router.get(
+    "/health/drift",
+    tags=["System"],
+    summary="Streaming drift-detector health",
+    description=(
+        "Returns per-feature ADWIN / Page-Hinkley detector state (Issue-385): "
+        "whether drift was recently detected, per-feature detector internals, "
+        "and whether conformal recalibration is currently gated active. "
+        "Complements the slower, batch PSI mechanism (see `detection/drift_monitor.py` "
+        "and `cli.py retrain-check`), which is not real-time."
+    ),
+)
+def health_drift() -> JSONResponse:
+    """Always returns 200; this endpoint reports observability state, not liveness."""
+    from detection.drift_detectors import get_drift_registry
+
+    return JSONResponse(content=get_drift_registry().state(), status_code=200)
+
+
+@app.get("/health/drift", include_in_schema=False)
+def health_drift_unversioned() -> JSONResponse:
+    """Unversioned alias, matching the `/health` and `/health/ready` convention."""
+    return health_drift()
+
+
+@app.get("/health/ready")
+def health_ready() -> JSONResponse:
+    """Kubernetes readiness probe. Returns 503 during shutdown."""
+    if _shutting_down:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "shutting_down"},
+        )
+    return JSONResponse(status_code=200, content={"status": "ready"})
+
+
+# ---------------------------------------------------------------------------
+# Analyst feedback endpoints
+# ---------------------------------------------------------------------------
+
+class FeedbackSubmission(BaseModel):
+    wallet: str
+    asset_pair: str
+    analyst_label: int
+    confidence: float = 1.0
+
+
+class FeedbackRecordOut(BaseModel):
+    id: int
+    wallet: str
+    asset_pair: str
+    analyst_label: int
+    original_score: int
+    confidence: float
+    importance_weight: float
+    has_feature_vector: bool
+    created_at: str
+
+
+class PaginatedFeedback(BaseModel):
+    records: list[FeedbackRecordOut]
+    total: int
+    page: int
+    page_size: int
+
+
+_feedback_rate_buckets: dict[str, list[float]] = defaultdict(list)
+_FEEDBACK_RATE_LIMIT = 100
+
+
+def _check_feedback_rate_limit(client_ip: str) -> None:
+    _check_sliding_window_rate_limit(
+        _feedback_rate_buckets,
+        client_ip,
+        _FEEDBACK_RATE_LIMIT,
+        detail=f"Rate limit exceeded: {_FEEDBACK_RATE_LIMIT} corrections per hour.",
+    )
+
+
+@v1_router.post("/feedback", status_code=201, response_model=FeedbackRecordOut,
+                dependencies=[Depends(require_admin_key)])
+def submit_analyst_feedback(payload: FeedbackSubmission, request: Request):
+    """Submit an analyst label correction. Admin-key required."""
+    _check_feedback_rate_limit(request.client.host if request.client else "unknown")
+
+    if not _STELLAR_ADDRESS_PATTERN.match(payload.wallet):
+        raise HTTPException(status_code=422, detail="Invalid Stellar wallet address format.")
+    if payload.analyst_label not in (0, 1):
+        raise HTTPException(status_code=422, detail="analyst_label must be 0 or 1.")
+    if not (0.0 <= payload.confidence <= 1.0):
+        raise HTTPException(status_code=422, detail="confidence must be in [0.0, 1.0].")
+
+    store = AnalystFeedbackStore(db_path=settings.db_path)
+
+    scores = get_latest_scores(wallet=payload.wallet, limit=1)
+    original_score = scores[0].score if scores else 0
+
+    if scores:
+        try:
+            from detection.model_inference import record_feedback_and_adapt
+            record_feedback_and_adapt(
+                predicted_score_0_100=float(original_score),
+                true_label=payload.analyst_label,
+            )
+        except Exception:
+            logger.exception("Drift-coupled conformal adaptation failed for feedback submission")
+
+    record = store.add_correction(
+        wallet=payload.wallet,
+        asset_pair=payload.asset_pair,
+        analyst_label=payload.analyst_label,
+        original_score=original_score,
+        confidence=payload.confidence,
+    )
+    return FeedbackRecordOut(
+        id=record.id,
+        wallet=record.wallet,
+        asset_pair=record.asset_pair,
+        analyst_label=record.analyst_label,
+        original_score=record.original_score,
+        confidence=record.confidence,
+        importance_weight=record.importance_weight,
+        has_feature_vector=record.has_feature_vector,
+        created_at=record.created_at.isoformat(),
+    )
+
+
+@v1_router.get("/feedback", response_model=PaginatedFeedback,
+               dependencies=[Depends(require_admin_key)])
+def list_analyst_feedback(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+):
+    """Paginated correction history (most recent first). Admin-key required."""
+    store = AnalystFeedbackStore(db_path=settings.db_path)
+    records, total = store.get_corrections_paginated(page=page, page_size=page_size)
+    return PaginatedFeedback(
+        records=[
+            FeedbackRecordOut(
+                id=r.id,
+                wallet=r.wallet,
+                asset_pair=r.asset_pair,
+                analyst_label=r.analyst_label,
+                original_score=r.original_score,
+                confidence=r.confidence,
+                importance_weight=r.importance_weight,
+                has_feature_vector=r.has_feature_vector,
+                created_at=r.created_at.isoformat(),
+            )
+            for r in records
+        ],
+        total=total,
+        page=page,
+        page_size=page_size,
+    )
+
+
+@v1_router.get("/scores", response_model=list[RiskScore])
+def list_scores(
+    min_score: int = Query(default=0, ge=0, le=100, description="Minimum RiskScore (0-100)."),
+    limit: int = Query(default=100, ge=1, le=1000),
+    offset: int = Query(default=0, ge=0),
+    benford_flag: bool | None = Query(
+        default=None,
+        description="Filter by the Benford detector flag when provided.",
+    ),
+    ml_flag: bool | None = Query(
+        default=None,
+        description="Filter by the machine-learning detector flag when provided.",
+    ),
+    sort_by: str = Query(
+        default="score",
+        pattern="^(score|confidence|timestamp)$",
+        description="Sort descending by score, confidence, or timestamp.",
+    ),
+) -> list[RiskScore]:
+    """Return latest scores filtered by score, flags, paging, and `sort_by` ordering."""
+    scores = get_latest_scores(
+        limit=limit,
+        offset=offset,
+        benford_flag=benford_flag,
+        ml_flag=ml_flag,
+        sort_by=sort_by,
+    )
+    # mark disputed flags
+    with sqlite3.connect(settings.db_path) as conn:
+        for s in scores:
+            r = conn.execute(
+                "SELECT 1 FROM score_disputes WHERE wallet = ? AND asset_pair = ? AND status = 'pending' LIMIT 1",
+                (s.wallet, s.asset_pair),
+            ).fetchone()
+            s.disputed = bool(r)
+    return [s for s in scores if s.score >= min_score]
+
+
+
+class ShapExplanationResponse(BaseModel):
+    """Response schema for GET /scores/{wallet}/explain (waterfall-style)."""
+
+    wallet: str
+    model_version: str
+    model_name: str
+    base_value: float
+    contributions: list[dict]
+    summary_sentence: str
+
+
+@v1_router.get(
+    "/scores/{wallet}/explain",
+    response_model=ShapExplanationResponse,
+)
+def explain_wallet_score(
+    wallet: str,
+    asset_pair: str = Query(..., description="Asset pair to explain, e.g. XLM/USDC"),
+    model: str = Query(
+        default="random_forest",
+        description="Model to use for SHAP explanation (random_forest, xgboost, or lightgbm)",
+    ),
+) -> ShapExplanationResponse:
+    """Return a waterfall-style SHAP explanation for ``wallet`` on ``asset_pair``.
+
+    Produces ranked per-feature SHAP contributions, the SHAP base value
+    (expected model output), and a human-readable summary sentence.
+
+    Requires ``X-LedgerLens-Admin-Key`` header for authentication.
+
+    - **200** — waterfall explanation returned.
+    - **404** — no feature vector or scores found for the given wallet.
+    - **422** — unknown ``model`` name.
+    - **503** — models were not loaded at startup.
+    """
+    from detection.shap_explainer import ShapExplainer, VALID_MODEL_NAMES
+
+    if not _models:
+        raise HTTPException(status_code=503, detail="Models not loaded")
+
+    validate_stellar_address(wallet)
+
+    if model not in VALID_MODEL_NAMES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Unknown model '{model}'. Valid models: {sorted(VALID_MODEL_NAMES)}",
+        )
+
+    # Fetch the stored feature vector for the wallet / asset pair
+    feature_vector = get_feature_vector(wallet, asset_pair)
+    if feature_vector is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No scores found for wallet {wallet}",
+        )
+
+    # Validate feature vector: reject NaN/inf values
+    import math
+    for name, val in feature_vector.items():
+        if isinstance(val, (int, float)) and not math.isfinite(val):
+            raise HTTPException(
+                status_code=422,
+                detail=f"Feature '{name}' has non-finite value; cannot compute SHAP explanation.",
+            )
+
+    # Get model version for cache keying
+    from detection.model_registry import get_current_version
+    model_version = get_current_version(model, settings.model_dir) or "unknown"
+
+    model_obj = _models.get(model)
+    if model_obj is None:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Model '{model}' is not currently loaded.",
+        )
+
+    # Model name for summary sentence
+    model_display_names = {
+        "random_forest": "Random Forest",
+        "xgboost": "XGBoost",
+        "lightgbm": "LightGBM",
+    }
+    model_display = model_display_names.get(model, model)
+
+    explainer = ShapExplainer()
+    with start_span("model.shap_explain", attributes={"wallet": wallet, "model": model}):
+        explanation = explainer.explain(
+            model_obj,
+            feature_vector,
+            wallet=wallet,
+            model_version=model_version,
+            model_name=model_display,
+        )
+
+    return ShapExplanationResponse(
+        wallet=explanation.wallet,
+        model_version=explanation.model_version,
+        model_name=explanation.model_name,
+        base_value=explanation.base_value,
+        contributions=[
+            {"feature": c.feature, "shap_value": c.shap_value, "rank": c.rank}
+            for c in explanation.contributions
+        ],
+        summary_sentence=explanation.summary_sentence,
+    )
+
+
+_stream_rate_limiter_state: dict = {}
+
+
+class RateLimiterStatus(BaseModel):
+    configured_rate: float
+    current_rate: float
+    bucket_level: float
+    backpressure_active: bool
+    queue_size: int
+    last_429_at: Optional[datetime] = None
+
+
+@app.get(
+    "/stream/rate-limiter",
+    response_model=RateLimiterStatus,
+    dependencies=[Depends(require_admin_key)],
+    tags=["System"],
+    summary="Stream rate-limiter status",
+    description="Return current Horizon stream rate limiter and backpressure state (admin only).",
+)
+def rate_limiter_status() -> RateLimiterStatus:
+    """Return current rate limiter and backpressure state.
+
+    Requires the ``X-LedgerLens-Admin-Key`` header.  Returns 503 if no
+    streamer is currently registered.
+    """
+    bucket = _stream_rate_limiter_state.get("bucket")
+    if bucket is None:
+        raise HTTPException(status_code=503, detail="Rate limiter not active (no streamer running)")
+
+    bp = _stream_rate_limiter_state.get("backpressure")
+    adaptive = _stream_rate_limiter_state.get("adaptive")
+    last_429_dt: Optional[datetime] = None
+    if adaptive and adaptive.last_429_at is not None:
+        last_429_dt = datetime.fromtimestamp(adaptive.last_429_at, tz=timezone.utc)
+
+    return RateLimiterStatus(
+        configured_rate=bucket.current_rate,
+        current_rate=bucket.current_rate,
+        bucket_level=bucket.bucket_level,
+        backpressure_active=bp.is_paused if bp else False,
+        queue_size=bp.queue_size if bp else 0,
+        last_429_at=last_429_dt,
+    )
+
+
+_COUNTERFACTUAL_TIMEOUT_SECONDS = 5
+_counterfactual_executor = ThreadPoolExecutor(max_workers=4)
+
+# ---------------------------------------------------------------------------
+# Stream status — lightweight ingestion telemetry.
+# ---------------------------------------------------------------------------
+_stream_status: dict = {
+    "last_trade_at": None,
+    "trades_per_second": 0.0,
+    "active_wallets": 0,
+    "_recent_timestamps": [],
+}
+
+
+def _stream_status_update(trade) -> None:
+    """Update in-memory stream status after each ingested trade."""
+    now = time.time()
+    _stream_status["last_trade_at"] = datetime.fromtimestamp(now, tz=timezone.utc).isoformat()
+    recent = [t for t in _stream_status["_recent_timestamps"] if now - t < 10.0]
+    recent.append(now)
+    _stream_status["_recent_timestamps"] = recent
+    _stream_status["trades_per_second"] = len(recent) / 10.0
+    wallet = getattr(trade, "base_account", None) or ""
+    if wallet:
+        wallets = _stream_status.get("_active_wallets") or set()
+        wallets.add(wallet)
+        _stream_status["_active_wallets"] = wallets
+        _stream_status["active_wallets"] = len(wallets)
+
+
+@app.get("/stream/status")
+def stream_status() -> dict:
+    """Return real-time ingestion statistics (trades/s, active wallets, last trade time)."""
+    return {
+        "trades_per_second": _stream_status["trades_per_second"],
+        "active_wallets": _stream_status["active_wallets"],
+        "last_trade_at": _stream_status["last_trade_at"],
+    }
+
+
+@app.get(
+    "/metrics",
+    tags=["System"],
+    summary="Prometheus metrics",
+    description=(
+        "Expose all LedgerLens Prometheus metrics in the standard text exposition "
+        "format. Requires the ``X-LedgerLens-Admin-Key`` header when "
+        "``LEDGERLENS_ADMIN_API_KEY`` is configured. "
+        "Returns ``503`` when ``METRICS_ENABLED=False``."
+    ),
+    include_in_schema=True,
+)
+async def prometheus_metrics(
+    _auth: None = Depends(require_admin_key),
+) -> Response:
+    """Return Prometheus metrics in text exposition format.
+
+    Protected by ``require_admin_key`` so that operational intelligence
+    (queue depths, error rates, request counts) is not publicly accessible.
+    When ``LEDGERLENS_ADMIN_API_KEY`` is unset the dependency is a no-op and
+    the endpoint is accessible without authentication — a startup WARNING is
+    logged in that case.
+
+    Returns ``503`` when ``METRICS_ENABLED=False`` in settings.
+    """
+    from fastapi.responses import Response as _Response  # noqa: PLC0415
+
+    try:
+        if not getattr(settings, "metrics_enabled", True):
+            return _Response(
+                content="# Metrics collection is disabled (METRICS_ENABLED=False)\n",
+                status_code=503,
+                media_type="text/plain; version=0.0.4; charset=utf-8",
+            )
+    except Exception:
+        pass
+
+    try:
+        from prometheus_client import CONTENT_TYPE_LATEST, generate_latest  # noqa: PLC0415
+        return _Response(
+            content=generate_latest(),
+            media_type=CONTENT_TYPE_LATEST,
+        )
+    except ImportError:
+        return _Response(
+            content="# prometheus_client is not installed\n",
+            status_code=503,
+            media_type="text/plain; version=0.0.4; charset=utf-8",
+        )
+
+
+@v1_router.get(
+    "/scores/{wallet}/counterfactual",
+    tags=["Scores"],
+    summary="Counterfactual score scenarios",
+    description="Return minimal feature changes that would lower a wallet's risk score below the target threshold.",
+)
+def wallet_counterfactual(
+    wallet: str,
+    asset_pair: str = Query(..., description="Asset pair to generate counterfactuals for, e.g. XLM/USDC"),
+    n: int = Query(default=3, ge=1, le=5),
+    target_score: int | None = Query(default=None, ge=0, le=99),
+) -> dict:
+    """Return up to `n` minimal feature changes that would drop `wallet`'s score below `target_score`.
+
+    Looks up `wallet`'s most recently cached feature vector for `asset_pair`
+    (saved by `run_pipeline.py`), then searches for feasible counterfactuals
+    with `detection.counterfactual_engine.generate_counterfactuals` and
+    translates each into plain English. Only feature deltas and human-readable
+    text are returned -- never model weights or internal probability outputs.
+
+    The search is hard-capped at 5 seconds; if it doesn't finish in time this
+    still returns 200 with an empty `counterfactuals` list rather than hanging
+    indefinitely (unbounded optimisation search is a denial-of-service vector).
+
+    - **404** — no cached feature vector for the given wallet / asset pair.
+    - **422** — `target_score` outside `[0, 99]` or `n` outside `[1, 5]`.
+    - **503** — models were not loaded at startup.
+    """
+    if not _models:
+        raise HTTPException(status_code=503, detail="Models not loaded")
+
+    validate_stellar_address(wallet)
+    feature_vector = get_feature_vector(wallet, asset_pair)
+    if feature_vector is None:
+        raise HTTPException(
+            status_code=404, detail=f"No cached feature vector for wallet {wallet} on {asset_pair}"
+        )
+
+    from detection.model_inference import score_feature_vector
+
+    resolved_target_score = target_score if target_score is not None else get_runtime_risk_score_threshold() - 1
+    with start_span("model.inference", attributes={"wallet": wallet}):
+        current_probability, _confidence = score_feature_vector(_models, feature_vector)
+    current_score = round(current_probability * 100)
+
+    future = _counterfactual_executor.submit(
+        generate_counterfactuals, feature_vector, _models, n, resolved_target_score
+    )
+    try:
+        counterfactuals = future.result(timeout=_COUNTERFACTUAL_TIMEOUT_SECONDS)
+    except FutureTimeoutError:
+        counterfactuals = []
+
+    return {
+        "wallet": wallet,
+        "asset_pair": asset_pair,
+        "current_score": current_score,
+        "target_score": resolved_target_score,
+        "counterfactuals": [
+            {
+                "rank": rank,
+                "distance": cf["distance"],
+                "predicted_score": cf["predicted_score"],
+                "feature_deltas": cf["feature_deltas"],
+                "human_readable": translate_counterfactual(cf["feature_deltas"]),
+            }
+            for rank, cf in enumerate(counterfactuals, start=1)
+        ],
+    }
+
+
+@v1_router.get("/scores/{wallet}", dependencies=[Depends(require_scope("read:scores"))])
+def wallet_scores(wallet: str) -> dict:
+    """Return the latest score for `wallet` on each asset pair.
+
+    Applies allowlist / denylist overrides from the ``wallet_overrides`` table.
+    When the wallet has known EVM counterparts (bridge transfer records in the
+    database), the response includes a ``"cross_chain_links"`` field listing
+    the linked EVM wallets and the chain they were last seen on.  EVM RPC
+    endpoint URLs are never exposed in this response.
+
+    If the wallet is allowlisted, all scores are overridden to 0.
+    If denylisted, all scores are overridden to 100.
+    """
+    from detection.wallet_override_store import get_active_override
+
+    validate_stellar_address(wallet)
+
+    # Check for manual override before hitting the score store
+    override_entry = get_active_override(wallet)
+    if override_entry:
+        list_type = override_entry["list_type"]
+        override_score = 0 if list_type == "allowlist" else 100
+        override_label = list_type[:-4]  # "allowlist" → "allow", handled below
+        override_label = "allowlisted" if list_type == "allowlist" else "denylisted"
+        return {
+            "scores": [
+                {
+                    "wallet": wallet,
+                    "score": override_score,
+                    "override": override_label,
+                    "reason": override_entry.get("reason", ""),
+                }
+            ],
+            "cross_chain_links": [],
+            "override": override_label,
+        }
+
+    scores = get_latest_scores(wallet=wallet)
+    if not scores:
+        raise HTTPException(status_code=404, detail=f"No scores found for wallet {wallet}")
+    with sqlite3.connect(settings.db_path) as conn:
+        for s in scores:
+            r = conn.execute(
+                "SELECT 1 FROM score_disputes WHERE wallet = ? AND asset_pair = ? AND status = 'pending' LIMIT 1",
+                (s.wallet, s.asset_pair),
+            ).fetchone()
+            s.disputed = bool(r)
+
+    transfers = get_bridge_transfers(stellar_wallet=wallet, since_days=90)
+    seen: dict[tuple, dict] = {}
+    for t in transfers:
+        key = (t.chain, t.evm_wallet)
+        if key not in seen or t.timestamp.isoformat() > seen[key]["last_bridge_at"]:
+            seen[key] = {
+                "chain": t.chain,
+                "evm_wallet": t.evm_wallet,
+                "last_bridge_at": t.timestamp.isoformat(),
+            }
+    cross_chain_links = list(seen.values())
+
+    return {
+        "scores": [s.model_dump() for s in scores],
+        "cross_chain_links": cross_chain_links,
+    }
+
+
+class SimilarWallet(BaseModel):
+    wallet: str
+    similarity: float
+    current_risk_score: int
+    wash_ring_membership: bool
+
+
+class SimilarWalletsResponse(BaseModel):
+    wallet: str
+    computed_from: str
+    model_version: str
+    similar_wallets: list[SimilarWallet]
+
+
+# Global vector index and embedding store singletons
+_vector_index: Optional[object] = None
+_embedding_store: Optional[object] = None
+_model_version: Optional[str] = None
+
+
+def _initialize_vector_resources():
+    """Initialize the vector index and embedding store singletons."""
+    global _vector_index, _embedding_store, _model_version
+    from config.settings import settings
+    from detection.embedding_store import EmbeddingStore
+    from detection.vector_index import create_vector_index
+    import numpy as np
+
+    if _embedding_store is None:
+        _embedding_store = EmbeddingStore()
+
+    # Get the latest model version
+    _model_version = _embedding_store.get_latest_model_version()
+    if _model_version is None:
+        return  # No embeddings yet
+
+    if _vector_index is None:
+        _vector_index = create_vector_index()
+        # Load all embeddings from the store
+        wallets = []
+        vectors = []
+        for wallet, embedding_bytes in _embedding_store.get_all_embeddings(_model_version):
+            wallets.append(wallet)
+            vectors.append(np.frombuffer(embedding_bytes, dtype=np.float32))
+        if vectors:
+            _vector_index.add_batch(wallets, np.array(vectors))
+
+
+@v1_router.get(
+    "/wallets/{wallet}/similar",
+    tags=["Wallets"],
+    summary="Find structurally similar wallets",
+    description="Return globally similar wallets using precomputed GNN embeddings and ANN search.",
+)
+def find_similar_wallets(
+    request: Request,
+    wallet: str,
+    k: int = Query(10, ge=1, le=100, description="Number of similar wallets to return"),
+    min_score: float = Query(0.0, ge=0.0, le=1.0, description="Minimum similarity score"),
+) -> SimilarWalletsResponse:
+    """Return structurally similar wallets using the global vector index.
+
+    - **404** — no embedding found for the given wallet.
+    - **503** — vector index not initialized.
+    """
+    from config.settings import settings
+    from detection.embedding_store import EmbeddingStore
+    from detection.vector_index import create_vector_index
+    import numpy as np
+
+    validate_stellar_address(wallet)
+
+    # Check rate limit
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    _check_gnn_similarity_rate_limit(client_ip)
+
+    # Initialize resources if needed
+    if _embedding_store is None:
+        _initialize_vector_resources()
+    if _vector_index is None:
+        _initialize_vector_resources()
+    if _embedding_store is None or _vector_index is None or _model_version is None:
+        raise HTTPException(status_code=503, detail="Vector similarity index not available")
+
+    # Get the embedding for the queried wallet
+    embedding_result = _embedding_store.get_embedding(wallet, _model_version)
+    if embedding_result is None:
+        raise HTTPException(status_code=404, detail=f"No embedding found for wallet {wallet}")
+    embedding, _ = embedding_result
+
+    # Search for similar wallets
+    similar_wallets_with_scores = _vector_index.search(embedding, k + 1)  # +1 to exclude self
+
+    # Filter out the queried wallet and apply min_score
+    filtered_similar = []
+    for similar_wallet, similarity in similar_wallets_with_scores:
+        if similar_wallet == wallet:
+            continue
+        if similarity < min_score:
+            continue
+        # Get current risk score and wash ring membership
+        scores = get_latest_scores(wallet=similar_wallet, limit=1)
+        current_risk_score = scores[0].score if scores else 0
+        # For wash ring membership, we can check if the wallet is in any wash ring
+        # Let's query the wash_rings table
+        wash_ring_membership = False
+        try:
+            with sqlite3.connect(settings.db_path) as conn:
+                cursor = conn.execute(
+                    "SELECT 1 FROM wash_rings WHERE accounts_json LIKE ? LIMIT 1",
+                    (f'%"{similar_wallet}"%',),
+                )
+                if cursor.fetchone():
+                    wash_ring_membership = True
+        except Exception:
+            pass
+        filtered_similar.append(
+            SimilarWallet(
+                wallet=similar_wallet,
+                similarity=similarity,
+                current_risk_score=current_risk_score,
+                wash_ring_membership=wash_ring_membership,
+            )
+        )
+        if len(filtered_similar) >= k:
+            break
+
+    return SimilarWalletsResponse(
+        wallet=wallet,
+        computed_from="global_index",
+        model_version=_model_version,
+        similar_wallets=filtered_similar,
+    )
+
+
+@v1_router.get("/alerts/dedup-state/{wallet}", tags=["Alerts"])
+def alert_dedup_state(wallet: str) -> dict:
+    """Return the current deduplication state and event history for a wallet."""
+    from detection.alert_engine import AlertDeduplicator
+    deduplicator = AlertDeduplicator()
+    state = deduplicator.get_state(wallet)
+    events = deduplicator.get_events(wallet)
+    return {"state": state, "events": events}
+
+
+@v1_router.get("/alerts")
+def alerts(
+    limit: int = Query(default=100, ge=1, le=1000),
+    offset: int = Query(default=0, ge=0),
+    alert_type: str | None = Query(
+        default=None,
+        description="Filter typed manipulation alerts (e.g. SANDWICH_ATTACK). "
+        "When omitted, returns risk scores at or above the threshold.",
+    ),
+):
+    """Return manipulation alerts.
+
+    Without `alert_type`, returns `RiskScore` records at or above
+    `settings.risk_score_threshold` (legacy behaviour). With `alert_type`,
+    returns stored typed alerts (see `detection.storage.AlertType`), such as
+    `SANDWICH_ATTACK`, most recent first.
+    """
+    if alert_type is not None:
+        return get_alerts(alert_type=alert_type, limit=limit, offset=offset)
+
+    scores = get_latest_scores(limit=limit, offset=offset)
+    return [s for s in scores if s.score >= get_runtime_risk_score_threshold()]
+
+
+
+@v1_router.get(
+    "/assets/risk-ranking",
+    tags=["Assets"],
+    summary="Asset pair risk ranking",
+    description="Return each asset pair ranked by average wallet risk score, descending.",
+)
+def asset_risk_ranking() -> list[dict]:
+    """Return each asset pair ranked by its average wallet risk score (descending)."""
+    scores = get_latest_scores()
+    by_pair: dict[str, list[int]] = defaultdict(list)
+    for s in scores:
+        by_pair[s.asset_pair].append(s.score)
+
+    ranking = [
+        {"asset_pair": pair, "average_score": round(sum(values) / len(values), 2), "wallet_count": len(values)}
+        for pair, values in by_pair.items()
+    ]
+    return sorted(ranking, key=lambda r: r["average_score"], reverse=True)
+
+
+@v1_router.get(
+    "/rings",
+    tags=["Detection"],
+    summary="Wash-trading rings",
+    description="Return detected wash-trading rings from the latest pipeline run.",
+)
+def list_rings() -> list[dict]:
+    """Return detected wash-trading rings from the latest pipeline run."""
+    return get_rings()
+
+
+@v1_router.get(
+    "/correlations",
+    tags=["Detection"],
+    summary="Correlated asset pairs",
+    description="Return correlated asset pairs with Spearman coefficient, shared wallet count, and run timestamp.",
+)
+def list_correlations() -> list[dict]:
+    """Return the most recent set of correlated asset pairs from the pipeline.
+
+    Each entry includes the pair names, Spearman correlation coefficient,
+    the method used, the count of shared wallets in burst windows, and the
+    run timestamp.
+    """
+    return get_pair_correlations()
+
+
+@v1_router.get("/amm-anomalies")
+def list_amm_anomalies(
+    min_score: float = Query(0.5, ge=0.0, le=1.0),
+    limit: int = Query(100, le=500),
+    offset: int = Query(0, ge=0),
+) -> list[dict]:
+    """Return AMM wash-trade anomalies ordered by anomaly_score DESC."""
+    from detection.amm_engine import AMMEngine
+
+    engine = AMMEngine()
+    anomalies = engine.get_anomalies(min_score=min_score, limit=limit, offset=offset)
+    return [
+        {
+            "wallet": a.wallet,
+            "pool_id": a.pool_id,
+            "session_start": a.session_start.isoformat() if a.session_start else None,
+            "tenure_seconds": a.tenure_seconds,
+            "volume_to_liquidity_ratio": a.volume_to_liquidity_ratio,
+            "deposit_withdraw_symmetry": a.deposit_withdraw_symmetry,
+            "counterparty_concentration": a.counterparty_concentration,
+            "anomaly_score": a.anomaly_score,
+            "detected_at": a.detected_at.isoformat() if a.detected_at else None,
+        }
+        for a in anomalies
+    ]
+
+
+@v1_router.get("/amm/pools/{pool_id}/risk")
+def pool_risk(pool_id: str) -> dict:
+    """Return pool-level round-trip ratio and trader concentration for `pool_id`.
+
+    Based on AMM pool trades ingested by `run_pipeline.py` (see
+    `ingestion.amm_loader`) and stored in `liquidity_pool_trades`.
+    """
+    rows = get_liquidity_pool_trades(pool_id)
+    if not rows:
+        raise HTTPException(status_code=404, detail=f"No pool trades found for pool {pool_id}")
+    risk = pool_risk_from_trade_rows(rows)
+    return {"pool_id": pool_id, **risk}
+
+
+@v1_router.get(
+    "/path-payments/circular",
+    tags=["Detection"],
+    summary="Circular path payments",
+    description="Return detected atomic circular path-payment routes, paginated.",
+)
+def circular_path_payments(
+    limit: int = Query(default=100, ge=1, le=1000),
+    offset: int = Query(default=0, ge=0),
+) -> list[dict]:
+    """Return detected atomic circular path-payment routes, paginated."""
+    return get_circular_routes(limit=limit, offset=offset)
+
+
+@app.get("/path-cycles")
+def list_path_cycles(
+    min_score: float = Query(0.6, ge=0.0, le=1.0),
+    wallet: Optional[str] = Query(None),
+    limit: int = Query(100, le=500),
+) -> list[dict]:
+    """Return detected multi-hop path-payment wash-trade cycles."""
+    from detection.storage import get_hop_payment_cycles
+    if wallet is not None:
+        validate_stellar_address(wallet)
+    return get_hop_payment_cycles(min_score=min_score, wallet=wallet, limit=limit)
+
+
+# ---------------------------------------------------------------------------
+# Feedback ingestion — admin-key gated
+# ---------------------------------------------------------------------------
+
+
+class FeedbackRequest(BaseModel):
+    wallet: str
+    asset_pair: str
+    ground_truth: int  # 1 = confirmed wash, 0 = confirmed clean
+    scored_at: str     # ISO-8601 datetime of the scoring event
+
+
+@v1_router.post(
+    "/feedback/ground-truth",
+    dependencies=[Depends(require_admin_key)],
+    tags=["Admin"],
+    summary="Submit ground-truth scoring feedback",
+    description="Record ground-truth feedback (confirmed wash / confirmed clean) for a previously scored wallet.",
+)
+def submit_feedback(body: FeedbackRequest) -> dict:
+    """Record ground-truth feedback for a previously scored wallet/asset_pair.
+
+    Looks up the stored per-model predictions from the ``risk_scores`` table
+    for the matching ``wallet``, ``asset_pair``, and ``scored_at`` timestamp,
+    then writes one :class:`~detection.feedback_store.ScoringFeedback` row per
+    model (3 rows total).
+
+    Returns ``{"recorded": 3}`` on success or 404 if no matching score is found.
+    """
+    from datetime import datetime, timezone
+
+    from detection.storage import _connect, init_db
+
+    try:
+        scored_at_dt = datetime.fromisoformat(body.scored_at)
+        if scored_at_dt.tzinfo is None:
+            scored_at_dt = scored_at_dt.replace(tzinfo=timezone.utc)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=f"Invalid scored_at: {exc}")
+
+    # Ensure schema exists before querying
+    init_db()
+
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT score, shap_json FROM risk_scores "
+            "WHERE wallet = ? AND asset_pair = ? AND timestamp = ? "
+            "ORDER BY id DESC LIMIT 1",
+            (body.wallet, body.asset_pair, scored_at_dt.isoformat()),
+        ).fetchone()
+
+    if row is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No score found for wallet={body.wallet} asset_pair={body.asset_pair} scored_at={body.scored_at}",
+        )
+
+    # We use the blended score / 100 as a proxy probability for each model
+    # when per-model probabilities are not stored separately.
+    blended_prob = row[0] / 100.0
+    confirmed_at = datetime.now(timezone.utc)
+    count = 0
+    for model_name in ("random_forest", "xgboost", "lightgbm"):
+        record_feedback(
+            ScoringFeedback(
+                wallet=body.wallet,
+                asset_pair=body.asset_pair,
+                model_name=model_name,
+                predicted_probability=blended_prob,
+                ground_truth=body.ground_truth,
+                scored_at=scored_at_dt,
+                confirmed_at=confirmed_at,
+            )
+        )
+        count += 1
+
+    return {"recorded": count}
+
+
+def get_slo_status_from_registry() -> dict:
+    try:
+        from prometheus_client import REGISTRY
+    except ImportError:
+        logger.warning("prometheus_client not installed — SLO status unavailable")
+        return {"error": "prometheus_client not installed"}
+
+    # Initialise counters
+    # 1. Score Availability
+    avail_good = 0.0
+    avail_total = 0.0
+
+    # 2. Scoring Latency
+    latency_good = 0.0
+    latency_total = 0.0
+
+    # 3. Webhook Delivery
+    webhook_good = 0.0
+    webhook_total = 0.0
+
+    # 4. Soroban Submission
+    soroban_good = 0.0
+    soroban_total = 0.0
+
+    from config.settings import settings
+
+    for metric in REGISTRY.collect():
+        if metric.name == "ledgerlens_api_request_duration_seconds":
+            for sample in metric.samples:
+                if sample.name == "ledgerlens_api_request_duration_seconds_count":
+                    labels = sample.labels
+                    if labels.get("method") == "GET" and labels.get("endpoint") in ("/scores/{wallet}", "/v1/scores/{wallet}"):
+                        status = labels.get("status_code", "")
+                        avail_total += sample.value
+                        if not status.startswith("5"):
+                            avail_good += sample.value
+
+        elif metric.name == "ledgerlens_scoring_latency_seconds":
+            for sample in metric.samples:
+                if sample.name == "ledgerlens_scoring_latency_seconds_bucket":
+                    le_val = sample.labels.get("le", "")
+                    try:
+                        if le_val and float(le_val) <= settings.slo_scoring_latency_target_seconds:
+                            latency_good += sample.value
+                    except ValueError:
+                        pass
+                elif sample.name == "ledgerlens_scoring_latency_seconds_count":
+                    latency_total += sample.value
+
+        elif metric.name == "ledgerlens_webhook_deliveries_total":
+            for sample in metric.samples:
+                if sample.name in ("ledgerlens_webhook_deliveries_total", "ledgerlens_webhook_deliveries_total_total"):
+                    res = sample.labels.get("result", "")
+                    webhook_total += sample.value
+                    if res == "delivered":
+                        webhook_good += sample.value
+
+        elif metric.name == "ledgerlens_soroban_submissions_total":
+            for sample in metric.samples:
+                if sample.name in ("ledgerlens_soroban_submissions_total", "ledgerlens_soroban_submissions_total_total"):
+                    status = sample.labels.get("status", "")
+                    if status != "skipped":
+                        soroban_total += sample.value
+                        if status in ("success", "submitted"):
+                            soroban_good += sample.value
+
+    # Compute error budget remaining
+    def budget_remaining(good, total, target_pct):
+        if total == 0:
+            return 100.0
+        success_rate = good / total
+        target_rate = target_pct / 100.0
+        allowed_error = 1.0 - target_rate
+        actual_error = 1.0 - success_rate
+        if allowed_error == 0:
+            return 100.0 if actual_error == 0 else -100.0
+        pct = (1.0 - (actual_error / allowed_error)) * 100.0
+        return round(pct, 2)
+
+    return {
+        "score_availability": {
+            "sli": round((avail_good / avail_total * 100.0) if avail_total > 0 else 100.0, 4),
+            "target": 99.5,
+            "error_budget_remaining": budget_remaining(avail_good, avail_total, 99.5),
+            "good_count": int(avail_good),
+            "total_count": int(avail_total),
+        },
+        "scoring_latency": {
+            "sli": round((latency_good / latency_total * 100.0) if latency_total > 0 else 100.0, 4),
+            "target": settings.slo_scoring_latency_target_percent,
+            "error_budget_remaining": budget_remaining(latency_good, latency_total, settings.slo_scoring_latency_target_percent),
+            "good_count": int(latency_good),
+            "total_count": int(latency_total),
+        },
+        "webhook_delivery": {
+            "sli": round((webhook_good / webhook_total * 100.0) if webhook_total > 0 else 100.0, 4),
+            "target": settings.slo_webhook_delivery_target_percent,
+            "error_budget_remaining": budget_remaining(webhook_good, webhook_total, settings.slo_webhook_delivery_target_percent),
+            "good_count": int(webhook_good),
+            "total_count": int(webhook_total),
+        },
+        "soroban_submission": {
+            "sli": round((soroban_good / soroban_total * 100.0) if soroban_total > 0 else 100.0, 4),
+            "target": settings.slo_soroban_submission_target_percent,
+            "error_budget_remaining": budget_remaining(soroban_good, soroban_total, settings.slo_soroban_submission_target_percent),
+            "good_count": int(soroban_good),
+            "total_count": int(soroban_total),
+        }
+    }
+
+
+@v1_router.get("/admin/slo-status", tags=["Admin"], summary="SLO and error budget status", description="Return the current error budget status for all defined SLOs (admin only).", dependencies=[Depends(require_admin_key)])
+def slo_status() -> dict:
+    """Return the current error budget status for all defined SLOs (admin only)."""
+    return get_slo_status_from_registry()
+
+
+# ---------------------------------------------------------------------------
+# Model observability — drift reports and retrain runs (admin-key gated)
+# ---------------------------------------------------------------------------
+
+
+@v1_router.get("/admin/drift-reports", tags=["Admin"], summary="Model drift reports", description="Return the most recent drift checks recorded by `cli.py retrain-check`.", dependencies=[Depends(require_admin_key)])
+def drift_reports(limit: int = Query(default=50, ge=1, le=1000)) -> list[dict]:
+    """Return the most recent drift checks recorded by `cli.py retrain-check`."""
+    return get_drift_reports(limit=limit)
+
+
+@v1_router.get("/admin/robustness-report", tags=["Admin"], summary="Latest robustness report", description="Return the latest adversarial robustness evaluation report (admin only).", dependencies=[Depends(require_admin_key)])
+def robustness_report() -> dict:
+    """Return the latest RobustnessReport from the database (admin only)."""
+    from detection.storage import get_latest_robustness_report
+
+    report = get_latest_robustness_report()
+    if report is None:
+        raise HTTPException(status_code=404, detail="No robustness report found")
+    return report
+
+
+@v1_router.get("/model/robustness", tags=["Admin"], summary="Live robustness metrics", description="Return live red-team robustness metrics: evasion rate, mean generations to evade, and hardening delta.")
+def model_robustness() -> dict:
+    """Return live red team robustness metrics for the current model.
+
+    Summarises the continuous adversarial loop (`detection.red_team`):
+    ``evasion_rate_24h``, ``mean_generations_to_evade``, and ``hardening_delta``
+    (change in evasion rate before/after the most recent retrain).
+    """
+    from detection.robustness_eval import live_robustness_metrics
+
+    return live_robustness_metrics()
+
+
+@v1_router.get("/admin/retrain-runs", tags=["Admin"], summary="Retrain run history", description="Return the most recent per-model retrain outcomes.", dependencies=[Depends(require_admin_key)])
+def retrain_runs(
+    limit: int = Query(default=50, ge=1, le=1000),
+    model_name: str | None = Query(default=None, description="Filter by model, e.g. random_forest"),
+) -> list[dict]:
+    """Return the most recent per-model retrain outcomes recorded by `cli.py retrain-check`."""
+    return get_retrain_runs(limit=limit, model_name=model_name)
+
+
+@v1_router.get("/admin/lineage/{dataset}", tags=["Admin"], summary="Lineage graph", description="Return the lineage graph for a named dataset or model version.", dependencies=[Depends(require_admin_key)])
+def get_lineage(dataset: str) -> dict:
+    """Return the lineage graph for a named dataset or model version."""
+    from detection.lineage import get_lineage_graph
+    return get_lineage_graph(dataset)
+
+
+@v1_router.get("/admin/federated/audit-log", tags=["Admin"], summary="Federated learning audit log", description="Return the most recent federated-round audit records (participant IDs are SHA-256 hashed).", dependencies=[Depends(require_admin_key)])
+def federated_audit_log(
+    limit: int = Query(default=50, ge=1, le=1000),
+) -> list[dict]:
+    """Return the most recent federated-round audit records (participant IDs are SHA-256 hashed)."""
+    from detection.federated.audit import get_audit_records
+    return get_audit_records(limit=limit)
+
+
+@app.get("/admin/namespaces", dependencies=[Depends(require_admin_key)])
+def admin_namespaces() -> list[dict]:
+    """Return every namespace with per-table record counts.
+
+    Admin-only (requires the ``LEDGERLENS_ADMIN_API_KEY`` header).
+    Gated by `require_admin_key` — the admin wildcard API key is
+    required to see cross-namespace data.
+    """
+    return list_namespaces()
+
+
+@app.post("/admin/namespaces/{namespace_id}/rotate-key", dependencies=[Depends(require_admin_key)])
+def admin_rotate_namespace_key(
+    namespace_id: str,
+    grace_period_seconds: int = 604800,
+) -> dict:
+    """Rotate the namespace key. Marks the old one rotating, creates a new one.
+
+    Admin-only (requires the ``LEDGERLENS_ADMIN_API_KEY`` header).
+    """
+    from api.namespace import rotate_namespace_key
+    if grace_period_seconds <= 0:
+        raise HTTPException(status_code=422, detail="Grace period must be positive")
+    return rotate_namespace_key(namespace_id, grace_period_seconds=grace_period_seconds)
+
+
+# ---------------------------------------------------------------------------
+# Model weights
+# ---------------------------------------------------------------------------
+
+
+@v1_router.get("/model/weights", tags=["Admin"], summary="Ensemble model weights", description="Return current ensemble classifier weights from the Thompson-sampling adaptive reweighter.")
+def model_weights() -> JSONResponse:
+    """Return current ensemble classifier weights from the adaptive reweighter."""
+    from detection.adaptive_reweighter import (
+        ThompsonSamplingReweighter,
+        _CLASSIFIER_NAMES,
+        get_global_reweighter,
+        load_state,
+    )
+
+    rw = get_global_reweighter() or load_state()
+    if rw is None:
+        rw = ThompsonSamplingReweighter(n_classifiers=len(_CLASSIFIER_NAMES))
+
+    weights = rw.current_weights()
+    return JSONResponse({
+        "classifiers": [
+            {
+                "name": name,
+                "alpha": float(rw.alphas[i]),
+                "beta": float(rw.betas[i]),
+                "weight": weights[name],
+            }
+            for i, name in enumerate(_CLASSIFIER_NAMES)
+        ],
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    })
+
+
+# ---------------------------------------------------------------------------
+# Webhook subscriber management
+# ---------------------------------------------------------------------------
+
+
+@v1_router.post(
+    "/webhooks",
+    status_code=201,
+    tags=["Webhooks"],
+    summary="Register webhook subscriber",
+    description="Register a URL to receive risk score alert notifications above a configurable threshold.",
+)
+def create_webhook(body: WebhookCreate) -> dict:
+    """Register a new webhook subscriber."""
+    try:
+        subscriber_id = register_subscriber(
+            url=body.url,
+            secret=body.secret,
+            min_score=body.min_score,
+            wallet_filter=body.wallet_filter,
+            asset_pair_filter=body.asset_pair_filter,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return {"subscriber_id": subscriber_id}
+
+
+@v1_router.get("/webhooks", tags=["Webhooks"], summary="List webhooks", description="Return all active webhook subscribers (secrets masked).")
+def list_webhooks() -> list[dict]:
+    """Return all active subscribers (secrets are masked)."""
+    return [
+        {
+            "subscriber_id": s.subscriber_id,
+            "url": s.url,
+            "secret": s.masked_secret(),
+            "min_score": s.min_score,
+            "wallet_filter": ",".join(s.wallet_filter) if s.wallet_filter else None,
+            "asset_pair_filter": ",".join(s.asset_pair_filter) if s.asset_pair_filter else None,
+            "created_at": s.created_at,
+        }
+        for s in list_subscribers()
+    ]
+
+
+@v1_router.delete("/webhooks/{subscriber_id}", tags=["Webhooks"], summary="Delete webhook", description="Permanently deactivate a webhook subscriber.")
+def delete_webhook(subscriber_id: str) -> dict:
+    """Deactivate a webhook subscriber."""
+    if not deactivate_subscriber(subscriber_id):
+        raise HTTPException(status_code=404, detail="Subscriber not found")
+    return {"status": "deactivated"}
+
+
+@v1_router.get("/webhooks/dead-letters", tags=["Webhooks"], summary="Dead-letter webhooks", description="Return webhook deliveries that permanently failed after all retry attempts.")
+def dead_letters() -> list[dict]:
+    """Return all deliveries that have permanently failed."""
+    return [
+        {
+            "id": d.id,
+            "subscriber_id": d.subscriber_id,
+            "payload": json.loads(d.payload_json),
+            "attempt_count": d.attempt_count,
+            "last_error": d.last_error,
+            "created_at": d.created_at,
+        }
+        for d in get_dead_letters()
+    ]
+
+
+@app.get("/sandwiches")
+def get_sandwiches(
+    asset_pair: str | None = Query(None, description="Filter by asset pair"),
+    min_confidence: float = Query(0.7, ge=0.0, le=1.0, description="Minimum sandwich confidence"),
+    limit: int = Query(50, ge=1, le=500),
+) -> list[dict]:
+    """Return detected sandwich attack events from the stored risk scores.
+
+    Results are ordered newest-first and filtered by `min_confidence`.
+    """
+    from detection.storage import _connect, init_db
+    init_db()
+    with _connect() as conn:
+        query = """
+            SELECT wallet, asset_pair, score, scored_at, metadata
+            FROM risk_scores
+            WHERE metadata LIKE '%sandwich%'
+        """
+        params: list = []
+        if asset_pair:
+            query += " AND asset_pair = ?"
+            params.append(asset_pair)
+        query += " ORDER BY scored_at DESC LIMIT ?"
+        params.append(limit)
+        rows = conn.execute(query, params).fetchall()
+
+    results = []
+    for wallet, pair, score, scored_at, metadata_json in rows:
+        try:
+            meta = json.loads(metadata_json) if metadata_json else {}
+        except (json.JSONDecodeError, TypeError):
+            meta = {}
+        conf = meta.get("sandwich_confidence", 0.0)
+        if conf >= min_confidence:
+            results.append(
+                {
+                    "attacker_wallet": wallet,
+                    "asset_pair": pair,
+                    "risk_score": score,
+                    "scored_at": scored_at,
+                    "sandwich_confidence": conf,
+                    "victim_wallet": meta.get("victim_wallet"),
+                    "victim_amount": meta.get("victim_amount"),
+                    "price_impact": meta.get("price_impact"),
+                    "front_run_time": meta.get("front_run_time"),
+                    "back_run_time": meta.get("back_run_time"),
+                }
+            )
+    return results
+
+
+@app.get("/admin/gnn-stats", dependencies=[Depends(require_admin_key)])
+def gnn_stats() -> dict:
+    """Return GNN model architecture summary and last inference time."""
+    try:
+        from detection.gnn_model import GNNInferenceEngine
+        engine = GNNInferenceEngine.get_instance()
+        return engine.stats()
+    except ImportError:
+        return {"status": "unavailable", "reason": "torch_geometric not installed"}
+    except Exception as exc:
+        return {"status": "error", "reason": str(exc)}
+# ------------------------------------------------------------------
+# Disputes
+# ------------------------------------------------------------------
+
+
+@v1_router.post("/disputes", status_code=201, tags=["Disputes"], summary="Submit score dispute", description="Submit a dispute for a scored wallet. Rate-limited to one dispute per wallet per 24h.")
+def create_dispute(body: DisputeCreate):
+    try:
+        dispute = submit_dispute(body.wallet, body.asset_pair, body.evidence_url)
+    except ValueError as exc:
+        # Rate limit or missing submission
+        if "Rate limit" in str(exc):
+            raise HTTPException(status_code=429, detail=str(exc))
+        raise HTTPException(status_code=422, detail=str(exc))
+    return dispute.model_dump()
+
+
+@v1_router.get("/disputes/{dispute_id}", tags=["Disputes"], summary="Get dispute", description="Return dispute details including committee vote counts (identities hidden).")
+def read_dispute(dispute_id: str):
+    d = get_dispute(dispute_id)
+    if d is None:
+        raise HTTPException(status_code=404, detail="Dispute not found")
+    # hide voter identities: return counts only
+    approves = sum(1 for v in d.committee_votes if v.get("vote") == "approve")
+    rejects = sum(1 for v in d.committee_votes if v.get("vote") == "reject")
+    return {
+        "dispute_id": d.dispute_id,
+        "wallet": d.wallet,
+        "asset_pair": d.asset_pair,
+        "disputed_score": d.disputed_score,
+        "soroban_tx_hash": d.soroban_tx_hash,
+        "evidence_url": d.evidence_url,
+        "submitted_at": d.submitted_at,
+        "status": d.status,
+        "votes": {"approve": approves, "reject": rejects},
+        "resolved_at": d.resolved_at,
+        "resolution": d.resolution,
+    }
+
+
+@v1_router.post("/disputes/{dispute_id}/vote", dependencies=[Depends(require_admin_key)], tags=["Disputes"], summary="Vote on dispute", description="Cast an approve/reject vote on an open dispute (admin only).")
+def vote_dispute(dispute_id: str, body: VoteBody):
+    # validate voter_key_hash format
+    if len(body.voter_key_hash) != 64:
+        raise HTTPException(status_code=422, detail="voter_key_hash must be 64 hex chars")
+    if body.vote not in ("approve", "reject"):
+        raise HTTPException(status_code=422, detail="vote must be 'approve' or 'reject'")
+    try:
+        d = cast_vote(dispute_id, body.voter_key_hash, body.vote)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return d.model_dump()
+
+
+# ------------------------------------------------------------------
+# ZK Commitment endpoints (#147)
+# ------------------------------------------------------------------
+
+
+@v1_router.get("/governance/proposals", tags=["Governance"], summary="List proposals", description="Return all open governance proposals.")
+def get_proposals():
+    return [p.model_dump() for p in list_open_proposals()]
+
+
+class ProposalCreate(BaseModel):
+    proposal_type: str
+    proposed_value: str
+    proposed_by_key_hash: str
+
+
+@v1_router.post("/governance/proposals", dependencies=[Depends(require_admin_key)], tags=["Governance"], summary="Create proposal", description="Create a new governance proposal (admin only).")
+def create_proposal_endpoint(body: ProposalCreate):
+    try:
+        p = create_proposal(body.proposal_type, body.proposed_value, body.proposed_by_key_hash)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return p.model_dump()
+
+
+class ProposalVote(BaseModel):
+    voter_key_hash: str
+    vote: str
+
+
+@v1_router.post("/governance/proposals/{proposal_id}/vote", dependencies=[Depends(require_admin_key)], tags=["Governance"], summary="Vote on proposal", description="Cast a vote on a governance proposal (admin only).")
+def vote_proposal(proposal_id: str, body: ProposalVote):
+    try:
+        p = cast_proposal_vote(proposal_id, body.voter_key_hash, body.vote)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return p.model_dump()
+
+
+@v1_router.post(
+    "/governance/proposals/{proposal_id}/execute",
+    dependencies=[Depends(require_admin_key)],
+    tags=["Governance"],
+    summary="Execute proposal",
+    description=(
+        "Execute a passed governance proposal (admin only): applies the "
+        "change and propagates it to every process. See "
+        "docs/governance_protocol.md for the consistency model and "
+        "propagation latency."
+    ),
+)
+def execute_proposal_endpoint(proposal_id: str):
+    """Delegates to `GovernanceEngine.execute_proposal` (the canonical
+    engine, not the legacy create/list/vote shim above -- there is no
+    legacy execute equivalent). Documented as existing since this
+    module's inception but never actually wired up; this closes that gap.
+    """
+    try:
+        pid = int(proposal_id)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="proposal_id must be an integer")
+
+    try:
+        p = GovernanceEngine().execute_proposal(pid)
+    except GovernanceError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+    return {
+        "proposal_id": p.id,
+        "status": p.status,
+        "executed_at": p.executed_at.isoformat() if p.executed_at else None,
+        "execution_error": p.execution_error,
+    }
+
+
+# ------------------------------------------------------------------
+# Regulatory compliance export layer
+#
+# These endpoints emit FATF Travel-Rule / SAR evidence and are gated behind the
+# dedicated `compliance:read` scope (see api.auth.require_compliance_key). They
+# are excluded from the public OpenAPI schema (include_in_schema=False) so they
+# never surface on the unauthenticated /docs page.
+# ------------------------------------------------------------------
+
+
+class SARPackageRequest(BaseModel):
+    wallet: str
+    start_date: str
+    end_date: str
+
+
+@v1_router.get(
+    "/compliance/ivms/{wallet}",
+    dependencies=[Depends(require_compliance_key)],
+    include_in_schema=False,
+)
+def compliance_ivms(wallet: str, dry_run: bool = Query(False)) -> dict:
+    """Return the IVMS 101 risk-augmentation block for ``wallet``.
+
+    Logged as a Travel-Rule export to the compliance audit trail unless
+    ``dry_run=true``.
+    """
+    from dataclasses import asdict
+
+    from detection.compliance_exporter import export_travel_rule
+
+    validate_stellar_address(wallet)
+    return asdict(export_travel_rule(wallet, dry_run=dry_run))
+
+
+@v1_router.post(
+    "/compliance/sar-package",
+    dependencies=[Depends(require_compliance_key)],
+    include_in_schema=False,
+)
+def compliance_sar_package(body: SARPackageRequest, dry_run: bool = Query(False)) -> FileResponse:
+    """Generate a SAR evidence ZIP for a wallet and return it as a download.
+
+    Requires the wallet's current risk score to be at least
+    ``COMPLIANCE_SAR_MIN_SCORE`` (400 otherwise) and is rate-limited to
+    ``COMPLIANCE_EXPORT_RATE_LIMIT_PER_HOUR`` exports/hour (429 otherwise).
+    Logged to the compliance audit trail unless ``dry_run=true``.
+    """
+    import tempfile
+
+    from detection.compliance_exporter import (
+        ComplianceRateLimitExceeded,
+        ComplianceScoreTooLow,
+        export_sar_package,
+    )
+
+    validate_stellar_address(body.wallet)
+    output_dir = tempfile.mkdtemp(prefix="ledgerlens_sar_")
+    try:
+        zip_path = export_sar_package(
+            wallet=body.wallet,
+            start_date=body.start_date,
+            end_date=body.end_date,
+            output_dir=output_dir,
+            dry_run=dry_run,
+        )
+    except ComplianceScoreTooLow as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except ComplianceRateLimitExceeded:
+        raise HTTPException(status_code=429, detail="Compliance export rate limit exceeded")
+
+    return FileResponse(
+        zip_path,
+        media_type="application/zip",
+        filename=os.path.basename(zip_path),
+    )
+
+
+@v1_router.get(
+    "/compliance/audit-trail/{wallet}",
+    dependencies=[Depends(require_compliance_key)],
+    include_in_schema=False,
+)
+def compliance_audit_trail(wallet: str) -> list[dict]:
+    """Return the full timestamped audit log for ``wallet`` (for legal hold)."""
+    from detection.compliance_exporter import get_audit_trail
+
+    validate_stellar_address(wallet)
+    return get_audit_trail(wallet)
+
+
+# ---------------------------------------------------------------------------
+# Causal explanation endpoint
+# ---------------------------------------------------------------------------
+
+# Valid feature names accepted by the feature_override parameter.
+_CAUSAL_FEATURE_NAMES_SET: frozenset[str] = frozenset([
+    "wash_ring_membership",
+    "round_trip_trade_frequency",
+    "chi_sq_24h",
+    "cycle_volume_ratio",
+    "volume_to_unique_counterparty_ratio",
+    "network_centrality",
+    "account_age_days",
+    "gnn_wash_ring_prob",
+])
+
+# Value range for feature overrides (validated for security).
+_FEATURE_OVERRIDE_MIN = -1000.0
+_FEATURE_OVERRIDE_MAX = 1000.0
+
+# Refutation gate: refuse to serve the ATE table and return 503 if more than
+# this FRACTION of all conducted refutation tests (across every feature that
+# has a genuine DoWhy-identified causal estimate) return p < 0.05.
+#
+# This is fraction-based, not a fixed count, because refutation coverage now
+# scales with the number of causally-identified features (see
+# CausalEngine.all_feature_refutation_tests) — a fixed count threshold would
+# either be trivially unreachable (if set >= max possible failures, as the
+# original _MAX_FAILING_REFUTATIONS = 3 bug did when exactly 3 tests were
+# ever run) or arbitrary (if raised without regard to coverage). A fraction
+# remains meaningful regardless of how many features/tests are in scope.
+_MAX_FAILING_REFUTATION_FRACTION = 1.0 / 3.0
+
+
+class CausalExplanationResponse(BaseModel):
+    """Response schema for GET /scores/{wallet}/causal-explanation."""
+
+    wallet: str
+    current_score: int
+    feature_ate_table: dict[str, float]
+    top_causal_features: list[tuple[str, float]]
+    counterfactual_score: Optional[float]
+    coverage_note: str
+    # --- Fields below are additive (default to empty) for backward compatibility. ---
+    # Per-feature provenance: "causal" (genuine DoWhy-identified estimate) or
+    # "correlational_fallback" (OLS coefficient substituted after DoWhy could
+    # not identify/estimate the effect). See detection.causal_engine.ATEEstimate.
+    estimation_method: dict[str, str] = Field(default_factory=dict)
+    # Human-readable reason for each feature present in estimation_method with
+    # value "correlational_fallback" (e.g. non-identifiable, dowhy missing).
+    estimation_notes: dict[str, str] = Field(default_factory=dict)
+    # Features that actually underwent DoWhy refutation testing this request
+    # (i.e. the subset of feature_ate_table with estimation_method == "causal").
+    refutation_coverage: list[str] = Field(default_factory=list)
+
+
+def _parse_feature_override(raw: str | None) -> tuple[str, float] | None:
+    """Parse and strictly validate a ``feature=value`` override string.
+
+    Returns ``(feature_name, value)`` on success or raises ``HTTPException``
+    with status 422 on any validation failure.
+
+    Security requirements:
+    - Feature name must be a known observable feature (not arbitrary user input).
+    - Value must be a finite float within [-1000, 1000].
+    """
+    if raw is None:
+        return None
+    if "=" not in raw:
+        raise HTTPException(
+            status_code=422,
+            detail="feature_override must be in 'feature=value' format (e.g. 'wash_ring_membership=0.0').",
+        )
+    feature, _, value_str = raw.partition("=")
+    feature = feature.strip()
+    value_str = value_str.strip()
+
+    if feature not in _CAUSAL_FEATURE_NAMES_SET:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Unknown feature '{feature}'. "
+                f"Valid features: {sorted(_CAUSAL_FEATURE_NAMES_SET)}"
+            ),
+        )
+    try:
+        value = float(value_str)
+    except ValueError:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Feature override value '{value_str}' is not a valid number.",
+        )
+    import math
+    if not math.isfinite(value):
+        raise HTTPException(
+            status_code=422,
+            detail="Feature override value must be a finite number.",
+        )
+    if value < _FEATURE_OVERRIDE_MIN or value > _FEATURE_OVERRIDE_MAX:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Feature override value {value} is out of range "
+                f"[{_FEATURE_OVERRIDE_MIN}, {_FEATURE_OVERRIDE_MAX}]."
+            ),
+        )
+    return feature, value
+
+
+def _get_or_fit_causal_engine():
+    """Return the global CausalEngine, fitting lazily from stored scores if needed.
+
+    Thread-safe via a module-level lock.  Returns None when insufficient data
+    is available (< CAUSAL_MIN_SAMPLE_SIZE scored wallets in the database).
+    """
+    global _causal_engine
+    if _causal_engine is not None and _causal_engine.is_fitted():
+        return _causal_engine
+
+    with _causal_engine_lock:
+        if _causal_engine is not None and _causal_engine.is_fitted():
+            return _causal_engine
+
+        try:
+            from detection.causal_engine import CausalEngine, build_causal_dag, OBSERVABLE_FEATURE_NODES
+            from detection.storage import _connect
+            import os
+
+            min_sample = int(os.getenv("CAUSAL_MIN_SAMPLE_SIZE", "500"))
+            method = os.getenv("CAUSAL_ESTIMATION_METHOD", "backdoor.linear_regression")
+            refutation_runs = int(os.getenv("CAUSAL_REFUTATION_RUNS", "100"))
+            model_version = os.getenv("LEDGERLENS_MODEL_VERSION", "default")
+
+            with _connect() as conn:
+                rows = conn.execute(
+                    "SELECT wallet, asset_pair, score, shap_json FROM risk_scores "
+                    "ORDER BY id DESC LIMIT 5000"
+                ).fetchall()
+
+            if len(rows) < min_sample:
+                logger.warning(
+                    "Causal engine: only %d scored wallets available (minimum %d). "
+                    "Returning None.",
+                    len(rows),
+                    min_sample,
+                )
+                return None
+
+            # Build a DataFrame from stored scores + shap_json feature proxies
+            records = []
+            for wallet_addr, asset_pair, score, shap_json_str in rows:
+                record: dict = {"risk_score": float(score)}
+                if shap_json_str:
+                    try:
+                        shap_data = json.loads(shap_json_str)
+                        for item in shap_data:
+                            feat = item.get("feature", "")
+                            if feat in _CAUSAL_FEATURE_NAMES_SET:
+                                record[feat] = float(item.get("shap_value", 0.0))
+                    except Exception:
+                        pass
+                records.append(record)
+
+            import pandas as pd
+            df = pd.DataFrame(records)
+            for feat in OBSERVABLE_FEATURE_NODES:
+                if feat not in df.columns:
+                    df[feat] = 0.0
+            df = df.fillna(0.0)
+
+            engine = CausalEngine(
+                dag=build_causal_dag(),
+                estimation_method=method,
+                db_path=settings.db_path,
+                model_version=model_version,
+                refutation_runs=refutation_runs,
+                min_sample_size=min_sample,
+            )
+            engine.fit(df)
+            _causal_engine = engine
+            return _causal_engine
+
+        except Exception as exc:
+            logger.error("Failed to fit CausalEngine: %s", exc)
+            return None
+
+
+@app.get("/scores/{wallet}/causal-explanation", response_model=CausalExplanationResponse)
+def causal_explanation(
+    request: Request,
+    wallet: str,
+    feature_override: Optional[str] = Query(
+        default=None,
+        description=(
+            "Optional feature override in 'feature=value' format. "
+            "Returns counterfactual_score with the override applied. "
+            "Example: 'wash_ring_membership=0.0'"
+        ),
+    ),
+) -> CausalExplanationResponse:
+    """Return a causal explanation of the risk score for ``wallet``.
+
+    Unlike SHAP, which conflates causal and correlational contributions, this
+    endpoint returns *causal* average treatment effects (ATEs) estimated via
+    do-calculus interventions on the fitted structural causal model.
+
+    Response fields
+    ---------------
+    - ``feature_ate_table``: ATE of each feature on risk_score — the expected
+      change in score if that feature alone is moved from 0 to 1.
+    - ``top_causal_features``: top-3 features by absolute ATE.
+    - ``counterfactual_score``: predicted score if ``feature_override`` were
+      applied (only present when ``feature_override`` is supplied).
+    - ``coverage_note``: advisory note about sample size and estimate quality.
+    - ``estimation_method``: per-feature ``"causal"`` (genuine DoWhy-identified
+      estimate) or ``"correlational_fallback"`` (OLS coefficient substituted
+      because DoWhy could not identify or estimate the effect). Consumers
+      must not treat these two as interchangeable.
+    - ``estimation_notes``: reason for each fallback entry in
+      ``estimation_method`` (e.g. non-identifiable, DoWhy not installed).
+    - ``refutation_coverage``: features that actually underwent DoWhy
+      refutation testing this request — i.e. the ``"causal"`` subset of
+      ``estimation_method``. See docs/causal_inference.md for the refutation
+      gate's coverage scope and rejection threshold.
+
+    Security
+    --------
+    - ``feature_override`` is strictly validated: feature must be a known
+      observable feature name; value must be a finite float in [-1000, 1000].
+    - Rate-limited to 10 requests per minute per IP.
+    - ``counterfactual_score`` is not cached publicly to prevent fingerprinting
+      the model's sensitivity surface.
+
+    Errors
+    ------
+    - **400** — invalid Stellar wallet address format.
+    - **404** — no scores found for the wallet.
+    - **422** — invalid ``feature_override`` format or value.
+    - **429** — rate limit exceeded (10 req/min per IP).
+    - **503** — causal model not available (insufficient training data, DoWhy
+      not installed, or refutation gate triggered).
+    """
+    # Rate limiting
+    client_ip = request.client.host if request.client else "unknown"
+    _check_causal_rate_limit(client_ip)
+
+    validate_stellar_address(wallet)
+
+    # Validate feature_override parameter before any expensive work
+    override_parsed = _parse_feature_override(feature_override)
+
+    # Fetch current score
+    scores = get_latest_scores(wallet=wallet)
+    if not scores:
+        raise HTTPException(status_code=404, detail=f"No scores found for wallet {wallet}")
+    current_score = scores[0].score
+
+    # Get or fit the causal engine
+    engine = _get_or_fit_causal_engine()
+    if engine is None:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Causal model is not available. Either the database has fewer than "
+                "CAUSAL_MIN_SAMPLE_SIZE scored wallets, or DoWhy is not installed "
+                "(pip install dowhy==0.11.1), or the refutation gate was triggered. "
+                "Check server logs for details."
+            ),
+        )
+
+    # Fetch the ATE table (uses cache when available), tagged with provenance
+    # so genuine causal estimates can never be confused with correlational
+    # fallbacks under the same schema.
+    from detection.causal_engine import ESTIMATION_CAUSAL
+
+    detailed_ate = engine.feature_ate_table_detailed(use_cache=True)
+    ate_table = {feat: est.value for feat, est in detailed_ate.items()}
+    estimation_method = {feat: est.method for feat, est in detailed_ate.items()}
+    estimation_notes = {
+        feat: est.reason for feat, est in detailed_ate.items() if est.reason
+    }
+    causally_identified_features = [
+        feat for feat, est in detailed_ate.items() if est.method == ESTIMATION_CAUSAL
+    ]
+
+    # Refutation gate: if the model appears misspecified, refuse to serve ATEs.
+    # Coverage now spans every causally-identified feature (not just a single
+    # hardcoded treatment), and the threshold is a fraction of tests actually
+    # run — so rejection is mathematically reachable at any coverage size.
+    try:
+        refutation_results = (
+            engine.all_feature_refutation_tests(features=causally_identified_features)
+            if causally_identified_features
+            else {}
+        )
+        total_tests = sum(len(tests) for tests in refutation_results.values())
+        failing = sum(
+            1
+            for tests in refutation_results.values()
+            for pval in tests.values()
+            if pval < 0.05
+        )
+        if total_tests > 0 and (failing / total_tests) > _MAX_FAILING_REFUTATION_FRACTION:
+            failing_fraction = failing / total_tests
+            logger.error(
+                "Causal model refutation gate triggered: %d/%d refutation tests "
+                "(%.1f%%) have p < 0.05 across %d features (threshold: %.1f%%). "
+                "Refusing to serve ATE table.",
+                failing,
+                total_tests,
+                failing_fraction * 100,
+                len(refutation_results),
+                _MAX_FAILING_REFUTATION_FRACTION * 100,
+            )
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    f"Causal model appears misspecified: {failing}/{total_tests} "
+                    f"refutation tests ({failing_fraction:.0%}) returned p < 0.05 "
+                    f"across {len(refutation_results)} feature(s) "
+                    f"(threshold: {_MAX_FAILING_REFUTATION_FRACTION:.0%}). "
+                    "The causal graph may not fit the current data distribution. "
+                    "Please retrain or investigate model specification."
+                ),
+            )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        # Refutation failures are logged but don't block the response
+        logger.warning("Refutation tests raised an exception: %s", exc)
+
+    # Top-3 features by absolute ATE
+    sorted_features = sorted(ate_table.items(), key=lambda x: abs(x[1]), reverse=True)
+    top_causal_features = sorted_features[:3]
+
+    # Counterfactual score
+    counterfactual_score_value: Optional[float] = None
+    if override_parsed is not None:
+        feature_name, feature_value = override_parsed
+        wallet_features = get_feature_vector(wallet, scores[0].asset_pair)
+        if wallet_features is not None:
+            counterfactual_score_value = engine.counterfactual_score(
+                wallet_features=wallet_features,
+                overrides={feature_name: feature_value},
+            )
+        else:
+            # Fall back to score-based approximation
+            counterfactual_score_value = engine.counterfactual_score(
+                wallet_features={"risk_score": float(current_score)},
+                overrides={feature_name: feature_value},
+            )
+
+    # Determine sample size for coverage note
+    try:
+        from detection.storage import _connect
+        with _connect() as conn:
+            n_wallets = conn.execute("SELECT COUNT(*) FROM risk_scores").fetchone()[0]
+    except Exception:
+        n_wallets = 0
+
+    coverage_note = (
+        f"Based on {n_wallets} scored wallets; causal estimates may be noisy "
+        "when sample size is below 500 or when the wallet's feature profile is "
+        "unusual relative to the training distribution."
+    )
+
+    return CausalExplanationResponse(
+        wallet=wallet,
+        current_score=current_score,
+        feature_ate_table=ate_table,
+        top_causal_features=top_causal_features,
+        counterfactual_score=counterfactual_score_value,
+        coverage_note=coverage_note,
+        estimation_method=estimation_method,
+        estimation_notes=estimation_notes,
+        refutation_coverage=causally_identified_features,
+    )
+# Mount versioned router and register legacy 302 redirect aliases
+# ---------------------------------------------------------------------------
+
+app.include_router(v1_router)
+
+# Legacy bare paths → /v1/... 302 redirects for 90-day deprecation window.
+# The DeprecationMiddleware above adds Deprecation/Sunset headers to these responses.
+_LEGACY_REDIRECTS = [
+    "/health",
+    "/scores",
+    "/alerts",
+    "/assets/risk-ranking",
+    "/rings",
+    "/correlations",
+    "/path-payments/circular",
+    "/webhooks",
+    "/webhooks/dead-letters",
+    "/governance/proposals",
+]
+
+for _path in _LEGACY_REDIRECTS:
+    # Capture _path in default arg to avoid late-binding closure issue
+    def _make_redirect(p):
+        def _redirect(request: Request):
+            # Preserve query string
+            qs = request.url.query
+            target = f"/v1{p}" + (f"?{qs}" if qs else "")
+            response = RedirectResponse(url=target, status_code=302)
+            response.headers["Deprecation"] = "true"
+            response.headers["Sunset"] = "Sat, 01 Jan 2028 00:00:00 GMT"
+            response.headers["Link"] = f'</v1{p}>; rel="successor-version"'
+            return response
+        _redirect.__name__ = f"legacy_redirect_{p.replace('/', '_').strip('_')}"
+        return _redirect
+
+    app.get(_path, include_in_schema=False)(_make_redirect(_path))
+
+
+# Parameterised legacy redirects
+@app.get("/scores/{wallet}", include_in_schema=False)
+def legacy_scores_wallet(wallet: str, request: Request):
+    qs = request.url.query
+    target = f"/v1/scores/{wallet}" + (f"?{qs}" if qs else "")
+    return RedirectResponse(url=target, status_code=302)
+
+
+@app.get("/scores/{wallet}/explain", include_in_schema=False)
+def legacy_scores_explain(wallet: str, request: Request):
+    qs = request.url.query
+    target = f"/v1/scores/{wallet}/explain" + (f"?{qs}" if qs else "")
+    return RedirectResponse(url=target, status_code=302)
+
+
+@app.get("/scores/{wallet}/counterfactual", include_in_schema=False)
+def legacy_scores_counterfactual(wallet: str, request: Request):
+    qs = request.url.query
+    target = f"/v1/scores/{wallet}/counterfactual" + (f"?{qs}" if qs else "")
+    return RedirectResponse(url=target, status_code=302)
+
+
+@app.get("/wallets/{wallet}/cross-chain", include_in_schema=False)
+def legacy_wallets_cross_chain(wallet: str, request: Request):
+    qs = request.url.query
+    target = f"/v1/wallets/{wallet}/cross-chain" + (f"?{qs}" if qs else "")
+    return RedirectResponse(url=target, status_code=302)
+
+
+@app.get("/amm/pools/{pool_id}/risk", include_in_schema=False)
+def legacy_amm_pool_risk(pool_id: str, request: Request):
+    qs = request.url.query
+    target = f"/v1/amm/pools/{pool_id}/risk" + (f"?{qs}" if qs else "")
+    return RedirectResponse(url=target, status_code=302)
+
+
+@app.post("/feedback", include_in_schema=False)
+def legacy_feedback(request: Request):
+    return RedirectResponse(url="/v1/feedback", status_code=302)
+
+
+@app.post("/webhooks", include_in_schema=False)
+def legacy_webhooks_post(request: Request):
+    return RedirectResponse(url="/v1/webhooks", status_code=302)
+
+
+@app.delete("/webhooks/{subscriber_id}", include_in_schema=False)
+def legacy_delete_webhook(subscriber_id: str, request: Request):
+    return RedirectResponse(url=f"/v1/webhooks/{subscriber_id}", status_code=302)
+
+
+@app.get("/admin/drift-reports", include_in_schema=False)
+def legacy_admin_drift_reports(request: Request):
+    qs = request.url.query
+    target = "/v1/admin/drift-reports" + (f"?{qs}" if qs else "")
+    return RedirectResponse(url=target, status_code=302)
+
+
+@app.get("/admin/robustness-report", include_in_schema=False)
+def legacy_admin_robustness_report(request: Request):
+    return RedirectResponse(url="/v1/admin/robustness-report", status_code=302)
+
+
+@app.get("/admin/retrain-runs", include_in_schema=False)
+def legacy_admin_retrain_runs(request: Request):
+    qs = request.url.query
+    target = "/v1/admin/retrain-runs" + (f"?{qs}" if qs else "")
+    return RedirectResponse(url=target, status_code=302)
+
+
+@app.get("/admin/lineage/{dataset}", include_in_schema=False)
+def legacy_admin_lineage(dataset: str, request: Request):
+    return RedirectResponse(url=f"/v1/admin/lineage/{dataset}", status_code=302)
+
+
+@app.get("/admin/federated/audit-log", include_in_schema=False)
+def legacy_admin_federated_audit_log(request: Request):
+    qs = request.url.query
+    target = "/v1/admin/federated/audit-log" + (f"?{qs}" if qs else "")
+    return RedirectResponse(url=target, status_code=302)
+
+
+@app.post("/disputes", include_in_schema=False)
+def legacy_disputes_post(request: Request):
+    return RedirectResponse(url="/v1/disputes", status_code=302)
+
+
+@app.get("/disputes/{dispute_id}", include_in_schema=False)
+def legacy_dispute_get(dispute_id: str, request: Request):
+    return RedirectResponse(url=f"/v1/disputes/{dispute_id}", status_code=302)
+
+
+@app.post("/disputes/{dispute_id}/vote", include_in_schema=False)
+def legacy_dispute_vote(dispute_id: str, request: Request):
+    return RedirectResponse(url=f"/v1/disputes/{dispute_id}/vote", status_code=302)
+
+
+@app.get("/compliance/ivms/{wallet}", dependencies=[Depends(require_compliance_key)], include_in_schema=False)
+def root_compliance_ivms(wallet: str) -> dict:
+    from dataclasses import asdict
+    from detection.compliance_exporter import build_ivms_risk_field
+    validate_stellar_address(wallet)
+    return asdict(build_ivms_risk_field(wallet))
+
+
+@app.post("/compliance/sar-package", dependencies=[Depends(require_compliance_key)], include_in_schema=False)
+def root_compliance_sar_package(body: SARPackageRequest, dry_run: bool = Query(False)) -> FileResponse:
+    import os
+    import tempfile
+    from detection.compliance_exporter import (
+        ComplianceRateLimitExceeded,
+        ComplianceScoreTooLow,
+        export_sar_package,
+    )
+    from fastapi.responses import FileResponse as _FileResponse
+
+    output_dir = tempfile.mkdtemp(prefix="ledgerlens_sar_")
+    try:
+        pkg_path = export_sar_package(
+            wallet=body.wallet,
+            start_date=body.start_date,
+            end_date=body.end_date,
+            output_dir=output_dir,
+            dry_run=dry_run,
+        )
+    except ComplianceScoreTooLow as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except ComplianceRateLimitExceeded:
+        raise HTTPException(status_code=429, detail="Compliance export rate limit exceeded")
+
+    return _FileResponse(pkg_path, media_type="application/zip", filename=os.path.basename(pkg_path))
+
+
+@app.get("/compliance/audit-trail/{wallet}", dependencies=[Depends(require_compliance_key)], include_in_schema=False)
+def root_compliance_audit_trail(wallet: str) -> list[dict]:
+    from detection.compliance_exporter import get_audit_trail
+    validate_stellar_address(wallet)
+    return get_audit_trail(wallet)
+
+
+@app.post("/governance/proposals", include_in_schema=False)
+def legacy_governance_proposals_post(request: Request):
+    return RedirectResponse(url="/v1/governance/proposals", status_code=302)
+
+
+@app.post("/governance/proposals/{proposal_id}/vote", include_in_schema=False)
+def legacy_governance_proposal_vote(proposal_id: str, request: Request):
+    return RedirectResponse(url=f"/v1/governance/proposals/{proposal_id}/vote", status_code=302)
+
+# ---------------------------------------------------------------------------
+# GraphQL endpoint (Issue #337)
+# ---------------------------------------------------------------------------
+try:
+    from api.graphql_schema import schema
+    from strawberry.fastapi import GraphQLRouter as _GraphQLRouter
+    _graphql_app = _GraphQLRouter(schema, graphql_ide=None)
+    app.include_router(_graphql_app, prefix="/graphql")
+except ImportError:
+    import logging as _logging
+    _logging.getLogger("ledgerlens.api").warning(
+        "GraphQL endpoint disabled: 'strawberry-graphql' is not installed. "
+        "Install the 'graphql' extra to enable it: "
+        "pip install 'ledgerlens-core[graphql]'"
+    )

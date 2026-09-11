@@ -1,0 +1,10 @@
+# requirements/docs.in
+# ─────────────────────────────────────────────────────────────────────────────
+# MkDocs site-build surface.  Does NOT include base runtime — docs build only
+# needs the project installed (for mkdocstrings resolution) plus the docs tools.
+# Regenerate with: make lock
+# ─────────────────────────────────────────────────────────────────────────────
+
+-e ".[docs]"
+# Needed so mkdocstrings can resolve module docstrings
+-e .

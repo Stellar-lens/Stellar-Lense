@@ -1,0 +1,8 @@
+# requirements/test.in
+# ─────────────────────────────────────────────────────────────────────────────
+# Test-surface dependencies.  Includes base runtime + test extras.
+# Regenerate with: make lock
+# ─────────────────────────────────────────────────────────────────────────────
+
+-r base.in
+-e ".[test]"

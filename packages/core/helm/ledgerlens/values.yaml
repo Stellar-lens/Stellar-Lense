@@ -1,0 +1,257 @@
+# ── Global ───────────────────────────────────────────────────────────────────
+# Number of API server replicas (templates/api-deployment.yaml /
+# templates/api-rollout.yaml). Ignored once autoscaling.enabled is true, since
+# the HPA (templates/hpa.yaml) takes over replica count management.
+replicaCount: 2
+
+# Container image used by templates/api-deployment.yaml,
+# templates/api-rollout.yaml and templates/ingestion-worker-deployment.yaml.
+image:
+  repository: ledgerlens/core
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# Overrides for the release name used to derive resource names
+# (see the ledgerlens.fullname helper in templates/_helpers.tpl).
+nameOverride: ""
+fullnameOverride: ""
+
+# Deployment-traceability metadata (Grand 5 / #702, Required scope C).
+# Overridden per-deploy by cd.yml via `--set-string deployment.meta.*` with
+# the real commit SHA, pushed image digest, deploy timestamp, and the CD
+# workflow run ID — rendered as annotations on the Deployment/Rollout and
+# their pod template (see templates/_helpers.tpl's
+# `ledgerlens.deploymentMetaAnnotations`). Left as "unknown" here so a
+# `helm install`/`helm template` run outside the CD pipeline still produces
+# a valid, inspectable (if honestly unpopulated) annotation block rather
+# than omitting it — query with:
+#   helm get metadata ledgerlens
+#   kubectl get deployment ledgerlens-api -o jsonpath='{.metadata.annotations}'
+deployment:
+  meta:
+    commitSha: "unknown"
+    imageDigest: "unknown"
+    deployedAt: "unknown"
+    workflowRunId: "unknown"
+
+# ── Service ──────────────────────────────────────────────────────────────────
+# Consumed by templates/service.yaml, and referenced by
+# templates/ingress.yaml as the backend port for incoming traffic.
+service:
+  type: ClusterIP
+  port: 8000
+  targetPort: 8000
+
+# ── Ingress ──────────────────────────────────────────────────────────────────
+# Consumed by templates/ingress.yaml. Disabled by default; enable and set
+# hosts/tls to expose the API server outside the cluster.
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: ledgerlens.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+# ── API Server ───────────────────────────────────────────────────────────────
+# Consumed by templates/api-deployment.yaml and templates/api-rollout.yaml.
+api:
+  # Default requests/limits sized for typical single-tenant API load; raise
+  # for higher-throughput deployments or tighter latency SLAs.
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  # Probed against the API's own health endpoints; failureThreshold values
+  # tolerate brief blips before Kubernetes restarts/removes the pod.
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 8000
+    initialDelaySeconds: 10
+    periodSeconds: 15
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readinessProbe:
+    httpGet:
+      path: /health/ready
+      port: 8000
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 2
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# ── Canary rollout (Argo Rollouts) ──────────────────────────────────────────
+# Fixes three pre-existing bugs found while wiring deployment-traceability
+# annotations into templates/api-rollout.yaml for Grand 5 / #702:
+#   1. This `canary:` key did not exist in values.yaml at all — every field
+#      templates/api-rollout.yaml and templates/analysis-template.yaml
+#      reference (`.steps`, `.analysis.*`, `.prometheusUrl`) was undefined.
+#   2. api-rollout.yaml used invalid Go-template bracket indexing
+#      (`.Values.canary.steps[0]`) instead of the `index` function — a hard
+#      parse error that broke `helm template`/`install`/`upgrade` for the
+#      *entire* chart (Helm aborts on the first template parse failure), not
+#      only when canary.enabled was true.
+#   3. api-rollout.yaml had no `{{- if .Values.canary.enabled }}` guard,
+#      unlike its sibling api-deployment.yaml — both a Deployment and a
+#      Rollout would render unconditionally, contending for the same
+#      selector.
+# Net effect before this fix: cd.yml's `--set canary.enabled=true` (its
+# literal, unconditional setting on every deploy) meant no deploy via this
+# chart could have ever actually succeeded. See templates/api-rollout.yaml
+# and templates/_helpers.tpl for the corresponding template-side fixes.
+canary:
+  enabled: false
+  # Two-phase canary: 20% -> analysis -> 50% -> analysis -> 100%. The pause
+  # duration (5m) is deliberately >= the analysis metrics' own `interval`
+  # and PromQL rate-window (both 1m/5m in analysis-template.yaml) so a
+  # pause never ends before the metric it's meant to gate on has produced
+  # a meaningful sample.
+  steps:
+    - setWeight: 20
+    - pauseSeconds: 300
+    - setWeight: 50
+    - pauseSeconds: 300
+  analysis:
+    p95LatencyThresholdSeconds: 2
+    errorRateThreshold: 0.05
+  prometheusUrl: "http://prometheus-server.monitoring.svc.cluster.local"
+
+# ── Ingestion Worker ─────────────────────────────────────────────────────────
+# Consumed by templates/ingestion-worker-deployment.yaml. Runs the Horizon
+# trade-history ingestion/streaming process separately from the API server.
+ingestionWorker:
+  enabled: true
+  replicaCount: 1
+  # Lighter footprint than the API server since it only streams/writes data.
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  # TCP check on the worker's port rather than an HTTP health path, since the
+  # worker does not expose one.
+  livenessProbe:
+    tcpSocket:
+      port: 8000
+    initialDelaySeconds: 15
+    periodSeconds: 20
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+# ── Horizontal Pod Autoscaler ────────────────────────────────────────────────
+# Consumed by templates/hpa.yaml. Scales the API deployment between
+# minReplicas and maxReplicas based on CPU/memory utilization targets;
+# supersedes the static `replicaCount` above while enabled.
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# ── ConfigMap ────────────────────────────────────────────────────────────────
+config:
+  # Stellar Horizon
+  HORIZON_URL: "https://horizon.stellar.org"
+  HORIZON_STREAM_URL: "https://horizon.stellar.org"
+  NETWORK: "testnet"
+  # Polling / streaming
+  POLL_INTERVAL_SECONDS: "5"
+  TRADE_HISTORY_LOOKBACK_DAYS: "30"
+  CURSOR_PATH: "/data/horizon_cursor.txt"
+  # Detection engine
+  BENFORD_MAD_THRESHOLD: "0.015"
+  RISK_SCORE_THRESHOLD: "70"
+  # Feature store
+  REDIS_URL: "redis://redis:6379/0"
+  # Per-key rate-limit backend: "redis" is required for correct enforcement
+  # under this chart's default multi-replica topology (replicaCount below,
+  # autoscaling.maxReplicas) — see docs/waf_and_rate_limiting.md.
+  GATEWAY_QUOTA_STORE: "redis"
+  FEATURE_STORE_TTL_HOURS: "48"
+  FEATURE_STORE_FLUSH_INTERVAL_SECONDS: "300"
+  # Model artifacts
+  MODEL_DIR: "/data/models"
+  # Database
+  LEDGERLENS_DB_PATH: "/data/ledgerlens.db"
+  # Rate limiting
+  HORIZON_RATE_LIMIT: "50"
+  HORIZON_RATE_BUCKET_CAPACITY: "100"
+  STREAMER_QUEUE_MAXSIZE: "1000"
+  STREAMER_OVERFLOW_STRATEGY: "drop_oldest"
+  STREAMER_HIGH_WATER_RATIO: "0.8"
+  RATE_RESTORE_SECONDS: "60"
+
+# ── Secrets (set via --set or --values) ───────────────────────────────────────
+# Consumed by templates/secret.yaml, which base64-encodes and injects these
+# into a Secret only when set. Leave "" values unset on the CLI (--set) or in
+# a private values file — do not commit real secrets here.
+secrets:
+  LEDGERLENS_SERVICE_SECRET_KEY: ""
+  LEDGERLENS_MODEL_SIGNING_KEY: ""
+  LEDGERLENS_ADMIN_API_KEY: ""
+  LEDGERLENS_COMPLIANCE_API_KEY: ""
+  LEDGERLENS_WEBHOOK_ENCRYPTION_KEY: ""
+
+# ── Persistent Volume ────────────────────────────────────────────────────────
+# Consumed by templates/pvc.yaml. Backs the SQLite DB, cursor file and model
+# artifacts under /data (see config.LEDGERLENS_DB_PATH, config.CURSOR_PATH
+# and config.MODEL_DIR above).
+persistence:
+  enabled: false
+  storageClass: ""
+  accessMode: ReadWriteOnce
+  size: 10Gi
+  annotations: {}
+
+# ── PostgreSQL ───────────────────────────────────────────────────────────────
+postgresql:
+  enabled: true
+  auth:
+    username: ledgerlens
+    database: ledgerlens
+    # password should be set via --set postgresql.auth.password
+    password: ""
+  primary:
+    persistence:
+      enabled: true
+      size: 20Gi
+
+# ── ServiceAccount ───────────────────────────────────────────────────────────
+# Consumed by templates/serviceaccount.yaml.
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# ── Cost and Capacity Configuration ──────────────────────────────────────────
+# Consumed by templates/cost-config.yaml, which renders these into a
+# ConfigMap used for cost/capacity reporting. Defaults approximate general
+# public-cloud on-demand pricing — override with your actual cloud pricing.
+costConfig:
+  enabled: true
+  # Cost per vCPU-hour in USD (adjust to your actual cloud pricing)
+  costPerVcpuHourUsd: "0.0416"
+  # Cost per GB memory-hour in USD
+  costPerGbMemoryHourUsd: "0.0056"
+  # Cost per GB storage per month in USD
+  costPerGbStorageMonthUsd: "0.10"
+  # Days of historical data for capacity projection
+  capacityProjectionWindowDays: "7"
+  # Lead time for capacity alerts (days)
+  capacityProjectionLeadTimeDays: "14"

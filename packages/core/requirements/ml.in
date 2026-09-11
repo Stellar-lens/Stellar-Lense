@@ -1,0 +1,9 @@
+# requirements/ml.in
+# ─────────────────────────────────────────────────────────────────────────────
+# Heavy ML surface: MLflow experiment tracking, DP accounting, PyTorch,
+# PyG (GNN).  Install this extra when training the temporal/GNN models.
+# Regenerate with: make lock
+# ─────────────────────────────────────────────────────────────────────────────
+
+-r base.in
+-e ".[ml]"

@@ -1,0 +1,10 @@
+[workspace]
+members = [
+    "contracts/oracle_aggregator",
+    "contracts/zk_verifier",
+    "crates/ledgerlens-sdk",
+]
+resolver = "2"
+
+[workspace.dependencies]
+soroban-sdk = "21.0"
