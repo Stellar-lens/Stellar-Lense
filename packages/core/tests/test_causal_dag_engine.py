@@ -170,7 +170,7 @@ def test_causal_engine_fit_warns_on_small_sample(caplog):
     import logging
     df = _make_synthetic_df(n=100)
     engine = CausalEngine(min_sample_size=500)
-    with caplog.at_level(logging.WARNING, logger="ledgerlens.causal_engine"):
+    with caplog.at_level(logging.WARNING, logger="stellar_lense.causal_engine"):
         engine.fit(df)
     assert any("100 rows" in r.message for r in caplog.records)
 

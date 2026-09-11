@@ -13,7 +13,7 @@ def test_threat_model_file_references():
         content = f.read()
         
     # Extract markdown links with file:/// scheme
-    # e.g., [text](file:///c:/Users/HP/Ledgerlens-core/path/to/file#L10)
+    # e.g., [text](file:///c:/Users/HP/StellarLense-core/path/to/file#L10)
     file_links = re.findall(r"file:///([^\)\s#]+)", content)
     
     # Extract backtick references that look like files (contain a slash or file extension)
@@ -28,10 +28,10 @@ def test_threat_model_file_references():
     # Process file:/// links
     for link in file_links:
         link_path = link.replace("\\", "/")
-        if "Ledgerlens-core/" in link_path:
-            rel_path = link_path.split("Ledgerlens-core/")[-1]
-        elif "ledgerlens-core/" in link_path:
-            rel_path = link_path.split("ledgerlens-core/")[-1]
+        if "StellarLense-core/" in link_path:
+            rel_path = link_path.split("StellarLense-core/")[-1]
+        elif "stellar-lense-core/" in link_path:
+            rel_path = link_path.split("stellar-lense-core/")[-1]
         elif ":" in link_path:
             p = pathlib.Path(link_path)
             try:

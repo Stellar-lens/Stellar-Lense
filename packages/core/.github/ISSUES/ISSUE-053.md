@@ -201,7 +201,7 @@ jobs:
       - name: Notify on failure
         if: failure()
         run: |
-          curl -s -X POST "${{ secrets.LEDGERLENS_WEBHOOK_URL }}" \
+          curl -s -X POST "${{ secrets.STELLARLENSE_WEBHOOK_URL }}" \
             -H "Content-Type: application/json" \
             -d '{"event": "red_team_failure", "repo": "${{ github.repository }}"}'
 ```
@@ -232,7 +232,7 @@ RED_TEAM_RANDOM_SEED=42
 ## Security Considerations
 
 - **Report confidentiality**: `CampaignReport` JSON files contain model evasion rates and attack effectiveness. Do not commit these to the repository. Add `red_team_reports/` to `.gitignore`
-- **CI secret isolation**: the `LEDGERLENS_WEBHOOK_URL` in the CI workflow is a GitHub secret. Ensure it is not echoed in workflow logs (`echo $SECRET` must never appear)
+- **CI secret isolation**: the `STELLARLENSE_WEBHOOK_URL` in the CI workflow is a GitHub secret. Ensure it is not echoed in workflow logs (`echo $SECRET` must never appear)
 - **Attack reproducibility vs operational security**: `random_seed=42` makes campaigns reproducible for debugging but means a public adversary who knows the seed can exactly replicate the attack. Document that the seed should be rotated quarterly and is not a security parameter
 - **Attack params exposure**: attack parameters are logged in `CampaignReport`. Avoid logging parameters that reveal internal thresholds (e.g., the exact `min_cycle_volume` used in graph_engine). Log parameter names but mask values above a configurable sensitivity level
 - **Model version pinning**: the red-team campaign must always run against the model version returned by `models/random_forest_latest.txt`. Never hardcode a version string — this prevents comparing against a stale model

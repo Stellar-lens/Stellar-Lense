@@ -22,7 +22,7 @@ import pandas as pd
 from detection.sandwich_engine import detect_sandwich_candidates
 from ingestion.data_models import TradeType
 
-logger = logging.getLogger("ledgerlens.amm_engine")
+logger = logging.getLogger("stellar_lense.amm_engine")
 
 _POOL_ID_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 MAX_SESSIONS_PER_WALLET = 1000

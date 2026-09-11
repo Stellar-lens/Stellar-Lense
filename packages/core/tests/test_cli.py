@@ -108,7 +108,7 @@ def test_reweight_dry_run_prints_table_does_not_write(tmp_path, monkeypatch):
     db_path = str(tmp_path / "test.db")
     model_dir = str(tmp_path / "models")
     os.makedirs(model_dir, exist_ok=True)
-    monkeypatch.setenv("LEDGERLENS_DB_PATH", db_path)
+    monkeypatch.setenv("STELLARLENSE_DB_PATH", db_path)
     monkeypatch.setenv("MODEL_DIR", model_dir)
     object.__setattr__(settings_module.settings, "db_path", db_path)
     object.__setattr__(settings_module.settings, "model_dir", model_dir)
@@ -165,7 +165,7 @@ class TestSignModelsCommand:
         self._make_unsigned_model(os.path.join(model_dir, "random_forest.joblib"))
         object.__setattr__(settings_module.settings, "model_dir", model_dir)
         object.__setattr__(settings_module.settings, "model_signing_key", "")
-        monkeypatch.delenv("LEDGERLENS_MODEL_SIGNING_KEY", raising=False)
+        monkeypatch.delenv("STELLARLENSE_MODEL_SIGNING_KEY", raising=False)
 
         result = runner.invoke(app, ["sign-models", "--model-dir", model_dir])
 

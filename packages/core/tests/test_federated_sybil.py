@@ -380,20 +380,20 @@ def test_http_admit_requires_admin_key(tmp_path):
     )
     assert resp_unconfigured.status_code == 503
 
-    original = cfg.ledgerlens_admin_api_key
-    object.__setattr__(cfg, "ledgerlens_admin_api_key", "test-admin-key")
+    original = cfg.stellarlense_admin_api_key
+    object.__setattr__(cfg, "stellarlense_admin_api_key", "test-admin-key")
     try:
         resp_wrong = client.post(
             "/federated/admit",
             json={"participant_id": "op-x", "max_n_samples": 1000},
-            headers={"X-LedgerLens-Admin-Key": "wrong-key"},
+            headers={"X-StellarLense-Admin-Key": "wrong-key"},
         )
         assert resp_wrong.status_code == 403
 
         resp_ok = client.post(
             "/federated/admit",
             json={"participant_id": "op-x", "max_n_samples": 1000},
-            headers={"X-LedgerLens-Admin-Key": "test-admin-key"},
+            headers={"X-StellarLense-Admin-Key": "test-admin-key"},
         )
         assert resp_ok.status_code == 200
         assert resp_ok.json() == {
@@ -402,4 +402,4 @@ def test_http_admit_requires_admin_key(tmp_path):
             "max_n_samples": 1000,
         }
     finally:
-        object.__setattr__(cfg, "ledgerlens_admin_api_key", original)
+        object.__setattr__(cfg, "stellarlense_admin_api_key", original)

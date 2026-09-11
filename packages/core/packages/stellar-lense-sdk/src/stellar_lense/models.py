@@ -1,10 +1,10 @@
-"""Typed Pydantic v2 models for LedgerLens API requests and responses.
+"""Typed Pydantic v2 models for StellarLense API requests and responses.
 
 These intentionally mirror (but do not import from) `detection.risk_score`
-and the response shapes in `api/main.py` in the main `ledgerlens-core`
+and the response shapes in `api/main.py` in the main `stellar-lense-core`
 repo -- this package is published standalone and must not depend on the
 core detection engine. Keep the two in sync; see the main repo README's
-"LedgerLens Organization" section for the cross-repo data contract.
+"StellarLense Organization" section for the cross-repo data contract.
 """
 
 from __future__ import annotations

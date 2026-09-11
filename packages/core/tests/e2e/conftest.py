@@ -1,4 +1,4 @@
-"""Fixtures for the LedgerLens E2E test suite.
+"""Fixtures for the StellarLense E2E test suite.
 
 Uses file-based SQLite (no external services required). Provides a fully
 initialised FastAPI TestClient, trained models written to a temp directory,
@@ -33,7 +33,7 @@ import pytest
 @pytest.fixture(scope="session")
 def e2e_tmpdir():
     """Session-scoped temporary directory for all E2E artefacts."""
-    d = tempfile.mkdtemp(prefix="ledgerlens_e2e_")
+    d = tempfile.mkdtemp(prefix="stellar_lense_e2e_")
     yield d
     shutil.rmtree(d, ignore_errors=True)
 
@@ -65,12 +65,12 @@ def e2e_settings(e2e_db_path, e2e_model_dir):
     import config.settings as settings_module
 
     env_overrides = {
-        "LEDGERLENS_DB_PATH": e2e_db_path,
+        "STELLARLENSE_DB_PATH": e2e_db_path,
         "MODEL_DIR": e2e_model_dir,
         "HORIZON_URL": "https://horizon-testnet.stellar.org",
         "HORIZON_STREAM_URL": "https://horizon-testnet.stellar.org",
-        "LEDGERLENS_MODEL_SIGNING_KEY": "e2e-test-signing-key",
-        "LEDGERLENS_ADMIN_API_KEY": "e2e-admin-key",
+        "STELLARLENSE_MODEL_SIGNING_KEY": "e2e-test-signing-key",
+        "STELLARLENSE_ADMIN_API_KEY": "e2e-admin-key",
     }
     with patch.dict(os.environ, env_overrides):
         # Force the settings singleton to reflect the patched DB path so that
@@ -87,7 +87,7 @@ def e2e_settings(e2e_db_path, e2e_model_dir):
         "db_path",
         settings_module.settings.model_fields["db_path"].default
         if "db_path" in settings_module.settings.model_fields
-        else "ledgerlens.db",
+        else "stellar_lense.db",
     )
 
 
@@ -170,17 +170,17 @@ def e2e_client(e2e_db_initialized, e2e_trained_models, e2e_model_dir, e2e_db_pat
     """Provide a FastAPI TestClient wired to the E2E stack.
 
     The ``headers`` attribute on the returned client is pre-populated with the
-    ``X-LedgerLens-Api-Key`` header so callers that need scoped endpoints can
+    ``X-StellarLense-Api-Key`` header so callers that need scoped endpoints can
     pass ``client.headers`` directly.
     """
     from unittest.mock import patch
     from fastapi.testclient import TestClient
 
     env = {
-        "LEDGERLENS_DB_PATH": e2e_db_path,
+        "STELLARLENSE_DB_PATH": e2e_db_path,
         "MODEL_DIR": e2e_model_dir,
-        "LEDGERLENS_MODEL_SIGNING_KEY": "e2e-test-signing-key",
-        "LEDGERLENS_ADMIN_API_KEY": "e2e-admin-key",
+        "STELLARLENSE_MODEL_SIGNING_KEY": "e2e-test-signing-key",
+        "STELLARLENSE_ADMIN_API_KEY": "e2e-admin-key",
     }
     with patch.dict(os.environ, env):
         from api.main import app
@@ -190,6 +190,6 @@ def e2e_client(e2e_db_initialized, e2e_trained_models, e2e_model_dir, e2e_db_pat
             # to scoped endpoints without re-importing the key store.
             client.headers = {
                 **client.headers,
-                "X-LedgerLens-Api-Key": e2e_api_key,
+                "X-StellarLense-Api-Key": e2e_api_key,
             }
             yield client

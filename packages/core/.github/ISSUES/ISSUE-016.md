@@ -5,16 +5,16 @@ assignees: []
 ---
 
 ## Summary
-`ingestion/historical_loader.py` ingests raw trade data into SQLite but provides no mechanism to export that data to the `ledgerlens-data` repository in a format suitable for long-term storage, versioned dataset management, and ML training. Implementing incremental Parquet snapshot exports — partitioned by date and asset pair, with delta detection and a checksum manifest — will enable `ledgerlens-core` to populate `ledgerlens-data` with auditable, reproducible training datasets that other tools can consume without a running SQLite instance.
+`ingestion/historical_loader.py` ingests raw trade data into SQLite but provides no mechanism to export that data to the `stellar-lense-data` repository in a format suitable for long-term storage, versioned dataset management, and ML training. Implementing incremental Parquet snapshot exports — partitioned by date and asset pair, with delta detection and a checksum manifest — will enable `stellar-lense-core` to populate `stellar-lense-data` with auditable, reproducible training datasets that other tools can consume without a running SQLite instance.
 
 ## Background & Context
-The README describes `ledgerlens-data` as the canonical storage for raw and processed trade data and labelled training datasets. `ledgerlens-core`'s `ingestion/historical_loader.py` reads from (or writes new snapshots to) this repo. Currently, the integration between the SQLite store in `core` and the dataset files in `ledgerlens-data` is listed as an "Open Integration Point (not yet implemented)".
+The README describes `stellar-lense-data` as the canonical storage for raw and processed trade data and labelled training datasets. `stellar-lense-core`'s `ingestion/historical_loader.py` reads from (or writes new snapshots to) this repo. Currently, the integration between the SQLite store in `core` and the dataset files in `stellar-lense-data` is listed as an "Open Integration Point (not yet implemented)".
 
 Parquet is the standard columnar storage format for ML training data: it supports efficient predicate pushdown, column pruning, and compression, and is natively supported by Pandas, PyArrow, and HuggingFace Datasets. Partitioning by `(date, asset_pair)` allows incremental exports — only changed partitions need to be re-exported after each pipeline run.
 
-The export must produce a checksum manifest (`manifest.json`) that records the SHA-256 hash of each Parquet file. This allows `ledgerlens-data` to detect corruption and allows `ledgerlens-core`'s training pipeline to verify dataset integrity before training.
+The export must produce a checksum manifest (`manifest.json`) that records the SHA-256 hash of each Parquet file. This allows `stellar-lense-data` to detect corruption and allows `stellar-lense-core`'s training pipeline to verify dataset integrity before training.
 
-The `detection/model_training.py` pipeline should be updated to optionally load training data from Parquet (exported by this feature) instead of re-generating synthetic data, enabling training on real historical data once `ledgerlens-data` is populated.
+The `detection/model_training.py` pipeline should be updated to optionally load training data from Parquet (exported by this feature) instead of re-generating synthetic data, enabling training on real historical data once `stellar-lense-data` is populated.
 
 ## Objectives
 - [ ] Implement `ParquetExporter` in `ingestion/historical_loader.py` (or a new `ingestion/parquet_exporter.py` module) that exports `Trade` records from SQLite to Parquet files partitioned by `(year, month, day, asset_pair)`.
@@ -38,7 +38,7 @@ The `detection/model_training.py` pipeline should be updated to optionally load 
 │   │   │   │       └── trades_20260601_XLM_BTC.parquet
 ```
 
-**Parquet schema** — the Parquet schema must match `Trade` model field names exactly to maintain the shared contract with `ledgerlens-data`:
+**Parquet schema** — the Parquet schema must match `Trade` model field names exactly to maintain the shared contract with `stellar-lense-data`:
 ```python
 PARQUET_SCHEMA = pa.schema([
     pa.field("id", pa.string()),
@@ -180,7 +180,7 @@ class ExportResult:
 
 ## Documentation Requirements
 - Update `README.md` CLI Reference with `python cli.py export-parquet` flags
-- Update the LedgerLens Organization > Data Flow section to describe how `export-parquet` populates `ledgerlens-data`
+- Update the Stellar Lense Organization > Data Flow section to describe how `export-parquet` populates `stellar-lense-data`
 - Add docstrings to `ParquetExporter`, `_export_partition`, `_is_partition_changed`, and `_write_manifest`
 - Create or update `docs/data-export.md` documenting the Parquet schema, partition structure, manifest format, and how to verify dataset integrity using the SHA-256 hashes
 

@@ -146,11 +146,11 @@ class TestScorePublisher:
 
         # Verify publish was called for wallet-specific channel
         wallet_channel_call = any(
-            str(call).find(f"ledgerlens:score:{event.wallet}") != -1
+            str(call).find(f"stellar_lense:score:{event.wallet}") != -1
             for call in mock_pipe.publish.call_args_list
         )
         wildcard_call = any(
-            str(call).find("ledgerlens:score:*") != -1
+            str(call).find("stellar_lense:score:*") != -1
             for call in mock_pipe.publish.call_args_list
         )
         assert wallet_channel_call, (

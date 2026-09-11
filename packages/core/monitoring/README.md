@@ -1,6 +1,6 @@
-# LedgerLens Monitoring
+# Stellar Lense Monitoring
 
-This directory contains Prometheus alerting and recording rules, plus Grafana dashboards for LedgerLens observability.
+This directory contains Prometheus alerting and recording rules, plus Grafana dashboards for Stellar Lense observability.
 
 ## Contents
 
@@ -25,8 +25,8 @@ These rules join Kubernetes resource metrics (kube-state-metrics, cadvisor) with
 ### Grafana Dashboards
 
 - **grafana/cost_capacity_dashboard.json** — Cost visibility and capacity planning dashboard
-- **grafana/core_detection_dashboard.json** — Core detection throughput, API request latency (p50/p95/p99), and Horizon ingestion throughput. Panels are built on the metrics already referenced by `alerts.yml` and `recording_rules.yml` (`ledgerlens_api_request_duration_seconds`, `ledgerlens_scoring_latency_seconds`, `ledgerlens_wallets_scored_total`, `ledgerlens_pipeline_run_duration_seconds`, `ledgerlens_ingestion_events_*`). Auto-loads at `/d/ledgerlens-core-detection`.
-- **grafana/provisioning/dashboards/ledgerlens.yaml** — Dashboard provisioning config
+- **grafana/core_detection_dashboard.json** — Core detection throughput, API request latency (p50/p95/p99), and Horizon ingestion throughput. Panels are built on the metrics already referenced by `alerts.yml` and `recording_rules.yml` (`stellar_lense_api_request_duration_seconds`, `stellar_lense_scoring_latency_seconds`, `stellar_lense_wallets_scored_total`, `stellar_lense_pipeline_run_duration_seconds`, `stellar_lense_ingestion_events_*`). Auto-loads at `/d/stellar-lense-core-detection`.
+- **grafana/provisioning/dashboards/stellar_lense.yaml** — Dashboard provisioning config
 
 ## Quick Start
 
@@ -50,7 +50,7 @@ curl -X POST http://localhost:9090/-/reload
 Verify rules are loaded:
 
 ```bash
-curl -s http://localhost:9090/api/v1/rules | jq '.data.groups[] | select(.name == "ledgerlens_cost")'
+curl -s http://localhost:9090/api/v1/rules | jq '.data.groups[] | select(.name == "stellar_lense_cost")'
 ```
 
 ### 2. Configure Cost Coefficients
@@ -65,7 +65,7 @@ COST_PER_GB_STORAGE_MONTH_USD=0.10
 ```
 
 ```yaml
-# helm/ledgerlens/values.yaml
+# helm/stellar_lense/values.yaml
 costConfig:
   enabled: true
   costPerVcpuHourUsd: "0.0416"
@@ -87,19 +87,19 @@ Cost coefficients are exposed as Prometheus gauges at `GET /metrics` and referen
 
 ```bash
 # On Grafana server
-sudo mkdir -p /var/lib/grafana/dashboards/ledgerlens
-sudo cp grafana/cost_capacity_dashboard.json /var/lib/grafana/dashboards/ledgerlens/
-sudo cp grafana/core_detection_dashboard.json /var/lib/grafana/dashboards/ledgerlens/
-sudo cp grafana/provisioning/dashboards/ledgerlens.yaml /etc/grafana/provisioning/dashboards/
+sudo mkdir -p /var/lib/grafana/dashboards/stellar_lense
+sudo cp grafana/cost_capacity_dashboard.json /var/lib/grafana/dashboards/stellar_lense/
+sudo cp grafana/core_detection_dashboard.json /var/lib/grafana/dashboards/stellar_lense/
+sudo cp grafana/provisioning/dashboards/stellar_lense.yaml /etc/grafana/provisioning/dashboards/
 sudo systemctl restart grafana-server
 ```
 
 The provisioning provider loads every `*.json` file in
-`/var/lib/grafana/dashboards/ledgerlens`, so no config change is needed when
+`/var/lib/grafana/dashboards/stellar_lense`, so no config change is needed when
 adding a dashboard — just drop the JSON in that directory.
 
-Dashboards auto-load at `/d/ledgerlens-cost-capacity` and
-`/d/ledgerlens-core-detection`.
+Dashboards auto-load at `/d/stellar-lense-cost-capacity` and
+`/d/stellar-lense-core-detection`.
 
 ## Validation
 
@@ -129,9 +129,9 @@ CI automatically validates rules on every PR (see `.github/workflows/cost-monito
 ### CapacityLimitApproaching
 
 **Severity:** Warning  
-**Condition:** `ledgerlens:replica_count_projected_days_to_max < 14 OR ledgerlens:pvc_projected_days_to_full < 14` for 1 hour
+**Condition:** `stellar_lense:replica_count_projected_days_to_max < 14 OR stellar_lense:pvc_projected_days_to_full < 14` for 1 hour
 
-**What it means:** At current growth trends, LedgerLens will hit `autoscaling.maxReplicas` or fill the PVC within 14 days.
+**What it means:** At current growth trends, Stellar Lense will hit `autoscaling.maxReplicas` or fill the PVC within 14 days.
 
 **Runbook:**
 1. Open the cost & capacity dashboard
@@ -145,11 +145,11 @@ See [docs/cost_and_capacity.md](../docs/cost_and_capacity.md) for the full runbo
 ### SorobanCircuitBreakerOpen
 
 **Severity:** Critical  
-**Condition:** `increase(ledgerlens_circuit_breaker_open_total[5m]) > 0`
+**Condition:** `increase(stellar_lense_circuit_breaker_open_total[5m]) > 0`
 
 Circuit breaker tripped due to consecutive Soroban submission failures. Check:
 - `SOROBAN_RPC_URL` connectivity
-- `LEDGERLENS_SERVICE_SECRET_KEY` is correct
+- `STELLARLENSE_SERVICE_SECRET_KEY` is correct
 - Contract authorization for the service account
 
 Circuit auto-resets after `SOROBAN_CIRCUIT_RESET_SECONDS` (default 300s).
@@ -157,25 +157,25 @@ Circuit auto-resets after `SOROBAN_CIRCUIT_RESET_SECONDS` (default 300s).
 ### WebhookDeadLetterBacklog
 
 **Severity:** Warning  
-**Condition:** `increase(ledgerlens_webhook_deliveries_total{result="dead_lettered"}[1h]) > 10`
+**Condition:** `increase(stellar_lense_webhook_deliveries_total{result="dead_lettered"}[1h]) > 10`
 
 More than 10 webhook deliveries permanently failed in the last hour. Check:
 - Subscriber URLs are reachable
-- `LEDGERLENS_WEBHOOK_ENCRYPTION_KEY` is set
+- `STELLARLENSE_WEBHOOK_ENCRYPTION_KEY` is set
 
 Dead-letter items require manual intervention (view with `GET /webhooks/dead-letters`).
 
 ### FeatureDriftDetected
 
 **Severity:** Warning  
-**Condition:** `increase(ledgerlens_drift_detected_total[24h]) > 0`
+**Condition:** `increase(stellar_lense_drift_detected_total[24h]) > 0`
 
 Feature distribution drift detected. Run `python cli.py retrain-check` to view PSI report. If PSI > 0.25, consider retraining.
 
 ### ScoringLatencyHigh
 
 **Severity:** Warning  
-**Condition:** `histogram_quantile(0.95, rate(ledgerlens_scoring_latency_seconds_bucket[10m])) > 2.0` for 5 minutes
+**Condition:** `histogram_quantile(0.95, rate(stellar_lense_scoring_latency_seconds_bucket[10m])) > 2.0` for 5 minutes
 
 p95 wallet scoring latency exceeds 2 seconds. Check:
 - Horizon API latency
@@ -185,12 +185,12 @@ p95 wallet scoring latency exceeds 2 seconds. Check:
 ### PipelineStalled
 
 **Severity:** Critical  
-**Condition:** `(time() - ledgerlens_pipeline_run_duration_seconds_created) > 300`
+**Condition:** `(time() - stellar_lense_pipeline_run_duration_seconds_created) > 300`
 
 Pipeline has not completed a run in over 5 minutes. Check:
 - `python run_pipeline.py` is running
 - No exceptions in logs
-- `LEDGERLENS_DB_PATH` is writable
+- `STELLARLENSE_DB_PATH` is writable
 
 ## Recording Rule Reference
 
@@ -198,19 +198,19 @@ Pipeline has not completed a run in over 5 minutes. Check:
 
 | Metric | Description | Unit |
 |--------|-------------|------|
-| `ledgerlens:pod_cost_per_hour:usd` | Per-pod cost (CPU + memory) | USD/hour |
-| `ledgerlens:namespace_cost_per_hour:usd` | Total namespace cost | USD/hour |
-| `ledgerlens:cost_per_wallet_scored:usd` | Unit cost per wallet scored | USD |
-| `ledgerlens:storage_cost_per_hour:usd` | PVC cost (provisioned size) | USD/hour |
+| `stellar_lense:pod_cost_per_hour:usd` | Per-pod cost (CPU + memory) | USD/hour |
+| `stellar_lense:namespace_cost_per_hour:usd` | Total namespace cost | USD/hour |
+| `stellar_lense:cost_per_wallet_scored:usd` | Unit cost per wallet scored | USD |
+| `stellar_lense:storage_cost_per_hour:usd` | PVC cost (provisioned size) | USD/hour |
 
 ### Capacity Projection Metrics
 
 | Metric | Description | Unit |
 |--------|-------------|------|
-| `ledgerlens:replica_count_projected_days_to_max` | Days until maxReplicas | days |
-| `ledgerlens:pvc_projected_days_to_full` | Days until PVC full | days |
-| `ledgerlens:wallets_scored_per_hour` | Current scoring rate | wallets/hour |
-| `ledgerlens:wallets_scored_per_hour:predicted_7d` | Projected scoring rate (7d forward) | wallets/hour |
+| `stellar_lense:replica_count_projected_days_to_max` | Days until maxReplicas | days |
+| `stellar_lense:pvc_projected_days_to_full` | Days until PVC full | days |
+| `stellar_lense:wallets_scored_per_hour` | Current scoring rate | wallets/hour |
+| `stellar_lense:wallets_scored_per_hour:predicted_7d` | Projected scoring rate (7d forward) | wallets/hour |
 
 ## Prerequisites
 
@@ -234,22 +234,22 @@ Verify metrics are scraped:
 curl -s http://localhost:9090/api/v1/targets | jq '.data.activeTargets[] | select(.labels.job == "kube-state-metrics")'
 ```
 
-### LedgerLens Metrics
+### Stellar Lense Metrics
 
-Ensure Prometheus scrapes the LedgerLens `/metrics` endpoint:
+Ensure Prometheus scrapes the Stellar Lense `/metrics` endpoint:
 
 ```yaml
 # prometheus.yml
 scrape_configs:
-  - job_name: 'ledgerlens'
+  - job_name: 'stellar_lense'
     kubernetes_sd_configs:
       - role: pod
         namespaces:
-          names: ['ledgerlens']
+          names: ['stellar_lense']
     relabel_configs:
       - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
         action: keep
-        regex: ledgerlens
+        regex: stellar_lense
       - source_labels: [__meta_kubernetes_pod_container_port_name]
         action: keep
         regex: http
@@ -279,14 +279,14 @@ scrape_configs:
 
 1. Verify cost gauges are exposed:
    ```bash
-   curl http://localhost:8000/metrics | grep ledgerlens_cost_per
+   curl http://localhost:8000/metrics | grep stellar_lense_cost_per
    ```
 
 2. Check `init_cost_metrics()` is called at startup (search logs for "Cost metrics initialized")
 
 3. Verify kube-state-metrics are scraped:
    ```promql
-   container_cpu_usage_seconds_total{namespace="ledgerlens"}
+   container_cpu_usage_seconds_total{namespace="stellar_lense"}
    ```
 
 ### Capacity projection is NaN or +Inf
@@ -299,7 +299,7 @@ scrape_configs:
 
 1. Verify Prometheus datasource is configured
 2. Check recording rules are loaded (Prometheus → Status → Rules)
-3. Verify `namespace="ledgerlens"` label matches your deployment
+3. Verify `namespace="stellar_lense"` label matches your deployment
 
 ## Documentation
 

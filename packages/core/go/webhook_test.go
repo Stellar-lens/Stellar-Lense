@@ -1,4 +1,4 @@
-package ledgerlens_test
+package stellar_lense_test
 
 import (
 	"crypto/hmac"
@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	ledgerlens "github.com/Ledger-Lenz/Ledgerlens-core/go"
+	stellar_lense "github.com/Stellar-lens/Stellar-Lense/go"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -41,13 +41,13 @@ func expectedSignature() string {
 
 func TestVerifyWebhookSignature_ValidSignature(t *testing.T) {
 	sig := expectedSignature()
-	ok := ledgerlens.VerifyWebhookSignature([]byte(knownBody), knownSecret, sig)
+	ok := stellar_lense.VerifyWebhookSignature([]byte(knownBody), knownSecret, sig)
 	assert.True(t, ok, "valid signature should pass verification")
 }
 
 func TestVerifyWebhookSignature_WrongSecret(t *testing.T) {
 	sig := expectedSignature()
-	ok := ledgerlens.VerifyWebhookSignature([]byte(knownBody), "wrong_secret", sig)
+	ok := stellar_lense.VerifyWebhookSignature([]byte(knownBody), "wrong_secret", sig)
 	assert.False(t, ok, "wrong secret should fail verification")
 }
 
@@ -55,7 +55,7 @@ func TestVerifyWebhookSignature_TamperedBodyOneByte(t *testing.T) {
 	sig := expectedSignature()
 	tampered := []byte(knownBody)
 	tampered[0] ^= 0x01 // flip one bit
-	ok := ledgerlens.VerifyWebhookSignature(tampered, knownSecret, sig)
+	ok := stellar_lense.VerifyWebhookSignature(tampered, knownSecret, sig)
 	assert.False(t, ok, "tampered body should fail verification")
 }
 
@@ -64,12 +64,12 @@ func TestVerifyWebhookSignature_WrongPrefix(t *testing.T) {
 	mac.Write([]byte(knownBody))
 	digest := hex.EncodeToString(mac.Sum(nil))
 	// Use a non-standard prefix — the function should reject it.
-	ok := ledgerlens.VerifyWebhookSignature([]byte(knownBody), knownSecret, "hmac="+digest)
+	ok := stellar_lense.VerifyWebhookSignature([]byte(knownBody), knownSecret, "hmac="+digest)
 	assert.False(t, ok, "wrong prefix should fail verification")
 }
 
 func TestVerifyWebhookSignature_EmptySignature(t *testing.T) {
-	ok := ledgerlens.VerifyWebhookSignature([]byte(knownBody), knownSecret, "")
+	ok := stellar_lense.VerifyWebhookSignature([]byte(knownBody), knownSecret, "")
 	assert.False(t, ok, "empty signature should fail verification")
 }
 
@@ -77,7 +77,7 @@ func TestVerifyWebhookSignature_EmptyBody(t *testing.T) {
 	mac := hmac.New(sha256.New, []byte(knownSecret))
 	mac.Write([]byte{})
 	sig := "sha256=" + hex.EncodeToString(mac.Sum(nil))
-	ok := ledgerlens.VerifyWebhookSignature([]byte{}, knownSecret, sig)
+	ok := stellar_lense.VerifyWebhookSignature([]byte{}, knownSecret, sig)
 	assert.True(t, ok, "empty body with correct HMAC should pass")
 }
 
@@ -90,7 +90,7 @@ func TestVerifyWebhookSignature_CrossCheckPythonScheme(t *testing.T) {
 	mac.Write([]byte(knownBody))
 	directSig := "sha256=" + hex.EncodeToString(mac.Sum(nil))
 
-	ok := ledgerlens.VerifyWebhookSignature([]byte(knownBody), knownSecret, directSig)
+	ok := stellar_lense.VerifyWebhookSignature([]byte(knownBody), knownSecret, directSig)
 	assert.True(t, ok, "cross-check with direct HMAC computation should pass")
 }
 
@@ -101,24 +101,24 @@ func TestVerifyWebhookSignature_CrossCheckPythonScheme(t *testing.T) {
 func TestVerifyWebhookTimestamp_ValidFourMinutesOld(t *testing.T) {
 	ts := time.Now().Add(-4 * time.Minute)
 	header := strconv.FormatInt(ts.Unix(), 10)
-	ok := ledgerlens.VerifyWebhookTimestamp(header, 5*time.Minute)
+	ok := stellar_lense.VerifyWebhookTimestamp(header, 5*time.Minute)
 	assert.True(t, ok, "4-minute-old timestamp should be accepted within 5-minute window")
 }
 
 func TestVerifyWebhookTimestamp_RejectSixMinutesOld(t *testing.T) {
 	ts := time.Now().Add(-6 * time.Minute)
 	header := strconv.FormatInt(ts.Unix(), 10)
-	ok := ledgerlens.VerifyWebhookTimestamp(header, 5*time.Minute)
+	ok := stellar_lense.VerifyWebhookTimestamp(header, 5*time.Minute)
 	assert.False(t, ok, "6-minute-old timestamp should be rejected outside 5-minute window")
 }
 
 func TestVerifyWebhookTimestamp_RejectMalformedHeader(t *testing.T) {
-	ok := ledgerlens.VerifyWebhookTimestamp("not-a-number", 5*time.Minute)
+	ok := stellar_lense.VerifyWebhookTimestamp("not-a-number", 5*time.Minute)
 	assert.False(t, ok, "non-numeric timestamp header should be rejected")
 }
 
 func TestVerifyWebhookTimestamp_RejectEmptyHeader(t *testing.T) {
-	ok := ledgerlens.VerifyWebhookTimestamp("", 5*time.Minute)
+	ok := stellar_lense.VerifyWebhookTimestamp("", 5*time.Minute)
 	assert.False(t, ok, "empty timestamp header should be rejected")
 }
 
@@ -126,7 +126,7 @@ func TestVerifyWebhookTimestamp_RejectFutureTimestamp(t *testing.T) {
 	// A timestamp in the far future (delta < 0).
 	ts := time.Now().Add(10 * time.Minute)
 	header := strconv.FormatInt(ts.Unix(), 10)
-	ok := ledgerlens.VerifyWebhookTimestamp(header, 5*time.Minute)
+	ok := stellar_lense.VerifyWebhookTimestamp(header, 5*time.Minute)
 	assert.False(t, ok, "future timestamp should be rejected")
 }
 
@@ -134,12 +134,12 @@ func TestVerifyWebhookTimestamp_AcceptJustWithinWindow(t *testing.T) {
 	// Just inside the window (4 min 59 s).
 	ts := time.Now().Add(-(5*time.Minute - time.Second))
 	header := strconv.FormatInt(ts.Unix(), 10)
-	ok := ledgerlens.VerifyWebhookTimestamp(header, 5*time.Minute)
+	ok := stellar_lense.VerifyWebhookTimestamp(header, 5*time.Minute)
 	assert.True(t, ok, "timestamp just inside the window should be accepted")
 }
 
 func TestVerifyWebhookTimestamp_DefaultMaxAge(t *testing.T) {
-	assert.Equal(t, 5*time.Minute, ledgerlens.DefaultWebhookMaxAge,
+	assert.Equal(t, 5*time.Minute, stellar_lense.DefaultWebhookMaxAge,
 		"DefaultWebhookMaxAge must be exactly 5 minutes per README spec")
 }
 
@@ -157,11 +157,11 @@ func ExampleVerifyWebhookSignature() {
 	receivedSig := "sha256=" + hex.EncodeToString(mac.Sum(nil))
 	receivedTS := strconv.FormatInt(time.Now().Unix(), 10)
 
-	if !ledgerlens.VerifyWebhookSignature(body, secret, receivedSig) {
+	if !stellar_lense.VerifyWebhookSignature(body, secret, receivedSig) {
 		fmt.Println("rejected: bad signature")
 		return
 	}
-	if !ledgerlens.VerifyWebhookTimestamp(receivedTS, ledgerlens.DefaultWebhookMaxAge) {
+	if !stellar_lense.VerifyWebhookTimestamp(receivedTS, stellar_lense.DefaultWebhookMaxAge) {
 		fmt.Println("rejected: timestamp too old")
 		return
 	}

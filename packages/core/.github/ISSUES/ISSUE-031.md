@@ -5,7 +5,7 @@ assignees: []
 ---
 
 ## Summary
-The current LedgerLens ensemble in `detection/model_training.py` averages the probability outputs of Random Forest, XGBoost, and LightGBM with equal weights. Simple averaging ignores the complementary strengths of each model and may produce a worse combined prediction than an optimally weighted or learned combination. A stacking ensemble with a logistic regression meta-learner trained on out-of-fold (OOF) base model predictions learns the optimal combination and can outperform simple averaging by 2–5% AUC-PR in practice. This issue implements full stacking with OOF generation and integrates the meta-learner into the inference pipeline.
+The current Stellar Lense ensemble in `detection/model_training.py` averages the probability outputs of Random Forest, XGBoost, and LightGBM with equal weights. Simple averaging ignores the complementary strengths of each model and may produce a worse combined prediction than an optimally weighted or learned combination. A stacking ensemble with a logistic regression meta-learner trained on out-of-fold (OOF) base model predictions learns the optimal combination and can outperform simple averaging by 2–5% AUC-PR in practice. This issue implements full stacking with OOF generation and integrates the meta-learner into the inference pipeline.
 
 ## Background & Context
 In `detection/model_inference.py`, `ModelInference.score()` calls all three base models and computes `ensemble_score = np.mean([rf_proba, xgb_proba, lgbm_proba])`. This equal-weight average is a reasonable baseline but:

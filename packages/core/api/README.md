@@ -1,8 +1,8 @@
 # `api/` — Local FastAPI Application
 
-This directory contains the **local read-only FastAPI application** (`main.py`) and all the routers, middleware, and supporting modules that make up LedgerLens Core's HTTP/WebSocket/GraphQL/gRPC surface.
+This directory contains the **local read-only FastAPI application** (`main.py`) and all the routers, middleware, and supporting modules that make up Stellar Lense Core's HTTP/WebSocket/GraphQL/gRPC surface.
 
-It is a **local development stand-in** for the production [`ledgerlens-api`](https://github.com/Ledger-Lenz/ledgerlens-api) repository. It serves whatever `RiskScore` records have been written to the local SQLite store by `run_pipeline.py` or `cli.py score`, and exposes the same endpoint contracts that downstream consumers (dashboard, protocol integrations) expect.
+It is a **local development stand-in** for the production [`stellar-lense-api`](https://github.com/Ledger-Lenz/stellar-lense-api) repository. It serves whatever `RiskScore` records have been written to the local SQLite store by `run_pipeline.py` or `cli.py score`, and exposes the same endpoint contracts that downstream consumers (dashboard, protocol integrations) expect.
 
 For deeper documentation see:
 - [REST API Reference](../docs/api_reference.md) — endpoint catalogue, request/response schemas
@@ -29,7 +29,7 @@ For deeper documentation see:
 | `gnn_router.py` | `/gnn/ring-score/{wallet}` GNN ring membership scores and nearest-neighbour wallet similarity. |
 | `graphql_schema.py` | Optional Strawberry GraphQL schema (enabled when `strawberry-graphql` is installed). |
 | `grpc_scoring_service.py` | gRPC `InternalScoringService` sidecar for low-latency internal score delivery. Run via `cli.py grpc-serve`. |
-| `metrics.py` | Prometheus metric definitions (`Counter`, `Gauge`, `Histogram`) prefixed with `ledgerlens_`. |
+| `metrics.py` | Prometheus metric definitions (`Counter`, `Gauge`, `Histogram`) prefixed with `stellar_lense_`. |
 | `namespace.py` | Multi-tenant namespace isolation — `namespace_filter` dependency that scopes all data queries to the caller's `namespace_id`. |
 | `streaming.py` | `ScorePublisher` and `SSEConnectionManager` for real-time score streaming over Server-Sent Events backed by Redis Pub/Sub. |
 | `streaming_router.py` | `/stream/scores` SSE endpoint and `/stream/stats` connection health endpoint. |

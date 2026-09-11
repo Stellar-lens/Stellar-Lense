@@ -43,7 +43,7 @@ def clean_db(tmp_path, monkeypatch):
     so the LineageEmitter background worker (which reads ``settings.db_path``
     at event-write time) always writes to the correct location.
     """
-    db_path = str(tmp_path / "ledgerlens.db")
+    db_path = str(tmp_path / "stellar_lense.db")
     monkeypatch.setattr(settings, "db_path", db_path)
 
     conn = sqlite3.connect(db_path)
@@ -150,7 +150,7 @@ def test_console_backend(clean_db, monkeypatch, caplog):
 
     emitter = LineageEmitter()
     try:
-        with caplog.at_level(logging.INFO, logger="ledgerlens.lineage"):
+        with caplog.at_level(logging.INFO, logger="stellar_lense.lineage"):
             with emitter.run("job_console", []):
                 pass
     finally:
@@ -204,7 +204,7 @@ def test_http_backend_failure_resilience(clean_db, monkeypatch, caplog):
 
     emitter = LineageEmitter()
     try:
-        with caplog.at_level(logging.ERROR, logger="ledgerlens.lineage"):
+        with caplog.at_level(logging.ERROR, logger="stellar_lense.lineage"):
             with emitter.run("job_http_resilience", []):
                 pass
     finally:
@@ -237,7 +237,7 @@ def test_lineage_queue_drops_when_full(clean_db, monkeypatch, caplog):
             except queue.Full:
                 break
 
-        with caplog.at_level(logging.WARNING, logger="ledgerlens.lineage"):
+        with caplog.at_level(logging.WARNING, logger="stellar_lense.lineage"):
             with emitter.run("job_dropped", []):
                 pass
     finally:
@@ -268,9 +268,9 @@ def test_lineage_api_endpoint(clean_db, monkeypatch):
             event_type, event_time, run_id, parent_run_id,
             job_namespace, job_name, inputs_json, outputs_json, producer
         ) VALUES ('COMPLETE', '2026-07-18T12:00:00Z', 'run-1', NULL,
-            'ledgerlens-core', 'ingestion.historical_loader.fetch_chunk',
+            'stellar-lense-core', 'ingestion.historical_loader.fetch_chunk',
             '[{"namespace": "horizon", "name": "trades", "facets": {}}]',
-            '[{"namespace": "ledgerlens-core.sqlite", "name": "trades", "facets": {}}]',
+            '[{"namespace": "stellar-lense-core.sqlite", "name": "trades", "facets": {}}]',
             'test')
         """
     )
@@ -280,9 +280,9 @@ def test_lineage_api_endpoint(clean_db, monkeypatch):
             event_type, event_time, run_id, parent_run_id,
             job_namespace, job_name, inputs_json, outputs_json, producer
         ) VALUES ('COMPLETE', '2026-07-18T12:01:00Z', 'run-2', 'run-1',
-            'ledgerlens-core', 'feature_engineering.build_feature_vector',
-            '[{"namespace": "ledgerlens-core.sqlite", "name": "trades", "facets": {}}]',
-            '[{"namespace": "ledgerlens-core.sqlite", "name": "feature_distribution_snapshots", "facets": {}}]',
+            'stellar-lense-core', 'feature_engineering.build_feature_vector',
+            '[{"namespace": "stellar-lense-core.sqlite", "name": "trades", "facets": {}}]',
+            '[{"namespace": "stellar-lense-core.sqlite", "name": "feature_distribution_snapshots", "facets": {}}]',
             'test')
         """
     )
@@ -292,26 +292,26 @@ def test_lineage_api_endpoint(clean_db, monkeypatch):
     client = TestClient(app)
 
     # 1. 503 when admin key is unset/empty
-    monkeypatch.setattr(settings, "ledgerlens_admin_api_key", "")
+    monkeypatch.setattr(settings, "stellarlense_admin_api_key", "")
     resp = client.get("/v1/admin/lineage/trades")
     assert resp.status_code == 503
 
     # 2. 401 when admin key is set but header is missing
-    monkeypatch.setattr(settings, "ledgerlens_admin_api_key", "secret-admin-key")
+    monkeypatch.setattr(settings, "stellarlense_admin_api_key", "secret-admin-key")
     resp = client.get("/v1/admin/lineage/trades")
     assert resp.status_code == 401
 
     # 3. 403 when admin key is set but header is wrong
     resp = client.get(
         "/v1/admin/lineage/trades",
-        headers={"X-LedgerLens-Admin-Key": "wrong-key"},
+        headers={"X-StellarLense-Admin-Key": "wrong-key"},
     )
     assert resp.status_code == 403
 
     # 4. Correct graph shape with matching admin key
     resp = client.get(
         "/v1/admin/lineage/trades",
-        headers={"X-LedgerLens-Admin-Key": "secret-admin-key"},
+        headers={"X-StellarLense-Admin-Key": "secret-admin-key"},
     )
     assert resp.status_code == 200
     graph = resp.json()
@@ -320,10 +320,10 @@ def test_lineage_api_endpoint(clean_db, monkeypatch):
 
     node_ids = {nd["id"] for nd in graph["nodes"]}
     assert "dataset:horizon:trades" in node_ids
-    assert "job:ledgerlens-core:ingestion.historical_loader.fetch_chunk" in node_ids
-    assert "dataset:ledgerlens-core.sqlite:trades" in node_ids
-    assert "job:ledgerlens-core:feature_engineering.build_feature_vector" in node_ids
-    assert "dataset:ledgerlens-core.sqlite:feature_distribution_snapshots" in node_ids
+    assert "job:stellar-lense-core:ingestion.historical_loader.fetch_chunk" in node_ids
+    assert "dataset:stellar-lense-core.sqlite:trades" in node_ids
+    assert "job:stellar-lense-core:feature_engineering.build_feature_vector" in node_ids
+    assert "dataset:stellar-lense-core.sqlite:feature_distribution_snapshots" in node_ids
 
     # 5. Legacy redirect endpoint
     resp = client.get("/admin/lineage/trades", follow_redirects=False)

@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to `ledgerlens-fl-client` will be documented in this file.
+All notable changes to `stellar-lense-fl-client` will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -12,8 +12,8 @@ _No changes pending release yet._
 ## [0.1.0] — 2026-06-26
 
 Initial release of the standalone federated learning client library for
-exchange-side participation in the LedgerLens federated learning network
-(implements [Issue #139](https://github.com/Ledger-Lenz/Ledgerlens-core/issues/139)).
+exchange-side participation in the Stellar Lense federated learning network
+(implements [Issue #139](https://github.com/Ledger-Lenz/StellarLense-core/issues/139)).
 
 ### Added
 
@@ -48,7 +48,7 @@ exchange-side participation in the LedgerLens federated learning network
   `/federated/server-public-key` endpoints of the `FederatedAggregationServer`.
 - Context manager support (`with FLClient(...) as client:`) on both
   `FLClient` and `FLProtocol` for safe HTTP connection cleanup.
-- CLI entry point (`python -m ledgerlens_fl_client`) with `--server-url`,
+- CLI entry point (`python -m stellar_lense_fl_client`) with `--server-url`,
   `--api-key`, `--data-dir`, `--operator-id`, `--rounds`, `--dp-epsilon`,
   `--dp-delta`, `--gradient-clip-threshold`, and `--noise-multiplier` flags;
   all parameters also settable via `FL_*` environment variables for
@@ -69,5 +69,5 @@ exchange-side participation in the LedgerLens federated learning network
 
 ---
 
-[Unreleased]: https://github.com/Ledger-Lenz/Ledgerlens-core/compare/ledgerlens-fl-client-v0.1.0...HEAD
-[0.1.0]: https://github.com/Ledger-Lenz/Ledgerlens-core/commits/main/packages/ledgerlens-fl-client
+[Unreleased]: https://github.com/Ledger-Lenz/StellarLense-core/compare/stellar-lense-fl-client-v0.1.0...HEAD
+[0.1.0]: https://github.com/Stellar-lens/Stellar-Lense/commits/main/packages/stellar-lense-fl-client

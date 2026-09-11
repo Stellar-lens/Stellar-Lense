@@ -16,7 +16,7 @@ from dataclasses import dataclass
 import numpy as np
 import shap
 
-logger = logging.getLogger("ledgerlens.shap_explainer")
+logger = logging.getLogger("stellar_lense.shap_explainer")
 
 # ---------------------------------------------------------------------------
 # Default cache TTL in seconds (1 hour)

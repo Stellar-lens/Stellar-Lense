@@ -10,11 +10,11 @@ Extend `detection/model_signing.py` so every trained model artifact (`.joblib` f
 
 ## Background & Context
 
-LedgerLens's ensemble models (Random Forest, XGBoost, LightGBM) are serialised as `.joblib` files in the `models/` directory. Currently there is no integrity check on these files: if an attacker gains write access to the filesystem (e.g., via a compromised CI pipeline, container escape, or misconfigured volume mount), they could replace a `.joblib` file with a malicious serialised object. When Python's `joblib.load()` is called, arbitrary code can be executed during deserialisation (the `__reduce__` protocol).
+Stellar Lense's ensemble models (Random Forest, XGBoost, LightGBM) are serialised as `.joblib` files in the `models/` directory. Currently there is no integrity check on these files: if an attacker gains write access to the filesystem (e.g., via a compromised CI pipeline, container escape, or misconfigured volume mount), they could replace a `.joblib` file with a malicious serialised object. When Python's `joblib.load()` is called, arbitrary code can be executed during deserialisation (the `__reduce__` protocol).
 
 ED25519 model signing provides two protections:
 1. **Integrity**: a valid signature proves the file has not been modified since training.
-2. **Authenticity**: a valid signature proves the file was produced by the LedgerLens training pipeline (which holds the private key), not by an external actor.
+2. **Authenticity**: a valid signature proves the file was produced by the Stellar Lense training pipeline (which holds the private key), not by an external actor.
 
 The signing scheme:
 - At training time: compute `SHA-256(model_bytes)` and sign the digest with the ED25519 private key; write the signature to `<model_name>.sig` alongside the `.joblib` file.

@@ -1,6 +1,6 @@
 # Cost & Capacity Quick Reference
 
-A one-page cheat sheet for LedgerLens cost visibility and capacity planning.
+A one-page cheat sheet for Stellar Lense cost visibility and capacity planning.
 
 ## Configuration
 
@@ -17,12 +17,12 @@ CAPACITY_PROJECTION_LEAD_TIME_DAYS=14  # Alert threshold
 
 | Metric | Description | Unit |
 |--------|-------------|------|
-| `ledgerlens:pod_cost_per_hour:usd` | Per-pod cost (CPU + memory) | USD/hr |
-| `ledgerlens:namespace_cost_per_hour:usd` | Total namespace cost | USD/hr |
-| `ledgerlens:cost_per_wallet_scored:usd` | Unit cost per wallet | USD |
-| `ledgerlens:replica_count_projected_days_to_max` | Days until maxReplicas | days |
-| `ledgerlens:pvc_projected_days_to_full` | Days until PVC full | days |
-| `ledgerlens:wallets_scored_per_hour` | Current throughput | wallets/hr |
+| `stellar_lense:pod_cost_per_hour:usd` | Per-pod cost (CPU + memory) | USD/hr |
+| `stellar_lense:namespace_cost_per_hour:usd` | Total namespace cost | USD/hr |
+| `stellar_lense:cost_per_wallet_scored:usd` | Unit cost per wallet | USD |
+| `stellar_lense:replica_count_projected_days_to_max` | Days until maxReplicas | days |
+| `stellar_lense:pvc_projected_days_to_full` | Days until PVC full | days |
+| `stellar_lense:wallets_scored_per_hour` | Current throughput | wallets/hr |
 
 ## Dashboard Panels
 
@@ -46,10 +46,10 @@ CAPACITY_PROJECTION_LEAD_TIME_DAYS=14  # Alert threshold
 3. **If expected:** Scale up
    ```bash
    # Raise maxReplicas
-   helm upgrade ledgerlens --set autoscaling.maxReplicas=20
+   helm upgrade stellar_lense --set autoscaling.maxReplicas=20
    
    # Or expand PVC (if storage class supports it)
-   kubectl edit pvc ledgerlens -n ledgerlens
+   kubectl edit pvc stellar_lense -n stellar_lense
    # Update spec.resources.requests.storage: 20Gi
    ```
 4. **If unexpected:** Investigate ingestion volume, check for duplicate trades
@@ -58,20 +58,20 @@ CAPACITY_PROJECTION_LEAD_TIME_DAYS=14  # Alert threshold
 
 ```bash
 # Verify cost metrics are exposed
-curl http://localhost:8000/metrics | grep ledgerlens_cost_per
+curl http://localhost:8000/metrics | grep stellar_lense_cost_per
 
 # Check recording rules are loaded
 curl -s http://localhost:9090/api/v1/rules | \
-  jq '.data.groups[] | select(.name == "ledgerlens_cost")'
+  jq '.data.groups[] | select(.name == "stellar_lense_cost")'
 
 # Query current namespace cost
 curl -s http://localhost:9090/api/v1/query \
-  --data-urlencode 'query=ledgerlens:namespace_cost_per_hour:usd' | \
+  --data-urlencode 'query=stellar_lense:namespace_cost_per_hour:usd' | \
   jq -r '.data.result[0].value[1]'
 
 # Check days until maxReplicas
 curl -s http://localhost:9090/api/v1/query \
-  --data-urlencode 'query=ledgerlens:replica_count_projected_days_to_max' | \
+  --data-urlencode 'query=stellar_lense:replica_count_projected_days_to_max' | \
   jq -r '.data.result[0].value[1]'
 ```
 
@@ -83,7 +83,7 @@ curl -s http://localhost:9090/api/v1/query \
 | Projection is NaN | < 7 days of data | Wait for data to accumulate or reduce projection window |
 | Projection is +Inf | No growth | Expected for stable workloads |
 | Alert not firing | < 1 hour sustained | Wait; alert has 1h `for` duration |
-| Dashboard shows "No data" | Wrong namespace label | Edit dashboard, change `namespace="ledgerlens"` to match yours |
+| Dashboard shows "No data" | Wrong namespace label | Edit dashboard, change `namespace="stellar_lense"` to match yours |
 
 ## File Locations
 
@@ -91,7 +91,7 @@ curl -s http://localhost:9090/api/v1/query \
 - **Alerts:** `monitoring/alerts.yml`
 - **Dashboard:** `monitoring/grafana/cost_capacity_dashboard.json`
 - **Cost exporter:** `config/cost_exporter.py`
-- **Helm config:** `helm/ledgerlens/templates/cost-config.yaml`
+- **Helm config:** `helm/stellar_lense/templates/cost-config.yaml`
 
 ## Prometheus Rule Validation
 
@@ -110,7 +110,7 @@ promtool check rules monitoring/alerts.yml
 
 # Provisioned:
 sudo cp monitoring/grafana/cost_capacity_dashboard.json \
-  /var/lib/grafana/dashboards/ledgerlens/
+  /var/lib/grafana/dashboards/stellar_lense/
 sudo systemctl restart grafana-server
 ```
 
@@ -143,13 +143,13 @@ ROI = (revenue_per_wallet - cost_per_wallet_scored) / cost_per_wallet_scored × 
 
 - ⚠️ Do NOT commit actual negotiated cloud pricing to public repos
 - 🔒 Enable Grafana auth (disable anonymous access)
-- 🛡️ Protect `/metrics` with `LEDGERLENS_ADMIN_API_KEY`
+- 🛡️ Protect `/metrics` with `STELLARLENSE_ADMIN_API_KEY`
 
 ## Documentation Links
 
 - **Full guide:** [docs/cost_and_capacity.md](cost_and_capacity.md)
 - **Upgrade guide:** [docs/UPGRADE_COST_CAPACITY.md](UPGRADE_COST_CAPACITY.md)
-- **Monitoring README:** [monitoring/README.md](https://github.com/Ledger-Lenz/Ledgerlens-core/blob/main/monitoring/README.md)
+- **Monitoring README:** [monitoring/README.md](https://github.com/Stellar-lens/Stellar-Lense/blob/main/monitoring/README.md)
 - **Observability:** [docs/observability.md](observability.md)
 
 ---

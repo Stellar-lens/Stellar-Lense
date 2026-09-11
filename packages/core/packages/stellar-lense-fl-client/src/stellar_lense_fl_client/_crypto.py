@@ -1,7 +1,7 @@
 """Ed25519 cryptographic operations for FL client authentication.
 
 Implements key generation, payload signing, and DER encoding compatible
-with the LedgerLens federated aggregation server protocol.
+with the StellarLense federated aggregation server protocol.
 """
 
 from __future__ import annotations

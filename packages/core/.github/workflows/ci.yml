@@ -156,7 +156,7 @@ jobs:
     timeout-minutes: 15
     defaults:
       run:
-        working-directory: crates/ledgerlens-sdk
+        working-directory: crates/stellar-lense-sdk
     steps:
       - uses: actions/checkout@v4
 
@@ -230,17 +230,17 @@ jobs:
           key: contracts-${{ hashFiles('**/Cargo.lock') }}
 
       - name: cargo build (native)
-        run: cargo build -p oracle_aggregator -p ledgerlens-zk-verifier
+        run: cargo build -p oracle_aggregator -p stellar-lense-zk-verifier
 
       - name: cargo build (wasm32-unknown-unknown, release)
         run: >
           cargo build --target wasm32-unknown-unknown --release --lib
-          -p oracle_aggregator -p ledgerlens-zk-verifier
+          -p oracle_aggregator -p stellar-lense-zk-verifier
 
       - name: cargo test
         run: >
-          cargo test -p oracle_aggregator -p ledgerlens-zk-verifier
-          --features oracle_aggregator/testutils,ledgerlens-zk-verifier/testutils
+          cargo test -p oracle_aggregator -p stellar-lense-zk-verifier
+          --features oracle_aggregator/testutils,stellar-lense-zk-verifier/testutils
 
       # Both crates carry pre-existing lint and formatting debt that predates
       # this job (mainly the partially-wired BN254 primitives in
@@ -251,13 +251,13 @@ jobs:
       - name: cargo clippy (advisory)
         continue-on-error: true
         run: >
-          cargo clippy -p oracle_aggregator -p ledgerlens-zk-verifier --all-targets
-          --features oracle_aggregator/testutils,ledgerlens-zk-verifier/testutils
+          cargo clippy -p oracle_aggregator -p stellar-lense-zk-verifier --all-targets
+          --features oracle_aggregator/testutils,stellar-lense-zk-verifier/testutils
           -- -D warnings
 
       - name: cargo fmt (advisory)
         continue-on-error: true
-        run: cargo fmt -p oracle_aggregator -p ledgerlens-zk-verifier -- --check
+        run: cargo fmt -p oracle_aggregator -p stellar-lense-zk-verifier -- --check
 
   # ── Contract fuzz (PR smoke) ──────────────────────────────────────────────
   fuzz:

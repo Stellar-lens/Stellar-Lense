@@ -1,6 +1,6 @@
 {
-  "consumer": { "name": "ledgerlens-api" },
-  "provider": { "name": "ledgerlens-core" },
+  "consumer": { "name": "stellar-lense-api" },
+  "provider": { "name": "stellar-lense-core" },
   "interactions": [
     {
       "description": "get risk score with conformal fields",

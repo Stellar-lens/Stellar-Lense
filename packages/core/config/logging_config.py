@@ -49,7 +49,7 @@ class _ServiceFilter(logging.Filter):
         return True
 
 
-def configure_logging(service_name: str = "ledgerlens", log_level: str = "INFO") -> None:
+def configure_logging(service_name: str = "stellar_lense", log_level: str = "INFO") -> None:
     """Configure structlog-based JSON logging for the whole process.
 
     Call this once at process startup (top of run_pipeline.py, cli.py,

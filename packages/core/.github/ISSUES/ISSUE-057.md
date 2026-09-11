@@ -6,13 +6,13 @@ assignees: []
 
 ## Summary
 
-Extend `detection/compliance_exporter.py` to generate structured FinCEN SAR narratives and FATF Travel Rule records from high-risk-score events. SAR narrative templates should include wallet IDs, asset pairs, detected ring structure, Benford metrics, and SHAP top-3 features. This positions LedgerLens as a compliance infrastructure layer usable by Stellar-based exchanges and custodians subject to AML/CFT obligations.
+Extend `detection/compliance_exporter.py` to generate structured FinCEN SAR narratives and FATF Travel Rule records from high-risk-score events. SAR narrative templates should include wallet IDs, asset pairs, detected ring structure, Benford metrics, and SHAP top-3 features. This positions Stellar Lense as a compliance infrastructure layer usable by Stellar-based exchanges and custodians subject to AML/CFT obligations.
 
 ## Background & Context
 
 Exchanges and custodians operating on the Stellar network may be obligated under the Financial Action Task Force (FATF) Travel Rule (Recommendation 16) and FinCEN SAR filing requirements. The Travel Rule requires sharing originator/beneficiary information for transfers above threshold amounts. SARs require a detailed narrative of suspicious activity.
 
-LedgerLens is uniquely positioned to feed both requirements: it has the detection evidence (Benford metrics, ring structure, SHAP explanations) and the wallet identifiers. By automating the export pipeline, compliance officers at exchanges can reduce SAR preparation time from hours to minutes.
+Stellar Lense is uniquely positioned to feed both requirements: it has the detection evidence (Benford metrics, ring structure, SHAP explanations) and the wallet identifiers. By automating the export pipeline, compliance officers at exchanges can reduce SAR preparation time from hours to minutes.
 
 `detection/compliance_exporter.py` exists as a stub. This issue builds:
 1. **FinCEN SAR narrative generator**: structured narrative text from a `RiskScore` + supporting evidence
@@ -20,7 +20,7 @@ LedgerLens is uniquely positioned to feed both requirements: it has the detectio
 3. **Export API**: `POST /compliance/export/sar` and `POST /compliance/export/travel-rule`
 4. **Audit log**: every export is timestamped and logged to SQLite `compliance_exports` table
 
-Note: this is a data structuring and export tool. LedgerLens does not file SARs — that is done by the regulated entity. All PII fields are caller-supplied; LedgerLens supplies the detection evidence.
+Note: this is a data structuring and export tool. Stellar Lense does not file SARs — that is done by the regulated entity. All PII fields are caller-supplied; Stellar Lense supplies the detection evidence.
 
 ## Objectives
 
@@ -80,7 +80,7 @@ Subject {subject_role} {subject_wallet_short} engaged in suspicious trading acti
 Stellar Decentralized Exchange (SDEX) involving asset pair(s) {asset_pairs} during the period
 {start_date} to {end_date}.
 
-Detection summary: LedgerLens risk score {score}/100 (90% confidence interval: {lower}–{upper}).
+Detection summary: Stellar Lense risk score {score}/100 (90% confidence interval: {lower}–{upper}).
 {benford_summary}
 {ring_summary}
 {ml_summary}
@@ -88,7 +88,7 @@ Detection summary: LedgerLens risk score {score}/100 (90% confidence interval: {
 Top contributing factors (SHAP analysis):
 {shap_bullets}
 
-This report was generated automatically by LedgerLens v{version}. The filing institution
+This report was generated automatically by Stellar Lense v{version}. The filing institution
 is responsible for independent review and verification before SAR submission.
 """
 
@@ -145,8 +145,8 @@ class TravelRuleTransfer:
     amount_usd_equiv: Optional[float]
     transfer_timestamp: datetime
     ledger_sequence: int
-    ledgerlens_risk_score: Optional[int]
-    ledgerlens_flagged: bool
+    stellar_lense_risk_score: Optional[int]
+    stellar_lense_flagged: bool
 
 @dataclass
 class TravelRuleRecord:
@@ -167,7 +167,7 @@ class TravelRuleRecord:
 async def export_sar(
     body: SARExportRequest,
     dry_run: bool = Query(False),
-    x_admin_key: str = Header(..., alias="X-LedgerLens-Admin-Key"),
+    x_admin_key: str = Header(..., alias="X-StellarLense-Admin-Key"),
 ) -> SARExportResponse:
     """
     Generate SAR narrative for a wallet.
@@ -180,7 +180,7 @@ async def export_sar(
 async def export_travel_rule(
     body: TravelRuleExportRequest,
     dry_run: bool = Query(False),
-    x_admin_key: str = Header(..., alias="X-LedgerLens-Admin-Key"),
+    x_admin_key: str = Header(..., alias="X-StellarLense-Admin-Key"),
 ) -> TravelRuleExportResponse:
     ...
 ```
@@ -211,7 +211,7 @@ COMPLIANCE_EXPORT_RATE_LIMIT_PER_HOUR=100
 
 - **PII handling**: originator/beneficiary names in Travel Rule records are PII. They must never be logged, echoed in error messages, or stored in the audit log. The audit log stores only the wallet hash, not plaintext addresses or names
 - **Wallet address in SAR narratives**: Stellar public keys are pseudonymous (not personal data under most jurisdictions) but should still be truncated to `GXXXX...YYYY` in log entries. The full address appears only in the returned document body
-- **Admin key requirement**: both export endpoints require `X-LedgerLens-Admin-Key`. Return 503 (not 401) if the key is unset
+- **Admin key requirement**: both export endpoints require `X-StellarLense-Admin-Key`. Return 503 (not 401) if the key is unset
 - **SAR narrative injection**: the `institution_name` field is caller-supplied and appears in the narrative text. Sanitise it: strip HTML tags, limit to 200 characters, allow only printable ASCII. Reject and return 422 for anything outside this range
 - **Rate limiting**: SAR export can be expensive (triggers SHAP recomputation). Rate-limit to 100 exports/hour per admin key. Track in SQLite `compliance_exports` table (count rows in last hour)
 - **Dry-run audit gap**: dry-run exports do not write to the audit log — document this limitation clearly. Compliance officers must not use dry-run for regulatory-submission versions
@@ -232,7 +232,7 @@ COMPLIANCE_EXPORT_RATE_LIMIT_PER_HOUR=100
 ## Documentation Requirements
 
 - [ ] Docstrings on `SARNarrativeBuilder`, `TravelRuleRecordBuilder`, `ComplianceExporter`
-- [ ] Add `docs/compliance_export.md` covering: regulatory context (FATF R16, FinCEN SAR), how to use the export API, field mapping to FinCEN SAR form sections, IVMS101 schema reference, legal disclaimer (LedgerLens is a tool, not a compliance advisor)
+- [ ] Add `docs/compliance_export.md` covering: regulatory context (FATF R16, FinCEN SAR), how to use the export API, field mapping to FinCEN SAR form sections, IVMS101 schema reference, legal disclaimer (Stellar Lense is a tool, not a compliance advisor)
 - [ ] Update `README.md` to mention the compliance export pipeline
 - [ ] Document `compliance_exports` table in `docs/database_schema.md`
 - [ ] Update `.env.example` with three new configuration variables including the mandatory `COMPLIANCE_INSTITUTION_NAME`

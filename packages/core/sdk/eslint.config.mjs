@@ -3,7 +3,7 @@ import js from "@eslint/js";
 import tseslint from "typescript-eslint";
 
 /**
- * ESLint flat config for the LedgerLens TypeScript SDK.
+ * ESLint flat config for the Stellar Lense TypeScript SDK.
  *
  * Baseline: eslint:recommended + @typescript-eslint/recommended.
  * Prettier owns formatting (see .prettierrc) — no stylistic rules here.

@@ -27,7 +27,7 @@
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "description": "Total cost per hour across all LedgerLens pods (CPU + memory)",
+      "description": "Total cost per hour across all Stellar Lense pods (CPU + memory)",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -103,7 +103,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "ledgerlens:namespace_cost_per_hour:usd{namespace=\"ledgerlens\"}",
+          "expr": "stellar_lense:namespace_cost_per_hour:usd{namespace=\"stellar_lense\"}",
           "legendFormat": "Total Cost/Hour",
           "range": true,
           "refId": "A"
@@ -170,7 +170,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "ledgerlens:cost_per_wallet_scored:usd",
+          "expr": "stellar_lense:cost_per_wallet_scored:usd",
           "legendFormat": "Cost/Wallet",
           "range": true,
           "refId": "A"
@@ -260,7 +260,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "ledgerlens:pod_cost_per_hour:usd{namespace=\"ledgerlens\"}",
+          "expr": "stellar_lense:pod_cost_per_hour:usd{namespace=\"stellar_lense\"}",
           "legendFormat": "{{pod}}",
           "range": true,
           "refId": "A"
@@ -344,7 +344,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "ledgerlens:replica_count_projected_days_to_max{deployment=\"ledgerlens-api\"}",
+          "expr": "stellar_lense:replica_count_projected_days_to_max{deployment=\"stellar-lense-api\"}",
           "legendFormat": "Days to Max Replicas",
           "range": true,
           "refId": "A"
@@ -428,7 +428,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "ledgerlens:pvc_projected_days_to_full{namespace=\"ledgerlens\"}",
+          "expr": "stellar_lense:pvc_projected_days_to_full{namespace=\"stellar_lense\"}",
           "legendFormat": "Days to Full PVC",
           "range": true,
           "refId": "A"
@@ -534,7 +534,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "ledgerlens:wallets_scored_per_hour",
+          "expr": "stellar_lense:wallets_scored_per_hour",
           "legendFormat": "Current Rate",
           "range": true,
           "refId": "A"
@@ -545,7 +545,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "ledgerlens:wallets_scored_per_hour:predicted_7d / (7 * 86400) * 3600",
+          "expr": "stellar_lense:wallets_scored_per_hour:predicted_7d / (7 * 86400) * 3600",
           "legendFormat": "Projected (7d)",
           "range": true,
           "refId": "B"
@@ -639,7 +639,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "kube_deployment_status_replicas{deployment=\"ledgerlens-api\", namespace=\"ledgerlens\"}",
+          "expr": "kube_deployment_status_replicas{deployment=\"stellar-lense-api\", namespace=\"stellar_lense\"}",
           "legendFormat": "Current Replicas",
           "range": true,
           "refId": "A"
@@ -708,7 +708,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "(kubelet_volume_stats_used_bytes{namespace=\"ledgerlens\", persistentvolumeclaim=~\"ledgerlens-.*\"} / kubelet_volume_stats_capacity_bytes{namespace=\"ledgerlens\", persistentvolumeclaim=~\"ledgerlens-.*\"}) * 100",
+          "expr": "(kubelet_volume_stats_used_bytes{namespace=\"stellar_lense\", persistentvolumeclaim=~\"stellar-lense-.*\"} / kubelet_volume_stats_capacity_bytes{namespace=\"stellar_lense\", persistentvolumeclaim=~\"stellar-lense-.*\"}) * 100",
           "legendFormat": "{{persistentvolumeclaim}}",
           "range": true,
           "refId": "A"
@@ -721,7 +721,7 @@
   "refresh": "30s",
   "schemaVersion": 38,
   "style": "dark",
-  "tags": ["ledgerlens", "cost", "capacity"],
+  "tags": ["stellar_lense", "cost", "capacity"],
   "templating": {
     "list": [
       {
@@ -750,8 +750,8 @@
   },
   "timepicker": {},
   "timezone": "",
-  "title": "LedgerLens Cost & Capacity",
-  "uid": "ledgerlens-cost-capacity",
+  "title": "Stellar Lense Cost & Capacity",
+  "uid": "stellar-lense-cost-capacity",
   "version": 1,
   "weekStart": ""
 }

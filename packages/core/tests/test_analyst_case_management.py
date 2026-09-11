@@ -49,13 +49,13 @@ def _noop_admin():
 @pytest.fixture(autouse=True)
 def webhook_enc_key(monkeypatch):
     key = base64.b64encode(os.urandom(32)).decode()
-    monkeypatch.setenv("LEDGERLENS_WEBHOOK_ENCRYPTION_KEY", key)
+    monkeypatch.setenv("STELLARLENSE_WEBHOOK_ENCRYPTION_KEY", key)
 
 
 @pytest.fixture()
 def db(tmp_path, monkeypatch):
     db_path = str(tmp_path / "case_test.db")
-    monkeypatch.setenv("LEDGERLENS_DB_PATH", db_path)
+    monkeypatch.setenv("STELLARLENSE_DB_PATH", db_path)
     object.__setattr__(settings, "db_path", db_path)
     object.__setattr__(settings, "analyst_lock_timeout_seconds", 1800)
     object.__setattr__(settings, "analyst_claim_max_active_per_analyst", 10)
@@ -66,7 +66,7 @@ def db(tmp_path, monkeypatch):
 @pytest.fixture()
 def client(tmp_path, monkeypatch):
     db_path = str(tmp_path / "case_api_test.db")
-    monkeypatch.setenv("LEDGERLENS_DB_PATH", db_path)
+    monkeypatch.setenv("STELLARLENSE_DB_PATH", db_path)
     object.__setattr__(settings, "db_path", db_path)
     object.__setattr__(settings, "analyst_lock_timeout_seconds", 1800)
     object.__setattr__(settings, "analyst_claim_max_active_per_analyst", 10)

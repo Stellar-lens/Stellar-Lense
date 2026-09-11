@@ -1,6 +1,6 @@
 # Ensemble Stacking with Meta-Learner
 
-LedgerLens uses a **stacking ensemble** to combine the outputs of RF, XGBoost,
+Stellar Lense uses a **stacking ensemble** to combine the outputs of RF, XGBoost,
 and LightGBM via a logistic regression meta-learner trained on out-of-fold
 (OOF) predictions. This outperforms equal-weight averaging by learning the
 optimal combination from data.

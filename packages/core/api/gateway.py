@@ -27,7 +27,7 @@ from starlette.responses import JSONResponse, Response
 
 from config.settings import settings
 
-logger = logging.getLogger("ledgerlens.gateway")
+logger = logging.getLogger("stellar_lense.gateway")
 
 try:
     from api.metrics import gateway_requests_total
@@ -103,16 +103,16 @@ def _resolve_auth(request: Request) -> dict | None:
     """Resolve the request's authentication to a key metadata dict.
 
     Checks, in order:
-    1. ``X-LedgerLens-Admin-Key`` header — matched against ``LEDGERLENS_ADMIN_API_KEY``
-    2. ``X-LedgerLens-Api-Key`` header — looked up in canonical ``api_keys`` store
-    3. ``X-LedgerLens-Compliance-Key`` header — matched against ``LEDGERLENS_COMPLIANCE_API_KEY``
+    1. ``X-StellarLense-Admin-Key`` header — matched against ``STELLARLENSE_ADMIN_API_KEY``
+    2. ``X-StellarLense-Api-Key`` header — looked up in canonical ``api_keys`` store
+    3. ``X-StellarLense-Compliance-Key`` header — matched against ``STELLARLENSE_COMPLIANCE_API_KEY``
 
     Returns None if no valid key is found.
     """
     from detection.api_key_store import get_api_key_by_hash
 
     # 1. Admin key
-    admin_key = request.headers.get("x-ledgerlens-admin-key", "")
+    admin_key = request.headers.get("x-stellarlense-admin-key", "")
     if admin_key and settings.admin_api_key:
         if secrets.compare_digest(admin_key, settings.admin_api_key):
             return {
@@ -127,7 +127,7 @@ def _resolve_auth(request: Request) -> dict | None:
             }
 
     # 2. Compliance key
-    compliance_key = request.headers.get("x-ledgerlens-compliance-key", "")
+    compliance_key = request.headers.get("x-stellarlense-compliance-key", "")
     if compliance_key and settings.compliance_api_key:
         if secrets.compare_digest(compliance_key, settings.compliance_api_key):
             return {
@@ -142,7 +142,7 @@ def _resolve_auth(request: Request) -> dict | None:
             }
 
     # 3. Scoped API key
-    api_key = request.headers.get("x-ledgerlens-api-key", "")
+    api_key = request.headers.get("x-stellarlense-api-key", "")
     if not api_key:
         return None
 
@@ -173,7 +173,7 @@ def _check_quota(key_meta: dict) -> tuple[bool, dict]:
     """Enforce per-key and per-namespace quota (daily + monthly + per-minute).
 
     Returns (allowed, headers_dict).
-    When not allowed, headers_dict contains Retry-After and/or X-LedgerLens-Quota-Reset.
+    When not allowed, headers_dict contains Retry-After and/or X-StellarLense-Quota-Reset.
     """
     from detection.api_key_store import (
         check_daily_quota,
@@ -200,28 +200,28 @@ def _check_quota(key_meta: dict) -> tuple[bool, dict]:
     if daily_limit > 0:
         allowed, reset_at = check_daily_quota(key_id, daily_limit)
         if not allowed:
-            return False, {"X-LedgerLens-Quota-Reset": reset_at}
+            return False, {"X-StellarLense-Quota-Reset": reset_at}
 
     # Daily quota per namespace (wildcard '*' is exempt)
     ns_daily_limit = key_meta.get("namespace_daily_quota", 0)
     if ns_daily_limit > 0 and namespace_id != "*":
         allowed, reset_at = check_namespace_quota(namespace_id, ns_daily_limit)
         if not allowed:
-            return False, {"X-LedgerLens-Quota-Reset": reset_at}
+            return False, {"X-StellarLense-Quota-Reset": reset_at}
 
     # Monthly quota per key
     monthly_limit = key_meta.get("monthly_quota", 0)
     if monthly_limit > 0:
         allowed, reset_at = check_monthly_quota(key_id, monthly_limit)
         if not allowed:
-            return False, {"X-LedgerLens-Quota-Reset": reset_at}
+            return False, {"X-StellarLense-Quota-Reset": reset_at}
 
     # Monthly quota per namespace (wildcard '*' is exempt)
     ns_monthly_limit = key_meta.get("namespace_monthly_quota", 0)
     if ns_monthly_limit > 0 and namespace_id != "*":
         allowed, reset_at = check_namespace_monthly_quota(namespace_id, ns_monthly_limit)
         if not allowed:
-            return False, {"X-LedgerLens-Quota-Reset": reset_at}
+            return False, {"X-StellarLense-Quota-Reset": reset_at}
 
     return True, {}
 

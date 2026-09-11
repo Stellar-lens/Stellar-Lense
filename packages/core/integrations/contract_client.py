@@ -6,10 +6,10 @@ and ``score_upper`` as additional Soroban ``i128`` fields (scaled ×100 for
 integer representation).
 
 .. code-block:: rust
-    :caption: Required ledgerlens-contract extension (PR target)
+    :caption: Required stellar-lense-contract extension (PR target)
 
     /// Extended RiskScore struct that includes conformal prediction interval.
-    /// Add to ``ledgerlens-score/src/lib.rs``.
+    /// Add to ``stellar-lense-score/src/lib.rs``.
     #[contracttype]
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct RiskScoreWithUncertainty {
@@ -35,7 +35,7 @@ integer representation).
     );
 
 The matching PR should be opened against the
-`ledgerlens-contract <https://github.com/your-org/ledgerlens-contract>`_ repo.
+`stellar-lense-contract <https://github.com/your-org/stellar-lense-contract>`_ repo.
 """
 
 from __future__ import annotations
@@ -45,7 +45,7 @@ import logging
 from detection.risk_score import RiskScore
 from detection.soroban_publisher import SorobanPublisher
 
-logger = logging.getLogger("ledgerlens.contract_client")
+logger = logging.getLogger("stellar_lense.contract_client")
 
 
 class UncertaintyBoundsUnsupportedError(RuntimeError):

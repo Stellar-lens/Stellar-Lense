@@ -10,7 +10,7 @@ Extend `detection/adversarial_features.py` to detect and neutralise adversarial 
 
 ## Background & Context
 
-As LedgerLens becomes public and its detection logic is understood by sophisticated adversaries, wash traders will attempt to craft their feature vectors to fall below detection thresholds. The attack surface includes:
+As Stellar Lense becomes public and its detection logic is understood by sophisticated adversaries, wash traders will attempt to craft their feature vectors to fall below detection thresholds. The attack surface includes:
 
 1. **Amount camouflage**: perturbing trade amounts to follow a Benford-like distribution while maintaining the same net wash volume (e.g., using a Benford-sampled noise layer on top of round-lot trades)
 2. **Timing jitter**: adding random delays to inter-arrival times to mask metronomic bot patterns
@@ -230,7 +230,7 @@ ADVERSARIAL_MIN_CLEAN_SAMPLES=200   # minimum clean samples to fit IF
 
 ## For Contributors
 
-**Ideal contributor profile**: You have experience in adversarial machine learning — either attacking ML models (evasion attacks, feature poisoning) or defending against them. You understand Isolation Forest and its limitations as an anomaly detector. Familiarity with the LedgerLens feature set and wash-trading attack vectors is important for designing effective consistency rules. Experience with the `red_team/` module in this codebase is a strong advantage.
+**Ideal contributor profile**: You have experience in adversarial machine learning — either attacking ML models (evasion attacks, feature poisoning) or defending against them. You understand Isolation Forest and its limitations as an anomaly detector. Familiarity with the Stellar Lense feature set and wash-trading attack vectors is important for designing effective consistency rules. Experience with the `red_team/` module in this codebase is a strong advantage.
 
 To apply, please comment on this issue stating:
 

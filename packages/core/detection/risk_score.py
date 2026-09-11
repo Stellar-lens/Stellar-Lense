@@ -1,8 +1,8 @@
-"""The `RiskScore` schema shared with ledgerlens-api and ledgerlens-contracts.
+"""The `RiskScore` schema shared with stellar-lense-api and stellar-lense-contracts.
 
 This mirrors the on-chain `RiskScore` struct defined in the
-ledgerlens-contracts repo (`ledgerlens-score/src/lib.rs`). Keep the two in
-sync — see README.md's "LedgerLens Organization" section for the cross-repo
+stellar-lense-contracts repo (`stellar-lense-score/src/lib.rs`). Keep the two in
+sync — see README.md's "StellarLense Organization" section for the cross-repo
 data contract.
 
 Starting from v2, the schema includes optional uncertainty fields

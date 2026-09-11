@@ -8,10 +8,10 @@ assignees: []
 `ingestion/evm_loader.py` currently connects to a single EVM JSON-RPC endpoint per chain for bridge event ingestion, creating a single point of failure for the cross-chain detection feature. When the primary RPC provider experiences downtime or rate limiting, bridge event ingestion stops entirely, creating gaps in the cross-chain feature data. Implementing multi-provider failover with health probing and per-chain block-lag monitoring will make cross-chain ingestion resilient to individual provider failures.
 
 ## Background & Context
-LedgerLens ingests bridge events from three EVM chains — Ethereum, Base, and Polygon — via `ingestion/evm_loader.py`. These events feed six cross-chain ML features (see README and `docs/cross_chain_detection.md`). Each chain requires a JSON-RPC provider to call `eth_getLogs`, `eth_getBlockNumber`, and `eth_getTransactionReceipt`.
+Stellar Lense ingests bridge events from three EVM chains — Ethereum, Base, and Polygon — via `ingestion/evm_loader.py`. These events feed six cross-chain ML features (see README and `docs/cross_chain_detection.md`). Each chain requires a JSON-RPC provider to call `eth_getLogs`, `eth_getBlockNumber`, and `eth_getTransactionReceipt`.
 
 Current production deployments typically use a single provider per chain (e.g., Infura, Alchemy, or a self-hosted node). These providers have:
-- **Rate limits**: free tiers are aggressively rate-limited; spikes in LedgerLens queries can trigger 429s
+- **Rate limits**: free tiers are aggressively rate-limited; spikes in Stellar Lense queries can trigger 429s
 - **Availability issues**: planned maintenance windows, regional outages, and DDoS attacks cause intermittent downtime
 - **Block lag**: some providers (especially public endpoints) lag behind the canonical chain head by 1–10 blocks, causing missed recent events
 
@@ -168,7 +168,7 @@ Additional settings:
 - API keys embedded in RPC URLs (e.g., `infura.io/v3/SECRET`) must never appear in logs. The `EVMProvider.__repr__` must mask the URL after the third `/` to avoid key leakage: `"https://mainnet.infura.io/v3/***"`.
 - The `EVMProviderPoolExhaustedError` message must not include the RPC URLs (which contain API keys) — only provider names and chain IDs.
 - The circuit breaker prevents a misbehaving provider from causing infinite retry loops that could exhaust rate limits or incur API cost overruns.
-- JSON-RPC `params` values from LedgerLens (block numbers, contract addresses) must be validated before serialisation to prevent injection of unexpected method calls via attacker-controlled parameter values.
+- JSON-RPC `params` values from Stellar Lense (block numbers, contract addresses) must be validated before serialisation to prevent injection of unexpected method calls via attacker-controlled parameter values.
 
 ## Testing Requirements
 - Unit tests covering `provider_score()`: healthy provider, lagging provider, circuit-open provider (score < 0)

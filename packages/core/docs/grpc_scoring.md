@@ -1,6 +1,6 @@
 # gRPC Internal Scoring Service
 
-This document describes the high-performance, low-latency gRPC Scoring Service (`ledgerlens.v1.ScoringService`) introduced in Issue #338.
+This document describes the high-performance, low-latency gRPC Scoring Service (`stellar_lense.v1.ScoringService`) introduced in Issue #338.
 
 ---
 
@@ -12,7 +12,7 @@ This document describes the high-performance, low-latency gRPC Scoring Service (
 | **Transport** | HTTP/1.1 (JSON) | HTTP/2 (Protobuf binary framing) |
 | **Serialization Overhead** | Medium (JSON parsing & Pydantic validation) | Low (Zero-copy binary Protobuf) |
 | **Streaming Support** | SSE (`/stream/scores`) | Native HTTP/2 Bidirectional Streaming (`BatchScoreWallets`) |
-| **Authentication** | `X-LedgerLens-Api-Key` HTTP Header | `x-ledgerlens-api-key` Metadata Entry |
+| **Authentication** | `X-StellarLense-Api-Key` HTTP Header | `x-stellarlense-api-key` Metadata Entry |
 | **Rate Limiting & Quotas** | Enforced via SQLite sliding window | Enforced via SQLite sliding window (shared counter with REST) |
 
 Use **REST** for standard integrations, browser/dashboard clients, and public administrative endpoints.
@@ -22,12 +22,12 @@ Use **gRPC** when gating high-throughput live transactions (e.g., exchange withd
 
 ## Protobuf Schema Reference
 
-The service is defined in `proto/ledgerlens/v1/scoring.proto`:
+The service is defined in `proto/stellar_lense/v1/scoring.proto`:
 
 ```protobuf
 syntax = "proto3";
 
-package ledgerlens.v1;
+package stellar_lense.v1;
 
 message ScoreRequest {
   string wallet = 1;
@@ -65,8 +65,8 @@ Add the following to your `.env` configuration:
 GRPC_ENABLED=true
 GRPC_PORT=50051
 GRPC_MAX_WORKERS=10
-GRPC_TLS_CERT_PATH=/etc/ssl/certs/ledgerlens.crt
-GRPC_TLS_KEY_PATH=/etc/ssl/private/ledgerlens.key
+GRPC_TLS_CERT_PATH=/etc/ssl/certs/stellar_lense.crt
+GRPC_TLS_KEY_PATH=/etc/ssl/private/stellar_lense.key
 GRPC_ALLOW_INSECURE=false
 GRPC_MAX_MESSAGE_SIZE_BYTES=4194304
 ```

@@ -1,6 +1,6 @@
 # Drift Monitoring
 
-LedgerLens runs **two independent, complementary** drift-detection
+Stellar Lense runs **two independent, complementary** drift-detection
 mechanisms. They differ in latency, scope, and what they're for — neither
 replaces the other.
 

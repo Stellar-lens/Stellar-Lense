@@ -1,6 +1,6 @@
 # Upgrading to Cost and Capacity Monitoring
 
-This guide walks you through enabling cost visibility and capacity planning for an existing LedgerLens deployment.
+This guide walks you through enabling cost visibility and capacity planning for an existing Stellar Lense deployment.
 
 ## Prerequisites Check
 
@@ -14,8 +14,8 @@ kubectl get pods -n monitoring | grep kube-state-metrics
 curl -s http://localhost:9090/api/v1/targets | \
   jq '.data.activeTargets[] | select(.labels.job == "kube-state-metrics")'
 
-# 3. Check LedgerLens metrics are scraped
-curl http://localhost:8000/metrics | grep ledgerlens_wallets_scored_total
+# 3. Check Stellar Lense metrics are scraped
+curl http://localhost:8000/metrics | grep stellar_lense_wallets_scored_total
 ```
 
 If kube-state-metrics is missing:
@@ -67,20 +67,20 @@ costConfig:
 Upgrade the release:
 
 ```bash
-helm upgrade ledgerlens ./helm/ledgerlens \
+helm upgrade stellar_lense ./helm/stellar_lense \
   -f values.prod.yaml \
-  --namespace ledgerlens
+  --namespace stellar_lense
 ```
 
 **Important:** The upgrade will:
-- Create a new ConfigMap (`ledgerlens-cost-config`)
+- Create a new ConfigMap (`stellar-lense-cost-config`)
 - Update the API deployment to mount the ConfigMap
 - Trigger a rolling restart of API pods
 
 Wait for pods to be ready:
 
 ```bash
-kubectl rollout status deployment/ledgerlens-api -n ledgerlens
+kubectl rollout status deployment/stellar-lense-api -n stellar_lense
 ```
 
 ## Step 2: Load Prometheus Rules
@@ -117,7 +117,7 @@ Verify rules are loaded:
 ```bash
 # Check recording rules appear
 curl -s http://localhost:9090/api/v1/rules | \
-  jq '.data.groups[] | select(.name == "ledgerlens_cost")'
+  jq '.data.groups[] | select(.name == "stellar_lense_cost")'
 
 # Check CapacityLimitApproaching alert is loaded
 curl -s http://localhost:9090/api/v1/rules | \
@@ -130,12 +130,12 @@ After the API restart, verify cost coefficient gauges are exposed:
 
 ```bash
 # Check /metrics endpoint
-curl http://localhost:8000/metrics | grep ledgerlens_cost_per
+curl http://localhost:8000/metrics | grep stellar_lense_cost_per
 
 # Expected output:
-# ledgerlens_cost_per_vcpu_hour_usd 0.0416
-# ledgerlens_cost_per_gb_memory_hour_usd 0.0056
-# ledgerlens_cost_per_gb_storage_month_usd 0.1
+# stellar_lense_cost_per_vcpu_hour_usd 0.0416
+# stellar_lense_cost_per_gb_memory_hour_usd 0.0056
+# stellar_lense_cost_per_gb_storage_month_usd 0.1
 ```
 
 After 5 minutes (the recording rule interval), verify cost recording rules are evaluating:
@@ -143,17 +143,17 @@ After 5 minutes (the recording rule interval), verify cost recording rules are e
 ```bash
 # Check cost-per-pod metric
 curl -s http://localhost:9090/api/v1/query \
-  --data-urlencode 'query=ledgerlens:pod_cost_per_hour:usd' | jq .
+  --data-urlencode 'query=stellar_lense:pod_cost_per_hour:usd' | jq .
 
 # Check cost-per-wallet metric
 curl -s http://localhost:9090/api/v1/query \
-  --data-urlencode 'query=ledgerlens:cost_per_wallet_scored:usd' | jq .
+  --data-urlencode 'query=stellar_lense:cost_per_wallet_scored:usd' | jq .
 ```
 
 If metrics are missing:
 1. Check Prometheus logs for rule evaluation errors
 2. Verify kube-state-metrics and cadvisor metrics are available
-3. Verify the `namespace="ledgerlens"` label matches your deployment
+3. Verify the `namespace="stellar_lense"` label matches your deployment
 
 ## Step 4: Verify Capacity Projection
 
@@ -162,11 +162,11 @@ After 15 minutes (the capacity projection rule interval), check the projection m
 ```bash
 # Check days-to-max-replicas
 curl -s http://localhost:9090/api/v1/query \
-  --data-urlencode 'query=ledgerlens:replica_count_projected_days_to_max' | jq .
+  --data-urlencode 'query=stellar_lense:replica_count_projected_days_to_max' | jq .
 
 # Check days-to-full-PVC
 curl -s http://localhost:9090/api/v1/query \
-  --data-urlencode 'query=ledgerlens:pvc_projected_days_to_full' | jq .
+  --data-urlencode 'query=stellar_lense:pvc_projected_days_to_full' | jq .
 ```
 
 **Expected behavior:**
@@ -185,7 +185,7 @@ curl -s http://localhost:9090/api/v1/query \
 4. Choose your Prometheus datasource
 5. Click "Import"
 
-The dashboard will be available at: `http://your-grafana/d/ledgerlens-cost-capacity`
+The dashboard will be available at: `http://your-grafana/d/stellar-lense-cost-capacity`
 
 ### Option B: Provisioned Dashboard (Recommended)
 
@@ -193,12 +193,12 @@ On your Grafana server:
 
 ```bash
 # Copy dashboard JSON
-sudo mkdir -p /var/lib/grafana/dashboards/ledgerlens
+sudo mkdir -p /var/lib/grafana/dashboards/stellar_lense
 sudo cp monitoring/grafana/cost_capacity_dashboard.json \
-  /var/lib/grafana/dashboards/ledgerlens/
+  /var/lib/grafana/dashboards/stellar_lense/
 
 # Copy provisioning config
-sudo cp monitoring/grafana/provisioning/dashboards/ledgerlens.yaml \
+sudo cp monitoring/grafana/provisioning/dashboards/stellar_lense.yaml \
   /etc/grafana/provisioning/dashboards/
 
 # Restart Grafana
@@ -227,7 +227,7 @@ To **simulate** the alert without waiting for real capacity exhaustion:
 
 ```bash
 # Temporarily lower the replica limit to trigger the alert
-kubectl scale deployment/ledgerlens-api --replicas=9 -n ledgerlens
+kubectl scale deployment/stellar-lense-api --replicas=9 -n stellar_lense
 
 # Wait 1 hour (the alert's `for` duration)
 # Check if CapacityLimitApproaching fires
@@ -236,7 +236,7 @@ kubectl scale deployment/ledgerlens-api --replicas=9 -n ledgerlens
 **Important:** Scale back after testing:
 
 ```bash
-kubectl scale deployment/ledgerlens-api --replicas=2 -n ledgerlens
+kubectl scale deployment/stellar-lense-api --replicas=2 -n stellar_lense
 ```
 
 ## Step 7: Update Alerting Routes (Optional)
@@ -259,7 +259,7 @@ receivers:
     slack_configs:
       - api_url: 'YOUR_SLACK_WEBHOOK'
         channel: '#sre-alerts'
-        title: 'LedgerLens Capacity Alert'
+        title: 'Stellar Lense Capacity Alert'
 ```
 
 ## Rollback Procedure
@@ -280,10 +280,10 @@ curl -X POST http://localhost:9090/-/reload
 
 ```bash
 # List release history
-helm history ledgerlens -n ledgerlens
+helm history stellar_lense -n stellar_lense
 
 # Rollback to previous revision
-helm rollback ledgerlens 1 -n ledgerlens
+helm rollback stellar_lense 1 -n stellar_lense
 ```
 
 ### Step 3: Remove Dashboard
@@ -296,7 +296,7 @@ In Grafana:
 Or for provisioned dashboards:
 
 ```bash
-sudo rm /var/lib/grafana/dashboards/ledgerlens/cost_capacity_dashboard.json
+sudo rm /var/lib/grafana/dashboards/stellar_lense/cost_capacity_dashboard.json
 sudo systemctl restart grafana-server
 ```
 
@@ -304,14 +304,14 @@ sudo systemctl restart grafana-server
 
 ### Cost Metrics Are Zero
 
-**Symptom:** `ledgerlens:pod_cost_per_hour:usd` returns 0 or no data
+**Symptom:** `stellar_lense:pod_cost_per_hour:usd` returns 0 or no data
 
 **Causes:**
 
 1. Cost coefficient gauges not initialized
    ```bash
    # Check API logs for "Cost metrics initialized"
-   kubectl logs deployment/ledgerlens-api -n ledgerlens | grep "Cost metrics initialized"
+   kubectl logs deployment/stellar-lense-api -n stellar_lense | grep "Cost metrics initialized"
    ```
 
 2. kube-state-metrics/cadvisor not scraped
@@ -360,7 +360,7 @@ sudo systemctl restart grafana-server
    ```
 
 2. Alert expression doesn't match your deployment
-   - Verify `deployment="ledgerlens-api"` and `namespace="ledgerlens"` labels match your actual deployment
+   - Verify `deployment="stellar-lense-api"` and `namespace="stellar_lense"` labels match your actual deployment
 
 **Fix:**
 
@@ -371,9 +371,9 @@ sudo systemctl restart grafana-server
 
 **Symptom:** All panels show "No data"
 
-**Cause:** Dashboard hardcodes `namespace="ledgerlens"`
+**Cause:** Dashboard hardcodes `namespace="stellar_lense"`
 
-**Fix:** Edit the dashboard JSON and replace all occurrences of `namespace="ledgerlens"` with your actual namespace, or add a template variable:
+**Fix:** Edit the dashboard JSON and replace all occurrences of `namespace="stellar_lense"` with your actual namespace, or add a template variable:
 
 1. Dashboard Settings → Variables → Add variable
 2. Name: `namespace`
@@ -386,7 +386,7 @@ Watch for these log messages after the upgrade:
 
 ```bash
 # API startup — cost metrics initialized
-kubectl logs deployment/ledgerlens-api -n ledgerlens | grep "Cost metrics initialized"
+kubectl logs deployment/stellar-lense-api -n stellar_lense | grep "Cost metrics initialized"
 # Expected: Cost metrics initialized: vCPU=$0.0416/hr, Memory=$0.0056/GB-hr, Storage=$0.10/GB-month
 
 # Prometheus — rules loaded
@@ -416,7 +416,7 @@ After the upgrade, verify:
 If you encounter issues:
 
 1. **Check logs:**
-   - API: `kubectl logs deployment/ledgerlens-api -n ledgerlens`
+   - API: `kubectl logs deployment/stellar-lense-api -n stellar_lense`
    - Prometheus: `kubectl logs deployment/prometheus -n monitoring`
    - Grafana: `kubectl logs deployment/grafana -n monitoring`
 
@@ -426,7 +426,7 @@ If you encounter issues:
 
 3. **Review documentation:**
    - [docs/cost_and_capacity.md](cost_and_capacity.md) — Comprehensive guide
-   - [monitoring/README.md](https://github.com/Ledger-Lenz/Ledgerlens-core/blob/main/monitoring/README.md) — Quick reference
+   - [monitoring/README.md](https://github.com/Stellar-lens/Stellar-Lense/blob/main/monitoring/README.md) — Quick reference
 
 4. **File an issue:**
    - Include: error logs, Prometheus version, Kubernetes version

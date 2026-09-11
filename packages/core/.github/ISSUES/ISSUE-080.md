@@ -5,10 +5,10 @@ assignees: []
 ---
 
 ## Summary
-LedgerLens has no admin API for managing model versions, retraining triggers, and runtime configuration without a server restart. Adding an admin API — protected by a separate admin key — enables operators to promote model versions, adjust score thresholds, and update alert routing rules at runtime.
+Stellar Lense has no admin API for managing model versions, retraining triggers, and runtime configuration without a server restart. Adding an admin API — protected by a separate admin key — enables operators to promote model versions, adjust score thresholds, and update alert routing rules at runtime.
 
 ## Objectives
-- [ ] Implement `api/admin_router.py` with routes protected by `X-LedgerLens-Admin-Key` header
+- [ ] Implement `api/admin_router.py` with routes protected by `X-StellarLense-Admin-Key` header
 - [ ] `GET /admin/models` — list all model versions with deployment status
 - [ ] `POST /admin/models/{version}/promote` — promote a model version to active
 - [ ] `GET /admin/config` — return current runtime configuration as JSON

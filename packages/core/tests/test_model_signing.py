@@ -117,15 +117,15 @@ class TestEmptyKey:
     def test_sign_raises_on_empty_key(self, tmp_path):
         path = str(tmp_path / "model.joblib")
         joblib.dump(object(), path)
-        with pytest.raises(ModelIntegrityError, match="LEDGERLENS_MODEL_SIGNING_KEY"):
+        with pytest.raises(ModelIntegrityError, match="STELLARLENSE_MODEL_SIGNING_KEY"):
             sign_model_file(path, b"")
 
     def test_verify_raises_on_empty_key(self, signed_model_file):
-        with pytest.raises(ModelIntegrityError, match="LEDGERLENS_MODEL_SIGNING_KEY"):
+        with pytest.raises(ModelIntegrityError, match="STELLARLENSE_MODEL_SIGNING_KEY"):
             verify_model_file(signed_model_file, b"")
 
     def test_safe_load_raises_on_empty_key(self, signed_model_file):
-        with pytest.raises(ModelIntegrityError, match="LEDGERLENS_MODEL_SIGNING_KEY"):
+        with pytest.raises(ModelIntegrityError, match="STELLARLENSE_MODEL_SIGNING_KEY"):
             safe_joblib_load(signed_model_file, b"")
 
 

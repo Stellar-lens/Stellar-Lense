@@ -10,19 +10,19 @@ Extend `detection/federated/client.py` to add differentially private stochastic 
 
 ## Background & Context
 
-LedgerLens's federated learning architecture (Flower-based) allows multiple institutional clients — e.g., exchange compliance teams — to jointly train the wash-trade detection model without sharing raw wallet transaction data. However, federated learning alone does not provide formal privacy guarantees: gradient updates can leak information about individual training examples through gradient inversion attacks (e.g., DLG — Deep Leakage from Gradients).
+Stellar Lense's federated learning architecture (Flower-based) allows multiple institutional clients — e.g., exchange compliance teams — to jointly train the wash-trade detection model without sharing raw wallet transaction data. However, federated learning alone does not provide formal privacy guarantees: gradient updates can leak information about individual training examples through gradient inversion attacks (e.g., DLG — Deep Leakage from Gradients).
 
 Differential privacy (DP) provides a formal, quantifiable bound on this leakage. DP-SGD augments standard mini-batch SGD with two operations:
 1. **Per-sample gradient clipping**: each individual sample's gradient is clipped to a maximum L2 norm (`clip_norm`), bounding the sensitivity of the aggregated gradient.
 2. **Gaussian noise injection**: calibrated Gaussian noise is added to the clipped, summed gradient before the optimizer step. The noise magnitude is determined by the `noise_multiplier` parameter.
 
-The **Rényi Differential Privacy (RDP) accountant** in Opacus tracks the cumulative privacy cost `(ε, δ)` across all gradient steps. When the target ε is reached, further training on sensitive data must stop. This ensures LedgerLens can make a binding privacy guarantee to participating clients.
+The **Rényi Differential Privacy (RDP) accountant** in Opacus tracks the cumulative privacy cost `(ε, δ)` across all gradient steps. When the target ε is reached, further training on sensitive data must stop. This ensures Stellar Lense can make a binding privacy guarantee to participating clients.
 
-The PyTorch model used in federated training must be the neural network variant of the LedgerLens classifier (or a wrapper around the sklearn/XGBoost models if a PyTorch-native model is introduced for FL). This issue should introduce a lightweight PyTorch MLP as the FL-specific model, separate from the primary RF/XGBoost/LightGBM ensemble used in non-FL scoring.
+The PyTorch model used in federated training must be the neural network variant of the Stellar Lense classifier (or a wrapper around the sklearn/XGBoost models if a PyTorch-native model is introduced for FL). This issue should introduce a lightweight PyTorch MLP as the FL-specific model, separate from the primary RF/XGBoost/LightGBM ensemble used in non-FL scoring.
 
 ## Objectives
 
-- [ ] Introduce `detection/federated/fl_model.py` defining a `WashTradeMLPClassifier` (PyTorch `nn.Module`) with configurable hidden layers, compatible with LedgerLens's 35-feature input schema.
+- [ ] Introduce `detection/federated/fl_model.py` defining a `WashTradeMLPClassifier` (PyTorch `nn.Module`) with configurable hidden layers, compatible with Stellar Lense's 35-feature input schema.
 - [ ] Extend `detection/federated/client.py` to wrap the model with `opacus.PrivacyEngine`, passing `max_grad_norm=1.0` and `noise_multiplier` (computed by `calibrate_noise_multiplier`).
 - [ ] Implement `calibrate_noise_multiplier(target_epsilon, delta, sample_rate, epochs)` in `detection/federated/privacy_utils.py` using `opacus.accountants.utils.get_noise_multiplier`.
 - [ ] Implement `PrivacyAccountant` class wrapping `opacus.accountants.RDPAccountant` with methods `step()`, `get_epsilon(delta)`, and `budget_exhausted(target_epsilon, delta) -> bool`.
@@ -203,7 +203,7 @@ FL_DP_EPOCHS_PER_ROUND=1  # local epochs per FL round
 ## Documentation Requirements
 
 - Docstrings on `PrivacyAccountant`, `calibrate_noise_multiplier`, and `train_round`.
-- New file `docs/differential_privacy.md` covering: DP-SGD mechanics, ε/δ interpretation for LedgerLens operators, noise multiplier calibration procedure, and budget management guidance.
+- New file `docs/differential_privacy.md` covering: DP-SGD mechanics, ε/δ interpretation for Stellar Lense operators, noise multiplier calibration procedure, and budget management guidance.
 - Update `README.md` with FL differential privacy capability in the Features section.
 - Document `FL_DP_*` environment variables in `.env.example`.
 - `CHANGELOG.md` entry under `## Unreleased`.

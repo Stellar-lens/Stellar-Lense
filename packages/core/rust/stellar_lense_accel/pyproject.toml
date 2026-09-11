@@ -3,10 +3,10 @@ requires = ["maturin>=1.5,<2.0"]
 build-backend = "maturin"
 
 [project]
-name = "ledgerlens-accel"
+name = "stellar-lense-accel"
 version = "0.1.0"
 requires-python = ">=3.10"
 
 [tool.maturin]
-module-name = "ledgerlens_accel"
+module-name = "stellar_lense_accel"
 features = ["pyo3/extension-module"]

@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 import requests
 
 # ---------------------------------------------------------------------------
-# Optional dependency: web3  (pip install 'ledgerlens-core[chain]')
+# Optional dependency: web3  (pip install 'stellar-lense-core[chain]')
 # ---------------------------------------------------------------------------
 try:
     from web3 import Web3
@@ -26,7 +26,7 @@ except ImportError:  # pragma: no cover
     _HAS_WEB3 = False
 
 
-logger = logging.getLogger("ledgerlens.curve_adapter")
+logger = logging.getLogger("stellar_lense.curve_adapter")
 
 if _HAS_WEB3:
     CURVE_TOKEN_EXCHANGE_TOPIC = "0x" + Web3.keccak(

@@ -12,7 +12,7 @@ import time
 
 from ingestion.data_models import OrderBookEvent
 
-logger = logging.getLogger("ledgerlens.replay_buffer")
+logger = logging.getLogger("stellar_lense.replay_buffer")
 
 __all__ = ["OrderBookReplayBuffer"]
 

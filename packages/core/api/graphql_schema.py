@@ -3,7 +3,7 @@ import logging
 from typing import Optional
 
 # ---------------------------------------------------------------------------
-# Optional dependency: strawberry-graphql  (pip install 'ledgerlens-core[graphql]')
+# Optional dependency: strawberry-graphql  (pip install 'stellar-lense-core[graphql]')
 # ---------------------------------------------------------------------------
 try:
     import strawberry
@@ -12,7 +12,7 @@ try:
 except ImportError as _strawberry_err:  # pragma: no cover
     raise ImportError(
         "'strawberry-graphql' is required by api/graphql_schema.py but is not installed.\n"
-        "  Install the 'graphql' extra:  pip install 'ledgerlens-core[graphql]'\n"
+        "  Install the 'graphql' extra:  pip install 'stellar-lense-core[graphql]'\n"
         "  Or install directly:          pip install 'strawberry-graphql[fastapi]'"
     ) from _strawberry_err
 
@@ -22,7 +22,7 @@ from detection.api_key_store import lookup_key
 from api.cross_chain_router import get_links_for_wallet
 from detection.model_registry import get_current_version
 
-logger = logging.getLogger("ledgerlens.graphql")
+logger = logging.getLogger("stellar_lense.graphql")
 
 # ---------------------------------------------------------------------------
 # GraphQL Types
@@ -114,7 +114,7 @@ def _require_scope(info: Info, scope: str) -> None:
     if request is None:
         logger.warning("GraphQL auth: no request context")
         raise strawberry.GraphQLError("Unauthorized: no request context")
-    api_key = request.headers.get("X-LedgerLens-Api-Key") or request.headers.get("X-LedgerLens-Admin-Key")
+    api_key = request.headers.get("X-StellarLense-Api-Key") or request.headers.get("X-StellarLense-Admin-Key")
     if not api_key:
         logger.warning("GraphQL auth: missing API key")
         raise strawberry.GraphQLError("Unauthorized: missing API key")
@@ -135,7 +135,7 @@ def _require_admin(info: Info) -> None:
     if request is None:
         logger.warning("GraphQL admin auth: no request context")
         raise strawberry.GraphQLError("Unauthorized: no request context")
-    admin_key = request.headers.get("X-LedgerLens-Admin-Key")
+    admin_key = request.headers.get("X-StellarLense-Admin-Key")
     if not admin_key:
         logger.warning("GraphQL admin auth: missing admin key")
         raise strawberry.GraphQLError("Unauthorized: missing admin key")

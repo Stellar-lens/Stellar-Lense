@@ -1,6 +1,6 @@
 # Interactive API (OpenAPI / Swagger UI)
 
-The LedgerLens REST API is fully described by an OpenAPI 3.1 spec.
+The Stellar Lense REST API is fully described by an OpenAPI 3.1 spec.
 
 ## Live Swagger UI
 
@@ -26,7 +26,7 @@ the spec renders below:
   src="https://petstore.swagger.io/v2/swagger.json"
   id="swagger-frame"
   style="width:100%; height:100%; border:none;"
-  title="LedgerLens OpenAPI Spec"
+  title="Stellar Lense OpenAPI Spec"
 ></iframe>
 </div>
 

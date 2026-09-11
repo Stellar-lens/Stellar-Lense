@@ -1,5 +1,5 @@
 /**
- * Zod schemas for LedgerLens API response validation.
+ * Zod schemas for StellarLense API response validation.
  *
  * All API responses are validated at runtime using these schemas.
  * Unknown fields are stripped by Zod's `.strip()` behaviour (default).
@@ -21,7 +21,7 @@ export const StellarAddressSchema = z
   .regex(/^G[A-Z2-7]{55}$/, "Invalid Stellar wallet address");
 
 /**
- * A risk score (0–100) computed by LedgerLens.
+ * A risk score (0–100) computed by StellarLense.
  *
  * IMPORTANT: This schema must stay in sync with the canonical Python model
  * (detection/risk_score.py). The contract is enforced by
@@ -29,9 +29,9 @@ export const StellarAddressSchema = z
  *
  * Field changes must be reflected in:
  *   - detection/risk_score.py (Python canonical — authoritative)
- *   - packages/ledgerlens-sdk/src/ledgerlens/models.py (Python SDK)
- *   - crates/ledgerlens-sdk/src/models.rs (Rust)
- *   - proto/ledgerlens/v1/scoring.proto
+ *   - packages/stellar-lense-sdk/src/stellar_lense/models.py (Python SDK)
+ *   - crates/stellar-lense-sdk/src/models.rs (Rust)
+ *   - proto/stellar_lense/v1/scoring.proto
  */
 export const RiskScoreSchema = z.object({
   wallet: z.string(),

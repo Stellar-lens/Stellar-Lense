@@ -1,6 +1,6 @@
 # Active Learning — Analyst Feedback Loop
 
-LedgerLens supports a human-in-the-loop feedback mechanism where analysts can submit label corrections (true wash-trade or false positive) that feed back into the retraining pipeline via importance-weighted sampling.
+Stellar Lense supports a human-in-the-loop feedback mechanism where analysts can submit label corrections (true wash-trade or false positive) that feed back into the retraining pipeline via importance-weighted sampling.
 
 ## Feedback Workflow
 
@@ -40,7 +40,7 @@ During training, correction sample weights are further multiplied by `feedback_w
 
 An attacker with API access could flood the feedback store with false corrections to degrade model quality. Mitigations:
 
-- `POST /v1/feedback` is gated behind `LEDGERLENS_ADMIN_API_KEY`
+- `POST /v1/feedback` is gated behind `STELLARLENSE_ADMIN_API_KEY`
 - Rate limited to 100 corrections per hour per IP
 - The `confidence` field is bounded `[0, 1]` server-side (422 on violation)
 - Corrections without feature vectors are stored for audit but excluded from training

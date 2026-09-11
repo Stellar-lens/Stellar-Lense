@@ -6,7 +6,7 @@ assignees: []
 
 ## Summary
 
-Extend `ingestion/horizon_streamer.py` with a token-bucket rate limiter (configurable: default 50 req/s) and backpressure signalling. When the downstream processing queue exceeds a high-watermark threshold (default: 1,000 items), pause SSE consumption and emit a WARN log. Implement adaptive rate reduction on HTTP 429 responses: halve the configured rate and restore it linearly over 60 seconds. This prevents LedgerLens from overloading the Horizon API during burst periods and protects the downstream scoring pipeline from queue saturation.
+Extend `ingestion/horizon_streamer.py` with a token-bucket rate limiter (configurable: default 50 req/s) and backpressure signalling. When the downstream processing queue exceeds a high-watermark threshold (default: 1,000 items), pause SSE consumption and emit a WARN log. Implement adaptive rate reduction on HTTP 429 responses: halve the configured rate and restore it linearly over 60 seconds. This prevents Stellar Lense from overloading the Horizon API during burst periods and protects the downstream scoring pipeline from queue saturation.
 
 ## Background & Context
 
@@ -227,7 +227,7 @@ class RateLimiterStatus(BaseModel):
 ## Security Considerations
 
 - Rate limiting is a defence-in-depth measure. An operator misconfiguring `HORIZON_RATE_LIMIT=0` would halt the streamer. Add a validation in `TokenBucket.__init__`: raise `ValueError` if `rate <= 0`.
-- The `GET /stream/rate-limiter` endpoint reveals internal queue depth and rate state, which could help an attacker time burst attacks. Gate it behind `LEDGERLENS_ADMIN_API_KEY`.
+- The `GET /stream/rate-limiter` endpoint reveals internal queue depth and rate state, which could help an attacker time burst attacks. Gate it behind `STELLARLENSE_ADMIN_API_KEY`.
 - `BackpressureController` pauses SSE consumption, potentially causing the Horizon SSE connection to time out. Implement an SSE reconnect on timeout rather than crashing: the streamer should reconnect and resume from the last cursor position.
 - Linear rate restoration is bounded by `configured_rate`: `set_rate` must enforce `new_rate <= configured_rate` during restoration to prevent the restoration overshoot exceeding the originally configured limit.
 
@@ -267,7 +267,7 @@ class RateLimiterStatus(BaseModel):
 
 ## For Contributors
 
-**Ideal contributor profile**: You have experience implementing or tuning rate limiters in high-throughput ingestion pipelines — specifically token-bucket or leaky-bucket algorithms. You understand the semantics of `asyncio` queues and backpressure in event-driven Python. Familiarity with the Horizon SSE API, HTTP 429 handling, and the LedgerLens ingestion pipeline will accelerate the integration work significantly. Experience with adaptive rate algorithms (multiplicative decrease / additive increase, similar to TCP congestion control) is a strong plus.
+**Ideal contributor profile**: You have experience implementing or tuning rate limiters in high-throughput ingestion pipelines — specifically token-bucket or leaky-bucket algorithms. You understand the semantics of `asyncio` queues and backpressure in event-driven Python. Familiarity with the Horizon SSE API, HTTP 429 handling, and the Stellar Lense ingestion pipeline will accelerate the integration work significantly. Experience with adaptive rate algorithms (multiplicative decrease / additive increase, similar to TCP congestion control) is a strong plus.
 
 To apply, please comment on this issue with:
 1. **Specialty area**: your primary expertise (e.g., streaming systems, rate limiting, async Python, ingestion pipelines).

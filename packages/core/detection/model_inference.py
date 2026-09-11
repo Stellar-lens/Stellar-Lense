@@ -24,7 +24,7 @@ from detection.gnn_model import _HAS_PYG, safe_load_gnn_checkpoint
 from detection.model_signing import assert_within_model_dir, safe_joblib_load
 from detection.adversarial_features import apply_adversarial_boost
 
-logger = logging.getLogger("ledgerlens.model_inference")
+logger = logging.getLogger("stellar_lense.model_inference")
 
 # ---------------------------------------------------------------------------
 # Per-wallet streaming Benford counters
@@ -61,7 +61,7 @@ _runtime_weights: dict[str, float] | None = None
 if TYPE_CHECKING:
     from detection.conformal import ConformalCalibrator
 
-logger = logging.getLogger("ledgerlens.model_inference")
+logger = logging.getLogger("stellar_lense.model_inference")
 
 _MODEL_FILENAMES = {
     "random_forest": "random_forest.joblib",

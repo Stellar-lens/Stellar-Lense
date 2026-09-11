@@ -44,7 +44,7 @@ def mem_store():
 @pytest.fixture
 def temp_db(tmp_path):
     """Isolated file-backed SQLite with dedup tables initialised."""
-    db_file = tmp_path / "test_ledgerlens.db"
+    db_file = tmp_path / "test_stellar_lense.db"
     db_path = str(db_file)
     # IdempotencyKeyStore.init ensures the required tables exist
     store = IdempotencyKeyStore(db_path=db_path)

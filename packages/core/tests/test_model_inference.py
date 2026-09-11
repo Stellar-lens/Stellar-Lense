@@ -104,7 +104,7 @@ def test_load_models_raises_on_missing_signing_key(tmp_path):
     import config.settings as settings_module
     object.__setattr__(settings_module.settings, "model_signing_key", "")
     try:
-        with pytest.raises(ModelIntegrityError, match="LEDGERLENS_MODEL_SIGNING_KEY"):
+        with pytest.raises(ModelIntegrityError, match="STELLARLENSE_MODEL_SIGNING_KEY"):
             load_models(str(tmp_path))
     finally:
         object.__setattr__(settings_module.settings, "model_signing_key", "test-signing-key-for-unit-tests-only")

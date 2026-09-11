@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "ledgerlens.fullname" . }}
+  name: {{ include "stellar-lense.fullname" . }}
   labels:
-    {{- include "ledgerlens.labels" . | nindent 4 }}
+    {{- include "stellar-lense.labels" . | nindent 4 }}
 data:
   HORIZON_URL: {{ .Values.config.HORIZON_URL | quote }}
   HORIZON_STREAM_URL: {{ .Values.config.HORIZON_STREAM_URL | quote }}
@@ -18,7 +18,7 @@ data:
   FEATURE_STORE_TTL_HOURS: {{ .Values.config.FEATURE_STORE_TTL_HOURS | quote }}
   FEATURE_STORE_FLUSH_INTERVAL_SECONDS: {{ .Values.config.FEATURE_STORE_FLUSH_INTERVAL_SECONDS | quote }}
   MODEL_DIR: {{ .Values.config.MODEL_DIR | quote }}
-  LEDGERLENS_DB_PATH: {{ .Values.config.LEDGERLENS_DB_PATH | quote }}
+  STELLARLENSE_DB_PATH: {{ .Values.config.STELLARLENSE_DB_PATH | quote }}
   HORIZON_RATE_LIMIT: {{ .Values.config.HORIZON_RATE_LIMIT | quote }}
   HORIZON_RATE_BUCKET_CAPACITY: {{ .Values.config.HORIZON_RATE_BUCKET_CAPACITY | quote }}
   STREAMER_QUEUE_MAXSIZE: {{ .Values.config.STREAMER_QUEUE_MAXSIZE | quote }}

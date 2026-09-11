@@ -6,7 +6,7 @@ assignees: []
 
 ## Summary
 
-LedgerLens currently uses Tarjan's strongly connected component algorithm to identify wash rings. While effective for closed loops, SCC cannot identify open wash structures (chain laundering, star-hub relay networks) or rank ring-member confidence. A Graph Neural Network trained on labelled transaction subgraphs replaces and extends the SCC heuristic — classifying each wallet node as a wash-ring member with a confidence score, capturing structural patterns SCC cannot express.
+Stellar Lense currently uses Tarjan's strongly connected component algorithm to identify wash rings. While effective for closed loops, SCC cannot identify open wash structures (chain laundering, star-hub relay networks) or rank ring-member confidence. A Graph Neural Network trained on labelled transaction subgraphs replaces and extends the SCC heuristic — classifying each wallet node as a wash-ring member with a confidence score, capturing structural patterns SCC cannot express.
 
 ## Background & Context
 

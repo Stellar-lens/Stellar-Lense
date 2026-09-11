@@ -21,7 +21,7 @@ Example (JavaScript EventSource client)
 -----------------------------------------
     const es = new EventSource(
         'http://localhost:8000/stream/scores?wallets=GABC...XYZ',
-        { headers: { 'X-LedgerLens-Admin-Key': 'your-key' } }
+        { headers: { 'X-StellarLense-Admin-Key': 'your-key' } }
     );
     es.addEventListener('score_update', (e) => {
         const data = JSON.parse(e.data);
@@ -167,7 +167,7 @@ async def stream_scores(
     wallet_list = raw_wallets[: getattr(settings, 'sse_max_wallets_per_connection', 50) ]
 
     # Connection limit per API key (best-effort when Redis available)
-    api_key_id = request.headers.get("X-LedgerLens-Admin-Key", "anonymous")
+    api_key_id = request.headers.get("X-StellarLense-Admin-Key", "anonymous")
     connection_id = str(uuid.uuid4())
 
     manager = _get_manager()

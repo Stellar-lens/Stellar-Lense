@@ -1,8 +1,8 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "LedgerLens API",
-    "description": "LedgerLens REST API for Stellar wallet risk scoring, alert management, AMM pool risk, cross-chain linking, and compliance exports. See [ReDoc](/redoc) for an alternative documentation view.",
+    "title": "Stellar Lense API",
+    "description": "Stellar Lense REST API for Stellar wallet risk scoring, alert management, AMM pool risk, cross-chain linking, and compliance exports. See [ReDoc](/redoc) for an alternative documentation view.",
     "version": "1.0.0"
   },
   "paths": {
@@ -43,13 +43,13 @@
             "description": "Asset pair to focus on (optional; defaults to highest-scored pair)"
           },
           {
-            "name": "x-ledgerlens-admin-key",
+            "name": "x-stellarlense-admin-key",
             "in": "header",
             "required": false,
             "schema": {
               "type": "string",
               "default": "",
-              "title": "X-Ledgerlens-Admin-Key"
+              "title": "X-StellarLense-Admin-Key"
             }
           }
         ],
@@ -114,13 +114,13 @@
             }
           },
           {
-            "name": "x-ledgerlens-admin-key",
+            "name": "x-stellarlense-admin-key",
             "in": "header",
             "required": false,
             "schema": {
               "type": "string",
               "default": "",
-              "title": "X-Ledgerlens-Admin-Key"
+              "title": "X-StellarLense-Admin-Key"
             }
           }
         ],
@@ -195,13 +195,13 @@
             }
           },
           {
-            "name": "x-ledgerlens-admin-key",
+            "name": "x-stellarlense-admin-key",
             "in": "header",
             "required": false,
             "schema": {
               "type": "string",
               "default": "",
-              "title": "X-Ledgerlens-Admin-Key"
+              "title": "X-StellarLense-Admin-Key"
             }
           }
         ],
@@ -260,13 +260,13 @@
             }
           },
           {
-            "name": "x-ledgerlens-admin-key",
+            "name": "x-stellarlense-admin-key",
             "in": "header",
             "required": false,
             "schema": {
               "type": "string",
               "default": "",
-              "title": "X-Ledgerlens-Admin-Key"
+              "title": "X-StellarLense-Admin-Key"
             }
           }
         ],
@@ -328,13 +328,13 @@
             }
           },
           {
-            "name": "x-ledgerlens-admin-key",
+            "name": "x-stellarlense-admin-key",
             "in": "header",
             "required": false,
             "schema": {
               "type": "string",
               "default": "",
-              "title": "X-Ledgerlens-Admin-Key"
+              "title": "X-StellarLense-Admin-Key"
             }
           }
         ],
@@ -377,13 +377,13 @@
         "operationId": "analyst_stats_analyst_stats_get",
         "parameters": [
           {
-            "name": "x-ledgerlens-admin-key",
+            "name": "x-stellarlense-admin-key",
             "in": "header",
             "required": false,
             "schema": {
               "type": "string",
               "default": "",
-              "title": "X-Ledgerlens-Admin-Key"
+              "title": "X-StellarLense-Admin-Key"
             }
           }
         ],
@@ -423,13 +423,13 @@
         "operationId": "analyst_case_stats_analyst_case_stats_get",
         "parameters": [
           {
-            "name": "x-ledgerlens-admin-key",
+            "name": "x-stellarlense-admin-key",
             "in": "header",
             "required": false,
             "schema": {
               "type": "string",
               "default": "",
-              "title": "X-Ledgerlens-Admin-Key"
+              "title": "X-StellarLense-Admin-Key"
             }
           }
         ],
@@ -480,13 +480,13 @@
             "description": "ISO-8601 timestamp; returns all feedback submitted at or after this time"
           },
           {
-            "name": "x-ledgerlens-admin-key",
+            "name": "x-stellarlense-admin-key",
             "in": "header",
             "required": false,
             "schema": {
               "type": "string",
               "default": "",
-              "title": "X-Ledgerlens-Admin-Key"
+              "title": "X-StellarLense-Admin-Key"
             }
           }
         ],
@@ -541,13 +541,13 @@
             }
           },
           {
-            "name": "x-ledgerlens-admin-key",
+            "name": "x-stellarlense-admin-key",
             "in": "header",
             "required": false,
             "schema": {
               "type": "string",
               "default": "",
-              "title": "X-Ledgerlens-Admin-Key"
+              "title": "X-StellarLense-Admin-Key"
             }
           }
         ],
@@ -608,13 +608,13 @@
             }
           },
           {
-            "name": "x-ledgerlens-admin-key",
+            "name": "x-stellarlense-admin-key",
             "in": "header",
             "required": false,
             "schema": {
               "type": "string",
               "default": "",
-              "title": "X-Ledgerlens-Admin-Key"
+              "title": "X-StellarLense-Admin-Key"
             }
           }
         ],
@@ -672,13 +672,13 @@
             }
           },
           {
-            "name": "x-ledgerlens-admin-key",
+            "name": "x-stellarlense-admin-key",
             "in": "header",
             "required": false,
             "schema": {
               "type": "string",
               "default": "",
-              "title": "X-Ledgerlens-Admin-Key"
+              "title": "X-StellarLense-Admin-Key"
             }
           }
         ],
@@ -732,13 +732,13 @@
             }
           },
           {
-            "name": "x-ledgerlens-admin-key",
+            "name": "x-stellarlense-admin-key",
             "in": "header",
             "required": false,
             "schema": {
               "type": "string",
               "default": "",
-              "title": "X-Ledgerlens-Admin-Key"
+              "title": "X-StellarLense-Admin-Key"
             }
           }
         ],
@@ -774,13 +774,13 @@
         "operationId": "create_key_admin_api_keys_post",
         "parameters": [
           {
-            "name": "x-ledgerlens-admin-key",
+            "name": "x-stellarlense-admin-key",
             "in": "header",
             "required": false,
             "schema": {
               "type": "string",
               "default": "",
-              "title": "X-Ledgerlens-Admin-Key"
+              "title": "X-StellarLense-Admin-Key"
             }
           }
         ],
@@ -828,13 +828,13 @@
         "operationId": "get_keys_admin_api_keys_get",
         "parameters": [
           {
-            "name": "x-ledgerlens-admin-key",
+            "name": "x-stellarlense-admin-key",
             "in": "header",
             "required": false,
             "schema": {
               "type": "string",
               "default": "",
-              "title": "X-Ledgerlens-Admin-Key"
+              "title": "X-StellarLense-Admin-Key"
             }
           }
         ],
@@ -886,13 +886,13 @@
             }
           },
           {
-            "name": "x-ledgerlens-admin-key",
+            "name": "x-stellarlense-admin-key",
             "in": "header",
             "required": false,
             "schema": {
               "type": "string",
               "default": "",
-              "title": "X-Ledgerlens-Admin-Key"
+              "title": "X-StellarLense-Admin-Key"
             }
           }
         ],
@@ -951,13 +951,13 @@
             }
           },
           {
-            "name": "x-ledgerlens-admin-key",
+            "name": "x-stellarlense-admin-key",
             "in": "header",
             "required": false,
             "schema": {
               "type": "string",
               "default": "",
-              "title": "X-Ledgerlens-Admin-Key"
+              "title": "X-StellarLense-Admin-Key"
             }
           }
         ],
@@ -1132,13 +1132,13 @@
             }
           },
           {
-            "name": "x-ledgerlens-admin-key",
+            "name": "x-stellarlense-admin-key",
             "in": "header",
             "required": false,
             "schema": {
               "type": "string",
               "default": "",
-              "title": "X-Ledgerlens-Admin-Key"
+              "title": "X-StellarLense-Admin-Key"
             }
           }
         ],
@@ -1224,13 +1224,13 @@
             }
           },
           {
-            "name": "x-ledgerlens-admin-key",
+            "name": "x-stellarlense-admin-key",
             "in": "header",
             "required": false,
             "schema": {
               "type": "string",
               "default": "",
-              "title": "X-Ledgerlens-Admin-Key"
+              "title": "X-StellarLense-Admin-Key"
             }
           }
         ],
@@ -1334,13 +1334,13 @@
             }
           },
           {
-            "name": "x-ledgerlens-admin-key",
+            "name": "x-stellarlense-admin-key",
             "in": "header",
             "required": false,
             "schema": {
               "type": "string",
               "default": "",
-              "title": "X-Ledgerlens-Admin-Key"
+              "title": "X-StellarLense-Admin-Key"
             }
           }
         ],
@@ -1499,13 +1499,13 @@
             }
           },
           {
-            "name": "x-ledgerlens-admin-key",
+            "name": "x-stellarlense-admin-key",
             "in": "header",
             "required": false,
             "schema": {
               "type": "string",
               "default": "",
-              "title": "X-Ledgerlens-Admin-Key"
+              "title": "X-StellarLense-Admin-Key"
             }
           }
         ],
@@ -1556,13 +1556,13 @@
             }
           },
           {
-            "name": "x-ledgerlens-admin-key",
+            "name": "x-stellarlense-admin-key",
             "in": "header",
             "required": false,
             "schema": {
               "type": "string",
               "default": "",
-              "title": "X-Ledgerlens-Admin-Key"
+              "title": "X-StellarLense-Admin-Key"
             }
           }
         ],
@@ -1600,13 +1600,13 @@
         "operationId": "get_audit_summary_audit_summary_get",
         "parameters": [
           {
-            "name": "x-ledgerlens-admin-key",
+            "name": "x-stellarlense-admin-key",
             "in": "header",
             "required": false,
             "schema": {
               "type": "string",
               "default": "",
-              "title": "X-Ledgerlens-Admin-Key"
+              "title": "X-StellarLense-Admin-Key"
             }
           }
         ],
@@ -1653,13 +1653,13 @@
             }
           },
           {
-            "name": "x-ledgerlens-admin-key",
+            "name": "x-stellarlense-admin-key",
             "in": "header",
             "required": false,
             "schema": {
               "type": "string",
               "default": "",
-              "title": "X-Ledgerlens-Admin-Key"
+              "title": "X-StellarLense-Admin-Key"
             }
           }
         ],
@@ -1791,13 +1791,13 @@
         "operationId": "rate_limiter_status_stream_rate_limiter_get",
         "parameters": [
           {
-            "name": "x-ledgerlens-admin-key",
+            "name": "x-stellarlense-admin-key",
             "in": "header",
             "required": false,
             "schema": {
               "type": "string",
               "default": "",
-              "title": "X-Ledgerlens-Admin-Key"
+              "title": "X-StellarLense-Admin-Key"
             }
           }
         ],
@@ -1852,17 +1852,17 @@
           "System"
         ],
         "summary": "Prometheus metrics",
-        "description": "Expose all LedgerLens Prometheus metrics in the standard text exposition format. Requires the ``X-LedgerLens-Admin-Key`` header when ``LEDGERLENS_ADMIN_API_KEY`` is configured. Returns ``503`` when ``METRICS_ENABLED=False``.",
+        "description": "Expose all Stellar Lense Prometheus metrics in the standard text exposition format. Requires the ``X-StellarLense-Admin-Key`` header when ``STELLARLENSE_ADMIN_API_KEY`` is configured. Returns ``503`` when ``METRICS_ENABLED=False``.",
         "operationId": "prometheus_metrics_metrics_get",
         "parameters": [
           {
-            "name": "x-ledgerlens-admin-key",
+            "name": "x-stellarlense-admin-key",
             "in": "header",
             "required": false,
             "schema": {
               "type": "string",
               "default": "",
-              "title": "X-Ledgerlens-Admin-Key"
+              "title": "X-StellarLense-Admin-Key"
             }
           }
         ],
@@ -1966,17 +1966,17 @@
     "/admin/namespaces": {
       "get": {
         "summary": "Admin Namespaces",
-        "description": "Return every namespace with per-table record counts.\n\nAdmin-only (requires the ``LEDGERLENS_ADMIN_API_KEY`` header).\nGated by `require_admin_key` \u2014 the admin wildcard API key is\nrequired to see cross-namespace data.",
+        "description": "Return every namespace with per-table record counts.\n\nAdmin-only (requires the ``STELLARLENSE_ADMIN_API_KEY`` header).\nGated by `require_admin_key` \u2014 the admin wildcard API key is\nrequired to see cross-namespace data.",
         "operationId": "admin_namespaces_admin_namespaces_get",
         "parameters": [
           {
-            "name": "x-ledgerlens-admin-key",
+            "name": "x-stellarlense-admin-key",
             "in": "header",
             "required": false,
             "schema": {
               "type": "string",
               "default": "",
-              "title": "X-Ledgerlens-Admin-Key"
+              "title": "X-StellarLense-Admin-Key"
             }
           }
         ],
@@ -2012,7 +2012,7 @@
     "/admin/namespaces/{namespace_id}/rotate-key": {
       "post": {
         "summary": "Admin Rotate Namespace Key",
-        "description": "Rotate the namespace key. Marks the old one rotating, creates a new one.\n\nAdmin-only (requires the ``LEDGERLENS_ADMIN_API_KEY`` header).",
+        "description": "Rotate the namespace key. Marks the old one rotating, creates a new one.\n\nAdmin-only (requires the ``STELLARLENSE_ADMIN_API_KEY`` header).",
         "operationId": "admin_rotate_namespace_key_admin_namespaces__namespace_id__rotate_key_post",
         "parameters": [
           {
@@ -2035,13 +2035,13 @@
             }
           },
           {
-            "name": "x-ledgerlens-admin-key",
+            "name": "x-stellarlense-admin-key",
             "in": "header",
             "required": false,
             "schema": {
               "type": "string",
               "default": "",
-              "title": "X-Ledgerlens-Admin-Key"
+              "title": "X-StellarLense-Admin-Key"
             }
           }
         ],
@@ -2158,13 +2158,13 @@
         "operationId": "gnn_stats_admin_gnn_stats_get",
         "parameters": [
           {
-            "name": "x-ledgerlens-admin-key",
+            "name": "x-stellarlense-admin-key",
             "in": "header",
             "required": false,
             "schema": {
               "type": "string",
               "default": "",
-              "title": "X-Ledgerlens-Admin-Key"
+              "title": "X-StellarLense-Admin-Key"
             }
           }
         ],
@@ -2299,13 +2299,13 @@
         "operationId": "submit_analyst_feedback_v1_feedback_post",
         "parameters": [
           {
-            "name": "x-ledgerlens-admin-key",
+            "name": "x-stellarlense-admin-key",
             "in": "header",
             "required": false,
             "schema": {
               "type": "string",
               "default": "",
-              "title": "X-Ledgerlens-Admin-Key"
+              "title": "X-StellarLense-Admin-Key"
             }
           }
         ],
@@ -2371,13 +2371,13 @@
             }
           },
           {
-            "name": "x-ledgerlens-admin-key",
+            "name": "x-stellarlense-admin-key",
             "in": "header",
             "required": false,
             "schema": {
               "type": "string",
               "default": "",
-              "title": "X-Ledgerlens-Admin-Key"
+              "title": "X-StellarLense-Admin-Key"
             }
           }
         ],
@@ -2529,7 +2529,7 @@
     "/v1/scores/{wallet}/explain": {
       "get": {
         "summary": "Explain Wallet Score",
-        "description": "Return a waterfall-style SHAP explanation for ``wallet`` on ``asset_pair``.\n\nProduces ranked per-feature SHAP contributions, the SHAP base value\n(expected model output), and a human-readable summary sentence.\n\nRequires ``X-LedgerLens-Admin-Key`` header for authentication.\n\n- **200** \u2014 waterfall explanation returned.\n- **404** \u2014 no feature vector or scores found for the given wallet.\n- **422** \u2014 unknown ``model`` name.\n- **503** \u2014 models were not loaded at startup.",
+        "description": "Return a waterfall-style SHAP explanation for ``wallet`` on ``asset_pair``.\n\nProduces ranked per-feature SHAP contributions, the SHAP base value\n(expected model output), and a human-readable summary sentence.\n\nRequires ``X-StellarLense-Admin-Key`` header for authentication.\n\n- **200** \u2014 waterfall explanation returned.\n- **404** \u2014 no feature vector or scores found for the given wallet.\n- **422** \u2014 unknown ``model`` name.\n- **503** \u2014 models were not loaded at startup.",
         "operationId": "explain_wallet_score_v1_scores__wallet__explain_get",
         "parameters": [
           {
@@ -2691,23 +2691,23 @@
             }
           },
           {
-            "name": "X-LedgerLens-Api-Key",
+            "name": "X-StellarLense-Api-Key",
             "in": "header",
             "required": false,
             "schema": {
               "type": "string",
               "default": "",
-              "title": "X-Ledgerlens-Api-Key"
+              "title": "X-StellarLense-Api-Key"
             }
           },
           {
-            "name": "X-LedgerLens-Admin-Key",
+            "name": "X-StellarLense-Admin-Key",
             "in": "header",
             "required": false,
             "schema": {
               "type": "string",
               "default": "",
-              "title": "X-Ledgerlens-Admin-Key"
+              "title": "X-StellarLense-Admin-Key"
             }
           }
         ],
@@ -3188,13 +3188,13 @@
         "operationId": "submit_feedback_v1_feedback_ground_truth_post",
         "parameters": [
           {
-            "name": "x-ledgerlens-admin-key",
+            "name": "x-stellarlense-admin-key",
             "in": "header",
             "required": false,
             "schema": {
               "type": "string",
               "default": "",
-              "title": "X-Ledgerlens-Admin-Key"
+              "title": "X-StellarLense-Admin-Key"
             }
           }
         ],
@@ -3244,13 +3244,13 @@
         "operationId": "slo_status_v1_admin_slo_status_get",
         "parameters": [
           {
-            "name": "x-ledgerlens-admin-key",
+            "name": "x-stellarlense-admin-key",
             "in": "header",
             "required": false,
             "schema": {
               "type": "string",
               "default": "",
-              "title": "X-Ledgerlens-Admin-Key"
+              "title": "X-StellarLense-Admin-Key"
             }
           }
         ],
@@ -3302,13 +3302,13 @@
             }
           },
           {
-            "name": "x-ledgerlens-admin-key",
+            "name": "x-stellarlense-admin-key",
             "in": "header",
             "required": false,
             "schema": {
               "type": "string",
               "default": "",
-              "title": "X-Ledgerlens-Admin-Key"
+              "title": "X-StellarLense-Admin-Key"
             }
           }
         ],
@@ -3351,13 +3351,13 @@
         "operationId": "robustness_report_v1_admin_robustness_report_get",
         "parameters": [
           {
-            "name": "x-ledgerlens-admin-key",
+            "name": "x-stellarlense-admin-key",
             "in": "header",
             "required": false,
             "schema": {
               "type": "string",
               "default": "",
-              "title": "X-Ledgerlens-Admin-Key"
+              "title": "X-StellarLense-Admin-Key"
             }
           }
         ],
@@ -3451,13 +3451,13 @@
             "description": "Filter by model, e.g. random_forest"
           },
           {
-            "name": "x-ledgerlens-admin-key",
+            "name": "x-stellarlense-admin-key",
             "in": "header",
             "required": false,
             "schema": {
               "type": "string",
               "default": "",
-              "title": "X-Ledgerlens-Admin-Key"
+              "title": "X-StellarLense-Admin-Key"
             }
           }
         ],
@@ -3509,13 +3509,13 @@
             }
           },
           {
-            "name": "x-ledgerlens-admin-key",
+            "name": "x-stellarlense-admin-key",
             "in": "header",
             "required": false,
             "schema": {
               "type": "string",
               "default": "",
-              "title": "X-Ledgerlens-Admin-Key"
+              "title": "X-StellarLense-Admin-Key"
             }
           }
         ],
@@ -3567,13 +3567,13 @@
             }
           },
           {
-            "name": "x-ledgerlens-admin-key",
+            "name": "x-stellarlense-admin-key",
             "in": "header",
             "required": false,
             "schema": {
               "type": "string",
               "default": "",
-              "title": "X-Ledgerlens-Admin-Key"
+              "title": "X-StellarLense-Admin-Key"
             }
           }
         ],
@@ -3867,13 +3867,13 @@
             }
           },
           {
-            "name": "x-ledgerlens-admin-key",
+            "name": "x-stellarlense-admin-key",
             "in": "header",
             "required": false,
             "schema": {
               "type": "string",
               "default": "",
-              "title": "X-Ledgerlens-Admin-Key"
+              "title": "X-StellarLense-Admin-Key"
             }
           }
         ],
@@ -3937,13 +3937,13 @@
         "operationId": "create_proposal_endpoint_v1_governance_proposals_post",
         "parameters": [
           {
-            "name": "x-ledgerlens-admin-key",
+            "name": "x-stellarlense-admin-key",
             "in": "header",
             "required": false,
             "schema": {
               "type": "string",
               "default": "",
-              "title": "X-Ledgerlens-Admin-Key"
+              "title": "X-StellarLense-Admin-Key"
             }
           }
         ],
@@ -3998,13 +3998,13 @@
             }
           },
           {
-            "name": "x-ledgerlens-admin-key",
+            "name": "x-stellarlense-admin-key",
             "in": "header",
             "required": false,
             "schema": {
               "type": "string",
               "default": "",
-              "title": "X-Ledgerlens-Admin-Key"
+              "title": "X-StellarLense-Admin-Key"
             }
           }
         ],
@@ -4059,13 +4059,13 @@
             }
           },
           {
-            "name": "x-ledgerlens-admin-key",
+            "name": "x-stellarlense-admin-key",
             "in": "header",
             "required": false,
             "schema": {
               "type": "string",
               "default": "",
-              "title": "X-Ledgerlens-Admin-Key"
+              "title": "X-StellarLense-Admin-Key"
             }
           }
         ],

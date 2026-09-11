@@ -4,7 +4,7 @@ Historically, three independent in-process ``dict``s implemented "per-key
 rate limiting" in this codebase (``api/gateway.py``, ``detection/api_key_store.py``,
 and the deprecated ``api/api_keys_router.py``), none of which shared state
 with any other. Under the project's documented horizontally-scaled deployment
-(``helm/ledgerlens/values.yaml``: 2-10 replicas) and split REST/gRPC processes,
+(``helm/stellar_lense/values.yaml``: 2-10 replicas) and split REST/gRPC processes,
 this meant a key's *effective* ceiling was ``configured_limit x N`` for N
 independent enforcing processes rather than ``configured_limit``.
 
@@ -55,7 +55,7 @@ codebase's WAF (``docs/waf_and_rate_limiting.md``) and FeatureStore
 Unlike a silent regression, though: falling back is guarded by a
 :class:`~utils.circuit_breaker.CircuitBreaker` (avoids hammering a down
 Redis on every request), logs a ``WARNING`` on each open/close transition,
-and increments the ``ledgerlens_rate_limiter_fallback_total`` Prometheus
+and increments the ``stellar_lense_rate_limiter_fallback_total`` Prometheus
 counter on every request served from the fallback path -- so the
 degradation is loud, not silent.
 """
@@ -69,7 +69,7 @@ from threading import Lock
 from config.settings import settings
 from utils.circuit_breaker import CircuitBreaker
 
-logger = logging.getLogger("ledgerlens.rate_limiter")
+logger = logging.getLogger("stellar_lense.rate_limiter")
 
 # Consecutive Redis failures before the circuit opens (fallback engaged).
 # Lower than FeatureStore's threshold (3) is not warranted here -- same
@@ -285,18 +285,18 @@ class DistributedRateLimiter:
 
 def _emit_fallback_metric() -> None:
     try:
-        from api.metrics import ledgerlens_rate_limiter_fallback_total
+        from api.metrics import stellar_lense_rate_limiter_fallback_total
 
-        ledgerlens_rate_limiter_fallback_total.inc()
+        stellar_lense_rate_limiter_fallback_total.inc()
     except Exception:
         pass
 
 
 def _emit_check_metric(backend: str) -> None:
     try:
-        from api.metrics import ledgerlens_rate_limiter_checks_total
+        from api.metrics import stellar_lense_rate_limiter_checks_total
 
-        ledgerlens_rate_limiter_checks_total.labels(backend=backend).inc()
+        stellar_lense_rate_limiter_checks_total.labels(backend=backend).inc()
     except Exception:
         pass
 

@@ -1,4 +1,4 @@
-"""Detection-specific exception classes used across the ledgerlens pipeline."""
+"""Detection-specific exception classes used across the stellar_lense pipeline."""
 
 
 class SubmissionLeaseError(Exception):

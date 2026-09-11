@@ -1,6 +1,6 @@
 """SQLite-backed persistence for `RiskScore` records and on-chain submission audit log.
 
-`ledgerlens-api` will eventually own the canonical score store; until that
+`stellar-lense-api` will eventually own the canonical score store; until that
 integration point is wired up (see README's "Open Integration Points"),
 `run_pipeline.py` and the local API (`api/main.py`) persist and read
 `RiskScore` records here.
@@ -35,7 +35,7 @@ from config.settings import settings
 from detection.risk_score import RiskScore
 from ingestion.data_models import BridgeTransfer, PathPayment, Trade
 
-logger = logging.getLogger("ledgerlens.storage")
+logger = logging.getLogger("stellar_lense.storage")
 
 # Database configuration constants
 _DB_TIMEOUT_SECONDS = 30.0

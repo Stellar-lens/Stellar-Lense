@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 
 from config.settings import settings
 
-logger = logging.getLogger("ledgerlens.wallet_overrides")
+logger = logging.getLogger("stellar_lense.wallet_overrides")
 
 
 _CREATE_TABLE = """

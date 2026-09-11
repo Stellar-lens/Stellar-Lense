@@ -1,10 +1,10 @@
-# LedgerLens Contract Fuzzing
+# Stellar Lense Contract Fuzzing
 
-This document describes the fuzzing infrastructure for the LedgerLens Soroban smart contracts (`oracle_aggregator` and `zk_verifier`). Fuzzing systematically tests contract entrypoints for integer overflow, authorization bypass, and malformed-input panics using `cargo-fuzz` (libFuzzer).
+This document describes the fuzzing infrastructure for the Stellar Lense Soroban smart contracts (`oracle_aggregator` and `zk_verifier`). Fuzzing systematically tests contract entrypoints for integer overflow, authorization bypass, and malformed-input panics using `cargo-fuzz` (libFuzzer).
 
 ## Overview
 
-The fuzzing infrastructure targets the trust boundary of our on-chain components — the Soroban contracts that AMMs, lending protocols, and DEX aggregators on Stellar query natively. A reachable panic, an authorization bypass, or a malformed-input DoS is a direct threat to the composability guarantees the entire LedgerLens project is built on.
+The fuzzing infrastructure targets the trust boundary of our on-chain components — the Soroban contracts that AMMs, lending protocols, and DEX aggregators on Stellar query natively. A reachable panic, an authorization bypass, or a malformed-input DoS is a direct threat to the composability guarantees the entire Stellar Lense project is built on.
 
 ### Why Fuzzing?
 
@@ -409,7 +409,7 @@ Install cargo-fuzz:
 cargo install cargo-fuzz
 ```
 
-### "error: package `ledgerlens-zk-verifier v0.1.0` cannot be built because it requires rustc 1.XX or newer"
+### "error: package `stellar-lense-zk-verifier v0.1.0` cannot be built because it requires rustc 1.XX or newer"
 
 Use nightly Rust:
 
@@ -464,5 +464,5 @@ Do not merge a fuzz harness that consistently fails on a known bug — it breaks
 - [cargo-fuzz documentation](https://rust-fuzz.github.io/book/cargo-fuzz.html)
 - [libFuzzer options](https://llvm.org/docs/LibFuzzer.html#options)
 - [Soroban SDK testing guide](https://soroban.stellar.org/docs/how-to-guides/testing)
-- [LedgerLens Oracle Quorum design](oracle_quorum.md)
-- [LedgerLens Soroban Operations](soroban_operations.md)
+- [Stellar Lense Oracle Quorum design](oracle_quorum.md)
+- [Stellar Lense Soroban Operations](soroban_operations.md)

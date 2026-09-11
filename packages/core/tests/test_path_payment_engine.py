@@ -237,7 +237,7 @@ def test_api_path_cycles_endpoint(tmp_path):
     from detection.storage import init_db, save_hop_payment_cycles
 
     db = str(tmp_path / "test.db")
-    object.__setattr__(settings_module.settings, "ledgerlens_db_path", db)
+    object.__setattr__(settings_module.settings, "stellarlense_db_path", db)
 
     init_db(db)
     cycle = PathPaymentCycle(

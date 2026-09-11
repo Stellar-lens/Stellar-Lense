@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import httpx
 
-from .exceptions import LedgerLensAPIError
+from .exceptions import StellarLenseAPIError
 
 DEFAULT_TIMEOUT = 10.0
-ADMIN_KEY_HEADER = "X-LedgerLens-Admin-Key"
+ADMIN_KEY_HEADER = "X-StellarLense-Admin-Key"
 
 
 def build_headers(api_key: str | None) -> dict[str, str]:
@@ -28,7 +28,7 @@ def clean_params(params: dict | None) -> dict | None:
 
 
 def raise_for_status(response: httpx.Response) -> None:
-    """Raise `LedgerLensAPIError` for any non-2xx response."""
+    """Raise `StellarLenseAPIError` for any non-2xx response."""
     if response.is_success:
         return
     detail = response.text
@@ -38,4 +38,4 @@ def raise_for_status(response: httpx.Response) -> None:
             detail = str(body["detail"])
     except ValueError:
         pass
-    raise LedgerLensAPIError(response.status_code, detail, response.text)
+    raise StellarLenseAPIError(response.status_code, detail, response.text)

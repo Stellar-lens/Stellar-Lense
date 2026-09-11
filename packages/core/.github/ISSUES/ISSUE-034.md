@@ -5,7 +5,7 @@ assignees: []
 ---
 
 ## Summary
-The current LedgerLens detection pipeline identifies wash rings through Tarjan's SCC algorithm in `detection/graph_engine.py` and extracts graph-structural features (ring membership, ring size, cycle volume ratio, timing tightness) for the tabular ML ensemble. This purely structural approach treats each wallet's graph features as independent tabular inputs, discarding the rich relational information encoded in the full trade graph topology. A Graph Neural Network (GNN) trained directly on the trade graph can learn complex multi-hop structural patterns (e.g., nested rings, coordinated multi-asset wash cycles) that are invisible to node-level tabular features alone. This issue implements a GraphSAGE or Graph Attention Network (GAT) classifier in `detection/gnn_model.py` using PyTorch Geometric and integrates it into the ensemble scoring pipeline.
+The current Stellar Lense detection pipeline identifies wash rings through Tarjan's SCC algorithm in `detection/graph_engine.py` and extracts graph-structural features (ring membership, ring size, cycle volume ratio, timing tightness) for the tabular ML ensemble. This purely structural approach treats each wallet's graph features as independent tabular inputs, discarding the rich relational information encoded in the full trade graph topology. A Graph Neural Network (GNN) trained directly on the trade graph can learn complex multi-hop structural patterns (e.g., nested rings, coordinated multi-asset wash cycles) that are invisible to node-level tabular features alone. This issue implements a GraphSAGE or Graph Attention Network (GAT) classifier in `detection/gnn_model.py` using PyTorch Geometric and integrates it into the ensemble scoring pipeline.
 
 ## Background & Context
 `detection/graph_engine.py` builds a directed weighted trade graph where nodes are Stellar account addresses and edges carry `total_volume`, `trade_count`, and timestamp information. The current pipeline extracts per-node features from this graph and passes them to the tabular ensemble. This discards structural information beyond the immediate SCC.
@@ -145,7 +145,7 @@ if self.gnn_model is not None and graph_data is not None:
 
 **Dependencies:**
 - `torch>=2.0.0` and `torch_geometric>=2.5.0` added to `requirements.txt` as optional dependencies
-- Add a `[gnn]` extras group in `pyproject.toml`; the rest of LedgerLens must function without PyTorch installed
+- Add a `[gnn]` extras group in `pyproject.toml`; the rest of Stellar Lense must function without PyTorch installed
 
 ## Security Considerations
 - GNN model weights (`gnn_model.pt`) must be signed alongside tabular model artifacts (see ISSUE-035)

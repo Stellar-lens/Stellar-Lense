@@ -4,7 +4,7 @@ import pytest
 import numpy as np
 import pandas as pd
 
-from ledgerlens_fl_client.adapter import DataAdapter
+from stellar_lense_fl_client.adapter import DataAdapter
 
 
 class MockDataAdapter(DataAdapter):

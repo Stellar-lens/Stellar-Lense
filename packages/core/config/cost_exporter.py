@@ -10,9 +10,9 @@ Usage:
     init_cost_metrics()
 
 This registers three gauges:
-- ledgerlens_cost_per_vcpu_hour_usd
-- ledgerlens_cost_per_gb_memory_hour_usd  
-- ledgerlens_cost_per_gb_storage_month_usd
+- stellar_lense_cost_per_vcpu_hour_usd
+- stellar_lense_cost_per_gb_memory_hour_usd  
+- stellar_lense_cost_per_gb_storage_month_usd
 
 which are scraped by Prometheus at GET /metrics alongside other metrics.
 """
@@ -23,17 +23,17 @@ from config.settings import settings
 
 # Cost coefficient gauges (static values set at startup)
 _cost_per_vcpu_hour_gauge = Gauge(
-    "ledgerlens_cost_per_vcpu_hour_usd",
+    "stellar_lense_cost_per_vcpu_hour_usd",
     "Cost per vCPU-hour in USD (operator-configurable coefficient)",
 )
 
 _cost_per_gb_memory_hour_gauge = Gauge(
-    "ledgerlens_cost_per_gb_memory_hour_usd",
+    "stellar_lense_cost_per_gb_memory_hour_usd",
     "Cost per GB memory-hour in USD (operator-configurable coefficient)",
 )
 
 _cost_per_gb_storage_month_gauge = Gauge(
-    "ledgerlens_cost_per_gb_storage_month_usd",
+    "stellar_lense_cost_per_gb_storage_month_usd",
     "Cost per GB storage per month in USD (operator-configurable coefficient)",
 )
 

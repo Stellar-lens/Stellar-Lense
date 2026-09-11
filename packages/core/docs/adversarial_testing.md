@@ -9,7 +9,7 @@ thresholds enforced in CI, and how to extend the suite with new strategies.
 
 ## Background
 
-LedgerLens's synthetic data generator (`ingestion/synthetic_data.py`)
+Stellar Lense's synthetic data generator (`ingestion/synthetic_data.py`)
 produces wash-trade patterns representative of **naive** bot behaviour:
 - Fixed lot sizes → caught by Benford chi-square / MAD
 - Regular timing intervals → caught by intra-minute clustering

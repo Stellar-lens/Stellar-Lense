@@ -8,7 +8,7 @@ assignees: []
 The current test suite uses unit tests with mocked dependencies, which cannot catch integration failures between the API, feature store, and scoring pipeline. An end-to-end test suite using Testcontainers to spin up real SQLite/Redis containers runs the full request path — from API call through feature extraction to score storage — giving confidence that components work together correctly.
 
 ## Objectives
-- [ ] Create `tests/e2e/` directory with Testcontainers-based fixtures for the full LedgerLens stack
+- [ ] Create `tests/e2e/` directory with Testcontainers-based fixtures for the full Stellar Lense stack
 - [ ] E2E test: ingest synthetic trade batch → score wallet → `GET /scores/{wallet}` returns expected score
 - [ ] E2E test: high-risk score → alert fires → `GET /alerts` returns the alert
 - [ ] E2E test: federated training round completes without error (using mock exchange client)

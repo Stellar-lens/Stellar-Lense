@@ -26,14 +26,14 @@ _SETTINGS_ENV_VARS = (
     "BENFORD_MAD_THRESHOLD",
     "RISK_SCORE_THRESHOLD",
     "MODEL_DIR",
-    "LEDGERLENS_DB_PATH",
+    "STELLARLENSE_DB_PATH",
     "ENSEMBLE_WEIGHT_RF",
     "ENSEMBLE_WEIGHT_XGB",
     "ENSEMBLE_WEIGHT_LGBM",
     "STREAMER_QUEUE_MAXSIZE",
     "STREAMER_OVERFLOW_STRATEGY",
     "STREAMER_HIGH_WATER_RATIO",
-    "LEDGERLENS_CORS_ALLOWED_ORIGINS",
+    "STELLARLENSE_CORS_ALLOWED_ORIGINS",
     "NETWORK",
 )
 
@@ -68,7 +68,7 @@ def test_defaults_when_env_unset(monkeypatch):
     assert settings.benford_mad_threshold == 0.015
     assert settings.risk_score_threshold == 70
     assert settings.model_dir == "./models"
-    assert settings.db_path == "./ledgerlens.db"
+    assert settings.db_path == "./stellar_lense.db"
     assert settings.ensemble_weight_rf == 0.25
     assert settings.ensemble_weight_xgb == 0.50
     assert settings.ensemble_weight_lgbm == 0.25
@@ -84,7 +84,7 @@ def test_defaults_when_env_unset(monkeypatch):
 
 def test_env_overrides_are_applied(monkeypatch):
     monkeypatch.setenv("RISK_SCORE_THRESHOLD", "85")
-    monkeypatch.setenv("LEDGERLENS_DB_PATH", "/tmp/custom.db")
+    monkeypatch.setenv("STELLARLENSE_DB_PATH", "/tmp/custom.db")
     monkeypatch.setenv("ENSEMBLE_WEIGHT_RF", "2")
     monkeypatch.setenv("ENSEMBLE_WEIGHT_XGB", "3")
     monkeypatch.setenv("ENSEMBLE_WEIGHT_LGBM", "5")
@@ -125,14 +125,14 @@ def test_all_zero_ensemble_weights_raise(monkeypatch):
 
 
 def test_cors_wildcard_origin_raises(monkeypatch):
-    monkeypatch.setenv("LEDGERLENS_CORS_ALLOWED_ORIGINS", "*")
+    monkeypatch.setenv("STELLARLENSE_CORS_ALLOWED_ORIGINS", "*")
 
     with pytest.raises(ValueError, match="must not contain '\\*'"):
         settings_module.Settings()
 
 
 def test_cors_wildcard_in_list_raises(monkeypatch):
-    monkeypatch.setenv("LEDGERLENS_CORS_ALLOWED_ORIGINS", "https://ok.example.com,*")
+    monkeypatch.setenv("STELLARLENSE_CORS_ALLOWED_ORIGINS", "https://ok.example.com,*")
 
     with pytest.raises(ValueError, match="must not contain '\\*'"):
         settings_module.Settings()
@@ -146,7 +146,7 @@ def test_cors_default_is_empty_tuple(monkeypatch):
 
 def test_cors_valid_origins_parsed_as_tuple(monkeypatch):
     monkeypatch.setenv(
-        "LEDGERLENS_CORS_ALLOWED_ORIGINS",
+        "STELLARLENSE_CORS_ALLOWED_ORIGINS",
         "https://dashboard.example.com,https://staging.example.com",
     )
 

@@ -1,4 +1,4 @@
-"""Prometheus metrics for the LedgerLens ingestion pipeline.
+"""Prometheus metrics for the StellarLense ingestion pipeline.
 
 This module owns **all** prometheus_client metric objects used by the
 ingestion layer.  Import :func:`get_metrics` (or use
@@ -40,7 +40,7 @@ import logging
 import re
 from urllib.parse import urlparse
 
-logger = logging.getLogger("ledgerlens.ingestion.metrics")
+logger = logging.getLogger("stellar_lense.ingestion.metrics")
 
 # ---------------------------------------------------------------------------
 # Endpoint normalisation
@@ -163,36 +163,36 @@ class IngestionMetricsCollector:
     Metric groups
     -------------
     **Streamer** (``horizon_streamer.py``)
-      - ``ledgerlens_ingestion_events_received_total`` — every SSE trade event
+      - ``stellar_lense_ingestion_events_received_total`` — every SSE trade event
         received from Horizon, labelled by ``source``.
-      - ``ledgerlens_ingestion_events_queued_total`` — events successfully
+      - ``stellar_lense_ingestion_events_queued_total`` — events successfully
         placed on the bounded queue.
-      - ``ledgerlens_ingestion_events_dropped_total`` — events discarded due
+      - ``stellar_lense_ingestion_events_dropped_total`` — events discarded due
         to queue overflow, labelled by ``source`` and ``reason``.
-      - ``ledgerlens_ingestion_sse_reconnects_total`` — SSE reconnection count.
-      - ``ledgerlens_ingestion_queue_depth`` — instantaneous queue size.
-      - ``ledgerlens_ingestion_queue_depth_peak`` — high-water mark since last
+      - ``stellar_lense_ingestion_sse_reconnects_total`` — SSE reconnection count.
+      - ``stellar_lense_ingestion_queue_depth`` — instantaneous queue size.
+      - ``stellar_lense_ingestion_queue_depth_peak`` — high-water mark since last
         reset.
 
     **HTTP client** (``http_client.py``)
-      - ``ledgerlens_http_requests_total`` — every outgoing Horizon request,
+      - ``stellar_lense_http_requests_total`` — every outgoing Horizon request,
         labelled by normalised ``endpoint``, ``method``, and ``status_code``.
-      - ``ledgerlens_http_request_duration_seconds`` — request latency
+      - ``stellar_lense_http_request_duration_seconds`` — request latency
         histogram with pre-configured buckets.
-      - ``ledgerlens_http_rate_limit_hits_total`` — HTTP 429 responses.
-      - ``ledgerlens_http_retries_total`` — retry attempts labelled by
+      - ``stellar_lense_http_rate_limit_hits_total`` — HTTP 429 responses.
+      - ``stellar_lense_http_retries_total`` — retry attempts labelled by
         ``reason`` (``"5xx"``, ``"429"``, ``"timeout"``).
 
     **Pipeline latency**
-      - ``ledgerlens_ledger_close_to_score_seconds`` — end-to-end latency from
+      - ``stellar_lense_ledger_close_to_score_seconds`` — end-to-end latency from
         Horizon ledger close timestamp to ``RiskScore`` written to SQLite.
 
     **Dead-letter queue**
-      - ``ledgerlens_dlq_entries_total`` — records sent to the DLQ.
-      - ``ledgerlens_dlq_depth`` — current DLQ depth gauge.
+      - ``stellar_lense_dlq_entries_total`` — records sent to the DLQ.
+      - ``stellar_lense_dlq_depth`` — current DLQ depth gauge.
 
     **Stream checkpoint coordination** (``ingestion/stream_checkpoint.py``)
-      - ``ledgerlens_checkpoint_desync_detected_total`` — incremented when
+      - ``stellar_lense_checkpoint_desync_detected_total`` — incremented when
         the unified stream checkpoint's recorded wallet count diverges from
         the rolling-window store's actual wallet count on load. Should stay
         at zero under normal operation, since the two are written in one
@@ -214,78 +214,78 @@ class IngestionMetricsCollector:
 
         # ── Streamer metrics ──────────────────────────────────────────────
         self.events_received_total = Counter(
-            "ledgerlens_ingestion_events_received_total",
+            "stellar_lense_ingestion_events_received_total",
             "Total trade events received from Horizon SSE",
             ["source"],
         )
         self.events_queued_total = Counter(
-            "ledgerlens_ingestion_events_queued_total",
+            "stellar_lense_ingestion_events_queued_total",
             "Total trade events successfully queued for processing",
             ["source"],
         )
         self.events_dropped_total = Counter(
-            "ledgerlens_ingestion_events_dropped_total",
+            "stellar_lense_ingestion_events_dropped_total",
             "Total trade events dropped due to queue overflow",
             ["source", "reason"],
         )
         self.sse_reconnects_total = Counter(
-            "ledgerlens_ingestion_sse_reconnects_total",
+            "stellar_lense_ingestion_sse_reconnects_total",
             "Total SSE stream reconnections",
         )
         self.queue_depth = Gauge(
-            "ledgerlens_ingestion_queue_depth",
+            "stellar_lense_ingestion_queue_depth",
             "Current trade queue depth",
             ["source"],
         )
         self.queue_depth_peak = Gauge(
-            "ledgerlens_ingestion_queue_depth_peak",
+            "stellar_lense_ingestion_queue_depth_peak",
             "Peak queue depth since last reset",
             ["source"],
         )
 
         # ── HTTP client metrics ───────────────────────────────────────────
         self.http_requests_total = Counter(
-            "ledgerlens_http_requests_total",
+            "stellar_lense_http_requests_total",
             "Total HTTP requests to Horizon",
             ["endpoint", "method", "status_code"],
         )
         self.http_request_duration_seconds = Histogram(
-            "ledgerlens_http_request_duration_seconds",
+            "stellar_lense_http_request_duration_seconds",
             "HTTP request latency in seconds",
             ["endpoint"],
             buckets=[0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0],
         )
         self.http_rate_limit_hits_total = Counter(
-            "ledgerlens_http_rate_limit_hits_total",
+            "stellar_lense_http_rate_limit_hits_total",
             "Total HTTP 429 responses received from Horizon",
         )
         self.http_retries_total = Counter(
-            "ledgerlens_http_retries_total",
+            "stellar_lense_http_retries_total",
             "Total retry attempts for failed HTTP requests",
             ["reason"],
         )
 
         # ── Pipeline latency ──────────────────────────────────────────────
         self.ledger_close_to_score_seconds = Histogram(
-            "ledgerlens_ledger_close_to_score_seconds",
+            "stellar_lense_ledger_close_to_score_seconds",
             "Time from Horizon ledger close to RiskScore written",
             buckets=[1, 5, 10, 30, 60, 120, 300],
         )
 
         # ── Dead-letter queue ─────────────────────────────────────────────
         self.dlq_entries_total = Counter(
-            "ledgerlens_dlq_entries_total",
+            "stellar_lense_dlq_entries_total",
             "Total records sent to the dead-letter queue",
             ["error_class"],
         )
         self.dlq_depth = Gauge(
-            "ledgerlens_dlq_depth",
+            "stellar_lense_dlq_depth",
             "Current number of pending DLQ entries",
         )
 
         # ── Stream checkpoint coordination ────────────────────────────────
         self.checkpoint_desync_detected_total = Counter(
-            "ledgerlens_checkpoint_desync_detected_total",
+            "stellar_lense_checkpoint_desync_detected_total",
             "Total times the unified stream checkpoint's recorded wallet "
             "count diverged from the rolling-window store's actual wallet "
             "count on load",

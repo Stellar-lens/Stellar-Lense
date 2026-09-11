@@ -10,7 +10,7 @@ Extend `detection/feature_store.py` to archive feature vectors older than 30 day
 
 ## Background & Context
 
-LedgerLens persists scored feature vectors to the `feature_distribution_snapshots` SQLite table for drift monitoring. At 1,000 wallets/run × 4 runs/day × 30 days × 26 features × ~8 bytes ≈ 25MB, and with a hard cap of 500,000 rows (~50MB), the hot-tier SQLite store retains approximately 30 days of data before oldest rows are pruned.
+Stellar Lense persists scored feature vectors to the `feature_distribution_snapshots` SQLite table for drift monitoring. At 1,000 wallets/run × 4 runs/day × 30 days × 26 features × ~8 bytes ≈ 25MB, and with a hard cap of 500,000 rows (~50MB), the hot-tier SQLite store retains approximately 30 days of data before oldest rows are pruned.
 
 This pruning discards potentially useful historical data for:
 1. **Drift trend analysis**: detecting gradual drift over 60–90 days requires more than 30 days of feature history.
@@ -207,7 +207,7 @@ class FeatureStoreStats(BaseModel):
 
 ## Security Considerations
 
-- Parquet files contain feature vectors which reveal LedgerLens's internal ML features for each wallet. Treat the archive directory as sensitive data: set directory permissions to `700` (owner-read-only) on creation.
+- Parquet files contain feature vectors which reveal Stellar Lense's internal ML features for each wallet. Treat the archive directory as sensitive data: set directory permissions to `700` (owner-read-only) on creation.
 - The `archive_old_features` method must not partially archive: if the Parquet write succeeds but the SQLite delete fails (e.g., due to a disk-full error), the data will exist in both tiers. The `DualTierFeatureStore.query()` deduplication handles this gracefully — but log a WARNING when deduplication removes >0 rows (indicates a previously failed archive).
 - Archive directory path (`FEATURE_ARCHIVE_DIR`) must be validated to be within the application's working directory or an explicitly configured path. Do not allow path traversal via the env variable.
 
@@ -247,10 +247,10 @@ class FeatureStoreStats(BaseModel):
 
 ## For Contributors
 
-**Ideal contributor profile**: You have experience designing tiered storage architectures — specifically hot/cold data lifecycle management, Parquet file layout optimisation (partition pruning), and transparent dual-source query abstractions. Familiarity with `pyarrow`, `pandas`, and SQLite is required. Experience with columnar storage formats, partitioned datasets, and partition-pruning query strategies is highly valued. Understanding of LedgerLens's drift monitoring requirements will inform good design decisions around partition granularity and query performance.
+**Ideal contributor profile**: You have experience designing tiered storage architectures — specifically hot/cold data lifecycle management, Parquet file layout optimisation (partition pruning), and transparent dual-source query abstractions. Familiarity with `pyarrow`, `pandas`, and SQLite is required. Experience with columnar storage formats, partitioned datasets, and partition-pruning query strategies is highly valued. Understanding of Stellar Lense's drift monitoring requirements will inform good design decisions around partition granularity and query performance.
 
 To apply, please comment on this issue with:
 1. **Specialty area**: your primary expertise (e.g., data engineering, tiered storage, Parquet/columnar formats, Python backend).
 2. **Relevant experience**: cold-tier archival pipelines, Parquet dataset management, or hot/cold tiered storage systems you have built.
-3. **Approach / thoughts**: would you use daily or monthly partitioning for the Parquet cold tier given LedgerLens's ~4 runs/day write rate? What is the optimal retention policy for the hot tier given the 30-day drift monitoring window?
+3. **Approach / thoughts**: would you use daily or monthly partitioning for the Parquet cold tier given Stellar Lense's ~4 runs/day write rate? What is the optimal retention policy for the hot tier given the 30-day drift monitoring window?
 4. **Estimated time**: realistic estimate to complete to the Definition of Done standard.

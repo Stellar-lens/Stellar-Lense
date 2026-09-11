@@ -1,14 +1,14 @@
-"""Exceptions raised by the LedgerLens SDK."""
+"""Exceptions raised by the StellarLense SDK."""
 
 from __future__ import annotations
 
 
-class LedgerLensError(Exception):
+class StellarLenseError(Exception):
     """Base class for every exception raised by this SDK."""
 
 
-class LedgerLensAPIError(LedgerLensError):
-    """Raised when the LedgerLens API returns a non-2xx response.
+class StellarLenseAPIError(StellarLenseError):
+    """Raised when the StellarLense API returns a non-2xx response.
 
     Attributes
     ----------
@@ -25,4 +25,4 @@ class LedgerLensAPIError(LedgerLensError):
         self.status_code = status_code
         self.detail = detail
         self.response_body = response_body
-        super().__init__(f"LedgerLens API error {status_code}: {detail}")
+        super().__init__(f"StellarLense API error {status_code}: {detail}")

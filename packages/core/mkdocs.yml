@@ -1,4 +1,4 @@
-site_name: LedgerLens Core
+site_name: Stellar Lense Core
 
 # docs/README.md exists only to orient contributors browsing the docs/
 # directory on GitHub (see its own content); index.md is the site's actual
@@ -7,9 +7,9 @@ site_name: LedgerLens Core
 exclude_docs: |
   README.md
 site_description: Benford's Law + ensemble ML wash-trading detection engine for the Stellar DEX
-site_url: https://ledger-lenz.github.io/Ledgerlens-core
-repo_url: https://github.com/Ledger-Lenz/Ledgerlens-core
-repo_name: Ledger-Lenz/Ledgerlens-core
+site_url: https://stellar-lens.github.io/Stellar-Lense
+repo_url: https://github.com/Stellar-lens/Stellar-Lense
+repo_name: Stellar-lens/Stellar-Lense
 
 theme:
   name: material
@@ -161,4 +161,4 @@ nav:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/Ledger-Lenz/Ledgerlens-core
+      link: https://github.com/Stellar-lens/Stellar-Lense

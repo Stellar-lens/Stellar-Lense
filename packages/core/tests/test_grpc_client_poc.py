@@ -12,7 +12,7 @@ class FakeScoringStub:
         self.stream_wallets: list[str] = []
 
     def ScoreWallet(self, request, *, metadata, timeout):
-        assert metadata == (("x-ledgerlens-api-key", "test-key"),)
+        assert metadata == (("x-stellarlense-api-key", "test-key"),)
         assert timeout == 2.5
         self.unary_wallets.append(request.wallet)
         return scoring_pb2.RiskScoreProto(
@@ -25,7 +25,7 @@ class FakeScoringStub:
         )
 
     def BatchScoreWallets(self, requests, *, metadata, timeout):
-        assert metadata == (("x-ledgerlens-api-key", "test-key"),)
+        assert metadata == (("x-stellarlense-api-key", "test-key"),)
         assert timeout == 2.5
         requests = list(requests)
         self.stream_wallets = [request.wallet for request in requests]

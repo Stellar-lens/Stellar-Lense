@@ -6,13 +6,13 @@ assignees: []
 
 ## Summary
 
-Extend `detection/causal_engine.py` using DoWhy to build a causal DAG over the ML features and risk score output. Implement do-calculus interventions so analysts can ask "if we remove the Benford signal, what is the causal contribution of graph topology to the score?" This transforms LedgerLens from a correlation-based detector into one that provides causal explanations — a major step toward regulatory defensibility and adversarial robustness.
+Extend `detection/causal_engine.py` using DoWhy to build a causal DAG over the ML features and risk score output. Implement do-calculus interventions so analysts can ask "if we remove the Benford signal, what is the causal contribution of graph topology to the score?" This transforms Stellar Lense from a correlation-based detector into one that provides causal explanations — a major step toward regulatory defensibility and adversarial robustness.
 
 ## Background & Context
 
 SHAP values explain *which features contributed most to a score* but they conflate causal and correlational effects. If Benford features and graph features are correlated (as they are: wash traders are non-Benford AND in rings), SHAP will attribute shared credit to both. A regulator asking "would this wallet still be flagged if it fixed its Benford distribution?" cannot be answered by SHAP — only by causal intervention.
 
-DoWhy (Microsoft Research) provides a Python API for causal reasoning: define a causal DAG, fit structural equations from data, then use `do(X=x)` interventions to compute counterfactual expected outcomes. For LedgerLens, the causal DAG encodes domain knowledge:
+DoWhy (Microsoft Research) provides a Python API for causal reasoning: define a causal DAG, fit structural equations from data, then use `do(X=x)` interventions to compute counterfactual expected outcomes. For Stellar Lense, the causal DAG encodes domain knowledge:
 
 - Wash-ring membership → round_trip_trade_frequency → risk_score
 - wash_ring_membership → volume_to_unique_counterparty_ratio → risk_score  
@@ -24,7 +24,7 @@ This issue builds the DAG, fits structural equations (linear + nonlinear), expos
 
 ## Objectives
 
-- [ ] Define the LedgerLens causal DAG as a NetworkX DiGraph with documented edge justifications
+- [ ] Define the Stellar Lense causal DAG as a NetworkX DiGraph with documented edge justifications
 - [ ] Implement `CausalEngine` class using `dowhy.CausalModel` and `econml` for nonlinear structural equations
 - [ ] Implement `CausalEngine.estimate_effect(treatment, outcome, intervention_value)` for `do()` interventions
 - [ ] Implement `CausalEngine.feature_ate(feature_name)` returning the average treatment effect of each feature on risk_score

@@ -12,7 +12,7 @@ Webhook deliveries to downstream consumers currently fail silently if the consum
 - [ ] On delivery failure: schedule retry at 30s, then 5m, then 30m
 - [ ] After 3 failed retries: write to `webhook_dlq` SQLite table and emit `webhook.dead_lettered` log event
 - [ ] `GET /admin/webhooks/dlq` lists dead-lettered deliveries; `POST /admin/webhooks/dlq/{id}/retry` manually retries one
-- [ ] Include HMAC signature on retried deliveries (same `X-LedgerLens-Signature` header)
+- [ ] Include HMAC signature on retried deliveries (same `X-StellarLense-Signature` header)
 
 ## Definition of Done
 - [ ] Delivery failure triggers 3 retries on the correct schedule

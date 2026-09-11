@@ -10,7 +10,7 @@ Extend `detection/federated/server.py` to replace plain FedAvg aggregation with 
 
 ## Background & Context
 
-LedgerLens's Flower-based federated learning server currently uses FedAvg to aggregate gradient updates from client nodes (institutional participants). FedAvg is optimal when all clients are honest, but it is trivially broken by Byzantine clients: a single malicious client can submit an arbitrarily scaled gradient that shifts the global model toward misclassifying wash-trading patterns as legitimate.
+Stellar Lense's Flower-based federated learning server currently uses FedAvg to aggregate gradient updates from client nodes (institutional participants). FedAvg is optimal when all clients are honest, but it is trivially broken by Byzantine clients: a single malicious client can submit an arbitrarily scaled gradient that shifts the global model toward misclassifying wash-trading patterns as legitimate.
 
 Krum (Blanchard et al., 2017) is the canonical Byzantine-resilient aggregation rule for federated learning. Given `n` clients with `f` potential Byzantine actors, Krum selects the single client gradient `g_i` that minimises the sum of squared distances to its `n-f-2` nearest neighbours. This score is robust as long as `2f+2 < n`. Multi-Krum extends this by averaging the top-`m` scoring gradients instead of selecting just one, offering a bias-variance tradeoff between Krum (lower bias, higher variance) and FedAvg (lower variance, higher bias).
 

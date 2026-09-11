@@ -35,13 +35,13 @@ def _noop_admin():
 @pytest.fixture(autouse=True)
 def webhook_enc_key(monkeypatch):
     key = base64.b64encode(os.urandom(32)).decode()
-    monkeypatch.setenv("LEDGERLENS_WEBHOOK_ENCRYPTION_KEY", key)
+    monkeypatch.setenv("STELLARLENSE_WEBHOOK_ENCRYPTION_KEY", key)
 
 
 @pytest.fixture()
 def client(tmp_path, monkeypatch):
-    db_path = str(tmp_path / "ledgerlens_analyst_test.db")
-    monkeypatch.setenv("LEDGERLENS_DB_PATH", db_path)
+    db_path = str(tmp_path / "stellar_lense_analyst_test.db")
+    monkeypatch.setenv("STELLARLENSE_DB_PATH", db_path)
 
     import config.settings as settings_module
     object.__setattr__(settings_module.settings, "db_path", db_path)

@@ -70,7 +70,7 @@ def _seed(db_path):
 @pytest.fixture
 def db_path(tmp_path, monkeypatch):
     path = str(tmp_path / "compliance.db")
-    monkeypatch.setenv("LEDGERLENS_DB_PATH", path)
+    monkeypatch.setenv("STELLARLENSE_DB_PATH", path)
     import config.settings as settings_module
 
     object.__setattr__(settings_module.settings, "db_path", path)
@@ -92,10 +92,10 @@ def test_augment_ivms_payload_injects_risk_fields(db_path):
 
     # Original IVMS members are preserved (input not mutated).
     assert "originator" in augmented and "beneficiary" in augmented
-    assert "ledgerLensRiskAssessment" not in payload
+    assert "stellarLenseRiskAssessment" not in payload
 
-    risk = augmented["ledgerLensRiskAssessment"]
-    assert risk["ledgerlens_score"] == 92.0
+    risk = augmented["stellarLenseRiskAssessment"]
+    assert risk["stellar_lense_score"] == 92.0
     assert risk["risk_level"] == "CRITICAL"
     assert risk["alert_types"] == ["SANDWICH_ATTACK"]
     # evidence_hash is a 64-char hex SHA-256 commitment.
@@ -105,7 +105,7 @@ def test_augment_ivms_payload_injects_risk_fields(db_path):
 
 def test_build_ivms_risk_field_no_scores(db_path):
     field = build_ivms_risk_field(WALLET, db_path=db_path)
-    assert field.ledgerlens_score == 0.0
+    assert field.stellar_lense_score == 0.0
     assert field.risk_level == "LOW"
     assert field.alert_types == []
 
@@ -191,13 +191,13 @@ def test_get_audit_trail_is_chronological(db_path):
 
 @pytest.fixture
 def client(db_path, monkeypatch):
-    monkeypatch.setenv("LEDGERLENS_COMPLIANCE_API_KEY", COMPLIANCE_KEY)
+    monkeypatch.setenv("STELLARLENSE_COMPLIANCE_API_KEY", COMPLIANCE_KEY)
     monkeypatch.setenv(
-        "LEDGERLENS_WEBHOOK_ENCRYPTION_KEY", base64.b64encode(os.urandom(32)).decode()
+        "STELLARLENSE_WEBHOOK_ENCRYPTION_KEY", base64.b64encode(os.urandom(32)).decode()
     )
     import config.settings as settings_module
 
-    object.__setattr__(settings_module.settings, "ledgerlens_compliance_api_key", COMPLIANCE_KEY)
+    object.__setattr__(settings_module.settings, "stellarlense_compliance_api_key", COMPLIANCE_KEY)
 
     _seed(db_path)
     from api.main import app
@@ -217,7 +217,7 @@ def test_sar_package_endpoint_requires_scope(client):
 
     # With the scope -> 200 + a ZIP body.
     resp = client.post(
-        "/compliance/sar-package", json=body, headers={"X-LedgerLens-Compliance-Key": COMPLIANCE_KEY}
+        "/compliance/sar-package", json=body, headers={"X-StellarLense-Compliance-Key": COMPLIANCE_KEY}
     )
     assert resp.status_code == 200
     assert resp.headers["content-type"] == "application/zip"
@@ -227,12 +227,12 @@ def test_sar_package_endpoint_requires_scope(client):
 
 def test_ivms_endpoint_returns_risk_block(client):
     resp = client.get(
-        f"/compliance/ivms/{WALLET}", headers={"X-LedgerLens-Compliance-Key": COMPLIANCE_KEY}
+        f"/compliance/ivms/{WALLET}", headers={"X-StellarLense-Compliance-Key": COMPLIANCE_KEY}
     )
     assert resp.status_code == 200
     body = resp.json()
     assert body["risk_level"] == "CRITICAL"
-    assert body["ledgerlens_score"] == 92.0
+    assert body["stellar_lense_score"] == 92.0
 
 
 def test_audit_trail_endpoint_forbidden_without_key(client):
@@ -371,7 +371,7 @@ def test_sar_package_endpoint_rejects_low_score(client, db_path):
         "end_date": "2026-06-30T00:00:00+00:00",
     }
     resp = client.post(
-        "/compliance/sar-package", json=body, headers={"X-LedgerLens-Compliance-Key": COMPLIANCE_KEY}
+        "/compliance/sar-package", json=body, headers={"X-StellarLense-Compliance-Key": COMPLIANCE_KEY}
     )
     assert resp.status_code == 400
 
@@ -385,7 +385,7 @@ def test_sar_package_endpoint_dry_run_skips_audit_log(client, db_path):
     resp = client.post(
         "/compliance/sar-package?dry_run=true",
         json=body,
-        headers={"X-LedgerLens-Compliance-Key": COMPLIANCE_KEY},
+        headers={"X-StellarLense-Compliance-Key": COMPLIANCE_KEY},
     )
     assert resp.status_code == 200
 
@@ -405,7 +405,7 @@ def test_sar_package_endpoint_rate_limited(client, db_path):
             "start_date": "2026-06-01T00:00:00+00:00",
             "end_date": "2026-06-30T00:00:00+00:00",
         }
-        headers = {"X-LedgerLens-Compliance-Key": COMPLIANCE_KEY}
+        headers = {"X-StellarLense-Compliance-Key": COMPLIANCE_KEY}
         resp1 = client.post("/compliance/sar-package", json=body, headers=headers)
         assert resp1.status_code == 200
 

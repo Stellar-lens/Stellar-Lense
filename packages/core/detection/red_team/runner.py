@@ -26,7 +26,7 @@ from detection.red_team import EVASION_THRESHOLD, N_EVASION_TRIGGER
 from detection.red_team.attacker import GeneticAttacker, evaluate_score
 from detection.red_team.evasion_logger import log_evasion, maybe_trigger_hardening
 
-logger = logging.getLogger("ledgerlens.red_team.runner")
+logger = logging.getLogger("stellar_lense.red_team.runner")
 
 CAMPAIGN_EVASION_THRESHOLD = 0.05  # 5% evasion rate gate
 

@@ -4,7 +4,7 @@ For a consolidated system threat model and all defined trust boundaries, see the
 
 ## Threat Model
 
-LedgerLens ensemble models (Random Forest, XGBoost, LightGBM) are serialised as
+Stellar Lense ensemble models (Random Forest, XGBoost, LightGBM) are serialised as
 `.joblib` files. Python's `joblib.load()` can execute arbitrary code during
 deserialisation via the `__reduce__` protocol. An attacker who gains write access
 to the `models/` directory (e.g., compromised CI, container escape, misconfigured
@@ -13,7 +13,7 @@ volume mount) could replace a `.joblib` file with a malicious serialised object.
 ED25519 model signing provides:
 
 - **Integrity**: a valid signature proves the file has not been modified since training.
-- **Authenticity**: a valid signature proves the file was produced by the LedgerLens
+- **Authenticity**: a valid signature proves the file was produced by the Stellar Lense
   training pipeline (which holds the private key).
 
 ## Signing Scheme

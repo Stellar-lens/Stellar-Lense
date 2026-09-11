@@ -1,17 +1,17 @@
 {
-  "name": "@ledgerlens/sdk",
+  "name": "@stellar-lense/sdk",
   "version": "0.1.0",
-  "description": "TypeScript SDK for the LedgerLens API with Zod runtime validation",
+  "description": "TypeScript SDK for the Stellar Lense API with Zod runtime validation",
   "keywords": [
-    "ledgerlens",
+    "stellar-lense",
     "stellar",
     "risk-scoring",
     "compliance",
     "wash-trading"
   ],
-  "homepage": "https://github.com/Ledger-Lenz/Ledgerlens-core#readme",
+  "homepage": "https://github.com/Stellar-lens/Stellar-Lense#readme",
   "license": "MIT",
-  "author": "LedgerLens",
+  "author": "Stellar Lense",
   "main": "./dist/cjs/index.js",
   "module": "./dist/esm/index.js",
   "types": "./dist/types/index.d.ts",

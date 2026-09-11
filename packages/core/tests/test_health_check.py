@@ -28,11 +28,11 @@ from fastapi.testclient import TestClient
 def client(tmp_path, monkeypatch):
     """TestClient with an isolated DB and settings; no shared state."""
     db_path = str(tmp_path / "test_health.db")
-    monkeypatch.setenv("LEDGERLENS_DB_PATH", db_path)
+    monkeypatch.setenv("STELLARLENSE_DB_PATH", db_path)
 
     import config.settings as settings_module
 
-    object.__setattr__(settings_module.settings, "ledgerlens_db_path", db_path)
+    object.__setattr__(settings_module.settings, "stellarlense_db_path", db_path)
 
     # Initialise schema so the DB file exists and SELECT 1 succeeds
     from detection.storage import init_db
@@ -48,11 +48,11 @@ def client(tmp_path, monkeypatch):
 def client_with_models(tmp_path, monkeypatch):
     """TestClient with an isolated DB *and* stub model files present."""
     db_path = str(tmp_path / "test_health_models.db")
-    monkeypatch.setenv("LEDGERLENS_DB_PATH", db_path)
+    monkeypatch.setenv("STELLARLENSE_DB_PATH", db_path)
 
     import config.settings as settings_module
 
-    object.__setattr__(settings_module.settings, "ledgerlens_db_path", db_path)
+    object.__setattr__(settings_module.settings, "stellarlense_db_path", db_path)
 
     from detection.storage import init_db
     from detection.model_inference import _MODEL_FILENAMES
@@ -177,9 +177,9 @@ def test_v1_health_returns_503_when_db_unreachable(tmp_path, monkeypatch):
     import config.settings as settings_module
 
     # Point to a non-existent directory to make _connect fail
-    bad_path = str(tmp_path / "no_such_dir" / "ledgerlens.db")
-    monkeypatch.setenv("LEDGERLENS_DB_PATH", bad_path)
-    object.__setattr__(settings_module.settings, "ledgerlens_db_path", bad_path)
+    bad_path = str(tmp_path / "no_such_dir" / "stellar_lense.db")
+    monkeypatch.setenv("STELLARLENSE_DB_PATH", bad_path)
+    object.__setattr__(settings_module.settings, "stellarlense_db_path", bad_path)
 
     # Use models stub so only DB fails
     from detection.model_inference import _MODEL_FILENAMES
@@ -295,12 +295,12 @@ def test_health_check_no_global_state_leak(tmp_path, monkeypatch):
     db2 = str(tmp_path / "leak_test_2.db")
 
     # First isolated settings mutation
-    object.__setattr__(settings_module.settings, "ledgerlens_db_path", db1)
+    object.__setattr__(settings_module.settings, "stellarlense_db_path", db1)
     assert settings_module.settings.db_path == db1
 
     # Second mutation overwrites the first (intentionally — this is the isolation test)
-    object.__setattr__(settings_module.settings, "ledgerlens_db_path", db2)
+    object.__setattr__(settings_module.settings, "stellarlense_db_path", db2)
     assert settings_module.settings.db_path == db2
 
     # Restore so we don't leak state to subsequent tests in the session
-    object.__setattr__(settings_module.settings, "ledgerlens_db_path", "./ledgerlens.db")
+    object.__setattr__(settings_module.settings, "stellarlense_db_path", "./stellar_lense.db")

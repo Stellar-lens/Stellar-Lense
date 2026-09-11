@@ -52,7 +52,7 @@ grpcio-tools>=1.60.0
 strawberry-graphql>=0.243.0
 # Pin explicitly: generated/scoring_pb2.py's gencode version must not be newer
 # than this runtime (regenerate via the command in generated/__init__.py if
-# proto/ledgerlens/v1/scoring.proto changes).
+# proto/stellar_lense/v1/scoring.proto changes).
 protobuf>=6.33.5,<7.0.0
 
 # Distributed rate limiting / caching (detection/feature_store.py hot tier,

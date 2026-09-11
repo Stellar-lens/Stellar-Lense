@@ -1,4 +1,4 @@
-"""Synchronous LedgerLens API client."""
+"""Synchronous StellarLense API client."""
 
 from __future__ import annotations
 
@@ -19,14 +19,14 @@ from .models import (
 )
 
 
-class LedgerLensClient:
-    """Synchronous client for the LedgerLens REST API.
+class StellarLenseClient:
+    """Synchronous client for the StellarLense REST API.
 
     Example
     -------
-        from ledgerlens import LedgerLensClient
+        from stellar_lense import StellarLenseClient
 
-        with LedgerLensClient(base_url="https://api.ledgerlens.io", api_key="...") as client:
+        with StellarLenseClient(base_url="https://api.stellar-lense.io", api_key="...") as client:
             result = client.get_score("GABC...")
             print(result.scores)
     """
@@ -48,7 +48,7 @@ class LedgerLensClient:
     def close(self) -> None:
         self._client.close()
 
-    def __enter__(self) -> LedgerLensClient:
+    def __enter__(self) -> StellarLenseClient:
         return self
 
     def __exit__(self, *exc_info: object) -> None:

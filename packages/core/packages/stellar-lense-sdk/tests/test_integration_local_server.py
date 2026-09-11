@@ -10,7 +10,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import pytest
 
-from ledgerlens import LedgerLensAPIError, LedgerLensClient
+from stellar_lense import StellarLenseAPIError, StellarLenseClient
 
 _SCORE_RESPONSE = {
     "scores": [
@@ -66,15 +66,15 @@ def local_server():
 
 
 def test_get_score_against_real_local_server(local_server):
-    with LedgerLensClient(base_url=local_server) as client:
+    with StellarLenseClient(base_url=local_server) as client:
         result = client.get_score("GINTEGRATIONTEST")
         assert result.scores[0].wallet == "GINTEGRATIONTEST"
         assert result.scores[0].score == 77
 
 
 def test_get_score_404_against_real_local_server(local_server):
-    with LedgerLensClient(base_url=local_server) as client:
-        with pytest.raises(LedgerLensAPIError) as exc_info:
+    with StellarLenseClient(base_url=local_server) as client:
+        with pytest.raises(StellarLenseAPIError) as exc_info:
             client.get_score("UNKNOWN")
         assert exc_info.value.status_code == 404
         assert "No scores found" in exc_info.value.detail

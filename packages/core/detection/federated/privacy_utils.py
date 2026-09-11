@@ -17,7 +17,7 @@ import logging
 import sqlite3
 from typing import Optional
 
-logger = logging.getLogger("ledgerlens.federated.privacy")
+logger = logging.getLogger("stellar_lense.federated.privacy")
 
 
 class PrivacyBudgetExhaustedError(Exception):

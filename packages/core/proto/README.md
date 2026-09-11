@@ -1,11 +1,11 @@
 # proto/
 
-Protocol Buffer service definitions for LedgerLens's internal gRPC scoring
+Protocol Buffer service definitions for Stellar Lense's internal gRPC scoring
 service.
 
 ## Layout
 
-- `ledgerlens/v1/scoring.proto` — defines `ScoringService`, the
+- `stellar_lense/v1/scoring.proto` — defines `ScoringService`, the
   low-latency gRPC alternative to the REST scoring API. It declares the
   `ScoreRequest` / `RiskScoreProto` messages and the unary (`ScoreWallet`)
   and bidirectional-streaming (`BatchScoreWallets`) RPCs.

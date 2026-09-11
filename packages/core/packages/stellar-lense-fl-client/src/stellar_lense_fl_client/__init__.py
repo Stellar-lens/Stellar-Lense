@@ -1,4 +1,4 @@
-"""LedgerLens FL Client - Standalone federated learning library."""
+"""StellarLense FL Client - Standalone federated learning library."""
 
 from .adapter import DataAdapter, CSVDirectoryAdapter
 from .client import FLClient

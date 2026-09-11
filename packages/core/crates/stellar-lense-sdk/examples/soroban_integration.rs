@@ -2,16 +2,16 @@
 ///
 /// This example shows how an off-chain Rust service (e.g. an exchange or
 /// custodian that already runs Soroban tooling) can verify a ThresholdProof
-/// from the LedgerLens API without spinning up a Python interpreter.
+/// from the StellarLense API without spinning up a Python interpreter.
 ///
 /// Run with:
 /// ```bash
 /// cargo run --example soroban_integration --features zk-verify
 /// ```
-use ledgerlens_sdk::{verify_threshold_proof, ThresholdProof};
+use stellar_lense_sdk::{verify_threshold_proof, ThresholdProof};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Simulated proof from the LedgerLens API response.
+    // Simulated proof from the StellarLense API response.
     // In production, this would be deserialized from the actual API response body.
     let proof = ThresholdProof {
         score_commit_x: "0".to_string(),
@@ -20,7 +20,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             // 7 bit proofs (2^7 = 128 >= 100)
             // In a real proof, these would contain valid BN254 curve points
             // and Fiat-Shamir challenges.
-            ledgerlens_sdk::BitProof {
+            stellar_lense_sdk::BitProof {
                 commit_x: "0".to_string(),
                 commit_y: "0".to_string(),
                 c0: "0".to_string(),

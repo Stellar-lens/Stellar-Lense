@@ -1,4 +1,4 @@
-# Contributing to LedgerLens Core
+# Contributing to Stellar Lense Core
 
 Thank you for your interest in contributing. This document covers everything you
 need to get a working local environment, run the tests, and make dependency or
@@ -79,8 +79,8 @@ to get a working local environment.
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/Ledger-Lenz/Ledgerlens-core.git
-cd Ledgerlens-core
+git clone https://github.com/Stellar-lens/Stellar-Lense.git
+cd StellarLense-core
 
 # 2. Create a virtual environment (recommended)
 python -m venv .venv && source .venv/bin/activate
@@ -174,8 +174,8 @@ completely separate toolchain (npm / `tsc` / vitest) — see the next section.
 
 ## TypeScript SDK development
 
-The `@ledgerlens/sdk` package in `sdk/` is a standalone TypeScript client for
-the LedgerLens API. It does **not** share the Python toolchain — no Makefile
+The `@stellar-lense/sdk` package in `sdk/` is a standalone TypeScript client for
+the Stellar Lense API. It does **not** share the Python toolchain — no Makefile
 targets, no `requirements/`, no `pytest`. Everything is driven through npm from
 inside the `sdk/` directory.
 
@@ -190,10 +190,10 @@ npm run build        # produce the dual CJS + ESM + types build under sdk/dist/
 
 > **Note:** the type-check script is named `typecheck` (renamed from the
 > misleadingly-named `lint` in
-> [#776](https://github.com/Ledger-Lenz/Ledgerlens-core/issues/776)). There is
+> [#776](https://github.com/Ledger-Lenz/StellarLense-core/issues/776)). There is
 > no real linter yet — `npm run typecheck` only checks types. ESLint + Prettier
 > configuration is tracked in
-> [issue #774](https://github.com/Ledger-Lenz/Ledgerlens-core/issues/774).
+> [issue #774](https://github.com/Ledger-Lenz/StellarLense-core/issues/774).
 
 ### Build targets
 
@@ -212,7 +212,7 @@ The dual build is what lets the SDK be consumed from both `import` and
 
 ### Publishing
 
-`sdk/package.json` is configured for publication to npm as `@ledgerlens/sdk`
+`sdk/package.json` is configured for publication to npm as `@stellar-lense/sdk`
 (`publishConfig.access: public`), and a `prepublishOnly` hook runs
 `npm run build && npm run test` before any publish.
 
@@ -515,30 +515,30 @@ def ingest_evm_events(...):
     if not _HAS_WEB3:
         raise ImportError(
             "'web3' is required but is not installed.\n"
-            "  Install the 'chain' extra:  pip install 'ledgerlens-core[chain]'"
+            "  Install the 'chain' extra:  pip install 'stellar-lense-core[chain]'"
         )
     ...
 ```
 
 Availability sentinels and `require_*()` helpers for all optional extras are
-centralised in `ledgerlens/_optional_imports.py`.
+centralised in `stellar_lense/_optional_imports.py`.
 
 ---
 
 ## Working with protobuf definitions
 
 The files under `generated/` (`scoring_pb2.py`, `scoring_pb2.pyi`,
-`scoring_pb2_grpc.py`) are compiled output from `proto/ledgerlens/v1/scoring.proto`.
+`scoring_pb2_grpc.py`) are compiled output from `proto/stellar_lense/v1/scoring.proto`.
 **Never hand-edit files in `generated/`** — any change must be made to the
 `.proto` source and then regenerated.
 
-After editing `proto/ledgerlens/v1/scoring.proto`, regenerate with (from the repo
+After editing `proto/stellar_lense/v1/scoring.proto`, regenerate with (from the repo
 root):
 
 ```bash
-python -m grpc_tools.protoc -I proto/ledgerlens/v1 \
+python -m grpc_tools.protoc -I proto/stellar_lense/v1 \
     --python_out=generated --grpc_python_out=generated \
-    proto/ledgerlens/v1/scoring.proto
+    proto/stellar_lense/v1/scoring.proto
 ```
 
 `grpc_tools.protoc` generates `scoring_pb2_grpc.py` with a bare
@@ -562,7 +562,7 @@ docstring in `generated/__init__.py` for further detail.
 
 ## License and vulnerability policy
 
-LedgerLens ships only packages with permissive licenses. The CI
+Stellar Lense ships only packages with permissive licenses. The CI
 `license-vuln-scan` workflow enforces this automatically on every push that
 touches a dependency file, and nightly for new CVEs.
 
@@ -604,7 +604,7 @@ turns out to conflict with the roadmap or an in-flight PR.
 Use the **[Bug report]** issue form:
 
 ```
-https://github.com/Ledger-Lenz/Ledgerlens-core/issues/new?template=bug_report.yml
+https://github.com/Ledger-Lenz/StellarLense-core/issues/new?template=bug_report.yml
 ```
 
 The form prompts for a summary, reproduction steps, expected and actual
@@ -618,7 +618,7 @@ template picker automatically when you click "New issue".
 Use the **[Feature request]** issue form:
 
 ```
-https://github.com/Ledger-Lenz/Ledgerlens-core/issues/new?template=feature_request.yml
+https://github.com/Ledger-Lenz/StellarLense-core/issues/new?template=feature_request.yml
 ```
 
 The form asks for:
@@ -629,7 +629,7 @@ The form asks for:
 | **Proposed solution** | Gives maintainers enough detail to assess feasibility and spot conflicts with existing design. |
 | **Alternatives considered** | Shows you've thought through the trade-offs, which speeds up review. |
 | **Affected component** | Multi-select dropdown so the right maintainer is looped in early. |
-| **Cross-repo impact** | Flags whether `ledgerlens-api`, `ledgerlens-contracts`, or `ledgerlens-data` also need changes (see [Cross-repo changes](#cross-repo-changes)). |
+| **Cross-repo impact** | Flags whether `stellar-lense-api`, `stellar-lense-contracts`, or `stellar-lense-data` also need changes (see [Cross-repo changes](#cross-repo-changes)). |
 | **PR willingness** | Helps maintainers prioritise and match contributors to open work. |
 
 Check [ROADMAP.md](ROADMAP.md) before filing — your feature may already
@@ -701,14 +701,14 @@ triggers it, and roughly how long it takes — see
 If a change affects a **shared contract** — `RiskScore` schema, `Trade`/`Asset`
 schemas, environment variables in `.env.example`, or the Soroban contract
 interface — call it out in the PR description so the corresponding change can be
-made in `ledgerlens-api`, `ledgerlens-contracts`, and/or `ledgerlens-dashboard`.
-See the "LedgerLens Organization" section of `README.md` for details.
+made in `stellar-lense-api`, `stellar-lense-contracts`, and/or `stellar-lense-dashboard`.
+See the "Stellar Lense Organization" section of `README.md` for details.
 
 ---
 
 ## Protobuf style conventions
 
-The `.proto` definitions under `proto/ledgerlens/v1/` back the internal gRPC
+The `.proto` definitions under `proto/stellar_lense/v1/` back the internal gRPC
 Scoring Service — see `docs/grpc_scoring.md` for the service's purpose and
 schema reference. When adding or changing a `.proto` file, follow the
 conventions already established there:

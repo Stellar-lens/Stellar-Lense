@@ -42,7 +42,7 @@ from typing import Optional
 
 import numpy as np
 
-logger = logging.getLogger("ledgerlens.drift_detectors")
+logger = logging.getLogger("stellar_lense.drift_detectors")
 
 # ---------------------------------------------------------------------------
 # Sensitivity configuration (Issue-109: ADWIN_DELTA / PAGE_HINKLEY_THRESHOLD)

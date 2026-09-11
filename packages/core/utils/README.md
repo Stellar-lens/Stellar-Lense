@@ -1,6 +1,6 @@
 # utils/
 
-Shared, dependency-free utility helpers used across the LedgerLens codebase.
+Shared, dependency-free utility helpers used across the Stellar Lense codebase.
 
 This package is for **infrastructure-level primitives** — small, general-purpose building blocks that are not specific to any one domain (ingestion, detection, API). Domain-specific code belongs in its own package (`ingestion/`, `detection/`, `api/`, etc.). If a helper needs to import from one of those packages, it does not belong here.
 
@@ -88,11 +88,11 @@ All state transitions are serialised under a single `threading.Lock`, so the bre
 A helper belongs in `utils/` if it satisfies **all** of these criteria:
 
 1. It is general-purpose — not specific to ingestion, detection, the API, or any other domain.
-2. It has no imports from other LedgerLens packages (`ingestion`, `detection`, `api`, `config`, …).
+2. It has no imports from other Stellar Lense packages (`ingestion`, `detection`, `api`, `config`, …).
 3. It has minimal external dependencies (ideally none beyond the standard library).
-4. It is expected to be reused in at least two different LedgerLens modules.
+4. It is expected to be reused in at least two different Stellar Lense modules.
 
-If the helper needs LedgerLens configuration or domain types, place it in the most specific package that owns its primary concern instead.
+If the helper needs Stellar Lense configuration or domain types, place it in the most specific package that owns its primary concern instead.
 
 ## Further Reading
 

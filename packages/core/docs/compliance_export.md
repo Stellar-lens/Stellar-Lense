@@ -1,6 +1,6 @@
 # Compliance Export Pipeline
 
-LedgerLens can package its detection evidence into the formats exchanges and
+Stellar Lense can package its detection evidence into the formats exchanges and
 custodians need to meet two distinct regulatory obligations:
 
 - **FATF Travel Rule** (Recommendation 16) — sharing originator/beneficiary
@@ -10,13 +10,13 @@ custodians need to meet two distinct regulatory obligations:
 
 All three endpoints live in `detection/compliance_exporter.py` and are
 mounted under `/compliance/*` in `api/main.py`, gated by the
-`X-LedgerLens-Compliance-Key` header (see [api_reference.md](api_reference.md)).
+`X-StellarLense-Compliance-Key` header (see [api_reference.md](api_reference.md)).
 They are excluded from the OpenAPI schema (`include_in_schema=False`) so they
 never surface on the unauthenticated `/docs` page.
 
 ## Legal disclaimer
 
-**LedgerLens is a detection and evidence-packaging tool, not a compliance
+**Stellar Lense is a detection and evidence-packaging tool, not a compliance
 advisor.** It does not file SARs or Travel Rule reports — that is the
 responsibility of the regulated institution. Generated narratives and
 records must be independently reviewed and verified by qualified compliance
@@ -27,7 +27,7 @@ constitutes legal advice.
 
 ### `GET /compliance/ivms/{wallet}`
 
-Returns an `IVMSRiskField` (`ledgerlens_score`, `risk_level`, `alert_types`,
+Returns an `IVMSRiskField` (`stellar_lense_score`, `risk_level`, `alert_types`,
 `score_timestamp`, `evidence_hash`) suitable for injecting into an existing
 IVMS 101 Travel Rule payload via `augment_ivms_payload`. `evidence_hash` is a
 SHA-256 commitment over the scored fact, mirroring the on-chain ZK proof
@@ -48,7 +48,7 @@ construction and is not cheap to run on demand:
 
 - **Minimum risk score** — the wallet's current peak risk score must be at
   least `COMPLIANCE_SAR_MIN_SCORE` (default 70), or the request fails with
-  `400`. A SAR shouldn't be trivial to generate for a wallet LedgerLens
+  `400`. A SAR shouldn't be trivial to generate for a wallet Stellar Lense
   hasn't actually flagged as high-risk.
 - **Rate limit** — `COMPLIANCE_EXPORT_RATE_LIMIT_PER_HOUR` exports/hour
   (default 100) across all SAR + Travel Rule exports combined, counted from
@@ -93,14 +93,14 @@ See [database_schema.md](database_schema.md) for the full table definition.
 ```bash
 COMPLIANCE_SAR_MIN_SCORE=70                  # minimum risk score required to generate a SAR
 COMPLIANCE_EXPORT_RATE_LIMIT_PER_HOUR=100    # combined SAR + Travel Rule exports/hour
-LEDGERLENS_COMPLIANCE_API_KEY=your-compliance-key
+STELLARLENSE_COMPLIANCE_API_KEY=your-compliance-key
 ```
 
 ## PII handling
 
 - Originator/beneficiary names are not handled by these endpoints today --
-  `build_ivms_risk_field`/`augment_ivms_payload` only attach LedgerLens's own
-  risk evidence to an IVMS payload the caller supplies; LedgerLens never
+  `build_ivms_risk_field`/`augment_ivms_payload` only attach Stellar Lense's own
+  risk evidence to an IVMS payload the caller supplies; Stellar Lense never
   generates the personal-data fields itself.
 - Stellar public keys are pseudonymous, but the audit log still stores only
   a SHA-256 hash, never the plaintext address, so the audit trail can't

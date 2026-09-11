@@ -5,7 +5,7 @@ assignees: []
 ---
 
 ## Summary
-SHAP explanations (see `detection/shap_explainer.py` and ISSUE-028) tell users *which features contributed most* to a high risk score, but they do not tell users *what would need to change* to reduce the score below the alert threshold. Counterfactual explanations bridge this gap: they find the smallest feature-space perturbation to a wallet's current feature vector that would result in a risk score below 70 (the `RISK_SCORE_THRESHOLD`), then translate those feature changes into actionable, plain-language advice for wallet owners who want to understand what legitimate behavioural changes would reduce their risk flag. This is essential for dispute resolution and for maintaining the credibility of LedgerLens scores.
+SHAP explanations (see `detection/shap_explainer.py` and ISSUE-028) tell users *which features contributed most* to a high risk score, but they do not tell users *what would need to change* to reduce the score below the alert threshold. Counterfactual explanations bridge this gap: they find the smallest feature-space perturbation to a wallet's current feature vector that would result in a risk score below 70 (the `RISK_SCORE_THRESHOLD`), then translate those feature changes into actionable, plain-language advice for wallet owners who want to understand what legitimate behavioural changes would reduce their risk flag. This is essential for dispute resolution and for maintaining the credibility of Stellar Lense scores.
 
 ## Background & Context
 A counterfactual explanation for a data point `x` with label `y=1` (wash-trading) is a point `x'` such that:
@@ -13,7 +13,7 @@ A counterfactual explanation for a data point `x` with label `y=1` (wash-trading
 2. `‖x' - x‖` is minimised (the counterfactual is as close as possible to the original — "what is the minimal change needed?")
 3. `x'` is plausible — it lies within the observed range of clean wallet feature distributions (out-of-distribution counterfactuals are not actionable)
 
-The `dice-ml` library (DiCE: Diverse Counterfactual Explanations) and the `alibi` library both implement algorithmic counterfactual generation for tabular ML models. For LedgerLens, the primary method should be gradient-free optimisation (since RF and XGB don't provide exact gradients) using CFRL (Counterfactual RL) or the simpler genetic algorithm approach in DiCE.
+The `dice-ml` library (DiCE: Diverse Counterfactual Explanations) and the `alibi` library both implement algorithmic counterfactual generation for tabular ML models. For Stellar Lense, the primary method should be gradient-free optimisation (since RF and XGB don't provide exact gradients) using CFRL (Counterfactual RL) or the simpler genetic algorithm approach in DiCE.
 
 `detection/counterfactual_engine.py` is the planned location for this functionality.
 

@@ -1,11 +1,11 @@
 """Local read-only API for `RiskScore` records produced by `run_pipeline.py`.
 
-This is a lightweight stand-in for the `ledgerlens-api` repo, useful for
+This is a lightweight stand-in for the `stellar-lense-api` repo, useful for
 local development and demos: it serves whatever has been written to the
 local SQLite store (`detection.storage`) by `run_pipeline.py` or
-`cli.py score`. `ledgerlens-api` will eventually own the canonical,
+`cli.py score`. `stellar-lense-api` will eventually own the canonical,
 production version of these endpoints (`/score`, `/alerts`,
-`/assets/risk-ranking`) — see README's "LedgerLens Organization" section.
+`/assets/risk-ranking`) — see README's "StellarLense Organization" section.
 
 Also exposes webhook subscriber management endpoints.
 
@@ -76,7 +76,7 @@ from detection.governance import (
 from detection.webhook_queue import get_dead_letters
 from detection.webhook_registry import deactivate_subscriber, list_subscribers, register_subscriber
 
-logger = logging.getLogger("ledgerlens.api")
+logger = logging.getLogger("stellar_lense.api")
 
 _STELLAR_ADDRESS_PATTERN = re.compile(r"^G[A-Z2-7]{55}$")
 
@@ -231,11 +231,11 @@ async def _lifespan(application: FastAPI):
     # not be publicly accessible in production deployments.
     try:
         from config.settings import settings as _s  # noqa: PLC0415
-        if getattr(_s, "metrics_enabled", True) and not _s.ledgerlens_admin_api_key:
+        if getattr(_s, "metrics_enabled", True) and not _s.stellarlense_admin_api_key:
             logger.warning(
-                "SECURITY WARNING: METRICS_ENABLED=True but LEDGERLENS_ADMIN_API_KEY "
+                "SECURITY WARNING: METRICS_ENABLED=True but STELLARLENSE_ADMIN_API_KEY "
                 "is unset. The /metrics endpoint is publicly accessible and may expose "
-                "operational intelligence. Set LEDGERLENS_ADMIN_API_KEY to protect it."
+                "operational intelligence. Set STELLARLENSE_ADMIN_API_KEY to protect it."
             )
     except Exception:
         pass
@@ -302,9 +302,9 @@ async def _lifespan(application: FastAPI):
 
 
 app = FastAPI(
-    title="LedgerLens API",
+    title="StellarLense API",
     description=(
-        "LedgerLens REST API for Stellar wallet risk scoring, alert management, "
+        "StellarLense REST API for Stellar wallet risk scoring, alert management, "
         "AMM pool risk, cross-chain linking, and compliance exports. "
         "See [ReDoc](/redoc) for an alternative documentation view."
     ),
@@ -813,7 +813,7 @@ def explain_wallet_score(
     Produces ranked per-feature SHAP contributions, the SHAP base value
     (expected model output), and a human-readable summary sentence.
 
-    Requires ``X-LedgerLens-Admin-Key`` header for authentication.
+    Requires ``X-StellarLense-Admin-Key`` header for authentication.
 
     - **200** — waterfall explanation returned.
     - **404** — no feature vector or scores found for the given wallet.
@@ -915,7 +915,7 @@ class RateLimiterStatus(BaseModel):
 def rate_limiter_status() -> RateLimiterStatus:
     """Return current rate limiter and backpressure state.
 
-    Requires the ``X-LedgerLens-Admin-Key`` header.  Returns 503 if no
+    Requires the ``X-StellarLense-Admin-Key`` header.  Returns 503 if no
     streamer is currently registered.
     """
     bucket = _stream_rate_limiter_state.get("bucket")
@@ -983,9 +983,9 @@ def stream_status() -> dict:
     tags=["System"],
     summary="Prometheus metrics",
     description=(
-        "Expose all LedgerLens Prometheus metrics in the standard text exposition "
-        "format. Requires the ``X-LedgerLens-Admin-Key`` header when "
-        "``LEDGERLENS_ADMIN_API_KEY`` is configured. "
+        "Expose all StellarLense Prometheus metrics in the standard text exposition "
+        "format. Requires the ``X-StellarLense-Admin-Key`` header when "
+        "``STELLARLENSE_ADMIN_API_KEY`` is configured. "
         "Returns ``503`` when ``METRICS_ENABLED=False``."
     ),
     include_in_schema=True,
@@ -997,7 +997,7 @@ async def prometheus_metrics(
 
     Protected by ``require_admin_key`` so that operational intelligence
     (queue depths, error rates, request counts) is not publicly accessible.
-    When ``LEDGERLENS_ADMIN_API_KEY`` is unset the dependency is a no-op and
+    When ``STELLARLENSE_ADMIN_API_KEY`` is unset the dependency is a no-op and
     the endpoint is accessible without authentication — a startup WARNING is
     logged in that case.
 
@@ -1557,9 +1557,9 @@ def get_slo_status_from_registry() -> dict:
     from config.settings import settings
 
     for metric in REGISTRY.collect():
-        if metric.name == "ledgerlens_api_request_duration_seconds":
+        if metric.name == "stellar_lense_api_request_duration_seconds":
             for sample in metric.samples:
-                if sample.name == "ledgerlens_api_request_duration_seconds_count":
+                if sample.name == "stellar_lense_api_request_duration_seconds_count":
                     labels = sample.labels
                     if labels.get("method") == "GET" and labels.get("endpoint") in ("/scores/{wallet}", "/v1/scores/{wallet}"):
                         status = labels.get("status_code", "")
@@ -1567,29 +1567,29 @@ def get_slo_status_from_registry() -> dict:
                         if not status.startswith("5"):
                             avail_good += sample.value
 
-        elif metric.name == "ledgerlens_scoring_latency_seconds":
+        elif metric.name == "stellar_lense_scoring_latency_seconds":
             for sample in metric.samples:
-                if sample.name == "ledgerlens_scoring_latency_seconds_bucket":
+                if sample.name == "stellar_lense_scoring_latency_seconds_bucket":
                     le_val = sample.labels.get("le", "")
                     try:
                         if le_val and float(le_val) <= settings.slo_scoring_latency_target_seconds:
                             latency_good += sample.value
                     except ValueError:
                         pass
-                elif sample.name == "ledgerlens_scoring_latency_seconds_count":
+                elif sample.name == "stellar_lense_scoring_latency_seconds_count":
                     latency_total += sample.value
 
-        elif metric.name == "ledgerlens_webhook_deliveries_total":
+        elif metric.name == "stellar_lense_webhook_deliveries_total":
             for sample in metric.samples:
-                if sample.name in ("ledgerlens_webhook_deliveries_total", "ledgerlens_webhook_deliveries_total_total"):
+                if sample.name in ("stellar_lense_webhook_deliveries_total", "stellar_lense_webhook_deliveries_total_total"):
                     res = sample.labels.get("result", "")
                     webhook_total += sample.value
                     if res == "delivered":
                         webhook_good += sample.value
 
-        elif metric.name == "ledgerlens_soroban_submissions_total":
+        elif metric.name == "stellar_lense_soroban_submissions_total":
             for sample in metric.samples:
-                if sample.name in ("ledgerlens_soroban_submissions_total", "ledgerlens_soroban_submissions_total_total"):
+                if sample.name in ("stellar_lense_soroban_submissions_total", "stellar_lense_soroban_submissions_total_total"):
                     status = sample.labels.get("status", "")
                     if status != "skipped":
                         soroban_total += sample.value
@@ -1711,7 +1711,7 @@ def federated_audit_log(
 def admin_namespaces() -> list[dict]:
     """Return every namespace with per-table record counts.
 
-    Admin-only (requires the ``LEDGERLENS_ADMIN_API_KEY`` header).
+    Admin-only (requires the ``STELLARLENSE_ADMIN_API_KEY`` header).
     Gated by `require_admin_key` — the admin wildcard API key is
     required to see cross-namespace data.
     """
@@ -1725,7 +1725,7 @@ def admin_rotate_namespace_key(
 ) -> dict:
     """Rotate the namespace key. Marks the old one rotating, creates a new one.
 
-    Admin-only (requires the ``LEDGERLENS_ADMIN_API_KEY`` header).
+    Admin-only (requires the ``STELLARLENSE_ADMIN_API_KEY`` header).
     """
     from api.namespace import rotate_namespace_key
     if grace_period_seconds <= 0:
@@ -2083,7 +2083,7 @@ def compliance_sar_package(body: SARPackageRequest, dry_run: bool = Query(False)
     )
 
     validate_stellar_address(body.wallet)
-    output_dir = tempfile.mkdtemp(prefix="ledgerlens_sar_")
+    output_dir = tempfile.mkdtemp(prefix="stellar_lense_sar_")
     try:
         zip_path = export_sar_package(
             wallet=body.wallet,
@@ -2248,7 +2248,7 @@ def _get_or_fit_causal_engine():
             min_sample = int(os.getenv("CAUSAL_MIN_SAMPLE_SIZE", "500"))
             method = os.getenv("CAUSAL_ESTIMATION_METHOD", "backdoor.linear_regression")
             refutation_runs = int(os.getenv("CAUSAL_REFUTATION_RUNS", "100"))
-            model_version = os.getenv("LEDGERLENS_MODEL_VERSION", "default")
+            model_version = os.getenv("STELLARLENSE_MODEL_VERSION", "default")
 
             with _connect() as conn:
                 rows = conn.execute(
@@ -2648,7 +2648,7 @@ def root_compliance_sar_package(body: SARPackageRequest, dry_run: bool = Query(F
     )
     from fastapi.responses import FileResponse as _FileResponse
 
-    output_dir = tempfile.mkdtemp(prefix="ledgerlens_sar_")
+    output_dir = tempfile.mkdtemp(prefix="stellar_lense_sar_")
     try:
         pkg_path = export_sar_package(
             wallet=body.wallet,
@@ -2691,8 +2691,8 @@ try:
     app.include_router(_graphql_app, prefix="/graphql")
 except ImportError:
     import logging as _logging
-    _logging.getLogger("ledgerlens.api").warning(
+    _logging.getLogger("stellar_lense.api").warning(
         "GraphQL endpoint disabled: 'strawberry-graphql' is not installed. "
         "Install the 'graphql' extra to enable it: "
-        "pip install 'ledgerlens-core[graphql]'"
+        "pip install 'stellar-lense-core[graphql]'"
     )

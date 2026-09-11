@@ -5,12 +5,12 @@ assignees: []
 ---
 
 ## Summary
-The LedgerLens CLI has no shell auto-completion, requiring users to memorise subcommand names and flags. Generating and installing completion scripts for Bash, Zsh, and Fish significantly improves CLI ergonomics for operators and developers.
+The Stellar Lense CLI has no shell auto-completion, requiring users to memorise subcommand names and flags. Generating and installing completion scripts for Bash, Zsh, and Fish significantly improves CLI ergonomics for operators and developers.
 
 ## Objectives
 - [ ] Add `cli.py completion --shell {bash,zsh,fish}` subcommand that prints the completion script
 - [ ] Use Click's built-in `shell_complete` or `click-completion` library for script generation
-- [ ] Document installation in `docs/cli_reference.md`: `eval "$(ledgerlens completion --shell zsh)"`
+- [ ] Document installation in `docs/cli_reference.md`: `eval "$(stellar_lense completion --shell zsh)"`
 - [ ] Add completion for subcommand names, common flags (`--output`, `--concurrency`), and `--shell` enum values
 
 ## Definition of Done

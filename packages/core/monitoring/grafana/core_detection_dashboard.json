@@ -27,7 +27,7 @@
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "description": "FastAPI request duration percentiles across all endpoints, from ledgerlens_api_request_duration_seconds.",
+      "description": "FastAPI request duration percentiles across all endpoints, from stellar_lense_api_request_duration_seconds.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -107,7 +107,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.50, sum(rate(ledgerlens_api_request_duration_seconds_bucket[5m])) by (le))",
+          "expr": "histogram_quantile(0.50, sum(rate(stellar_lense_api_request_duration_seconds_bucket[5m])) by (le))",
           "legendFormat": "p50",
           "range": true,
           "refId": "A"
@@ -118,7 +118,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum(rate(ledgerlens_api_request_duration_seconds_bucket[5m])) by (le))",
+          "expr": "histogram_quantile(0.95, sum(rate(stellar_lense_api_request_duration_seconds_bucket[5m])) by (le))",
           "legendFormat": "p95",
           "range": true,
           "refId": "B"
@@ -129,7 +129,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.99, sum(rate(ledgerlens_api_request_duration_seconds_bucket[5m])) by (le))",
+          "expr": "histogram_quantile(0.99, sum(rate(stellar_lense_api_request_duration_seconds_bucket[5m])) by (le))",
           "legendFormat": "p99",
           "range": true,
           "refId": "C"
@@ -143,7 +143,7 @@
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "description": "Per-endpoint p95 of ledgerlens_api_request_duration_seconds \u2014 surfaces which route is slow.",
+      "description": "Per-endpoint p95 of stellar_lense_api_request_duration_seconds \u2014 surfaces which route is slow.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -223,7 +223,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum(rate(ledgerlens_api_request_duration_seconds_bucket[5m])) by (le, endpoint))",
+          "expr": "histogram_quantile(0.95, sum(rate(stellar_lense_api_request_duration_seconds_bucket[5m])) by (le, endpoint))",
           "legendFormat": "{{endpoint}}",
           "range": true,
           "refId": "A"
@@ -237,7 +237,7 @@
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "description": "Request throughput from ledgerlens_api_request_duration_seconds_count, split by HTTP status_code.",
+      "description": "Request throughput from stellar_lense_api_request_duration_seconds_count, split by HTTP status_code.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -317,7 +317,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(ledgerlens_api_request_duration_seconds_count[5m])) by (status_code)",
+          "expr": "sum(rate(stellar_lense_api_request_duration_seconds_count[5m])) by (status_code)",
           "legendFormat": "{{status_code}}",
           "range": true,
           "refId": "A"
@@ -331,7 +331,7 @@
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "description": "ledgerlens:score_availability_slo:ratio_rate5m recording rule \u2014 fraction of GET /scores/{wallet} requests not returning 5xx.",
+      "description": "stellar_lense:score_availability_slo:ratio_rate5m recording rule \u2014 fraction of GET /scores/{wallet} requests not returning 5xx.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -388,7 +388,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "ledgerlens:score_availability_slo:ratio_rate5m",
+          "expr": "stellar_lense:score_availability_slo:ratio_rate5m",
           "legendFormat": "success ratio",
           "range": true,
           "refId": "A"
@@ -402,7 +402,7 @@
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "description": "rate(ledgerlens_wallets_scored_total[5m]) broken out by result. Total scoring throughput of the detection engine.",
+      "description": "rate(stellar_lense_wallets_scored_total[5m]) broken out by result. Total scoring throughput of the detection engine.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -482,7 +482,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(ledgerlens_wallets_scored_total[5m]))",
+          "expr": "sum(rate(stellar_lense_wallets_scored_total[5m]))",
           "legendFormat": "total",
           "range": true,
           "refId": "A"
@@ -493,7 +493,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(ledgerlens_wallets_scored_total[5m])) by (result)",
+          "expr": "sum(rate(stellar_lense_wallets_scored_total[5m])) by (result)",
           "legendFormat": "{{result}}",
           "range": true,
           "refId": "B"
@@ -507,7 +507,7 @@
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "description": "End-to-end wallet scoring latency percentiles from ledgerlens_scoring_latency_seconds. The ScoringLatencyHigh alert fires on p95 > 2s.",
+      "description": "End-to-end wallet scoring latency percentiles from stellar_lense_scoring_latency_seconds. The ScoringLatencyHigh alert fires on p95 > 2s.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -587,7 +587,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.50, sum(rate(ledgerlens_scoring_latency_seconds_bucket[10m])) by (le))",
+          "expr": "histogram_quantile(0.50, sum(rate(stellar_lense_scoring_latency_seconds_bucket[10m])) by (le))",
           "legendFormat": "p50",
           "range": true,
           "refId": "A"
@@ -598,7 +598,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum(rate(ledgerlens_scoring_latency_seconds_bucket[10m])) by (le))",
+          "expr": "histogram_quantile(0.95, sum(rate(stellar_lense_scoring_latency_seconds_bucket[10m])) by (le))",
           "legendFormat": "p95",
           "range": true,
           "refId": "B"
@@ -609,7 +609,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.99, sum(rate(ledgerlens_scoring_latency_seconds_bucket[10m])) by (le))",
+          "expr": "histogram_quantile(0.99, sum(rate(stellar_lense_scoring_latency_seconds_bucket[10m])) by (le))",
           "legendFormat": "p99",
           "range": true,
           "refId": "C"
@@ -623,7 +623,7 @@
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "description": "ledgerlens:scoring_latency_slo:ratio_rate5m recording rule \u2014 fraction of wallet scores completing under the 2s objective.",
+      "description": "stellar_lense:scoring_latency_slo:ratio_rate5m recording rule \u2014 fraction of wallet scores completing under the 2s objective.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -680,7 +680,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "ledgerlens:scoring_latency_slo:ratio_rate5m",
+          "expr": "stellar_lense:scoring_latency_slo:ratio_rate5m",
           "legendFormat": "fast ratio",
           "range": true,
           "refId": "A"
@@ -694,7 +694,7 @@
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "description": "Duration of a full detection pipeline pass from ledgerlens_pipeline_run_duration_seconds. The PipelineStalled alert watches staleness of this metric.",
+      "description": "Duration of a full detection pipeline pass from stellar_lense_pipeline_run_duration_seconds. The PipelineStalled alert watches staleness of this metric.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -774,7 +774,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum(rate(ledgerlens_pipeline_run_duration_seconds_bucket[30m])) by (le))",
+          "expr": "histogram_quantile(0.95, sum(rate(stellar_lense_pipeline_run_duration_seconds_bucket[30m])) by (le))",
           "legendFormat": "p95",
           "range": true,
           "refId": "A"
@@ -785,7 +785,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.99, sum(rate(ledgerlens_pipeline_run_duration_seconds_bucket[30m])) by (le))",
+          "expr": "histogram_quantile(0.99, sum(rate(stellar_lense_pipeline_run_duration_seconds_bucket[30m])) by (le))",
           "legendFormat": "p99",
           "range": true,
           "refId": "B"
@@ -799,7 +799,7 @@
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "description": "Horizon SSE ingestion rates: ledgerlens_ingestion_events_received_total vs _queued_total vs _dropped_total.",
+      "description": "Horizon SSE ingestion rates: stellar_lense_ingestion_events_received_total vs _queued_total vs _dropped_total.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -879,7 +879,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(ledgerlens_ingestion_events_received_total[5m]))",
+          "expr": "sum(rate(stellar_lense_ingestion_events_received_total[5m]))",
           "legendFormat": "received",
           "range": true,
           "refId": "A"
@@ -890,7 +890,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(ledgerlens_ingestion_events_queued_total[5m]))",
+          "expr": "sum(rate(stellar_lense_ingestion_events_queued_total[5m]))",
           "legendFormat": "queued",
           "range": true,
           "refId": "B"
@@ -901,7 +901,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(ledgerlens_ingestion_events_dropped_total[5m]))",
+          "expr": "sum(rate(stellar_lense_ingestion_events_dropped_total[5m]))",
           "legendFormat": "dropped",
           "range": true,
           "refId": "C"
@@ -915,7 +915,7 @@
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "description": "ledgerlens_ingestion_queue_depth (current) and ledgerlens_ingestion_queue_depth_peak, per source. Sustained growth precedes drops.",
+      "description": "stellar_lense_ingestion_queue_depth (current) and stellar_lense_ingestion_queue_depth_peak, per source. Sustained growth precedes drops.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -995,7 +995,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "ledgerlens_ingestion_queue_depth",
+          "expr": "stellar_lense_ingestion_queue_depth",
           "legendFormat": "{{source}} current",
           "range": true,
           "refId": "A"
@@ -1006,7 +1006,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "ledgerlens_ingestion_queue_depth_peak",
+          "expr": "stellar_lense_ingestion_queue_depth_peak",
           "legendFormat": "{{source}} peak",
           "range": true,
           "refId": "B"
@@ -1020,7 +1020,7 @@
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "description": "rate(ledgerlens_ingestion_events_dropped_total[5m]) by reason \u2014 queue-overflow backpressure signal.",
+      "description": "rate(stellar_lense_ingestion_events_dropped_total[5m]) by reason \u2014 queue-overflow backpressure signal.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1100,7 +1100,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(ledgerlens_ingestion_events_dropped_total[5m])) by (reason)",
+          "expr": "sum(rate(stellar_lense_ingestion_events_dropped_total[5m])) by (reason)",
           "legendFormat": "{{reason}}",
           "range": true,
           "refId": "A"
@@ -1114,7 +1114,7 @@
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "description": "rate(ledgerlens_ingestion_sse_reconnects_total[5m]) * 60 \u2014 Horizon SSE connection stability.",
+      "description": "rate(stellar_lense_ingestion_sse_reconnects_total[5m]) * 60 \u2014 Horizon SSE connection stability.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1194,7 +1194,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(ledgerlens_ingestion_sse_reconnects_total[5m])) * 60",
+          "expr": "sum(rate(stellar_lense_ingestion_sse_reconnects_total[5m])) * 60",
           "legendFormat": "reconnects/min",
           "range": true,
           "refId": "A"
@@ -1208,7 +1208,7 @@
   "schemaVersion": 38,
   "style": "dark",
   "tags": [
-    "ledgerlens",
+    "stellar_lense",
     "detection",
     "api",
     "ingestion"
@@ -1241,8 +1241,8 @@
   },
   "timepicker": {},
   "timezone": "",
-  "title": "LedgerLens Core Detection & API",
-  "uid": "ledgerlens-core-detection",
+  "title": "Stellar Lense Core Detection & API",
+  "uid": "stellar-lense-core-detection",
   "version": 1,
   "weekStart": ""
 }

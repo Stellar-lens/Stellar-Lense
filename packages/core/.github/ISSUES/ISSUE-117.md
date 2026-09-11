@@ -5,7 +5,7 @@ assignees: []
 ---
 
 ## Summary
-LedgerLens has no automated resilience testing. Failures in the Horizon API, Redis, or SQLite are handled with retry logic and circuit breakers, but these mechanisms have never been validated under realistic failure conditions. A chaos engineering test suite using `toxiproxy` or `chaos-monkey`-style fault injection verifies that the system degrades gracefully rather than cascading.
+Stellar Lense has no automated resilience testing. Failures in the Horizon API, Redis, or SQLite are handled with retry logic and circuit breakers, but these mechanisms have never been validated under realistic failure conditions. A chaos engineering test suite using `toxiproxy` or `chaos-monkey`-style fault injection verifies that the system degrades gracefully rather than cascading.
 
 ## Objectives
 - [ ] Implement `tests/chaos/` with Toxiproxy-controlled network fault injection

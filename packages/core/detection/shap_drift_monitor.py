@@ -10,7 +10,7 @@ import numpy as np
 
 from detection.drift_monitor import compute_psi
 
-logger = logging.getLogger("ledgerlens.shap_drift_monitor")
+logger = logging.getLogger("stellar_lense.shap_drift_monitor")
 
 SHAP_DRIFT_PSI_THRESHOLD = 0.20
 SHAP_DRIFT_MIN_FLAGGED_FEATURES = 3

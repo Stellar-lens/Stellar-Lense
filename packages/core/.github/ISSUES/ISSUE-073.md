@@ -10,7 +10,7 @@ Extend `detection/benford_engine.py` to replace asymptotic chi-square p-values (
 
 ## Background & Context
 
-LedgerLens's Benford engine computes chi-square statistics comparing observed leading-digit distributions against the expected Benford distribution. The asymptotic chi-square p-value is derived from the chi-square distribution with 8 degrees of freedom (`df = digits(1-9) - 1`). This approximation is valid when `N * p_i >= 5` for all digit classes `i` — i.e., when the expected count for each digit exceeds 5. For `p_1 ≈ 0.301` (the most frequent digit), this requires `N >= 5/0.046 ≈ 109` transactions (using the rarest digit `p_9 ≈ 0.046`).
+Stellar Lense's Benford engine computes chi-square statistics comparing observed leading-digit distributions against the expected Benford distribution. The asymptotic chi-square p-value is derived from the chi-square distribution with 8 degrees of freedom (`df = digits(1-9) - 1`). This approximation is valid when `N * p_i >= 5` for all digit classes `i` — i.e., when the expected count for each digit exceeds 5. For `p_1 ≈ 0.301` (the most frequent digit), this requires `N >= 5/0.046 ≈ 109` transactions (using the rarest digit `p_9 ≈ 0.046`).
 
 Many SDEX wallets have fewer than 100 transactions in any given window (especially the 1h and 4h windows). For these wallets, the asymptotic p-value is unreliable — it systematically over-rejects benign wallets (false positives) because the chi-square approximation breaks down in small-sample tail regions.
 
@@ -190,7 +190,7 @@ For N=50, `bootstrap_chi_square_pvalue` with `n_bootstrap=10,000` must complete 
 
 ## For Contributors
 
-**Ideal contributor profile**: You have a strong background in computational statistics — specifically bootstrap methods, Monte Carlo sampling, and goodness-of-fit testing. You understand the conditions under which asymptotic chi-square p-values are valid and why they fail for small samples. Proficiency with `numpy` vectorised operations is required for the performance constraint. Familiarity with LedgerLens's Benford engine and the 5-window feature schema will accelerate the work.
+**Ideal contributor profile**: You have a strong background in computational statistics — specifically bootstrap methods, Monte Carlo sampling, and goodness-of-fit testing. You understand the conditions under which asymptotic chi-square p-values are valid and why they fail for small samples. Proficiency with `numpy` vectorised operations is required for the performance constraint. Familiarity with Stellar Lense's Benford engine and the 5-window feature schema will accelerate the work.
 
 To apply, please comment on this issue with:
 1. **Specialty area**: your primary expertise (e.g., computational statistics, bootstrap methods, Python scientific computing, anomaly detection).

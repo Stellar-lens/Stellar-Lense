@@ -30,7 +30,7 @@ from pydantic import BaseModel
 from api.auth import require_admin_key
 from config.settings import settings
 
-logger = logging.getLogger("ledgerlens.api.audit")
+logger = logging.getLogger("stellar_lense.api.audit")
 
 router = APIRouter(prefix="/audit", tags=["Audit Log"])
 
@@ -49,7 +49,7 @@ def _get_store():
     if _store is None:
         from audit.scoring_events import ScoringEventStore
 
-        db_path = getattr(settings, "ledgerlens_db_path", "ledgerlens.db")
+        db_path = getattr(settings, "stellarlense_db_path", "stellar_lense.db")
         max_keys = getattr(settings, "audit_feature_snapshot_max_keys", 50)
         _store = ScoringEventStore(db_path=db_path, max_feature_keys=max_keys)
     return _store

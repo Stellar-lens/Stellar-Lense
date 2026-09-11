@@ -32,7 +32,7 @@ def test_canonical_message():
     symbol_xdr = struct.pack(">iI", 15, len(symbol)) + symbol
     symbol_xdr += b"\x00" * ((-len(symbol)) % 4)
     expected = hashlib.sha256(
-        b"LedgerLens-Oracle-v2"
+        b"StellarLense-Oracle-v2"
         + wallet.encode()
         + b"|"
         + symbol_xdr

@@ -10,7 +10,7 @@ Harden `detection/conformal.py` so every `RiskScore` produced by the pipeline in
 
 ## Background & Context
 
-Conformal prediction is a distribution-free method for producing prediction intervals with a finite-sample coverage guarantee: for any new input, the interval contains the true label with probability ≥ 1−α. For LedgerLens, this means: "wallet W's true wash-trade status (0=clean, 1=wash) is included in the prediction set with probability ≥ 90%."
+Conformal prediction is a distribution-free method for producing prediction intervals with a finite-sample coverage guarantee: for any new input, the interval contains the true label with probability ≥ 1−α. For Stellar Lense, this means: "wallet W's true wash-trade status (0=clean, 1=wash) is included in the prediction set with probability ≥ 90%."
 
 The split-conformal approach splits the training data into a proper training set and a calibration set. On the calibration set, nonconformity scores (e.g., `1 - p̂(y_true)`) are computed. The (1−α)-quantile of these scores becomes the threshold for the prediction set at test time.
 
@@ -183,7 +183,7 @@ def score_wallet(
 ```python
 @router.get("/admin/conformal-coverage")
 async def conformal_coverage(
-    x_admin_key: str = Header(..., alias="X-LedgerLens-Admin-Key"),
+    x_admin_key: str = Header(..., alias="X-StellarLense-Admin-Key"),
 ) -> dict:
     return {
         "alpha": ...,

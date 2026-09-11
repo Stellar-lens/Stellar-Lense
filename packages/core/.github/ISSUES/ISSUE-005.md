@@ -5,7 +5,7 @@ assignees: []
 ---
 
 ## Summary
-The Stellar Horizon API occasionally introduces breaking changes between versions (e.g., field renames, type changes, new required fields), and LedgerLens currently has no mechanism to detect when the Horizon instance it is talking to has drifted from the schema version the models were written against. Adding schema version header validation will surface API version mismatches as explicit, actionable errors before they silently corrupt ingested data or cause cryptic Pydantic parse failures deep in the pipeline.
+The Stellar Horizon API occasionally introduces breaking changes between versions (e.g., field renames, type changes, new required fields), and Stellar Lense currently has no mechanism to detect when the Horizon instance it is talking to has drifted from the schema version the models were written against. Adding schema version header validation will surface API version mismatches as explicit, actionable errors before they silently corrupt ingested data or cause cryptic Pydantic parse failures deep in the pipeline.
 
 ## Background & Context
 `ingestion/http_client.py` provides `RetryingHorizonClient`, which wraps all HTTP calls to the Horizon API. Every Horizon response includes the header `X-Stellar-Horizon-Version` (e.g., `"2.28.0"`) which identifies the server software version. The Horizon API also returns `Content-Type: application/hal+json` with a `_links` envelope whose structure varies across major versions.

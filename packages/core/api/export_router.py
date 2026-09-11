@@ -72,7 +72,7 @@ def _query_rows(from_date: str, to_date: str, min_score: int, wallet: str | None
 
 
 def _filename(fmt: str, from_date: str, to_date: str) -> str:
-    return f"ledgerlens_scores_{from_date}_{to_date}.{fmt}"
+    return f"stellar_lense_scores_{from_date}_{to_date}.{fmt}"
 
 
 @router.get("/scores.csv", include_in_schema=True, dependencies=[Depends(require_admin_key)])
@@ -81,10 +81,10 @@ def export_csv(
     to_date: str = Query(..., alias="to", description="End date YYYY-MM-DD"),
     min_score: int = Query(default=0, ge=0, le=100),
     wallet: str | None = Query(default=None),
-    x_ledgerlens_admin_key: str = Header(default="", include_in_schema=False),
+    x_stellarlense_admin_key: str = Header(default="", include_in_schema=False),
 ) -> StreamingResponse:
     """Stream risk scores as CSV. Max 90-day window. Requires admin key."""
-    _check_rate_limit(x_ledgerlens_admin_key or "")
+    _check_rate_limit(x_stellarlense_admin_key or "")
     rows = _query_rows(from_date, to_date, min_score, wallet)
 
     buf = io.StringIO()
@@ -107,10 +107,10 @@ def export_parquet(
     to_date: str = Query(..., alias="to", description="End date YYYY-MM-DD"),
     min_score: int = Query(default=0, ge=0, le=100),
     wallet: str | None = Query(default=None),
-    x_ledgerlens_admin_key: str = Header(default="", include_in_schema=False),
+    x_stellarlense_admin_key: str = Header(default="", include_in_schema=False),
 ) -> StreamingResponse:
     """Stream risk scores as Parquet (snappy compressed). Max 90-day window. Requires admin key."""
-    _check_rate_limit(x_ledgerlens_admin_key or "")
+    _check_rate_limit(x_stellarlense_admin_key or "")
     rows = _query_rows(from_date, to_date, min_score, wallet)
 
     if rows:

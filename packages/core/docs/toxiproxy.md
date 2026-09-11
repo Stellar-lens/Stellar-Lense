@@ -1,6 +1,6 @@
 # Toxiproxy & Chaos Testing
 
-LedgerLens uses [Toxiproxy](https://github.com/Shopify/toxiproxy) to inject
+Stellar Lense uses [Toxiproxy](https://github.com/Shopify/toxiproxy) to inject
 network faults (latency, connection refusal, partitions) between the service and
 its external dependencies during the chaos-engineering test suite under
 `tests/chaos/`.

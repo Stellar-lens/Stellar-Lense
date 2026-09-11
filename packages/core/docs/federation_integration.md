@@ -1,10 +1,10 @@
 # Federated Learning Integration Guide
 
-This guide walks exchange partners through integrating with the LedgerLens federated learning network using the `ledgerlens-fl-client` library.
+This guide walks exchange partners through integrating with the Stellar Lense federated learning network using the `stellar-lense-fl-client` library.
 
 ## Overview
 
-LedgerLens federated learning enables multiple Stellar exchanges to collaboratively improve wash-trading detection models **without sharing raw trade data**. Each exchange:
+Stellar Lense federated learning enables multiple Stellar exchanges to collaboratively improve wash-trading detection models **without sharing raw trade data**. Each exchange:
 
 1. Trains local models on their private data
 2. Computes soft labels on a shared public synthetic dataset
@@ -28,13 +28,13 @@ LedgerLens federated learning enables multiple Stellar exchanges to collaborativ
 ## Installation
 
 ```bash
-pip install ledgerlens-fl-client
+pip install stellar-lense-fl-client
 ```
 
 Verify installation:
 
 ```bash
-python -c "from ledgerlens_fl_client import FLClient; print('Installation successful')"
+python -c "from stellar_lense_fl_client import FLClient; print('Installation successful')"
 ```
 
 ---
@@ -42,7 +42,7 @@ python -c "from ledgerlens_fl_client import FLClient; print('Installation succes
 ## Quick Start
 
 ```python
-from ledgerlens_fl_client import FLClient, DataAdapter
+from stellar_lense_fl_client import FLClient, DataAdapter
 import pandas as pd
 
 # Step 1: Implement a data adapter for your trade data
@@ -54,7 +54,7 @@ class MyExchangeAdapter(DataAdapter):
 
 # Step 2: Create the FL client
 client = FLClient(
-    server_url="https://fl.ledgerlens.io",
+    server_url="https://fl.stellar-lense.io",
     api_key="your-api-key-here",
     data_adapter=MyExchangeAdapter(),
     operator_id="exchange-xyz",  # Your unique identifier
@@ -78,7 +78,7 @@ The `DataAdapter` abstract base class is how you provide your private trade data
 ### Required Interface
 
 ```python
-from ledgerlens_fl_client import DataAdapter
+from stellar_lense_fl_client import DataAdapter
 from typing import Iterator
 import pandas as pd
 
@@ -108,14 +108,14 @@ Each yielded DataFrame must contain:
 | Features | Any (auto-detected) | float64 | ML features (e.g., benford_chi_square, volume_concentration, etc.) |
 | Label | `label` | int (0 or 1) | Ground truth: 0=normal, 1=wash-trading |
 
-**Important:** Feature columns must match the schema expected by the LedgerLens model. See `detection/feature_engineering.py` in the main repository for the complete feature list.
+**Important:** Feature columns must match the schema expected by the Stellar Lense model. See `detection/feature_engineering.py` in the main repository for the complete feature list.
 
 ### Using CSVDirectoryAdapter (Quick Start)
 
 For CSV-based data, use the built-in adapter:
 
 ```python
-from ledgerlens_fl_client import CSVDirectoryAdapter, FLClient
+from stellar_lense_fl_client import CSVDirectoryAdapter, FLClient
 
 adapter = CSVDirectoryAdapter(
     directory="/path/to/trade_csvs",
@@ -124,7 +124,7 @@ adapter = CSVDirectoryAdapter(
 )
 
 client = FLClient(
-    server_url="https://fl.ledgerlens.io",
+    server_url="https://fl.stellar-lense.io",
     api_key="your-key",
     data_adapter=adapter,
 )
@@ -217,34 +217,34 @@ else:
 Run federated rounds hourly:
 
 ```bash
-# /etc/cron.d/ledgerlens-fl
-0 * * * * root /usr/bin/python -m ledgerlens_fl_client >> /var/log/fl-client.log 2>&1
+# /etc/cron.d/stellar-lense-fl
+0 * * * * root /usr/bin/python -m stellar_lense_fl_client >> /var/log/fl-client.log 2>&1
 ```
 
 ### systemd Timer (Linux)
 
-Create `/etc/systemd/system/ledgerlens-fl.service`:
+Create `/etc/systemd/system/stellar-lense-fl.service`:
 
 ```ini
 [Unit]
-Description=LedgerLens FL Client
+Description=Stellar Lense FL Client
 After=network.target
 
 [Service]
 Type=oneshot
-Environment="FL_SERVER_URL=https://fl.ledgerlens.io"
+Environment="FL_SERVER_URL=https://fl.stellar-lense.io"
 Environment="FL_API_KEY=your-key"
 Environment="FL_DATA_DIR=/data/trades"
 Environment="FL_OPERATOR_ID=exchange-xyz"
 Environment="FL_ROUNDS=1"
-ExecStart=/usr/bin/python -m ledgerlens_fl_client
+ExecStart=/usr/bin/python -m stellar_lense_fl_client
 ```
 
-Create `/etc/systemd/system/ledgerlens-fl.timer`:
+Create `/etc/systemd/system/stellar-lense-fl.timer`:
 
 ```ini
 [Unit]
-Description=Run LedgerLens FL Client hourly
+Description=Run Stellar Lense FL Client hourly
 
 [Timer]
 OnCalendar=hourly
@@ -258,8 +258,8 @@ Enable and start:
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable ledgerlens-fl.timer
-sudo systemctl start ledgerlens-fl.timer
+sudo systemctl enable stellar-lense-fl.timer
+sudo systemctl start stellar-lense-fl.timer
 ```
 
 ### Kubernetes CronJob
@@ -268,7 +268,7 @@ sudo systemctl start ledgerlens-fl.timer
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: ledgerlens-fl-client
+  name: stellar-lense-fl-client
 spec:
   schedule: "0 * * * *"  # Every hour
   jobTemplate:
@@ -277,10 +277,10 @@ spec:
         spec:
           containers:
           - name: fl-client
-            image: ledgerlens/fl-client:latest
+            image: stellar_lense/fl-client:latest
             env:
             - name: FL_SERVER_URL
-              value: "https://fl.ledgerlens.io"
+              value: "https://fl.stellar-lense.io"
             - name: FL_API_KEY
               valueFrom:
                 secretKeyRef:
@@ -309,21 +309,21 @@ spec:
 ### Build Image
 
 ```bash
-cd packages/ledgerlens-fl-client
-docker build -t ledgerlens/fl-client:latest .
+cd packages/stellar-lense-fl-client
+docker build -t stellar_lense/fl-client:latest .
 ```
 
 ### Run Container
 
 ```bash
 docker run --rm \
-  -e FL_SERVER_URL=https://fl.ledgerlens.io \
+  -e FL_SERVER_URL=https://fl.stellar-lense.io \
   -e FL_API_KEY=your-secret-key \
   -e FL_DATA_DIR=/data \
   -e FL_OPERATOR_ID=exchange-xyz \
   -e FL_ROUNDS=1 \
   -v /path/to/your/trade/data:/data:ro \
-  ledgerlens/fl-client:latest
+  stellar_lense/fl-client:latest
 ```
 
 ### Docker Compose
@@ -333,9 +333,9 @@ version: '3.8'
 
 services:
   fl-client:
-    image: ledgerlens/fl-client:latest
+    image: stellar_lense/fl-client:latest
     environment:
-      FL_SERVER_URL: https://fl.ledgerlens.io
+      FL_SERVER_URL: https://fl.stellar-lense.io
       FL_API_KEY: ${FL_API_KEY}
       FL_DATA_DIR: /data
       FL_OPERATOR_ID: exchange-xyz
@@ -383,7 +383,7 @@ The server tracks cumulative ε across rounds. When `cumulative_ε >= FEDERATED_
 **Solution**:
 - Verify `server_url` is correct and accessible
 - Check firewall rules allow outbound HTTPS
-- Test connectivity: `curl -I https://fl.ledgerlens.io`
+- Test connectivity: `curl -I https://fl.stellar-lense.io`
 
 ### "Invalid signature" error
 
@@ -417,7 +417,7 @@ The server tracks cumulative ε across rounds. When `cumulative_ε >= FEDERATED_
 **Solution**:
 ```bash
 pip install --upgrade pip
-pip install ledgerlens-fl-client
+pip install stellar-lense-fl-client
 ```
 
 Or in a clean virtualenv:
@@ -425,7 +425,7 @@ Or in a clean virtualenv:
 python -m venv .venv
 source .venv/bin/activate  # Linux/macOS
 .venv\Scripts\activate     # Windows
-pip install ledgerlens-fl-client
+pip install stellar-lense-fl-client
 ```
 
 ### AUC-ROC is NaN or very low
@@ -440,9 +440,9 @@ pip install ledgerlens-fl-client
 
 ## Next Steps
 
-1. **Generate your API key**: Contact the LedgerLens federation operator
+1. **Generate your API key**: Contact the Stellar Lense federation operator
 2. **Prepare your labelled dataset**: Export trades with ground-truth compliance labels
 3. **Test locally**: Run a single round against a local test server
 4. **Deploy to production**: Schedule regular rounds via cron/systemd/Kubernetes
 
-For questions or issues, open a GitHub issue or contact the LedgerLens team.
+For questions or issues, open a GitHub issue or contact the Stellar Lense team.

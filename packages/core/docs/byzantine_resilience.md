@@ -1,6 +1,6 @@
 # Byzantine Resilience in Federated Learning
 
-LedgerLens's federated aggregation server supports Krum and Multi-Krum —
+Stellar Lense's federated aggregation server supports Krum and Multi-Krum —
 Byzantine-fault-tolerant aggregation rules that protect gradient updates
 against poisoning from malicious or compromised federation participants.
 
@@ -138,7 +138,7 @@ CREATE TABLE fl_aggregation_log (
 Query via the API:
 
 ```bash
-curl -H "X-LedgerLens-Admin-Key: $LEDGERLENS_ADMIN_API_KEY" \
+curl -H "X-StellarLense-Admin-Key: $STELLARLENSE_ADMIN_API_KEY" \
      "http://localhost:8000/admin/fl/aggregation?rounds=10"
 ```
 

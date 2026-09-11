@@ -1,17 +1,17 @@
-//! # LedgerLens SDK (Rust)
+//! # StellarLense SDK (Rust)
 //!
-//! A typed Rust client for the LedgerLens REST API, with optional zero-knowledge
+//! A typed Rust client for the StellarLense REST API, with optional zero-knowledge
 //! proof verification for threshold proofs.
 //!
 //! ## Quick Start
 //!
 //! ```no_run
-//! use ledgerlens_sdk::LedgerLensClient;
+//! use stellar_lense_sdk::StellarLenseClient;
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     let client = LedgerLensClient::new(
-//!         "https://api.ledgerlens.io",
+//!     let client = StellarLenseClient::new(
+//!         "https://api.stellar-lense.io",
 //!         Some("sk_your_api_key".into()),
 //!     );
 //!
@@ -40,8 +40,8 @@ pub mod models;
 pub mod zk;
 
 // Re-exports for convenience.
-pub use client::LedgerLensClient;
-pub use error::LedgerLensError;
+pub use client::StellarLenseClient;
+pub use error::StellarLenseError;
 pub use models::{CrossChainLink, HealthStatus, Ring, RiskScore, WalletScoresResponse};
 
 #[cfg(feature = "zk-verify")]

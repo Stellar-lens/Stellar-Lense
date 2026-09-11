@@ -136,11 +136,11 @@ class TestSubmitProposal:
             _make_engine(db_path).submit_proposal("alice", "nuke_everything", {})
 
     def test_disallowed_config_key_raises(self, db_path):
-        """Governance proposal to change LEDGERLENS_SERVICE_SECRET_KEY → GovernanceError before any write."""
+        """Governance proposal to change STELLARLENSE_SERVICE_SECRET_KEY → GovernanceError before any write."""
         _add_members(db_path, "alice")
         with pytest.raises(GovernanceError, match="not modifiable via governance"):
             _make_engine(db_path).submit_proposal(
-                "alice", "config_change", {"key": "LEDGERLENS_SERVICE_SECRET_KEY", "new_value": "x"}
+                "alice", "config_change", {"key": "STELLARLENSE_SERVICE_SECRET_KEY", "new_value": "x"}
             )
 
 
@@ -328,11 +328,11 @@ class TestFullLifecycle:
 class TestSettingsReloader:
     def test_secret_key_rejected(self):
         with pytest.raises(GovernanceError, match="not modifiable via governance"):
-            SettingsReloader().apply("LEDGERLENS_SERVICE_SECRET_KEY", "x")
+            SettingsReloader().apply("STELLARLENSE_SERVICE_SECRET_KEY", "x")
 
     def test_admin_key_rejected(self):
         with pytest.raises(GovernanceError, match="not modifiable via governance"):
-            SettingsReloader().apply("LEDGERLENS_ADMIN_API_KEY", "x")
+            SettingsReloader().apply("STELLARLENSE_ADMIN_API_KEY", "x")
 
     def test_invalid_type_raises(self):
         with pytest.raises(ValueError):

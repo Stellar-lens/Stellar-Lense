@@ -1,7 +1,7 @@
 # WAF and Rate Limiting
 
 This document describes the Web Application Firewall (WAF) and the distributed
-per-API-key rate limiter that protect the LedgerLens API.
+per-API-key rate limiter that protect the Stellar Lense API.
 
 ## Overview
 
@@ -57,7 +57,7 @@ Two compounding problems fell out of this:
    module-level dict — a client alternating between REST and gRPC got up to
    ~2x its configured budget in a single logical deployment.
 2. **None of the in-process dicts survive horizontal scaling.** The
-   project's own documented topology (`helm/ledgerlens/values.yaml`:
+   project's own documented topology (`helm/stellar_lense/values.yaml`:
    `replicaCount: 2`, autoscaling to `maxReplicas: 10`,
    `docs/kubernetes_deployment.md`) runs multiple independent REST pods.
    Each pod's dict is invisible to every other pod, so the real ceiling for
@@ -136,9 +136,9 @@ The fallback is not silent, though:
   *exactly* today's pre-fix behavior, never worse — rather than adding
   latency or failing requests.
 - Every open/close transition is logged at `WARNING`/`INFO`
-  (`ledgerlens.rate_limiter` logger).
+  (`stellar_lense.rate_limiter` logger).
 - Every check served from the fallback increments
-  `ledgerlens_rate_limiter_fallback_total` (Prometheus counter). Sustained
+  `stellar_lense_rate_limiter_fallback_total` (Prometheus counter). Sustained
   non-zero values mean cross-replica/cross-protocol enforcement is currently
   degraded to per-process-only — this is the metric to alert on.
 
@@ -178,9 +178,9 @@ unchanged by this fix):
 ## Metrics
 
 Prometheus metrics exposed (defined in `api/metrics.py`):
-- `ledgerlens_waf_blocks_total{rule, namespace_id}`: Total number of requests blocked by the WAF, grouped by rule and namespace
-- `ledgerlens_rate_limiter_checks_total{backend}`: Total per-key rate-limit checks, split by `backend="redis"` (shared) vs `backend="local"` (degraded fallback)
-- `ledgerlens_rate_limiter_fallback_total`: Total checks served from the local fallback because Redis was unavailable — alert on sustained non-zero values
+- `stellar_lense_waf_blocks_total{rule, namespace_id}`: Total number of requests blocked by the WAF, grouped by rule and namespace
+- `stellar_lense_rate_limiter_checks_total{backend}`: Total per-key rate-limit checks, split by `backend="redis"` (shared) vs `backend="local"` (degraded fallback)
+- `stellar_lense_rate_limiter_fallback_total`: Total checks served from the local fallback because Redis was unavailable — alert on sustained non-zero values
 
 ## Alerts
 
@@ -195,7 +195,7 @@ For production deployments, consider using an ingress-level WAF like ModSecurity
 ```nginx
 server {
     listen 80;
-    server_name api.ledgerlens.io;
+    server_name api.stellar-lense.io;
 
     # Enable ModSecurity
     modsecurity on;

@@ -85,7 +85,7 @@ model architecture is updated.
 - `torch` and `torch-geometric` (`pip install torch-geometric`). The script
   exits early with an install hint if PyTorch Geometric is missing.
 - `scikit-learn` (already a project dependency) for `roc_auc_score`.
-- A LedgerLens SQLite DB with `ring_members` and `wallet_scores` tables. Without
+- A Stellar Lense SQLite DB with `ring_members` and `wallet_scores` tables. Without
   it the script logs a warning and exits non-zero on "insufficient labelled
   data".
 
@@ -101,7 +101,7 @@ Key flags (all have `argparse` defaults; run `--help` for the complete list):
 
 | Flag | Default | Meaning |
 |------|---------|---------|
-| `--db-path` | `$LEDGERLENS_DB_PATH` or `./ledgerlens.db` | SQLite DB with the label tables |
+| `--db-path` | `$STELLARLENSE_DB_PATH` or `./stellar_lense.db` | SQLite DB with the label tables |
 | `--model-path` | `$GNN_MODEL_PATH` or `models/gnn_ring_detector.pt` | Output checkpoint (`.pt`); a `.sha256` sidecar is written next to it |
 | `--epochs` | `50` | Max training epochs (early stopping, patience 5, on val AUC-ROC) |
 | `--lr` | `0.001` | Adam learning rate |
@@ -109,7 +109,7 @@ Key flags (all have `argparse` defaults; run `--help` for the complete list):
 | `--graph-mode` | `homogeneous` | `homogeneous` (wallet-only) or `heterogeneous` (wallet+asset+order) |
 | `--conv-type` | `sage` | `sage` or `hgt`, only used in heterogeneous mode |
 
-Environment: `LEDGERLENS_DB_PATH` and `GNN_MODEL_PATH` are read as defaults for
+Environment: `STELLARLENSE_DB_PATH` and `GNN_MODEL_PATH` are read as defaults for
 `--db-path` / `--model-path`.
 
 Output: encoder + classifier state dicts and training metadata saved to the
@@ -146,7 +146,7 @@ Run it to (re)produce `models/lstm_autoencoder.pt`.
 - `torch` (`pip install torch`). The script exits with an error if PyTorch is
   missing.
 - `numpy` (project dependency).
-- Optionally a LedgerLens SQLite DB with `feature_distribution_snapshots`; not
+- Optionally a Stellar Lense SQLite DB with `feature_distribution_snapshots`; not
   required thanks to the synthetic fallback.
 
 ### Invocation
@@ -154,7 +154,7 @@ Run it to (re)produce `models/lstm_autoencoder.pt`.
 ```bash
 python scripts/train_lstm_autoencoder.py --help    # full flag reference
 python scripts/train_lstm_autoencoder.py \
-    --epochs 100 --lr 0.001 --db-path ledgerlens.db --model-dir models \
+    --epochs 100 --lr 0.001 --db-path stellar_lense.db --model-dir models \
     --hidden-dim 64 --num-layers 2 --dropout 0.2 \
     --sequence-length 48 --batch-size 32 --val-split 0.2
 ```
@@ -165,7 +165,7 @@ Key flags (all have `argparse` defaults; run `--help` for the complete list):
 |------|---------|---------|
 | `--epochs` | `100` | Max training epochs (early stopping, `--patience` default 10, on val loss) |
 | `--lr` | `1e-3` | Adam learning rate |
-| `--db-path` | `ledgerlens.db` | SQLite DB; synthetic data used if empty/missing |
+| `--db-path` | `stellar_lense.db` | SQLite DB; synthetic data used if empty/missing |
 | `--model-dir` | `models` | Output dir — writes `lstm_autoencoder.pt`, `lstm_autoencoder.sha256`, `lstm_training_metadata.json` |
 | `--hidden-dim` | `64` | LSTM hidden dimension |
 | `--num-layers` | `2` | Stacked LSTM layers |

@@ -585,7 +585,7 @@ class TestArchiveFeaturesCLI:
         _insert_row(db_path, "GA_NEW", "f1", 0.6, datetime.utcnow() - timedelta(days=5))
 
         from config import settings as settings_module
-        monkeypatch.setattr(settings_module.settings, "ledgerlens_db_path", db_path)
+        monkeypatch.setattr(settings_module.settings, "stellarlense_db_path", db_path)
         monkeypatch.setattr(settings_module.settings, "feature_archive_dir", str(archive_dir))
         monkeypatch.setattr(settings_module.settings, "feature_archive_cutoff_days", 30)
 
@@ -610,7 +610,7 @@ class TestArchiveFeaturesCLI:
         _insert_row(db_path, "GA1", "f1", 0.5, datetime.utcnow() - timedelta(days=5))
 
         from config import settings as settings_module
-        monkeypatch.setattr(settings_module.settings, "ledgerlens_db_path", db_path)
+        monkeypatch.setattr(settings_module.settings, "stellarlense_db_path", db_path)
         monkeypatch.setattr(settings_module.settings, "feature_archive_dir", str(archive_dir))
         monkeypatch.setattr(settings_module.settings, "feature_archive_cutoff_days", 30)
 

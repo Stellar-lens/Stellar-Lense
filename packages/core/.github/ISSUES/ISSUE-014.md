@@ -5,7 +5,7 @@ assignees: []
 ---
 
 ## Summary
-When ingestion fails for an individual trade or event record — due to a Pydantic parse error, a network timeout, or a schema mismatch — LedgerLens currently either silently drops the record or crashes the entire ingestion loop. Neither is acceptable in a production fraud detection system: silent drops create undetectable coverage gaps, while crashes require manual intervention. A Dead-Letter Queue (DLQ) with structured error classification will capture failed records, categorise the failure reason, enable operator inspection, and support selective replay once the root cause is fixed.
+When ingestion fails for an individual trade or event record — due to a Pydantic parse error, a network timeout, or a schema mismatch — Stellar Lense currently either silently drops the record or crashes the entire ingestion loop. Neither is acceptable in a production fraud detection system: silent drops create undetectable coverage gaps, while crashes require manual intervention. A Dead-Letter Queue (DLQ) with structured error classification will capture failed records, categorise the failure reason, enable operator inspection, and support selective replay once the root cause is fixed.
 
 ## Background & Context
 The ingestion layer processes records from multiple sources: Horizon SSE stream (`horizon_streamer.py`), historical REST pages (`historical_loader.py`), operations stream (`operations_loader.py`), AMM events (`amm_loader.py`), and bridge events (`bridge_loader.py`, `evm_loader.py`). Each source has its own failure modes:
@@ -17,7 +17,7 @@ The ingestion layer processes records from multiple sources: Horizon SSE stream 
 
 Each error class has a different remediation: parse errors require a code fix; network errors should be auto-replayed after a delay; schema errors indicate an API change; storage errors require operator action.
 
-The DLQ should use the same SQLite database as the rest of LedgerLens (for simplicity) with a dedicated `dead_letter_queue` table. A CLI sub-command must allow operators to inspect, filter, and replay DLQ entries without restarting the ingestion pipeline.
+The DLQ should use the same SQLite database as the rest of Stellar Lense (for simplicity) with a dedicated `dead_letter_queue` table. A CLI sub-command must allow operators to inspect, filter, and replay DLQ entries without restarting the ingestion pipeline.
 
 ## Objectives
 - [ ] Implement a `DeadLetterQueue` class in a new `ingestion/dlq.py` module backed by a SQLite table, with methods for enqueue, list, filter by error class, replay, and purge.
@@ -144,7 +144,7 @@ python cli.py dlq purge --status resolved --older-than-days 7
 **Auto-replay on startup**: `NetworkError` entries that were created more than 60 seconds ago are automatically replayed once on pipeline startup (since the transient network issue may have resolved).
 
 ## Security Considerations
-- `raw_record` (BLOB) may contain wallet addresses, transaction hashes, and API response data. It must be stored encrypted at rest if `LEDGERLENS_DB_ENCRYPTION_KEY` is set (use the same encryption as HMAC secrets per the webhook README section).
+- `raw_record` (BLOB) may contain wallet addresses, transaction hashes, and API response data. It must be stored encrypted at rest if `STELLARLENSE_DB_ENCRYPTION_KEY` is set (use the same encryption as HMAC secrets per the webhook README section).
 - The `error_message` field must truncate exception messages at 1,000 characters to prevent a crafted Horizon response from storing arbitrarily large data in the DLQ.
 - `raw_record_hash` enables deduplication — if the same raw bytes have already been enqueued (e.g., due to a retry loop), `enqueue` should update `retry_count` on the existing entry rather than creating a new row.
 - The `dlq inspect` CLI command must not print `raw_record` in full — it should print only the first 500 bytes (printable ASCII) to prevent accidentally displaying sensitive data in terminal logs.

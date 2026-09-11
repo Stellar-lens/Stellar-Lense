@@ -1,10 +1,10 @@
 """Cross-repo E2E data flow tests.
 
-These tests verify the full schema + flow contract between ledgerlens-core,
-ledgerlens-api, and ledgerlens-contracts. They run against either:
+These tests verify the full schema + flow contract between stellar-lense-core,
+stellar-lense-api, and stellar-lense-contracts. They run against either:
 
   - The documented stub server (default, lower-fidelity — see stub_contract_server.py)
-  - A real Soroban quickstart + ledgerlens-api container (LEDGERLENS_USE_REAL_SOROBAN=true)
+  - A real Soroban quickstart + stellar-lense-api container (STELLARLENSE_USE_REAL_SOROBAN=true)
 
 IMPORTANT: Every test in this file MUST call conftest.record_assertion(n) before
 returning, where n is the number of real assertions made. This feeds the
@@ -70,7 +70,7 @@ def test_risk_score_schema_drift(api_base_url: str) -> None:
     - The stub server builds its OpenAPI spec dynamically from the canonical
       Python model (CoreRiskScore.model_json_schema()), so stub mode proves
       the mechanism works for well-formed implementations.
-    - Against a real ledgerlens-api, this test would detect any field added to
+    - Against a real stellar-lense-api, this test would detect any field added to
       core but not yet added to the API's response models.
     """
     # Get core's authoritative schema
@@ -110,8 +110,8 @@ def test_risk_score_schema_drift(api_base_url: str) -> None:
         f"API fields: {sorted(api_fields)}\n"
         f"The following language implementations may be out of sync:\n"
         f"  - sdk/src/schemas.ts (TypeScript/Zod)\n"
-        f"  - crates/ledgerlens-sdk/src/models.rs (Rust)\n"
-        f"  - packages/ledgerlens-sdk/src/ledgerlens/models.py (Python SDK)\n"
+        f"  - crates/stellar-lense-sdk/src/models.rs (Rust)\n"
+        f"  - packages/stellar-lense-sdk/src/stellar_lense/models.py (Python SDK)\n"
         f"Run: python scripts/generate_contract_vectors.py && python scripts/check_contract_vectors.py"
     )
 

@@ -14,7 +14,7 @@ from api.auth import require_admin_key
 from config.settings import settings, bump_config_version, invalidate_runtime_config_cache
 from detection.model_registry import get_current_version, list_model_versions
 
-logger = logging.getLogger("ledgerlens.admin")
+logger = logging.getLogger("stellar_lense.admin")
 
 router = APIRouter(prefix="/admin", dependencies=[Depends(require_admin_key)])
 

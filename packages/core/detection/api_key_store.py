@@ -21,7 +21,7 @@ from datetime import datetime, timedelta, timezone
 from config.settings import settings
 from detection.rate_limiter import check_rate_limit as _distributed_check_rate_limit
 
-logger = logging.getLogger("ledgerlens.api_key_store")
+logger = logging.getLogger("stellar_lense.api_key_store")
 
 _CREATE_TABLE = """
 CREATE TABLE IF NOT EXISTS api_keys (
@@ -235,9 +235,9 @@ def rotate_api_key(key_id: str, grace_period_seconds: int = 604800) -> dict:
         conn.commit()
 
     try:
-        from api.metrics import ledgerlens_secret_rotation_total
-        if ledgerlens_secret_rotation_total is not None:
-            ledgerlens_secret_rotation_total.labels(secret_type="api_key", result="success").inc()
+        from api.metrics import stellar_lense_secret_rotation_total
+        if stellar_lense_secret_rotation_total is not None:
+            stellar_lense_secret_rotation_total.labels(secret_type="api_key", result="success").inc()
     except Exception:
         pass
 

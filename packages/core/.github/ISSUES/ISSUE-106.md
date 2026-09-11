@@ -5,7 +5,7 @@ assignees: []
 ---
 
 ## Summary
-There is no framework for evaluating how the LedgerLens models would have performed on historical Stellar trade data with known outcomes (confirmed wash-trading cases from public enforcement actions). A backtesting framework loads a labelled historical dataset, runs the current model pipeline over it, and computes precision/recall/F1 relative to ground truth — enabling evidence-based model improvement and regression testing.
+There is no framework for evaluating how the Stellar Lense models would have performed on historical Stellar trade data with known outcomes (confirmed wash-trading cases from public enforcement actions). A backtesting framework loads a labelled historical dataset, runs the current model pipeline over it, and computes precision/recall/F1 relative to ground truth — enabling evidence-based model improvement and regression testing.
 
 ## Objectives
 - [ ] Build `backtesting/backtest_runner.py` that loads a labelled CSV (wallet, label, start_date, end_date)

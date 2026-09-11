@@ -19,7 +19,7 @@ TEST_KEY = "test-signing-key-for-unit-tests-only"
 
 
 def test_patch_signing_key_injects_test_key_into_settings():
-    """The autouse patch_signing_key fixture must make settings.ledgerlens_model_signing_key
+    """The autouse patch_signing_key fixture must make settings.stellarlense_model_signing_key
     equal to TEST_SIGNING_KEY for the duration of every test body.
 
     This test would have FAILED before the yield was added to the fixture:
@@ -28,17 +28,17 @@ def test_patch_signing_key_injects_test_key_into_settings():
     """
     import config.settings as settings_module
 
-    assert settings_module.settings.ledgerlens_model_signing_key == TEST_KEY, (
+    assert settings_module.settings.stellarlense_model_signing_key == TEST_KEY, (
         "patch_signing_key fixture did not inject the test key — "
         "the fixture may be missing its yield statement"
     )
 
 
 def test_patch_signing_key_injects_env_var():
-    """LEDGERLENS_MODEL_SIGNING_KEY env var must be set to the test value."""
+    """STELLARLENSE_MODEL_SIGNING_KEY env var must be set to the test value."""
     import os
 
-    assert os.environ.get("LEDGERLENS_MODEL_SIGNING_KEY") == TEST_KEY
+    assert os.environ.get("STELLARLENSE_MODEL_SIGNING_KEY") == TEST_KEY
 
 
 # ---------------------------------------------------------------------------

@@ -13,19 +13,19 @@ See the upstream reference:
 ```
 monitoring/grafana/provisioning/
 └── dashboards/
-    └── ledgerlens.yaml     # dashboard provider definition
+    └── stellar_lense.yaml     # dashboard provider definition
 ```
 
-### `dashboards/ledgerlens.yaml`
+### `dashboards/stellar_lense.yaml`
 
 A single **dashboard provider**. The important fields:
 
 | Field | Value | Meaning |
 | ----- | ----- | ------- |
-| `providers[].name` | `LedgerLens` | Provider id (must be unique within the Grafana instance). |
-| `folder` | `LedgerLens` | Dashboards load into this Grafana folder. |
+| `providers[].name` | `Stellar Lense` | Provider id (must be unique within the Grafana instance). |
+| `folder` | `Stellar Lense` | Dashboards load into this Grafana folder. |
 | `type` | `file` | Read dashboards from a directory on disk. |
-| `options.path` | `/var/lib/grafana/dashboards/ledgerlens` | Directory Grafana scans **inside the container / server**. Every `*.json` file here is loaded as a dashboard. |
+| `options.path` | `/var/lib/grafana/dashboards/stellar_lense` | Directory Grafana scans **inside the container / server**. Every `*.json` file here is loaded as a dashboard. |
 | `options.foldersFromFilesStructure` | `false` | Sub-directories are *not* turned into Grafana folders; everything lands in `folder` above. |
 | `updateIntervalSeconds` | `30` | Grafana re-scans the path every 30 s, so new/edited JSON files appear without a restart. |
 | `allowUiUpdates` / `editable` | `true` | You can tweak a provisioned dashboard in the UI, but "Save" writes back a warning — the file on disk is the source of truth. |
@@ -47,8 +47,8 @@ A single **dashboard provider**. The important fields:
 
    ```json
    {
-     "uid": "ledgerlens-core-detection",
-     "title": "LedgerLens Core Detection",
+     "uid": "stellar-lense-core-detection",
+     "title": "Stellar Lense Core Detection",
      "schemaVersion": 38,
      "panels": [ ... ]
    }
@@ -71,11 +71,11 @@ A single **dashboard provider**. The important fields:
    `_dashboard.json` to match the existing file.
 
 4. **Make sure the file reaches the provisioned path** on the Grafana instance
-   (`options.path`, i.e. `/var/lib/grafana/dashboards/ledgerlens`). How depends
+   (`options.path`, i.e. `/var/lib/grafana/dashboards/stellar_lense`). How depends
    on how Grafana is deployed — see the next section.
 
 5. **Wait ≤30 s** (the `updateIntervalSeconds`) or restart Grafana. The
-   dashboard shows up in the **LedgerLens** folder with no manual import.
+   dashboard shows up in the **Stellar Lense** folder with no manual import.
 
 ## How the provisioning path is wired up per deployment
 
@@ -84,22 +84,22 @@ A single **dashboard provider**. The important fields:
 Per `monitoring/README.md` → *Import Grafana Dashboard* → *Option B*:
 
 ```bash
-sudo mkdir -p /var/lib/grafana/dashboards/ledgerlens
-sudo cp monitoring/grafana/*.json           /var/lib/grafana/dashboards/ledgerlens/
-sudo cp monitoring/grafana/provisioning/dashboards/ledgerlens.yaml \
+sudo mkdir -p /var/lib/grafana/dashboards/stellar_lense
+sudo cp monitoring/grafana/*.json           /var/lib/grafana/dashboards/stellar_lense/
+sudo cp monitoring/grafana/provisioning/dashboards/stellar_lense.yaml \
         /etc/grafana/provisioning/dashboards/
 sudo systemctl restart grafana-server
 ```
 
 - provider YAML → `/etc/grafana/provisioning/dashboards/`
 - dashboard JSON → the `options.path` directory
-  (`/var/lib/grafana/dashboards/ledgerlens`)
+  (`/var/lib/grafana/dashboards/stellar_lense`)
 
 ### Docker Compose
 
 The repository's `docker-compose.yml` does **not** currently run Grafana (only
 `api`, `jaeger`, `toxiproxy`, `redis`). If you add a Grafana service, mount both
-trees so the paths in `ledgerlens.yaml` line up:
+trees so the paths in `stellar_lense.yaml` line up:
 
 ```yaml
 grafana:
@@ -110,8 +110,8 @@ grafana:
   volumes:
     # provider config → Grafana's provisioning dir
     - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
-    # dashboard JSON → the path referenced by options.path in ledgerlens.yaml
-    - ./monitoring/grafana:/var/lib/grafana/dashboards/ledgerlens:ro
+    # dashboard JSON → the path referenced by options.path in stellar_lense.yaml
+    - ./monitoring/grafana:/var/lib/grafana/dashboards/stellar_lense:ro
 ```
 
 ### Kubernetes / Helm
@@ -127,14 +127,14 @@ Quick standalone check without touching an existing Grafana:
 ```bash
 docker run --rm -p 3000:3000 \
   -v "$PWD/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro" \
-  -v "$PWD/monitoring/grafana:/var/lib/grafana/dashboards/ledgerlens:ro" \
+  -v "$PWD/monitoring/grafana:/var/lib/grafana/dashboards/stellar_lense:ro" \
   grafana/grafana:11.1.0
 
 # then, after ~15s:
-curl -s -u admin:admin http://localhost:3000/api/search?query=LedgerLens | jq '.[].title'
+curl -s -u admin:admin http://localhost:3000/api/search?query=Stellar Lense | jq '.[].title'
 ```
 
-The new dashboard title should appear in that list (and under the **LedgerLens**
+The new dashboard title should appear in that list (and under the **Stellar Lense**
 folder at <http://localhost:3000>) with no manual import step. Grafana logs
 `msg="starting to provision dashboards"` / `finished to provision dashboards`
 and will log a parse error naming the file if the JSON is malformed.

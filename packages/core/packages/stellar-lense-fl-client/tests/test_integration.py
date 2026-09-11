@@ -10,7 +10,7 @@ import threading
 import time
 from pathlib import Path
 
-from ledgerlens_fl_client import FLClient, DataAdapter
+from stellar_lense_fl_client import FLClient, DataAdapter
 import pandas as pd
 
 

@@ -1,10 +1,10 @@
 [package]
-name = "ledgerlens-sdk"
+name = "stellar-lense-sdk"
 version = "0.1.0"
-description = "Rust client SDK for the LedgerLens risk scoring API with optional ZK proof verification"
+description = "Rust client SDK for the Stellar Lense risk scoring API with optional ZK proof verification"
 edition = "2021"
 license = "MIT"
-repository = "https://github.com/Derry255/Ledgerlens-core"
+repository = "https://github.com/Derry255/StellarLense-core"
 
 [dependencies]
 reqwest = { version = "0.12", features = ["json"] }

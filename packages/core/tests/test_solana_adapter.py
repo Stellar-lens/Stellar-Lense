@@ -11,7 +11,7 @@ canned response by one (or raised ``IndexError`` from a background pop).
 The adapter is always constructed through the ``adapter_factory`` fixture,
 which pins dedup off by default and otherwise binds an **in-memory** sqlite
 store.  Previously the tests instantiated ``SolanaAdapter()`` directly, which
-built an ``IdempotencyKeyStore`` against the on-disk ``ledgerlens.db``: the
+built an ``IdempotencyKeyStore`` against the on-disk ``stellar_lense.db``: the
 first run recorded the mock signature and every later run saw it as a
 duplicate, so ``test_ingest_cassette`` was order- and history-dependent.
 """

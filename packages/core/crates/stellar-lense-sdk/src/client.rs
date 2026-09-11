@@ -1,9 +1,9 @@
 use std::fmt;
 
-use crate::error::LedgerLensError;
+use crate::error::StellarLenseError;
 use crate::models::{HealthStatus, Ring, RiskScore, WalletScoresResponse};
 
-/// A typed HTTP client for the LedgerLens REST API.
+/// A typed HTTP client for the StellarLense REST API.
 ///
 /// # Security
 ///
@@ -15,26 +15,26 @@ use crate::models::{HealthStatus, Ring, RiskScore, WalletScoresResponse};
 /// # Example (async)
 ///
 /// ```no_run
-/// use ledgerlens_sdk::LedgerLensClient;
+/// use stellar_lense_sdk::StellarLenseClient;
 ///
 /// #[tokio::main]
 /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-///     let client = LedgerLensClient::new("https://api.ledgerlens.io", Some("sk_...".into()));
+///     let client = StellarLenseClient::new("https://api.stellar-lense.io", Some("sk_...".into()));
 ///     let scores = client.get_scores(None).await?;
 ///     println!("Got {} scores", scores.len());
 ///     Ok(())
 /// }
 /// ```
-pub struct LedgerLensClient {
+pub struct StellarLenseClient {
     base_url: String,
     api_key: Option<String>,
     http: reqwest::Client,
 }
 
 // Manual Debug impl to redact the API key.
-impl fmt::Debug for LedgerLensClient {
+impl fmt::Debug for StellarLenseClient {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("LedgerLensClient")
+        f.debug_struct("StellarLenseClient")
             .field("base_url", &self.base_url)
             .field("api_key", &self.api_key.as_deref().map(|_| "***"))
             .field("http", &self.http)
@@ -42,12 +42,12 @@ impl fmt::Debug for LedgerLensClient {
     }
 }
 
-impl LedgerLensClient {
+impl StellarLenseClient {
     /// Build the internal `reqwest::Client`, panicking only if the underlying
     /// TLS backend cannot be initialized (which indicates a bug, not user error).
     fn build_http_client(danger_accept_invalid_certs: bool) -> reqwest::Client {
         reqwest::Client::builder()
-            .user_agent("ledgerlens-sdk/0.1.0")
+            .user_agent("stellar-lense-sdk/0.1.0")
             .danger_accept_invalid_certs(danger_accept_invalid_certs)
             .build()
             .expect("Failed to build reqwest Client; this is a bug")
@@ -61,16 +61,16 @@ impl LedgerLensClient {
     /// # Examples
     ///
     /// ```no_run
-    /// use ledgerlens_sdk::LedgerLensClient;
+    /// use stellar_lense_sdk::StellarLenseClient;
     ///
     /// // With an API key
-    /// let client = LedgerLensClient::new(
-    ///     "https://api.ledgerlens.io",
+    /// let client = StellarLenseClient::new(
+    ///     "https://api.stellar-lense.io",
     ///     Some("sk_your_api_key".into()),
     /// );
     ///
     /// // Without an API key (local dev server)
-    /// let dev_client = LedgerLensClient::new("http://localhost:8000", None);
+    /// let dev_client = StellarLenseClient::new("http://localhost:8000", None);
     /// ```
     pub fn new(base_url: impl Into<String>, api_key: Option<String>) -> Self {
         Self {
@@ -91,10 +91,10 @@ impl LedgerLensClient {
     /// # Examples
     ///
     /// ```no_run
-    /// use ledgerlens_sdk::LedgerLensClient;
+    /// use stellar_lense_sdk::StellarLenseClient;
     ///
     /// // Only for local development with self-signed certs — never use in production.
-    /// let client = LedgerLensClient::danger_accept_invalid_certs(
+    /// let client = StellarLenseClient::danger_accept_invalid_certs(
     ///     "https://localhost:8443",
     ///     None,
     /// );
@@ -119,14 +119,14 @@ impl LedgerLensClient {
     fn auth_header(&self) -> Option<(&str, &str)> {
         self.api_key
             .as_ref()
-            .map(|k| ("X-LedgerLens-API-Key", k.as_str()))
+            .map(|k| ("X-StellarLense-API-Key", k.as_str()))
     }
 
     /// Perform a GET request and deserialize the response.
     async fn get_json<T: serde::de::DeserializeOwned>(
         &self,
         path: &str,
-    ) -> Result<T, LedgerLensError> {
+    ) -> Result<T, StellarLenseError> {
         let url = self.url(path);
         let mut req = self.http.get(&url);
 
@@ -140,10 +140,10 @@ impl LedgerLensClient {
             let status = resp.status().as_u16();
             let body = resp.text().await.unwrap_or_default();
             return Err(match status {
-                401 => LedgerLensError::Unauthorized(body),
-                404 => LedgerLensError::NotFound(body),
-                429 => LedgerLensError::RateLimited(body),
-                _ => LedgerLensError::Api {
+                401 => StellarLenseError::Unauthorized(body),
+                404 => StellarLenseError::NotFound(body),
+                429 => StellarLenseError::RateLimited(body),
+                _ => StellarLenseError::Api {
                     status_code: status,
                     message: body,
                 },
@@ -166,11 +166,11 @@ impl LedgerLensClient {
     /// # Examples
     ///
     /// ```no_run
-    /// use ledgerlens_sdk::LedgerLensClient;
+    /// use stellar_lense_sdk::StellarLenseClient;
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let client = LedgerLensClient::new("https://api.ledgerlens.io", None);
+    ///     let client = StellarLenseClient::new("https://api.stellar-lense.io", None);
     ///     let response = client.get_score("GABCDEFGHIJKLMNOPQRSTUVWXYZ012345678901234567890123456").await?;
     ///     for score in &response.scores {
     ///         println!("Pair: {}, Score: {}", score.asset_pair, score.score);
@@ -178,7 +178,7 @@ impl LedgerLensClient {
     ///     Ok(())
     /// }
     /// ```
-    pub async fn get_score(&self, wallet: &str) -> Result<WalletScoresResponse, LedgerLensError> {
+    pub async fn get_score(&self, wallet: &str) -> Result<WalletScoresResponse, StellarLenseError> {
         self.get_json(&format!("/v1/scores/{}", wallet)).await
     }
 
@@ -192,11 +192,11 @@ impl LedgerLensClient {
     /// # Examples
     ///
     /// ```no_run
-    /// use ledgerlens_sdk::LedgerLensClient;
+    /// use stellar_lense_sdk::StellarLenseClient;
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let client = LedgerLensClient::new("https://api.ledgerlens.io", None);
+    ///     let client = StellarLenseClient::new("https://api.stellar-lense.io", None);
     ///
     ///     // All scores across all asset pairs
     ///     let all_scores = client.get_scores(None).await?;
@@ -212,7 +212,7 @@ impl LedgerLensClient {
     pub async fn get_scores(
         &self,
         asset_pair: Option<&str>,
-    ) -> Result<Vec<RiskScore>, LedgerLensError> {
+    ) -> Result<Vec<RiskScore>, StellarLenseError> {
         let path = match asset_pair {
             Some(pair) => format!("/v1/scores?asset_pair={}", urlencoding(pair)),
             None => "/v1/scores".to_string(),
@@ -230,11 +230,11 @@ impl LedgerLensClient {
     /// # Examples
     ///
     /// ```no_run
-    /// use ledgerlens_sdk::LedgerLensClient;
+    /// use stellar_lense_sdk::StellarLenseClient;
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let client = LedgerLensClient::new("https://api.ledgerlens.io", None);
+    ///     let client = StellarLenseClient::new("https://api.stellar-lense.io", None);
     ///     let rings = client.get_rings().await?;
     ///     for ring in &rings {
     ///         println!(
@@ -247,7 +247,7 @@ impl LedgerLensClient {
     ///     Ok(())
     /// }
     /// ```
-    pub async fn get_rings(&self) -> Result<Vec<Ring>, LedgerLensError> {
+    pub async fn get_rings(&self) -> Result<Vec<Ring>, StellarLenseError> {
         self.get_json("/v1/rings").await
     }
 
@@ -261,11 +261,11 @@ impl LedgerLensClient {
     /// # Examples
     ///
     /// ```no_run
-    /// use ledgerlens_sdk::LedgerLensClient;
+    /// use stellar_lense_sdk::StellarLenseClient;
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let client = LedgerLensClient::new("https://api.ledgerlens.io", None);
+    ///     let client = StellarLenseClient::new("https://api.stellar-lense.io", None);
     ///     let health = client.health().await?;
     ///     if health.status == "ok" {
     ///         println!("API is healthy");
@@ -275,7 +275,7 @@ impl LedgerLensClient {
     ///     Ok(())
     /// }
     /// ```
-    pub async fn health(&self) -> Result<HealthStatus, LedgerLensError> {
+    pub async fn health(&self) -> Result<HealthStatus, StellarLenseError> {
         self.get_json("/health").await
     }
 }

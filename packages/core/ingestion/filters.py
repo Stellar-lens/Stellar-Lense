@@ -1,4 +1,4 @@
-"""Configurable trade filter pipeline for the LedgerLens ingestion layer.
+"""Configurable trade filter pipeline for the StellarLense ingestion layer.
 
 Trades are passed through an ordered list of :class:`TradeFilter` instances.
 A trade must pass **all** enabled filters (logical AND) to reach the detection
@@ -50,7 +50,7 @@ from typing import Annotated
 
 from ingestion.data_models import Trade
 
-logger = logging.getLogger("ledgerlens.filters")
+logger = logging.getLogger("stellar_lense.filters")
 
 # ---------------------------------------------------------------------------
 # Stellar public key validation helper

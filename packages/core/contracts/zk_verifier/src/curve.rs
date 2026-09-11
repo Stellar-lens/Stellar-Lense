@@ -484,13 +484,13 @@ impl Point {
         }
     }
 
-    /// "Nothing up my sleeve" second generator: `H = SHA256("LedgerLens ZK
+    /// "Nothing up my sleeve" second generator: `H = SHA256("StellarLense ZK
     /// Generator H") mod n * G` -- computed at runtime via the real hash
     /// (matching `detection/zk_commitment.py::h_generator` exactly), not a
     /// hardcoded constant. The previous implementation hardcoded an
     /// unrelated scalar that did not correspond to this hash at all.
     pub fn h_generator(env: &Env) -> Self {
-        let msg = Bytes::from_slice(env, b"LedgerLens ZK Generator H");
+        let msg = Bytes::from_slice(env, b"StellarLense ZK Generator H");
         let digest: BytesN<32> = env.crypto().sha256(&msg).into();
         let scalar = Fr::from_bytesn(&digest);
         Point::generator().mul_scalar(&scalar)

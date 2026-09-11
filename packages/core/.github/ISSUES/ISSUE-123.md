@@ -6,7 +6,7 @@ assignees: []
 
 ## Summary
 
-LedgerLens scoring decisions are stored as the current state of a `wallet_scores` row — overwriting the previous score on every recompute. Regulatory compliance requires a cryptographically tamper-evident, append-only audit trail of every scoring decision: what score was assigned, which feature values drove it, which model version was used, and who (or what automated process) triggered the recompute. An event-sourced audit log with Merkle-chain integrity satisfies this requirement.
+Stellar Lense scoring decisions are stored as the current state of a `wallet_scores` row — overwriting the previous score on every recompute. Regulatory compliance requires a cryptographically tamper-evident, append-only audit trail of every scoring decision: what score was assigned, which feature values drove it, which model version was used, and who (or what automated process) triggered the recompute. An event-sourced audit log with Merkle-chain integrity satisfies this requirement.
 
 ## Background & Context
 

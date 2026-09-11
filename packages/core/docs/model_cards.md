@@ -1,4 +1,4 @@
-# Model Cards for LedgerLens
+# Model Cards for Stellar Lense
 
 This document covers the model card generation feature, which produces human‑readable, auditable model cards following the [Model Cards for Model Reporting (Mitchell et al.)](https://arxiv.org/abs/1810.03993) pattern, plus a Datasheet for Datasets section.
 

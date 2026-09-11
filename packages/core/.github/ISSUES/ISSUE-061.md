@@ -6,13 +6,13 @@ assignees: []
 
 ## Summary
 
-Extend `detection/shap_explainer.py` to produce waterfall-style SHAP explanation payloads, and expose a new `GET /scores/{wallet}/explain` endpoint in `api/main.py`. The response returns the SHAP base value, per-feature contributions sorted by magnitude, a human-readable summary sentence, and cached SHAP values keyed on `(wallet, model_version)` in the feature store. This makes LedgerLens risk scores actionable and auditable for analysts, protocol teams, and compliance integrators who need to understand *why* a wallet was flagged.
+Extend `detection/shap_explainer.py` to produce waterfall-style SHAP explanation payloads, and expose a new `GET /scores/{wallet}/explain` endpoint in `api/main.py`. The response returns the SHAP base value, per-feature contributions sorted by magnitude, a human-readable summary sentence, and cached SHAP values keyed on `(wallet, model_version)` in the feature store. This makes Stellar Lense risk scores actionable and auditable for analysts, protocol teams, and compliance integrators who need to understand *why* a wallet was flagged.
 
 ## Background & Context
 
-LedgerLens already integrates SHAP via `detection/shap_explainer.py` for offline interpretability during model evaluation. However, SHAP explanations are not yet surfaced through the REST API, which means operators and downstream consumers see a risk score of, say, 87 with no understanding of which features drove that score. For compliance use cases — and for the dispute resolution workflow defined in `docs/governance_protocol.md` — this opacity is a significant gap.
+Stellar Lense already integrates SHAP via `detection/shap_explainer.py` for offline interpretability during model evaluation. However, SHAP explanations are not yet surfaced through the REST API, which means operators and downstream consumers see a risk score of, say, 87 with no understanding of which features drove that score. For compliance use cases — and for the dispute resolution workflow defined in `docs/governance_protocol.md` — this opacity is a significant gap.
 
-SHAP (SHapley Additive exPlanations) attributes a model prediction to each input feature as a signed contribution value. For tree-based models (RF, XGBoost, LightGBM), `shap.TreeExplainer` computes exact Shapley values efficiently. The waterfall format — base value + ordered contributions summing to the final prediction — is the standard display format used in the SHAP library's own visualisation tools and is directly parseable by the LedgerLens dashboard.
+SHAP (SHapley Additive exPlanations) attributes a model prediction to each input feature as a signed contribution value. For tree-based models (RF, XGBoost, LightGBM), `shap.TreeExplainer` computes exact Shapley values efficiently. The waterfall format — base value + ordered contributions summing to the final prediction — is the standard display format used in the SHAP library's own visualisation tools and is directly parseable by the Stellar Lense dashboard.
 
 The existing `detection/shap_explainer.py` must be extended to:
 1. Accept a pre-computed feature vector and return a structured `ShapExplanation` dataclass.
@@ -31,7 +31,7 @@ The new `GET /scores/{wallet}/explain` endpoint should be consistent with the ex
 - [ ] Add `GET /scores/{wallet}/explain` to `api/main.py` that retrieves the cached explanation or recomputes it on demand.
 - [ ] Return HTTP 404 with `{"detail": "No score found for wallet"}` when the wallet has no `RiskScore` record.
 - [ ] Add query parameter `?asset_pair=XLM/USDC` to scope the explanation to a specific trading pair.
-- [ ] Ensure the endpoint is covered by the existing admin-key auth when `LEDGERLENS_ADMIN_API_KEY` is set.
+- [ ] Ensure the endpoint is covered by the existing admin-key auth when `STELLARLENSE_ADMIN_API_KEY` is set.
 - [ ] Write unit and integration tests achieving ≥90% branch coverage on the new code paths.
 
 ## Technical Requirements
@@ -169,7 +169,7 @@ SHAP computation for a single 35-feature vector must complete in <200 ms on a si
 
 - The `summary_sentence` is generated from feature names and numeric values only — never from user-supplied strings — so there is no injection risk.
 - `feature_vector` values come from `RiskScore.feature_vector` stored in SQLite; validate that all keys match `FEATURE_NAMES` and that values are finite floats before passing to SHAP. Reject any vector containing NaN, Inf, or unexpected keys with HTTP 422.
-- The `/explain` endpoint exposes internal model structure (base values, feature weights). Gate it behind `LEDGERLENS_ADMIN_API_KEY` if the admin key is configured, or document that it is intended for authenticated use only in the deployment guide.
+- The `/explain` endpoint exposes internal model structure (base values, feature weights). Gate it behind `STELLARLENSE_ADMIN_API_KEY` if the admin key is configured, or document that it is intended for authenticated use only in the deployment guide.
 - Cache keys must be constructed without unsanitised user input: use `wallet` values that have been validated as valid Stellar account IDs (56-char G-addresses) before constructing the cache key.
 - Do not log raw `feature_vector` contents at INFO level — log only wallet, asset_pair, and model_version to avoid leaking model features into log aggregation systems.
 
@@ -210,7 +210,7 @@ SHAP computation for a single 35-feature vector must complete in <200 ms on a si
 
 ## For Contributors
 
-**Ideal contributor profile**: You have hands-on experience with the SHAP library — specifically `TreeExplainer` for gradient-boosted or random-forest models — and are comfortable extending FastAPI applications with new response models and dependency injection patterns. Familiarity with LedgerLens's 35-feature schema (Benford, trade-pattern, graph, cross-pair) will accelerate the work considerably. Experience with SQLite-backed caching or TTL-aware key-value stores is a plus.
+**Ideal contributor profile**: You have hands-on experience with the SHAP library — specifically `TreeExplainer` for gradient-boosted or random-forest models — and are comfortable extending FastAPI applications with new response models and dependency injection patterns. Familiarity with Stellar Lense's 35-feature schema (Benford, trade-pattern, graph, cross-pair) will accelerate the work considerably. Experience with SQLite-backed caching or TTL-aware key-value stores is a plus.
 
 To apply, please comment on this issue with:
 1. **Specialty area**: your primary expertise (e.g., ML interpretability, FastAPI, Python backend).

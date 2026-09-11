@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "ledgerlens-fl-server"
+name = "stellar-lense-fl-server"
 version = "0.1.0"
-description = "Standalone federated learning server/coordinator for LedgerLens"
+description = "Standalone federated learning server/coordinator for Stellar Lense"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.10"
@@ -26,11 +26,11 @@ test = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/Ledger-Lenz/Ledgerlens-core"
-Repository = "https://github.com/Ledger-Lenz/Ledgerlens-core"
+Homepage = "https://github.com/Stellar-lens/Stellar-Lense"
+Repository = "https://github.com/Stellar-lens/Stellar-Lense"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/ledgerlens_fl_server"]
+packages = ["src/stellar_lense_fl_server"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

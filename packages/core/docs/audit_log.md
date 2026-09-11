@@ -8,7 +8,7 @@ Financial intelligence units require that risk scoring systems demonstrate:
 2. **Decision provenance** — every score must be traceable to exact feature values and model version.
 3. **Actor attribution** — whether a score was triggered by automated ingestion, analyst feedback, or admin override must be recorded immutably.
 
-LedgerLens solves this with an event-sourced design: every scoring decision is
+Stellar Lense solves this with an event-sourced design: every scoring decision is
 appended to `scoring_events` as a `ScoringEvent`. The current score is always
 derivable by replaying events — it is never stored as mutable state.
 
@@ -73,7 +73,7 @@ END;
 Using the API:
 
 ```bash
-curl -H "X-LedgerLens-Admin-Key: $ADMIN_KEY" \
+curl -H "X-StellarLense-Admin-Key: $ADMIN_KEY" \
   "http://localhost:8000/audit/wallet/GABCD...XYZ/verify"
 ```
 
@@ -127,7 +127,7 @@ retention period.
 
 - **SQLite triggers are advisory**: a root-level database edit with a SQLite
   client bypasses the triggers. For production deployments, restrict filesystem
-  access to the SQLite file to the LedgerLens service account only.
+  access to the SQLite file to the Stellar Lense service account only.
 - **Replay performance**: replaying a wallet with 10,000+ events incurs a
   sequential table scan. The `idx_se_wallet` index on `(wallet, occurred_at)`
   makes this efficient for per-wallet queries. For full-table verification,

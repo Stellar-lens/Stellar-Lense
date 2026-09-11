@@ -11,7 +11,7 @@ class Settings(BaseSettings):
         case_sensitive=False,
     )
 
-    db_path: str = "./ledgerlens_federated.db"
+    db_path: str = "./stellar_lense_federated.db"
     
     # ── API / security ────────────────────────────────────────────────────────
     admin_api_key: str = ""

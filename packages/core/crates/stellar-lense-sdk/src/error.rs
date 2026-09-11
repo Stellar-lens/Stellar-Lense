@@ -1,27 +1,27 @@
 use std::fmt;
 
-/// Errors that can occur when using the LedgerLens client.
+/// Errors that can occur when using the StellarLense client.
 ///
 /// # Examples
 ///
 /// ```no_run
-/// use ledgerlens_sdk::{LedgerLensClient, LedgerLensError};
+/// use stellar_lense_sdk::{StellarLenseClient, StellarLenseError};
 ///
 /// #[tokio::main]
 /// async fn main() {
-///     let client = LedgerLensClient::new("https://api.ledgerlens.io", None);
+///     let client = StellarLenseClient::new("https://api.stellar-lense.io", None);
 ///     match client.get_score("GABCDEF").await {
 ///         Ok(response) => println!("Got {} scores", response.scores.len()),
-///         Err(LedgerLensError::NotFound(_)) => eprintln!("Wallet not found"),
-///         Err(LedgerLensError::Unauthorized(_)) => eprintln!("Invalid API key"),
-///         Err(LedgerLensError::RateLimited(_)) => eprintln!("Rate limit exceeded; back off"),
-///         Err(LedgerLensError::HttpError(msg)) => eprintln!("Network error: {}", msg),
+///         Err(StellarLenseError::NotFound(_)) => eprintln!("Wallet not found"),
+///         Err(StellarLenseError::Unauthorized(_)) => eprintln!("Invalid API key"),
+///         Err(StellarLenseError::RateLimited(_)) => eprintln!("Rate limit exceeded; back off"),
+///         Err(StellarLenseError::HttpError(msg)) => eprintln!("Network error: {}", msg),
 ///         Err(e) => eprintln!("Other error: {}", e),
 ///     }
 /// }
 /// ```
 #[derive(Debug, Clone)]
-pub enum LedgerLensError {
+pub enum StellarLenseError {
     /// HTTP request failed (network error, DNS resolution failure, etc.)
     HttpError(String),
     /// The API returned an error response.
@@ -41,55 +41,55 @@ pub enum LedgerLensError {
     TlsError(String),
 }
 
-impl std::error::Error for LedgerLensError {}
+impl std::error::Error for StellarLenseError {}
 
-impl fmt::Display for LedgerLensError {
+impl fmt::Display for StellarLenseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            LedgerLensError::HttpError(msg) => write!(f, "HTTP error: {}", msg),
-            LedgerLensError::Api {
+            StellarLenseError::HttpError(msg) => write!(f, "HTTP error: {}", msg),
+            StellarLenseError::Api {
                 status_code,
                 message,
             } => {
                 write!(f, "API error ({}): {}", status_code, message)
             }
-            LedgerLensError::Unauthorized(msg) => write!(f, "Unauthorized (401): {}", msg),
-            LedgerLensError::NotFound(msg) => write!(f, "Not found (404): {}", msg),
-            LedgerLensError::RateLimited(msg) => write!(f, "Rate limited (429): {}", msg),
-            LedgerLensError::Deserialization(msg) => write!(f, "Deserialization error: {}", msg),
-            LedgerLensError::InvalidUrl(msg) => write!(f, "Invalid URL: {}", msg),
-            LedgerLensError::TlsError(msg) => write!(f, "TLS error: {}", msg),
+            StellarLenseError::Unauthorized(msg) => write!(f, "Unauthorized (401): {}", msg),
+            StellarLenseError::NotFound(msg) => write!(f, "Not found (404): {}", msg),
+            StellarLenseError::RateLimited(msg) => write!(f, "Rate limited (429): {}", msg),
+            StellarLenseError::Deserialization(msg) => write!(f, "Deserialization error: {}", msg),
+            StellarLenseError::InvalidUrl(msg) => write!(f, "Invalid URL: {}", msg),
+            StellarLenseError::TlsError(msg) => write!(f, "TLS error: {}", msg),
         }
     }
 }
 
-impl From<reqwest::Error> for LedgerLensError {
+impl From<reqwest::Error> for StellarLenseError {
     fn from(e: reqwest::Error) -> Self {
         if e.is_status() {
             let status = e.status().unwrap_or_default();
             let msg = e.to_string();
             match status.as_u16() {
-                401 => LedgerLensError::Unauthorized(msg),
-                404 => LedgerLensError::NotFound(msg),
-                429 => LedgerLensError::RateLimited(msg),
-                _ => LedgerLensError::Api {
+                401 => StellarLenseError::Unauthorized(msg),
+                404 => StellarLenseError::NotFound(msg),
+                429 => StellarLenseError::RateLimited(msg),
+                _ => StellarLenseError::Api {
                     status_code: status.as_u16(),
                     message: msg,
                 },
             }
         } else if e.is_connect() || e.is_timeout() {
-            LedgerLensError::HttpError(e.to_string())
+            StellarLenseError::HttpError(e.to_string())
         } else if e.is_builder() {
-            LedgerLensError::InvalidUrl(e.to_string())
+            StellarLenseError::InvalidUrl(e.to_string())
         } else {
-            LedgerLensError::HttpError(e.to_string())
+            StellarLenseError::HttpError(e.to_string())
         }
     }
 }
 
-impl From<serde_json::Error> for LedgerLensError {
+impl From<serde_json::Error> for StellarLenseError {
     fn from(e: serde_json::Error) -> Self {
-        LedgerLensError::Deserialization(e.to_string())
+        StellarLenseError::Deserialization(e.to_string())
     }
 }
 

@@ -10,7 +10,7 @@ Extend the test suite for `detection/webhook_registry.py` and `detection/webhook
 
 ## Background & Context
 
-LedgerLens's webhook system allows protocol teams and asset issuers to receive real-time risk-score alerts via signed HTTP POST requests. Each delivery is signed with an HMAC-SHA256 digest over the raw request body, keyed with the subscriber's secret. The `X-LedgerLens-Timestamp` header enables replay-attack prevention: receivers should reject payloads with timestamps older than 5 minutes.
+Stellar Lense's webhook system allows protocol teams and asset issuers to receive real-time risk-score alerts via signed HTTP POST requests. Each delivery is signed with an HMAC-SHA256 digest over the raw request body, keyed with the subscriber's secret. The `X-StellarLense-Timestamp` header enables replay-attack prevention: receivers should reject payloads with timestamps older than 5 minutes.
 
 The existing test coverage for `detection/webhook_registry.py` and `detection/webhook_worker.py` is minimal — primarily happy-path delivery. Missing coverage includes:
 
@@ -25,7 +25,7 @@ This issue produces a comprehensive test file `tests/test_webhook_security.py` p
 ## Objectives
 
 - [ ] Implement `TestHMACVerification` class with tests for: correct secret → verification passes; wrong secret → verification fails; empty body → verification fails; body tampered post-signing → verification fails; signature with wrong prefix (`md5=` instead of `sha256=`) → fails.
-- [ ] Implement `TestTimestampReplayPrevention` with tests for: timestamp within 5-min window → accepted; timestamp exactly 5 min ago → accepted (boundary); timestamp 5 min + 1 sec ago → rejected; future timestamp (clock skew) → accepted if within 5 min ahead; missing `X-LedgerLens-Timestamp` header → rejected.
+- [ ] Implement `TestTimestampReplayPrevention` with tests for: timestamp within 5-min window → accepted; timestamp exactly 5 min ago → accepted (boundary); timestamp 5 min + 1 sec ago → rejected; future timestamp (clock skew) → accepted if within 5 min ahead; missing `X-StellarLense-Timestamp` header → rejected.
 - [ ] Implement `TestSecretRotation` with tests for: rotate secret while delivery is queued → new secret used for subsequent deliveries; in-flight delivery with old secret completes successfully; no deliveries are dropped or duplicated during rotation.
 - [ ] Implement `TestDeadLetterBehaviour` with tests for: exactly 8 failures → subscriber moved to `dead` status; 7 failures → subscriber remains `active`; verify exponential backoff delays between retries (2^n × 5s); verify `GET /webhooks/dead-letters` lists the subscriber.
 - [ ] Implement `TestConcurrency` with tests for: 10 simultaneous deliveries to different subscribers do not interfere; slow subscriber (mock 10s response) does not block fast subscriber.
@@ -109,7 +109,7 @@ class TestSecretRotation:
         registry.rotate_secret(subscriber.id, new_secret="new_secret")
         # Deliver — should use new_secret for signing
         worker.process_due()
-        sent_sig = mock_http.last_request.headers["X-LedgerLens-Signature"]
+        sent_sig = mock_http.last_request.headers["X-StellarLense-Signature"]
         expected_sig = "sha256=" + hmac.new(
             b"new_secret", mock_http.last_request.content, hashlib.sha256
         ).hexdigest()

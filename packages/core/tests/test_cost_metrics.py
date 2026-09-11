@@ -56,9 +56,9 @@ def test_init_cost_metrics_sets_gauges_from_settings(monkeypatch):
 
     init_cost_metrics()
 
-    vcpu_gauge = REGISTRY.get_sample_value("ledgerlens_cost_per_vcpu_hour_usd")
-    memory_gauge = REGISTRY.get_sample_value("ledgerlens_cost_per_gb_memory_hour_usd")
-    storage_gauge = REGISTRY.get_sample_value("ledgerlens_cost_per_gb_storage_month_usd")
+    vcpu_gauge = REGISTRY.get_sample_value("stellar_lense_cost_per_vcpu_hour_usd")
+    memory_gauge = REGISTRY.get_sample_value("stellar_lense_cost_per_gb_memory_hour_usd")
+    storage_gauge = REGISTRY.get_sample_value("stellar_lense_cost_per_gb_storage_month_usd")
 
     assert vcpu_gauge == pytest.approx(0.123), \
         f"Expected vCPU cost gauge = 0.123, got {vcpu_gauge}"
@@ -73,12 +73,12 @@ def test_init_cost_metrics_is_idempotent(monkeypatch):
     monkeypatch.setattr(settings_module.settings, "cost_per_vcpu_hour_usd", 0.050)
 
     init_cost_metrics()
-    first_value = REGISTRY.get_sample_value("ledgerlens_cost_per_vcpu_hour_usd")
+    first_value = REGISTRY.get_sample_value("stellar_lense_cost_per_vcpu_hour_usd")
 
     # Mutate settings *after* the first init; the second call must be a no-op.
     monkeypatch.setattr(settings_module.settings, "cost_per_vcpu_hour_usd", 0.999)
     init_cost_metrics()
-    second_value = REGISTRY.get_sample_value("ledgerlens_cost_per_vcpu_hour_usd")
+    second_value = REGISTRY.get_sample_value("stellar_lense_cost_per_vcpu_hour_usd")
 
     assert first_value == second_value, \
         "Repeated init_cost_metrics() calls must be no-ops; gauge must not change"
@@ -98,11 +98,11 @@ def test_cost_gauges_are_exposed_at_metrics_endpoint():
 
     text = generate_latest().decode("utf-8")
 
-    assert "ledgerlens_cost_per_vcpu_hour_usd" in text, \
+    assert "stellar_lense_cost_per_vcpu_hour_usd" in text, \
         "vCPU cost gauge missing from Prometheus output"
-    assert "ledgerlens_cost_per_gb_memory_hour_usd" in text, \
+    assert "stellar_lense_cost_per_gb_memory_hour_usd" in text, \
         "Memory cost gauge missing from Prometheus output"
-    assert "ledgerlens_cost_per_gb_storage_month_usd" in text, \
+    assert "stellar_lense_cost_per_gb_storage_month_usd" in text, \
         "Storage cost gauge missing from Prometheus output"
 
 
@@ -110,9 +110,9 @@ def test_cost_gauges_with_default_values():
     """Default cost values loaded from settings are non-negative and plausible."""
     init_cost_metrics()
 
-    vcpu_cost = REGISTRY.get_sample_value("ledgerlens_cost_per_vcpu_hour_usd")
-    memory_cost = REGISTRY.get_sample_value("ledgerlens_cost_per_gb_memory_hour_usd")
-    storage_cost = REGISTRY.get_sample_value("ledgerlens_cost_per_gb_storage_month_usd")
+    vcpu_cost = REGISTRY.get_sample_value("stellar_lense_cost_per_vcpu_hour_usd")
+    memory_cost = REGISTRY.get_sample_value("stellar_lense_cost_per_gb_memory_hour_usd")
+    storage_cost = REGISTRY.get_sample_value("stellar_lense_cost_per_gb_storage_month_usd")
 
     assert vcpu_cost is not None, "vCPU cost gauge not initialized"
     assert vcpu_cost >= 0, f"vCPU cost must be non-negative, got {vcpu_cost}"

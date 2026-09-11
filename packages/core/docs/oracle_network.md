@@ -1,4 +1,4 @@
-# LedgerLens Decentralized Oracle Network (DON)
+# Stellar Lense Decentralized Oracle Network (DON)
 
 ## Overview
 Multi-validator consensus mechanism for risk score publication to Soroban.

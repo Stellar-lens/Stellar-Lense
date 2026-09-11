@@ -5,12 +5,12 @@ assignees: []
 ---
 
 ## Summary
-`detection/shap_explainer.py` computes SHAP values for each risk score but currently does not export human-readable visualisations. The LedgerLens dashboard and API consumers need per-score SHAP waterfall plots (showing how each feature pushes the prediction from the base value to the final score) and force plots (inline HTML showing feature contributions). This issue builds a `SHAPPlotExporter` that produces SVG/PNG waterfall plots and structured JSON summaries suitable for both server-side rendering and dashboard API responses.
+`detection/shap_explainer.py` computes SHAP values for each risk score but currently does not export human-readable visualisations. The Stellar Lense dashboard and API consumers need per-score SHAP waterfall plots (showing how each feature pushes the prediction from the base value to the final score) and force plots (inline HTML showing feature contributions). This issue builds a `SHAPPlotExporter` that produces SVG/PNG waterfall plots and structured JSON summaries suitable for both server-side rendering and dashboard API responses.
 
 ## Background & Context
 `detection/shap_explainer.py` uses the `shap` library to compute `shap_values` for each wallet/asset-pair score. The SHAP `TreeExplainer` is used for all three tree ensemble models (Random Forest, XGBoost, LightGBM), and the current implementation returns raw `shap.Explanation` objects that are logged but not persisted or exported.
 
-The `ledgerlens-dashboard` needs:
+The `stellar-lense-dashboard` needs:
 1. **SVG/PNG waterfall plots**: one per score, showing the 10 most influential features, base value, and final predicted probability; these are static images suitable for embedding in dashboards, PDFs, and email alerts
 2. **Structured JSON explanations**: `{"feature_name": "...", "shap_value": 0.34, "feature_value": 12.5, "direction": "increases_risk"}` for each of the top-10 features; used by the dashboard's interactive SHAP table and by the `/scores/{wallet}` API response
 

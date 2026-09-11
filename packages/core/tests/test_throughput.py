@@ -122,9 +122,9 @@ async def test_async_run_throughput_500_wallets(tmp_path, monkeypatch):
 
     models_path = _save_temp_models(tmp_path, settings_module.settings.model_signing_key.encode())
     object.__setattr__(settings_module.settings, "model_dir", models_path)
-    object.__setattr__(settings_module.settings, "ledgerlens_db_path", str(tmp_path / "ledgerlens.db"))
-    object.__setattr__(settings_module.settings, "ledgerlens_score_contract_id", "")
-    object.__setattr__(settings_module.settings, "ledgerlens_service_secret_key", "")
+    object.__setattr__(settings_module.settings, "stellarlense_db_path", str(tmp_path / "stellar_lense.db"))
+    object.__setattr__(settings_module.settings, "stellarlense_score_contract_id", "")
+    object.__setattr__(settings_module.settings, "stellarlense_service_secret_key", "")
 
     # Mock historical trades (no real HTTP pagination needed).
     async def _return_trades(**kwargs):

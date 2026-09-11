@@ -225,7 +225,7 @@ class TestRAPSConformal:
         raps = RAPSConformal(alpha=0.10)
         probs = _uniform_softmax(10, seed=5)
         labels = np.arange(10) % 3
-        with caplog.at_level(logging.WARNING, logger="ledgerlens.conformal"):
+        with caplog.at_level(logging.WARNING, logger="stellar_lense.conformal"):
             raps.calibrate(probs, labels)
         assert any("unreliable" in m for m in caplog.messages)
 

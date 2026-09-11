@@ -17,7 +17,7 @@ repository's setup scripts, configuration, and existing runbooks.
 
 ## Database and Redis
 
-- SQLite defaults to `./ledgerlens.db`; set `LEDGERLENS_DB_PATH` to a writable path and run `python cli.py db-migrate` for a fresh database.
+- SQLite defaults to `./stellar_lense.db`; set `STELLARLENSE_DB_PATH` to a writable path and run `python cli.py db-migrate` for a fresh database.
 - A degraded `db` health result means SQLite could not execute `SELECT 1`; check path permissions and migration state.
 - Redis is optional locally. Set `REDIS_URL=redis://localhost:6379/0` for shared feature-store or rate-limit tests; an unreachable Redis uses the documented in-process fallback.
 

@@ -190,7 +190,7 @@ def train(
     Parameters
     ----------
     db_path:
-        Path to the LedgerLens SQLite database containing ring_members and
+        Path to the StellarLense SQLite database containing ring_members and
         wallet_scores tables.
     model_path:
         Output path for the trained model checkpoint.
@@ -451,7 +451,7 @@ class _HelpFormatter(
 def main():
     parser = argparse.ArgumentParser(
         description=(
-            "Train the LedgerLens GNN ring-membership classifier (GraphSAGE "
+            "Train the StellarLense GNN ring-membership classifier (GraphSAGE "
             "encoder + MLP). Positive labels come from the `ring_members` table "
             "(confirmed=1); negatives are low-risk wallets (score < 20 in the "
             "last 30 days) with no open alert in the last 90 days, downsampled "
@@ -464,16 +464,16 @@ def main():
             "Examples:\n"
             "  python scripts/train_gnn.py --epochs 50 --lr 0.001 --neg-sample-ratio 3\n"
             "  python scripts/train_gnn.py --graph-mode heterogeneous --conv-type hgt\n"
-            "  LEDGERLENS_DB_PATH=/data/ll.db python scripts/train_gnn.py\n"
+            "  STELLARLENSE_DB_PATH=/data/ll.db python scripts/train_gnn.py\n"
         ),
     )
     parser.add_argument(
         "--db-path",
-        default=os.environ.get("LEDGERLENS_DB_PATH", "./ledgerlens.db"),
+        default=os.environ.get("STELLARLENSE_DB_PATH", "./stellar_lense.db"),
         help=(
-            "Path to the LedgerLens SQLite database file, which must contain the "
+            "Path to the StellarLense SQLite database file, which must contain the "
             "`ring_members` and `wallet_scores` (and `alerts`) tables. Defaults "
-            "to the LEDGERLENS_DB_PATH env var, else ./ledgerlens.db."
+            "to the STELLARLENSE_DB_PATH env var, else ./stellar_lense.db."
         ),
     )
     parser.add_argument(

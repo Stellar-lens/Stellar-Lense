@@ -5,7 +5,7 @@ assignees: []
 ---
 
 ## Summary
-LedgerLens reads configuration from environment variables without validating types, ranges, or required fields at startup. Missing or malformed config (e.g., a non-integer `SCORE_ALERT_THRESHOLD`) causes cryptic runtime errors far from the startup path. A Pydantic v2 `Settings` model with validators that runs at import time provides immediate, actionable error messages for misconfiguration.
+Stellar Lense reads configuration from environment variables without validating types, ranges, or required fields at startup. Missing or malformed config (e.g., a non-integer `SCORE_ALERT_THRESHOLD`) causes cryptic runtime errors far from the startup path. A Pydantic v2 `Settings` model with validators that runs at import time provides immediate, actionable error messages for misconfiguration.
 
 ## Objectives
 - [ ] Implement `config/settings.py` with a `pydantic_settings.BaseSettings` subclass covering all env vars

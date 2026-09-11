@@ -152,7 +152,7 @@ def test_cli_config_validate_exits_zero(monkeypatch):
 
 def test_cli_config_validate_masks_secrets(monkeypatch):
     """config validate prints *** for secret fields."""
-    monkeypatch.setenv("LEDGERLENS_SERVICE_SECRET_KEY", "super-secret")
+    monkeypatch.setenv("STELLARLENSE_SERVICE_SECRET_KEY", "super-secret")
     from typer.testing import CliRunner
     from cli import app
 

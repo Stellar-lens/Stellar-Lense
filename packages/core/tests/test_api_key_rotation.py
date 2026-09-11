@@ -19,8 +19,8 @@ from detection.webhook_registry import _encrypt_secret, _decrypt_secret, registe
 @pytest.fixture
 def db_path(tmp_path):
     """Use a temporary SQLite database for each test."""
-    path = str(tmp_path / "test_ledgerlens.db")
-    with patch.object(_settings, "ledgerlens_db_path", path):
+    path = str(tmp_path / "test_stellar_lense.db")
+    with patch.object(_settings, "stellarlense_db_path", path):
         yield path
 
 
@@ -56,17 +56,17 @@ def test_api_key_rotation_flow(db_path, app):
     new_plain = new_key["plaintext_key"]
 
     # Both keys must work
-    resp1 = client.get("/v1/scores/G123", headers={"X-LedgerLens-Api-Key": key1_plain})
+    resp1 = client.get("/v1/scores/G123", headers={"X-StellarLense-Api-Key": key1_plain})
     assert resp1.status_code == 200
 
-    resp2 = client.get("/v1/scores/G123", headers={"X-LedgerLens-Api-Key": new_plain})
+    resp2 = client.get("/v1/scores/G123", headers={"X-StellarLense-Api-Key": new_plain})
     assert resp2.status_code == 200
 
     # Test sweep doesn't revoke early
     assert sweep_expired_api_keys() == 0
 
     # Both keys still work
-    resp1 = client.get("/v1/scores/G123", headers={"X-LedgerLens-Api-Key": key1_plain})
+    resp1 = client.get("/v1/scores/G123", headers={"X-StellarLense-Api-Key": key1_plain})
     assert resp1.status_code == 200
 
 
@@ -86,11 +86,11 @@ def test_api_key_expiry_after_deadline(db_path, app):
     assert sweep_expired_api_keys() == 1
 
     # Old key fails (401)
-    resp1 = client.get("/v1/scores/G123", headers={"X-LedgerLens-Api-Key": key1_plain})
+    resp1 = client.get("/v1/scores/G123", headers={"X-StellarLense-Api-Key": key1_plain})
     assert resp1.status_code == 401
 
     # New key works (200)
-    resp2 = client.get("/v1/scores/G123", headers={"X-LedgerLens-Api-Key": new_plain})
+    resp2 = client.get("/v1/scores/G123", headers={"X-StellarLense-Api-Key": new_plain})
     assert resp2.status_code == 200
 
 
@@ -144,11 +144,11 @@ def test_webhook_encryption_rotation_fallback(db_path):
 
     # Configure env
     with patch.dict(os.environ, {
-        "LEDGERLENS_WEBHOOK_ENCRYPTION_KEY": key_primary,
-        "LEDGERLENS_WEBHOOK_ENCRYPTION_KEY_PREVIOUS": key_previous,
+        "STELLARLENSE_WEBHOOK_ENCRYPTION_KEY": key_primary,
+        "STELLARLENSE_WEBHOOK_ENCRYPTION_KEY_PREVIOUS": key_previous,
     }):
         # 1. Encrypt secret under the previous key
-        with patch.dict(os.environ, {"LEDGERLENS_WEBHOOK_ENCRYPTION_KEY": key_previous}):
+        with patch.dict(os.environ, {"STELLARLENSE_WEBHOOK_ENCRYPTION_KEY": key_previous}):
             encrypted_under_prev = _encrypt_secret("super_secret_hmac")
 
         # 2. Decrypt with primary (current) key configured. Primary fails but fallback should succeed.
@@ -157,7 +157,7 @@ def test_webhook_encryption_rotation_fallback(db_path):
 
         # 3. Register subscriber with previous key
         # In order to simulate DB rows under the old key, we'll temporarily set old key as primary
-        with patch.dict(os.environ, {"LEDGERLENS_WEBHOOK_ENCRYPTION_KEY": key_previous}):
+        with patch.dict(os.environ, {"STELLARLENSE_WEBHOOK_ENCRYPTION_KEY": key_previous}):
             sub_id = register_subscriber("https://example.com/webhook", "super_secret_hmac", db_path=db_path)
 
         # Retrieve subscriber (uses fallback, should succeed)
@@ -175,7 +175,7 @@ def test_webhook_encryption_rotation_fallback(db_path):
             conn.commit()
 
         # Try to decrypt with ONLY the primary key (no previous key fallback). Should now succeed!
-        with patch.dict(os.environ, {"LEDGERLENS_WEBHOOK_ENCRYPTION_KEY_PREVIOUS": ""}):
+        with patch.dict(os.environ, {"STELLARLENSE_WEBHOOK_ENCRYPTION_KEY_PREVIOUS": ""}):
             sub_re = get_subscriber(sub_id, db_path=db_path)
             assert sub_re.secret == "super_secret_hmac"
 
@@ -192,7 +192,7 @@ def test_rotate_api_key_endpoint_and_prometheus(db_path, app):
     # Admin key must be configured for "missing header" to return 401 rather
     # than 503 ("admin key not configured" -- require_admin_key fails closed
     # and checks this first).
-    with patch.object(_settings, "ledgerlens_admin_api_key", "admin-key-123"):
+    with patch.object(_settings, "stellarlense_admin_api_key", "admin-key-123"):
         # Attempt rotation without admin key (401)
         resp = client.post(f"/admin/api-keys/{key_id}/rotate?grace_period_seconds=10")
         assert resp.status_code == 401
@@ -200,7 +200,7 @@ def test_rotate_api_key_endpoint_and_prometheus(db_path, app):
         # Rotate with admin key (200)
         resp = client.post(
             f"/admin/api-keys/{key_id}/rotate?grace_period_seconds=10",
-            headers={"X-LedgerLens-Admin-Key": "admin-key-123"}
+            headers={"X-StellarLense-Admin-Key": "admin-key-123"}
         )
         assert resp.status_code == 200
         result = resp.json()

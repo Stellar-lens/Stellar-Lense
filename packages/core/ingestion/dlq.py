@@ -9,7 +9,7 @@ from typing import Any
 
 from config.settings import settings
 
-logger = logging.getLogger("ledgerlens.dlq")
+logger = logging.getLogger("stellar_lense.dlq")
 
 
 class DLQErrorClass(str, Enum):

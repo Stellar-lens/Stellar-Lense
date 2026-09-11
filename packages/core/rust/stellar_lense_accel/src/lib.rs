@@ -12,7 +12,7 @@ fn tarjan_scc(_adjacency: &Bound<'_, PyDict>) -> PyResult<Vec<Vec<u32>>> {
 }
 
 #[pymodule]
-fn ledgerlens_accel(m: &Bound<'_, PyModule>) -> PyResult<()> {
+fn stellar_lense_accel(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(chi_square_batch, m)?)?;
     m.add_function(wrap_pyfunction!(tarjan_scc, m)?)?;
     Ok(())

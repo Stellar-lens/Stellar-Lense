@@ -5,7 +5,7 @@ assignees: []
 ---
 
 ## Summary
-LedgerLens currently creates database tables via `CREATE TABLE IF NOT EXISTS` scattered across module init code, with no migration history and no rollback capability. Adopting Alembic provides versioned migrations, safe schema evolution, and one-command rollback for failed deployments.
+Stellar Lense currently creates database tables via `CREATE TABLE IF NOT EXISTS` scattered across module init code, with no migration history and no rollback capability. Adopting Alembic provides versioned migrations, safe schema evolution, and one-command rollback for failed deployments.
 
 ## Objectives
 - [ ] Initialise Alembic in `alembic/` with `alembic init alembic`

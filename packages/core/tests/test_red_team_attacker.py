@@ -174,7 +174,7 @@ def webhook_environment(monkeypatch):
     from detection import webhook_registry
 
     monkeypatch.setenv(
-        "LEDGERLENS_WEBHOOK_ENCRYPTION_KEY",
+        "STELLARLENSE_WEBHOOK_ENCRYPTION_KEY",
         base64.b64encode(bytes(range(32))).decode("ascii"),
     )
     # URL validation is covered separately; this test must not depend on external DNS.

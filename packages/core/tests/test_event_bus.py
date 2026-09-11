@@ -65,7 +65,7 @@ def test_serialize_event(sample_score):
     assert data["schema_version"] == 1
     assert data["event"] == "risk_score.updated"
     assert "produced_at" in data
-    assert data["producer"] == "ledgerlens-core"
+    assert data["producer"] == "stellar-lense-core"
 
     payload = data["data"]
     assert payload["wallet"] == "GBX..."

@@ -3,7 +3,7 @@
 import pytest
 import pandas as pd
 
-from ledgerlens_fl_client.adapter import DataAdapter, CSVDirectoryAdapter
+from stellar_lense_fl_client.adapter import DataAdapter, CSVDirectoryAdapter
 
 
 def test_data_adapter_is_abstract():

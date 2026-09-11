@@ -28,7 +28,7 @@ import pandas as pd
 from detection.feature_engineering import FEATURE_NAMES, build_feature_vector
 from detection.graph_engine import build_ring_membership_index, build_transaction_graph, find_wash_rings
 
-logger = logging.getLogger("ledgerlens.dataset")
+logger = logging.getLogger("stellar_lense.dataset")
 
 
 def build_training_dataset(

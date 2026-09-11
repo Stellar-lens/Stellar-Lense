@@ -16,7 +16,7 @@ from typing import List
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
-logger = logging.getLogger("ledgerlens.api.gnn")
+logger = logging.getLogger("stellar_lense.api.gnn")
 
 router = APIRouter(prefix="/gnn", tags=["GNN Ring Detection"])
 
@@ -162,7 +162,7 @@ def _build_graph_for_wallet(wallet: str):
 
         from config.settings import settings
 
-        db_path = getattr(settings, "ledgerlens_db_path", "./ledgerlens.db")
+        db_path = getattr(settings, "stellarlense_db_path", "./stellar_lense.db")
         trades = _load_recent_trades(db_path, wallet, limit=500)
 
         if not trades:

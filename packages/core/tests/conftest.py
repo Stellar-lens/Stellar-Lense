@@ -30,7 +30,7 @@ def patch_signing_key(monkeypatch):
     """
     import config.settings as settings_module
 
-    monkeypatch.setenv("LEDGERLENS_MODEL_SIGNING_KEY", TEST_SIGNING_KEY)
+    monkeypatch.setenv("STELLARLENSE_MODEL_SIGNING_KEY", TEST_SIGNING_KEY)
     monkeypatch.setattr(settings_module.settings, "model_signing_key", TEST_SIGNING_KEY)
 
 

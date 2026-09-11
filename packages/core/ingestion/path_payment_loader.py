@@ -1,4 +1,4 @@
-"""Path payment ingestion and hop decomposition for LedgerLens.
+"""Path payment ingestion and hop decomposition for StellarLense.
 
 Stellar's path payment operations (``path_payment_strict_send`` and
 ``path_payment_strict_receive``) route a source asset to a destination asset
@@ -45,7 +45,7 @@ from ingestion.data_models import (
 from ingestion.http_client import AsyncHorizonClient, get_with_retry
 from ingestion.operations_loader import _horizon_url, _parse_datetime, _parse_float
 
-logger = logging.getLogger("ledgerlens.path_payment_loader")
+logger = logging.getLogger("stellar_lense.path_payment_loader")
 
 PAGE_LIMIT = 200
 MAX_PATH_HOPS = 8

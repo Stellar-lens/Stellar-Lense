@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from config.settings import settings
 from detection.red_team import EVASION_THRESHOLD, N_EVASION_TRIGGER
 
-logger = logging.getLogger("ledgerlens.red_team.evasion")
+logger = logging.getLogger("stellar_lense.red_team.evasion")
 
 MODEL_EVASION_EVENT = "MODEL_EVASION_DETECTED"
 

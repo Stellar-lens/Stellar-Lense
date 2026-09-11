@@ -6,19 +6,19 @@ assignees: []
 
 > **Historical design note:** The v1 signatures and pseudocode below describe
 > the original proposal. Issue #684 upgrades the implemented integration to
-> `LedgerLens-Oracle-v2` and the current ten-argument `ledgerlens-score`
+> `StellarLense-Oracle-v2` and the current ten-argument `stellar-lense-score`
 > `submit_score` ABI. The normative integration contract is
 > `docs/oracle_quorum.md`.
 
 ## Summary
 
-Extend `detection/oracle_node.py` and `contracts/oracle_aggregator/src/lib.rs` to implement a 3-of-5 multi-oracle quorum: score submissions to the Soroban on-chain registry require threshold signatures from at least 3 of 5 independent oracle nodes before being accepted on-chain. Implement ED25519 multi-sig aggregation in the oracle coordinator, and a Soroban contract (`oracle_aggregator`) that verifies the quorum signature before calling `submit_score` on the main `ledgerlens-score` contract. This removes the single point of trust in the current single-key `SorobanPublisher`.
+Extend `detection/oracle_node.py` and `contracts/oracle_aggregator/src/lib.rs` to implement a 3-of-5 multi-oracle quorum: score submissions to the Soroban on-chain registry require threshold signatures from at least 3 of 5 independent oracle nodes before being accepted on-chain. Implement ED25519 multi-sig aggregation in the oracle coordinator, and a Soroban contract (`oracle_aggregator`) that verifies the quorum signature before calling `submit_score` on the main `stellar-lense-score` contract. This removes the single point of trust in the current single-key `SorobanPublisher`.
 
 ## Background & Context
 
-The current `SorobanPublisher` uses a single service account keypair (`LEDGERLENS_SERVICE_SECRET_KEY`) to sign and submit all on-chain score updates. This is a single point of failure and trust: if the service key is compromised, an attacker can submit arbitrary risk scores on-chain, potentially extorting wallets or clearing genuine fraud flags.
+The current `SorobanPublisher` uses a single service account keypair (`STELLARLENSE_SERVICE_SECRET_KEY`) to sign and submit all on-chain score updates. This is a single point of failure and trust: if the service key is compromised, an attacker can submit arbitrary risk scores on-chain, potentially extorting wallets or clearing genuine fraud flags.
 
-A multi-oracle quorum architecture distributes this trust across `n=5` independent oracle nodes, each holding its own ED25519 keypair. A score submission is only accepted on-chain when `k=3` oracles have independently computed the same score and signed the submission. The Soroban `oracle_aggregator` contract verifies that the collected signatures form a valid `k-of-n` threshold before forwarding to `ledgerlens-score`.
+A multi-oracle quorum architecture distributes this trust across `n=5` independent oracle nodes, each holding its own ED25519 keypair. A score submission is only accepted on-chain when `k=3` oracles have independently computed the same score and signed the submission. The Soroban `oracle_aggregator` contract verifies that the collected signatures form a valid `k-of-n` threshold before forwarding to `stellar-lense-score`.
 
 This architecture is analogous to a Stellar multi-sig account but implemented at the application layer using Soroban contracts, which gives more flexibility for threshold changes and key rotation.
 
@@ -67,7 +67,7 @@ class OracleNode:
         self, wallet: str, asset_pair: str, score: int, timestamp: int
     ) -> bytes:
         """
-        Sign canonical message: SHA-256("LedgerLens-Oracle-v1" || wallet || asset_pair || score_u32_be || timestamp_u64_be)
+        Sign canonical message: SHA-256("StellarLense-Oracle-v1" || wallet || asset_pair || score_u32_be || timestamp_u64_be)
         Returns 64-byte ED25519 signature.
         """
         message = self._canonical_message(wallet, asset_pair, score, timestamp)
@@ -76,7 +76,7 @@ class OracleNode:
     @staticmethod
     def _canonical_message(wallet: str, asset_pair: str, score: int, timestamp: int) -> bytes:
         import hashlib, struct
-        prefix = b"LedgerLens-Oracle-v1"
+        prefix = b"StellarLense-Oracle-v1"
         body = (
             prefix
             + wallet.encode("utf-8")
@@ -163,7 +163,7 @@ impl OracleAggregator {
     /// Initialise with threshold k and list of n authorised oracle public keys.
     pub fn initialize(env: Env, threshold: u32, oracle_keys: Vec<BytesN<32>>) { ... }
 
-    /// Verify k-of-n signatures and forward to ledgerlens-score contract.
+    /// Verify k-of-n signatures and forward to stellar-lense-score contract.
     pub fn submit_with_quorum(
         env: Env,
         wallet: Address,
@@ -189,9 +189,9 @@ impl OracleAggregator {
         if valid_count < threshold {
             return false;
         }
-        // Forward to ledgerlens-score contract
+        // Forward to stellar-lense-score contract
         let score_contract: Address = env.storage().instance().get(&Symbol::new(&env, "SCORE_CONTRACT")).unwrap();
-        // invoke submit_score on ledgerlens-score
+        // invoke submit_score on stellar-lense-score
         true
     }
     
@@ -216,7 +216,7 @@ ORACLE_QUORUM_THRESHOLD=3
 ## Security Considerations
 
 - **Private key isolation**: each oracle node's key must be in a separate environment variable. Never log any oracle private key or expose it through the `/admin/oracle/status` endpoint (which shows public keys only).
-- **Message canonicalisation must match exactly between Python and Rust**: any discrepancy in byte encoding causes signature verification failures. Use identical domain separator (`"LedgerLens-Oracle-v1"`), field ordering, and byte packing in both implementations. Cover this with a cross-language test vector.
+- **Message canonicalisation must match exactly between Python and Rust**: any discrepancy in byte encoding causes signature verification failures. Use identical domain separator (`"StellarLense-Oracle-v1"`), field ordering, and byte packing in both implementations. Cover this with a cross-language test vector.
 - **Replay protection**: the canonical message includes `timestamp`; the Soroban contract should reject timestamps older than 5 minutes (using `env.ledger().timestamp()`).
 - **Key rotation**: oracle key rotation requires a contract re-initialisation (`initialize` call with new key set). Document this procedure in `docs/oracle_operations.md`.
 - **Threshold reduction attack**: ensure `initialize` can only be called once or by an authorised admin address (Stellar account stored in contract storage at first init). Subsequent key set changes require a governance proposal (see ISSUE-070).
@@ -246,7 +246,7 @@ ORACLE_QUORUM_THRESHOLD=3
 
 - [ ] `OracleNode` implemented with correct ED25519 signing and canonical message construction.
 - [ ] `OracleCoordinator` collects signatures with short-circuit and quorum validation.
-- [ ] `oracle_aggregator` Soroban contract verifies k-of-n ED25519 signatures and forwards to `ledgerlens-score`.
+- [ ] `oracle_aggregator` Soroban contract verifies k-of-n ED25519 signatures and forwards to `stellar-lense-score`.
 - [ ] Canonical message format is identical between Python and Rust (verified by shared test vector).
 - [ ] Replay protection (timestamp check) implemented in Soroban contract.
 - [ ] `GET /admin/oracle/status` shows public keys and last-seen timestamps.

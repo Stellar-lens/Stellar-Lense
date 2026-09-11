@@ -75,12 +75,12 @@ jobs:
             echo "  2. Review the diff: git diff tests/fixtures/contract_vectors.json"
             echo "  3. Update the affected language implementations:"
             echo "     - sdk/src/schemas.ts (TypeScript/Zod)"
-            echo "     - crates/ledgerlens-sdk/src/models.rs (Rust)"
-            echo "     - packages/ledgerlens-sdk/src/ledgerlens/models.py (Python SDK)"
-            echo "     - proto/ledgerlens/v1/scoring.proto (Proto)"
+            echo "     - crates/stellar-lense-sdk/src/models.rs (Rust)"
+            echo "     - packages/stellar-lense-sdk/src/stellar_lense/models.py (Python SDK)"
+            echo "     - proto/stellar_lense/v1/scoring.proto (Proto)"
             echo "  4. Confirm per-language tests pass:"
             echo "     pytest tests/test_contract_vectors.py"
-            echo "     cargo test -p ledgerlens-sdk contract_vectors"
+            echo "     cargo test -p stellar-lense-sdk contract_vectors"
             echo "     npx vitest run sdk/tests/contract_vectors.test.ts"
             exit 1
           fi
@@ -149,7 +149,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Run Rust contract vector tests
-        run: cargo test -p ledgerlens-sdk contract_vectors --verbose
-        # This runs only the contract vector tests in the ledgerlens-sdk crate.
+        run: cargo test -p stellar-lense-sdk contract_vectors --verbose
+        # This runs only the contract vector tests in the stellar-lense-sdk crate.
         # The fixture is loaded from tests/fixtures/contract_vectors.json relative
         # to the workspace root.

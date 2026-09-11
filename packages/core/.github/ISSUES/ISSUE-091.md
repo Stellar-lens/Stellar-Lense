@@ -5,7 +5,7 @@ assignees: []
 ---
 
 ## Summary
-There is no systematic performance benchmark for the LedgerLens scoring pipeline, making it impossible to detect performance regressions between releases. A benchmark suite measuring p50/p95/p99 latency for single-wallet scoring, batch scoring, and feature extraction — with results committed to `benchmarks/baseline.json` — enables regression detection in CI.
+There is no systematic performance benchmark for the Stellar Lense scoring pipeline, making it impossible to detect performance regressions between releases. A benchmark suite measuring p50/p95/p99 latency for single-wallet scoring, batch scoring, and feature extraction — with results committed to `benchmarks/baseline.json` — enables regression detection in CI.
 
 ## Objectives
 - [ ] Create `benchmarks/` directory with `benchmark_scoring.py` using `pytest-benchmark`

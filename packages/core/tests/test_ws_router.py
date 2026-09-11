@@ -20,7 +20,7 @@ from detection.risk_score import RiskScore
 @pytest.fixture(autouse=True)
 def _patch_admin_api_key(monkeypatch):
     """Ensure the admin API key is set so ws_alerts authentication passes."""
-    monkeypatch.setattr(settings, "ledgerlens_admin_api_key", "test-admin-key")
+    monkeypatch.setattr(settings, "stellarlense_admin_api_key", "test-admin-key")
 
 
 @pytest.fixture

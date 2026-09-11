@@ -5,7 +5,7 @@ assignees: []
 ---
 
 ## Summary
-LedgerLens model artifacts (`.joblib` files, `meta_learner.joblib`, `gnn_model.pt`) are loaded at inference time with no integrity verification. A compromised build environment, supply chain attack, or unauthorised filesystem write could replace a model file with a backdoored version that systematically under-scores specific wash-trading wallets without any alerting. This issue implements Ed25519 cryptographic signing of all model artifacts at training time and mandatory signature verification at inference load time, with hard rejection of any artifact whose signature does not verify — making model tampering detectable and non-silently-exploitable.
+Stellar Lense model artifacts (`.joblib` files, `meta_learner.joblib`, `gnn_model.pt`) are loaded at inference time with no integrity verification. A compromised build environment, supply chain attack, or unauthorised filesystem write could replace a model file with a backdoored version that systematically under-scores specific wash-trading wallets without any alerting. This issue implements Ed25519 cryptographic signing of all model artifacts at training time and mandatory signature verification at inference load time, with hard rejection of any artifact whose signature does not verify — making model tampering detectable and non-silently-exploitable.
 
 ## Background & Context
 `detection/model_registry.py` manages model versioning (version hash in filename, `latest.txt` pointer files, `training_metadata.json`). `detection/model_inference.py` loads models using `joblib.load(path)`, which deserializes Python objects from disk without any integrity check. This is a known attack surface:
@@ -43,7 +43,7 @@ public_bytes = public_key.public_bytes(Encoding.PEM, PublicFormat.SubjectPublicK
 ```
 
 Store:
-- Private key: environment variable `LEDGERLENS_MODEL_SIGNING_KEY` (PEM string, training environment only; never commit)
+- Private key: environment variable `STELLARLENSE_MODEL_SIGNING_KEY` (PEM string, training environment only; never commit)
 - Public key: `config/model_signing_pubkey.pem` (committed to repository; used for verification)
 
 **Signing procedure:**
@@ -52,7 +52,7 @@ def sign_artifact(model_path: Path) -> Path:
     """Compute SHA-256 digest of model file, sign with Ed25519, write .sig sidecar."""
     with open(model_path, "rb") as f:
         digest = hashlib.sha256(f.read()).digest()
-    private_key = load_private_key_from_env()  # reads LEDGERLENS_MODEL_SIGNING_KEY
+    private_key = load_private_key_from_env()  # reads STELLARLENSE_MODEL_SIGNING_KEY
     signature = private_key.sign(digest)  # 64-byte Ed25519 signature
     sig_path = model_path.with_suffix(model_path.suffix + ".sig")
     sig_data = {
@@ -61,7 +61,7 @@ def sign_artifact(model_path: Path) -> Path:
         "file": model_path.name,
         "signature": base64.b64encode(signature).decode("ascii"),
         "signed_at": datetime.utcnow().isoformat() + "Z",
-        "signer": "ledgerlens-training-pipeline",
+        "signer": "stellar-lense-training-pipeline",
     }
     with open(sig_path, "w") as f:
         json.dump(sig_data, f, indent=2)
@@ -117,7 +117,7 @@ All verified: 4/5. 1 artifact(s) require attention.
 **Key rotation procedure:**
 - When the signing key is rotated: generate new key pair, re-sign all existing model artifacts with the new key, update `config/model_signing_pubkey.pem`
 - Document key rotation steps in `docs/model_signing.md`
-- Add a `--re-sign` flag to `cli.py verify-models` that re-signs all artifacts (requires `LEDGERLENS_MODEL_SIGNING_KEY` to be set)
+- Add a `--re-sign` flag to `cli.py verify-models` that re-signs all artifacts (requires `STELLARLENSE_MODEL_SIGNING_KEY` to be set)
 
 **Dependency:**
 - `cryptography>=41.0.0` added to `requirements.txt` (likely already present as a transitive dependency of `stellar-sdk`; verify and pin)
@@ -129,7 +129,7 @@ All verified: 4/5. 1 artifact(s) require attention.
 - `.json` (metadata) → optionally signed; required for `training_metadata.json`
 
 ## Security Considerations
-- `LEDGERLENS_MODEL_SIGNING_KEY` must never be logged, committed to git, or included in error messages; when loading the key, immediately after parsing discard the raw PEM string (`del pem_string`)
+- `STELLARLENSE_MODEL_SIGNING_KEY` must never be logged, committed to git, or included in error messages; when loading the key, immediately after parsing discard the raw PEM string (`del pem_string`)
 - The public key file `config/model_signing_pubkey.pem` must be committed as a read-only file; a CI check should fail if this file is modified in a PR without a matching key rotation ticket
 - `ModelIntegrityError` must cause `ModelInference.__init__()` to raise and the inference service to fail to start — it must never be caught silently; this is a hard security boundary
 - Sidecar `.sig` files must be validated for JSON structure before attempting signature verification; a malformed `.sig` file that causes a JSON parse error should raise `ModelIntegrityError`, not a generic `JSONDecodeError`
@@ -148,13 +148,13 @@ All verified: 4/5. 1 artifact(s) require attention.
   - `ModelInference.__init__()` raises `ModelIntegrityError` when one model file is tampered
   - `cli.py verify-models` prints VALID for all signed artifacts
 - Edge cases:
-  - `LEDGERLENS_MODEL_SIGNING_KEY` not set: `sign_artifact()` raises `ConfigurationError` with clear message
+  - `STELLARLENSE_MODEL_SIGNING_KEY` not set: `sign_artifact()` raises `ConfigurationError` with clear message
   - `config/model_signing_pubkey.pem` absent: `verify_artifact()` raises `ModelIntegrityError` with clear message
   - Model file is empty (0 bytes): signing succeeds; SHA-256 of empty bytes is valid
 
 ## Documentation Requirements
 - Create `detection/model_signing.py` with full module docstring covering the signing protocol and key management workflow
-- Add `LEDGERLENS_MODEL_SIGNING_KEY` to `.env.example` with a comment "# Ed25519 private key PEM (training environment only; never set in production inference environment)"
+- Add `STELLARLENSE_MODEL_SIGNING_KEY` to `.env.example` with a comment "# Ed25519 private key PEM (training environment only; never set in production inference environment)"
 - Add `config/model_signing_pubkey.pem` as a placeholder file with a comment
 - Create `docs/model_signing.md` with key generation instructions, signing workflow, key rotation procedure, and threat model
 

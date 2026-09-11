@@ -100,7 +100,7 @@ def test_effects_count_mismatch_returns_empty_with_warning(caplog):
     import logging
     op = _op(path=[BTC])  # expects 2 effects
     effects = [_effect(XLM, "100", BTC, "0.005")]  # only 1
-    with caplog.at_level(logging.WARNING, logger="ledgerlens.path_payment_loader"):
+    with caplog.at_level(logging.WARNING, logger="stellar_lense.path_payment_loader"):
         trades = PathPaymentDecomposer().decompose(op, effects)
     assert trades == []
     assert any("expected" in r.message for r in caplog.records)
@@ -113,7 +113,7 @@ def test_effects_asset_mismatch_returns_empty_with_warning(caplog):
         _effect(ETH, "100", BTC, "0.005"),  # wrong sold_asset (ETH instead of XLM)
         _effect(BTC, "0.005", USDC, "95"),
     ]
-    with caplog.at_level(logging.WARNING, logger="ledgerlens.path_payment_loader"):
+    with caplog.at_level(logging.WARNING, logger="stellar_lense.path_payment_loader"):
         trades = PathPaymentDecomposer().decompose(op, effects)
     assert trades == []
 
@@ -122,7 +122,7 @@ def test_non_positive_amount_returns_empty(caplog):
     import logging
     op = _op(path=[])
     effects = [_effect(XLM, "0", USDC, "95")]
-    with caplog.at_level(logging.WARNING, logger="ledgerlens.path_payment_loader"):
+    with caplog.at_level(logging.WARNING, logger="stellar_lense.path_payment_loader"):
         trades = PathPaymentDecomposer().decompose(op, effects)
     assert trades == []
 
@@ -131,7 +131,7 @@ def test_amount_exceeds_bound_returns_empty(caplog):
     import logging
     op = _op(path=[])
     effects = [_effect(XLM, "1e16", USDC, "95")]
-    with caplog.at_level(logging.WARNING, logger="ledgerlens.path_payment_loader"):
+    with caplog.at_level(logging.WARNING, logger="stellar_lense.path_payment_loader"):
         trades = PathPaymentDecomposer().decompose(op, effects)
     assert trades == []
 

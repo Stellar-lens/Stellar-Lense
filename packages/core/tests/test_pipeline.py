@@ -65,7 +65,7 @@ def model_dir(tmp_path, monkeypatch):
         sign_model_file(str(path), settings_module.settings.model_signing_key.encode())
 
     object.__setattr__(settings_module.settings, "model_dir", str(model_path))
-    object.__setattr__(settings_module.settings, "db_path", str(tmp_path / "ledgerlens.db"))
+    object.__setattr__(settings_module.settings, "db_path", str(tmp_path / "stellar_lense.db"))
     return str(model_path)
 
 
@@ -113,8 +113,8 @@ def test_submit_batch_called_for_high_risk_scores(model_dir, monkeypatch):
 
     import config.settings as settings_module
 
-    object.__setattr__(settings_module.settings, "ledgerlens_score_contract_id", "CA3CQ7C6YHK6K6C6J6C6K6C6K6C6K6C6K6")
-    object.__setattr__(settings_module.settings, "ledgerlens_service_secret_key", "SAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+    object.__setattr__(settings_module.settings, "stellarlense_score_contract_id", "CA3CQ7C6YHK6K6C6J6C6K6C6K6C6K6C6K6")
+    object.__setattr__(settings_module.settings, "stellarlense_service_secret_key", "SAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
     object.__setattr__(settings_module.settings, "risk_score_threshold", 70)
 
     mock_publisher = MagicMock()
@@ -141,8 +141,8 @@ def test_no_submit_flag_skips_on_chain(model_dir, monkeypatch):
 
     import config.settings as settings_module
 
-    object.__setattr__(settings_module.settings, "ledgerlens_score_contract_id", "CA3CQ7C6YHK6K6C6J6C6K6C6K6C6K6C6K6")
-    object.__setattr__(settings_module.settings, "ledgerlens_service_secret_key", "SAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+    object.__setattr__(settings_module.settings, "stellarlense_score_contract_id", "CA3CQ7C6YHK6K6C6J6C6K6C6K6C6K6C6K6")
+    object.__setattr__(settings_module.settings, "stellarlense_service_secret_key", "SAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
 
     mock_publisher = MagicMock()
     with patch("detection.soroban_publisher.SorobanPublisher", return_value=mock_publisher):
@@ -165,8 +165,8 @@ def test_submit_skipped_when_not_configured(model_dir, monkeypatch):
     monkeypatch.setattr(run_pipeline, "load_path_payments_for_accounts", lambda accounts, since: [])
 
     # Ensure Soroban settings are empty (reset from any earlier test)
-    object.__setattr__(settings_module.settings, "ledgerlens_score_contract_id", "")
-    object.__setattr__(settings_module.settings, "ledgerlens_service_secret_key", "")
+    object.__setattr__(settings_module.settings, "stellarlense_score_contract_id", "")
+    object.__setattr__(settings_module.settings, "stellarlense_service_secret_key", "")
 
     mock_publisher = MagicMock()
     with patch("detection.soroban_publisher.SorobanPublisher", return_value=mock_publisher):

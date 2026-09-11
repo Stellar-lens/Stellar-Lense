@@ -12,7 +12,7 @@ from config.settings import settings as _settings
 @pytest.fixture
 def db_path(tmp_path):
     path = str(tmp_path / "admin_router.db")
-    with patch.object(_settings, "ledgerlens_db_path", path):
+    with patch.object(_settings, "stellarlense_db_path", path):
         yield path
 
 

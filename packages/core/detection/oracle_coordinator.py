@@ -9,7 +9,7 @@ from detection.oracle_node import OracleNode
 if TYPE_CHECKING:
     from detection.soroban_publisher import SorobanPublisher
 
-logger = logging.getLogger("ledgerlens.oracle_coordinator")
+logger = logging.getLogger("stellar_lense.oracle_coordinator")
 
 
 @dataclass

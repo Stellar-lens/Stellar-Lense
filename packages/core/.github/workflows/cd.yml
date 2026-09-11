@@ -143,7 +143,7 @@ jobs:
           context: .
           push: false
           load: true
-          tags: ${{ env.DOCKER_USERNAME }}/ledgerlens:${{ env.DEPLOY_SHA }}
+          tags: ${{ env.DOCKER_USERNAME }}/stellar_lense:${{ env.DEPLOY_SHA }}
 
       - name: Install Trivy
         if: steps.deploy-config.outputs.enabled == 'true'
@@ -162,7 +162,7 @@ jobs:
             --ignorefile .trivyignore.yaml \
             --format table \
             --output "$RUNNER_TEMP/trivy-report.txt" \
-            "${DOCKER_USERNAME}/ledgerlens:${DEPLOY_SHA}"
+            "${DOCKER_USERNAME}/stellar_lense:${DEPLOY_SHA}"
           status=$?
           cat "$RUNNER_TEMP/trivy-report.txt"
           if [ "$status" -ne 0 ]; then
@@ -189,7 +189,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ env.DOCKER_USERNAME }}/ledgerlens:${{ env.DEPLOY_SHA }}
+          tags: ${{ env.DOCKER_USERNAME }}/stellar_lense:${{ env.DEPLOY_SHA }}
 
       - name: Set up Kubeconfig
         if: steps.deploy-config.outputs.enabled == 'true'
@@ -210,14 +210,14 @@ jobs:
           # or dates by Helm's YAML type coercion.
           #
           # deployment.meta.* land in template annotations (see
-          # helm/ledgerlens/templates/_helpers.tpl and the rollout/
+          # helm/stellar_lense/templates/_helpers.tpl and the rollout/
           # deployment templates) specifically so "what commit and image
           # digest is actually running" is answerable via
           # `helm get metadata` / `kubectl get -o jsonpath` after the
           # fact, per Required scope C — not just inferable from CI logs
           # that may have rotated out of retention by the time anyone asks.
-          helm upgrade --install ledgerlens ./helm/ledgerlens \
-            --set image.repository="${DOCKER_USERNAME}/ledgerlens" \
+          helm upgrade --install stellar_lense ./helm/stellar_lense \
+            --set image.repository="${DOCKER_USERNAME}/stellar_lense" \
             --set-string image.tag="${DEPLOY_SHA}" \
             --set-string deployment.meta.commitSha="${DEPLOY_SHA}" \
             --set-string deployment.meta.imageDigest="${IMAGE_DIGEST}" \

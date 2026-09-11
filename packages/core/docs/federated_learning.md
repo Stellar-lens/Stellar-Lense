@@ -1,8 +1,8 @@
-# Federated Learning in LedgerLens
+# Federated Learning in Stellar Lense
 
 ## Overview
 
-LedgerLens supports a privacy-preserving Federated Learning (FL) mode that allows exchange operators (wallets, custodians, DEX aggregators) to improve the global wash-trading detection model using their private labelled datasets **without sharing raw transaction data**.
+Stellar Lense supports a privacy-preserving Federated Learning (FL) mode that allows exchange operators (wallets, custodians, DEX aggregators) to improve the global wash-trading detection model using their private labelled datasets **without sharing raw transaction data**.
 
 ---
 
@@ -64,7 +64,7 @@ below.
 
 ### Why Option B?
 
-LedgerLens trains three heterogeneous tree-ensemble classifiers: `RandomForestClassifier`, `XGBClassifier`, and `LGBMClassifier`.
+Stellar Lense trains three heterogeneous tree-ensemble classifiers: `RandomForestClassifier`, `XGBClassifier`, and `LGBMClassifier`.
 
 **Option A (leaf-value FedAvg)** requires serialising internal tree leaf arrays.  This is feasible for XGBoost and LightGBM (both expose leaf-value APIs) but not for scikit-learn's RandomForest, which would need to be dropped or replaced.  Combining leaf arrays from different model types also requires a shared architecture assumption that doesn't exist here.
 
@@ -332,8 +332,8 @@ does not substitute operator judgement about *who* to admit, only bounds
    python3 cli.py federated admit exchange-xyz --max-n-samples 500000
    # or, against a running server:
    curl -X POST http://server:8001/federated/admit \
-     -H 'Content-Type: application/json' -H 'X-LedgerLens-Admin-Key: <admin key>' \
-     -d '{"participant_id":"exchange-xyz","max_n_samples":500000,"admitted_by":"jane@ledgerlens-ops"}'
+     -H 'Content-Type: application/json' -H 'X-StellarLense-Admin-Key: <admin key>' \
+     -d '{"participant_id":"exchange-xyz","max_n_samples":500000,"admitted_by":"jane@stellar-lense-ops"}'
    ```
    Registration is rejected with 403 until this step has run for
    `exchange-xyz`. Choose `--max-n-samples` conservatively — it is the hard
@@ -371,8 +371,8 @@ does not substitute operator judgement about *who* to admit, only bounds
 
 ```
 POST /federated/admit
-X-LedgerLens-Admin-Key: <LEDGERLENS_ADMIN_API_KEY>
-{"participant_id": "exchange-xyz", "max_n_samples": 500000, "admitted_by": "jane@ledgerlens-ops"}
+X-StellarLense-Admin-Key: <STELLARLENSE_ADMIN_API_KEY>
+{"participant_id": "exchange-xyz", "max_n_samples": 500000, "admitted_by": "jane@stellar-lense-ops"}
 ```
 
 Served by the federated server process itself (`cli.py federated server`),
@@ -385,7 +385,7 @@ not the main `api/main.py` app — this endpoint and `/federated/register` /
 
 ```
 GET /admin/federated/audit-log?limit=50
-Authorization: X-Admin-Key: <LEDGERLENS_ADMIN_API_KEY>
+Authorization: X-Admin-Key: <STELLARLENSE_ADMIN_API_KEY>
 ```
 
 Returns a list of signed audit records. Each record contains:

@@ -1,4 +1,4 @@
-package ledgerlens
+package stellar_lense
 
 import (
 	"context"
@@ -13,10 +13,10 @@ import (
 
 const (
 	defaultTimeout = 30 * time.Second
-	userAgent      = "ledgerlens-go-sdk/0.1.0"
+	userAgent      = "stellar-lense-go-sdk/0.1.0"
 )
 
-// Client is the main LedgerLens API client. Every method accepts a
+// Client is the main Stellar Lense API client. Every method accepts a
 // context.Context so callers can apply timeouts and cancellation.
 //
 // Client must be constructed with NewClient; a zero-value Client is not valid.
@@ -32,7 +32,7 @@ type Client struct {
 // String returns a non-sensitive representation of the client.
 // The API key is redacted.
 func (c *Client) String() string {
-	return fmt.Sprintf("ledgerlens.Client{baseURL: %q, apiKey: [REDACTED]}", c.baseURL)
+	return fmt.Sprintf("stellar_lense.Client{baseURL: %q, apiKey: [REDACTED]}", c.baseURL)
 }
 
 // GoString is the %#v representation. The API key is redacted.
@@ -42,11 +42,11 @@ func (c *Client) GoString() string {
 
 // NewClient constructs a Client targeting baseURL with the given options.
 //
-// baseURL should be the scheme+host only (e.g. "https://api.ledgerlens.io").
+// baseURL should be the scheme+host only (e.g. "https://api.stellar-lense.io").
 // No trailing slash is required; the client normalises it internally.
 //
-//	client := ledgerlens.NewClient("https://api.ledgerlens.io",
-//	    ledgerlens.WithAPIKey(apiKey),
+//	client := stellar_lense.NewClient("https://api.stellar-lense.io",
+//	    stellar_lense.WithAPIKey(apiKey),
 //	)
 func NewClient(baseURL string, opts ...Option) *Client {
 	c := &Client{
@@ -195,7 +195,7 @@ func (c *Client) get(ctx context.Context, path string, params map[string]string,
 func (c *Client) post(ctx context.Context, path string, body interface{}, out interface{}) error {
 	encoded, err := json.Marshal(body)
 	if err != nil {
-		return fmt.Errorf("ledgerlens: marshal request: %w", err)
+		return fmt.Errorf("stellar_lense: marshal request: %w", err)
 	}
 	req, err := c.newRequest(ctx, http.MethodPost, path, strings.NewReader(string(encoded)))
 	if err != nil {
@@ -211,12 +211,12 @@ func (c *Client) newRequest(ctx context.Context, method, path string, body io.Re
 	fullURL := c.baseURL + path
 	req, err := http.NewRequestWithContext(ctx, method, fullURL, body)
 	if err != nil {
-		return nil, fmt.Errorf("ledgerlens: build request: %w", err)
+		return nil, fmt.Errorf("stellar_lense: build request: %w", err)
 	}
 	req.Header.Set("User-Agent", userAgent)
 	req.Header.Set("Accept", "application/json")
 	if c.apiKey != "" {
-		req.Header.Set("X-LedgerLens-Admin-Key", c.apiKey)
+		req.Header.Set("X-StellarLense-Admin-Key", c.apiKey)
 	}
 	return req, nil
 }
@@ -230,14 +230,14 @@ func (c *Client) do(req *http.Request, out interface{}) error {
 	defer resp.Body.Close() //nolint:errcheck
 	rawBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("ledgerlens: read response body: %w", err)
+		return fmt.Errorf("stellar_lense: read response body: %w", err)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return newAPIError(resp, string(rawBody))
 	}
 	if out != nil {
 		if err := json.Unmarshal(rawBody, out); err != nil {
-			return fmt.Errorf("ledgerlens: decode response: %w", err)
+			return fmt.Errorf("stellar_lense: decode response: %w", err)
 		}
 	}
 	return nil

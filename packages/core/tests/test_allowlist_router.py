@@ -18,7 +18,7 @@ WALLET = "GA" + "A" * 54
 @pytest.fixture
 def client(tmp_path):
     path = str(tmp_path / "overrides.db")
-    with patch.object(_settings, "ledgerlens_db_path", path):
+    with patch.object(_settings, "stellarlense_db_path", path):
         from api.allowlist_router import router
         from api.auth import require_admin_key
         from detection.wallet_override_store import init_override_table

@@ -1,4 +1,4 @@
-use ledgerlens_sdk::models::RiskScore;
+use stellar_lense_sdk::models::RiskScore;
 use serde_json::Value;
 
 #[test]

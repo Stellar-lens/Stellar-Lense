@@ -1,9 +1,9 @@
-"""LedgerLens detection pipeline entry point.
+"""StellarLense detection pipeline entry point.
 
 Loads recent trades, computes Benford + ML features per wallet/asset pair,
 scores each with the trained ensemble, and publishes the resulting
-`RiskScore` records to ledgerlens-api (and optionally ledgerlens-contracts).
-See README.md's "LedgerLens Organization" section for how this fits with
+`RiskScore` records to stellar-lense-api (and optionally stellar-lense-contracts).
+See README.md's "StellarLense Organization" section for how this fits with
 the other repos in the org.
 """
 
@@ -59,7 +59,7 @@ from ingestion.operations_loader import (
 from ingestion.path_payment_loader import async_load_path_payments, load_path_payments_for_accounts
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("ledgerlens.pipeline")
+logger = logging.getLogger("stellar_lense.pipeline")
 
 
 def _ingest_solana_trades(stellar_accounts: list[str]) -> pd.DataFrame:
@@ -245,7 +245,7 @@ def run(
 
     from api.metrics import pipeline_run_duration_seconds, wallets_scored_total, scoring_latency_seconds
 
-    tracer = get_tracer("ledgerlens.pipeline")
+    tracer = get_tracer("stellar_lense.pipeline")
     _t_start = time.monotonic()
 
     with tracer.start_as_current_span("pipeline.run") as span:

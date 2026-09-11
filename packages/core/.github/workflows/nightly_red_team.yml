@@ -31,7 +31,7 @@ jobs:
           MLFLOW_ALLOW_FILE_STORE: "true"
           # Saving a trained model HMAC-signs it; the red-team step below
           # needs the same key set to load these models back.
-          LEDGERLENS_MODEL_SIGNING_KEY: "red-team-ci-test-signing-key"
+          STELLARLENSE_MODEL_SIGNING_KEY: "red-team-ci-test-signing-key"
 
       - name: Run red-team campaigns
         id: red_team
@@ -39,7 +39,7 @@ jobs:
         continue-on-error: true
         env:
           # Must match the training step's key to load the models it signed.
-          LEDGERLENS_MODEL_SIGNING_KEY: "red-team-ci-test-signing-key"
+          STELLARLENSE_MODEL_SIGNING_KEY: "red-team-ci-test-signing-key"
 
       - name: Upload campaign report
         uses: actions/upload-artifact@v4

@@ -35,7 +35,7 @@ from freezegun import freeze_time
 def webhook_env(monkeypatch):
     """Provide a valid AES-256-GCM encryption key for every test."""
     key = base64.b64encode(os.urandom(32)).decode()
-    monkeypatch.setenv("LEDGERLENS_WEBHOOK_ENCRYPTION_KEY", key)
+    monkeypatch.setenv("STELLARLENSE_WEBHOOK_ENCRYPTION_KEY", key)
 
 
 @pytest.fixture(autouse=True)
@@ -54,9 +54,9 @@ def db_path(tmp_path):
 
 @pytest.fixture(autouse=True)
 def _fix_settings(monkeypatch, db_path):
-    monkeypatch.setenv("LEDGERLENS_DB_PATH", db_path)
+    monkeypatch.setenv("STELLARLENSE_DB_PATH", db_path)
     import config.settings as s
-    object.__setattr__(s.settings, "ledgerlens_db_path", db_path)
+    object.__setattr__(s.settings, "stellarlense_db_path", db_path)
 
 
 def _sample_payload() -> dict:
@@ -187,7 +187,7 @@ class TestTimestampReplayPrevention:
         assert _verify_timestamp(0, window_seconds=300) is False
 
     def test_deliver_includes_timestamp_header(self, db_path):
-        """_deliver must send X-LedgerLens-Timestamp header."""
+        """_deliver must send X-StellarLense-Timestamp header."""
         from detection.webhook_queue import enqueue, get_due_deliveries
         from detection.webhook_registry import get_subscriber
         from detection.webhook_worker import _deliver
@@ -208,12 +208,12 @@ class TestTimestampReplayPrevention:
 
         asyncio.get_event_loop().run_until_complete(run())
         headers = {k.lower(): v for k, v in captured["headers"].items()}
-        assert "x-ledgerlens-timestamp" in headers
-        ts = int(headers["x-ledgerlens-timestamp"])
+        assert "x-stellarlense-timestamp" in headers
+        ts = int(headers["x-stellarlense-timestamp"])
         assert ts > 0
 
     def test_timestamp_header_is_recent(self, db_path):
-        """X-LedgerLens-Timestamp must be within the last 10 seconds."""
+        """X-StellarLense-Timestamp must be within the last 10 seconds."""
         from detection.webhook_queue import enqueue, get_due_deliveries
         from detection.webhook_registry import get_subscriber
         from detection.webhook_worker import _deliver
@@ -225,7 +225,7 @@ class TestTimestampReplayPrevention:
         captured: dict = {}
 
         async def handler(request):
-            captured["ts"] = int(request.headers.get("x-ledgerlens-timestamp", "0"))
+            captured["ts"] = int(request.headers.get("x-stellarlense-timestamp", "0"))
             return httpx.Response(200)
 
         async def run():
@@ -271,7 +271,7 @@ class TestSecretRotation:
         captured: dict = {}
 
         async def handler(request):
-            captured["sig"] = request.headers.get("x-ledgerlens-signature", "")
+            captured["sig"] = request.headers.get("x-stellarlense-signature", "")
             captured["body"] = request.content
             return httpx.Response(200)
 

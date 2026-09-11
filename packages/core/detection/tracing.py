@@ -1,4 +1,4 @@
-"""Distributed tracing context propagation for LedgerLens.
+"""Distributed tracing context propagation for StellarLense.
 
 Wraps OpenTelemetry SDK with W3C TraceContext (traceparent / tracestate) header
 propagation across all async and HTTP boundaries.  Configures an OTLP exporter
@@ -14,7 +14,7 @@ you need spans.  Use `async_span()` to safely propagate context across
 Environment variables
 ---------------------
 OTEL_EXPORTER_OTLP_ENDPOINT   OTLP gRPC endpoint (default: http://localhost:4317)
-OTEL_SERVICE_NAME              Service name attached to all spans (default: ledgerlens)
+OTEL_SERVICE_NAME              Service name attached to all spans (default: stellar_lense)
 OTEL_TRACES_SAMPLER            Sampler type: always_on | always_off | traceidratio
                                (default: always_on)
 OTEL_PROPAGATORS               Must include tracecontext (default: tracecontext,baggage)
@@ -34,7 +34,7 @@ from typing import Any, AsyncGenerator, Callable, Generator
 
 from config.settings import settings
 
-logger = logging.getLogger("ledgerlens.tracing")
+logger = logging.getLogger("stellar_lense.tracing")
 
 _OTEL_AVAILABLE = False
 try:
@@ -112,7 +112,7 @@ class TailSamplingSpanProcessor(SpanProcessor):
         if keep:
             # Add sampling reason attribute to all spans
             for span in buffered.spans:
-                span.set_attribute("ledgerlens.sampling.reason", reason)
+                span.set_attribute("stellar_lense.sampling.reason", reason)
                 self._wrapped.on_end(span)
 
     def _flush_loop(self):
@@ -203,7 +203,7 @@ def configure_tracing(
     if isinstance(current, TracerProvider):
         return
 
-    svc = service_name or os.getenv("OTEL_SERVICE_NAME", "ledgerlens")
+    svc = service_name or os.getenv("OTEL_SERVICE_NAME", "stellar_lense")
     endpoint = otlp_endpoint or os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317")
 
     resource = Resource.create({SERVICE_NAME: svc})
@@ -240,7 +240,7 @@ def configure_tracing(
     logger.info("OpenTelemetry tracing configured for service '%s' (sampling: %s)", svc, settings.trace_sampling_strategy)
 
 
-def get_tracer(name: str = "ledgerlens") -> Any:
+def get_tracer(name: str = "stellar_lense") -> Any:
     """Return a named OpenTelemetry tracer, or a no-op stub if OTel is unavailable."""
     if not _OTEL_AVAILABLE:
         return _NoOpTracer()
@@ -257,7 +257,7 @@ def _set_span_attributes(span, attributes: dict | None = None) -> None:
 @contextmanager
 def start_span(
     name: str,
-    tracer_name: str = "ledgerlens",
+    tracer_name: str = "stellar_lense",
     attributes: dict | None = None,
 ) -> Generator:
     """Context manager that starts a new span and sets optional attributes.
@@ -276,7 +276,7 @@ def start_span(
 @asynccontextmanager
 async def async_span(
     name: str,
-    tracer_name: str = "ledgerlens",
+    tracer_name: str = "stellar_lense",
     attributes: dict | None = None,
 ) -> AsyncGenerator:
     """Async context manager that starts a span inside an asyncio coroutine.

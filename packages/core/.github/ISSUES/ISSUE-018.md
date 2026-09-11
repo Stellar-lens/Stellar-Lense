@@ -5,10 +5,10 @@ assignees: []
 ---
 
 ## Summary
-`ingestion/bridge_loader.py` ingests bridge transfer events from Allbridge relayer contracts without verifying the cryptographic integrity of those events against the on-chain contract's emitted log data. An adversary who controls a malicious RPC endpoint or a man-in-the-middle position could inject fabricated bridge events that would cause LedgerLens to produce false wash-trading alerts against innocent wallets. Adding HMAC-based integrity verification — matching ingested event data against a trusted relayer contract signature or a locally computed on-chain event log hash — will ensure that only authentic bridge events influence the detection pipeline.
+`ingestion/bridge_loader.py` ingests bridge transfer events from Allbridge relayer contracts without verifying the cryptographic integrity of those events against the on-chain contract's emitted log data. An adversary who controls a malicious RPC endpoint or a man-in-the-middle position could inject fabricated bridge events that would cause Stellar Lense to produce false wash-trading alerts against innocent wallets. Adding HMAC-based integrity verification — matching ingested event data against a trusted relayer contract signature or a locally computed on-chain event log hash — will ensure that only authentic bridge events influence the detection pipeline.
 
 ## Background & Context
-The cross-chain detection feature (see `docs/cross_chain_detection.md`) links Stellar wallets to EVM counterparts via Allbridge bridge events. These events are fetched from EVM chains by `ingestion/evm_loader.py` (raw logs) and decoded by `ingestion/bridge_loader.py` (into `BridgeEvent` records). They then feed six cross-chain ML features that contribute to the `LedgerLens Risk Score`.
+The cross-chain detection feature (see `docs/cross_chain_detection.md`) links Stellar wallets to EVM counterparts via Allbridge bridge events. These events are fetched from EVM chains by `ingestion/evm_loader.py` (raw logs) and decoded by `ingestion/bridge_loader.py` (into `BridgeEvent` records). They then feed six cross-chain ML features that contribute to the `Stellar Lense Risk Score`.
 
 The trust model for EVM event logs is:
 1. **On-chain events are authoritative**: events emitted by the Allbridge contract on Ethereum/Base/Polygon are cryptographically committed to the block via the Merkle Patricia Trie. Any tampering changes the block hash.
@@ -159,7 +159,7 @@ async def _process_event(self, event: BridgeEvent) -> None:
 ## Security Considerations
 - The HMAC/hash approach here is **not** a full Merkle proof — it relies on the `eth_getTransactionReceipt` call going to the same (or a different) trusted provider. For maximum security, operators should configure `EVMProviderPool` (ISSUE-013) with multiple independent providers so a tampering attack would need to compromise all of them simultaneously.
 - `BRIDGE_VERIFY_SAMPLE_RATE=0.0` disables all verification and must emit a `WARNING` log on startup: `"Bridge event verification disabled — cross-chain integrity not guaranteed"`.
-- The canonical hash stored in the database must be computed before writing — not read back from the response — to ensure it reflects what LedgerLens ingested, not what a subsequent attacker might claim.
+- The canonical hash stored in the database must be computed before writing — not read back from the response — to ensure it reflects what Stellar Lense ingested, not what a subsequent attacker might claim.
 - `TamperedEventError` messages must not include the full event `data` field (which can be large and potentially contain sensitive encoded addresses) — include only the transaction hash, log index, and chain ID.
 - Timing: `eth_getTransactionReceipt` calls must have a configurable timeout and must not block the ingestion pipeline indefinitely. Use `asyncio.wait_for` with `BRIDGE_VERIFY_RECEIPT_TIMEOUT_SECONDS`.
 

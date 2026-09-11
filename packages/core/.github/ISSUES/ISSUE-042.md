@@ -6,7 +6,7 @@ assignees: []
 
 ## Summary
 
-Harden `detection/sandwich_engine.py` to significantly reduce false positives from legitimate arbitrage activity. The current engine flags any front-run/back-run order pair around a victim trade without accounting for victim-amount thresholds, price-impact magnitude, or cross-ledger timing precision. This causes legitimate arbitrageurs — who react to genuine price discrepancies, not victims — to be incorrectly scored as sandwich attackers, degrading precision and eroding trust in LedgerLens scores.
+Harden `detection/sandwich_engine.py` to significantly reduce false positives from legitimate arbitrage activity. The current engine flags any front-run/back-run order pair around a victim trade without accounting for victim-amount thresholds, price-impact magnitude, or cross-ledger timing precision. This causes legitimate arbitrageurs — who react to genuine price discrepancies, not victims — to be incorrectly scored as sandwich attackers, degrading precision and eroding trust in Stellar Lense scores.
 
 ## Background & Context
 

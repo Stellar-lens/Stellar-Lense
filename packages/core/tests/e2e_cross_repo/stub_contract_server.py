@@ -1,4 +1,4 @@
-"""Local stub implementation of the ledgerlens-score Soroban contract interface.
+"""Local stub implementation of the stellar-lense-score Soroban contract interface.
 
 FIDELITY TRADE-OFF (per ADR-005 §B):
 =====================================
@@ -18,14 +18,14 @@ provides a lower-fidelity alternative that:
   ❌  Does NOT test gas metering, auth-failed edge cases, or ledger storage.
 
 WHEN TO USE REAL DEPLOYMENT:
-  Set LEDGERLENS_USE_REAL_SOROBAN=true in the workflow environment and ensure
-  LEDGERLENS_CONTRACTS_REPO_PATH points to the contracts repo. The conftest
+  Set STELLARLENSE_USE_REAL_SOROBAN=true in the workflow environment and ensure
+  STELLARLENSE_CONTRACTS_REPO_PATH points to the contracts repo. The conftest
   will then attempt a real quickstart container deployment and fall back to this
   stub only if soroban-cli is unavailable.
 
 STUB SERVER:
   This module starts a FastAPI server in a background thread that mimics the
-  interface ledgerlens-api exposes after forwarding scores to the contract.
+  interface stellar-lense-api exposes after forwarding scores to the contract.
   It provides two JSON endpoints:
 
     POST /api/v1/scores
@@ -105,7 +105,7 @@ def _build_openapi_spec() -> dict:
 
     return {
         "openapi": "3.1.0",
-        "info": {"title": "LedgerLens Stub API", "version": "0.0.0-stub"},
+        "info": {"title": "StellarLense Stub API", "version": "0.0.0-stub"},
         "paths": {
             "/api/v1/scores": {
                 "post": {
@@ -185,9 +185,9 @@ def _build_openapi_spec() -> dict:
 
 def create_stub_app() -> FastAPI:
     app = FastAPI(
-        title="LedgerLens Stub API",
+        title="StellarLense Stub API",
         description=(
-            "Documented stub implementing the ledgerlens-api interface for E2E tests. "
+            "Documented stub implementing the stellar-lense-api interface for E2E tests. "
             "See tests/e2e_cross_repo/stub_contract_server.py for fidelity trade-offs."
         ),
         # Disable FastAPI's auto-generated /openapi.json route: it would otherwise

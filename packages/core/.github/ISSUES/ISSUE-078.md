@@ -5,7 +5,7 @@ assignees: []
 ---
 
 ## Summary
-The LedgerLens REST API lacks machine-readable OpenAPI documentation, forcing integrators to read source code to understand request/response schemas. Auto-generating an OpenAPI 3.1 spec from FastAPI route annotations and Pydantic models, then serving it via Swagger UI and ReDoc, provides a self-documenting API surface that accelerates third-party integration.
+The Stellar Lense REST API lacks machine-readable OpenAPI documentation, forcing integrators to read source code to understand request/response schemas. Auto-generating an OpenAPI 3.1 spec from FastAPI route annotations and Pydantic models, then serving it via Swagger UI and ReDoc, provides a self-documenting API surface that accelerates third-party integration.
 
 ## Background & Context
 FastAPI natively generates OpenAPI specs from route decorators and Pydantic response models. However, the current `api/main.py` has incomplete response model annotations and missing `summary`/`description` fields on many routes, resulting in a sparse auto-generated spec. This issue completes the annotation work and enables the auto-generated spec as the canonical API reference.

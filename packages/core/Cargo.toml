@@ -2,7 +2,7 @@
 members = [
     "contracts/oracle_aggregator",
     "contracts/zk_verifier",
-    "crates/ledgerlens-sdk",
+    "crates/stellar-lense-sdk",
 ]
 resolver = "2"
 

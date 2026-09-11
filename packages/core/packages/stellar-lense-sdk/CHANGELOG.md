@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to `ledgerlens-sdk` are documented in this file.
+All notable changes to `stellar-lense-sdk` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -11,19 +11,19 @@ _No unreleased changes yet._
 
 ## [0.1.0] — 2026-06-24
 
-Initial release of the standalone Python SDK for the LedgerLens wash-trading
+Initial release of the standalone Python SDK for the Stellar Lense wash-trading
 detection API. Depends only on `httpx` and `pydantic`; does **not** require
-the `ledgerlens-core` detection engine.
+the `stellar-lense-core` detection engine.
 
 ### Added
 
-- **`LedgerLensClient`** — synchronous client backed by `httpx.Client`.
-- **`AsyncLedgerLensClient`** — asynchronous client backed by
+- **`StellarLenseClient`** — synchronous client backed by `httpx.Client`.
+- **`AsyncStellarLenseClient`** — asynchronous client backed by
   `httpx.AsyncClient`; safe for use with `asyncio.gather`.
 - **Typed Pydantic v2 response models** for every covered endpoint
   (`RiskScore`, `ScoreExplanation`, `Alert`, `Ring`, `Webhook`,
   `Dispute`, …).
-- **`LedgerLensAPIError`** — raised on every non-2xx HTTP response,
+- **`StellarLenseAPIError`** — raised on every non-2xx HTTP response,
   carrying the parsed `status_code` and `detail` from the API body.
 - **Endpoint coverage** (primary read surface + most common write operations):
   - `health()`
@@ -37,7 +37,7 @@ the `ledgerlens-core` detection engine.
   - `create_dispute(...)`, `get_dispute(dispute_id)`
   - `submit_feedback(...)` (admin-key gated)
 - **`api_key` constructor parameter** — sent as
-  `X-LedgerLens-Admin-Key` on every request; harmless on public
+  `X-StellarLense-Admin-Key` on every request; harmless on public
   endpoints, required for admin-gated ones (`submit_feedback`).
 - **Bring-your-own-client support** — both constructors accept an
   optional pre-configured `httpx.Client` / `httpx.AsyncClient`
@@ -47,7 +47,7 @@ the `ledgerlens-core` detection engine.
   test for the sync client.
 - **`pyproject.toml`** with `[build-system]` (hatchling), `[project]`,
   and `[project.optional-dependencies]` sections; publishable to PyPI
-  as `ledgerlens-sdk` via `python -m build && twine upload dist/*`.
+  as `stellar-lense-sdk` via `python -m build && twine upload dist/*`.
 
-[Unreleased]: https://github.com/Ledger-Lenz/Ledgerlens-core/compare/sdk-v0.1.0...HEAD
-[0.1.0]: https://github.com/Ledger-Lenz/Ledgerlens-core/releases/tag/sdk-v0.1.0
+[Unreleased]: https://github.com/Ledger-Lenz/StellarLense-core/compare/sdk-v0.1.0...HEAD
+[0.1.0]: https://github.com/Stellar-lens/Stellar-Lense/releases/tag/sdk-v0.1.0

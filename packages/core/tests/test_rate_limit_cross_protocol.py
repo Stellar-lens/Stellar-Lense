@@ -40,8 +40,8 @@ def shared_backend(tmp_path, monkeypatch):
     makes the check meaningful: without it, each side would just get its
     own isolated fallback dict and the test would pass for the wrong reason.
     """
-    db_file = str(tmp_path / "ledgerlens.db")
-    monkeypatch.setenv("LEDGERLENS_DB_PATH", db_file)
+    db_file = str(tmp_path / "stellar_lense.db")
+    monkeypatch.setenv("STELLARLENSE_DB_PATH", db_file)
 
     original_db_path = settings.db_path
     original_quota_store = settings.gateway_quota_store
@@ -88,14 +88,14 @@ def test_rest_and_grpc_share_one_quota_no_2x_bypass(grpc_stub, shared_backend):
     # Alternate REST / gRPC calls against the SAME key, well past the limit.
     for i in range(30):
         if i % 2 == 0:
-            resp = client.get(f"/v1/scores/{WALLET}", headers={"X-LedgerLens-Api-Key": api_key})
+            resp = client.get(f"/v1/scores/{WALLET}", headers={"X-StellarLense-Api-Key": api_key})
             if resp.status_code == 429:
                 denied += 1
             else:
                 allowed += 1
         else:
             try:
-                grpc_stub.ScoreWallet(request, metadata=[("x-ledgerlens-api-key", api_key)])
+                grpc_stub.ScoreWallet(request, metadata=[("x-stellarlense-api-key", api_key)])
                 allowed += 1
             except grpc.RpcError as exc:
                 if exc.code() == grpc.StatusCode.RESOURCE_EXHAUSTED:
@@ -122,7 +122,7 @@ def test_rest_alone_hits_the_same_limit_grpc_would_have_shared(shared_backend):
     client = TestClient(app)
 
     allowed = sum(
-        client.get(f"/v1/scores/{WALLET}", headers={"X-LedgerLens-Api-Key": api_key}).status_code != 429
+        client.get(f"/v1/scores/{WALLET}", headers={"X-StellarLense-Api-Key": api_key}).status_code != 429
         for _ in range(15)
     )
     assert allowed == 10

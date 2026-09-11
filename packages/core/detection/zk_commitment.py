@@ -38,7 +38,7 @@ def h_generator() -> tuple[FQ, FQ]:
     """
     global _H
     if _H is None:
-        digest = hashlib.sha256(b"LedgerLens ZK Generator H").digest()
+        digest = hashlib.sha256(b"StellarLense ZK Generator H").digest()
         scalar = int.from_bytes(digest, "big") % curve_order
         _H = multiply(G1, scalar)
     return _H

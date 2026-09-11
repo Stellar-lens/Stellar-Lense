@@ -1,16 +1,16 @@
-"""Unit tests for the synchronous LedgerLensClient, using httpx.MockTransport
+"""Unit tests for the synchronous StellarLenseClient, using httpx.MockTransport
 so no real network or server is needed."""
 
 import httpx
 import pytest
 
-from ledgerlens import LedgerLensAPIError, LedgerLensClient
+from stellar_lense import StellarLenseAPIError, StellarLenseClient
 
 
-def _client(handler) -> LedgerLensClient:
+def _client(handler) -> StellarLenseClient:
     transport = httpx.MockTransport(handler)
     http_client = httpx.Client(base_url="https://test.local", transport=transport)
-    return LedgerLensClient(base_url="https://test.local", client=http_client)
+    return StellarLenseClient(base_url="https://test.local", client=http_client)
 
 
 def test_get_score_parses_response():
@@ -61,12 +61,12 @@ def test_get_score_includes_cross_chain_links():
     assert result.cross_chain_links[0].chain == "ethereum"
 
 
-def test_non_2xx_response_raises_ledgerlens_api_error():
+def test_non_2xx_response_raises_stellar_lense_api_error():
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(404, json={"detail": "No scores found for wallet GABC"})
 
     client = _client(handler)
-    with pytest.raises(LedgerLensAPIError) as exc_info:
+    with pytest.raises(StellarLenseAPIError) as exc_info:
         client.get_score("GABC")
     assert exc_info.value.status_code == 404
     assert "No scores found" in exc_info.value.detail
@@ -77,7 +77,7 @@ def test_non_json_error_body_falls_back_to_raw_text():
         return httpx.Response(500, text="internal server error")
 
     client = _client(handler)
-    with pytest.raises(LedgerLensAPIError) as exc_info:
+    with pytest.raises(StellarLenseAPIError) as exc_info:
         client.get_score("GABC")
     assert exc_info.value.status_code == 500
     assert exc_info.value.detail == "internal server error"
@@ -111,12 +111,12 @@ def test_api_key_sent_as_admin_header_even_with_custom_client():
     captured = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
-        captured["header"] = request.headers.get("x-ledgerlens-admin-key")
+        captured["header"] = request.headers.get("x-stellarlense-admin-key")
         return httpx.Response(200, json={"recorded": 3})
 
     transport = httpx.MockTransport(handler)
     http_client = httpx.Client(base_url="https://test.local", transport=transport)
-    client = LedgerLensClient(base_url="https://test.local", api_key="my-admin-key", client=http_client)
+    client = StellarLenseClient(base_url="https://test.local", api_key="my-admin-key", client=http_client)
     client.submit_feedback("GABC", "XLM/USDC", ground_truth=1, scored_at="2026-01-01T00:00:00Z")
     assert captured["header"] == "my-admin-key"
 

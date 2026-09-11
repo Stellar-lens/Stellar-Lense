@@ -238,9 +238,9 @@ def test_alerts_endpoint_returns_sandwich_alerts(tmp_path, monkeypatch):
     from fastapi.testclient import TestClient
 
     db_path = str(tmp_path / "api.db")
-    monkeypatch.setenv("LEDGERLENS_DB_PATH", db_path)
+    monkeypatch.setenv("STELLARLENSE_DB_PATH", db_path)
     monkeypatch.setenv(
-        "LEDGERLENS_WEBHOOK_ENCRYPTION_KEY", base64.b64encode(os.urandom(32)).decode()
+        "STELLARLENSE_WEBHOOK_ENCRYPTION_KEY", base64.b64encode(os.urandom(32)).decode()
     )
     import config.settings as settings_module
 

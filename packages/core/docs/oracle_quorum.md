@@ -1,6 +1,6 @@
 # Multi-Signature Oracle Quorum
 
-Ledgerlens-core utilizes a 3-of-5 multi-signature oracle quorum to secure on-chain RiskScore submissions, eliminating single points of failure and preventing single-key compromise attacks. For a consolidated system threat model, see the [STRIDE Threat Model](threat_model.md).
+StellarLense-core utilizes a 3-of-5 multi-signature oracle quorum to secure on-chain RiskScore submissions, eliminating single points of failure and preventing single-key compromise attacks. For a consolidated system threat model, see the [STRIDE Threat Model](threat_model.md).
 
 ## Architecture Overview
 
@@ -14,9 +14,9 @@ The `oracle_aggregator` contract:
 2. Verifies each ED25519 signature against the authorized oracle public keys.
 3. Ensures at least `k` valid signatures are present.
 4. Checks timestamps for replay protection.
-5. Forwards the approved score to the main `ledgerlens-score` contract.
+5. Forwards the approved score to the main `stellar-lense-score` contract.
 
-## `ledgerlens-score` ABI Integration
+## `stellar-lense-score` ABI Integration
 
 The aggregator targets the current ten-argument `submit_score` ABI:
 
@@ -28,7 +28,7 @@ submit_score(
 ```
 
 Oracle nodes sign every caller-controlled score field in the
-`LedgerLens-Oracle-v2` canonical message. `asset_pair` is encoded as a Soroban
+`StellarLense-Oracle-v2` canonical message. `asset_pair` is encoded as a Soroban
 `Symbol` XDR value, matching the destination ABI; callers must provide a
 non-empty ASCII alphanumeric/underscore identifier of at most 32 bytes.
 
@@ -39,7 +39,7 @@ caller-controlled authorization data:
 - `attestation_input = None`
 
 Deployment must configure the aggregator contract address as the
-`ledgerlens-score` service address. Before invoking `submit_score`, the
+`stellar-lense-score` service address. Before invoking `submit_score`, the
 aggregator authorizes that exact nested call with
 `authorize_as_current_contract`, so the destination's `require_auth` check is
 preserved. The destination's optional secp256k1 service-pubkey attestation must

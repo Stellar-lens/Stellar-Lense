@@ -1,7 +1,7 @@
 """Migration script to export data from local SQLite to Postgres.
 
 Usage:
-    python scripts/migrate_sqlite_to_postgres.py --sqlite-db data/ledgerlens.db --pg-url postgresql://user:pass@host:5432/ledgerlens
+    python scripts/migrate_sqlite_to_postgres.py --sqlite-db data/stellar_lense.db --pg-url postgresql://user:pass@host:5432/stellar_lense
 """
 
 import argparse

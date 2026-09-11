@@ -1,6 +1,6 @@
-# LedgerLens Backtesting
+# Stellar Lense Backtesting
 
-This directory contains the backtesting framework used to evaluate LedgerLens
+This directory contains the backtesting framework used to evaluate Stellar Lense
 detection models against labelled historical data.
 
 ## Contents
@@ -41,4 +41,4 @@ For deeper documentation on the detection pipeline these backtests exercise, see
 
 - [docs/benford_analysis.md](../docs/benford_analysis.md) — Benford's Law analysis
 - [docs/ensemble_stacking.md](../docs/ensemble_stacking.md) — Ensemble ML scoring
-- [docs/index.md](../docs/index.md) — LedgerLens documentation index
+- [docs/index.md](../docs/index.md) — Stellar Lense documentation index

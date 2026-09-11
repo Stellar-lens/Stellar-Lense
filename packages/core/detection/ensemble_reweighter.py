@@ -27,7 +27,7 @@ import time
 
 from detection.feedback_store import ScoringFeedback
 
-logger = logging.getLogger("ledgerlens.ensemble_reweighter")
+logger = logging.getLogger("stellar_lense.ensemble_reweighter")
 
 _MODEL_NAMES = ("random_forest", "xgboost", "lightgbm")
 _WEIGHTS_FILENAME = "ensemble_weights.json"

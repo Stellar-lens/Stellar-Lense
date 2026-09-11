@@ -12,7 +12,7 @@ from typing import Any
 from config.settings import settings
 from detection.risk_score import RiskScore
 
-logger = logging.getLogger("ledgerlens.event_bus")
+logger = logging.getLogger("stellar_lense.event_bus")
 
 
 @dataclass
@@ -57,7 +57,7 @@ def _serialize_event(score: RiskScore) -> bytes:
         "schema_version": 1,
         "event": "risk_score.updated",
         "produced_at": datetime.now(timezone.utc).isoformat(),
-        "producer": "ledgerlens-core",
+        "producer": "stellar-lense-core",
         "data": payload,
     }
     return json.dumps(envelope).encode("utf-8")
@@ -79,7 +79,7 @@ class NullEventBus(RiskScoreEventBus):
 
 
 class KafkaRiskScoreBus(RiskScoreEventBus):
-    def __init__(self, bootstrap_servers: str, topic: str, sasl_password: str = "", client_id: str = "ledgerlens-core"):
+    def __init__(self, bootstrap_servers: str, topic: str, sasl_password: str = "", client_id: str = "stellar-lense-core"):
         self.topic = topic
         self._last_publish = None
         self._failures = 0
@@ -150,7 +150,7 @@ class KafkaRiskScoreBus(RiskScoreEventBus):
 
 
 class NATSRiskScoreBus(RiskScoreEventBus):
-    def __init__(self, servers: str, subject: str, token: str = "", stream: str = "LEDGERLENS_RISKSCORES"):
+    def __init__(self, servers: str, subject: str, token: str = "", stream: str = "STELLARLENSE_RISKSCORES"):
         self.servers = servers
         self.subject = subject
         self.token = token

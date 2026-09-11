@@ -43,7 +43,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import chi2, norm
 
-logger = logging.getLogger("ledgerlens.benford_engine")
+logger = logging.getLogger("stellar_lense.benford_engine")
 
 DIGITS = list(range(1, 10))
 

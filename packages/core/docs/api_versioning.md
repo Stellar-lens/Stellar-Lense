@@ -1,8 +1,8 @@
-# LedgerLens API Versioning Policy
+# Stellar Lense API Versioning Policy
 
 ## Overview
 
-All LedgerLens API routes are versioned under a `/v1/` path prefix. This allows breaking changes to be introduced in a future `/v2/` without forcing simultaneous migration by all consumers.
+All Stellar Lense API routes are versioned under a `/v1/` path prefix. This allows breaking changes to be introduced in a future `/v2/` without forcing simultaneous migration by all consumers.
 
 ## Current version
 

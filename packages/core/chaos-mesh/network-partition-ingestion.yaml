@@ -1,19 +1,19 @@
 apiVersion: chaos-mesh.org/v1alpha1
 kind: NetworkChaos
 metadata:
-  name: ledgerlens-ingestion-partition
+  name: stellar-lense-ingestion-partition
   namespace: chaos-mesh
 spec:
   action: partition
   mode: all
   selector:
-    namespaces: ["ledgerlens-staging"]
+    namespaces: ["stellar-lense-staging"]
     labelSelectors:
       "app.kubernetes.io/component": api
   direction: to
   target:
     selector:
-      namespaces: ["ledgerlens-staging"]
+      namespaces: ["stellar-lense-staging"]
       labelSelectors:
         "app.kubernetes.io/name": ingestion-worker
     mode: all

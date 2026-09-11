@@ -8,7 +8,7 @@ assignees: []
 `detection/model_training.py` currently trains the Random Forest, XGBoost, and LightGBM classifiers with manually tuned default hyperparameters. Manual tuning is suboptimal and brittle: the best hyperparameters depend on the training data distribution, which shifts as wash-trading strategies evolve. Bayesian hyperparameter optimization with Optuna's TPE sampler automatically finds near-optimal configurations within a 100-trial budget, using temporal cross-validation to prevent data leakage, and logs the best parameters for reproducibility and auditability.
 
 ## Background & Context
-The ensemble models in `detection/model_training.py` are constructed with fixed hyperparameters (e.g., `RandomForestClassifier(n_estimators=100, max_depth=None)`). These defaults are neither optimal for the LedgerLens feature set nor stable across retraining runs triggered by concept drift (see `detection/drift_monitor.py`).
+The ensemble models in `detection/model_training.py` are constructed with fixed hyperparameters (e.g., `RandomForestClassifier(n_estimators=100, max_depth=None)`). These defaults are neither optimal for the Stellar Lense feature set nor stable across retraining runs triggered by concept drift (see `detection/drift_monitor.py`).
 
 Optuna (https://optuna.org) is a hyperparameter optimization framework that uses the Tree-structured Parzen Estimator (TPE) algorithm — a Bayesian method that models the probability of trial configurations being good, rather than sampling randomly. TPE significantly outperforms random search and grid search for budgets of 50–200 trials.
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Small client proof of concept for the LedgerLens gRPC scoring service.
+"""Small client proof of concept for the StellarLense gRPC scoring service.
 
 This intentionally uses the generated protobuf bindings directly. Production
 SDKs should wrap the same generated client with language-specific error,
@@ -42,7 +42,7 @@ def score_wallets(
     timeout: float,
 ) -> tuple[list[scoring_pb2.RiskScoreProto], list[scoring_pb2.RiskScoreProto]]:
     """Call both RPCs and return the unary and streaming responses."""
-    metadata = (("x-ledgerlens-api-key", api_key),)
+    metadata = (("x-stellarlense-api-key", api_key),)
     unary_responses = [
         stub.ScoreWallet(scoring_pb2.ScoreRequest(wallet=wallet), metadata=metadata, timeout=timeout)
         for wallet in wallets
@@ -86,7 +86,7 @@ def main() -> int:
     parser.add_argument(
         "--api-key",
         default=None,
-        help="API key; defaults to LEDGERLENS_API_KEY",
+        help="API key; defaults to STELLARLENSE_API_KEY",
     )
     parser.add_argument("--timeout", type=float, default=10.0, help="Per-RPC deadline in seconds")
     parser.add_argument(
@@ -99,9 +99,9 @@ def main() -> int:
 
     import os
 
-    api_key = args.api_key or os.environ.get("LEDGERLENS_API_KEY")
+    api_key = args.api_key or os.environ.get("STELLARLENSE_API_KEY")
     if not api_key:
-        parser.error("--api-key or LEDGERLENS_API_KEY is required")
+        parser.error("--api-key or STELLARLENSE_API_KEY is required")
 
     if args.insecure and args.ca_cert:
         parser.error("--ca-cert cannot be combined with --insecure")

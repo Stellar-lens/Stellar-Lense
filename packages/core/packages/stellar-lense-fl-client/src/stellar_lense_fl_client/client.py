@@ -1,4 +1,4 @@
-"""Federated Learning client for LedgerLens exchange partners.
+"""Federated Learning client for StellarLense exchange partners.
 
 Provides a clean API for exchange operators to participate in federated
 learning rounds without sharing raw trade data. Only gradient updates
@@ -6,7 +6,7 @@ learning rounds without sharing raw trade data. Only gradient updates
 
 Example
 -------
-    from ledgerlens_fl_client import FLClient, DataAdapter
+    from stellar_lense_fl_client import FLClient, DataAdapter
     import pandas as pd
 
     class MyExchangeAdapter(DataAdapter):
@@ -16,7 +16,7 @@ Example
             yield df
 
     client = FLClient(
-        server_url="https://fl.ledgerlens.io",
+        server_url="https://fl.stellar-lense.io",
         api_key="your-api-key",
         data_adapter=MyExchangeAdapter(),
         operator_id="exchange-xyz",
@@ -55,7 +55,7 @@ logger = logging.getLogger(__name__)
 class FLClient:
     """Federated learning client for exchange-side participation.
     
-    This client enables exchange operators to contribute to the LedgerLens
+    This client enables exchange operators to contribute to the StellarLense
     federated learning network without exposing raw trade data. Only soft
     labels on a shared public dataset are transmitted.
     
@@ -89,7 +89,7 @@ class FLClient:
     Example
     -------
         client = FLClient(
-            server_url="https://fl.ledgerlens.io",
+            server_url="https://fl.stellar-lense.io",
             api_key="...",
             data_adapter=my_adapter,
             operator_id="exchange-xyz",

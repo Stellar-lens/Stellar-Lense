@@ -2,7 +2,7 @@
 
 Asserts that:
   - Each generator produces statistically correct output (unit tests).
-  - The default LedgerLens detection pipeline achieves ≥ minimum recall
+  - The default StellarLense detection pipeline achieves ≥ minimum recall
     thresholds on each evasion strategy (integration tests).
   - AdversarialDataset.build() produces complete, finite feature DataFrames.
 

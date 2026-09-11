@@ -1,8 +1,8 @@
-# @ledgerlens/sdk
+# @stellar-lense/sdk
 
-TypeScript SDK for the [LedgerLens](https://github.com/Ledger-Lenz/Ledgerlens-core) fraud-detection API.
+TypeScript SDK for the [Stellar Lense](https://github.com/Stellar-lens/Stellar-Lense) fraud-detection API.
 
-Covers the same REST surface as the [Go SDK](../go/README.md), the [Python SDK](../packages/ledgerlens-sdk/README.md), and the [Rust SDK](../crates/ledgerlens-sdk/README.md), with full TypeScript inference and Zod runtime response validation.
+Covers the same REST surface as the [Go SDK](../go/README.md), the [Python SDK](../packages/stellar-lense-sdk/README.md), and the [Rust SDK](../crates/stellar-lense-sdk/README.md), with full TypeScript inference and Zod runtime response validation.
 
 - **Full TypeScript types** — every response field is statically inferred; no `any` casts required.
 - **Zod runtime validation** — responses are validated on arrival; unknown fields are silently stripped so future API additions never break existing consumers.
@@ -13,11 +13,11 @@ Covers the same REST surface as the [Go SDK](../go/README.md), the [Python SDK](
 ## Installation
 
 ```bash
-npm install @ledgerlens/sdk
+npm install @stellar-lense/sdk
 # or
-yarn add @ledgerlens/sdk
+yarn add @stellar-lense/sdk
 # or
-pnpm add @ledgerlens/sdk
+pnpm add @stellar-lense/sdk
 ```
 
 Requires Node.js ≥ 18 (for native `fetch`). Works in any modern browser without bundler configuration.
@@ -25,10 +25,10 @@ Requires Node.js ≥ 18 (for native `fetch`). Works in any modern browser withou
 ## Quick Start
 
 ```ts
-import { LedgerLensClient } from "@ledgerlens/sdk";
+import { StellarLenseClient } from "@stellar-lense/sdk";
 
-const client = new LedgerLensClient({
-  baseUrl: "http://localhost:8000", // your LedgerLens API instance
+const client = new StellarLenseClient({
+  baseUrl: "http://localhost:8000", // your Stellar Lense API instance
 });
 
 // Check API health
@@ -53,10 +53,10 @@ if (score.score >= 70) {
 Admin and compliance endpoints require API keys passed as HTTP headers. Supply them at construction time:
 
 ```ts
-const client = new LedgerLensClient({
-  baseUrl: "https://api.ledgerlens.io",
-  adminKey: process.env.LEDGERLENS_ADMIN_KEY,       // X-LedgerLens-Admin-Key
-  complianceKey: process.env.LEDGERLENS_COMPLIANCE_KEY, // X-LedgerLens-Compliance-Key
+const client = new StellarLenseClient({
+  baseUrl: "https://api.stellar-lense.io",
+  adminKey: process.env.STELLARLENSE_ADMIN_KEY,       // X-StellarLense-Admin-Key
+  complianceKey: process.env.STELLARLENSE_COMPLIANCE_KEY, // X-StellarLense-Compliance-Key
 });
 ```
 
@@ -64,13 +64,13 @@ Standard user endpoints (scores, alerts, rings) do not require a key unless your
 
 ## API Reference
 
-### `new LedgerLensClient(options?)`
+### `new StellarLenseClient(options?)`
 
 | Option          | Type          | Default                    | Description                                     |
 |-----------------|---------------|----------------------------|-------------------------------------------------|
-| `baseUrl`       | `string`      | `"http://localhost:8000"`  | Base URL of your LedgerLens API instance        |
-| `adminKey`      | `string`      | —                          | Admin API key (`X-LedgerLens-Admin-Key` header) |
-| `complianceKey` | `string`      | —                          | Compliance key (`X-LedgerLens-Compliance-Key`)  |
+| `baseUrl`       | `string`      | `"http://localhost:8000"`  | Base URL of your Stellar Lense API instance        |
+| `adminKey`      | `string`      | —                          | Admin API key (`X-StellarLense-Admin-Key` header) |
+| `complianceKey` | `string`      | —                          | Compliance key (`X-StellarLense-Compliance-Key`)  |
 | `timeout`       | `number`      | `30000`                    | Request timeout in milliseconds                 |
 | `fetchInit`     | `RequestInit` | —                          | Extra options merged into every `fetch` call    |
 
@@ -172,15 +172,15 @@ Both require `adminKey` to be set.
 
 ## Error Handling
 
-All methods throw `LedgerLensError` on non-2xx responses or Zod validation failures:
+All methods throw `StellarLenseError` on non-2xx responses or Zod validation failures:
 
 ```ts
-import { LedgerLensClient, LedgerLensError } from "@ledgerlens/sdk";
+import { StellarLenseClient, StellarLenseError } from "@stellar-lense/sdk";
 
 try {
   const score = await client.getScore("G...");
 } catch (err) {
-  if (err instanceof LedgerLensError) {
+  if (err instanceof StellarLenseError) {
     console.error("API error:", err.message);      // human-readable detail from the API
     console.error("HTTP status:", err.statusCode); // e.g. 404, 401, 503
     console.error("Zod issues:", err.zodIssues);   // set when response validation fails
@@ -195,7 +195,7 @@ Network failures (DNS, connection refused, `AbortError`) propagate as standard `
 All Zod schemas are exported for consumers who want to validate API data independently:
 
 ```ts
-import { RiskScoreSchema, AlertSchema } from "@ledgerlens/sdk";
+import { RiskScoreSchema, AlertSchema } from "@stellar-lense/sdk";
 
 // Parse data from a webhook payload, a cache, etc.
 const score = RiskScoreSchema.parse(rawData);
@@ -237,7 +237,7 @@ The build emits three artefacts under `dist/`:
 sdk/
 ├── src/
 │   ├── index.ts       — public re-exports (client + all schemas + types)
-│   ├── client.ts      — LedgerLensClient, LedgerLensError, LedgerLensClientOptions
+│   ├── client.ts      — StellarLenseClient, StellarLenseError, StellarLenseClientOptions
 │   └── schemas.ts     — Zod schemas and inferred TypeScript types for every API response
 ├── tests/
 │   └── client.test.ts — Vitest unit tests (fetch-mocked, no network required)
@@ -250,12 +250,12 @@ sdk/
 
 ## Further Reading
 
-- [LedgerLens API reference](../docs/api_reference.md)
+- [Stellar Lense API reference](../docs/api_reference.md)
 - [OpenAPI spec](../docs/openapi.json)
 - [Webhook security model](../docs/webhook_security_model.md) — HMAC verification for webhook deliveries
 - [Go SDK](../go/README.md) — idiomatic Go client covering the same API surface
-- [Python SDK](../packages/ledgerlens-sdk/README.md) — Python client
-- [Rust SDK](../crates/ledgerlens-sdk/README.md) — Rust client
+- [Python SDK](../packages/stellar-lense-sdk/README.md) — Python client
+- [Rust SDK](../crates/stellar-lense-sdk/README.md) — Rust client
 
 ## License
 

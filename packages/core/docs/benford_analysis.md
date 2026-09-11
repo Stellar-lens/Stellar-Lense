@@ -1,12 +1,12 @@
-# Benford's Law Analysis in LedgerLens
+# Benford's Law Analysis in Stellar Lense
 
-This document describes how LedgerLens applies Benford's Law to detect wash-trading on the Stellar DEX, with a focus on p-value estimation and the small-sample bootstrap method introduced in the Unreleased version.
+This document describes how Stellar Lense applies Benford's Law to detect wash-trading on the Stellar DEX, with a focus on p-value estimation and the small-sample bootstrap method introduced in the Unreleased version.
 
 ---
 
 ## Overview
 
-LedgerLens computes three Benford metrics for each wallet/asset-pair window:
+Stellar Lense computes three Benford metrics for each wallet/asset-pair window:
 
 | Metric | Description |
 |---|---|
@@ -39,7 +39,7 @@ Many SDEX wallets have **fewer than 100 transactions** in any given short-durati
 
 ### Monte Carlo Bootstrap Method
 
-For windows with `N < BENFORD_BOOTSTRAP_THRESHOLD` (default: **100**), LedgerLens replaces the asymptotic p-value with a **Monte Carlo bootstrap p-value**:
+For windows with `N < BENFORD_BOOTSTRAP_THRESHOLD` (default: **100**), Stellar Lense replaces the asymptotic p-value with a **Monte Carlo bootstrap p-value**:
 
 1. Compute the observed chi-square statistic `T_obs` from the wallet's digit counts.
 2. Generate `B = 10,000` synthetic digit samples of size `N` by drawing from a multinomial distribution parameterised by the theoretical Benford probabilities.
@@ -107,7 +107,7 @@ The method used is recorded in the `pvalue_method` field of `compute_benford_met
 | `BENFORD_BOOTSTRAP_THRESHOLD` | `100` | N below which bootstrap is used |
 | `BENFORD_BOOTSTRAP_SAMPLES` | `10000` | Number of bootstrap replicates |
 
-Override via `.env` or shell environment. CLI overrides are also available via `ledgerlens score --bootstrap-threshold N --bootstrap-samples B`.
+Override via `.env` or shell environment. CLI overrides are also available via `stellar_lense score --bootstrap-threshold N --bootstrap-samples B`.
 
 ---
 

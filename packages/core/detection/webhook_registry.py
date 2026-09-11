@@ -1,7 +1,7 @@
 """Subscriber registry for webhook alerts — SQLite-backed with AES-256-GCM at-rest encryption.
 
 Secrets are never hashed (HMAC signing requires the plaintext at delivery time).
-Encryption key loaded from ``LEDGERLENS_WEBHOOK_ENCRYPTION_KEY`` (32-byte base64).
+Encryption key loaded from ``STELLARLENSE_WEBHOOK_ENCRYPTION_KEY`` (32-byte base64).
 SSRF protection: only ``https://`` URLs, no private IPs, no localhost.
 """
 
@@ -22,7 +22,7 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from config.settings import settings
 from detection.risk_score import RiskScore
 
-logger = logging.getLogger("ledgerlens.webhook.registry")
+logger = logging.getLogger("stellar_lense.webhook.registry")
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS webhook_subscribers (
@@ -65,10 +65,10 @@ class Subscriber:
 # ---------------------------------------------------------------------------
 
 def _get_encryption_key() -> bytes:
-    key_b64 = os.environ.get("LEDGERLENS_WEBHOOK_ENCRYPTION_KEY")
+    key_b64 = os.environ.get("STELLARLENSE_WEBHOOK_ENCRYPTION_KEY")
     if not key_b64:
         raise RuntimeError(
-            "LEDGERLENS_WEBHOOK_ENCRYPTION_KEY environment variable not set. "
+            "STELLARLENSE_WEBHOOK_ENCRYPTION_KEY environment variable not set. "
             "Generate one with: python -c \"import base64, os; "
             "print(base64.b64encode(os.urandom(32)).decode())\""
         )
@@ -91,7 +91,7 @@ def _decrypt_with_key(encrypted: str, key: bytes) -> str:
 
 
 def _decrypt_secret(encrypted: str) -> str:
-    for key_env in ("LEDGERLENS_WEBHOOK_ENCRYPTION_KEY", "LEDGERLENS_WEBHOOK_ENCRYPTION_KEY_PREVIOUS"):
+    for key_env in ("STELLARLENSE_WEBHOOK_ENCRYPTION_KEY", "STELLARLENSE_WEBHOOK_ENCRYPTION_KEY_PREVIOUS"):
         key_b64 = os.environ.get(key_env)
         if not key_b64:
             continue

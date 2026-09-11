@@ -5,12 +5,12 @@ in `alembic/versions/` and reads its configuration from `alembic.ini`.
 
 ## Select the development database
 
-`alembic/env.py` builds a SQLite URL from `LEDGERLENS_DB_PATH` when
+`alembic/env.py` builds a SQLite URL from `STELLARLENSE_DB_PATH` when
 `sqlalchemy.url` in `alembic.ini` is blank. The default is
-`./ledgerlens.db`. Use a disposable development path when testing migrations:
+`./stellar_lense.db`. Use a disposable development path when testing migrations:
 
 ```bash
-export LEDGERLENS_DB_PATH=/tmp/ledgerlens-dev.db
+export STELLARLENSE_DB_PATH=/tmp/stellar-lense-dev.db
 ```
 
 An explicit non-empty `sqlalchemy.url` in `alembic.ini` takes precedence over

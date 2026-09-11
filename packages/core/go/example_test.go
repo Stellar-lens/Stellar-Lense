@@ -1,4 +1,4 @@
-package ledgerlens_test
+package stellar_lense_test
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	ledgerlens "github.com/Ledger-Lenz/Ledgerlens-core/go"
+	stellar_lense "github.com/Stellar-lens/Stellar-Lense/go"
 )
 
 // scoresResponse is a canned GET /scores/{wallet} body used by the examples so
@@ -31,10 +31,10 @@ const scoresResponse = `{
 // Example shows the basic usage of the Go SDK: construct a client with an API
 // key and fetch the risk scores for a wallet.
 //
-// In real code, pass the production base URL ("https://api.ledgerlens.io")
+// In real code, pass the production base URL ("https://api.stellar-lense.io")
 // instead of the local test server used here.
 func Example() {
-	// Stand-in for the LedgerLens API. A real program would not need this.
+	// Stand-in for the Stellar Lense API. A real program would not need this.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		if _, err := io.WriteString(w, scoresResponse); err != nil {
@@ -43,9 +43,9 @@ func Example() {
 	}))
 	defer srv.Close()
 
-	client := ledgerlens.NewClient(
-		srv.URL, // use "https://api.ledgerlens.io" in production
-		ledgerlens.WithAPIKey("your-api-key"),
+	client := stellar_lense.NewClient(
+		srv.URL, // use "https://api.stellar-lense.io" in production
+		stellar_lense.WithAPIKey("your-api-key"),
 	)
 
 	resp, err := client.GetScore(context.Background(), "GABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF12345")
@@ -72,7 +72,7 @@ func Example_withdrawalGating() {
 	}))
 	defer srv.Close()
 
-	client := ledgerlens.NewClient(srv.URL, ledgerlens.WithAPIKey("your-api-key"))
+	client := stellar_lense.NewClient(srv.URL, stellar_lense.WithAPIKey("your-api-key"))
 
 	allowed := true
 	resp, err := client.GetScore(context.Background(), "GABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF12345")

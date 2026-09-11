@@ -1,4 +1,4 @@
-package ledgerlens
+package stellar_lense
 
 import (
 	"crypto/hmac"
@@ -18,7 +18,7 @@ const DefaultWebhookMaxAge = 5 * time.Minute
 // signature matches the expected digest of body using secret.
 //
 // The signature parameter must have the form "sha256=<hex-digest>", which is
-// the exact format sent in the X-LedgerLens-Signature header.
+// the exact format sent in the X-StellarLense-Signature header.
 //
 // SECURITY: comparison is performed with hmac.Equal (constant-time). Never
 // compare webhook signatures with == or bytes.Equal — those operations are

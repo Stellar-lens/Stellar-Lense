@@ -21,16 +21,16 @@ import pytest
 # Registry isolation helpers
 # ---------------------------------------------------------------------------
 # prometheus_client uses a global REGISTRY singleton. We unregister all
-# LedgerLens collectors between tests to avoid "duplicate metric" errors.
+# StellarLense collectors between tests to avoid "duplicate metric" errors.
 
 
-def _unregister_ledgerlens_metrics():
-    """Remove all previously registered LedgerLens collectors from the default registry."""
+def _unregister_stellar_lense_metrics():
+    """Remove all previously registered StellarLense collectors from the default registry."""
     try:
         from prometheus_client import REGISTRY
         collectors_to_remove = [
             c for c in list(REGISTRY._names_to_collectors.values())
-            if hasattr(c, "_name") and c._name.startswith("ledgerlens_")
+            if hasattr(c, "_name") and c._name.startswith("stellar_lense_")
         ]
         seen = set()
         for c in collectors_to_remove:
@@ -75,12 +75,12 @@ def isolate_registry():
     """Clear the IngestionMetricsCollector singleton and unregister metrics before each test."""
     from ingestion.metrics import IngestionMetricsCollector
     IngestionMetricsCollector.reset_for_testing()
-    _unregister_ledgerlens_metrics()
+    _unregister_stellar_lense_metrics()
     _resync_cached_metrics_refs()
     yield
     from ingestion.metrics import IngestionMetricsCollector
     IngestionMetricsCollector.reset_for_testing()
-    _unregister_ledgerlens_metrics()
+    _unregister_stellar_lense_metrics()
 
 
 # ---------------------------------------------------------------------------
@@ -171,7 +171,7 @@ class TestIngestionMetricsCollectorSingleton:
         from ingestion.metrics import IngestionMetricsCollector
         a = IngestionMetricsCollector.instance()
         IngestionMetricsCollector.reset_for_testing()
-        _unregister_ledgerlens_metrics()
+        _unregister_stellar_lense_metrics()
         b = IngestionMetricsCollector.instance()
         assert a is not b
 
@@ -574,8 +574,8 @@ class TestMetricsEndpoint:
                 # Prometheus text format: metric_name{labels} value [timestamp]
                 assert " " in line, f"Unexpected line format: {line!r}"
 
-    def test_metrics_contains_ledgerlens_prefix(self, api_client):
-        """Response contains at least one ledgerlens_ metric name."""
+    def test_metrics_contains_stellar_lense_prefix(self, api_client):
+        """Response contains at least one stellar_lense_ metric name."""
         # First ensure the collector has been initialised by triggering an increment
         from ingestion.metrics import get_metrics
         m = get_metrics()
@@ -583,7 +583,7 @@ class TestMetricsEndpoint:
 
         resp = api_client.get("/metrics")
         if resp.status_code == 200:
-            assert "ledgerlens_" in resp.text
+            assert "stellar_lense_" in resp.text
 
     def test_metrics_before_any_events_valid(self, api_client):
         """GET /metrics before any events processed returns valid format (counters at 0)."""
@@ -634,7 +634,7 @@ class TestStreamerMetricsIntegration:
         # Read the counter value from prometheus
         from prometheus_client import REGISTRY
         samples = {s.name: s.value for m in REGISTRY.collect()
-                   for s in m.samples if "ledgerlens_ingestion_events_queued_total" in s.name}
+                   for s in m.samples if "stellar_lense_ingestion_events_queued_total" in s.name}
 
         total_queued = sum(v for k, v in samples.items())
         assert total_queued >= 100
@@ -664,7 +664,7 @@ class TestConcurrentMetricUpdates:
         from prometheus_client import REGISTRY
         samples = {s.name: s.value for m in REGISTRY.collect()
                    for s in m.samples
-                   if s.name == "ledgerlens_ingestion_events_received_total"
+                   if s.name == "stellar_lense_ingestion_events_received_total"
                    and s.labels.get("source") == "horizon_sse"}
         total = sum(samples.values())
         assert total == 1000

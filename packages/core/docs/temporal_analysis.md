@@ -2,7 +2,7 @@
 
 ## Motivation: Aggregate Features Miss Temporal Structure
 
-LedgerLens feature extraction collapses trade sequences into 24-hour aggregate
+Stellar Lense feature extraction collapses trade sequences into 24-hour aggregate
 statistics. Three attack patterns are invisible to this approach:
 
 ### 1. Metronomic Periodicity
@@ -94,7 +94,7 @@ fits on low-activity wallets are unreliable and can produce false positives.
 python scripts/train_lstm_autoencoder.py \
   --epochs 100 \
   --lr 0.001 \
-  --db-path ledgerlens.db \
+  --db-path stellar_lense.db \
   --model-dir models \
   --hidden-dim 64 \
   --num-layers 2 \

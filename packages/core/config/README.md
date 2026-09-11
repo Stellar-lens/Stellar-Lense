@@ -1,6 +1,6 @@
 # config/
 
-This directory holds all runtime configuration for LedgerLens: environment
+This directory holds all runtime configuration for Stellar Lense: environment
 variable schemas, structured logging, distributed tracing, request correlation,
 and cost-metric export. Every file in this directory is loaded at process
 startup; nothing here is optional or lazy-loaded.
@@ -27,13 +27,13 @@ with a human-readable error listing every problem at once.
 ```python
 from config.settings import settings
 
-db_path = settings.ledgerlens_db_path
+db_path = settings.stellarlense_db_path
 ```
 
 **Key design decisions:**
 
 - `populate_by_name=True` — both the Python attribute name and the
-  `LEDGERLENS_*` env var name are accepted (Pydantic v2 migration).
+  `STELLARLENSE_*` env var name are accepted (Pydantic v2 migration).
 - `strict=False` globally — Horizon returns datetimes and numeric values as
   JSON strings, so those fields must remain coercible.
 - Numeric `mode="before"` validators reject booleans, non-finite floats, and
@@ -53,7 +53,7 @@ Call `configure_logging()` once at process startup:
 
 ```python
 from config.logging_config import configure_logging
-configure_logging(service_name="ledgerlens", log_level="INFO")
+configure_logging(service_name="stellar_lense", log_level="INFO")
 ```
 
 Every log record is emitted as valid JSON with at least these fields:
@@ -73,7 +73,7 @@ Initialises the [OpenTelemetry](https://opentelemetry.io/) SDK. Call
 
 ```python
 from config.telemetry import init_telemetry, shutdown_telemetry
-init_telemetry(service_name="ledgerlens")
+init_telemetry(service_name="stellar_lense")
 # ... run the application ...
 shutdown_telemetry()   # flush pending spans on graceful shutdown
 ```
@@ -103,7 +103,7 @@ Provides two utilities:
 
 2. **`mask_wallet(addr)`** — truncates a 56-character Stellar wallet address
    to `GABC1234...WXYZ` format for safe inclusion in log output. All log
-   formatters in LedgerLens call this before logging wallet addresses.
+   formatters in Stellar Lense call this before logging wallet addresses.
 
 ```python
 from config.correlation import mask_wallet, get_correlation_id
@@ -121,9 +121,9 @@ Registers three Prometheus gauges for cost coefficients read from `settings`:
 
 | Gauge | Description |
 |-------|-------------|
-| `ledgerlens_cost_per_vcpu_hour_usd` | Cost per vCPU-hour |
-| `ledgerlens_cost_per_gb_memory_hour_usd` | Cost per GB memory-hour |
-| `ledgerlens_cost_per_gb_storage_month_usd` | Cost per GB storage per month |
+| `stellar_lense_cost_per_vcpu_hour_usd` | Cost per vCPU-hour |
+| `stellar_lense_cost_per_gb_memory_hour_usd` | Cost per GB memory-hour |
+| `stellar_lense_cost_per_gb_storage_month_usd` | Cost per GB storage per month |
 
 The gauges are set once at startup and remain static until the process
 restarts. Call `init_cost_metrics()` in the application startup hook:

@@ -1,4 +1,4 @@
-"""Asynchronous LedgerLens API client, for concurrent integrations (e.g.
+"""Asynchronous StellarLense API client, for concurrent integrations (e.g.
 scoring many wallets in parallel with `asyncio.gather`)."""
 
 from __future__ import annotations
@@ -20,16 +20,16 @@ from .models import (
 )
 
 
-class AsyncLedgerLensClient:
-    """Asynchronous client for the LedgerLens REST API.
+class AsyncStellarLenseClient:
+    """Asynchronous client for the StellarLense REST API.
 
     Example
     -------
         import asyncio
-        from ledgerlens import AsyncLedgerLensClient
+        from stellar_lense import AsyncStellarLenseClient
 
         async def main():
-            async with AsyncLedgerLensClient(base_url="https://api.ledgerlens.io") as client:
+            async with AsyncStellarLenseClient(base_url="https://api.stellar-lense.io") as client:
                 results = await asyncio.gather(*(client.get_score(w) for w in wallets))
 
         asyncio.run(main())
@@ -52,7 +52,7 @@ class AsyncLedgerLensClient:
     async def aclose(self) -> None:
         await self._client.aclose()
 
-    async def __aenter__(self) -> AsyncLedgerLensClient:
+    async def __aenter__(self) -> AsyncStellarLenseClient:
         return self
 
     async def __aexit__(self, *exc_info: object) -> None:

@@ -36,7 +36,7 @@ from detection.storage import (
 
 @pytest.fixture
 def db_path(tmp_path):
-    return str(tmp_path / "ledgerlens.db")
+    return str(tmp_path / "stellar_lense.db")
 
 
 def _score(wallet="GABC", asset_pair="XLM/USDC", score=80, timestamp=None) -> RiskScore:
@@ -180,7 +180,7 @@ def test_get_latest_scores_applies_limit_offset_in_sql(tmp_path, monkeypatch):
     """Paging (LIMIT / OFFSET) is performed in SQL, not by loading all rows in Python."""
     import detection.storage as storage_module
 
-    db_path = str(tmp_path / "ledgerlens.db")
+    db_path = str(tmp_path / "stellar_lense.db")
 
     cm, conn = _fake_connect_factory()
     monkeypatch.setattr(storage_module, "_connect", cm)

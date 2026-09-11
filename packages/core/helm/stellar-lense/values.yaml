@@ -7,12 +7,12 @@ replicaCount: 2
 # Container image used by templates/api-deployment.yaml,
 # templates/api-rollout.yaml and templates/ingestion-worker-deployment.yaml.
 image:
-  repository: ledgerlens/core
+  repository: stellar-lense/core
   tag: latest
   pullPolicy: IfNotPresent
 
 # Overrides for the release name used to derive resource names
-# (see the ledgerlens.fullname helper in templates/_helpers.tpl).
+# (see the stellar-lense.fullname helper in templates/_helpers.tpl).
 nameOverride: ""
 fullnameOverride: ""
 
@@ -21,12 +21,12 @@ fullnameOverride: ""
 # the real commit SHA, pushed image digest, deploy timestamp, and the CD
 # workflow run ID — rendered as annotations on the Deployment/Rollout and
 # their pod template (see templates/_helpers.tpl's
-# `ledgerlens.deploymentMetaAnnotations`). Left as "unknown" here so a
+# `stellar-lense.deploymentMetaAnnotations`). Left as "unknown" here so a
 # `helm install`/`helm template` run outside the CD pipeline still produces
 # a valid, inspectable (if honestly unpopulated) annotation block rather
 # than omitting it — query with:
-#   helm get metadata ledgerlens
-#   kubectl get deployment ledgerlens-api -o jsonpath='{.metadata.annotations}'
+#   helm get metadata stellar-lense
+#   kubectl get deployment stellar-lense-api -o jsonpath='{.metadata.annotations}'
 deployment:
   meta:
     commitSha: "unknown"
@@ -50,7 +50,7 @@ ingress:
   className: ""
   annotations: {}
   hosts:
-    - host: ledgerlens.local
+    - host: stellar-lense.local
       paths:
         - path: /
           pathType: Prefix
@@ -188,7 +188,7 @@ config:
   # Model artifacts
   MODEL_DIR: "/data/models"
   # Database
-  LEDGERLENS_DB_PATH: "/data/ledgerlens.db"
+  STELLARLENSE_DB_PATH: "/data/stellar_lense.db"
   # Rate limiting
   HORIZON_RATE_LIMIT: "50"
   HORIZON_RATE_BUCKET_CAPACITY: "100"
@@ -202,15 +202,15 @@ config:
 # into a Secret only when set. Leave "" values unset on the CLI (--set) or in
 # a private values file — do not commit real secrets here.
 secrets:
-  LEDGERLENS_SERVICE_SECRET_KEY: ""
-  LEDGERLENS_MODEL_SIGNING_KEY: ""
-  LEDGERLENS_ADMIN_API_KEY: ""
-  LEDGERLENS_COMPLIANCE_API_KEY: ""
-  LEDGERLENS_WEBHOOK_ENCRYPTION_KEY: ""
+  STELLARLENSE_SERVICE_SECRET_KEY: ""
+  STELLARLENSE_MODEL_SIGNING_KEY: ""
+  STELLARLENSE_ADMIN_API_KEY: ""
+  STELLARLENSE_COMPLIANCE_API_KEY: ""
+  STELLARLENSE_WEBHOOK_ENCRYPTION_KEY: ""
 
 # ── Persistent Volume ────────────────────────────────────────────────────────
 # Consumed by templates/pvc.yaml. Backs the SQLite DB, cursor file and model
-# artifacts under /data (see config.LEDGERLENS_DB_PATH, config.CURSOR_PATH
+# artifacts under /data (see config.STELLARLENSE_DB_PATH, config.CURSOR_PATH
 # and config.MODEL_DIR above).
 persistence:
   enabled: false
@@ -223,8 +223,8 @@ persistence:
 postgresql:
   enabled: true
   auth:
-    username: ledgerlens
-    database: ledgerlens
+    username: stellar_lense
+    database: stellar_lense
     # password should be set via --set postgresql.auth.password
     password: ""
   primary:

@@ -1,7 +1,7 @@
 # CI Workflows Reference
 
 This page summarises every GitHub Actions workflow under
-[`.github/workflows/`](https://github.com/Ledger-Lenz/Ledgerlens-core/tree/main/.github/workflows).
+[`.github/workflows/`](https://github.com/Stellar-lens/Stellar-Lense/tree/main/.github/workflows).
 It is meant as a quick orientation for contributors debugging a failing check:
 what each workflow does, what triggers it, and roughly how long it takes.
 
@@ -49,7 +49,7 @@ with `cancel-in-progress`, so a new push supersedes an in-flight run.
   `go/`.
 - **Benchmark regression (`benchmark`)** — runs `make benchmark-check` to guard
   scoring-pipeline performance against a regression threshold.
-- **Rust SDK (`rust-sdk`)** — in `crates/ledgerlens-sdk`: `cargo check` (with
+- **Rust SDK (`rust-sdk`)** — in `crates/stellar-lense-sdk`: `cargo check` (with
   and without the `zk-verify` feature), `cargo test`, `cargo clippy -D
   warnings`, and `cargo fmt --check`.
 - **Contract fuzz (PR smoke) (`fuzz`)** — pull requests only. Runs
@@ -111,7 +111,7 @@ regenerate and commit the schema.
 
 **What it does:** if `DOCKER_USERNAME` and `DOCKER_PASSWORD` secrets are
 configured, builds and pushes the Docker image tagged with the commit SHA, then
-runs `helm upgrade --install ledgerlens ./helm/ledgerlens` with canary enabled.
+runs `helm upgrade --install stellar_lense ./helm/stellar_lense` with canary enabled.
 If the secrets are absent every step is skipped and the workflow is a no-op.
 
 **Duration:** ~6–12 min when deploying; seconds when skipped.
@@ -160,7 +160,7 @@ tears the stack down. 30 min job timeout.
 
 **Triggers:** weekly on Sunday at 00:00 UTC, manual.
 
-**What it does:** checks out `ledgerlens-api` and `ledgerlens-contracts`
+**What it does:** checks out `stellar-lense-api` and `stellar-lense-contracts`
 alongside this repo and runs `pytest -m cross_repo_e2e tests/e2e_cross_repo/`.
 Kept off PRs because it depends on sibling-repo availability and build time.
 
@@ -196,6 +196,6 @@ rate). 60 min job timeout.
 
 ## See also
 
-- [`CONTRIBUTING.md`](https://github.com/Ledger-Lenz/Ledgerlens-core/blob/main/CONTRIBUTING.md) — "Before opening a PR" lists the checks you should run locally before CI does.
+- [`CONTRIBUTING.md`](https://github.com/Stellar-lens/Stellar-Lense/blob/main/CONTRIBUTING.md) — "Before opening a PR" lists the checks you should run locally before CI does.
 - [`docs/dependency_policy.md`](dependency_policy.md) — the license deny-list enforced by `license-vuln-scan.yml`.
-- [`monitoring/README.md`](https://github.com/Ledger-Lenz/Ledgerlens-core/blob/main/monitoring/README.md) — context for `cost-monitoring-validation.yml`.
+- [`monitoring/README.md`](https://github.com/Stellar-lens/Stellar-Lense/blob/main/monitoring/README.md) — context for `cost-monitoring-validation.yml`.

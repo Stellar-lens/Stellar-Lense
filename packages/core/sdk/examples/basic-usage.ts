@@ -1,31 +1,31 @@
 /**
- * Basic usage example for @ledgerlens/sdk.
+ * Basic usage example for @stellar-lense/sdk.
  *
  * Instantiates the client, checks API health, lists a page of risk scores,
  * and fetches the detail for a single wallet. Errors from the API are
- * surfaced as `LedgerLensError`.
+ * surfaced as `StellarLenseError`.
  *
  * Run it against a local API:
  *
  *   cd sdk
  *   npm install
- *   LEDGERLENS_BASE_URL=http://localhost:8000 npm run example
+ *   STELLARLENSE_BASE_URL=http://localhost:8000 npm run example
  *
  * (`npm run example` uses `tsx` to execute this file directly — no build step.)
  *
  * When consuming the published package instead of running it from this repo,
  * change the import below to:
  *
- *   import { LedgerLensClient, LedgerLensError } from "@ledgerlens/sdk";
+ *   import { StellarLenseClient, StellarLenseError } from "@stellar-lense/sdk";
  */
 
-import { LedgerLensClient, LedgerLensError } from "../src/index";
+import { StellarLenseClient, StellarLenseError } from "../src/index";
 
 async function main(): Promise<void> {
-  const client = new LedgerLensClient({
-    baseUrl: process.env.LEDGERLENS_BASE_URL ?? "http://localhost:8000",
+  const client = new StellarLenseClient({
+    baseUrl: process.env.STELLARLENSE_BASE_URL ?? "http://localhost:8000",
     // adminKey / complianceKey can be passed here for gated endpoints:
-    // adminKey: process.env.LEDGERLENS_ADMIN_KEY,
+    // adminKey: process.env.STELLARLENSE_ADMIN_KEY,
     timeout: 15_000,
   });
 
@@ -57,9 +57,9 @@ async function main(): Promise<void> {
       console.log(`\nDetail for ${detail.wallet}:`, detail);
     }
   } catch (err) {
-    if (err instanceof LedgerLensError) {
+    if (err instanceof StellarLenseError) {
       console.error(
-        `LedgerLens API error (HTTP ${err.statusCode ?? "n/a"}): ${err.message}`,
+        `StellarLense API error (HTTP ${err.statusCode ?? "n/a"}): ${err.message}`,
       );
       if (err.zodIssues) console.error("Validation issues:", err.zodIssues);
       process.exitCode = 1;

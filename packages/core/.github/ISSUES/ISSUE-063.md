@@ -6,7 +6,7 @@ assignees: []
 
 ## Summary
 
-Productionise `detection/soroban_publisher.py` by adding: a `GET /admin/soroban/health` endpoint exposing circuit state, failure count, and last error; a `POST /admin/soroban/reset` endpoint for manual circuit reset; and a SQLite dead-letter queue (DLQ) for failed on-chain score submissions that can be inspected and replayed via `cli.py`. This transforms the existing circuit breaker from a silent safety mechanism into an observable, operable component of the LedgerLens production stack.
+Productionise `detection/soroban_publisher.py` by adding: a `GET /admin/soroban/health` endpoint exposing circuit state, failure count, and last error; a `POST /admin/soroban/reset` endpoint for manual circuit reset; and a SQLite dead-letter queue (DLQ) for failed on-chain score submissions that can be inspected and replayed via `cli.py`. This transforms the existing circuit breaker from a silent safety mechanism into an observable, operable component of the Stellar Lense production stack.
 
 ## Background & Context
 
@@ -152,10 +152,10 @@ SOROBAN_DLQ_MAX_ROWS=10000    # Hard cap; oldest rows pruned when exceeded
 
 ## Security Considerations
 
-- Both `/admin/soroban/health` and `/admin/soroban/reset` must require `LEDGERLENS_ADMIN_API_KEY`. Return HTTP 503 (not 401) if the key is not configured, consistent with other admin endpoints.
+- Both `/admin/soroban/health` and `/admin/soroban/reset` must require `STELLARLENSE_ADMIN_API_KEY`. Return HTTP 503 (not 401) if the key is not configured, consistent with other admin endpoints.
 - `POST /admin/soroban/reset` is a privileged mutation: it bypasses the circuit breaker's automatic protection. Log the event at `WARNING` level including the requesting IP address so resets are auditable.
 - Dead-letter rows contain wallet addresses and scores but no secret keys. Treat the DLQ as moderately sensitive data — it reveals which wallets triggered high scores, which could be useful to an attacker. Ensure `GET /admin/soroban/dead-letters` is admin-key gated.
-- `dlq-replay` reuses `SorobanPublisher`'s existing key management (keypair loaded from env, never logged). Replay should fail fast if `LEDGERLENS_SERVICE_SECRET_KEY` is not set rather than silently skipping submissions.
+- `dlq-replay` reuses `SorobanPublisher`'s existing key management (keypair loaded from env, never logged). Replay should fail fast if `STELLARLENSE_SERVICE_SECRET_KEY` is not set rather than silently skipping submissions.
 - Rate-limit `POST /admin/soroban/reset` to 10 calls per minute to prevent automated circuit-flapping attacks.
 
 ## Testing Requirements

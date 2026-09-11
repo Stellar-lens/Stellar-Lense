@@ -8,7 +8,7 @@ assignees: []
 The cross-chain detection feature (see `docs/cross_chain_detection.md`) ingests bridge events from EVM chains (Ethereum, Base, Polygon) via `bridge_loader.py` and `evm_loader.py`. These loaders can receive the same bridge event multiple times due to RPC provider retries, block reorganisations, and restart replay. Without a deduplication layer, duplicate events propagate into the feature engineering pipeline, artificially inflating cross-chain volume metrics and producing false wash-trading alerts. A content-hash-based dedup layer with idempotent SQLite upserts and replay-attack protection will make the cross-chain ingestion path idempotent and correct.
 
 ## Background & Context
-The README describes six dedicated cross-chain features computed by `detection/feature_engineering.py` from bridge events. These features feed directly into the ensemble ML classifiers (Random Forest, XGBoost, LightGBM) and contribute to the composite `LedgerLens Risk Score (0–100)`.
+The README describes six dedicated cross-chain features computed by `detection/feature_engineering.py` from bridge events. These features feed directly into the ensemble ML classifiers (Random Forest, XGBoost, LightGBM) and contribute to the composite `Stellar Lense Risk Score (0–100)`.
 
 `ingestion/bridge_loader.py` polls the Allbridge relayer contract logs on EVM chains for bridge transfer events. `ingestion/evm_loader.py` fetches raw EVM transaction receipts and decodes event logs. Both can receive duplicates because:
 1. **RPC retries**: when a `getLogs` call times out and is retried, the provider may return overlapping block ranges

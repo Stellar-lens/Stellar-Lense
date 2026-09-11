@@ -1,8 +1,8 @@
 # chaos-mesh
 
-Chaos-engineering experiments for LedgerLens, run with
+Chaos-engineering experiments for Stellar Lense, run with
 [Chaos Mesh](https://chaos-mesh.org/). Each YAML in this directory injects one
-fault into the `ledgerlens` namespace; `verify_experiment.py` checks that the
+fault into the `stellar_lense` namespace; `verify_experiment.py` checks that the
 system recovers afterwards.
 
 ## Experiment definitions
@@ -15,7 +15,7 @@ system recovers afterwards.
 | `network-partition-redis.yaml` | `NetworkChaos` (`partition`, `direction: to`) | Partitions the API pods from Redis for 60s — validates the feature-store / cache fallback path when Redis is unreachable. |
 
 All experiments are created in the `chaos-mesh` namespace and select workloads
-in the `ledgerlens` namespace by `app.kubernetes.io/*` labels.
+in the `stellar_lense` namespace by `app.kubernetes.io/*` labels.
 
 ## Running an experiment end to end
 
@@ -28,7 +28,7 @@ in the `ledgerlens` namespace by `app.kubernetes.io/*` labels.
 2. **Observe** — while the fault is active, watch pods, dashboards and logs:
 
    ```bash
-   kubectl get pods -n ledgerlens -w
+   kubectl get pods -n stellar_lense -w
    kubectl describe networkchaos,podchaos -n chaos-mesh
    ```
 
@@ -39,7 +39,7 @@ in the `ledgerlens` namespace by `app.kubernetes.io/*` labels.
 
    ```bash
    # Against a real target (Kubernetes-hosted staging, port-forward, etc.)
-   python chaos-mesh/verify_experiment.py --health-url https://ledgerlens.staging.example/health
+   python chaos-mesh/verify_experiment.py --health-url https://stellar_lense.staging.example/health
 
    # Local default: http://localhost:8000/health
    python chaos-mesh/verify_experiment.py

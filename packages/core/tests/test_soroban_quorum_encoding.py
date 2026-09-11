@@ -4,7 +4,7 @@ These assert the actual ScVal types sent to the Soroban host, which
 `test_soroban_publisher.py` cannot do: that module replaces `stellar_sdk` with a
 `MagicMock` at import time, so every ScVal it builds is a mock.
 
-The distinction matters because the official ledgerlens-score ABI requires a
+The distinction matters because the official stellar-lense-score ABI requires a
 `Symbol`; a client-side mock cannot catch an accidental `String` encoding.
 
 The encoding must match `contracts/oracle_aggregator/src/lib.rs`:

@@ -5,7 +5,7 @@ assignees: []
 ---
 
 ## Summary
-LedgerLens documentation is scattered across `docs/*.md` files with no consistent navigation, search, or visual structure. A MkDocs-Material site with auto-generated API reference, versioned documentation, and a CI deploy pipeline to GitHub Pages provides a professional documentation experience for contributors and integrators.
+Stellar Lense documentation is scattered across `docs/*.md` files with no consistent navigation, search, or visual structure. A MkDocs-Material site with auto-generated API reference, versioned documentation, and a CI deploy pipeline to GitHub Pages provides a professional documentation experience for contributors and integrators.
 
 ## Objectives
 - [ ] Configure MkDocs-Material in `mkdocs.yml` with navigation mirroring the existing `docs/` structure
