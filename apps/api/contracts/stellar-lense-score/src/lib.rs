@@ -1,7 +1,7 @@
-//! LedgerLens on-chain risk score registry.
+//! StellarLense on-chain risk score registry.
 //!
-//! Stores the most recent LedgerLens Risk Score for each (wallet, asset
-//! pair) combination, written by the authorised LedgerLens service account
+//! Stores the most recent StellarLense Risk Score for each (wallet, asset
+//! pair) combination, written by the authorised StellarLense service account
 //! and readable by any other Soroban contract.
 #![no_std]
 
@@ -29,10 +29,10 @@ enum DataKey {
 }
 
 #[contract]
-pub struct LedgerLensScore;
+pub struct StellarLenseScore;
 
 #[contractimpl]
-impl LedgerLensScore {
+impl StellarLenseScore {
     /// One-time initialisation: registers the address authorised to call `submit_score`.
     pub fn initialize(env: Env, admin: Address) {
         if env.storage().instance().has(&DataKey::Admin) {
@@ -43,7 +43,7 @@ impl LedgerLensScore {
 
     /// Register a computed risk score for `wallet` on `asset_pair`.
     ///
-    /// Only the authorised LedgerLens service account (set via `initialize`)
+    /// Only the authorised StellarLense service account (set via `initialize`)
     /// may call this.
     pub fn submit_score(
         env: Env,
@@ -79,7 +79,7 @@ impl LedgerLensScore {
             .set(&DataKey::Score(wallet, asset_pair), &risk_score);
     }
 
-    /// Return the most recent LedgerLens risk score for `wallet` on `asset_pair`.
+    /// Return the most recent StellarLense risk score for `wallet` on `asset_pair`.
     ///
     /// Callable by any contract or external client; returns `None` if no
     /// score has been submitted yet.
@@ -98,8 +98,8 @@ mod test {
     #[test]
     fn submit_and_read_score() {
         let env = Env::default();
-        let contract_id = env.register_contract(None, LedgerLensScore);
-        let client = LedgerLensScoreClient::new(&env, &contract_id);
+        let contract_id = env.register_contract(None, StellarLenseScore);
+        let client = StellarLenseScoreClient::new(&env, &contract_id);
 
         let admin = Address::generate(&env);
         let wallet = Address::generate(&env);
@@ -121,8 +121,8 @@ mod test {
     #[test]
     fn unknown_wallet_returns_none() {
         let env = Env::default();
-        let contract_id = env.register_contract(None, LedgerLensScore);
-        let client = LedgerLensScoreClient::new(&env, &contract_id);
+        let contract_id = env.register_contract(None, StellarLenseScore);
+        let client = StellarLenseScoreClient::new(&env, &contract_id);
 
         let admin = Address::generate(&env);
         let wallet = Address::generate(&env);

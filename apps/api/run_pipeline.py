@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""LedgerLens detection pipeline entry point.
+"""StellarLense detection pipeline entry point.
 
 Loads historical trades for an asset pair from Horizon, scores every wallet
-active on that pair, and prints the resulting LedgerLens Risk Scores as
+active on that pair, and prints the resulting StellarLense Risk Scores as
 JSON. This is the offline counterpart to the live API in `api/main.py`,
 useful for batch scoring runs and Soroban `submit_score` updates.
 """
@@ -51,7 +51,7 @@ def run(base_asset: Asset, counter_asset: Asset, horizon_url: str) -> list[dict]
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Run the LedgerLens detection pipeline.")
+    parser = argparse.ArgumentParser(description="Run the StellarLense detection pipeline.")
     parser.add_argument("base_asset", help="Base asset, e.g. 'XLM' or 'CODE:ISSUER'")
     parser.add_argument("counter_asset", help="Counter asset, e.g. 'USDC:ISSUER'")
     parser.add_argument(

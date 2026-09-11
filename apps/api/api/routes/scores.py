@@ -1,4 +1,4 @@
-"""GET /score/{wallet}/{pair} — LedgerLens Risk Score lookup."""
+"""GET /score/{wallet}/{pair} — StellarLense Risk Score lookup."""
 
 from fastapi import APIRouter, HTTPException
 
@@ -10,7 +10,7 @@ router = APIRouter(prefix="/score", tags=["scores"])
 
 @router.get("/{wallet}/{pair:path}", response_model=RiskScore)
 def get_score(wallet: str, pair: str) -> RiskScore:
-    """Return the current LedgerLens Risk Score for `wallet` on `pair`.
+    """Return the current StellarLense Risk Score for `wallet` on `pair`.
 
     `pair` is an asset pair identifier in `BASE/COUNTER` form, e.g.
     `XLM/USDC:GISSUER...`.

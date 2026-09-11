@@ -1,7 +1,7 @@
-"""On-chain feature extraction for the LedgerLens ML layer.
+"""On-chain feature extraction for the StellarLense ML layer.
 
 Computes trade-pattern, volume/timing, and wallet-graph features for a
-wallet's trade history, as described in the LedgerLens methodology.
+wallet's trade history, as described in the StellarLense methodology.
 """
 
 from collections import Counter
