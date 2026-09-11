@@ -5,7 +5,7 @@ on known-good actors such as DEX arbitrage bots, AMM liquidity managers, and
 Stellar anchor wallets.
 
 The suppression store is backed by a ``alert_suppressions`` table in the
-main LedgerLens SQLite database. Rules expire automatically at ``expires_at``
+main StellarLense SQLite database. Rules expire automatically at ``expires_at``
 (UTC); expired rules are ignored but not deleted until explicitly removed.
 """
 
@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 
 from config.settings import settings
 
-logger = logging.getLogger("ledgerlens.suppressions")
+logger = logging.getLogger("stellar_lense.suppressions")
 
 _CREATE_TABLE_SQL = """
 CREATE TABLE IF NOT EXISTS alert_suppressions (

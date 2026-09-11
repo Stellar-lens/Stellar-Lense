@@ -1,6 +1,6 @@
 name: "\U0001F41B Bug report"
 description: >
-  Something in LedgerLens is not behaving as documented or expected.
+  Something in Stellar Lense is not behaving as documented or expected.
   Fill in as much detail as you can — the more context you give, the
   faster we can reproduce and fix the issue.
 title: "[Bug]: "
@@ -12,9 +12,9 @@ body:
     attributes:
       value: |
         Thanks for taking the time to report a bug. Before you submit:
-        - Search [existing issues](https://github.com/Ledger-Lenz/Ledgerlens-core/issues) to avoid duplicates.
-        - Check the [README](https://github.com/Ledger-Lenz/Ledgerlens-core/blob/main/README.md) and [`docs/`](https://github.com/Ledger-Lenz/Ledgerlens-core/tree/main/docs) folder — your issue may already be documented.
-        - For **security vulnerabilities**, use [GitHub's private advisory form](https://github.com/Ledger-Lenz/Ledgerlens-core/security/advisories/new) — do **not** open a public issue.
+        - Search [existing issues](https://github.com/Stellar-lens/Stellar-Lense/issues) to avoid duplicates.
+        - Check the [README](https://github.com/Stellar-lens/Stellar-Lense/blob/main/README.md) and [`docs/`](https://github.com/Stellar-lens/Stellar-Lense/tree/main/docs) folder — your issue may already be documented.
+        - For **security vulnerabilities**, use [GitHub's private advisory form](https://github.com/Stellar-lens/Stellar-Lense/security/advisories/new) — do **not** open a public issue.
 
   # ── 1. Summary ─────────────────────────────────────────────────────────────
   - type: textarea
@@ -106,10 +106,10 @@ body:
         - "api — admin / analyst / audit routers"
         - "contracts — oracle aggregator (Rust/Soroban)"
         - "contracts — ZK verifier (Rust/Soroban)"
-        - "sdk — Python SDK (packages/ledgerlens-sdk)"
+        - "sdk — Python SDK (packages/stellar-lense-sdk)"
         - "sdk — TypeScript SDK (sdk/)"
         - "sdk — Go SDK (go/)"
-        - "sdk — Rust crate (crates/ledgerlens-sdk)"
+        - "sdk — Rust crate (crates/stellar-lense-sdk)"
         - "config / settings / environment variables"
         - "CLI (cli.py)"
         - "pipeline entry point (run_pipeline.py)"
@@ -135,7 +135,7 @@ body:
         - **Rust version** (if relevant): <!-- e.g. 1.79.0 -->
         - **Go version** (if relevant): <!-- e.g. 1.22.4 -->
         - **Node version** (if relevant): <!-- e.g. 20.11.0 -->
-        - **LedgerLens commit / tag**: <!-- e.g. `git rev-parse --short HEAD` output or a release tag -->
+        - **Stellar Lense commit / tag**: <!-- e.g. `git rev-parse --short HEAD` output or a release tag -->
         - **Install surface**: <!-- e.g. `make install-dev`, `make install-chain`, Docker -->
         - **Stellar network**: <!-- Testnet / Mainnet / local -->
         - **Relevant env vars** (mask secrets): <!-- e.g. MAX_GRAPH_NODES=50000 -->

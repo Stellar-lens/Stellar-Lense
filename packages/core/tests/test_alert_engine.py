@@ -12,7 +12,7 @@ from detection.alert_engine import AlertDeduplicator, _ensure_tables
 
 @pytest.fixture()
 def db_path(tmp_path: Path) -> str:
-    return str(tmp_path / "ledgerlens.db")
+    return str(tmp_path / "stellar_lense.db")
 
 
 class TestEnsureTables:

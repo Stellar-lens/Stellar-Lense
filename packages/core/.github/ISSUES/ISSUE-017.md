@@ -5,7 +5,7 @@ assignees: []
 ---
 
 ## Summary
-LedgerLens currently ingests all trades from Horizon and passes them all to the detection engine, including dust trades, test asset pairs, and known-clean institutional market makers that would add noise to the risk models without contributing to wash-trade detection. A configurable filter pipeline — supporting asset pair whitelists/blacklists, minimum volume thresholds, asset type filters, and account-level exclusion lists — will reduce detection noise, lower compute costs, and allow operators to focus analysis on the asset pairs and volume tiers where wash trading is most impactful.
+Stellar Lense currently ingests all trades from Horizon and passes them all to the detection engine, including dust trades, test asset pairs, and known-clean institutional market makers that would add noise to the risk models without contributing to wash-trade detection. A configurable filter pipeline — supporting asset pair whitelists/blacklists, minimum volume thresholds, asset type filters, and account-level exclusion lists — will reduce detection noise, lower compute costs, and allow operators to focus analysis on the asset pairs and volume tiers where wash trading is most impactful.
 
 ## Background & Context
 The ingestion layer (Layer 1 in the README architecture) feeds all ingested trades directly into `detection/feature_engineering.py`. In production, the SDEX processes thousands of unique asset pairs, many of which are:

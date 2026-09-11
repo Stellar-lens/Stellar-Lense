@@ -12,7 +12,7 @@ Extend `detection/path_payment_engine.py` to detect circular value flows disguis
 
 A Stellar `path_payment_strict_send` or `path_payment_strict_receive` operation routes value through up to 6 intermediate assets. Each hop generates a trade record in the Horizon `/trades` endpoint, making a single round-trip path payment appear as 3–7 distinct trades — artificially multiplying reported volume by the path length.
 
-LedgerLens currently detects pairwise wash trades (direct A→B→A cycles) via the SCC engine in `detection/graph_engine.py`. However, `graph_engine.py` operates on the trade graph where nodes are wallets. Path-payment wash trades are different: the same wallet sends and receives, but the path graph is an asset-hop graph, not a wallet graph. Existing detection misses these entirely.
+Stellar Lense currently detects pairwise wash trades (direct A→B→A cycles) via the SCC engine in `detection/graph_engine.py`. However, `graph_engine.py` operates on the trade graph where nodes are wallets. Path-payment wash trades are different: the same wallet sends and receives, but the path graph is an asset-hop graph, not a wallet graph. Existing detection misses these entirely.
 
 `ingestion/path_payment_loader.py` already ingests raw path payment operation records from Horizon. This issue builds the cycle-detection layer on top of that data.
 

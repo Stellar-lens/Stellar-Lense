@@ -2,13 +2,13 @@
 
 Usage
 -----
-    python chaos-mesh/verify_experiment.py --health-url https://ledgerlens.staging.example/health
+    python chaos-mesh/verify_experiment.py --health-url https://stellar_lense.staging.example/health
 
     # Local default (http://localhost:8000/health), e.g. against a port-forward
     python chaos-mesh/verify_experiment.py
 
     # Environment variable instead of the flag
-    HEALTH_URL=https://ledgerlens.staging.example/health python chaos-mesh/verify_experiment.py
+    HEALTH_URL=https://stellar_lense.staging.example/health python chaos-mesh/verify_experiment.py
 
 Workflow
     This script is the "verify" step of the chaos-testing loop:
@@ -78,7 +78,7 @@ def assert_recovery(health_url: str, timeout_s: int = 60) -> None:
 def parse_args(argv=None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Verify that a LedgerLens deployment recovers after a chaos-mesh "
+            "Verify that a StellarLense deployment recovers after a chaos-mesh "
             "experiment by polling its /health endpoint."
         )
     )

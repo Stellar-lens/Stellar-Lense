@@ -416,7 +416,7 @@ def test_tampered_event_error_log_excludes_data_field(caplog, tmp_path):
 
     import logging
     with patch("ingestion.bridge_loader.settings") as mock_settings, \
-         caplog.at_level(logging.ERROR, logger="ledgerlens.bridge_loader"), \
+         caplog.at_level(logging.ERROR, logger="stellar_lense.bridge_loader"), \
          patch("ingestion.bridge_loader.BridgeTransferLoader._send_to_dlq"):
         mock_settings.bridge_verify_sample_rate = 1.0
         mock_settings.evm_lookback_blocks = 10

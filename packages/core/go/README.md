@@ -1,8 +1,8 @@
-# LedgerLens Go SDK
+# Stellar Lense Go SDK
 
-Idiomatic Go client for the [LedgerLens](https://github.com/Ledger-Lenz/Ledgerlens-core) fraud-detection REST API.
+Idiomatic Go client for the [Stellar Lense](https://github.com/Stellar-lens/Stellar-Lense) fraud-detection REST API.
 
-Covers the same REST surface as the Python SDK (`packages/ledgerlens-sdk`) and the TypeScript SDK (`sdk/`), with context-aware methods, typed error handling, and webhook HMAC verification helpers.
+Covers the same REST surface as the Python SDK (`packages/stellar-lense-sdk`) and the TypeScript SDK (`sdk/`), with context-aware methods, typed error handling, and webhook HMAC verification helpers.
 
 ## Requirements
 
@@ -11,10 +11,10 @@ Go 1.22 or later, matching the `go` directive in [`go.mod`](./go.mod). CI builds
 ## Installation
 
 ```bash
-go get github.com/Ledger-Lenz/Ledgerlens-core/go@latest
+go get github.com/Stellar-lens/Stellar-Lense/go@latest
 ```
 
-The module path is `github.com/Ledger-Lenz/Ledgerlens-core/go`.
+The module path is `github.com/Stellar-lens/Stellar-Lense/go`.
 
 ### Minimum supported Go version
 
@@ -30,13 +30,13 @@ import (
     "fmt"
     "log"
 
-    ledgerlens "github.com/Ledger-Lenz/Ledgerlens-core/go"
+    stellar_lense "github.com/Stellar-lens/Stellar-Lense/go"
 )
 
 func main() {
-    client := ledgerlens.NewClient(
-        "https://api.ledgerlens.io",
-        ledgerlens.WithAPIKey("your-api-key"),
+    client := stellar_lense.NewClient(
+        "https://api.stellar-lense.io",
+        stellar_lense.WithAPIKey("your-api-key"),
     )
 
     ctx := context.Background()
@@ -72,14 +72,14 @@ A common exchange-backend pattern: block a withdrawal when the wallet's risk
 score is at or above a threshold and the ML classifier has flagged it.
 
 ```go
-func checkWithdrawalAllowed(ctx context.Context, client *ledgerlens.Client, wallet string) error {
+func checkWithdrawalAllowed(ctx context.Context, client *stellar_lense.Client, wallet string) error {
     resp, err := client.GetScore(ctx, wallet)
     if err != nil {
-        return fmt.Errorf("ledgerlens score lookup: %w", err)
+        return fmt.Errorf("stellar_lense score lookup: %w", err)
     }
     for _, s := range resp.Scores {
         if s.Score >= 70 && s.MLFlag {
-            return fmt.Errorf("withdrawal blocked: LedgerLens risk score %d for %s/%s",
+            return fmt.Errorf("withdrawal blocked: Stellar Lense risk score %d for %s/%s",
                 s.Score, s.Wallet, s.AssetPair)
         }
     }
@@ -91,7 +91,7 @@ func checkWithdrawalAllowed(ctx context.Context, client *ledgerlens.Client, wall
 
 | Option | Description |
 |--------|-------------|
-| `WithAPIKey(key)` | Sets `X-LedgerLens-Admin-Key` on every request |
+| `WithAPIKey(key)` | Sets `X-StellarLense-Admin-Key` on every request |
 | `WithHTTPClient(hc)` | Replaces the default `*http.Client` |
 | `WithTimeout(d)` | Sets the per-request timeout (default: 30 s) |
 | `WithInsecureSkipVerify()` | Disables TLS verification — **test servers only** |
@@ -118,12 +118,12 @@ client.DeleteWebhook(ctx, subscriberID)       error
 
 ## Error Handling
 
-All methods return a `*LedgerLensAPIError` on non-2xx responses:
+All methods return a `*StellarLenseAPIError` on non-2xx responses:
 
 ```go
 resp, err := client.GetScore(ctx, wallet)
 if err != nil {
-    var apiErr *ledgerlens.LedgerLensAPIError
+    var apiErr *stellar_lense.StellarLenseAPIError
     if errors.As(err, &apiErr) {
         switch apiErr.StatusCode {
         case 401:
@@ -141,7 +141,7 @@ if err != nil {
 ## Webhook Verification
 
 Go-based exchange backends receiving webhook alerts should verify the
-`X-LedgerLens-Signature` and `X-LedgerLens-Timestamp` headers on every
+`X-StellarLense-Signature` and `X-StellarLense-Timestamp` headers on every
 delivery. The SDK provides constant-time helpers matching the Python reference
 in [docs/webhook_security_model.md](../docs/webhook_security_model.md):
 
@@ -153,14 +153,14 @@ func webhookHandler(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    sig := r.Header.Get("X-LedgerLens-Signature")
-    if !ledgerlens.VerifyWebhookSignature(body, webhookSecret, sig) {
+    sig := r.Header.Get("X-StellarLense-Signature")
+    if !stellar_lense.VerifyWebhookSignature(body, webhookSecret, sig) {
         http.Error(w, "invalid signature", http.StatusUnauthorized)
         return
     }
 
-    ts := r.Header.Get("X-LedgerLens-Timestamp")
-    if !ledgerlens.VerifyWebhookTimestamp(ts, ledgerlens.DefaultWebhookMaxAge) {
+    ts := r.Header.Get("X-StellarLense-Timestamp")
+    if !stellar_lense.VerifyWebhookTimestamp(ts, stellar_lense.DefaultWebhookMaxAge) {
         http.Error(w, "timestamp too old (replay?)", http.StatusUnauthorized)
         return
     }
@@ -225,7 +225,7 @@ go vet ./...
 The module is tagged `go/vX.Y.Z` for `go get`:
 
 ```bash
-go get github.com/Ledger-Lenz/Ledgerlens-core/go@go/v0.1.0
+go get github.com/Stellar-lens/Stellar-Lense/go@go/v0.1.0
 ```
 
 See [CHANGELOG.md](CHANGELOG.md) for the version history of this module.

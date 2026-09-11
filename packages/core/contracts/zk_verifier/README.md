@@ -300,7 +300,7 @@ The current `fiat_shamir` implementation returns a placeholder value. Production
 ## References
 
 - [Contract fuzzing documentation](../../docs/contract_fuzzing.md)
-- [LedgerLens ZK design](../../docs/zk_design.md) *(if it exists)*
+- [Stellar Lense ZK design](../../docs/zk_design.md) *(if it exists)*
 - [Soroban SDK documentation](https://soroban.stellar.org/docs/reference/sdk)
 - [BN254 curve specification](https://hackmd.io/@jpw/bn254)
 - [Sigma protocols](https://en.wikipedia.org/wiki/Proof_of_knowledge#Sigma_protocols)

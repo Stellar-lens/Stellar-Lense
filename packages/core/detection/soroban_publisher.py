@@ -1,6 +1,6 @@
 """Soroban on-chain score publisher.
 
-Submits RiskScore records to the ledgerlens-score Soroban contract,
+Submits RiskScore records to the stellar-lense-score Soroban contract,
 making wash-trading scores natively queryable by other Soroban contracts
 (AMMs, lending protocols, DEX aggregators).
 
@@ -41,7 +41,7 @@ from detection.zk_commitment import (
 from detection.zk_prover import generate_threshold_proof
 from config.settings import settings
 
-logger = logging.getLogger("ledgerlens.soroban")
+logger = logging.getLogger("stellar_lense.soroban")
 
 _DLQ_MAX_ROWS_DEFAULT = 10000
 
@@ -154,7 +154,7 @@ class SorobanCircuitOpenError(Exception):
 
 
 class SorobanPublisher:
-    """Publishes RiskScore records on-chain via the ledgerlens-score contract.
+    """Publishes RiskScore records on-chain via the stellar-lense-score contract.
 
     Handles transaction construction, fee estimation via simulate_transaction,
     sequence-number management with tx_bad_seq retry, INSUFFICIENT_FEE retry,
@@ -383,7 +383,7 @@ class SorobanPublisher:
         Raises SorobanCircuitOpenError when the circuit breaker is open.
         """
         # Ensure this region holds the submission lease before processing
-        if not acquire_submission_lease(settings.ledgerlens_region_name, settings.soroban_submission_lease_duration_seconds):
+        if not acquire_submission_lease(settings.stellarlense_region_name, settings.soroban_submission_lease_duration_seconds):
             raise SubmissionLeaseError("Region does not hold the Soroban submission lease.")
 
         try:
@@ -459,7 +459,7 @@ class SorobanPublisher:
         model_version: int,
         quorum: QuorumSignature,
     ) -> bool:
-        """Submit the quorum-bound ledgerlens-score payload for verification."""
+        """Submit the quorum-bound stellar-lense-score payload for verification."""
         try:
             self._check_circuit()
         except SorobanCircuitOpenError:
@@ -485,7 +485,7 @@ class SorobanPublisher:
 
             params = [
                 scval.to_address(wallet),
-                # The official ledgerlens-score ABI uses Symbol. OracleNode
+                # The official stellar-lense-score ABI uses Symbol. OracleNode
                 # validates the same charset/length before any signature is
                 # produced, so this cannot silently rewrite a signed pair.
                 scval.to_symbol(asset_pair),
@@ -554,7 +554,7 @@ class SorobanPublisher:
         """
         results: dict[str, str] = {}
         # Ensure this region holds the submission lease before batch processing
-        if not acquire_submission_lease(settings.ledgerlens_region_name, settings.soroban_submission_lease_duration_seconds):
+        if not acquire_submission_lease(settings.stellarlense_region_name, settings.soroban_submission_lease_duration_seconds):
             raise SubmissionLeaseError("Region does not hold the Soroban submission lease.")
         for s in scores:
             key = f"{s.wallet}:{s.asset_pair}"

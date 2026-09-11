@@ -18,4 +18,4 @@ Regulators and exchange compliance teams conducting audits require a complete, h
 - [ ] HTML report renders correctly in Chrome and Firefox
 - [ ] PDF output passes PDF/A-1b validation for archival compliance
 - [ ] All six report sections present with no placeholder text
-- [ ] Report includes LedgerLens version hash and model signature for auditability
+- [ ] Report includes Stellar Lense version hash and model signature for auditability

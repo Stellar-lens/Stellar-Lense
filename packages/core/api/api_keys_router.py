@@ -28,7 +28,7 @@ from config.settings import settings
 router = APIRouter(prefix="/admin/api-keys", tags=["API Keys"])
 
 _DEPRECATION_HEADER = {"Deprecation": "True", "Sunset": "Sat, 31 Jan 2027 00:00:00 GMT"}
-_MIGRATION_GUIDE = "https://ledgerlens.ai/docs/api_gateway_migration"
+_MIGRATION_GUIDE = "https://stellar_lense.ai/docs/api_gateway_migration"
 
 VALID_SCOPES = {"read:scores", "write:suppressions", "admin"}
 

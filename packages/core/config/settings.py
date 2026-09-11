@@ -166,14 +166,14 @@ class Settings(BaseSettings):
 
     # ── Storage ───────────────────────────────────────────────────────────────
     model_dir: str = "./models"
-    ledgerlens_db_url: str = ""
-    ledgerlens_db_path: str = "./ledgerlens.db"
+    stellarlense_db_url: str = ""
+    stellarlense_db_path: str = "./stellar_lense.db"
 
     @property
     def db_url(self) -> str:
-        if self.ledgerlens_db_url:
-            return self.ledgerlens_db_url
-        return f"sqlite:///{self.ledgerlens_db_path}"
+        if self.stellarlense_db_url:
+            return self.stellarlense_db_url
+        return f"sqlite:///{self.stellarlense_db_path}"
     ingestion_dedup_enabled: bool = True
     idempotency_retention_days: int = 90
     idempotency_replay_window_seconds: float = 3600.0
@@ -182,26 +182,26 @@ class Settings(BaseSettings):
     lineage_enabled: bool = False
     lineage_backend: str = "console"
     openlineage_url: str = ""
-    openlineage_namespace: str = "ledgerlens-core"
+    openlineage_namespace: str = "stellar-lense-core"
     lineage_queue_maxsize: int = 1000
 
 
     # ── Event Bus (RiskScore Handoff) ─────────────────────────────────────────
     event_bus_backend: str = "none"  # none | kafka | nats
     event_bus_kafka_bootstrap_servers: str = "localhost:9092"
-    event_bus_kafka_topic: str = "ledgerlens.riskscore.v1"
+    event_bus_kafka_topic: str = "stellar_lense.riskscore.v1"
     event_bus_kafka_sasl_password: str = ""
     event_bus_nats_servers: str = "nats://localhost:4222"
-    event_bus_nats_subject: str = "ledgerlens.riskscore.v1"
+    event_bus_nats_subject: str = "stellar_lense.riskscore.v1"
     event_bus_nats_token: str = ""
     event_bus_publish_timeout_seconds: float = 5.0
     event_bus_max_retries: int = 3
     event_bus_retry_backoff_seconds: float = 1.0
 
     # ── Downstream services ───────────────────────────────────────────────────
-    ledgerlens_api_url: str = "http://localhost:8000"
-    ledgerlens_score_contract_id: str = ""
-    ledgerlens_service_secret_key: str = ""
+    stellarlense_api_url: str = "http://localhost:8000"
+    stellarlense_score_contract_id: str = ""
+    stellarlense_service_secret_key: str = ""
 
     # ── Soroban ───────────────────────────────────────────────────────────────
     soroban_rpc_url: str = "https://soroban-testnet.stellar.org"
@@ -209,23 +209,23 @@ class Settings(BaseSettings):
     soroban_circuit_breaker_threshold: int = 5
     soroban_circuit_reset_seconds: int = 300
     # Multi‑region configuration
-    ledgerlens_region_name: str = "us-east-1"
-    ledgerlens_region_role: str = "active"  # active | passive | standby
+    stellarlense_region_name: str = "us-east-1"
+    stellarlense_region_role: str = "active"  # active | passive | standby
     soroban_submission_lease_enabled: bool = True
-    soroban_submission_lease_name: str = "ledgerlens-soroban-submitter"
+    soroban_submission_lease_name: str = "stellar-lense-soroban-submitter"
     soroban_submission_lease_duration_seconds: int = 30
 
     # ── API / security ────────────────────────────────────────────────────────
-    ledgerlens_cors_allowed_origins: str = ""
-    ledgerlens_admin_api_key: str = ""
-    ledgerlens_compliance_api_key: str = ""
-    ledgerlens_model_signing_key: str = ""
-    ledgerlens_webhook_encryption_key: str = ""
-    ledgerlens_webhook_encryption_key_previous: str = ""
+    stellarlense_cors_allowed_origins: str = ""
+    stellarlense_admin_api_key: str = ""
+    stellarlense_compliance_api_key: str = ""
+    stellarlense_model_signing_key: str = ""
+    stellarlense_webhook_encryption_key: str = ""
+    stellarlense_webhook_encryption_key_previous: str = ""
     api_key_rotation_grace_seconds: int = 604800
     ws_max_connections: int = 100
     api_key_max_age_days: int = 90
-    # Minimum LedgerLens risk score (0-100) required to export a SAR package.
+    # Minimum StellarLense risk score (0-100) required to export a SAR package.
     compliance_sar_min_score: int = 70
     # Hourly cap on regulatory exports (SAR + Travel Rule) per `detection.compliance_exporter`.
     compliance_export_rate_limit_per_hour: int = 10
@@ -314,7 +314,7 @@ class Settings(BaseSettings):
 
     # ── MLflow integration ────────────────────────────────────────────────────
     mlflow_tracking_uri: str = ""
-    mlflow_experiment_name: str = "ledgerlens-training"
+    mlflow_experiment_name: str = "stellar-lense-training"
     mlflow_tracking_enabled: bool = False
 
     # ── Gateway (consolidated auth/quota/logging middleware) ──────────────────
@@ -326,7 +326,7 @@ class Settings(BaseSettings):
     # "redis": per-key rate limits are enforced via the shared, distributed
     #   sliding-window counter in detection/rate_limiter.py — required for
     #   correct enforcement under the documented multi-replica topology
-    #   (helm/ledgerlens/values.yaml: replicaCount 2, autoscaling to 10) and
+    #   (helm/stellar_lense/values.yaml: replicaCount 2, autoscaling to 10) and
     #   across the REST/gRPC process split. Falls back to a local in-process
     #   window (logged + metered) if Redis is unreachable.
     # "sqlite": explicit opt-out — always use the local in-process window,
@@ -403,7 +403,7 @@ class Settings(BaseSettings):
     # Rate limit for similarity queries (per minute)
     gnn_similarity_rate_limit_per_minute: int = 10
 
-    # ── Parquet export (ledgerlens-data integration) ──────────────────────────
+    # ── Parquet export (stellar-lense-data integration) ──────────────────────────
     # Default root directory for `cli.py export-parquet` output.
     # Resolved relative to the working directory; must remain inside the project.
     parquet_export_dir: str = "./data/parquet_export"
@@ -639,7 +639,7 @@ class Settings(BaseSettings):
         return v
 
     @field_validator("horizon_url", "horizon_stream_url", "soroban_rpc_url",
-                     "ledgerlens_api_url", "redis_url",
+                     "stellarlense_api_url", "redis_url",
                      "evm_rpc_ethereum", "evm_rpc_base", "evm_rpc_polygon",
                      mode="before")
     @classmethod
@@ -677,9 +677,9 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def no_wildcard_cors(self) -> "Settings":
-        if "*" in _split_csv(self.ledgerlens_cors_allowed_origins):
+        if "*" in _split_csv(self.stellarlense_cors_allowed_origins):
             raise ValueError(
-                "LEDGERLENS_CORS_ALLOWED_ORIGINS must not contain '*'. "
+                "STELLARLENSE_CORS_ALLOWED_ORIGINS must not contain '*'. "
                 "Specify an explicit origin list instead."
             )
         return self
@@ -914,39 +914,39 @@ class Settings(BaseSettings):
 
     @property
     def db_path(self) -> str:
-        return self.ledgerlens_db_path
+        return self.stellarlense_db_path
 
     @db_path.setter
     def db_path(self, value: str) -> None:
-        object.__setattr__(self, "ledgerlens_db_path", value)
+        object.__setattr__(self, "stellarlense_db_path", value)
 
     @property
     def score_contract_id(self) -> str:
-        return self.ledgerlens_score_contract_id
+        return self.stellarlense_score_contract_id
 
     @property
     def service_secret_key(self) -> str:
-        return self.ledgerlens_service_secret_key
+        return self.stellarlense_service_secret_key
 
     @property
     def cors_allowed_origins(self) -> tuple[str, ...]:
-        return _split_csv(self.ledgerlens_cors_allowed_origins)
+        return _split_csv(self.stellarlense_cors_allowed_origins)
 
     @property
     def admin_api_key(self) -> str:
-        return self.ledgerlens_admin_api_key
+        return self.stellarlense_admin_api_key
 
     @property
     def compliance_api_key(self) -> str:
-        return self.ledgerlens_compliance_api_key
+        return self.stellarlense_compliance_api_key
 
     @property
     def model_signing_key(self) -> str:
-        return self.ledgerlens_model_signing_key
+        return self.stellarlense_model_signing_key
 
     @model_signing_key.setter
     def model_signing_key(self, value: str) -> None:
-        object.__setattr__(self, "ledgerlens_model_signing_key", value)
+        object.__setattr__(self, "stellarlense_model_signing_key", value)
 
     @property
     def _default_risk_score_threshold(self) -> int:
@@ -963,7 +963,7 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-logger = logging.getLogger("ledgerlens.config")
+logger = logging.getLogger("stellar_lense.config")
 
 
 # ── Runtime config cache ──────────────────────────────────────────────────────
@@ -997,7 +997,7 @@ logger = logging.getLogger("ledgerlens.config")
 # behavior -- when Redis is unconfigured or unreachable (e.g. local
 # docker-compose's default profile, which does not run Redis at all).
 
-_CONFIG_VERSION_REDIS_KEY = "ledgerlens:config:version"
+_CONFIG_VERSION_REDIS_KEY = "stellar_lense:config:version"
 _CONFIG_VERSION_FAILURE_THRESHOLD = 3
 _CONFIG_VERSION_RECOVERY_TIMEOUT_SECONDS = 30.0
 

@@ -3,7 +3,7 @@
 Provides a combined view of risk score, SHAP explanation, trade timeline,
 ring membership, and analyst feedback capture for compliance analysts.
 
-All endpoints are admin-key gated (X-LedgerLens-Admin-Key header).
+All endpoints are admin-key gated (X-StellarLense-Admin-Key header).
 
 Endpoints
 ---------

@@ -19,7 +19,7 @@ INVALID_WALLET = "not-a-wallet"
 @pytest.fixture
 def client(tmp_path):
     path = str(tmp_path / "analyst.db")
-    with patch.object(_settings, "ledgerlens_db_path", path):
+    with patch.object(_settings, "stellarlense_db_path", path):
         from api.analyst import router
         from api.auth import require_admin_key
 

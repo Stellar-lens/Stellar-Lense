@@ -5,12 +5,12 @@ assignees: []
 ---
 
 ## Summary
-LedgerLens has no Kubernetes deployment artifacts, limiting production deployment options to single-host Docker Compose. A Helm chart covering the API server, ingestion workers, and feature store enables repeatable, configurable cloud-native deployment on any Kubernetes cluster.
+Stellar Lense has no Kubernetes deployment artifacts, limiting production deployment options to single-host Docker Compose. A Helm chart covering the API server, ingestion workers, and feature store enables repeatable, configurable cloud-native deployment on any Kubernetes cluster.
 
 ## Objectives
-- [ ] Create `helm/ledgerlens/` chart with templates for: API Deployment, Ingestion Worker Deployment, HPA, Service, Ingress, ConfigMap, Secret, PersistentVolumeClaim
+- [ ] Create `helm/stellar_lense/` chart with templates for: API Deployment, Ingestion Worker Deployment, HPA, Service, Ingress, ConfigMap, Secret, PersistentVolumeClaim
 - [ ] Values file with sensible defaults: `replicaCount: 2`, resource limits, ingress disabled by default
-- [ ] `helm install ledgerlens ./helm/ledgerlens --set ingress.enabled=true` produces a working deployment
+- [ ] `helm install stellar_lense ./helm/stellar_lense --set ingress.enabled=true` produces a working deployment
 - [ ] Add liveness probe (`GET /health`) and readiness probe (`GET /health/ready`) to the API deployment
 - [ ] Document in `docs/kubernetes_deployment.md`
 

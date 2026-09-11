@@ -1,6 +1,6 @@
 # detection/
 
-This package is the core of LedgerLens: it ingests trade feature vectors and produces the **LedgerLens Risk Score (0–100)** for every wallet and asset pair. It implements Benford's Law anomaly detection, graph-based wash-ring discovery, an ensemble ML pipeline (RF / XGBoost / LightGBM), a temporal sequence encoder, GNN ring classification, SHAP and causal explainability, conformal uncertainty quantification, zero-knowledge range proofs, federated learning, governance/dispute handling, compliance reporting, and all infrastructure required to publish scores on-chain via Soroban.
+This package is the core of Stellar Lense: it ingests trade feature vectors and produces the **Stellar Lense Risk Score (0–100)** for every wallet and asset pair. It implements Benford's Law anomaly detection, graph-based wash-ring discovery, an ensemble ML pipeline (RF / XGBoost / LightGBM), a temporal sequence encoder, GNN ring classification, SHAP and causal explainability, conformal uncertainty quantification, zero-knowledge range proofs, federated learning, governance/dispute handling, compliance reporting, and all infrastructure required to publish scores on-chain via Soroban.
 
 The files below are grouped by concern. For deeper treatment of any subsystem, follow the linked documentation pages.
 
@@ -133,7 +133,7 @@ The files below are grouped by concern. For deeper treatment of any subsystem, f
 
 | File | Description |
 |------|-------------|
-| `soroban_publisher.py` | Submits `RiskScore` records on-chain via the `ledgerlens-score` Soroban contract with circuit-breaker and retry logic |
+| `soroban_publisher.py` | Submits `RiskScore` records on-chain via the `stellar-lense-score` Soroban contract with circuit-breaker and retry logic |
 | `soroban_lease.py` | Manages Soroban storage entry lease renewals to prevent on-chain data expiry |
 | `event_bus.py` | Event bus integration (Kafka / NATS) for publishing score events to downstream consumers |
 | `oracle_coordinator.py` | Oracle quorum coordination — collects independent score attestations before on-chain submission |

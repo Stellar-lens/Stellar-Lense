@@ -1,7 +1,7 @@
-"""Incremental Parquet snapshot exports from the LedgerLens SQLite store.
+"""Incremental Parquet snapshot exports from the StellarLense SQLite store.
 
 Exports :class:`~ingestion.data_models.Trade` records to date-partitioned
-Parquet files compatible with the ``ledgerlens-data`` repository schema.
+Parquet files compatible with the ``stellar-lense-data`` repository schema.
 Partitions are laid out in Hive-style directories::
 
     <output_dir>/
@@ -24,7 +24,7 @@ Usage::
     from pathlib import Path
     from ingestion.parquet_exporter import ParquetExporter
 
-    conn = sqlite3.connect("./ledgerlens.db")
+    conn = sqlite3.connect("./stellar_lense.db")
     exporter = ParquetExporter(db_conn=conn, output_dir=Path("./export"))
     result = exporter.export(since=date(2026, 1, 1), until=date(2026, 6, 30))
     print(result)
@@ -61,7 +61,7 @@ from typing import TYPE_CHECKING, Iterator
 if TYPE_CHECKING:
     import pyarrow as pa
 
-logger = logging.getLogger("ledgerlens.parquet_exporter")
+logger = logging.getLogger("stellar_lense.parquet_exporter")
 
 # ---------------------------------------------------------------------------
 # Schema field list (usable without importing pyarrow)
@@ -95,7 +95,7 @@ def _build_schema():
     handle ``ImportError`` themselves.
 
     The schema matches :class:`~ingestion.data_models.Trade` field names
-    exactly to maintain the shared contract with ``ledgerlens-data``.
+    exactly to maintain the shared contract with ``stellar-lense-data``.
     Decimal128(22, 7) matches Stellar's 7-decimal-place amount precision.
     """
     import pyarrow as pa  # noqa: PLC0415
@@ -227,7 +227,7 @@ class ParquetExporter:
     (delta detection), making incremental exports fast for large datasets.
 
     Args:
-        db_conn: Open ``sqlite3.Connection`` to the LedgerLens database.
+        db_conn: Open ``sqlite3.Connection`` to the StellarLense database.
             The caller is responsible for closing it after export.
         output_dir: Root directory for Parquet output.  Must resolve to a
             path within the project working directory (validated at init).

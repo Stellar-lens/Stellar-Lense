@@ -6,11 +6,11 @@ assignees: []
 
 ## Summary
 
-Extend `detection/zk_commitment.py` to implement a Pedersen commitment scheme enabling a wallet to prove cryptographically that its LedgerLens risk score is below a configurable threshold — without revealing the exact score. Implement `commit(score, randomness)`, `open(commitment, score, randomness)`, and `verify_below_threshold(commitment, threshold, proof)`. This enables privacy-preserving score attestation for DeFi protocol integrations: a protocol can verify a wallet meets its risk requirement without LedgerLens needing to reveal the raw score.
+Extend `detection/zk_commitment.py` to implement a Pedersen commitment scheme enabling a wallet to prove cryptographically that its Stellar Lense risk score is below a configurable threshold — without revealing the exact score. Implement `commit(score, randomness)`, `open(commitment, score, randomness)`, and `verify_below_threshold(commitment, threshold, proof)`. This enables privacy-preserving score attestation for DeFi protocol integrations: a protocol can verify a wallet meets its risk requirement without Stellar Lense needing to reveal the raw score.
 
 ## Background & Context
 
-LedgerLens currently exposes raw risk scores (0–100) via its REST API and on-chain Soroban contract. For some DeFi protocol integrations, this creates a privacy concern: the raw score reveals LedgerLens's internal model assessment of a wallet, which could be commercially sensitive or enable gamification (a wallet operator who knows their exact score can tune their behaviour to stay just below a threshold).
+Stellar Lense currently exposes raw risk scores (0–100) via its REST API and on-chain Soroban contract. For some DeFi protocol integrations, this creates a privacy concern: the raw score reveals Stellar Lense's internal model assessment of a wallet, which could be commercially sensitive or enable gamification (a wallet operator who knows their exact score can tune their behaviour to stay just below a threshold).
 
 Pedersen commitments provide a solution. A Pedersen commitment to a value `v` using randomness `r` is `C = g^v * h^r mod p` (in a multiplicative group), where `g` and `h` are public group generators and `r` is a secret blinding factor known only to the committer. The commitment is:
 - **Hiding**: `C` reveals nothing about `v` (computationally, assuming DLP hardness).
@@ -151,7 +151,7 @@ async def verify_threshold(body: VerifyRequest, scheme: PedersenScheme = Depends
 - **Blinding factor secrecy**: `r` must never appear in API responses, logs, or the `on_chain_submissions` audit table. The `ThresholdCommitResponse` contains only `commitment_hex` and the proof (which reveals no information about `r` under the Fiat-Shamir transform).
 - **Group parameter integrity**: `PedersenParams` must be a compile-time constant, not loaded from the database or user input. A malicious caller substituting weak group parameters could break the binding property.
 - **Score validation**: `commit()` must reject scores outside [0, 100] before any group operations.
-- **Fiat-Shamir heuristic**: the challenge hash must include all public parameters (`C`, `threshold`, all bit commitments) to prevent selective forgery attacks. Use SHA-256 with a domain separator: `b"LedgerLens-Pedersen-v1"`.
+- **Fiat-Shamir heuristic**: the challenge hash must include all public parameters (`C`, `threshold`, all bit commitments) to prevent selective forgery attacks. Use SHA-256 with a domain separator: `b"StellarLense-Pedersen-v1"`.
 - **Constant-time comparison**: `open()` must use `secrets.compare_digest()` for the commitment comparison to prevent timing side-channels.
 - **Proof expiry**: `POST /scores/{wallet}/commit` returns a `valid_until` timestamp (1 hour). Expired proofs should be rejected by `POST /scores/verify-threshold`. Cache commitments in SQLite with expiry; do not cache the blinding factor.
 

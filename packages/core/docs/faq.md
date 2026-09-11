@@ -1,20 +1,20 @@
 # Frequently Asked Questions
 
-Higher-level questions a newcomer or evaluator of LedgerLens is likely to ask.
+Higher-level questions a newcomer or evaluator of Stellar Lense is likely to ask.
 For setup and environment problems (e.g. a broken install), this page is **not**
 the right place — this FAQ is about understanding *what the project is*.
 
 Answers are grounded in the current state of the repository. Where a topic needs
 more depth, follow the linked doc.
 
-## What is LedgerLens?
+## What is Stellar Lense?
 
-LedgerLens is a hybrid on-chain fraud detection system for the Stellar
+Stellar Lense is a hybrid on-chain fraud detection system for the Stellar
 Decentralised Exchange (SDEX). It ingests trade data from the Stellar Horizon
 API, scores wallets and asset pairs for wash-trading risk using Benford's Law
 digit-distribution analysis combined with ensemble machine learning, and
 publishes those scores through both a REST API and an on-chain Soroban contract.
-See the [project overview](https://github.com/Ledger-Lenz/Ledgerlens-core/blob/main/README.md#overview) for the full picture.
+See the [project overview](https://github.com/Stellar-lens/Stellar-Lense/blob/main/README.md#overview) for the full picture.
 
 ## What is wash trading, and why does it matter?
 
@@ -22,13 +22,13 @@ Wash trading is simultaneously buying and selling the same asset to artificially
 inflate trading volume. On a DEX it misleads traders about real liquidity, lets
 token issuers game DEX-aggregator rankings, and erodes ecosystem credibility.
 Blockchain data is transparent, but the volume of on-chain activity makes manual
-detection impractical — which is the gap LedgerLens fills.
+detection impractical — which is the gap Stellar Lense fills.
 
-## What chains does LedgerLens support?
+## What chains does Stellar Lense support?
 
 The primary target is the **Stellar DEX**, with trade data ingested from the
 Horizon API and risk scores anchored on-chain via a **Soroban** contract.
-LedgerLens also has **cross-chain** detection that links Stellar wallets to EVM
+Stellar Lense also has **cross-chain** detection that links Stellar wallets to EVM
 counterparts (Ethereum, Base, Polygon) through Allbridge bridge events to catch
 wash-trade rings that route capital across the bridge. There is also a Solana
 ingestion adapter. See
@@ -36,7 +36,7 @@ ingestion adapter. See
 
 ## How is this different from a generic fraud-detection tool?
 
-LedgerLens is purpose-built for DEX wash trading rather than general fraud. It
+Stellar Lense is purpose-built for DEX wash trading rather than general fraud. It
 combines three complementary signals that a generic tool would not have together:
 Benford's Law analysis of transaction amounts, an ensemble ML classifier trained
 on labelled wash-trade patterns, and graph-based ring detection over the trade
@@ -44,18 +44,18 @@ graph. It is also composable — scores are published to a Soroban contract so
 other Stellar protocols (AMMs, lending, aggregators) can consume them natively,
 not just read a dashboard.
 
-## Is LedgerLens production-ready?
+## Is Stellar Lense production-ready?
 
 Not fully. The detection engine — Benford analysis, the ML ensemble, graph ring
 detection, SHAP explanations, and the local read-only API — is implemented and
 tested. However, several roadmap items are still open, including internal Testnet
 testing, Soroban contract deployment, the public rate-limited API, and mainnet
-deployment. See the [Roadmap](https://github.com/Ledger-Lenz/Ledgerlens-core/blob/main/ROADMAP.md) and the roadmap section of the
-[README](https://github.com/Ledger-Lenz/Ledgerlens-core/blob/main/README.md#roadmap) for what is done versus in progress.
+deployment. See the [Roadmap](https://github.com/Stellar-lens/Stellar-Lense/blob/main/ROADMAP.md) and the roadmap section of the
+[README](https://github.com/Stellar-lens/Stellar-Lense/blob/main/README.md#roadmap) for what is done versus in progress.
 
 ## How accurate is the risk score? Can I trust a single number?
 
-Each wallet and asset pair gets a **LedgerLens Risk Score (0–100)** blended from
+Each wallet and asset pair gets a **Stellar Lense Risk Score (0–100)** blended from
 Benford anomaly metrics and the ML ensemble. Benford signals alone are not
 sufficient (legitimate market makers can also be non-Benford), which is why they
 are always combined with the ML layer. Scores can also carry calibrated
@@ -65,7 +65,7 @@ signal backed by explanations, not an absolute verdict — see
 
 ## Can I run just the detection engine without the full API or on-chain publishing?
 
-Yes. This repo (`ledgerlens-core`) *is* the detection engine — the public API,
+Yes. This repo (`stellar-lense-core`) *is* the detection engine — the public API,
 dashboard, and Soroban contract live in separate repos. You can train on
 synthetic data with `python cli.py train` and run the pipeline with
 `python run_pipeline.py`, which writes `RiskScore` records to a local SQLite
@@ -79,7 +79,7 @@ No. `python cli.py train` generates a synthetic trade history with labelled
 wash-trading rings (`ingestion/synthetic_data.py`) and trains the
 Random Forest / XGBoost / LightGBM ensemble on it, so you can run the full
 pipeline end-to-end without any external dataset. See the
-[Quick Start](https://github.com/Ledger-Lenz/Ledgerlens-core/blob/main/README.md#quick-start) in the README.
+[Quick Start](https://github.com/Stellar-lens/Stellar-Lense/blob/main/README.md#quick-start) in the README.
 
 ## Why Benford's Law? Isn't that just for accounting?
 
@@ -90,7 +90,7 @@ this expectation, which makes it a useful first-pass signal on transaction
 amounts. It is one input among several, combined with ML and graph features. See
 [Benford Analysis](benford_analysis.md).
 
-## How do other protocols consume LedgerLens scores?
+## How do other protocols consume Stellar Lense scores?
 
 The Soroban contract is the on-chain truth layer. It exposes
 `get_score(wallet, asset_pair) -> RiskScore`, callable by any other Soroban
@@ -99,19 +99,19 @@ for example, refusing liquidity provision above a configurable risk threshold �
 without an external oracle. Off-chain consumers can use the REST API or subscribe
 to signed webhook alerts.
 
-## Is LedgerLens open source? What's the license?
+## Is Stellar Lense open source? What's the license?
 
-Yes. LedgerLens is MIT-licensed and developed as an open-source public good for
+Yes. Stellar Lense is MIT-licensed and developed as an open-source public good for
 the Stellar ecosystem — the methodology, scores, and training data are intended
 to be transparent and auditable. See [`LICENSE`](../LICENSE) and the
-[Contributing](https://github.com/Ledger-Lenz/Ledgerlens-core/blob/main/README.md#contributing) section.
+[Contributing](https://github.com/Stellar-lens/Stellar-Lense/blob/main/README.md#contributing) section.
 
 ## How is the project organised across repos?
 
-`ledgerlens-core` (this repo) is the detection engine. The public API,
+`stellar-lense-core` (this repo) is the detection engine. The public API,
 dashboard, Soroban contracts, canonical data store, and org-wide GitHub config
 each live in their own repo. See the
-[LedgerLens Organization](https://github.com/Ledger-Lenz/Ledgerlens-core/blob/main/README.md#ledgerlens-organization) section of the
+[Stellar Lense Organization](https://github.com/Stellar-lens/Stellar-Lense/blob/main/README.md#stellar-lense-organization) section of the
 README for the full breakdown and the cross-repo data flow.
 
 ## Where do I go for more detail?
@@ -121,4 +121,4 @@ README for the full breakdown and the cross-repo data flow.
 - [Cross-Chain Detection](cross_chain_detection.md)
 - [Governance Protocol](governance_protocol.md)
 - [Threat Model](threat_model.md)
-- [Roadmap](https://github.com/Ledger-Lenz/Ledgerlens-core/blob/main/ROADMAP.md)
+- [Roadmap](https://github.com/Stellar-lens/Stellar-Lense/blob/main/ROADMAP.md)

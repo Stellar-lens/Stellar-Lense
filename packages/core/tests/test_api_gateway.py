@@ -4,7 +4,7 @@ Covers:
 - Key created via canonical store is recognised by gateway
 - Migration consolidates rows from legacy schemas into canonical table
 - Per-minute rate limit (429 with Retry-After)
-- Daily quota (429 with X-LedgerLens-Quota-Reset)
+- Daily quota (429 with X-StellarLense-Quota-Reset)
 - GATEWAY_LOG_BODY=false — access logs never contain wallet/score payloads
 - Quota backend unreachable — scoped routes return 503, public routes succeed
 - Legacy api/api_keys_router.py endpoints include Deprecation header
@@ -36,11 +36,11 @@ def db_path(tmp_path):
     Uses object.__setattr__ (pydantic-safe) to patch both the raw field and
     the property, so _connect() sees the tmp path on every call.
     """
-    path = str(tmp_path / "test_ledgerlens.db")
-    original = _settings.ledgerlens_db_path
-    object.__setattr__(_settings, "ledgerlens_db_path", path)
+    path = str(tmp_path / "test_stellar_lense.db")
+    original = _settings.stellarlense_db_path
+    object.__setattr__(_settings, "stellarlense_db_path", path)
     yield path
-    object.__setattr__(_settings, "ledgerlens_db_path", original)
+    object.__setattr__(_settings, "stellarlense_db_path", original)
 
 
 @pytest.fixture
@@ -59,10 +59,10 @@ def canonical_api_key(db_path):
 @pytest.fixture
 def admin_api_key(db_path):
     """Patch the admin API key in settings for the duration of the test."""
-    original = _settings.ledgerlens_admin_api_key
-    object.__setattr__(_settings, "ledgerlens_admin_api_key", "test-admin-key-12345")
+    original = _settings.stellarlense_admin_api_key
+    object.__setattr__(_settings, "stellarlense_admin_api_key", "test-admin-key-12345")
     yield "test-admin-key-12345"
-    object.__setattr__(_settings, "ledgerlens_admin_api_key", original)
+    object.__setattr__(_settings, "stellarlense_admin_api_key", original)
 
 
 @pytest.fixture
@@ -116,7 +116,7 @@ def test_gateway_recognises_canonical_key(app, canonical_api_key, db_path):
 
     resp = client.get(
         "/v1/scores/GABCDEF123",
-        headers={"X-LedgerLens-Api-Key": plaintext},
+        headers={"X-StellarLense-Api-Key": plaintext},
     )
     assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
     data = resp.json()
@@ -129,7 +129,7 @@ def test_gateway_rejects_invalid_key(app, db_path):
     client = TestClient(app)
     resp = client.get(
         "/v1/scores/GABCDEF123",
-        headers={"X-LedgerLens-Api-Key": "invalid-key-123"},
+        headers={"X-StellarLense-Api-Key": "invalid-key-123"},
     )
     assert resp.status_code == 401
 
@@ -143,11 +143,11 @@ def test_gateway_public_route_no_auth_required(app, db_path):
 
 
 def test_gateway_admin_key_access(app, admin_api_key, db_path):
-    """X-LedgerLens-Admin-Key grants access to admin-scoped routes."""
+    """X-StellarLense-Admin-Key grants access to admin-scoped routes."""
     client = TestClient(app)
     resp = client.get(
         "/admin/test",
-        headers={"X-LedgerLens-Admin-Key": "test-admin-key-12345"},
+        headers={"X-StellarLense-Admin-Key": "test-admin-key-12345"},
     )
     assert resp.status_code == 200
     assert resp.json() == {"admin": True}
@@ -155,17 +155,17 @@ def test_gateway_admin_key_access(app, admin_api_key, db_path):
 
 def test_gateway_compliance_key_access(app, db_path):
     """Compliance key grants access to compliance:read-scoped routes."""
-    original = _settings.ledgerlens_compliance_api_key
-    object.__setattr__(_settings, "ledgerlens_compliance_api_key", "test-compliance-key")
+    original = _settings.stellarlense_compliance_api_key
+    object.__setattr__(_settings, "stellarlense_compliance_api_key", "test-compliance-key")
     try:
         client = TestClient(app)
         resp = client.get(
             "/compliance/sar-package",
-            headers={"X-LedgerLens-Compliance-Key": "test-compliance-key"},
+            headers={"X-StellarLense-Compliance-Key": "test-compliance-key"},
         )
         assert resp.status_code == 200
     finally:
-        object.__setattr__(_settings, "ledgerlens_compliance_api_key", original)
+        object.__setattr__(_settings, "stellarlense_compliance_api_key", original)
 
 
 # ---------------------------------------------------------------------------
@@ -180,7 +180,7 @@ def test_gateway_rejects_wrong_scope(app, canonical_api_key, db_path):
 
     resp = client.get(
         "/admin/test",
-        headers={"X-LedgerLens-Api-Key": plaintext},
+        headers={"X-StellarLense-Api-Key": plaintext},
     )
     assert resp.status_code == 403
     assert "Scope" in resp.text or "scope" in resp.text
@@ -204,14 +204,14 @@ def test_gateway_per_minute_rate_limit(app, db_path):
 
     client = TestClient(app)
 
-    resp1 = client.get("/v1/scores/A", headers={"X-LedgerLens-Api-Key": plaintext})
+    resp1 = client.get("/v1/scores/A", headers={"X-StellarLense-Api-Key": plaintext})
     assert resp1.status_code == 200
 
-    resp2 = client.get("/v1/scores/B", headers={"X-LedgerLens-Api-Key": plaintext})
+    resp2 = client.get("/v1/scores/B", headers={"X-StellarLense-Api-Key": plaintext})
     assert resp2.status_code == 200
 
     # Third request exceeds the limit of 2/minute
-    resp3 = client.get("/v1/scores/C", headers={"X-LedgerLens-Api-Key": plaintext})
+    resp3 = client.get("/v1/scores/C", headers={"X-StellarLense-Api-Key": plaintext})
     assert resp3.status_code == 429
     assert "Retry-After" in resp3.headers
 
@@ -222,7 +222,7 @@ def test_gateway_per_minute_rate_limit(app, db_path):
 
 
 def test_gateway_daily_quota(app, db_path):
-    """Exceeding the daily quota returns 429 with X-LedgerLens-Quota-Reset."""
+    """Exceeding the daily quota returns 429 with X-StellarLense-Quota-Reset."""
     from detection.api_key_store import _hash_key, _init_table, _connect
 
     key_id = "test-quota-key"
@@ -271,9 +271,9 @@ def test_gateway_daily_quota(app, db_path):
         conn.commit()
 
     client = TestClient(app)
-    resp = client.get("/v1/scores/D", headers={"X-LedgerLens-Api-Key": plaintext})
+    resp = client.get("/v1/scores/D", headers={"X-StellarLense-Api-Key": plaintext})
     assert resp.status_code == 429
-    assert "X-LedgerLens-Quota-Reset" in resp.headers
+    assert "X-StellarLense-Quota-Reset" in resp.headers
 
 
 # ---------------------------------------------------------------------------
@@ -382,7 +382,7 @@ def test_gateway_log_body_false(app, db_path, caplog):
     """Access log entries never contain wallet addresses or score payloads."""
     import logging
 
-    caplog.set_level(logging.INFO, logger="ledgerlens.gateway")
+    caplog.set_level(logging.INFO, logger="stellar_lense.gateway")
 
     from detection.api_key_store import create_api_key
 
@@ -396,13 +396,13 @@ def test_gateway_log_body_false(app, db_path, caplog):
     client = TestClient(app)
     resp = client.get(
         "/v1/scores/GABCDEF123XYZ",
-        headers={"X-LedgerLens-Api-Key": plaintext},
+        headers={"X-StellarLense-Api-Key": plaintext},
     )
     assert resp.status_code == 200
 
     # Gateway log should record path and method, but must not log response body
     for record in caplog.records:
-        if record.name == "ledgerlens.gateway":
+        if record.name == "stellar_lense.gateway":
             msg = record.getMessage()
             # Response body fields (wallet, score) must not appear in log
             assert '"wallet"' not in msg, f"Response body leaked into gateway log: {msg}"
@@ -500,7 +500,7 @@ def test_correlation_id_in_response(app, canonical_api_key, db_path):
     # Authenticated route
     resp = client.get(
         "/v1/scores/GABCDEF123",
-        headers={"X-LedgerLens-Api-Key": canonical_api_key["plaintext_key"]},
+        headers={"X-StellarLense-Api-Key": canonical_api_key["plaintext_key"]},
     )
     assert "x-correlation-id" in resp.headers, "Authenticated route missing X-Correlation-ID"
 

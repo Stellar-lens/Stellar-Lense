@@ -18,7 +18,7 @@ from fastapi import Header, HTTPException
 
 from config.settings import settings
 
-logger = logging.getLogger("ledgerlens.namespace")
+logger = logging.getLogger("stellar_lense.namespace")
 
 # ---------------------------------------------------------------------------
 # Schema
@@ -256,9 +256,9 @@ def rotate_namespace_key(
         conn.commit()
 
     try:
-        from api.metrics import ledgerlens_secret_rotation_total
-        if ledgerlens_secret_rotation_total is not None:
-            ledgerlens_secret_rotation_total.labels(secret_type="namespace_key", result="success").inc()
+        from api.metrics import stellar_lense_secret_rotation_total
+        if stellar_lense_secret_rotation_total is not None:
+            stellar_lense_secret_rotation_total.labels(secret_type="namespace_key", result="success").inc()
     except Exception:
         pass
 
@@ -338,21 +338,21 @@ def list_namespaces(db_path: str | None = None) -> list[dict]:
 
 
 def namespace_filter(
-    x_ledgerlens_api_key: str = Header(default=""),
+    x_stellarlense_api_key: str = Header(default=""),
 ) -> str:
     """FastAPI dependency that resolves the API key to its namespace_id.
 
     Returns the namespace string.  An admin wildcard key returns ``'*'``.
     Raises ``HTTPException 401`` for unknown / inactive keys.
     """
-    multi_tenant = getattr(settings, "ledgerlens_multi_tenant_enabled", False)
+    multi_tenant = getattr(settings, "stellar_lense_multi_tenant_enabled", False)
     if not multi_tenant:
         return "default"
 
-    if not x_ledgerlens_api_key:
+    if not x_stellarlense_api_key:
         raise HTTPException(
             status_code=401,
-            detail="Missing X-LedgerLens-Api-Key header",
+            detail="Missing X-StellarLense-Api-Key header",
         )
-    ns = lookup_namespace(x_ledgerlens_api_key)
+    ns = lookup_namespace(x_stellarlense_api_key)
     return ns

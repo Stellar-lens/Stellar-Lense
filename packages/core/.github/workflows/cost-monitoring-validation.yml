@@ -60,10 +60,10 @@ jobs:
       - name: Check dashboard references correct metrics
         run: |
           # Verify recording rule metrics are referenced
-          grep -q "ledgerlens:namespace_cost_per_hour:usd" monitoring/grafana/cost_capacity_dashboard.json
-          grep -q "ledgerlens:cost_per_wallet_scored:usd" monitoring/grafana/cost_capacity_dashboard.json
-          grep -q "ledgerlens:replica_count_projected_days_to_max" monitoring/grafana/cost_capacity_dashboard.json
-          grep -q "ledgerlens:pvc_projected_days_to_full" monitoring/grafana/cost_capacity_dashboard.json
+          grep -q "stellar_lense:namespace_cost_per_hour:usd" monitoring/grafana/cost_capacity_dashboard.json
+          grep -q "stellar_lense:cost_per_wallet_scored:usd" monitoring/grafana/cost_capacity_dashboard.json
+          grep -q "stellar_lense:replica_count_projected_days_to_max" monitoring/grafana/cost_capacity_dashboard.json
+          grep -q "stellar_lense:pvc_projected_days_to_full" monitoring/grafana/cost_capacity_dashboard.json
           echo "✓ Dashboard references correct metrics"
   
   test-cost-metrics:

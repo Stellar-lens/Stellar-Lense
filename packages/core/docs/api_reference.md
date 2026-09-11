@@ -1,6 +1,6 @@
 # REST API Reference
 
-The LedgerLens local API is a FastAPI application serving risk scores, alerts,
+The Stellar Lense local API is a FastAPI application serving risk scores, alerts,
 and analyst review data from the local SQLite store.
 
 ## Authentication
@@ -9,14 +9,14 @@ Two API keys gate protected endpoints:
 
 | Header | Scope |
 |--------|-------|
-| `X-LedgerLens-Admin-Key` | Admin endpoints (drift reports, retrain runs, analyst dashboard) |
-| `X-LedgerLens-Compliance-Key` | Compliance endpoints (IVMS, SAR packages) |
+| `X-StellarLense-Admin-Key` | Admin endpoints (drift reports, retrain runs, analyst dashboard) |
+| `X-StellarLense-Compliance-Key` | Compliance endpoints (IVMS, SAR packages) |
 
 Set these in your `.env` file:
 
 ```bash
-LEDGERLENS_ADMIN_API_KEY=your-admin-key
-LEDGERLENS_COMPLIANCE_API_KEY=your-compliance-key
+STELLARLENSE_ADMIN_API_KEY=your-admin-key
+STELLARLENSE_COMPLIANCE_API_KEY=your-compliance-key
 ```
 
 ## Core Endpoints
@@ -52,7 +52,7 @@ Manipulation alerts. Use `alert_type` to filter by type
 
 ## Analyst Dashboard
 
-The following endpoints all require `X-LedgerLens-Admin-Key`.
+The following endpoints all require `X-StellarLense-Admin-Key`.
 
 ### GET /analyst/wallet/{wallet}
 
@@ -77,7 +77,7 @@ Export feedback records for the active learning loop.
 
 ## Admin Endpoints
 
-All require `X-LedgerLens-Admin-Key`.
+All require `X-StellarLense-Admin-Key`.
 
 | Endpoint | Description |
 |----------|-------------|
@@ -88,7 +88,7 @@ All require `X-LedgerLens-Admin-Key`.
 
 ## Compliance Endpoints
 
-All require `X-LedgerLens-Compliance-Key` and are excluded from the public
+All require `X-StellarLense-Compliance-Key` and are excluded from the public
 OpenAPI schema. See [compliance_export.md](compliance_export.md) for full
 details, regulatory context, and a legal disclaimer.
 

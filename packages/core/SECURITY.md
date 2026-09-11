@@ -1,13 +1,13 @@
 # Security Policy
 
-LedgerLens handles on-chain smart contract interactions, API credentials, and
+Stellar Lense handles on-chain smart contract interactions, API credentials, and
 cryptographic proofs. If you believe you've found a security vulnerability,
 please report it privately rather than filing a public GitHub issue.
 
 ## Reporting a Vulnerability
 
 Please report suspected vulnerabilities using
-[GitHub's private vulnerability reporting](https://github.com/Ledger-Lenz/Ledgerlens-core/security/advisories/new)
+[GitHub's private vulnerability reporting](https://github.com/Stellar-lens/Stellar-Lense/security/advisories/new)
 feature for this repository (Security tab → "Report a vulnerability"). This
 opens a private advisory visible only to maintainers until a fix is ready.
 
@@ -26,7 +26,7 @@ issue is triaged and fixed.
 
 ## Supported Versions
 
-LedgerLens does not yet maintain parallel release branches — security fixes
+Stellar Lense does not yet maintain parallel release branches — security fixes
 are applied to the `main` branch and released from there. See
 [CHANGELOG.md](CHANGELOG.md) for release history.
 

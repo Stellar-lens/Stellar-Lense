@@ -10,7 +10,7 @@ Extend `detection/temporal_model.py` with a production-quality LSTM/Transformer 
 
 ## Background & Context
 
-The 35 baseline features in LedgerLens are all scalar aggregates over a time window. They capture what a wallet does (volume, concentration, ring membership) but not *how* it does it temporally. Wash-trading bots often have characteristic timing signatures:
+The 35 baseline features in Stellar Lense are all scalar aggregates over a time window. They capture what a wallet does (volume, concentration, ring membership) but not *how* it does it temporally. Wash-trading bots often have characteristic timing signatures:
 
 - **Metronomic inter-arrival times**: human traders have high variance in trade timing; bots execute at near-fixed intervals (e.g., every 4 seconds ± 0.2s)
 - **Low counterparty entropy**: bots rotate through a small fixed counterparty set, producing low Shannon entropy of counterparty distribution

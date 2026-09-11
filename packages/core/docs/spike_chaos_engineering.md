@@ -7,7 +7,7 @@
 
 ## Executive Summary & Recommendation
 
-LedgerLens requires a robust chaos-engineering strategy to ensure high availability and resilience under adverse network, database, and infrastructure conditions. We currently have two disconnected implementations:
+Stellar Lense requires a robust chaos-engineering strategy to ensure high availability and resilience under adverse network, database, and infrastructure conditions. We currently have two disconnected implementations:
 1. **Application-level Toxiproxy-based suite** (`tests/chaos/`) running fast via Docker Compose.
 2. **Kubernetes-native Chaos Mesh manifests** (`chaos-mesh/`) targeting cluster infrastructure, which are currently un-triggered.
 
@@ -53,13 +53,13 @@ graph TD
 
 Toxiproxy intercepts network traffic between the application and its dependencies (Redis, external Horizon APIs). 
 
-*   **Location:** [tests/chaos/](file:///c:/Users/Lc/Desktop/Ledgerlens-core/tests/chaos)
+*   **Location:** [tests/chaos/](file:///c:/Users/Lc/Desktop/StellarLense-core/tests/chaos)
 *   **Target Scope:** Every Pull Request and commit to the `main` branch.
 *   **Key Coverage:**
-    *   **Latency Spikes:** [`test_horizon_latency.py`](file:///c:/Users/Lc/Desktop/Ledgerlens-core/tests/chaos/test_horizon_latency.py) verifies p99 scoring latency stays below 2s when Horizon is slow.
-    *   **Circuit Breaking:** [`test_circuit_breaker.py`](file:///c:/Users/Lc/Desktop/Ledgerlens-core/tests/chaos/test_circuit_breaker.py) checks that `SorobanPublisher` isolates API failures.
-    *   **Cache Fallbacks:** [`test_redis_fallback.py`](file:///c:/Users/Lc/Desktop/Ledgerlens-core/tests/chaos/test_redis_fallback.py) ensures cold tier activation when Redis is down.
-    *   **Lock Contention:** [`test_sqlite_wal_lock.py`](file:///c:/Users/Lc/Desktop/Ledgerlens-core/tests/chaos/test_sqlite_wal_lock.py) verifies SQLite WAL locks return 503 instead of 500.
+    *   **Latency Spikes:** [`test_horizon_latency.py`](file:///c:/Users/Lc/Desktop/StellarLense-core/tests/chaos/test_horizon_latency.py) verifies p99 scoring latency stays below 2s when Horizon is slow.
+    *   **Circuit Breaking:** [`test_circuit_breaker.py`](file:///c:/Users/Lc/Desktop/StellarLense-core/tests/chaos/test_circuit_breaker.py) checks that `SorobanPublisher` isolates API failures.
+    *   **Cache Fallbacks:** [`test_redis_fallback.py`](file:///c:/Users/Lc/Desktop/StellarLense-core/tests/chaos/test_redis_fallback.py) ensures cold tier activation when Redis is down.
+    *   **Lock Contention:** [`test_sqlite_wal_lock.py`](file:///c:/Users/Lc/Desktop/StellarLense-core/tests/chaos/test_sqlite_wal_lock.py) verifies SQLite WAL locks return 503 instead of 500.
 
 > [!TIP]
 > To fully integrate Layer 1 into standard PR flows, we should update `.github/workflows/ci.yml` or modify `.github/workflows/chaos.yml` to trigger on `pull_request` events, running the suite automatically on every code change.
@@ -68,12 +68,12 @@ Toxiproxy intercepts network traffic between the application and its dependencie
 
 Chaos Mesh injects low-level chaos directly via Kubernetes Custom Resource Definitions (CRDs).
 
-*   **Location:** [chaos-mesh/](file:///c:/Users/Lc/Desktop/Ledgerlens-core/chaos-mesh)
+*   **Location:** [chaos-mesh/](file:///c:/Users/Lc/Desktop/StellarLense-core/chaos-mesh)
 *   **Target Scope:** Nightly cron schedules and pre-release validation against a replica environment.
 *   **Key Coverage:**
-    *   **Network Partition (Ingestion):** [`network-partition-ingestion.yaml`](file:///c:/Users/Lc/Desktop/Ledgerlens-core/chaos-mesh/network-partition-ingestion.yaml) cuts communication between the API and the ingestion workers.
-    *   **Network Partition (Redis):** [`network-partition-redis.yaml`](file:///c:/Users/Lc/Desktop/Ledgerlens-core/chaos-mesh/network-partition-redis.yaml) simulates cache disconnection at the network interface layer.
-    *   **Pod Kills:** [`pod-kill-api.yaml`](file:///c:/Users/Lc/Desktop/Ledgerlens-core/chaos-mesh/pod-kill-api.yaml) and [`pod-kill-ingestion.yaml`](file:///c:/Users/Lc/Desktop/Ledgerlens-core/chaos-mesh/pod-kill-ingestion.yaml) randomly terminate active service instances.
+    *   **Network Partition (Ingestion):** [`network-partition-ingestion.yaml`](file:///c:/Users/Lc/Desktop/StellarLense-core/chaos-mesh/network-partition-ingestion.yaml) cuts communication between the API and the ingestion workers.
+    *   **Network Partition (Redis):** [`network-partition-redis.yaml`](file:///c:/Users/Lc/Desktop/StellarLense-core/chaos-mesh/network-partition-redis.yaml) simulates cache disconnection at the network interface layer.
+    *   **Pod Kills:** [`pod-kill-api.yaml`](file:///c:/Users/Lc/Desktop/StellarLense-core/chaos-mesh/pod-kill-api.yaml) and [`pod-kill-ingestion.yaml`](file:///c:/Users/Lc/Desktop/StellarLense-core/chaos-mesh/pod-kill-ingestion.yaml) randomly terminate active service instances.
 
 ---
 
@@ -158,12 +158,12 @@ jobs:
         run: |
           # Send silence request to staging Prometheus Alertmanager
           curl -H "Content-Type: application/json" -d '{
-            "matchers": [{"name": "namespace", "value": "ledgerlens-staging", "isRegex": false}],
+            "matchers": [{"name": "namespace", "value": "stellar-lense-staging", "isRegex": false}],
             "startsAt": "'"$(date -u +"%Y-%m-%dT%H:%M:%SZ")"'",
             "endsAt": "'"$(date -u -d '+30 mins' +"%Y-%m-%dT%H:%M:%SZ")"'",
             "createdBy": "GHA-Chaos-Workflow",
             "comment": "Silencing alerts for scheduled chaos testing"
-          }' http://alertmanager.staging.ledgerlens.io/api/v2/silences || true
+          }' http://alertmanager.staging.stellar-lense.io/api/v2/silences || true
 
       - name: Inject Chaos Experiment
         run: |
@@ -174,14 +174,14 @@ jobs:
       - name: Run Active Validation workload
         run: |
           # Start a background request-generation script to simulate normal user traffic
-          python scripts/generate_traffic.py --url http://api.staging.ledgerlens.io --duration 120 &
+          python scripts/generate_traffic.py --url http://api.staging.stellar-lense.io --duration 120 &
           echo "Traffic generator started in background"
 
       - name: Verify Recovery
         run: |
           python chaos-mesh/verify_experiment.py \
-            --url http://api.staging.ledgerlens.io \
-            --metrics http://api.staging.ledgerlens.io/metrics \
+            --url http://api.staging.stellar-lense.io \
+            --metrics http://api.staging.stellar-lense.io/metrics \
             --timeout ${{ github.event.inputs.duration_seconds || 60 }}
 
       - name: Remove Chaos Experiment (Success Cleanup)
@@ -205,7 +205,7 @@ jobs:
 ## Production-Ready Completion of `verify_experiment.py`
 
 ### Current Implementation Assessment
-The existing [`verify_experiment.py`](file:///c:/Users/Lc/Desktop/Ledgerlens-core/chaos-mesh/verify_experiment.py) is a basic placeholder:
+The existing [`verify_experiment.py`](file:///c:/Users/Lc/Desktop/StellarLense-core/chaos-mesh/verify_experiment.py) is a basic placeholder:
 1. It has **hardcoded URLs** pointing to `localhost:8000`.
 2. It only checks the `/health` status is `"ok"`.
 3. It does not verify business-level flows (e.g., whether ingestion is processing blocks, whether Redis cache state transitions back to primary, or whether db queries succeed).
@@ -238,7 +238,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--url",
         default="http://localhost:8000",
-        help="Base URL of the LedgerLens API under test",
+        help="Base URL of the Stellar Lense API under test",
     )
     parser.add_argument(
         "--metrics-url",

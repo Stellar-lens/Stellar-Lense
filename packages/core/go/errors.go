@@ -1,4 +1,4 @@
-package ledgerlens
+package stellar_lense
 
 import (
 	"fmt"
@@ -7,10 +7,10 @@ import (
 	"time"
 )
 
-// LedgerLensAPIError is returned when the server responds with a non-2xx
+// StellarLenseAPIError is returned when the server responds with a non-2xx
 // status code. Callers can type-assert to inspect the status, body, and
 // Retry-After header (set on HTTP 429 responses).
-type LedgerLensAPIError struct {
+type StellarLenseAPIError struct {
 	// StatusCode is the HTTP status code (e.g. 401, 404, 429).
 	StatusCode int
 	// Detail is the parsed "detail" field from the JSON error body, or the
@@ -22,17 +22,17 @@ type LedgerLensAPIError struct {
 	RetryAfter time.Duration
 }
 
-func (e *LedgerLensAPIError) Error() string {
+func (e *StellarLenseAPIError) Error() string {
 	if e.RetryAfter > 0 {
-		return fmt.Sprintf("ledgerlens API error %d: %s (retry after %s)", e.StatusCode, e.Detail, e.RetryAfter)
+		return fmt.Sprintf("stellar_lense API error %d: %s (retry after %s)", e.StatusCode, e.Detail, e.RetryAfter)
 	}
-	return fmt.Sprintf("ledgerlens API error %d: %s", e.StatusCode, e.Detail)
+	return fmt.Sprintf("stellar_lense API error %d: %s", e.StatusCode, e.Detail)
 }
 
-// newAPIError constructs a LedgerLensAPIError from an HTTP response and the
+// newAPIError constructs a StellarLenseAPIError from an HTTP response and the
 // already-consumed response body text.
-func newAPIError(resp *http.Response, body string) *LedgerLensAPIError {
-	err := &LedgerLensAPIError{
+func newAPIError(resp *http.Response, body string) *StellarLenseAPIError {
+	err := &StellarLenseAPIError{
 		StatusCode: resp.StatusCode,
 		Detail:     extractDetail(body),
 	}

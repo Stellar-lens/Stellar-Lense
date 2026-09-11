@@ -1,4 +1,4 @@
-"""LedgerLens command-line interface.
+"""StellarLense command-line interface.
 
 Convenience wrapper around the pieces of the detection engine that are
 otherwise run as separate scripts/modules:
@@ -34,13 +34,13 @@ try:
 except Exception:
     __version__ = "0.0.0"
 
-app = typer.Typer(help="LedgerLens detection engine CLI")
-logger = logging.getLogger("ledgerlens.cli")
+app = typer.Typer(help="StellarLense detection engine CLI")
+logger = logging.getLogger("stellar_lense.cli")
 
 
 def _version_callback(value: bool) -> None:
     if value:
-        typer.echo(f"ledgerlens-core v{__version__}")
+        typer.echo(f"stellar-lense-core v{__version__}")
         raise typer.Exit()
 
 
@@ -55,7 +55,7 @@ def _main_callback(
         is_eager=True,
     ),
 ) -> None:
-    """LedgerLens detection engine CLI."""
+    """StellarLense detection engine CLI."""
     pass
 
 
@@ -829,7 +829,7 @@ def export_parquet(
     manifest.json. Unchanged partitions are skipped automatically
     (incremental export); use --force to re-export everything.
 
-    The output layout is compatible with the ledgerlens-data repository::
+    The output layout is compatible with the stellar-lense-data repository::
 
         <output_dir>/
         ├── manifest.json
@@ -862,7 +862,7 @@ def export_parquet(
     until_date = _parse_date(until, "--until") if until else None
 
     try:
-        conn = sqlite3.connect(cfg.ledgerlens_db_path)
+        conn = sqlite3.connect(cfg.stellarlense_db_path)
         exporter = ParquetExporter(
             db_conn=conn,
             output_dir=Path(output_dir),
@@ -1202,7 +1202,7 @@ def stream(
 
 @app.command("db-migrate")
 def db_migrate(
-    db_path: str = typer.Option(None, "--db-path", help="Path to the SQLite database (defaults to LEDGERLENS_DB_PATH)"),
+    db_path: str = typer.Option(None, "--db-path", help="Path to the SQLite database (defaults to STELLARLENSE_DB_PATH)"),
     consolidate_api_keys: bool = typer.Option(
         True, "--consolidate-api-keys/--skip-consolidation",
         help="Consolidate legacy api_keys tables into the canonical detection.api_key_store schema.",
@@ -1281,9 +1281,9 @@ def dlq_replay(
     )
     from detection.risk_score import RiskScore
 
-    secret_key = os.environ.get("LEDGERLENS_SERVICE_SECRET_KEY", "")
+    secret_key = os.environ.get("STELLARLENSE_SERVICE_SECRET_KEY", "")
     if not secret_key and not dry_run:
-        typer.echo("ERROR: LEDGERLENS_SERVICE_SECRET_KEY is not set. Cannot replay.", err=True)
+        typer.echo("ERROR: STELLARLENSE_SERVICE_SECRET_KEY is not set. Cannot replay.", err=True)
         raise typer.Exit(1)
 
     init_dlq_schema()
@@ -1300,7 +1300,7 @@ def dlq_replay(
         return
 
     publisher = SorobanPublisher(
-        contract_id=os.environ.get("LEDGERLENS_SCORE_CONTRACT_ID", ""),
+        contract_id=os.environ.get("STELLARLENSE_SCORE_CONTRACT_ID", ""),
         secret_key=secret_key,
         soroban_rpc_url=os.environ.get("SOROBAN_RPC_URL", "https://soroban-testnet.stellar.org"),
         network_passphrase=os.environ.get("NETWORK_PASSPHRASE", "Test SDF Network ; September 2015"),
@@ -1413,7 +1413,7 @@ def sign_models(
 
     Idempotent: re-signs files whose content changed, skips already-valid ones.
     Run this once against trusted committed artifacts after setting
-    LEDGERLENS_MODEL_SIGNING_KEY. Required before loading models with
+    STELLARLENSE_MODEL_SIGNING_KEY. Required before loading models with
     verification enabled.
     """
     import glob
@@ -1425,7 +1425,7 @@ def sign_models(
     signing_key = settings.model_signing_key.encode()
 
     if not signing_key:
-        typer.echo("ERROR: LEDGERLENS_MODEL_SIGNING_KEY is not set.", err=True)
+        typer.echo("ERROR: STELLARLENSE_MODEL_SIGNING_KEY is not set.", err=True)
         raise typer.Exit(1)
 
     pattern = os.path.join(target_dir, "*.joblib")
@@ -1717,7 +1717,7 @@ def federated_server(
     """Start the federated aggregation server as a standalone process."""
     logger.warning(
         "[DEPRECATED] `cli.py federated server` is deprecated and will be removed in a future release. "
-        "Please use the standalone package `ledgerlens-fl-server` instead."
+        "Please use the standalone package `stellar-lense-fl-server` instead."
     )
     import uvicorn
 
@@ -1741,7 +1741,7 @@ def federated_admit(
     participant_id: str = typer.Argument(..., help="Identifier the operator will register with"),
     max_n_samples: int = typer.Option(..., "--max-n-samples", help="Ceiling on this participant's claimed dataset size, enforced server-side on every round"),
     admitted_by: str = typer.Option("operator", "--admitted-by", help="Free-text note recording who approved this admission (for audit)"),
-    db_path: str = typer.Option(None, "--db-path", help="Federated server's SQLite path (defaults to LEDGERLENS_DB_PATH)"),
+    db_path: str = typer.Option(None, "--db-path", help="Federated server's SQLite path (defaults to STELLARLENSE_DB_PATH)"),
 ) -> None:
     """Authorize a participant_id to register with the federated server.
 
@@ -1989,7 +1989,7 @@ app.add_typer(db_app, name="db")
 def db_retention(
     dry_run: bool = typer.Option(False, "--dry-run", help="Report what would be archived without making changes"),
     archive_root: str = typer.Option("./data/archive", "--archive-root", help="Root directory for Parquet archives"),
-    db_path: str = typer.Option(None, "--db-path", help="Path to SQLite database (defaults to LEDGERLENS_DB_PATH)"),
+    db_path: str = typer.Option(None, "--db-path", help="Path to SQLite database (defaults to STELLARLENSE_DB_PATH)"),
 ) -> None:
     """Archive records older than their TTL to Parquet and purge from SQLite.
 
@@ -2055,11 +2055,11 @@ def config_validate() -> None:
     import pydantic
 
     _SECRETS = {
-        "ledgerlens_service_secret_key",
-        "ledgerlens_admin_api_key",
-        "ledgerlens_compliance_api_key",
-        "ledgerlens_model_signing_key",
-        "ledgerlens_webhook_encryption_key",
+        "stellarlense_service_secret_key",
+        "stellarlense_admin_api_key",
+        "stellarlense_compliance_api_key",
+        "stellarlense_model_signing_key",
+        "stellarlense_webhook_encryption_key",
     }
 
     try:

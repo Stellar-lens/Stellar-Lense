@@ -512,7 +512,7 @@ class FeatureStoreArchiver:
 
     Usage::
 
-        archiver = FeatureStoreArchiver(db_path="./ledgerlens.db",
+        archiver = FeatureStoreArchiver(db_path="./stellar_lense.db",
                                         archive_dir=Path("./feature_archive"))
         n_archived = archiver.archive_old_features(cutoff_days=30)
     """

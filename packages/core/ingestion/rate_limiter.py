@@ -18,7 +18,7 @@ import time
 from threading import Lock
 from typing import Optional
 
-logger = logging.getLogger("ledgerlens.rate_limiter")
+logger = logging.getLogger("stellar_lense.rate_limiter")
 
 __all__ = [
     "TokenBucket",

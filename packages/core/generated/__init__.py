@@ -1,11 +1,11 @@
-"""Generated gRPC / protobuf code for LedgerLens.
+"""Generated gRPC / protobuf code for StellarLense.
 
-Regenerate after editing proto/ledgerlens/v1/scoring.proto with (from repo root,
+Regenerate after editing proto/stellar_lense/v1/scoring.proto with (from repo root,
 matching the flat, non-package-nested layout of the files in this directory):
 
-    python -m grpc_tools.protoc -I proto/ledgerlens/v1 \\
+    python -m grpc_tools.protoc -I proto/stellar_lense/v1 \\
         --python_out=generated --grpc_python_out=generated \\
-        proto/ledgerlens/v1/scoring.proto
+        proto/stellar_lense/v1/scoring.proto
 
 grpc_tools.protoc's generated scoring_pb2_grpc.py imports scoring_pb2 with a
 bare `import scoring_pb2`, which fails from within this package -- after

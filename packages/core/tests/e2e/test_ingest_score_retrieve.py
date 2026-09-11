@@ -16,7 +16,7 @@ Changes in this revision
   the database clean for subsequent tests regardless of assertion failures.
 * ``GET /v1/scores/{wallet}`` is protected by
   ``Depends(require_scope("read:scores"))``; the ``e2e_client`` fixture
-  now includes the ``X-LedgerLens-Api-Key`` header for a provisioned key, so
+  now includes the ``X-StellarLense-Api-Key`` header for a provisioned key, so
   this endpoint returns 200 rather than 401.
 * The expected response structure ``{"scores": [...]}`` is asserted
   explicitly with a descriptive failure message.

@@ -1,4 +1,4 @@
-package ledgerlens
+package stellar_lense
 
 import (
 	"crypto/tls"
@@ -9,7 +9,7 @@ import (
 // Option is a functional option for NewClient.
 type Option func(*Client)
 
-// WithAPIKey sets the API key sent as X-LedgerLens-Admin-Key on every request.
+// WithAPIKey sets the API key sent as X-StellarLense-Admin-Key on every request.
 func WithAPIKey(key string) Option {
 	return func(c *Client) {
 		c.apiKey = key

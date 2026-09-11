@@ -3,9 +3,9 @@
 import numpy as np
 from unittest.mock import Mock, patch
 
-from ledgerlens_fl_client.client import FLClient
-from ledgerlens_fl_client.models import RoundResult
-from ledgerlens_fl_client.adapter import DataAdapter
+from stellar_lense_fl_client.client import FLClient
+from stellar_lense_fl_client.models import RoundResult
+from stellar_lense_fl_client.adapter import DataAdapter
 import pandas as pd
 
 
@@ -67,8 +67,8 @@ def test_client_status_before_any_rounds():
     assert len(status.public_key_der_b64) > 0
 
 
-@patch("ledgerlens_fl_client.client.get_public_dataset")
-@patch("ledgerlens_fl_client.client.FLProtocol")
+@patch("stellar_lense_fl_client.client.get_public_dataset")
+@patch("stellar_lense_fl_client.client.FLProtocol")
 def test_train_round_calls_register(mock_protocol_cls, mock_get_pub_ds):
     """train_round() registers with server on first call."""
     mock_protocol = Mock()
@@ -103,8 +103,8 @@ def test_train_round_calls_register(mock_protocol_cls, mock_get_pub_ds):
     assert result.accepted is True
 
 
-@patch("ledgerlens_fl_client.client.get_public_dataset")
-@patch("ledgerlens_fl_client.client.FLProtocol")
+@patch("stellar_lense_fl_client.client.get_public_dataset")
+@patch("stellar_lense_fl_client.client.FLProtocol")
 def test_train_round_returns_round_result(mock_protocol_cls, mock_get_pub_ds):
     """train_round() returns RoundResult with expected fields."""
     mock_protocol = Mock()
@@ -142,8 +142,8 @@ def test_train_round_returns_round_result(mock_protocol_cls, mock_get_pub_ds):
     assert result.n_samples > 0
 
 
-@patch("ledgerlens_fl_client.client.get_public_dataset")
-@patch("ledgerlens_fl_client.client.FLProtocol")
+@patch("stellar_lense_fl_client.client.get_public_dataset")
+@patch("stellar_lense_fl_client.client.FLProtocol")
 def test_train_round_rejects_update(mock_protocol_cls, mock_get_pub_ds):
     """train_round() handles rejected updates correctly."""
     mock_protocol = Mock()
@@ -175,8 +175,8 @@ def test_train_round_rejects_update(mock_protocol_cls, mock_get_pub_ds):
     assert "cosine_sim" in result.reason
 
 
-@patch("ledgerlens_fl_client.client.get_public_dataset")
-@patch("ledgerlens_fl_client.client.FLProtocol")
+@patch("stellar_lense_fl_client.client.get_public_dataset")
+@patch("stellar_lense_fl_client.client.FLProtocol")
 def test_dp_noise_is_applied(mock_protocol_cls, mock_get_pub_ds):
     """DP noise is injected into soft labels."""
     mock_protocol = Mock()

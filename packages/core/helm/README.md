@@ -1,11 +1,11 @@
-# LedgerLens Helm Charts
+# Stellar Lense Helm Charts
 
 This directory contains the Helm chart and values files used to deploy
-LedgerLens on Kubernetes.
+Stellar Lense on Kubernetes.
 
 ## Contents
 
-- **`ledgerlens/`** — The official LedgerLens Helm chart.
+- **`stellar_lense/`** — The official Stellar Lense Helm chart.
   - `Chart.yaml` — Chart metadata (name, version, description)
   - `values.yaml` — Default configuration: replica count, image, service,
     ingress, API/worker probes and resources, autoscaling, ConfigMap settings,
@@ -18,14 +18,14 @@ LedgerLens on Kubernetes.
 ## Quick start
 
 ```bash
-helm install ledgerlens ./helm/ledgerlens
+helm install stellar_lense ./helm/stellar_lense
 ```
 
 Override defaults with `--set` (e.g. `--set ingress.enabled=true`) or a custom
 values file:
 
 ```bash
-helm install ledgerlens ./helm/ledgerlens -f my-values.yaml
+helm install stellar_lense ./helm/stellar_lense -f my-values.yaml
 ```
 
 ## Further reading

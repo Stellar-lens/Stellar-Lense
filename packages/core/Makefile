@@ -151,10 +151,10 @@ license: ## Generate the Python license inventory into reports/
 	pip-licenses \
 	  --format=csv \
 	  --output-file=reports/licenses-python.csv \
-	  --ignore-packages ledgerlens-core
+	  --ignore-packages stellar-lense-core
 	pip-licenses \
 	  --format=plain-vertical \
-	  --ignore-packages ledgerlens-core
+	  --ignore-packages stellar-lense-core
 	@echo ""
 	@echo "Full inventory written to reports/licenses-python.csv"
 

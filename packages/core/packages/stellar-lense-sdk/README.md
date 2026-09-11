@@ -1,8 +1,8 @@
-# ledgerlens-sdk
+# stellar-lense-sdk
 
-Typed Python client for the [LedgerLens](https://github.com/Ledger-Lenz/Ledgerlens-core)
+Typed Python client for the [Stellar Lense](https://github.com/Stellar-lens/Stellar-Lense)
 wash-trading detection API. Standalone package — depends only on `httpx`
-and `pydantic`, not on the `ledgerlens-core` detection engine itself.
+and `pydantic`, not on the `stellar-lense-core` detection engine itself.
 
 See [CHANGELOG.md](CHANGELOG.md) for a full list of notable changes between
 releases.
@@ -10,7 +10,7 @@ releases.
 ## Install
 
 ```bash
-pip install ledgerlens-sdk
+pip install stellar-lense-sdk
 ```
 
 (Not yet published to PyPI — see "Publishing" below.)
@@ -19,17 +19,17 @@ pip install ledgerlens-sdk
 
 The snippet below is self-contained and runnable. It shows the full
 install-to-first-call flow against either the hosted API or a local
-`ledgerlens-core` dev server (`python cli.py serve`).
+`stellar-lense-core` dev server (`python cli.py serve`).
 
 ```python
-from ledgerlens import LedgerLensClient, LedgerLensAPIError
+from stellar_lense import StellarLenseClient, StellarLenseAPIError
 
 # Point at the hosted API, or your local dev server:
 #   base_url="http://localhost:8000"  (after `python cli.py serve`)
-BASE_URL = "https://api.ledgerlens.io"
+BASE_URL = "https://api.stellar-lense.io"
 API_KEY  = "your-api-key"           # omit or pass None for public endpoints
 
-with LedgerLensClient(base_url=BASE_URL, api_key=API_KEY) as client:
+with StellarLenseClient(base_url=BASE_URL, api_key=API_KEY) as client:
 
     # 1. Check that the API and its backing services are healthy.
     health = client.health()
@@ -40,7 +40,7 @@ with LedgerLensClient(base_url=BASE_URL, api_key=API_KEY) as client:
     WALLET = "GABCDEFGHIJKLMNOPQRSTUVWXYZ012345678901234567890123456789"
     try:
         response = client.get_score(WALLET)
-    except LedgerLensAPIError as exc:
+    except StellarLenseAPIError as exc:
         print(f"[{exc.status_code}] {exc.detail}")
     else:
         for score in response.scores:
@@ -69,11 +69,11 @@ with LedgerLensClient(base_url=BASE_URL, api_key=API_KEY) as client:
 ```
 
 **Running against your local dev server** — spin up `python cli.py serve`
-from the `ledgerlens-core` root first, then substitute:
+from the `stellar-lense-core` root first, then substitute:
 
 ```python
 BASE_URL = "http://localhost:8000"
-API_KEY  = None   # or your LEDGERLENS_ADMIN_API_KEY if set
+API_KEY  = None   # or your STELLARLENSE_ADMIN_API_KEY if set
 ```
 
 ## Usage
@@ -81,9 +81,9 @@ API_KEY  = None   # or your LEDGERLENS_ADMIN_API_KEY if set
 ### Synchronous
 
 ```python
-from ledgerlens import LedgerLensClient
+from stellar_lense import StellarLenseClient
 
-with LedgerLensClient(base_url="https://api.ledgerlens.io", api_key="...") as client:
+with StellarLenseClient(base_url="https://api.stellar-lense.io", api_key="...") as client:
     response = client.get_score("GABCDEF...")
     for score in response.scores:
         print(score.asset_pair, score.score)
@@ -91,17 +91,17 @@ with LedgerLensClient(base_url="https://api.ledgerlens.io", api_key="...") as cl
 
 ### Asynchronous
 
-Use `AsyncLedgerLensClient` and `async with` / `await`. Pass multiple
+Use `AsyncStellarLenseClient` and `async with` / `await`. Pass multiple
 wallets to `asyncio.gather` to score them concurrently in a single event
 loop turn:
 
 ```python
 import asyncio
-from ledgerlens import AsyncLedgerLensClient
+from stellar_lense import AsyncStellarLenseClient
 
 async def main():
     wallets = ["GABC...", "GDEF...", "GHIJ..."]
-    async with AsyncLedgerLensClient(base_url="https://api.ledgerlens.io") as client:
+    async with AsyncStellarLenseClient(base_url="https://api.stellar-lense.io") as client:
         results = await asyncio.gather(*(client.get_score(w) for w in wallets))
         for wallet, result in zip(wallets, results):
             for score in result.scores:
@@ -112,17 +112,17 @@ asyncio.run(main())
 
 ### Error handling
 
-Every non-2xx response raises `LedgerLensAPIError`. Always use the client
+Every non-2xx response raises `StellarLenseAPIError`. Always use the client
 as a context manager (or call `client.close()` / `await client.aclose()`
 explicitly) so the underlying HTTP connection pool is cleaned up:
 
 ```python
-from ledgerlens import LedgerLensClient, LedgerLensAPIError
+from stellar_lense import StellarLenseClient, StellarLenseAPIError
 
-with LedgerLensClient(base_url="https://api.ledgerlens.io") as client:
+with StellarLenseClient(base_url="https://api.stellar-lense.io") as client:
     try:
         client.get_score("not-a-real-wallet")
-    except LedgerLensAPIError as exc:
+    except StellarLenseAPIError as exc:
         print(exc.status_code, exc.detail)
 ```
 
@@ -149,7 +149,7 @@ pattern in `client.py`/`async_client.py` and can be added the same way.
 ## Authentication
 
 Pass `api_key=...` to either client constructor; it's sent as the
-`X-LedgerLens-Admin-Key` header on every request (harmless on public
+`X-StellarLense-Admin-Key` header on every request (harmless on public
 endpoints — only admin-gated ones like `submit_feedback` check it).
 
 ## Development
@@ -161,8 +161,8 @@ pytest
 
 ## Publishing
 
-This package is structured to be published to PyPI as `ledgerlens-sdk`
+This package is structured to be published to PyPI as `stellar-lense-sdk`
 (`python -m build && twine upload dist/*`), with its version kept in sync
-with the LedgerLens API version. Publishing itself (PyPI credentials, the
+with the Stellar Lense API version. Publishing itself (PyPI credentials, the
 actual `twine upload`) is a release action for a maintainer to run, not
 something done as part of writing the SDK.

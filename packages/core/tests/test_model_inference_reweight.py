@@ -41,7 +41,7 @@ def test_falls_back_when_file_absent(tmp_path):
 def test_falls_back_and_logs_warning_for_bad_sum(tmp_path, caplog):
     import logging
     _write_weights(tmp_path, rf=0.5, xgb=0.5, lgbm=0.5)  # sum = 1.5
-    with caplog.at_level(logging.WARNING, logger="ledgerlens.model_inference"):
+    with caplog.at_level(logging.WARNING, logger="stellar_lense.model_inference"):
         weights = mi.load_runtime_weights(str(tmp_path))
     assert weights is None
     assert any("falling back" in r.message.lower() for r in caplog.records)

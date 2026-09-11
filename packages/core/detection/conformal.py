@@ -1,7 +1,7 @@
 """Conformal Prediction for distribution-free uncertainty quantification.
 
 Implements split conformal prediction (Angelopoulos & Bates, 2023) for
-the LedgerLens risk score ensemble. Provides valid, finite-sample
+the StellarLense risk score ensemble. Provides valid, finite-sample
 prediction intervals at a user-specified coverage level (default 90%).
 
 Multi-class extension (Issue-109): Implements RAPS (Regularised Adaptive
@@ -21,7 +21,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-logger = logging.getLogger("ledgerlens.conformal")
+logger = logging.getLogger("stellar_lense.conformal")
 
 # ---------------------------------------------------------------------------
 # Three-class taxonomy

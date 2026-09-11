@@ -1,6 +1,6 @@
 # Uncertainty Quantification via Conformal Prediction
 
-LedgerLens uses **split Conformal Prediction (CP)** to provide valid,
+Stellar Lense uses **split Conformal Prediction (CP)** to provide valid,
 distribution-free prediction intervals alongside every risk score. This
 document explains what CP is, why we use it, and how to interpret the
 uncertainty fields — written for compliance, legal, and operations teams
@@ -39,7 +39,7 @@ rarely hold in practice.
 | Works on any model | Yes | Requires prior | Requires resampling |
 | Auditable | Yes | No | Partially |
 
-## How LedgerLens Implements CP
+## How Stellar Lense Implements CP
 
 ### Calibration Phase (during training)
 
@@ -122,7 +122,7 @@ point estimate.
 
 ### Three-Class Risk Taxonomy
 
-LedgerLens now maps the 0-100 risk score to three risk classes:
+Stellar Lense now maps the 0-100 risk score to three risk classes:
 
 | Class | Label | Score Range |
 |-------|-------|-------------|
@@ -199,7 +199,7 @@ once drift is detected.
 
 Rather than a full offline retrain, or switching every request onto a
 continuously-adapting alpha (which would need the historical calibration
-score set retained and persisted indefinitely), LedgerLens uses a
+score set retained and persisted indefinitely), Stellar Lense uses a
 lightweight **online quantile-tracking** update — the practical form of
 Adaptive Conformal Inference (Gibbs & Candès, NeurIPS 2021), closely related
 to "Conformal PID Control" (Angelopoulos et al., 2023):

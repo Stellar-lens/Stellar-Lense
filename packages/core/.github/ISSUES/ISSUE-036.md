@@ -8,7 +8,7 @@ assignees: []
 Wash-trading bots are adaptive adversaries that observe detection signals and modify their behaviour to evade them. A model trained only on historical patterns is vulnerable to evasion once bots learn to suppress the features that the model relies on (e.g., slightly randomising trade amounts to improve Benford conformity, or adding noise trades to dilute counterparty concentration). Adversarial feature augmentation generates synthetic evasion examples during training — slight perturbations of confirmed wash-trading feature vectors that push them below the decision boundary — and trains the model to still classify them as wash-trading, improving robustness against adaptive adversaries.
 
 ## Background & Context
-The threat model for LedgerLens is that sophisticated wash-trading bots will query the API (or reverse-engineer the detection logic) and iteratively adjust their on-chain behaviour to reduce their risk score. The most effective evasion strategies target the features with the highest SHAP values (see `detection/shap_explainer.py`).
+The threat model for Stellar Lense is that sophisticated wash-trading bots will query the API (or reverse-engineer the detection logic) and iteratively adjust their on-chain behaviour to reduce their risk score. The most effective evasion strategies target the features with the highest SHAP values (see `detection/shap_explainer.py`).
 
 Adversarial training adds a min-max objective: while the model tries to classify wash-trading correctly, a simulated adversary tries to find small feature perturbations that fool the model. Two approaches:
 

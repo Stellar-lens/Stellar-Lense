@@ -2,17 +2,17 @@
 
 Contract deployment strategy (ADR-005 §B)
 ==========================================
-Two modes are supported, selected by the LEDGERLENS_USE_REAL_SOROBAN environment
+Two modes are supported, selected by the STELLARLENSE_USE_REAL_SOROBAN environment
 variable:
 
-  LEDGERLENS_USE_REAL_SOROBAN=false (default)
+  STELLARLENSE_USE_REAL_SOROBAN=false (default)
     Uses the documented stub server (stub_contract_server.py) which implements
-    the same wire interface as the real ledgerlens-api + Soroban contract but
+    the same wire interface as the real stellar-lense-api + Soroban contract but
     runs entirely in-process. Trade-offs are documented in that module.
 
-  LEDGERLENS_USE_REAL_SOROBAN=true
+  STELLARLENSE_USE_REAL_SOROBAN=true
     Attempts a real deployment using stellar/quickstart Docker + soroban-cli.
-    Requires Docker to be available and LEDGERLENS_CONTRACTS_REPO_PATH to be set.
+    Requires Docker to be available and STELLARLENSE_CONTRACTS_REPO_PATH to be set.
 
 Idempotency guarantee
 ======================
@@ -39,11 +39,11 @@ This prevents the "green with nothing tested" failure mode.
 Lazy contracts-repo resolution
 ================================
 ``contracts_repo_path`` (and transitively ``soroban_rpc_url``) is only resolved
-via ``request.getfixturevalue()`` when LEDGERLENS_USE_REAL_SOROBAN=true. Pytest
+via ``request.getfixturevalue()`` when STELLARLENSE_USE_REAL_SOROBAN=true. Pytest
 resolves every *declared* fixture parameter before a test/fixture body runs,
 regardless of what the body does with it — so if ``deployed_score_contract`` had
 ``contracts_repo_path`` as a plain parameter, the default stub-mode run would
-still attempt to git-clone ledgerlens-contracts before ever checking the mode
+still attempt to git-clone stellar-lense-contracts before ever checking the mode
 flag. That defeats the point of the stub being a no-network-dependency default.
 Fetching it lazily means stub mode (the default weekly CI path) never touches
 git, Docker, or the contracts repo at all.
@@ -110,7 +110,7 @@ def enforce_minimum_assertions() -> Generator[None, None, None]:
 
 def _resolve_repo_path(env_var: str, repo_name: str, pinned_ref: str) -> Path:
     """Return a local checkout path from env_var if set, otherwise git-clone
-    Ledger-Lenz/{repo_name} at pinned_ref into a session tempdir.
+    Stellar-lens/{repo_name} at pinned_ref into a session tempdir.
 
     Raises a hard pytest.fail (not a skip) if the path cannot be resolved.
     """
@@ -135,7 +135,7 @@ def _resolve_repo_path(env_var: str, repo_name: str, pinned_ref: str) -> Path:
         )
 
     temp_dir = Path(mkdtemp())
-    repo_url = f"https://github.com/Ledger-Lenz/{repo_name}.git"
+    repo_url = f"https://github.com/Stellar-lens/{repo_name}.git"
     try:
         subprocess.run(
             ["git", "clone", "--depth=1", repo_url, str(temp_dir)],
@@ -166,14 +166,14 @@ def _resolve_repo_path(env_var: str, repo_name: str, pinned_ref: str) -> Path:
 
 @pytest.fixture(scope="session")
 def api_repo_path() -> Path:
-    """Resolve path to ledgerlens-api repo."""
+    """Resolve path to stellar-lense-api repo."""
     pinned_ref = os.environ.get("CROSS_REPO_E2E_PINNED_REF", "main")
-    return _resolve_repo_path("LEDGERLENS_API_REPO_PATH", "ledgerlens-api", pinned_ref)
+    return _resolve_repo_path("STELLARLENSE_API_REPO_PATH", "stellar-lense-api", pinned_ref)
 
 
 @pytest.fixture(scope="session")
 def contracts_repo_path() -> Path:
-    """Resolve path to ledgerlens-contracts repo.
+    """Resolve path to stellar-lense-contracts repo.
 
     Only pulled in real-Soroban mode, via request.getfixturevalue() from
     soroban_rpc_url / deployed_score_contract. Never resolved as a plain
@@ -181,7 +181,7 @@ def contracts_repo_path() -> Path:
     a clone of this repo.
     """
     pinned_ref = os.environ.get("CROSS_REPO_E2E_PINNED_REF", "main")
-    return _resolve_repo_path("LEDGERLENS_CONTRACTS_REPO_PATH", "ledgerlens-contracts", pinned_ref)
+    return _resolve_repo_path("STELLARLENSE_CONTRACTS_REPO_PATH", "stellar-lense-contracts", pinned_ref)
 
 
 # ---------------------------------------------------------------------------
@@ -218,7 +218,7 @@ def stub_server():
 # ---------------------------------------------------------------------------
 
 def _is_real_soroban_requested() -> bool:
-    return os.environ.get("LEDGERLENS_USE_REAL_SOROBAN", "false").lower() in (
+    return os.environ.get("STELLARLENSE_USE_REAL_SOROBAN", "false").lower() in (
         "1", "true", "yes"
     )
 
@@ -256,9 +256,9 @@ def soroban_rpc_url(request: pytest.FixtureRequest, stub_server) -> str:
 
     if not _is_docker_available():
         pytest.fail(
-            "LEDGERLENS_USE_REAL_SOROBAN=true but Docker is not available. "
+            "STELLARLENSE_USE_REAL_SOROBAN=true but Docker is not available. "
             "Cannot start Soroban quickstart container. "
-            "Either install Docker or unset LEDGERLENS_USE_REAL_SOROBAN."
+            "Either install Docker or unset STELLARLENSE_USE_REAL_SOROBAN."
         )
 
     production_passphrases = [
@@ -276,7 +276,7 @@ def soroban_rpc_url(request: pytest.FixtureRequest, stub_server) -> str:
     except ImportError:
         pytest.fail(
             "testcontainers is not installed. Run: pip install testcontainers. "
-            "Required for LEDGERLENS_USE_REAL_SOROBAN=true mode."
+            "Required for STELLARLENSE_USE_REAL_SOROBAN=true mode."
         )
 
     # contracts_repo_path isn't used directly by container startup, but resolving
@@ -349,7 +349,7 @@ def deployed_score_contract(request: pytest.FixtureRequest, stub_server) -> str:
     FIDELITY NOTE:
     - Stub mode: returns STUB_CONTRACT_ID (a deterministic placeholder).
       The stub server validates the same field constraints as the real contract.
-    - Real mode: deploys the ledgerlens-score Wasm contract via soroban-cli and
+    - Real mode: deploys the stellar-lense-score Wasm contract via soroban-cli and
       returns the real on-chain contract ID.
 
     A deployment failure raises pytest.fail, NOT pytest.skip. This ensures CI
@@ -385,7 +385,7 @@ def _deploy_real_contract(
     rpc_url: str,
     run_suffix: str = "local",
 ) -> str:
-    """Deploy the ledgerlens-score contract via soroban-cli.
+    """Deploy the stellar-lense-score contract via soroban-cli.
 
     Returns the deployed contract ID on success.
     Raises pytest.fail on any error — never skips.
@@ -407,11 +407,11 @@ def _deploy_real_contract(
         )
 
     # Build the contract Wasm
-    score_contract_dir = contracts_repo_path / "ledgerlens-score"
+    score_contract_dir = contracts_repo_path / "stellar-lense-score"
     if not score_contract_dir.exists():
         pytest.fail(
-            f"ledgerlens-score contract directory not found at {score_contract_dir}. "
-            "Check LEDGERLENS_CONTRACTS_REPO_PATH."
+            f"stellar-lense-score contract directory not found at {score_contract_dir}. "
+            "Check STELLARLENSE_CONTRACTS_REPO_PATH."
         )
 
     try:
@@ -425,7 +425,7 @@ def _deploy_real_contract(
         )
     except subprocess.CalledProcessError as e:
         pytest.fail(
-            f"Failed to build ledgerlens-score contract: {e.stderr}. "
+            f"Failed to build stellar-lense-score contract: {e.stderr}. "
             "Check the contracts repo and Rust toolchain."
         )
 
@@ -479,15 +479,15 @@ def api_base_url(deployed_score_contract, stub_server) -> str:
     """Return the base URL of the active API (stub or real container).
 
     In stub mode: the stub server itself is the API.
-    In real mode: this would point to a ledgerlens-api container.
+    In real mode: this would point to a stellar-lense-api container.
     """
     if not _is_real_soroban_requested():
         return stub_server.base_url
 
-    # Real mode: ledgerlens-api container URL would be set here.
+    # Real mode: stellar-lense-api container URL would be set here.
     # For now, fall back to stub since the API container requires additional setup.
     pytest.fail(
-        "Real ledgerlens-api container setup not yet implemented. "
-        "Use stub mode (unset LEDGERLENS_USE_REAL_SOROBAN or set it to false) "
+        "Real stellar-lense-api container setup not yet implemented. "
+        "Use stub mode (unset STELLARLENSE_USE_REAL_SOROBAN or set it to false) "
         "for schema/flow verification, or set up the API container manually."
     )

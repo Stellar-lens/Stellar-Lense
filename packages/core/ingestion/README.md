@@ -1,6 +1,6 @@
 # ingestion/
 
-The `ingestion/` package is responsible for pulling trade and event data into LedgerLens from every supported source — the Stellar Horizon API, EVM chains (Ethereum, Base, Polygon), Solana, and cross-chain bridges — and preparing it for the detection engine. It also contains the transformation utilities, checkpointing infrastructure, deduplication, and observability helpers that keep the pipeline reliable at production scale.
+The `ingestion/` package is responsible for pulling trade and event data into Stellar Lense from every supported source — the Stellar Horizon API, EVM chains (Ethereum, Base, Polygon), Solana, and cross-chain bridges — and preparing it for the detection engine. It also contains the transformation utilities, checkpointing infrastructure, deduplication, and observability helpers that keep the pipeline reliable at production scale.
 
 For a full conceptual overview see [../docs/ingestion.md](../docs/ingestion.md).
 

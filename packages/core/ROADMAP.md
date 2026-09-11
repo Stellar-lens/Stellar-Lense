@@ -1,8 +1,8 @@
 # Roadmap
 
-This tracks near-term direction for `ledgerlens-core`. It complements, rather
+This tracks near-term direction for `stellar-lense-core`. It complements, rather
 than replaces, the per-feature docs under `docs/` and the cross-repo contracts
-documented in the [README's "LedgerLens Organization" section](README.md#ledgerlens-organization).
+documented in the [README's "Stellar Lense Organization" section](README.md#stellar-lense-organization).
 
 ## Now
 

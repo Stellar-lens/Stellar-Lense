@@ -2,7 +2,7 @@
 
 **Status**: Accepted  
 **Date**: 2026-08-25  
-**Deciders**: LedgerLens core team  
+**Deciders**: Stellar Lense core team  
 **Context**: [Issue audit evidence – see README.md §Shared Contracts]
 
 ---
@@ -17,7 +17,7 @@ Three independent language ecosystems (Python/Pydantic, Rust/serde, TypeScript/Z
 | `disputed` | ✅ | ✅ | ✅ | ✅ | ❌ missing |
 | `prediction_set` | `list[int]` | `list[int]` | `list[int]` | `Vec<u8>` ⚠️ | ❌ missing |
 
-Additionally, `crates/ledgerlens-sdk/README.md` claimed a shared fixture file at `tests/fixtures/zk_proof_vectors.json` was "consumed by both the Python and Rust test suites" for cross-language contract testing. That file exists but contains only ZK proof vectors — the claim was false, and no cross-language schema contract test existed.
+Additionally, `crates/stellar-lense-sdk/README.md` claimed a shared fixture file at `tests/fixtures/zk_proof_vectors.json` was "consumed by both the Python and Rust test suites" for cross-language contract testing. That file exists but contains only ZK proof vectors — the claim was false, and no cross-language schema contract test existed.
 
 ---
 
@@ -26,7 +26,7 @@ Additionally, `crates/ledgerlens-sdk/README.md` claimed a shared fixture file at
 * **Zero-ambiguity divergence detection**: introducing a field name or type change in one language must cause a CI failure, not just a documentation note.
 * **No new build toolchain**: the project already uses Python (pytest), Rust (cargo test), and TypeScript (vitest). Any solution must work within those existing runners.
 * **Single source of truth**: one authoritative JSON document defines the contract; each language's tests prove it can round-trip that document faithfully.
-* **Proto as partial reference**: `proto/ledgerlens/v1/scoring.proto` is the existing closest thing to a canonical schema. It is used as a cross-reference but not as the single source of truth because it currently has gaps (`disputed`, `prediction_set`, `latency_ms`) and generating per-language bindings from it would require introducing `protoc` into the TypeScript and Python test pipelines — a heavier toolchain change than needed.
+* **Proto as partial reference**: `proto/stellar_lense/v1/scoring.proto` is the existing closest thing to a canonical schema. It is used as a cross-reference but not as the single source of truth because it currently has gaps (`disputed`, `prediction_set`, `latency_ms`) and generating per-language bindings from it would require introducing `protoc` into the TypeScript and Python test pipelines — a heavier toolchain change than needed.
 * **Divergence, not just existence**: a "the fixture file exists and both languages can parse it" test is insufficient. Tests must prove that a deliberate field-name change in one implementation causes a CI failure.
 
 ---
@@ -35,7 +35,7 @@ Additionally, `crates/ledgerlens-sdk/README.md` claimed a shared fixture file at
 
 ### Option A – Protobuf Codegen (single-source proto → generated stubs)
 
-Generate language bindings from `proto/ledgerlens/v1/scoring.proto` for all three languages, replacing the hand-written models.
+Generate language bindings from `proto/stellar_lense/v1/scoring.proto` for all three languages, replacing the hand-written models.
 
 **Pros**: True single source of truth; field changes are structural, not textual.  
 **Cons**: `scoring.proto` currently has three missing fields and would need updating first. Integrating `protoc` into the TypeScript SDK build and Python SDK packaging adds non-trivial toolchain complexity. The on-chain Soroban contract interface cannot be derived from proto, so a second SSoT would still be needed for the Rust/Soroban layer.
@@ -80,9 +80,9 @@ A Python CI script (`scripts/check_contract_vectors.py`) independently validates
    - Verify adversarial vector (wrong field name) causes `ValidationError`.
    - Verify v2+ uncertainty fields (`score_lower`, `score_upper`, `prediction_set`, `coverage_guarantee`) are present and typed.
 
-3. **Rust contract tests** (`crates/ledgerlens-sdk/tests/contract_vectors_test.rs`):
+3. **Rust contract tests** (`crates/stellar-lense-sdk/tests/contract_vectors_test.rs`):
    - Load `../../tests/fixtures/contract_vectors.json` (relative path from workspace root).
-   - Deserialize via `serde_json` into `ledgerlens_sdk::models::RiskScore`.
+   - Deserialize via `serde_json` into `stellar_lense_sdk::models::RiskScore`.
    - Assert all required fields present.
    - Fix `prediction_set` type from `Vec<u8>` to `Vec<i32>` to match Python canonical type.
 
@@ -107,10 +107,10 @@ A Python CI script (`scripts/check_contract_vectors.py`) independently validates
 
 As part of this ADR's implementation:
 - `latency_ms` is added to `sdk/src/schemas.ts` (TypeScript).
-- `latency_ms` is added to `packages/ledgerlens-sdk/src/ledgerlens/models.py` (Python SDK).
-- `prediction_set` type in `crates/ledgerlens-sdk/src/models.rs` is corrected from `Option<Vec<u8>>` to `Option<Vec<i32>>`.
-- `latency_ms` is added to `crates/ledgerlens-sdk/src/models.rs`.
-- `proto/ledgerlens/v1/scoring.proto` is updated to add `disputed`, `prediction_set`, `latency_ms` fields.
+- `latency_ms` is added to `packages/stellar-lense-sdk/src/stellar_lense/models.py` (Python SDK).
+- `prediction_set` type in `crates/stellar-lense-sdk/src/models.rs` is corrected from `Option<Vec<u8>>` to `Option<Vec<i32>>`.
+- `latency_ms` is added to `crates/stellar-lense-sdk/src/models.rs`.
+- `proto/stellar_lense/v1/scoring.proto` is updated to add `disputed`, `prediction_set`, `latency_ms` fields.
 
 ### Advancement policy
 
@@ -128,7 +128,7 @@ The fixture file `tests/fixtures/contract_vectors.json` carries a `_contract_ver
 **Positive**:
 - Any field-name or type mismatch between Python core and any other language immediately fails CI.
 - New contributors receive a CI failure with a message identifying which language is out of sync (the fixture diff identifies the field; the failing test language identifies the implementation).
-- The `crates/ledgerlens-sdk/README.md` claim about a shared fixture is now true.
+- The `crates/stellar-lense-sdk/README.md` claim about a shared fixture is now true.
 - The v2+ uncertainty fields are covered by the enforcement mechanism.
 
 **Negative**:
@@ -136,4 +136,4 @@ The fixture file `tests/fixtures/contract_vectors.json` carries a `_contract_ver
 - TypeScript tests require `fs` access in vitest; a `tsconfig` path alias or relative-path resolution is needed.
 
 **Neutral**:
-- The Soroban on-chain `RiskScore` struct (in `ledgerlens-contracts`) cannot be directly tested from this repo. The contract_vectors fixture serves as the reference document for that repo's maintainers; the `test_risk_score_schema_drift` E2E test will validate the API response shape once a real contract is deployed.
+- The Soroban on-chain `RiskScore` struct (in `stellar-lense-contracts`) cannot be directly tested from this repo. The contract_vectors fixture serves as the reference document for that repo's maintainers; the `test_risk_score_schema_drift` E2E test will validate the API response shape once a real contract is deployed.

@@ -6,7 +6,7 @@ assignees: []
 
 ## Summary
 
-LedgerLens feature extraction captures aggregate statistics (trade volume, Benford deviation, round-trip frequency) over fixed 24-hour windows, collapsing the temporal structure of trade sequences into scalars. A temporal pattern analysis engine that models trade sequences as time series — using ARIMA residual anomaly detection for steady-state deviation and an LSTM autoencoder for sequence-level pattern matching — captures bot-like periodicity, metronomic timing, and coordinated burst patterns that aggregate features cannot express.
+Stellar Lense feature extraction captures aggregate statistics (trade volume, Benford deviation, round-trip frequency) over fixed 24-hour windows, collapsing the temporal structure of trade sequences into scalars. A temporal pattern analysis engine that models trade sequences as time series — using ARIMA residual anomaly detection for steady-state deviation and an LSTM autoencoder for sequence-level pattern matching — captures bot-like periodicity, metronomic timing, and coordinated burst patterns that aggregate features cannot express.
 
 ## Background & Context
 

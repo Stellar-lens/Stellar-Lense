@@ -226,7 +226,7 @@ class TestGenerateModelCard:
         """When model_dir is None, settings.model_dir is used."""
         import config.settings as settings_module
 
-        monkeypatch.setattr(settings_module.settings, "model_dir", "/tmp/ledgerlens-test-models")
+        monkeypatch.setattr(settings_module.settings, "model_dir", "/tmp/stellar-lense-test-models")
         card = generate_model_card("rf", "v1")
         assert card.model_name == "rf"
 

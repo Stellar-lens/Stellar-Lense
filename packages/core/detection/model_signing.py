@@ -20,7 +20,7 @@ from pathlib import Path
 
 import joblib
 
-logger = logging.getLogger("ledgerlens.model_signing")
+logger = logging.getLogger("stellar_lense.model_signing")
 
 
 class ModelIntegrityError(RuntimeError):
@@ -121,7 +121,7 @@ def _sig_path(path: str) -> str:
 def _require_key(signing_key: bytes) -> None:
     if not signing_key:
         raise ModelIntegrityError(
-            "LEDGERLENS_MODEL_SIGNING_KEY is not configured. "
+            "STELLARLENSE_MODEL_SIGNING_KEY is not configured. "
             "Set this environment variable before loading or saving model artifacts."
         )
 

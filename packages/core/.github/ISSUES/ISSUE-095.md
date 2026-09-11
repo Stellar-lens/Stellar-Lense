@@ -5,7 +5,7 @@ assignees: []
 ---
 
 ## Summary
-Sending SIGTERM to the LedgerLens API server currently kills in-flight requests abruptly, causing clients to receive connection-reset errors during rolling deployments. A graceful shutdown handler that stops accepting new connections, drains in-flight requests with a configurable timeout, and cleanly closes database connections prevents client-visible errors during deployment.
+Sending SIGTERM to the Stellar Lense API server currently kills in-flight requests abruptly, causing clients to receive connection-reset errors during rolling deployments. A graceful shutdown handler that stops accepting new connections, drains in-flight requests with a configurable timeout, and cleanly closes database connections prevents client-visible errors during deployment.
 
 ## Objectives
 - [ ] Register SIGTERM and SIGINT handlers in `api/main.py` using FastAPI lifespan events

@@ -1,6 +1,6 @@
 # Soroban Operations Guide
 
-Operational runbook for the LedgerLens Soroban circuit breaker, health endpoint, dead-letter queue (DLQ), and manual reset procedures.
+Operational runbook for the Stellar Lense Soroban circuit breaker, health endpoint, dead-letter queue (DLQ), and manual reset procedures.
 
 ## Circuit Breaker States
 
@@ -29,7 +29,7 @@ The reset timeout is `SOROBAN_CIRCUIT_RESET_SECONDS` (default: 300 seconds).
 
 ## Health Endpoint
 
-`GET /admin/soroban/health` — requires `X-LedgerLens-Admin-Key`.
+`GET /admin/soroban/health` — requires `X-StellarLense-Admin-Key`.
 
 Returns:
 
@@ -55,19 +55,19 @@ Returns:
 | `seconds_until_reset` | Seconds until the circuit transitions to `half-open`. `null` if closed. |
 | `dlq_pending_count` | Unprocessed items in `soroban_dead_letters`. |
 
-**HTTP 503** is returned if `LEDGERLENS_ADMIN_API_KEY` is not configured.
+**HTTP 503** is returned if `STELLARLENSE_ADMIN_API_KEY` is not configured.
 
 ---
 
 ## Manual Reset
 
-`POST /admin/soroban/reset` — requires `X-LedgerLens-Admin-Key`.
+`POST /admin/soroban/reset` — requires `X-StellarLense-Admin-Key`.
 
 Immediately closes the circuit, clears `consecutive_failures` and `last_error`, and returns the new health snapshot. Rate-limited to **10 calls/minute**.
 
 ```bash
 curl -X POST http://localhost:8000/admin/soroban/reset \
-  -H "X-LedgerLens-Admin-Key: $LEDGERLENS_ADMIN_API_KEY"
+  -H "X-StellarLense-Admin-Key: $STELLARLENSE_ADMIN_API_KEY"
 ```
 
 **When to use**: after fixing the underlying issue (e.g., re-funding the service account, redeploying the contract). Without this, the circuit waits `SOROBAN_CIRCUIT_RESET_SECONDS` before entering `half-open`.
@@ -102,11 +102,11 @@ CREATE TABLE soroban_dead_letters (
 
 ```bash
 curl http://localhost:8000/admin/soroban/dead-letters \
-  -H "X-LedgerLens-Admin-Key: $LEDGERLENS_ADMIN_API_KEY"
+  -H "X-StellarLense-Admin-Key: $STELLARLENSE_ADMIN_API_KEY"
 
 # Filter by status:
 curl "http://localhost:8000/admin/soroban/dead-letters?status=pending&page=1&page_size=50" \
-  -H "X-LedgerLens-Admin-Key: $LEDGERLENS_ADMIN_API_KEY"
+  -H "X-StellarLense-Admin-Key: $STELLARLENSE_ADMIN_API_KEY"
 ```
 
 ### DLQ Replay Procedure

@@ -202,7 +202,7 @@ async def feature_store_stats() -> dict:
 
 ## Security Considerations
 
-- **Redis authentication**: `FEATURE_STORE_REDIS_URL` must support `redis://:password@host:port/db` and `rediss://` (TLS). Reject plaintext `redis://` URLs in production mode (`LEDGERLENS_ENV=production`)
+- **Redis authentication**: `FEATURE_STORE_REDIS_URL` must support `redis://:password@host:port/db` and `rediss://` (TLS). Reject plaintext `redis://` URLs in production mode (`STELLARLENSE_ENV=production`)
 - **Key namespace isolation**: all Redis keys must use the `ll:fv:` prefix to prevent collision with other services sharing the same Redis instance
 - **Data serialisation**: feature values are floats; validate that deserialized values are finite (`math.isfinite`) before returning to the inference engine. Reject and log any NaN or Inf values from the cold tier
 - **Write buffer overflow**: if the SQLite flush falls behind and the buffer exceeds `MAX_BUFFER_SIZE`, emit a `WARNING` log and start dropping oldest entries (not newest) — never block the hot path

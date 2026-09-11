@@ -42,7 +42,7 @@ from urllib.parse import urlparse
 import numpy as np
 import pandas as pd
 
-logger = logging.getLogger("ledgerlens.drift_monitor")
+logger = logging.getLogger("stellar_lense.drift_monitor")
 
 PSI_THRESHOLD: float = 0.20
 PSI_MIN_DRIFTED_FEATURES: int = 3

@@ -2,7 +2,7 @@
 Event Sourcing and Immutable Audit Log for Scoring Decisions  (Issue #297)
 ==========================================================================
 Provides a cryptographically tamper-evident, append-only audit trail of every
-scoring decision made by LedgerLens.
+scoring decision made by StellarLense.
 
 Design
 ------
@@ -54,7 +54,7 @@ from typing import Optional
 
 import aiosqlite
 
-logger = logging.getLogger("ledgerlens.audit.scoring_events")
+logger = logging.getLogger("stellar_lense.audit.scoring_events")
 
 # ---------------------------------------------------------------------------
 # Allowed triggered_by values (enum-like constant set)

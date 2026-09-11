@@ -5,7 +5,7 @@ assignees: []
 ---
 
 ## Summary
-The LedgerLens API has no versioning strategy, meaning any breaking change to an endpoint forces immediate migration for all consumers. Adding a `/v1/` path prefix and a `Deprecation` response header framework enables backward-compatible evolution and gives integrators a migration window before breaking changes land.
+The Stellar Lense API has no versioning strategy, meaning any breaking change to an endpoint forces immediate migration for all consumers. Adding a `/v1/` path prefix and a `Deprecation` response header framework enables backward-compatible evolution and gives integrators a migration window before breaking changes land.
 
 ## Background & Context
 As the API surface grows, schema changes to endpoints like `GET /scores/{wallet}` are inevitable. Without versioning, a response field rename breaks every downstream consumer simultaneously. The industry standard for REST APIs is URL-based versioning (`/v1/`, `/v2/`) with `Deprecation` and `Sunset` headers (RFC 8594) to signal planned breaking changes.

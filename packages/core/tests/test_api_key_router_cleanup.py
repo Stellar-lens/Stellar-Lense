@@ -12,7 +12,7 @@ from config.settings import settings as _settings
 @pytest.fixture
 def db_path(tmp_path):
     path = str(tmp_path / "api_keys.db")
-    with patch.object(_settings, "ledgerlens_db_path", path):
+    with patch.object(_settings, "stellarlense_db_path", path):
         yield path
 
 
@@ -58,19 +58,19 @@ def test_require_scope_enforces_scopes(app, db_path):
     client = TestClient(app)
 
     assert client.get("/scores").status_code == 401
-    assert client.get("/scores", headers={"X-LedgerLens-Api-Key": "bogus"}).status_code == 401
+    assert client.get("/scores", headers={"X-StellarLense-Api-Key": "bogus"}).status_code == 401
 
     wrong = create_api_key(scopes=["write:suppressions"])
-    resp = client.get("/scores", headers={"X-LedgerLens-Api-Key": wrong["plaintext_key"]})
+    resp = client.get("/scores", headers={"X-StellarLense-Api-Key": wrong["plaintext_key"]})
     assert resp.status_code == 403
 
     right = create_api_key(scopes=["read:scores"])
-    resp = client.get("/scores", headers={"X-LedgerLens-Api-Key": right["plaintext_key"]})
+    resp = client.get("/scores", headers={"X-StellarLense-Api-Key": right["plaintext_key"]})
     assert resp.status_code == 200
 
     # An `admin` key satisfies any required scope.
     admin = create_api_key(scopes=["admin"])
-    resp = client.get("/scores", headers={"X-LedgerLens-Api-Key": admin["plaintext_key"]})
+    resp = client.get("/scores", headers={"X-StellarLense-Api-Key": admin["plaintext_key"]})
     assert resp.status_code == 200
 
 

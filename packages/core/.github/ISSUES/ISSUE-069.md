@@ -10,7 +10,7 @@ Extend `detection/cross_chain_linker.py` to assign probabilistic confidence scor
 
 ## Background & Context
 
-LedgerLens already detects cross-chain wash-trade patterns by linking Stellar wallets to EVM counterparts (Ethereum, Base, Polygon) via Allbridge bridge events (`docs/cross_chain_detection.md`). The current implementation matches wallets based on hard thresholds (e.g., bridge events within a fixed time window + amount within some tolerance). This deterministic approach has two weaknesses:
+Stellar Lense already detects cross-chain wash-trade patterns by linking Stellar wallets to EVM counterparts (Ethereum, Base, Polygon) via Allbridge bridge events (`docs/cross_chain_detection.md`). The current implementation matches wallets based on hard thresholds (e.g., bridge events within a fixed time window + amount within some tolerance). This deterministic approach has two weaknesses:
 
 1. **False positives**: two unrelated wallets that happen to bridge similar amounts at similar times can be incorrectly linked, inflating wash-trade risk scores for innocent parties.
 2. **Opacity**: the linking decision is binary and provides no uncertainty signal to downstream features or the dispute mechanism.
@@ -199,7 +199,7 @@ CROSS_CHAIN_CONFIRMED_CONFIDENCE: float = 0.90
 
 - EVM wallet addresses entering the linker must pass EIP-55 checksum validation (see ISSUE-078) before any processing. Reject malformed addresses with `ValueError`.
 - `confidence` is a floating-point value that influences risk scores. Ensure it is clamped to [0.0, 1.0] after sigmoid transformation (numerical edge cases near `-inf` or `+inf` log-likelihood ratios).
-- The `evidence_json` field in SQLite stores feature values for audit. These are derived values, not raw transaction data — they reveal LedgerLens's internal model weights. Gate `GET /cross-chain/links/{wallet}/explain` behind admin key for this reason.
+- The `evidence_json` field in SQLite stores feature values for audit. These are derived values, not raw transaction data — they reveal Stellar Lense's internal model weights. Gate `GET /cross-chain/links/{wallet}/explain` behind admin key for this reason.
 - Do not store EVM private keys or raw bridge transaction payloads in the `cross_chain_links` table — only derived features.
 - Rate-limit `GET /cross-chain/links/{wallet}` to prevent enumeration of all cross-chain links in the system.
 
@@ -239,7 +239,7 @@ CROSS_CHAIN_CONFIRMED_CONFIDENCE: float = 0.90
 
 ## For Contributors
 
-**Ideal contributor profile**: You have experience with probabilistic modelling, Bayesian inference, or probabilistic entity resolution — ideally applied to blockchain or financial transaction data. You understand log-likelihood ratios and sigmoid functions for converting evidence to probabilities. Familiarity with LedgerLens's cross-chain detection architecture and Allbridge bridge events is a significant advantage. Experience linking identities across heterogeneous systems (record linkage, entity resolution) translates directly to this work.
+**Ideal contributor profile**: You have experience with probabilistic modelling, Bayesian inference, or probabilistic entity resolution — ideally applied to blockchain or financial transaction data. You understand log-likelihood ratios and sigmoid functions for converting evidence to probabilities. Familiarity with Stellar Lense's cross-chain detection architecture and Allbridge bridge events is a significant advantage. Experience linking identities across heterogeneous systems (record linkage, entity resolution) translates directly to this work.
 
 To apply, please comment on this issue with:
 1. **Specialty area**: your primary expertise (e.g., probabilistic modelling, entity resolution, cross-chain analytics, Python backend).

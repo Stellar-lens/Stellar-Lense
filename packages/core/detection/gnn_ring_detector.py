@@ -35,7 +35,7 @@ from typing import Any
 
 import numpy as np
 
-logger = logging.getLogger("ledgerlens.gnn_ring_detector")
+logger = logging.getLogger("stellar_lense.gnn_ring_detector")
 
 # ---------------------------------------------------------------------------
 # Optional heavy imports

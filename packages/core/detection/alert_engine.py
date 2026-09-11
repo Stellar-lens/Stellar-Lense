@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 
 from config.settings import get_runtime_risk_score_threshold, settings
 
-logger = logging.getLogger("ledgerlens.alert_engine")
+logger = logging.getLogger("stellar_lense.alert_engine")
 
 _ESCALATION_DELTA = 10
 _RESOLUTION_CONSECUTIVE = 3

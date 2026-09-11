@@ -25,7 +25,7 @@ from enum import Enum
 import requests
 
 # ---------------------------------------------------------------------------
-# Optional dependency: web3  (pip install 'ledgerlens-core[chain]')
+# Optional dependency: web3  (pip install 'stellar-lense-core[chain]')
 # ---------------------------------------------------------------------------
 try:
     from web3 import Web3
@@ -39,14 +39,14 @@ def _require_web3(location: str = "ingestion/bridge_loader.py") -> None:
     if not _HAS_WEB3:
         raise ImportError(
             f"'web3' is required by {location} but is not installed.\n"
-            "  Install the 'chain' extra:  pip install 'ledgerlens-core[chain]'\n"
+            "  Install the 'chain' extra:  pip install 'stellar-lense-core[chain]'\n"
             "  Or install directly:        pip install web3"
         )
 
 from config.settings import settings
 from ingestion.data_models import BridgeTransfer
 
-logger = logging.getLogger("ledgerlens.bridge_loader")
+logger = logging.getLogger("stellar_lense.bridge_loader")
 
 # Allbridge TokensSent(address indexed sender, bytes32 recipient, uint256 amount, ...)
 if _HAS_WEB3:

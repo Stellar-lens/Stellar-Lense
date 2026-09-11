@@ -53,7 +53,7 @@ from detection.soroban_publisher import (
 )
 from detection.storage import init_db
 
-logger = logging.getLogger("ledgerlens.chain_submission_queue")
+logger = logging.getLogger("stellar_lense.chain_submission_queue")
 
 # Status values a row can hold. 'submitted' and 'abandoned' are terminal.
 STATUS_PENDING = "pending"

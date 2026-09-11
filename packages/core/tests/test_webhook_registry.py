@@ -40,7 +40,7 @@ def webhook_env(monkeypatch):
     would cause all register_subscriber() calls to raise RuntimeError.
     """
     key = base64.b64encode(os.urandom(32)).decode()
-    monkeypatch.setenv("LEDGERLENS_WEBHOOK_ENCRYPTION_KEY", key)
+    monkeypatch.setenv("STELLARLENSE_WEBHOOK_ENCRYPTION_KEY", key)
 
 
 @pytest.fixture

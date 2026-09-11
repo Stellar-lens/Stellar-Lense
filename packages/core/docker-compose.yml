@@ -15,7 +15,7 @@ services:
       # run `python cli.py db-migrate` (or `python cli.py train`) on the host before
       # the first `docker compose up`, or the container will fail to start because
       # the mount source doesn't exist.
-      - ./ledgerlens.db:/app/ledgerlens.db
+      - ./stellar_lense.db:/app/stellar_lense.db
     # Mirrors the HEALTHCHECK instruction baked into the Dockerfile so that
     # `docker compose up --wait` and any `depends_on: { api: { condition:
     # service_healthy } }` block until the API is actually serving traffic on

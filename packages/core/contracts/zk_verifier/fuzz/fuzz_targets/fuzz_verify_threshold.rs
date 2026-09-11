@@ -3,7 +3,7 @@
 use libfuzzer_sys::fuzz_target;
 use arbitrary::Arbitrary;
 use soroban_sdk::{Env, Address, Bytes, BytesN, testutils::Address as _};
-use ledgerlens_zk_verifier::{ZkVerifier, ZkVerifierClient};
+use stellar_lense_zk_verifier::{ZkVerifier, ZkVerifierClient};
 
 /// Fuzz inputs for verify_threshold with malformed proofs
 #[derive(Arbitrary, Debug)]

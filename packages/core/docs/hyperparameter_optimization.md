@@ -2,7 +2,7 @@
 
 ## Overview
 
-LedgerLens uses [Optuna](https://optuna.org) with the Tree-structured Parzen Estimator (TPE) algorithm for Bayesian hyperparameter optimization of the Random Forest, XGBoost, and LightGBM classifiers.
+Stellar Lense uses [Optuna](https://optuna.org) with the Tree-structured Parzen Estimator (TPE) algorithm for Bayesian hyperparameter optimization of the Random Forest, XGBoost, and LightGBM classifiers.
 
 ## TPE Algorithm
 

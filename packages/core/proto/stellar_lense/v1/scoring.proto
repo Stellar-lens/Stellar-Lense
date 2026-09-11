@@ -1,14 +1,14 @@
 syntax = "proto3";
 
-package ledgerlens.v1;
+package stellar_lense.v1;
 
-// RiskScoreProto is the canonical cross-language wire format for a LedgerLens risk score.
+// RiskScoreProto is the canonical cross-language wire format for a Stellar Lense risk score.
 //
 // IMPORTANT: This proto definition must stay in sync with:
 //   - detection/risk_score.py (Python canonical model — authoritative)
-//   - packages/ledgerlens-sdk/src/ledgerlens/models.py (Python SDK)
+//   - packages/stellar-lense-sdk/src/stellar_lense/models.py (Python SDK)
 //   - sdk/src/schemas.ts (TypeScript/Zod)
-//   - crates/ledgerlens-sdk/src/models.rs (Rust)
+//   - crates/stellar-lense-sdk/src/models.rs (Rust)
 //
 // Field numbers must never be reused. Add new optional fields at the next
 // available field number. See docs/adr/ADR-005-schema-contract-enforcement.md.

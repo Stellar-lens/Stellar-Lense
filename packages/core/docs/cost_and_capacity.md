@@ -1,8 +1,8 @@
 # Cost and Capacity Planning
 
-LedgerLens's cost and capacity monitoring stack translates Kubernetes resource consumption into financial visibility and forward-looking capacity projections, enabling operators to answer:
+Stellar Lense's cost and capacity monitoring stack translates Kubernetes resource consumption into financial visibility and forward-looking capacity projections, enabling operators to answer:
 
-- **What does LedgerLens cost to run?** (per hour, per wallet scored, per pod)
+- **What does Stellar Lense cost to run?** (per hour, per wallet scored, per pod)
 - **How much will it cost next month?** (trend analysis)
 - **When will we run out of capacity?** (days until maxReplicas or PVC full)
 
@@ -24,7 +24,7 @@ COST_PER_GB_STORAGE_MONTH_USD=0.10
 ```
 
 ```yaml
-# helm/ledgerlens/values.yaml (production)
+# helm/stellar_lense/values.yaml (production)
 costConfig:
   enabled: true
   costPerVcpuHourUsd: "0.0416"   # Replace with your negotiated rate
@@ -66,14 +66,14 @@ Copy the provisioning config to your Grafana server:
 
 ```bash
 # On the Grafana server
-sudo mkdir -p /var/lib/grafana/dashboards/ledgerlens
-sudo cp monitoring/grafana/cost_capacity_dashboard.json /var/lib/grafana/dashboards/ledgerlens/
-sudo cp monitoring/grafana/provisioning/dashboards/ledgerlens.yaml /etc/grafana/provisioning/dashboards/
+sudo mkdir -p /var/lib/grafana/dashboards/stellar_lense
+sudo cp monitoring/grafana/cost_capacity_dashboard.json /var/lib/grafana/dashboards/stellar_lense/
+sudo cp monitoring/grafana/provisioning/dashboards/stellar_lense.yaml /etc/grafana/provisioning/dashboards/
 
 sudo systemctl restart grafana-server
 ```
 
-The dashboard auto-loads at `http://your-grafana/d/ledgerlens-cost-capacity`.
+The dashboard auto-loads at `http://your-grafana/d/stellar-lense-cost-capacity`.
 
 ---
 
@@ -93,7 +93,7 @@ Three configurable coefficients translate resource usage into USD:
 
 1. **Compute (CPU + memory):** Check your cloud provider's pricing page for the instance type running your Kubernetes nodes. Divide the hourly instance cost by the number of vCPUs and GB of RAM to get per-unit rates.
 
-2. **Storage:** Check the cost per GB-month for the storage class used by LedgerLens's PersistentVolumeClaim (typically gp3, pd-standard, or equivalent).
+2. **Storage:** Check the cost per GB-month for the storage class used by Stellar Lense's PersistentVolumeClaim (typically gp3, pd-standard, or equivalent).
 
 3. **Reserved instances / savings plans:** If you're running on reserved capacity, use the effective hourly rate (reservation cost / reservation hours) rather than on-demand pricing.
 
@@ -101,19 +101,19 @@ Three configurable coefficients translate resource usage into USD:
 
 The cost recording rules (in `monitoring/recording_rules_cost.yml`) aggregate kube-state-metrics and cadvisor metrics with the configured coefficients:
 
-#### `ledgerlens:pod_cost_per_hour:usd`
+#### `stellar_lense:pod_cost_per_hour:usd`
 
 Per-pod cost (CPU + memory) per hour:
 
 ```promql
 (
-  sum by (pod, namespace) (rate(container_cpu_usage_seconds_total{namespace="ledgerlens"}[5m]))
-  * ledgerlens_cost_per_vcpu_hour_usd
+  sum by (pod, namespace) (rate(container_cpu_usage_seconds_total{namespace="stellar_lense"}[5m]))
+  * stellar_lense_cost_per_vcpu_hour_usd
 )
 +
 (
-  sum by (pod, namespace) (container_memory_working_set_bytes{namespace="ledgerlens"}) / 1073741824
-  * ledgerlens_cost_per_gb_memory_hour_usd
+  sum by (pod, namespace) (container_memory_working_set_bytes{namespace="stellar_lense"}) / 1073741824
+  * stellar_lense_cost_per_gb_memory_hour_usd
 )
 ```
 
@@ -123,37 +123,37 @@ Per-pod cost (CPU + memory) per hour:
 
 **Why working set, not requested/limit?** You pay for actual consumption, not reservations. `container_memory_working_set_bytes` is the memory actively in use (RSS + cache), which drives cloud billing.
 
-#### `ledgerlens:namespace_cost_per_hour:usd`
+#### `stellar_lense:namespace_cost_per_hour:usd`
 
-Total cost across all LedgerLens pods:
+Total cost across all Stellar Lense pods:
 
 ```promql
-sum(ledgerlens:pod_cost_per_hour:usd{namespace="ledgerlens"})
+sum(stellar_lense:pod_cost_per_hour:usd{namespace="stellar_lense"})
 ```
 
-#### `ledgerlens:cost_per_wallet_scored:usd`
+#### `stellar_lense:cost_per_wallet_scored:usd`
 
 Cost per wallet scored (amortized over 1 hour):
 
 ```promql
-sum(ledgerlens:pod_cost_per_hour:usd{namespace="ledgerlens"})
+sum(stellar_lense:pod_cost_per_hour:usd{namespace="stellar_lense"})
 /
-(sum(rate(ledgerlens_wallets_scored_total[1h])) * 3600)
+(sum(rate(stellar_lense_wallets_scored_total[1h])) * 3600)
 ```
 
 **Interpretation:** If this value is `0.0001`, each scored wallet costs $0.0001 = $0.10 per 1,000 wallets.
 
 **When it's NaN:** If no wallets are scored in the last hour (cold start, maintenance window), the denominator is zero and the result is NaN. The Grafana gauge panel displays "No data" in this case.
 
-#### `ledgerlens:storage_cost_per_hour:usd`
+#### `stellar_lense:storage_cost_per_hour:usd`
 
 Storage cost (PVC size × monthly cost / hours per month):
 
 ```promql
 sum by (persistentvolumeclaim, namespace) (
-  kube_persistentvolumeclaim_resource_requests_storage_bytes{namespace="ledgerlens"}
+  kube_persistentvolumeclaim_resource_requests_storage_bytes{namespace="stellar_lense"}
 ) / 1073741824
-* ledgerlens_cost_per_gb_storage_month_usd
+* stellar_lense_cost_per_gb_storage_month_usd
 / 730
 ```
 
@@ -178,14 +178,14 @@ CAPACITY_PROJECTION_WINDOW_DAYS=7
 
 ### Recording Rules
 
-#### `ledgerlens:replica_count_projected_days_to_max`
+#### `stellar_lense:replica_count_projected_days_to_max`
 
 Days until API replica count hits `autoscaling.maxReplicas`:
 
 ```promql
-(10 - kube_deployment_status_replicas{deployment="ledgerlens-api", namespace="ledgerlens"})
+(10 - kube_deployment_status_replicas{deployment="stellar-lense-api", namespace="stellar_lense"})
 /
-clamp_min(deriv(kube_deployment_status_replicas{deployment="ledgerlens-api", namespace="ledgerlens"}[7d]) * 86400, 1e-9)
+clamp_min(deriv(kube_deployment_status_replicas{deployment="stellar-lense-api", namespace="stellar_lense"}[7d]) * 86400, 1e-9)
 ```
 
 **How it works:**
@@ -208,19 +208,19 @@ clamp_min(deriv(kube_deployment_status_replicas{deployment="ledgerlens-api", nam
 - **Step changes:** If traffic suddenly doubles (product launch, marketing campaign), the 7-day window underestimates growth. Review the dashboard after major events and manually adjust if needed.
 - **Seasonal patterns:** Linear regression cannot capture weekly or monthly cycles. Use a longer window (30 days) to average out cycles, or supplement with external forecasting tools.
 
-#### `ledgerlens:pvc_projected_days_to_full`
+#### `stellar_lense:pvc_projected_days_to_full`
 
 Days until PVC usage hits `persistence.size`:
 
 ```promql
 (
-  kubelet_volume_stats_capacity_bytes{namespace="ledgerlens", persistentvolumeclaim=~"ledgerlens-.*"}
+  kubelet_volume_stats_capacity_bytes{namespace="stellar_lense", persistentvolumeclaim=~"stellar-lense-.*"}
   -
-  kubelet_volume_stats_used_bytes{namespace="ledgerlens", persistentvolumeclaim=~"ledgerlens-.*"}
+  kubelet_volume_stats_used_bytes{namespace="stellar_lense", persistentvolumeclaim=~"stellar-lense-.*"}
 )
 /
 clamp_min(
-  deriv(kubelet_volume_stats_used_bytes{namespace="ledgerlens", persistentvolumeclaim=~"ledgerlens-.*"}[7d]) * 86400,
+  deriv(kubelet_volume_stats_used_bytes{namespace="stellar_lense", persistentvolumeclaim=~"stellar-lense-.*"}[7d]) * 86400,
   1e-9
 )
 ```
@@ -229,21 +229,21 @@ clamp_min(
 
 **Actionable threshold:** The `CapacityLimitApproaching` alert fires when this value drops below 14 days.
 
-#### `ledgerlens:wallets_scored_per_hour`
+#### `stellar_lense:wallets_scored_per_hour`
 
 Current scoring throughput (for capacity planning dashboards):
 
 ```promql
-rate(ledgerlens_wallets_scored_total[1h]) * 3600
+rate(stellar_lense_wallets_scored_total[1h]) * 3600
 ```
 
-#### `ledgerlens:wallets_scored_per_hour:predicted_7d`
+#### `stellar_lense:wallets_scored_per_hour:predicted_7d`
 
 Projected scoring throughput 7 days from now:
 
 ```promql
-predict_linear(ledgerlens_wallets_scored_total[7d], 7*86400)
-- ledgerlens_wallets_scored_total
+predict_linear(stellar_lense_wallets_scored_total[7d], 7*86400)
+- stellar_lense_wallets_scored_total
 ```
 
 **Interpretation:** If current rate is 1000 wallets/hour and predicted is 1500, throughput is growing by 50% over the next week.
@@ -257,13 +257,13 @@ The `CapacityLimitApproaching` alert (in `monitoring/alerts.yml`) fires when pro
 ```yaml
 - alert: CapacityLimitApproaching
   expr: |
-    ledgerlens:replica_count_projected_days_to_max < 14
+    stellar_lense:replica_count_projected_days_to_max < 14
     or
-    ledgerlens:pvc_projected_days_to_full < 14
+    stellar_lense:pvc_projected_days_to_full < 14
   for: 1h
   annotations:
     summary: "Cluster capacity projected to be exhausted within 14 days"
-    runbook: "Review ledgerlens_wallets_scored_total growth trend..."
+    runbook: "Review stellar_lense_wallets_scored_total growth trend..."
 ```
 
 **Lead time configuration:**
@@ -285,12 +285,12 @@ When the alert fires:
    - "Wallet Scoring Throughput" trend (is growth expected or anomalous?)
 
 2. **Investigate growth cause:**
-   - Check `GET /metrics` for `ledgerlens_wallets_scored_total` by `asset_pair` — has a specific market driven the growth?
+   - Check `GET /metrics` for `stellar_lense_wallets_scored_total` by `asset_pair` — has a specific market driven the growth?
    - Review Horizon SSE metrics — is ingestion volume up?
    - Check for data quality issues — are duplicate trades being ingested?
 
 3. **Take action:**
-   - **Replica limit:** Increase `autoscaling.maxReplicas` in `helm/ledgerlens/values.yaml` and `helm upgrade`
+   - **Replica limit:** Increase `autoscaling.maxReplicas` in `helm/stellar_lense/values.yaml` and `helm upgrade`
    - **PVC full:** Expand the PVC (if your storage class supports `allowVolumeExpansion: true`) or migrate to a larger volume
    - **Cost concern:** If growth is expected but budget-constrained, tune `TRADE_HISTORY_LOOKBACK_DAYS` or filter low-value asset pairs
 
@@ -310,16 +310,16 @@ The cost & capacity dashboard (`monitoring/grafana/cost_capacity_dashboard.json`
 ### 1. Namespace Cost Per Hour
 
 **Type:** Time series  
-**Metric:** `ledgerlens:namespace_cost_per_hour:usd`
+**Metric:** `stellar_lense:namespace_cost_per_hour:usd`
 
-Total cost across all LedgerLens pods. Useful for:
+Total cost across all Stellar Lense pods. Useful for:
 - Daily cost estimation (cost per hour × 24)
 - Detecting cost spikes (e.g., unexpected autoscaling)
 
 ### 2. Cost Per Wallet Scored
 
 **Type:** Gauge  
-**Metric:** `ledgerlens:cost_per_wallet_scored:usd`
+**Metric:** `stellar_lense:cost_per_wallet_scored:usd`
 
 Unit economics: how much does it cost to score one wallet? Lower is better.
 
@@ -331,7 +331,7 @@ Unit economics: how much does it cost to score one wallet? Lower is better.
 ### 3. Cost Per Pod (Stacked)
 
 **Type:** Time series (stacked area)  
-**Metric:** `ledgerlens:pod_cost_per_hour:usd`
+**Metric:** `stellar_lense:pod_cost_per_hour:usd`
 
 Per-pod cost breakdown. Useful for:
 - Identifying expensive pods (API vs ingestion worker)
@@ -340,7 +340,7 @@ Per-pod cost breakdown. Useful for:
 ### 4. Days Until Max Replicas
 
 **Type:** Gauge  
-**Metric:** `ledgerlens:replica_count_projected_days_to_max`
+**Metric:** `stellar_lense:replica_count_projected_days_to_max`
 
 **Thresholds:**
 - Red: < 7 days (critical — act now)
@@ -351,7 +351,7 @@ Per-pod cost breakdown. Useful for:
 ### 5. Days Until PVC Full
 
 **Type:** Gauge  
-**Metric:** `ledgerlens:pvc_projected_days_to_full`
+**Metric:** `stellar_lense:pvc_projected_days_to_full`
 
 Same thresholds as replica projection.
 
@@ -359,15 +359,15 @@ Same thresholds as replica projection.
 
 **Type:** Time series  
 **Metrics:**
-- `ledgerlens:wallets_scored_per_hour` (solid line)
-- `ledgerlens:wallets_scored_per_hour:predicted_7d / (7*86400) * 3600` (dashed line)
+- `stellar_lense:wallets_scored_per_hour` (solid line)
+- `stellar_lense:wallets_scored_per_hour:predicted_7d / (7*86400) * 3600` (dashed line)
 
 Shows current and projected scoring rate. Helps answer "will we be able to handle next week's traffic?"
 
 ### 7. API Replica Count
 
 **Type:** Time series  
-**Metric:** `kube_deployment_status_replicas{deployment="ledgerlens-api"}`
+**Metric:** `kube_deployment_status_replicas{deployment="stellar-lense-api"}`
 
 Current replica count over time. The red threshold line at `maxReplicas=10` indicates the hard limit.
 
@@ -411,20 +411,20 @@ curl http://localhost:9090/api/v1/targets | jq '.data.activeTargets[] | select(.
 
 ### Prometheus Scrape Config
 
-Ensure Prometheus scrapes the LedgerLens `/metrics` endpoint:
+Ensure Prometheus scrapes the Stellar Lense `/metrics` endpoint:
 
 ```yaml
 # prometheus.yml
 scrape_configs:
-  - job_name: 'ledgerlens'
+  - job_name: 'stellar_lense'
     kubernetes_sd_configs:
       - role: pod
         namespaces:
-          names: ['ledgerlens']
+          names: ['stellar_lense']
     relabel_configs:
       - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
         action: keep
-        regex: ledgerlens
+        regex: stellar_lense
       - source_labels: [__meta_kubernetes_pod_container_port_name]
         action: keep
         regex: http
@@ -448,9 +448,9 @@ async def startup():
 
 The three gauges are:
 
-- `ledgerlens_cost_per_vcpu_hour_usd`
-- `ledgerlens_cost_per_gb_memory_hour_usd`
-- `ledgerlens_cost_per_gb_storage_month_usd`
+- `stellar_lense_cost_per_vcpu_hour_usd`
+- `stellar_lense_cost_per_gb_memory_hour_usd`
+- `stellar_lense_cost_per_gb_storage_month_usd`
 
 They are static values set once at startup. If you change the cost coefficients in `.env` or Helm values, restart the application for the new values to take effect.
 
@@ -473,7 +473,7 @@ costConfig:
 These values are injected into the API deployment via a ConfigMap:
 
 ```bash
-helm install ledgerlens ./helm/ledgerlens \
+helm install stellar_lense ./helm/stellar_lense \
   --set costConfig.costPerVcpuHourUsd=0.05 \
   --set costConfig.costPerGbMemoryHourUsd=0.007
 ```
@@ -543,7 +543,7 @@ Negotiated cloud discount rates are **commercially sensitive**. Publishing your 
 costConfig:
   costPerVcpuHourUsd: "0.032"  # Your actual negotiated rate
 
-helm install ledgerlens ./helm/ledgerlens -f values.prod.yaml
+helm install stellar_lense ./helm/stellar_lense -f values.prod.yaml
 ```
 
 3. Store `values.prod.yaml` in a secret manager (Vault, AWS Secrets Manager) or private repo
@@ -603,15 +603,15 @@ Unit tests for the cost exporter are in `tests/test_cost_metrics.py`.
 
 1. Verify cost coefficient gauges are set:
    ```bash
-   curl http://localhost:8000/metrics | grep ledgerlens_cost_per
+   curl http://localhost:8000/metrics | grep stellar_lense_cost_per
    ```
 
 2. Check that `init_cost_metrics()` is called at startup (search for "Cost metrics initialized" in logs)
 
 3. Verify kube-state-metrics and cadvisor metrics are scraped by Prometheus:
    ```promql
-   container_cpu_usage_seconds_total{namespace="ledgerlens"}
-   kube_deployment_status_replicas{deployment="ledgerlens-api"}
+   container_cpu_usage_seconds_total{namespace="stellar_lense"}
+   kube_deployment_status_replicas{deployment="stellar-lense-api"}
    ```
 
 ### Capacity projection is NaN or +Inf
@@ -626,7 +626,7 @@ Unit tests for the cost exporter are in `tests/test_cost_metrics.py`.
 
 1. Verify the Prometheus datasource is configured in Grafana
 2. Check that recording rules are loaded (Prometheus → Status → Rules)
-3. Verify the `namespace="ledgerlens"` label matches your actual namespace
+3. Verify the `namespace="stellar_lense"` label matches your actual namespace
 
 ---
 

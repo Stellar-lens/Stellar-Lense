@@ -1,6 +1,6 @@
-# LedgerLens Database Schema
+# Stellar Lense Database Schema
 
-LedgerLens uses a single SQLite database (path: `LEDGERLENS_DB_PATH`, default `./ledgerlens.db`).
+Stellar Lense uses a single SQLite database (path: `STELLARLENSE_DB_PATH`, default `./stellar_lense.db`).
 Schema migrations are tracked in the `schema_migrations` table and applied automatically at startup
 via `detection.storage.init_db()`.
 
@@ -54,14 +54,14 @@ API requests read from this table rather than re-fitting the structural equation
 
 | Column          | Type      | Notes                                                    |
 | --------------- | --------- | -------------------------------------------------------- |
-| `model_version` | TEXT      | Version tag (set via `LEDGERLENS_MODEL_VERSION` env var) |
+| `model_version` | TEXT      | Version tag (set via `STELLARLENSE_MODEL_VERSION` env var) |
 | `feature_name`  | TEXT      | Observable feature name (e.g. `wash_ring_membership`)    |
 | `ate`           | REAL      | Average Treatment Effect in risk-score units             |
 | `computed_at`   | TIMESTAMP | When the ATE was computed                                |
 
 Primary key: `(model_version, feature_name)`
 
-**Cache invalidation**: update `LEDGERLENS_MODEL_VERSION` after retraining, or call
+**Cache invalidation**: update `STELLARLENSE_MODEL_VERSION` after retraining, or call
 `CausalEngine.invalidate_cache()` programmatically.
 
 **Security**: the ATE cache is read-only from the API. No runtime DAG modification is

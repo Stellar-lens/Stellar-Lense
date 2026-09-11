@@ -13,7 +13,7 @@ table is first created.
 
 Signing secret
 --------------
-The HMAC key comes from ``LEDGERLENS_AUDIT_SECRET`` and has no hardcoded
+The HMAC key comes from ``STELLARLENSE_AUDIT_SECRET`` and has no hardcoded
 fallback. It previously defaulted to a constant committed to this repository,
 which meant any deployment that omitted the variable produced a chain whose
 HMACs any reader of the public source could recompute -- tamper-evident in
@@ -21,8 +21,8 @@ form, but providing no actual tamper evidence.
 
 Resolution order:
 
-* ``LEDGERLENS_AUDIT_SECRET`` set (>= 32 chars) -- used as-is.
-* Otherwise, in a production-flagged environment (``LEDGERLENS_ENV`` in
+* ``STELLARLENSE_AUDIT_SECRET`` set (>= 32 chars) -- used as-is.
+* Otherwise, in a production-flagged environment (``STELLARLENSE_ENV`` in
   {production, prod, staging}, or ``NETWORK=mainnet``) -- raise
   :class:`AuditSecretError` and refuse to run.
 * Otherwise (local development) -- generate a random secret once and persist it
@@ -76,7 +76,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-logger = logging.getLogger("ledgerlens.audit_log")
+logger = logging.getLogger("stellar_lense.audit_log")
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -84,18 +84,18 @@ logger = logging.getLogger("ledgerlens.audit_log")
 
 DEFAULT_DB_NAME = "audit_log.db"
 GENESIS_PREV_HASH = "genesis"
-AUDIT_SECRET_ENV_KEY = "LEDGERLENS_AUDIT_SECRET"
+AUDIT_SECRET_ENV_KEY = "STELLARLENSE_AUDIT_SECRET"
 
 # Which deployments must refuse to start without a real signing secret.
 # NETWORK=mainnet is honoured too, so an existing mainnet deployment is
-# covered without having to also set LEDGERLENS_ENV.
-ENVIRONMENT_ENV_KEY = "LEDGERLENS_ENV"
+# covered without having to also set STELLARLENSE_ENV.
+ENVIRONMENT_ENV_KEY = "STELLARLENSE_ENV"
 NETWORK_ENV_KEY = "NETWORK"
 _PRODUCTION_ENVIRONMENTS = frozenset({"production", "prod", "staging"})
 
 # Filename of the machine-local development secret. Generated on first use and
 # never committed — see the module docstring.
-DEV_SECRET_FILENAME = ".ledgerlens_audit_secret"
+DEV_SECRET_FILENAME = ".stellar_lense_audit_secret"
 
 # Short keys weaken the HMAC and are almost always a placeholder that escaped
 # review; 32 characters is the smallest value worth trusting here.

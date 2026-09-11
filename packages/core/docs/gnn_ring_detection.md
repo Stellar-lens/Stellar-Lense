@@ -2,7 +2,7 @@
 
 ## Motivation — SCC Limitations
 
-LedgerLens originally used Tarjan's Strongly Connected Component (SCC) algorithm to identify wash rings. SCC is effective for closed cycles but has three fundamental weaknesses:
+Stellar Lense originally used Tarjan's Strongly Connected Component (SCC) algorithm to identify wash rings. SCC is effective for closed cycles but has three fundamental weaknesses:
 
 | Weakness | Description |
 |----------|-------------|

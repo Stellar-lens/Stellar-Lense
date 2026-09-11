@@ -1,6 +1,6 @@
 # SHAP Explanation
 
-LedgerLens provides per-wallet SHAP (SHapley Additive exPlanations) waterfall
+Stellar Lense provides per-wallet SHAP (SHapley Additive exPlanations) waterfall
 explanations through the `GET /v1/scores/{wallet}/explain` endpoint, making
 risk scores actionable and auditable for analysts, protocol teams, and
 compliance integrators.
@@ -36,7 +36,7 @@ GET /v1/scores/{wallet}/explain?asset_pair=XLM/USDC&model=random_forest
 ### Example Request
 
 ```bash
-curl -H "X-LedgerLens-Admin-Key: your-key" \
+curl -H "X-StellarLense-Admin-Key: your-key" \
   "http://localhost:8000/v1/scores/GABCD...XYZ/explain?asset_pair=XLM/USDC&model=random_forest"
 ```
 
@@ -83,7 +83,7 @@ next `explain()` call recomputes the SHAP values from the underlying
 The cache is per-process and lives in memory only. It does not survive
 process restarts and is not shared across API instances. This design
 is appropriate for a single-process local API (`api/main.py`). The
-canonical `ledgerlens-api` service may implement a shared Redis-backed
+canonical `stellar-lense-api` service may implement a shared Redis-backed
 cache when multi-replica deployments are supported.
 
 ## Error Responses

@@ -11,7 +11,7 @@ assignees: []
 The `detection/drift_monitor.py` module provides `DriftMonitor.check_psi()` which computes Population Stability Index for each feature dimension. PSI measures *input* distribution shift but cannot distinguish between (a) the input distribution shifting in a way that preserves model accuracy, and (b) the input distribution shifting because the model has become less accurate.
 
 A model performance monitoring loop requires:
-1. **Ground-truth collection**: when a wallet is flagged as wash-trading by LedgerLens (score > threshold), an analyst can confirm or dismiss the flag. These labels are stored in a `feedback_labels` table in SQLite.
+1. **Ground-truth collection**: when a wallet is flagged as wash-trading by Stellar Lense (score > threshold), an analyst can confirm or dismiss the flag. These labels are stored in a `feedback_labels` table in SQLite.
 2. **Rolling performance computation**: on each `retrain-check` run, compute precision, recall, and F1 on all feedback-labelled samples from the last 30 days.
 3. **Degradation detection**: if `F1_current < F1_baseline - 0.05`, raise `ModelDegradationAlert` and trigger the retraining pipeline.
 4. **Alerting**: write the alert to the SQLite `degradation_alerts` table and (if configured) call the webhook delivery worker with a `model_degradation` event.
@@ -112,7 +112,7 @@ Content-Type: application/json
 
 **`GET /admin/performance-report` endpoint:**
 - Returns latest `PerformanceReport` as JSON
-- Requires `X-LedgerLens-Admin-Key` header (same admin auth as `/admin/drift-reports`)
+- Requires `X-StellarLense-Admin-Key` header (same admin auth as `/admin/drift-reports`)
 
 ## Security Considerations
 - `submitted_by` field in `feedback_labels` must be derived from an authenticated API call, not user-supplied; in the local API, default to `"local_api"` and document that production should use an authenticated analyst identity

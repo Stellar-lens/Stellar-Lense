@@ -13,7 +13,7 @@ Usage
         --epochs 100 \\
         --lr 0.001 \\
         --neg-sample-ratio 3 \\
-        --db-path ledgerlens.db \\
+        --db-path stellar_lense.db \\
         --model-dir models \\
         --hidden-dim 64 \\
         --num-layers 2 \\
@@ -50,7 +50,7 @@ from typing import Optional
 
 import numpy as np
 
-logger = logging.getLogger("ledgerlens.train_lstm")
+logger = logging.getLogger("stellar_lense.train_lstm")
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s — %(message)s",
@@ -72,7 +72,7 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="train_lstm_autoencoder",
         description=(
-            "Train the LedgerLens LSTM autoencoder (detection.temporal_patterns."
+            "Train the StellarLense LSTM autoencoder (detection.temporal_patterns."
             "LSTMAutoencoder) on clean (non-wash-trade) wallet trade sequences so "
             "it reconstructs normal behaviour well; high reconstruction loss at "
             "inference then flags anomalies. Training sequences are 5-min-binned "
@@ -89,7 +89,7 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
             "  python scripts/train_lstm_autoencoder.py --epochs 3 --db-path /nonexistent.db\n"
             "\n"
             "  # Full run against a populated DB:\n"
-            "  python scripts/train_lstm_autoencoder.py --epochs 100 --db-path ledgerlens.db \\\n"
+            "  python scripts/train_lstm_autoencoder.py --epochs 100 --db-path stellar_lense.db \\\n"
             "      --hidden-dim 64 --num-layers 2 --sequence-length 48 --batch-size 32\n"
         ),
     )
@@ -111,9 +111,9 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         ),
     )
     parser.add_argument(
-        "--db-path", default="ledgerlens.db",
+        "--db-path", default="stellar_lense.db",
         help=(
-            "Path to the LedgerLens SQLite database. Only the "
+            "Path to the StellarLense SQLite database. Only the "
             "`feature_distribution_snapshots` table is read. A missing file or "
             "empty result triggers the synthetic-data fallback (still exits 0)."
         ),

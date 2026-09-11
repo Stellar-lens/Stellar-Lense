@@ -1,6 +1,6 @@
 # Contract Fuzzing Quick Start
 
-Quick reference for running and debugging fuzz tests on the LedgerLens Soroban contracts.
+Quick reference for running and debugging fuzz tests on the Stellar Lense Soroban contracts.
 
 ## Prerequisites
 

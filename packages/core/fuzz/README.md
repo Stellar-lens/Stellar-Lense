@@ -1,4 +1,4 @@
-# Fuzz Testing — LedgerLens Ingestion Parsers
+# Fuzz Testing — Stellar Lense Ingestion Parsers
 
 This directory contains [Atheris](https://github.com/google/atheris) coverage-guided
 fuzz harnesses for every Pydantic parser entrypoint in `ingestion/data_models.py` and

@@ -2,7 +2,7 @@
 
 This directory implements **scoring decision provenance** — an event-sourced,
 cryptographically tamper-evident record of every risk scoring decision made by
-LedgerLens, including the full feature snapshot and model version that produced
+Stellar Lense, including the full feature snapshot and model version that produced
 it.
 
 | File | Purpose |
@@ -26,7 +26,7 @@ problems and should not be confused:
 | **Async** | ✅ `aiosqlite` | ❌ Synchronous `sqlite3` |
 | **Default retention** | 7 years (FATF AML minimum) | Configurable |
 
-Both modules write to the same SQLite database (`LEDGERLENS_DB_PATH`) but to
+Both modules write to the same SQLite database (`STELLARLENSE_DB_PATH`) but to
 different tables.
 
 ---

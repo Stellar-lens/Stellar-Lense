@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to `ledgerlens-core` are documented in this file.
+All notable changes to `stellar-lense-core` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -83,7 +83,7 @@ messages drive version bumps, this file, and the tagged GHCR image publish.
   audit logs know whether a flagging decision used bootstrap or asymptotic estimates.
 - `chi_square_pvalue` and `pvalue_method` keys added to the dict returned by
   `compute_benford_metrics` (backward-compatible; existing keys unchanged).
-- `--bootstrap-threshold` and `--bootstrap-samples` CLI flags on `ledgerlens score`.
+- `--bootstrap-threshold` and `--bootstrap-samples` CLI flags on `stellar_lense score`.
 - `BENFORD_BOOTSTRAP_THRESHOLD` and `BENFORD_BOOTSTRAP_SAMPLES` documented in `.env.example`.
 - `docs/benford_analysis.md` with "Small-Sample P-Value Estimation" methodology section.
 - Synthetic SDEX trade generator (`ingestion/synthetic_data.py`) with
@@ -92,10 +92,10 @@ messages drive version bumps, this file, and the tagged GHCR image publish.
 - SQLite-backed local `RiskScore` store (`detection/storage.py`).
 - Local read-only FastAPI app (`api/main.py`) serving `/scores`, `/alerts`,
   and `/assets/risk-ranking`.
-- `ledgerlens` CLI (`cli.py`): `generate-data`, `train`, `score`, `serve`.
+- `stellar_lense` CLI (`cli.py`): `generate-data`, `train`, `score`, `serve`.
 - Retrying HTTP client for Horizon API calls (`ingestion/http_client.py`).
 - Dockerfile, docker-compose, and GitHub Actions CI workflow.
-- `ledgerlens --version` / `-V` flag that reports the current version from
+- `stellar_lense --version` / `-V` flag that reports the current version from
   `pyproject.toml`.
 - `release-please` GitHub Action workflow for automated semantic versioning,
   changelog generation, and Docker image publishing to GHCR.

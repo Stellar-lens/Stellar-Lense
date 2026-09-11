@@ -20,7 +20,7 @@ repeatable, with zero filesystem side effects.
 |---|---|---|
 | A1 | `patch("httpx.Client", lambda: httpx.Client(transport=...))` — the stub took no kwargs, but `httpx.Client()` recursed into the patched name | **3 hard failures** (`TypeError: <lambda>() got an unexpected keyword argument 'transport'`) |
 | A2 | `_MockTransport` popped responses **positionally** from a queue | Any added RPC call shifts every response by one; an extra call raises `IndexError` from inside the adapter's blanket `except` and vanishes |
-| A3 | `SolanaAdapter()` built a real `IdempotencyKeyStore` against the **repo's `ledgerlens.db`** | `test_ingest_cassette` recorded `_MOCK_SIG` on first run; on any later run it was a duplicate and returned `[]`. Test passed once, then failed forever, and dirtied a tracked file |
+| A3 | `SolanaAdapter()` built a real `IdempotencyKeyStore` against the **repo's `stellar_lense.db`** | `test_ingest_cassette` recorded `_MOCK_SIG` on first run; on any later run it was a duplicate and returned `[]`. Test passed once, then failed forever, and dirtied a tracked file |
 | A4 | Assertions were tautological — `assert x in owners or y in owners`, `assert addr is None or addr.startswith("G")`, `assert 0 <= crc <= 0xFFFF` | Passed even if the code returned `None` or was totally wrong. `_crc16_xmodem` was never checked against a known value |
 | A5 | No test ever built a **valid** VAA, so `_extract_stellar_address_from_vaa` had zero happy-path coverage (only "returns None" cases) | The entire Wormhole linking feature was effectively untested |
 | A6 | `test_solana_adapter_rpc_url_from_env` set `SOLANA_RPC_URL` via monkeypatch, but the adapter's `os.environ.setdefault` could leak it | Cross-test env pollution |
@@ -101,7 +101,7 @@ pytest tests/test_solana_adapter.py     →  73 passed        (was 13 passed / 3
 5× repeat + pytest-randomly random order →  73 passed each time
 ruff check ingestion/solana_adapter.py tests/test_solana_adapter.py → All checks passed
                                             (was 4 errors, incl. one pre-existing)
-md5sum ledgerlens.db before/after        →  unchanged
+md5sum stellar_lense.db before/after        →  unchanged
 20,000-iteration fuzz-harness equivalent →  no exceptions
 10,976 malformed-input combos to _tx_to_trade → no exceptions
 ```

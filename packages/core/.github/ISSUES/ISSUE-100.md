@@ -5,7 +5,7 @@ assignees: []
 ---
 
 ## Summary
-The LedgerLens SQLite database grows unboundedly as risk scores, alert events, and trade features accumulate. Without a retention policy, the database will exhaust disk space within months on a production node. A configurable retention policy engine that archives old records to Parquet and purges them from SQLite on a nightly schedule keeps disk usage bounded.
+The Stellar Lense SQLite database grows unboundedly as risk scores, alert events, and trade features accumulate. Without a retention policy, the database will exhaust disk space within months on a production node. A configurable retention policy engine that archives old records to Parquet and purges them from SQLite on a nightly schedule keeps disk usage bounded.
 
 ## Objectives
 - [ ] Implement `RetentionEngine` in `storage/retention.py` with per-table TTL configuration

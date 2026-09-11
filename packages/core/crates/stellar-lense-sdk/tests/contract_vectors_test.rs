@@ -2,14 +2,14 @@
 ///
 /// These tests load the canonical fixture file `tests/fixtures/contract_vectors.json`
 /// and verify that every valid vector deserializes cleanly via serde_json into the
-/// `ledgerlens_sdk::models::RiskScore` struct. They also verify that adversarial
+/// `stellar_lense_sdk::models::RiskScore` struct. They also verify that adversarial
 /// vectors (wrong field names, out-of-range values) are handled correctly.
 ///
 /// ADR reference: docs/adr/ADR-005-schema-contract-enforcement.md
 ///
 /// The fixture path is resolved relative to the workspace root using the
 /// CARGO_MANIFEST_DIR environment variable set by cargo test.
-use ledgerlens_sdk::models::RiskScore;
+use stellar_lense_sdk::models::RiskScore;
 use serde_json::Value;
 use std::fs;
 use std::path::PathBuf;
@@ -22,7 +22,7 @@ use std::path::PathBuf;
 fn fixture_path() -> PathBuf {
     let manifest_dir =
         std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR must be set by cargo test");
-    // crates/ledgerlens-sdk → go up two levels to workspace root
+    // crates/stellar-lense-sdk → go up two levels to workspace root
     let workspace_root = PathBuf::from(manifest_dir)
         .parent()
         .expect("crate has parent dir")

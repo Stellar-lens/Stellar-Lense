@@ -21,7 +21,7 @@ Module-level tunables (overridable via environment variables):
 
 import os
 
-EVASION_THRESHOLD: float = float(os.getenv("LEDGERLENS_EVASION_THRESHOLD", "30.0"))
-N_EVASION_TRIGGER: int = int(os.getenv("LEDGERLENS_N_EVASION_TRIGGER", "100"))
+EVASION_THRESHOLD: float = float(os.getenv("STELLARLENSE_EVASION_THRESHOLD", "30.0"))
+N_EVASION_TRIGGER: int = int(os.getenv("STELLARLENSE_N_EVASION_TRIGGER", "100"))
 
 __all__ = ["EVASION_THRESHOLD", "N_EVASION_TRIGGER"]

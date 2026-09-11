@@ -25,7 +25,7 @@ from detection.storage import (
     get_shap_values,
 )
 
-logger = logging.getLogger("ledgerlens.compliance_report")
+logger = logging.getLogger("stellar-lense.compliance_report")
 
 _FEATURE_DESCRIPTIONS: dict[str, str] = {
     "benford_chi_square_1h": "First-digit chi-square statistic (1h window)",
@@ -329,7 +329,7 @@ th{{background:#f0f4f8}}.risk-HIGH{{color:#c00}}.risk-CRITICAL{{color:#900}}
 .summary{{background:#f8f9fa;padding:1em;border-radius:8px;margin:1em 0}}
 </style></head>
 <body>
-<h1>LedgerLens Compliance Audit Report</h1>
+<h1>StellarLense Compliance Audit Report</h1>
 <div class="summary">
 <p><strong>Wallet:</strong> {self.wallet}</p>
 <p><strong>Date:</strong> {self.date}</p>

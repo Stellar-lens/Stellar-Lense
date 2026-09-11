@@ -1,1 +1,1 @@
-"""Storage layer for LedgerLens immutable audit log."""
+"""Storage layer for StellarLense immutable audit log."""

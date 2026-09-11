@@ -14,7 +14,7 @@ from detection import storage
 from detection.api_key_store import check_rate_limit, lookup_key
 from generated import scoring_pb2, scoring_pb2_grpc
 
-logger = logging.getLogger("ledgerlens.grpc_scoring_service")
+logger = logging.getLogger("stellar_lense.grpc_scoring_service")
 
 
 def mask_wallet(wallet: str) -> str:
@@ -29,9 +29,9 @@ def mask_wallet(wallet: str) -> str:
 def _authenticate(context: grpc.ServicerContext, required_scope: str = "read:scores") -> dict:
     # Check for cached auth state in invocation metadata
     metadata = dict(context.invocation_metadata())
-    api_key = metadata.get("x-ledgerlens-api-key", "") or metadata.get("x-ledgerlens-admin-key", "")
+    api_key = metadata.get("x-stellarlense-api-key", "") or metadata.get("x-stellarlense-admin-key", "")
     if not api_key:
-        context.abort(grpc.StatusCode.UNAUTHENTICATED, "Missing x-ledgerlens-api-key metadata")
+        context.abort(grpc.StatusCode.UNAUTHENTICATED, "Missing x-stellarlense-api-key metadata")
 
     # First check if it's the configured admin key (admin keys satisfy any scope)
     if settings.admin_api_key and secrets.compare_digest(api_key, settings.admin_api_key):

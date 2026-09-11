@@ -8,7 +8,7 @@ between the implementations:
 
 | Module | Auth mechanism | Backing store | Hash algo | Key prefix |
 |--------|---------------|---------------|-----------|------------|
-| `api/auth.py` | Single admin key (`require_admin_key`) | Env var (`LEDGERLENS_ADMIN_API_KEY`) | `secrets.compare_digest` | n/a |
+| `api/auth.py` | Single admin key (`require_admin_key`) | Env var (`STELLARLENSE_ADMIN_API_KEY`) | `secrets.compare_digest` | n/a |
 | `api/auth.py` | Scoped API key (`require_api_key_scope`) | `detection.storage` (imports `get_api_key_by_hash`) | BLAKE2b-256 | n/a |
 | `api/api_key_router.py` | Scoped API key (`require_scope`) | `detection.api_key_store` (canonical) | BLAKE2b-256 | `ll_` |
 | `api/api_keys_router.py` | Scoped API key (`require_scope`) | Its own `_ensure_table` / `CREATE TABLE api_keys` | SHA-256 | `secrets.token_urlsafe(32)` |
@@ -91,9 +91,9 @@ is checked, but access is still logged.
 
 The gateway checks authentication in this order (first match wins):
 
-1. **`X-LedgerLens-Admin-Key`** header — compared against `LEDGERLENS_ADMIN_API_KEY`
-2. **`X-LedgerLens-Compliance-Key`** header — compared against `LEDGERLENS_COMPLIANCE_API_KEY`
-3. **`X-LedgerLens-Api-Key`** header — looked up in the canonical `api_keys` table
+1. **`X-StellarLense-Admin-Key`** header — compared against `STELLARLENSE_ADMIN_API_KEY`
+2. **`X-StellarLense-Compliance-Key`** header — compared against `STELLARLENSE_COMPLIANCE_API_KEY`
+3. **`X-StellarLense-Api-Key`** header — looked up in the canonical `api_keys` table
    via `detection.api_key_store.get_api_key_by_hash`
 
 If none of these match, the gateway returns **401 Unauthorized**.
@@ -119,7 +119,7 @@ behavior described under "Security Considerations" below.
 - Wildcard namespace (`namespace_id='*'`) keys are **exempt** from
   per-namespace quota but still subject to per-minute rate limits.
 - When daily quota is exceeded, the response includes an
-  `X-LedgerLens-Quota-Reset` header with the ISO-8601 datetime of the next
+  `X-StellarLense-Quota-Reset` header with the ISO-8601 datetime of the next
   quota reset (midnight UTC).
 - When per-minute rate limit is exceeded, the response includes a `Retry-After`
   header with seconds until the window resets.
@@ -129,7 +129,7 @@ behavior described under "Security Considerations" below.
 Every request (public or authenticated) is logged to:
 
 1. **`gateway_request_log` SQLite table** — structured records for analysis
-2. **Structured log line** — via the `ledgerlens.gateway` logger
+2. **Structured log line** — via the `stellar_lense.gateway` logger
 
 The log entry contains:
 - `method` — HTTP method
@@ -171,7 +171,7 @@ removed after 31 Jan 2027.
 **Migration steps:**
 1. Run `python cli.py db-migrate` to consolidate any existing keys from the
    legacy schema into the canonical store.
-2. Update your client to use the canonical `X-LedgerLens-Api-Key` header (not
+2. Update your client to use the canonical `X-StellarLense-Api-Key` header (not
    the deprecated `X-Api-Key` header).
 3. Verify that keys created via the deprecated router's endpoint are recognised
    by the canonical store after migration.
@@ -179,7 +179,7 @@ removed after 31 Jan 2027.
 
 ### For operators of deployed instances
 
-1. Upgrade to the version of `ledgerlens-core` that includes this gateway.
+1. Upgrade to the version of `stellar-lense-core` that includes this gateway.
 2. Run `python cli.py db-migrate` — this applies schema migration 16 and
    consolidates any existing legacy API keys.
 3. Verify that existing API keys still work with the gateway.
@@ -198,7 +198,7 @@ middleware is the right solution — it adds zero operational overhead, shares
 the process's configuration and connection pool, and requires no additional
 infrastructure.
 
-If `ledgerlens-api` splits into multiple backend services in the future,
+If `stellar-lense-api` splits into multiple backend services in the future,
 the natural next step would be to extract the gateway into a sidecar process
 or edge proxy:
 

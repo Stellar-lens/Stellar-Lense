@@ -1,12 +1,12 @@
 use wiremock::matchers::{header, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
-use ledgerlens_sdk::LedgerLensClient;
+use stellar_lense_sdk::StellarLenseClient;
 
 /// Helper to create a mock client pointing at a wiremock server.
-async fn setup_mock() -> (MockServer, LedgerLensClient) {
+async fn setup_mock() -> (MockServer, StellarLenseClient) {
     let mock_server = MockServer::start().await;
-    let client = LedgerLensClient::new(mock_server.uri(), Some("test-key".into()));
+    let client = StellarLenseClient::new(mock_server.uri(), Some("test-key".into()));
     (mock_server, client)
 }
 
@@ -36,7 +36,7 @@ async fn test_get_score_happy_path() {
 
     Mock::given(method("GET"))
         .and(path("/v1/scores/GA1234567890ABCDEF"))
-        .and(header("X-LedgerLens-API-Key", "test-key"))
+        .and(header("X-StellarLense-API-Key", "test-key"))
         .respond_with(ResponseTemplate::new(200).set_body_json(&body))
         .expect(1)
         .mount(&server)
@@ -166,7 +166,7 @@ async fn test_401_error() {
 
     let err = client.get_score("GA123").await.unwrap_err();
     match err {
-        ledgerlens_sdk::LedgerLensError::Unauthorized(_) => {}
+        stellar_lense_sdk::StellarLenseError::Unauthorized(_) => {}
         _ => panic!("Expected Unauthorized error, got {:?}", err),
     }
 }
@@ -184,7 +184,7 @@ async fn test_404_error() {
 
     let err = client.get_score("UNKNOWN").await.unwrap_err();
     match err {
-        ledgerlens_sdk::LedgerLensError::NotFound(_) => {}
+        stellar_lense_sdk::StellarLenseError::NotFound(_) => {}
         _ => panic!("Expected NotFound error, got {:?}", err),
     }
 }
@@ -202,14 +202,14 @@ async fn test_429_error() {
 
     let err = client.get_score("GA123").await.unwrap_err();
     match err {
-        ledgerlens_sdk::LedgerLensError::RateLimited(_) => {}
+        stellar_lense_sdk::StellarLenseError::RateLimited(_) => {}
         _ => panic!("Expected RateLimited error, got {:?}", err),
     }
 }
 
 #[tokio::test]
 async fn test_debug_redacts_api_key() {
-    let client = LedgerLensClient::new("http://localhost", Some("sk_secret123".into()));
+    let client = StellarLenseClient::new("http://localhost", Some("sk_secret123".into()));
     let debug_str = format!("{:?}", client);
     assert!(
         !debug_str.contains("sk_secret123"),

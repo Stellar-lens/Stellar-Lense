@@ -2,7 +2,7 @@ name: Cross-Repo E2E Tests
 
 # Run on schedule (weekly) or manual dispatch.
 # Uses a documented stub contract server by default (no Docker required).
-# Set LEDGERLENS_USE_REAL_SOROBAN=true for full Soroban deployment fidelity.
+# Set STELLARLENSE_USE_REAL_SOROBAN=true for full Soroban deployment fidelity.
 #
 # ADR reference: docs/adr/ADR-005-schema-contract-enforcement.md
 on:
@@ -12,8 +12,8 @@ on:
     inputs:
       pinned_ref:
         description: >
-          Commit SHA or tag to check out for both ledgerlens-api and
-          ledgerlens-contracts. Defaults to the value of
+          Commit SHA or tag to check out for both stellar-lense-api and
+          stellar-lense-contracts. Defaults to the value of
           CROSS_REPO_E2E_PINNED_REF in the workflow env (currently 'main').
           Set to a specific SHA for reproducible runs.
         required: false
@@ -53,9 +53,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # ------------------------------------------------------------------
-      # Step 1: Checkout this repo (ledgerlens-core)
+      # Step 1: Checkout this repo (stellar-lense-core)
       # ------------------------------------------------------------------
-      - name: Checkout ledgerlens-core
+      - name: Checkout stellar-lense-core
         uses: actions/checkout@v4
 
       # ------------------------------------------------------------------
@@ -80,31 +80,31 @@ jobs:
           echo "EFFECTIVE_PINNED_REF=$EFFECTIVE_REF" >> "$GITHUB_ENV"
 
       # ------------------------------------------------------------------
-      # Step 3: Checkout ledgerlens-api at the resolved ref
+      # Step 3: Checkout stellar-lense-api at the resolved ref
       #
       # CRITICAL FIX (ADR-005 §C): ref: is now set from the resolved ref,
       # not hardcoded to 'main'. The CROSS_REPO_E2E_PINNED_REF variable now
       # actually governs what is checked out.
       # ------------------------------------------------------------------
-      - name: Checkout ledgerlens-api at pinned ref
+      - name: Checkout stellar-lense-api at pinned ref
         uses: actions/checkout@v4
         with:
-          repository: Ledger-Lenz/ledgerlens-api
-          path: ledgerlens-api
+          repository: Stellar-lens/stellar-lense-api
+          path: stellar-lense-api
           ref: ${{ steps.resolve_ref.outputs.effective_ref }}
           # If the repo is private, a token is required:
           # token: ${{ secrets.CROSS_REPO_READ_TOKEN }}
 
       # ------------------------------------------------------------------
-      # Step 4: Checkout ledgerlens-contracts at the resolved ref
+      # Step 4: Checkout stellar-lense-contracts at the resolved ref
       #
-      # Same fix as ledgerlens-api above.
+      # Same fix as stellar-lense-api above.
       # ------------------------------------------------------------------
-      - name: Checkout ledgerlens-contracts at pinned ref
+      - name: Checkout stellar-lense-contracts at pinned ref
         uses: actions/checkout@v4
         with:
-          repository: Ledger-Lenz/ledgerlens-contracts
-          path: ledgerlens-contracts
+          repository: Stellar-lens/stellar-lense-contracts
+          path: stellar-lense-contracts
           ref: ${{ steps.resolve_ref.outputs.effective_ref }}
           # token: ${{ secrets.CROSS_REPO_READ_TOKEN }}
 
@@ -120,19 +120,19 @@ jobs:
         run: |
           echo "=== Resolved pinned ref: $EFFECTIVE_PINNED_REF ==="
           echo ""
-          echo "--- ledgerlens-core ---"
+          echo "--- stellar-lense-core ---"
           git -C . rev-parse HEAD
           echo ""
-          echo "--- ledgerlens-api ---"
-          if [ -d ledgerlens-api/.git ]; then
-            git -C ledgerlens-api rev-parse HEAD
+          echo "--- stellar-lense-api ---"
+          if [ -d stellar-lense-api/.git ]; then
+            git -C stellar-lense-api rev-parse HEAD
           else
             echo "(not a git repo — may be a path checkout)"
           fi
           echo ""
-          echo "--- ledgerlens-contracts ---"
-          if [ -d ledgerlens-contracts/.git ]; then
-            git -C ledgerlens-contracts rev-parse HEAD
+          echo "--- stellar-lense-contracts ---"
+          if [ -d stellar-lense-contracts/.git ]; then
+            git -C stellar-lense-contracts rev-parse HEAD
           else
             echo "(not a git repo — may be a path checkout)"
           fi
@@ -155,7 +155,7 @@ jobs:
       # ------------------------------------------------------------------
       # Step 7: Run cross-repo E2E tests
       #
-      # Both LEDGERLENS_API_REPO_PATH and LEDGERLENS_CONTRACTS_REPO_PATH are
+      # Both STELLARLENSE_API_REPO_PATH and STELLARLENSE_CONTRACTS_REPO_PATH are
       # set so the conftest can locate the checked-out repos.
       #
       # CROSS_REPO_E2E_PINNED_REF is ALSO passed here so the conftest can use
@@ -164,10 +164,10 @@ jobs:
       # ------------------------------------------------------------------
       - name: Run cross-repo E2E tests
         env:
-          LEDGERLENS_API_REPO_PATH: ./ledgerlens-api
-          LEDGERLENS_CONTRACTS_REPO_PATH: ./ledgerlens-contracts
+          STELLARLENSE_API_REPO_PATH: ./stellar-lense-api
+          STELLARLENSE_CONTRACTS_REPO_PATH: ./stellar-lense-contracts
           CROSS_REPO_E2E_PINNED_REF: ${{ env.EFFECTIVE_PINNED_REF }}
-          LEDGERLENS_USE_REAL_SOROBAN: ${{ github.event.inputs.use_real_soroban || 'false' }}
+          STELLARLENSE_USE_REAL_SOROBAN: ${{ github.event.inputs.use_real_soroban || 'false' }}
           # Prevent accidental production use
           SOROBAN_NETWORK_PASSPHRASE: "Test SDF Network ; September 2015"
         run: |

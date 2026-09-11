@@ -10,9 +10,9 @@ Extend `detection/governance.py` to implement a full proposal lifecycle: `submit
 
 ## Background & Context
 
-LedgerLens includes an off-chain dispute and governance mechanism described in `docs/governance_protocol.md`. The existing implementation is a stub — proposals can be submitted and stored, but there is no enforcement of voting periods, quorum thresholds, or automated execution. This creates a governance gap: configuration changes (e.g., raising `RISK_SCORE_THRESHOLD`, adding a committee member) are applied directly to `.env` without committee oversight.
+Stellar Lense includes an off-chain dispute and governance mechanism described in `docs/governance_protocol.md`. The existing implementation is a stub — proposals can be submitted and stored, but there is no enforcement of voting periods, quorum thresholds, or automated execution. This creates a governance gap: configuration changes (e.g., raising `RISK_SCORE_THRESHOLD`, adding a committee member) are applied directly to `.env` without committee oversight.
 
-The governance engine to be built mirrors the semantics of on-chain governance (analogous to Compound Governor Bravo or OpenZeppelin Governor) but is implemented off-chain in Python with SQLite persistence. This is appropriate for the current phase of LedgerLens development; migration to on-chain Soroban governance is a future milestone.
+The governance engine to be built mirrors the semantics of on-chain governance (analogous to Compound Governor Bravo or OpenZeppelin Governor) but is implemented off-chain in Python with SQLite persistence. This is appropriate for the current phase of Stellar Lense development; migration to on-chain Soroban governance is a future milestone.
 
 Key design requirements:
 - **Proposals** are typed: `ConfigChange` (modify a runtime setting) or `CommitteeUpdate` (add/remove a committee member).
@@ -194,7 +194,7 @@ async def execute_proposal(proposal_id: int, admin_key: str = Header(...), ...):
 
 ## Security Considerations
 
-- **Allowed settings whitelist**: `SettingsReloader.ALLOWED_SETTINGS` must be a compile-time constant. A governance proposal attempting to change `LEDGERLENS_SERVICE_SECRET_KEY` or `LEDGERLENS_ADMIN_API_KEY` must be rejected with `GovernanceError("Setting not modifiable via governance")`.
+- **Allowed settings whitelist**: `SettingsReloader.ALLOWED_SETTINGS` must be a compile-time constant. A governance proposal attempting to change `STELLARLENSE_SERVICE_SECRET_KEY` or `STELLARLENSE_ADMIN_API_KEY` must be rejected with `GovernanceError("Setting not modifiable via governance")`.
 - **Atomic `.env` write**: use `os.replace` (atomic on POSIX) to prevent a corrupted `.env` if the process is killed mid-write. Never write the secret key values to `.env` via governance — only non-secret config values are in `ALLOWED_SETTINGS`.
 - **Committee member authentication**: the current implementation uses string identifiers for committee members (`proposer`, `voter`). In the MVP, these are validated against the `governance_committee` table only — not cryptographically authenticated. Document this limitation explicitly and note that production deployments should add request signing (e.g., JWT or Stellar keypair signatures) to committee member actions.
 - **Vote deduplication**: the `UNIQUE(proposal_id, voter)` constraint in SQLite enforces one-vote-per-member at the database layer, not just the application layer.
@@ -208,7 +208,7 @@ async def execute_proposal(proposal_id: int, admin_key: str = Header(...), ...):
 - **Unit — `close_expired` timing**: advance mock clock past `voting_ends_at`; assert `close_expired()` returns the proposal with updated status.
 - **Unit — `execute_proposal` config change**: mock `SettingsReloader.apply`; assert called with correct key/value; assert proposal status → `executed`.
 - **Unit — `execute_proposal` failure**: mock `SettingsReloader.apply` raising `ValueError`; assert proposal status → `failed`, `execution_error` populated.
-- **Unit — disallowed settings key**: governance proposal to change `LEDGERLENS_SERVICE_SECRET_KEY`; assert `GovernanceError` raised before any write.
+- **Unit — disallowed settings key**: governance proposal to change `STELLARLENSE_SERVICE_SECRET_KEY`; assert `GovernanceError` raised before any write.
 - **Integration — full lifecycle**: submit → cast 3 votes → tally → execute; assert proposal status sequence is `active → passed → executed`.
 - **Integration — API 422 on expired vote**: vote on proposal past deadline → 422.
 
@@ -235,7 +235,7 @@ async def execute_proposal(proposal_id: int, admin_key: str = Header(...), ...):
 
 ## For Contributors
 
-**Ideal contributor profile**: You have experience designing and implementing state-machine-based workflow engines — governance, approval workflows, or similar lifecycle systems — in Python. Familiarity with on-chain governance patterns (Compound Governor, OpenZeppelin) is a significant advantage even though this is an off-chain implementation. You are comfortable with SQLite transaction semantics and atomic file operations on POSIX systems. Understanding of LedgerLens's risk score pipeline and why config parameters like `RISK_SCORE_THRESHOLD` require governance oversight will help you design robust safeguards.
+**Ideal contributor profile**: You have experience designing and implementing state-machine-based workflow engines — governance, approval workflows, or similar lifecycle systems — in Python. Familiarity with on-chain governance patterns (Compound Governor, OpenZeppelin) is a significant advantage even though this is an off-chain implementation. You are comfortable with SQLite transaction semantics and atomic file operations on POSIX systems. Understanding of Stellar Lense's risk score pipeline and why config parameters like `RISK_SCORE_THRESHOLD` require governance oversight will help you design robust safeguards.
 
 To apply, please comment on this issue with:
 1. **Specialty area**: your primary expertise (e.g., governance systems, workflow engines, Python backend, on-chain governance).

@@ -1,7 +1,7 @@
 """Template-based Suspicious Activity Report (SAR) narrative generator.
 
 FinCEN SAR Form 111 requires a plain-English narrative describing the suspicious
-activity.  This module renders that narrative from LedgerLens risk intelligence
+activity.  This module renders that narrative from StellarLense risk intelligence
 *without* any LLM dependency, so the output is deterministic, auditable and free
 of hallucinated content — every value in the narrative traces back to a stored
 score or alert.
@@ -15,7 +15,7 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 SAR_TEMPLATE = (
-    "Between {start_date} and {end_date}, wallet {wallet} received a LedgerLens Risk "
+    "Between {start_date} and {end_date}, wallet {wallet} received a StellarLense Risk "
     "Score of {peak_score}/100 (peak), indicating {risk_level} risk of wash trading activity.\n"
     """
 

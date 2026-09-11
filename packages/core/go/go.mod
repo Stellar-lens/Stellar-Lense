@@ -1,4 +1,4 @@
-module github.com/Ledger-Lenz/Ledgerlens-core/go
+module github.com/Stellar-lens/Stellar-Lense/go
 
 go 1.22
 

@@ -31,7 +31,7 @@ from pydantic import BaseModel
 from api.auth import require_admin_key
 from config.settings import settings
 
-logger = logging.getLogger("ledgerlens.api.temporal")
+logger = logging.getLogger("stellar_lense.api.temporal")
 
 router = APIRouter(prefix="/temporal", tags=["Temporal Pattern Analysis"])
 
@@ -91,7 +91,7 @@ def _load_wallet_trades(wallet: str, days: int = 7) -> list:
         from datetime import datetime, timedelta, timezone
 
         cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
-        conn = sqlite3.connect(settings.ledgerlens_db_path)
+        conn = sqlite3.connect(settings.stellarlense_db_path)
         conn.row_factory = sqlite3.Row
         cur = conn.execute(
             """

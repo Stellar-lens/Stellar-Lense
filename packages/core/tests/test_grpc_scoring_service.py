@@ -14,11 +14,11 @@ from api.grpc_scoring_service import create_grpc_server, _to_proto
 
 @pytest.fixture(scope="module")
 def grpc_server_fixture(tmp_path_factory):
-    db_file = str(tmp_path_factory.mktemp("grpc_db") / "test_ledgerlens.db")
-    original_db = settings.ledgerlens_db_path
+    db_file = str(tmp_path_factory.mktemp("grpc_db") / "test_stellar_lense.db")
+    original_db = settings.stellarlense_db_path
     original_insecure = settings.grpc_allow_insecure
     
-    settings.ledgerlens_db_path = db_file
+    settings.stellarlense_db_path = db_file
     settings.grpc_allow_insecure = True
     _init_table()
 
@@ -38,7 +38,7 @@ def grpc_server_fixture(tmp_path_factory):
 
     channel.close()
     server.stop(0)
-    settings.ledgerlens_db_path = original_db
+    settings.stellarlense_db_path = original_db
     settings.grpc_allow_insecure = original_insecure
 
 
@@ -75,7 +75,7 @@ def test_score_wallet_parity(grpc_server_fixture):
 
     request = scoring_pb2.ScoreRequest(wallet=wallet, asset_pair=asset_pair)
     response = stub.ScoreWallet(
-        request, metadata=[("x-ledgerlens-api-key", api_key)]
+        request, metadata=[("x-stellarlense-api-key", api_key)]
     )
 
     assert response.wallet == wallet
@@ -97,7 +97,7 @@ def test_unauthenticated_missing_or_invalid_key(grpc_server_fixture):
 
     # Invalid key
     with pytest.raises(grpc.RpcError) as exc_info:
-        stub.ScoreWallet(request, metadata=[("x-ledgerlens-api-key", "invalid_key_123")])
+        stub.ScoreWallet(request, metadata=[("x-stellarlense-api-key", "invalid_key_123")])
     assert exc_info.value.code() == grpc.StatusCode.UNAUTHENTICATED
 
 
@@ -108,7 +108,7 @@ def test_permission_denied_wrong_scope(grpc_server_fixture):
 
     request = scoring_pb2.ScoreRequest(wallet="GABC1234567890WXYZ")
     with pytest.raises(grpc.RpcError) as exc_info:
-        stub.ScoreWallet(request, metadata=[("x-ledgerlens-api-key", api_key)])
+        stub.ScoreWallet(request, metadata=[("x-stellarlense-api-key", api_key)])
     assert exc_info.value.code() == grpc.StatusCode.PERMISSION_DENIED
     assert "read:scores" in exc_info.value.details()
 
@@ -120,7 +120,7 @@ def test_not_found_masked_wallet(grpc_server_fixture):
 
     request = scoring_pb2.ScoreRequest(wallet="GNOTFOUND1234567890WXYZ")
     with pytest.raises(grpc.RpcError) as exc_info:
-        stub.ScoreWallet(request, metadata=[("x-ledgerlens-api-key", api_key)])
+        stub.ScoreWallet(request, metadata=[("x-stellarlense-api-key", api_key)])
     assert exc_info.value.code() == grpc.StatusCode.NOT_FOUND
     assert "GNOTFOUN...WXYZ" in exc_info.value.details()
 
@@ -155,7 +155,7 @@ def test_batch_score_wallets_order(grpc_server_fixture):
 
     responses = list(
         stub.BatchScoreWallets(
-            req_generator(), metadata=[("x-ledgerlens-api-key", api_key)]
+            req_generator(), metadata=[("x-stellarlense-api-key", api_key)]
         )
     )
 
@@ -178,7 +178,7 @@ def test_batch_max_batch_exceeded(grpc_server_fixture, monkeypatch):
     with pytest.raises(grpc.RpcError) as exc_info:
         list(
             stub.BatchScoreWallets(
-                req_generator(), metadata=[("x-ledgerlens-api-key", api_key)]
+                req_generator(), metadata=[("x-stellarlense-api-key", api_key)]
             )
         )
     assert exc_info.value.code() == grpc.StatusCode.RESOURCE_EXHAUSTED
@@ -209,15 +209,15 @@ def test_rate_limit_exceeded_shared_counter(grpc_server_fixture):
     request = scoring_pb2.ScoreRequest(wallet=wallet)
 
     # First 2 requests succeed
-    r1 = stub.ScoreWallet(request, metadata=[("x-ledgerlens-api-key", api_key)])
+    r1 = stub.ScoreWallet(request, metadata=[("x-stellarlense-api-key", api_key)])
     assert r1.wallet == wallet
 
-    r2 = stub.ScoreWallet(request, metadata=[("x-ledgerlens-api-key", api_key)])
+    r2 = stub.ScoreWallet(request, metadata=[("x-stellarlense-api-key", api_key)])
     assert r2.wallet == wallet
 
     # 3rd request fails with RESOURCE_EXHAUSTED
     with pytest.raises(grpc.RpcError) as exc_info:
-        stub.ScoreWallet(request, metadata=[("x-ledgerlens-api-key", api_key)])
+        stub.ScoreWallet(request, metadata=[("x-stellarlense-api-key", api_key)])
     assert exc_info.value.code() == grpc.StatusCode.RESOURCE_EXHAUSTED
 
 

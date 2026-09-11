@@ -1,4 +1,4 @@
-"""Federated Aggregation Server — Knowledge Distillation FedAvg for LedgerLens.
+"""Federated Aggregation Server — Knowledge Distillation FedAvg for StellarLense.
 
 Design rationale (Option B — Knowledge Distillation):
   Tree ensembles (RF, XGB, LGBM) have no gradient tensors in the neural-network
@@ -76,7 +76,7 @@ from .audit import (
 from .krum import KrumAggregator
 from .weighting import apply_weight_share_cap
 
-logger = logging.getLogger("ledgerlens.federated.server")
+logger = logging.getLogger("stellar_lense.federated.server")
 
 
 @dataclass
@@ -713,7 +713,7 @@ def get_server() -> FederatedAggregationServer:
     return _server_instance
 
 
-federated_app = FastAPI(title="LedgerLens Federated Server")
+federated_app = FastAPI(title="StellarLense Federated Server")
 
 
 class RegisterRequest(BaseModel):

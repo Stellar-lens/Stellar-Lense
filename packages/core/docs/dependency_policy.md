@@ -1,6 +1,6 @@
 # Dependency License Policy
 
-LedgerLens ships only packages with OSI-approved permissive licenses.
+Stellar Lense ships only packages with OSI-approved permissive licenses.
 
 ## Allowed license families
 

@@ -1,8 +1,8 @@
-# Causal Inference in LedgerLens
+# Causal Inference in Stellar Lense
 
 ## Why Causal Inference Instead of SHAP?
 
-LedgerLens uses an ensemble of ML classifiers (Random Forest, XGBoost, LightGBM) to
+Stellar Lense uses an ensemble of ML classifiers (Random Forest, XGBoost, LightGBM) to
 score wallets for wash-trading risk. SHAP (SHapley Additive exPlanations) is used to
 explain which features contributed most to each score.
 
@@ -22,7 +22,7 @@ the risk score?"** This is the `do(X=x)` operator from Pearl's do-calculus.
 
 ## The Causal DAG
 
-LedgerLens encodes domain knowledge about wash-trading into a **causal directed acyclic
+Stellar Lense encodes domain knowledge about wash-trading into a **causal directed acyclic
 graph (DAG)**. Each directed edge `A → B` means "A causally influences B".
 
 ```
@@ -91,7 +91,7 @@ haven't had time to form rings). If we _do_(`wash_ring_membership=0`) — we sur
 remove ring membership while holding everything else constant — we get the pure causal
 effect.
 
-LedgerLens uses the **backdoor criterion** to identify causal effects. Given the DAG,
+Stellar Lense uses the **backdoor criterion** to identify causal effects. Given the DAG,
 the backdoor criterion finds a set of observable variables Z such that conditioning on Z
 blocks all backdoor paths from treatment X to outcome Y, enabling identification of
 `P(Y | do(X=x))` from observational data.
@@ -142,7 +142,7 @@ other feature values unchanged. This is the direct answer to a regulator's quest
 
 ## Estimation Method
 
-By default, LedgerLens uses **linear regression (backdoor adjustment)**:
+By default, Stellar Lense uses **linear regression (backdoor adjustment)**:
 
 ```
 risk_score = α + β₁·wash_ring_membership + β₂·round_trip_trade_frequency + ...
@@ -156,7 +156,7 @@ For nonlinear effects, set `CAUSAL_ESTIMATION_METHOD=backdoor.econml.dml.DML` in
 
 ## Refutation Tests
 
-Before serving the ATE table, LedgerLens runs three DoWhy refutation tests to validate
+Before serving the ATE table, Stellar Lense runs three DoWhy refutation tests to validate
 the causal model:
 
 | Test                        | What it checks                                                                   | Pass condition |
@@ -268,7 +268,7 @@ CREATE TABLE IF NOT EXISTS causal_ate_cache (
 );
 ```
 
-The `model_version` key is set via the `LEDGERLENS_MODEL_VERSION` environment variable
+The `model_version` key is set via the `STELLARLENSE_MODEL_VERSION` environment variable
 (default: `"default"`). After retraining the ML ensemble, update this variable to
 invalidate the cache and trigger a fresh ATE estimation.
 

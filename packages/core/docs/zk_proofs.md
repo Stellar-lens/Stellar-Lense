@@ -1,7 +1,7 @@
 # ZK Threshold Proof Protocol Specification
 
 This document defines the Fiat-Shamir transcript format and verification logic
-for the LedgerLens ZK threshold proof scheme. The protocol proves that a
+for the Stellar Lense ZK threshold proof scheme. The protocol proves that a
 Pedersen-committed score `s` satisfies `s >= t` for a public threshold `t`
 without revealing `s`.
 
@@ -22,7 +22,7 @@ C = s * G + r * H
 
 where:
 - `G` is the BN254 generator point `G1`.
-- `H` is a second generator derived as `H = SHA256("LedgerLens ZK Generator H") * G1`,
+- `H` is a second generator derived as `H = SHA256("Stellar Lense ZK Generator H") * G1`,
   ensuring the discrete-log relation between `G` and `H` is unknown.
 - `r` is a random blinding factor (prover secret).
 
@@ -44,7 +44,7 @@ The non-interactive challenge is computed as:
 ```
 context = SHA256(wallet || t_byte || C.x_bytes || C.y_bytes)
 
-challenge = SHA256("LedgerLens/zk/v1" || R0_bytes || R1_bytes || B_bytes || context)
+challenge = SHA256("Stellar Lense/zk/v1" || R0_bytes || R1_bytes || B_bytes || context)
 ```
 
 Where:
@@ -79,7 +79,7 @@ Each scalar/field element is encoded as 32 big-endian bytes.
 2. Reconstruct the Fiat-Shamir challenge for each bit commitment:
    - Compute `R0 = s0 * H - c0 * B_i`
    - Compute `R1 = s1 * H - c1 * (B_i - G)`
-   - Challenge `c = SHA256("LedgerLens/zk/v1" || R0 || R1 || B_i || context)`
+   - Challenge `c = SHA256("Stellar Lense/zk/v1" || R0 || R1 || B_i || context)`
    - Verify `c == c0 + c1 mod q`
 3. Verify the aggregate sum:
    - Compute `C' = Σ (2^i * B_i)`

@@ -1,14 +1,14 @@
-# LedgerLens Prometheus Metrics
+# Stellar Lense Prometheus Metrics
 
-LedgerLens exposes a Prometheus-compatible metrics endpoint at `GET /metrics`
+Stellar Lense exposes a Prometheus-compatible metrics endpoint at `GET /metrics`
 (configurable via `METRICS_ENDPOINT`, default `/metrics`). All metric names are
-prefixed with `ledgerlens_`.
+prefixed with `stellar_lense_`.
 
 ## Quick Start
 
 ```bash
-# Requires X-LedgerLens-Admin-Key when LEDGERLENS_ADMIN_API_KEY is set
-curl -H "X-LedgerLens-Admin-Key: your-admin-key" http://localhost:8000/metrics
+# Requires X-StellarLense-Admin-Key when STELLARLENSE_ADMIN_API_KEY is set
+curl -H "X-StellarLense-Admin-Key: your-admin-key" http://localhost:8000/metrics
 ```
 
 The response is the standard [Prometheus text exposition format](https://prometheus.io/docs/instrumenting/exposition_formats/#text-based-format), compatible with Prometheus `scrape_configs`, Grafana datasources, and any OpenMetrics-compliant collector.
@@ -19,9 +19,9 @@ The response is the standard [Prometheus text exposition format](https://prometh
 |---|---|---|
 | `METRICS_ENABLED` | `true` | Set to `false` to disable all metric collection. Returns HTTP 503 from `/metrics`. |
 | `METRICS_ENDPOINT` | `/metrics` | URL path for the Prometheus scrape endpoint. Must start with `/`. |
-| `LEDGERLENS_ADMIN_API_KEY` | _(unset)_ | When set, `/metrics` requires `X-LedgerLens-Admin-Key` header. **Always set in production.** |
+| `STELLARLENSE_ADMIN_API_KEY` | _(unset)_ | When set, `/metrics` requires `X-StellarLense-Admin-Key` header. **Always set in production.** |
 
-> **Security**: if `LEDGERLENS_ADMIN_API_KEY` is unset, `/metrics` is publicly accessible and a `WARNING` is logged at startup. Metrics expose operational intelligence (queue depths, error rates, request counts) that should not be visible to unauthenticated users in production.
+> **Security**: if `STELLARLENSE_ADMIN_API_KEY` is unset, `/metrics` is publicly accessible and a `WARNING` is logged at startup. Metrics expose operational intelligence (queue depths, error rates, request counts) that should not be visible to unauthenticated users in production.
 
 ## Metric Catalogue
 
@@ -29,7 +29,7 @@ The response is the standard [Prometheus text exposition format](https://prometh
 
 These metrics are emitted by `ingestion/horizon_streamer.py`.
 
-#### `ledgerlens_ingestion_events_received_total`
+#### `stellar_lense_ingestion_events_received_total`
 
 | Property | Value |
 |---|---|
@@ -45,12 +45,12 @@ Label values for `source`:
 
 ```promql
 # SSE ingestion stall alert
-rate(ledgerlens_ingestion_events_received_total{source="horizon_sse"}[5m]) == 0
+rate(stellar_lense_ingestion_events_received_total{source="horizon_sse"}[5m]) == 0
 ```
 
 ---
 
-#### `ledgerlens_ingestion_events_queued_total`
+#### `stellar_lense_ingestion_events_queued_total`
 
 | Property | Value |
 |---|---|
@@ -62,7 +62,7 @@ rate(ledgerlens_ingestion_events_received_total{source="horizon_sse"}[5m]) == 0
 
 ---
 
-#### `ledgerlens_ingestion_events_dropped_total`
+#### `stellar_lense_ingestion_events_dropped_total`
 
 | Property | Value |
 |---|---|
@@ -78,12 +78,12 @@ Label values for `reason`:
 
 ```promql
 # Queue overflow alert
-rate(ledgerlens_ingestion_events_dropped_total[1m]) * 60 > 100
+rate(stellar_lense_ingestion_events_dropped_total[1m]) * 60 > 100
 ```
 
 ---
 
-#### `ledgerlens_ingestion_sse_reconnects_total`
+#### `stellar_lense_ingestion_sse_reconnects_total`
 
 | Property | Value |
 |---|---|
@@ -94,12 +94,12 @@ rate(ledgerlens_ingestion_events_dropped_total[1m]) * 60 > 100
 **Alert threshold**: > 5 reconnects in 10 minutes suggests persistent Horizon instability.
 
 ```promql
-increase(ledgerlens_ingestion_sse_reconnects_total[10m]) > 5
+increase(stellar_lense_ingestion_sse_reconnects_total[10m]) > 5
 ```
 
 ---
 
-#### `ledgerlens_ingestion_queue_depth`
+#### `stellar_lense_ingestion_queue_depth`
 
 | Property | Value |
 |---|---|
@@ -110,12 +110,12 @@ increase(ledgerlens_ingestion_sse_reconnects_total[10m]) > 5
 **Alert threshold**: queue depth consistently above 80% of `STREAMER_QUEUE_MAXSIZE` indicates sustained backpressure.
 
 ```promql
-ledgerlens_ingestion_queue_depth / 1000 > 0.8   # assuming maxsize=1000
+stellar_lense_ingestion_queue_depth / 1000 > 0.8   # assuming maxsize=1000
 ```
 
 ---
 
-#### `ledgerlens_ingestion_queue_depth_peak`
+#### `stellar_lense_ingestion_queue_depth_peak`
 
 | Property | Value |
 |---|---|
@@ -131,7 +131,7 @@ Useful for capacity planning: if `queue_depth_peak` frequently approaches `STREA
 
 These metrics are emitted by `ingestion/http_client.py` for every outgoing request to the Stellar Horizon API.
 
-#### `ledgerlens_http_requests_total`
+#### `stellar_lense_http_requests_total`
 
 | Property | Value |
 |---|---|
@@ -151,13 +151,13 @@ This prevents high-cardinality label explosion from wallet addresses appearing i
 **Alert**: sustained 429 rate > 10% of total requests indicates rate limit pressure.
 
 ```promql
-rate(ledgerlens_http_requests_total{status_code="429"}[5m])
-  / rate(ledgerlens_http_requests_total[5m]) > 0.1
+rate(stellar_lense_http_requests_total{status_code="429"}[5m])
+  / rate(stellar_lense_http_requests_total[5m]) > 0.1
 ```
 
 ---
 
-#### `ledgerlens_http_request_duration_seconds`
+#### `stellar_lense_http_request_duration_seconds`
 
 | Property | Value |
 |---|---|
@@ -169,12 +169,12 @@ rate(ledgerlens_http_requests_total{status_code="429"}[5m])
 **Alert**: p99 latency above 5 seconds degrades "real-time" scoring quality.
 
 ```promql
-histogram_quantile(0.99, rate(ledgerlens_http_request_duration_seconds_bucket[5m])) > 5
+histogram_quantile(0.99, rate(stellar_lense_http_request_duration_seconds_bucket[5m])) > 5
 ```
 
 ---
 
-#### `ledgerlens_http_rate_limit_hits_total`
+#### `stellar_lense_http_rate_limit_hits_total`
 
 | Property | Value |
 |---|---|
@@ -182,11 +182,11 @@ histogram_quantile(0.99, rate(ledgerlens_http_request_duration_seconds_bucket[5m
 | Labels | _(none)_ |
 | Description | Total HTTP 429 (Too Many Requests) responses received from Horizon |
 
-Equivalent to filtering `ledgerlens_http_requests_total{status_code="429"}` but provided as a convenience counter for simple alerting rules.
+Equivalent to filtering `stellar_lense_http_requests_total{status_code="429"}` but provided as a convenience counter for simple alerting rules.
 
 ---
 
-#### `ledgerlens_http_retries_total`
+#### `stellar_lense_http_retries_total`
 
 | Property | Value |
 |---|---|
@@ -202,14 +202,14 @@ Label values for `reason`:
 **Alert**: sustained retry rate > 20% suggests a systemic upstream issue.
 
 ```promql
-rate(ledgerlens_http_retries_total[5m]) > 0.2
+rate(stellar_lense_http_retries_total[5m]) > 0.2
 ```
 
 ---
 
 ### Pipeline Latency
 
-#### `ledgerlens_ledger_close_to_score_seconds`
+#### `stellar_lense_ledger_close_to_score_seconds`
 
 | Property | Value |
 |---|---|
@@ -218,19 +218,19 @@ rate(ledgerlens_http_retries_total[5m]) > 0.2
 | Buckets | 1s, 5s, 10s, 30s, 60s, 120s, 300s |
 | Description | End-to-end latency from Horizon `ledger_close_time` to `RiskScore` written to the local SQLite store |
 
-This is the primary SLO metric for LedgerLens's "real-time" claim.
+This is the primary SLO metric for Stellar Lense's "real-time" claim.
 
-**Alert**: p95 latency above 60 seconds means LedgerLens is not processing trades in real time.
+**Alert**: p95 latency above 60 seconds means Stellar Lense is not processing trades in real time.
 
 ```promql
-histogram_quantile(0.95, rate(ledgerlens_ledger_close_to_score_seconds_bucket[10m])) > 60
+histogram_quantile(0.95, rate(stellar_lense_ledger_close_to_score_seconds_bucket[10m])) > 60
 ```
 
 ---
 
 ### Dead-Letter Queue (DLQ)
 
-#### `ledgerlens_dlq_entries_total`
+#### `stellar_lense_dlq_entries_total`
 
 | Property | Value |
 |---|---|
@@ -246,12 +246,12 @@ Common `error_class` values:
 **Alert**: any DLQ growth indicates a class of events that cannot be processed.
 
 ```promql
-increase(ledgerlens_dlq_entries_total[1h]) > 0
+increase(stellar_lense_dlq_entries_total[1h]) > 0
 ```
 
 ---
 
-#### `ledgerlens_dlq_depth`
+#### `stellar_lense_dlq_depth`
 
 | Property | Value |
 |---|---|
@@ -262,7 +262,7 @@ increase(ledgerlens_dlq_entries_total[1h]) > 0
 **Alert threshold**: > 0 entries means there are unprocessed failures requiring manual investigation.
 
 ```promql
-ledgerlens_dlq_depth > 0
+stellar_lense_dlq_depth > 0
 ```
 
 ---
@@ -277,28 +277,28 @@ For cost and capacity alerting, see also:
 
 ```yaml
 groups:
-  - name: ledgerlens_ingestion
+  - name: stellar_lense_ingestion
     rules:
       - alert: IngestionStalled
-        expr: rate(ledgerlens_ingestion_events_received_total{source="horizon_sse"}[5m]) == 0
+        expr: rate(stellar_lense_ingestion_events_received_total{source="horizon_sse"}[5m]) == 0
         for: 5m
         labels:
           severity: critical
         annotations:
-          summary: "LedgerLens SSE ingestion has stalled"
+          summary: "Stellar Lense SSE ingestion has stalled"
           description: "No events received in the last 5 minutes. Check Horizon connectivity and circuit breaker state."
 
       - alert: QueueOverflowHigh
-        expr: rate(ledgerlens_ingestion_events_dropped_total[1m]) * 60 > 100
+        expr: rate(stellar_lense_ingestion_events_dropped_total[1m]) * 60 > 100
         for: 2m
         labels:
           severity: warning
         annotations:
-          summary: "LedgerLens queue dropping > 100 events/min"
+          summary: "Stellar Lense queue dropping > 100 events/min"
           description: "{{ $value | printf \"%.0f\" }} events/min dropped. Increase STREAMER_QUEUE_MAXSIZE or downstream throughput."
 
       - alert: HorizonRateLimitHigh
-        expr: rate(ledgerlens_http_requests_total{status_code="429"}[5m]) / rate(ledgerlens_http_requests_total[5m]) > 0.1
+        expr: rate(stellar_lense_http_requests_total{status_code="429"}[5m]) / rate(stellar_lense_http_requests_total[5m]) > 0.1
         for: 5m
         labels:
           severity: warning
@@ -307,36 +307,36 @@ groups:
           description: "Reduce HORIZON_RATE_LIMIT or upgrade the Horizon API tier."
 
       - alert: ScoringLatencyHigh
-        expr: histogram_quantile(0.95, rate(ledgerlens_ledger_close_to_score_seconds_bucket[10m])) > 60
+        expr: histogram_quantile(0.95, rate(stellar_lense_ledger_close_to_score_seconds_bucket[10m])) > 60
         for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "LedgerLens p95 scoring latency > 60s"
+          summary: "Stellar Lense p95 scoring latency > 60s"
           description: "The real-time scoring guarantee is compromised. Check model inference throughput."
 
       - alert: DLQBacklog
-        expr: ledgerlens_dlq_depth > 0
+        expr: stellar_lense_dlq_depth > 0
         for: 1m
         labels:
           severity: warning
         annotations:
-          summary: "LedgerLens dead-letter queue is non-empty"
+          summary: "Stellar Lense dead-letter queue is non-empty"
           description: "{{ $value }} unprocessed failures in the DLQ. Run `GET /webhooks/dead-letters` to inspect."
 
       - alert: SSEReconnectStorm
-        expr: increase(ledgerlens_ingestion_sse_reconnects_total[10m]) > 5
+        expr: increase(stellar_lense_ingestion_sse_reconnects_total[10m]) > 5
         for: 0m
         labels:
           severity: warning
         annotations:
-          summary: "LedgerLens SSE reconnecting frequently"
+          summary: "Stellar Lense SSE reconnecting frequently"
           description: "{{ $value | printf \"%.0f\" }} reconnects in 10 minutes. Check Horizon network stability."
 ```
 
 ## Cardinality Notes
 
-High label cardinality is the primary scaling failure mode for Prometheus metrics. LedgerLens enforces two critical protections:
+High label cardinality is the primary scaling failure mode for Prometheus metrics. Stellar Lense enforces two critical protections:
 
 1. **Endpoint normalisation** (`_normalise_endpoint`): Stellar wallet addresses, paging tokens, and transaction hashes appearing in Horizon URL paths are replaced with stable placeholders (`{account_id}`, `{id}`) before use as label values. Without this, every unique wallet address would create a new time series.
 
@@ -344,11 +344,11 @@ High label cardinality is the primary scaling failure mode for Prometheus metric
 
 ## Scrape Configuration
 
-Add LedgerLens to your `prometheus.yml`:
+Add Stellar Lense to your `prometheus.yml`:
 
 ```yaml
 scrape_configs:
-  - job_name: "ledgerlens"
+  - job_name: "stellar_lense"
     scrape_interval: 15s
     static_configs:
       - targets: ["localhost:8000"]
@@ -357,8 +357,8 @@ scrape_configs:
       type: Bearer   # or use basic_auth; depends on your auth setup
     # Pass admin key as a custom header
     # (Prometheus does not natively support custom headers; use a proxy or
-    #  set LEDGERLENS_ADMIN_API_KEY="" to allow unauthenticated scraping
+    #  set STELLARLENSE_ADMIN_API_KEY="" to allow unauthenticated scraping
     #  in isolated networks only)
 ```
 
-For production deployments where the admin key must be passed, place a reverse-proxy (nginx, Caddy, or Envoy) in front of the metrics endpoint to inject the `X-LedgerLens-Admin-Key` header, keeping the key out of the Prometheus config file.
+For production deployments where the admin key must be passed, place a reverse-proxy (nginx, Caddy, or Envoy) in front of the metrics endpoint to inject the `X-StellarLense-Admin-Key` header, keeping the key out of the Prometheus config file.

@@ -20,7 +20,7 @@ from detection.benford_engine import compute_benford_metrics
 from detection.storage import get_bridge_transfers
 from ingestion.data_models import BridgeTransfer
 
-logger = logging.getLogger("ledgerlens.cross_chain_linker")
+logger = logging.getLogger("stellar_lense.cross_chain_linker")
 
 CONFIDENCE_THRESHOLD = 0.70
 CONFIRMED_THRESHOLD = 0.90
@@ -253,7 +253,7 @@ class CrossChainLinker:
         if hypothesis.link_status == LinkStatus.REJECTED:
             return
 
-        db_path = self._db_path or "./ledgerlens.db"
+        db_path = self._db_path or "./stellar_lense.db"
         conn = sqlite3.connect(db_path)
         try:
             self._ensure_table(conn)
@@ -290,7 +290,7 @@ class CrossChainLinker:
     ) -> list[WalletLinkHypothesis]:
         """Retrieve all accepted hypotheses for a Stellar wallet, sorted by confidence desc."""
         min_conf = min_confidence if min_confidence is not None else self.min_confidence
-        db_path = self._db_path or "./ledgerlens.db"
+        db_path = self._db_path or "./stellar_lense.db"
         try:
             conn = sqlite3.connect(db_path)
             self._ensure_table(conn)

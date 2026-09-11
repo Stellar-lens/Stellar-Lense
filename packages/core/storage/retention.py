@@ -24,7 +24,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
-logger = logging.getLogger("ledgerlens.retention")
+logger = logging.getLogger("stellar_lense.retention")
 
 # Default TTL map: SQLite table name → days to retain
 DEFAULT_TTL: dict[str, int] = {

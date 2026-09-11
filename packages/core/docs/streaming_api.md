@@ -2,12 +2,12 @@
 
 ## Overview
 
-LedgerLens exposes a push-based streaming API using **Server-Sent Events (SSE)**. Clients subscribe to a set of wallet addresses and receive `score_update` events in real-time as scores change, eliminating the need to poll `/scores/{wallet}`.
+Stellar Lense exposes a push-based streaming API using **Server-Sent Events (SSE)**. Clients subscribe to a set of wallet addresses and receive `score_update` events in real-time as scores change, eliminating the need to poll `/scores/{wallet}`.
 
 **Architecture:**
-1. The scoring pipeline publishes a `ScoreUpdateEvent` to Redis (`PUBLISH ledgerlens:score:{wallet}`) after every score change.
+1. The scoring pipeline publishes a `ScoreUpdateEvent` to Redis (`PUBLISH stellar_lense:score:{wallet}`) after every score change.
 2. SSE handlers subscribe to Redis channels and forward events to connected clients.
-3. A Redis hash (`ledgerlens:last_event`) stores the last event per wallet for reconnect replay.
+3. A Redis hash (`stellar_lense:last_event`) stores the last event per wallet for reconnect replay.
 
 ## SSE Protocol Reference
 
@@ -85,7 +85,7 @@ This keeps the connection alive through proxies and load balancers that would ot
 
 ## Reconnect Semantics
 
-Browser's `EventSource` API automatically reconnects on disconnect and sends the `Last-Event-ID` header. LedgerLens replays the last cached event for each subscribed wallet if it differs from `Last-Event-ID`.
+Browser's `EventSource` API automatically reconnects on disconnect and sends the `Last-Event-ID` header. Stellar Lense replays the last cached event for each subscribed wallet if it differs from `Last-Event-ID`.
 
 Replay window: **5 minutes** (`SSE_MISSED_EVENT_REPLAY_WINDOW_SECONDS=300`). Events older than this window are not replayed even if the client requests them — this limits Redis memory usage.
 
@@ -113,7 +113,7 @@ Maximum **10 concurrent SSE connections** per API key. Exceeding this returns **
 }
 ```
 
-The counter is tracked in Redis (`ledgerlens:sse_connections:{key_id}`) and decremented when the connection closes.
+The counter is tracked in Redis (`stellar_lense:sse_connections:{key_id}`) and decremented when the connection closes.
 
 ## JavaScript Client Example
 
@@ -156,7 +156,7 @@ const response = await fetch(
     `http://localhost:8000/stream/scores?wallets=${wallets}`,
     {
         headers: {
-            'X-LedgerLens-Admin-Key': 'your-admin-key',
+            'X-StellarLense-Admin-Key': 'your-admin-key',
             'Accept': 'text/event-stream'
         }
     }
@@ -239,7 +239,7 @@ For Nginx, disable response buffering:
 
 ```nginx
 location /stream/scores {
-    proxy_pass http://ledgerlens-api;
+    proxy_pass http://stellar-lense-api;
     proxy_buffering off;
     proxy_cache off;
     proxy_set_header Connection '';

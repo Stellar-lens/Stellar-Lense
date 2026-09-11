@@ -25,7 +25,7 @@ import logging
 import joblib
 
 # ---------------------------------------------------------------------------
-# Optional dependency: mlflow  (pip install 'ledgerlens-core[ml]')
+# Optional dependency: mlflow  (pip install 'stellar-lense-core[ml]')
 # ---------------------------------------------------------------------------
 try:
     import mlflow as mlflow
@@ -49,7 +49,7 @@ from xgboost import XGBClassifier
 from config.settings import settings
 from detection.feature_engineering import FEATURE_NAMES
 
-logger = logging.getLogger("ledgerlens.model_training")
+logger = logging.getLogger("stellar_lense.model_training")
 
 
 # ---------------------------------------------------------------------------
@@ -729,8 +729,8 @@ def save_models(
     from detection.lineage import lineage, Dataset
     
     inputs = [
-        Dataset(namespace="ledgerlens-core.csv", name="training_reference.csv"),
-        Dataset(namespace="ledgerlens-core.models", name=f"labelled_dataset_v{version}")
+        Dataset(namespace="stellar-lense-core.csv", name="training_reference.csv"),
+        Dataset(namespace="stellar-lense-core.models", name=f"labelled_dataset_v{version}")
     ]
 
     with lineage.run("model_training.train_ensemble", inputs=inputs) as r:
@@ -754,7 +754,7 @@ def save_models(
             with open(latest_path, "w") as f:
                 f.write(version)
                 
-            r.add_output(Dataset(namespace="ledgerlens-core.models", name=f"{name}_v{version}.joblib"))
+            r.add_output(Dataset(namespace="stellar-lense-core.models", name=f"{name}_v{version}.joblib"))
 
     _causal_selected = results.get("_causal_selected_features")
     metadata = {
@@ -881,7 +881,7 @@ def train_ensemble(
             One of ``"smote"`` (default), ``"adasyn"``, ``"borderline1"``,
             ``"borderline2"``, or ``"none"``.  See :func:`_get_oversampler`.
         experiment_name: MLflow experiment name.  Falls back to
-            ``settings.mlflow_experiment_name`` then ``"ledgerlens-training"``.
+            ``settings.mlflow_experiment_name`` then ``"stellar-lense-training"``.
         tracking_uri: MLflow tracking URI.  Falls back to
             ``MLFLOW_TRACKING_URI`` env var, then ``settings.mlflow_tracking_uri``.
     """
@@ -950,7 +950,7 @@ def _log_train_test_split_params(random_state: int, calibrate: bool) -> None:
 
 
 if __name__ == "__main__":
-    # The ledgerlens-data repo does not yet provide a labelled dataset, so
+    # The stellar-lense-data repo does not yet provide a labelled dataset, so
     # default to a synthetic one for local training/testing.
     import logging
 
@@ -958,7 +958,7 @@ if __name__ == "__main__":
     from ingestion.synthetic_data import generate_synthetic_dataset
 
     logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger("ledgerlens.model_training")
+    logger = logging.getLogger("stellar_lense.model_training")
 
     trades, account_metadata, order_book_events, labels = generate_synthetic_dataset(
         n_normal_accounts=60, n_wash_rings=10, ring_size=3

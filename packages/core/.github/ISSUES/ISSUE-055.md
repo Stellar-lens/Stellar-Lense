@@ -164,7 +164,7 @@ class DriftMonitor:
 ```python
 @router.get("/admin/drift-reports/latest")
 async def latest_drift_report(
-    x_admin_key: str = Header(..., alias="X-LedgerLens-Admin-Key"),
+    x_admin_key: str = Header(..., alias="X-StellarLense-Admin-Key"),
 ) -> DriftReportResponse:
     """
     Returns the most recent DriftReport with full per-feature breakdown.
@@ -194,7 +194,7 @@ DRIFT_TREND_DELTA_THRESHOLD=0.02            # |delta| > this = rising/falling
 
 ## Security Considerations
 
-- **Admin key requirement**: `GET /admin/drift-reports/latest` must require the `X-LedgerLens-Admin-Key` header. Return 503 (not 401) if the key is unset, to avoid revealing the endpoint exists to unauthenticated callers
+- **Admin key requirement**: `GET /admin/drift-reports/latest` must require the `X-StellarLense-Admin-Key` header. Return 503 (not 401) if the key is unset, to avoid revealing the endpoint exists to unauthenticated callers
 - **Webhook payload sanitisation**: the `feature` name in the webhook payload is sourced from `FEATURE_NAMES` — a hardcoded list. No user input flows into this payload. Document this explicitly to prevent future injection vectors if the payload is ever extended with external data
 - **PSI history retention**: 90 days × 41 features × 4 runs/day = ~15,000 rows — trivial. The retention pruning is precautionary. Never prune rows younger than 48 hours (to preserve trend calculation data)
 - **YAML config injection**: `config/drift_thresholds.yml` is loaded from the filesystem. Validate that all threshold values are floats in `[0.0, 1.0]` and all feature names are in `FEATURE_NAMES` after loading. Reject invalid config at startup

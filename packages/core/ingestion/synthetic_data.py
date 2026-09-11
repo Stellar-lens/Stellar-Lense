@@ -1,6 +1,6 @@
 """Synthetic SDEX trade data generator for local training and testing.
 
-The canonical labelled dataset lives in `ledgerlens-data`. This module
+The canonical labelled dataset lives in `stellar-lense-data`. This module
 generates synthetic trade activity for local development:
 
 * A pool of "normal" accounts trading with organic, Benford-conforming

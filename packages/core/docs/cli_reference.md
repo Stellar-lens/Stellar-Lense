@@ -1,6 +1,6 @@
 # CLI Reference
 
-LedgerLens provides a `ledgerlens` CLI built with [Typer](https://typer.tiangolo.com/).
+Stellar Lense provides a `stellar_lense` CLI built with [Typer](https://typer.tiangolo.com/).
 
 ## Commands
 

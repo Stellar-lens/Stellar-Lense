@@ -1,5 +1,5 @@
 /**
- * @ledgerlens/sdk — TypeScript SDK for the LedgerLens API
+ * @stellar-lense/sdk — TypeScript SDK for the StellarLense API
  *
  * Features:
  * - Full TypeScript type inference for all API responses
@@ -9,21 +9,21 @@
  *
  * @example
  * ```ts
- * import { LedgerLensClient } from "@ledgerlens/sdk";
+ * import { StellarLenseClient } from "@stellar-lense/sdk";
  *
- * const client = new LedgerLensClient({ baseUrl: "http://localhost:8000" });
+ * const client = new StellarLenseClient({ baseUrl: "http://localhost:8000" });
  * const health = await client.getHealth();
  * console.log(health);
  * ```
  */
 
 /**
- * {@link LedgerLensClient} is the HTTP client; {@link LedgerLensError} is the
+ * {@link StellarLenseClient} is the HTTP client; {@link StellarLenseError} is the
  * error type every client method rejects with.
  */
-export { LedgerLensClient, LedgerLensError } from "./client";
-/** Constructor options for {@link LedgerLensClient}. */
-export type { LedgerLensClientOptions } from "./client";
+export { StellarLenseClient, StellarLenseError } from "./client";
+/** Constructor options for {@link StellarLenseClient}. */
+export type { StellarLenseClientOptions } from "./client";
 
 /**
  * Zod schemas backing every API response. Exported so consumers can run their

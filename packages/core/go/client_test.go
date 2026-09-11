@@ -1,4 +1,4 @@
-package ledgerlens_test
+package stellar_lense_test
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	ledgerlens "github.com/Ledger-Lenz/Ledgerlens-core/go"
+	stellar_lense "github.com/Stellar-lens/Stellar-Lense/go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -17,11 +17,11 @@ import (
 // helpers
 // ---------------------------------------------------------------------------
 
-func newTestClient(t *testing.T, mux *http.ServeMux) (*ledgerlens.Client, *httptest.Server) {
+func newTestClient(t *testing.T, mux *http.ServeMux) (*stellar_lense.Client, *httptest.Server) {
 	t.Helper()
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
-	client := ledgerlens.NewClient(srv.URL, ledgerlens.WithAPIKey("test-key"))
+	client := stellar_lense.NewClient(srv.URL, stellar_lense.WithAPIKey("test-key"))
 	return client, srv
 }
 
@@ -61,7 +61,7 @@ func TestGetScore_OK(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/scores/"+wallet, func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodGet, r.Method)
-		assert.Equal(t, "test-key", r.Header.Get("X-LedgerLens-Admin-Key"))
+		assert.Equal(t, "test-key", r.Header.Get("X-StellarLense-Admin-Key"))
 		writeJSON(t, w, map[string]interface{}{
 			"scores": []map[string]interface{}{
 				{
@@ -172,7 +172,7 @@ func TestRegisterWebhook_OK(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/webhooks", func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodPost, r.Method)
-		var body ledgerlens.WebhookRegisterRequest
+		var body stellar_lense.WebhookRegisterRequest
 		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
 		assert.Equal(t, "https://example.com/webhook", body.URL)
 		assert.Equal(t, 75, body.MinScore)
@@ -181,7 +181,7 @@ func TestRegisterWebhook_OK(t *testing.T) {
 	})
 	client, _ := newTestClient(t, mux)
 
-	created, err := client.RegisterWebhook(context.Background(), ledgerlens.WebhookRegisterRequest{
+	created, err := client.RegisterWebhook(context.Background(), stellar_lense.WebhookRegisterRequest{
 		URL:      "https://example.com/webhook",
 		Secret:   "whsec_test",
 		MinScore: 75,
@@ -206,8 +206,8 @@ func TestGetScore_401(t *testing.T) {
 
 	_, err := client.GetScore(context.Background(), "GABC")
 	require.Error(t, err)
-	apiErr, ok := err.(*ledgerlens.LedgerLensAPIError)
-	require.True(t, ok, "expected *LedgerLensAPIError, got %T", err)
+	apiErr, ok := err.(*stellar_lense.StellarLenseAPIError)
+	require.True(t, ok, "expected *StellarLenseAPIError, got %T", err)
 	assert.Equal(t, http.StatusUnauthorized, apiErr.StatusCode)
 	assert.Equal(t, "Invalid API key", apiErr.Detail)
 }
@@ -228,7 +228,7 @@ func TestGetScore_404(t *testing.T) {
 
 	_, err := client.GetScore(context.Background(), "GNOT_FOUND")
 	require.Error(t, err)
-	apiErr, ok := err.(*ledgerlens.LedgerLensAPIError)
+	apiErr, ok := err.(*stellar_lense.StellarLenseAPIError)
 	require.True(t, ok)
 	assert.Equal(t, http.StatusNotFound, apiErr.StatusCode)
 	assert.Equal(t, "Wallet not found", apiErr.Detail)
@@ -251,7 +251,7 @@ func TestGetScore_429WithRetryAfter(t *testing.T) {
 
 	_, err := client.GetScore(context.Background(), "GABC")
 	require.Error(t, err)
-	apiErr, ok := err.(*ledgerlens.LedgerLensAPIError)
+	apiErr, ok := err.(*stellar_lense.StellarLenseAPIError)
 	require.True(t, ok)
 	assert.Equal(t, http.StatusTooManyRequests, apiErr.StatusCode)
 	assert.Equal(t, 30*time.Second, apiErr.RetryAfter)
@@ -289,7 +289,7 @@ func TestGetScore_ContextCancellation(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestClient_APIKeyRedacted(t *testing.T) {
-	client := ledgerlens.NewClient("https://api.ledgerlens.io", ledgerlens.WithAPIKey("super-secret-key"))
+	client := stellar_lense.NewClient("https://api.stellar-lense.io", stellar_lense.WithAPIKey("super-secret-key"))
 	s := client.String()
 	assert.NotContains(t, s, "super-secret-key", "API key must not appear in String()")
 	gs := client.GoString()

@@ -16,7 +16,7 @@ class WashTradeMLPClassifier(nn.Module):
     """Lightweight MLP for FL-specific binary wash-trade classification.
 
     Designed to be compatible with Opacus PrivacyEngine for DP-SGD.
-    Input dimension matches LedgerLens's 35-feature schema.
+    Input dimension matches StellarLense's 35-feature schema.
     """
 
     def __init__(

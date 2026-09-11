@@ -100,12 +100,12 @@ def require_scope(required_scope: str):
     """
 
     def _dependency(
-        x_ledgerlens_api_key: str = Header(default="", alias="X-LedgerLens-Api-Key"),
-        x_ledgerlens_admin_key: str = Header(default="", alias="X-LedgerLens-Admin-Key"),
+        x_stellarlense_api_key: str = Header(default="", alias="X-StellarLense-Api-Key"),
+        x_stellarlense_admin_key: str = Header(default="", alias="X-StellarLense-Admin-Key"),
     ) -> None:
-        plaintext = x_ledgerlens_api_key or x_ledgerlens_admin_key
+        plaintext = x_stellarlense_api_key or x_stellarlense_admin_key
         if not plaintext:
-            raise HTTPException(status_code=401, detail="Missing X-LedgerLens-Api-Key header")
+            raise HTTPException(status_code=401, detail="Missing X-StellarLense-Api-Key header")
 
         key_meta = lookup_key(plaintext)
         if key_meta is None:

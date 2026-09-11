@@ -2,7 +2,7 @@
 
 ## Overview
 
-The LedgerLens Streaming Feature Store provides efficient, incremental per-trade feature computation using a Redis hot layer and SQLite cold layer. This replaces the previous full-recompute approach that rescanned all historical trades for each wallet on every scoring pass.
+The Stellar Lense Streaming Feature Store provides efficient, incremental per-trade feature computation using a Redis hot layer and SQLite cold layer. This replaces the previous full-recompute approach that rescanned all historical trades for each wallet on every scoring pass.
 
 ### Problem Solved
 

@@ -5,7 +5,7 @@ assignees: []
 ---
 
 ## Summary
-LedgerLens currently ingests Stellar SDEX and EVM bridge events but has no visibility into Solana-side trading activity for wallets that operate cross-chain via Wormhole. A Solana SPL token trade ingestion adapter using the Solana RPC `getSignaturesForAddress` API adds cross-chain coverage for Stellar↔Solana bridge users.
+Stellar Lense currently ingests Stellar SDEX and EVM bridge events but has no visibility into Solana-side trading activity for wallets that operate cross-chain via Wormhole. A Solana SPL token trade ingestion adapter using the Solana RPC `getSignaturesForAddress` API adds cross-chain coverage for Stellar↔Solana bridge users.
 
 ## Objectives
 - [ ] Implement `SolanaAdapter` in `ingestion/solana_adapter.py` using `solana-py` library

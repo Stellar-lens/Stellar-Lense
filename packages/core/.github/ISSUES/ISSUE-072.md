@@ -10,7 +10,7 @@ Extend `cli.py stream` and `detection/model_inference.py` to implement a statefu
 
 ## Background & Context
 
-LedgerLens currently scores wallets in batch mode: `run_pipeline.py` ingests historical data, computes features, and scores all wallets in a single pass. The `cli.py stream` command exists but only streams and stores trades without triggering real-time scoring. This gap means wash-trading activity is only detectable after the batch pipeline runs — potentially hours after the pattern emerges.
+Stellar Lense currently scores wallets in batch mode: `run_pipeline.py` ingests historical data, computes features, and scores all wallets in a single pass. The `cli.py stream` command exists but only streams and stores trades without triggering real-time scoring. This gap means wash-trading activity is only detectable after the batch pipeline runs — potentially hours after the pattern emerges.
 
 Real-time streaming detection requires:
 1. **Stateful feature windows**: per-wallet state that accumulates trades within rolling time windows (1h, 4h, 24h), evicting trades older than the window as new ones arrive.
@@ -231,7 +231,7 @@ STREAM_WINDOW_HOURS=1,4,24
 
 ## For Contributors
 
-**Ideal contributor profile**: You have experience building stateful streaming data pipelines — ideally in fraud detection, anomaly detection, or time-series monitoring contexts. You understand rolling window data structures (deque-based eviction), incremental feature computation, and the tradeoffs between accuracy and latency in streaming ML. Familiarity with the Horizon SSE API and LedgerLens's feature engineering schema (35-feature vector) will accelerate implementation significantly.
+**Ideal contributor profile**: You have experience building stateful streaming data pipelines — ideally in fraud detection, anomaly detection, or time-series monitoring contexts. You understand rolling window data structures (deque-based eviction), incremental feature computation, and the tradeoffs between accuracy and latency in streaming ML. Familiarity with the Horizon SSE API and Stellar Lense's feature engineering schema (35-feature vector) will accelerate implementation significantly.
 
 To apply, please comment on this issue with:
 1. **Specialty area**: your primary expertise (e.g., streaming systems, real-time ML, Python backend, event-driven architectures).

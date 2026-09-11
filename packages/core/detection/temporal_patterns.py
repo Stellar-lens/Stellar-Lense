@@ -50,7 +50,7 @@ from typing import Optional
 
 import numpy as np
 
-logger = logging.getLogger("ledgerlens.temporal_patterns")
+logger = logging.getLogger("stellar_lense.temporal_patterns")
 
 # ---------------------------------------------------------------------------
 # Optional PyTorch import

@@ -1,7 +1,7 @@
 """Provider-side contract tests for the RiskScore schema.
 
 These tests verify that the :class:`RiskScore` model serializes exactly as the
-`ledgerlens-api` consumer expects, using Pact (consumer-driven contract testing).
+`stellar-lense-api` consumer expects, using Pact (consumer-driven contract testing).
 See `docs/contract_testing.md` for details.
 """
 import os
@@ -12,14 +12,14 @@ from pact import Verifier
 
 from tests.contract.helpers import find_free_port, start_server
 
-FALLBACK_PACT_PATH= "tests/contract/pacts/ledgerlens-api-ledgerlens-core.json"
+FALLBACK_PACT_PATH= "tests/contract/pacts/stellar-lense-api-stellar-lense-core.json"
 PACT_BROKER_URL = os.getenv("PACT_BROKER_URL")
 PACT_BROKER_TOKEN = os.getenv("PACT_BROKER_TOKEN")
 
 
 @pytest.mark.contract
-def test_risk_score_satisfies_ledgerlens_api_pact(live_provider_base_url):
-    verifier = Verifier(provider="ledgerlens-core", provider_base_url=live_provider_base_url)
+def test_risk_score_satisfies_stellar_lense_api_pact(live_provider_base_url):
+    verifier = Verifier(provider="stellar-lense-core", provider_base_url=live_provider_base_url)
     verifier.set_state_setup_url(f"{live_provider_base_url}/_pact/provider-states")
     if PACT_BROKER_URL:
         success, _ = verifier.verify_with_broker(
@@ -30,7 +30,7 @@ def test_risk_score_satisfies_ledgerlens_api_pact(live_provider_base_url):
         )
     else:
         success, _ = verifier.verify_pacts(FALLBACK_PACT_PATH)
-    assert success, "RiskScore schema no longer matches the ledgerlens-api consumer pact"
+    assert success, "RiskScore schema no longer matches the stellar-lense-api consumer pact"
 
 
 @pytest.mark.contract
@@ -79,7 +79,7 @@ def test_broken_risk_score_schema_fails_verification():
     server, thread = start_server(app, port)
     base_url = f"http://127.0.0.1:{port}"
     try:
-        verifier = Verifier(provider="ledgerlens-core", provider_base_url=base_url)
+        verifier = Verifier(provider="stellar-lense-core", provider_base_url=base_url)
         verifier.set_state_setup_url(f"{base_url}/_pact/provider-states")
         success, _ = verifier.verify_pacts(FALLBACK_PACT_PATH)
         assert not success, "Expected provider verification to fail when the response is missing `score`"

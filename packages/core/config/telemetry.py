@@ -11,12 +11,12 @@ from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
 
-logger = logging.getLogger("ledgerlens.telemetry")
+logger = logging.getLogger("stellar_lense.telemetry")
 
 _tracer_provider: TracerProvider | None = None
 
 
-def init_telemetry(service_name: str = "ledgerlens") -> None:
+def init_telemetry(service_name: str = "stellar_lense") -> None:
     """Initialize the OTel SDK.
 
     Uses the OTLP gRPC exporter when OTEL_EXPORTER_OTLP_ENDPOINT is set,
@@ -97,6 +97,6 @@ def shutdown_telemetry() -> None:
             _tracer_provider = None
 
 
-def get_tracer(name: str = "ledgerlens") -> trace.Tracer:
+def get_tracer(name: str = "stellar_lense") -> trace.Tracer:
     """Return a tracer for the given instrumentation scope."""
     return trace.get_tracer(name)

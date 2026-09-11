@@ -8,7 +8,7 @@ import time
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
-ORACLE_DOMAIN_SEPARATOR = b"LedgerLens-Oracle-v2"
+ORACLE_DOMAIN_SEPARATOR = b"StellarLense-Oracle-v2"
 SOROBAN_SYMBOL_SCVAL_TYPE = 15
 MAX_SYMBOL_LENGTH = 32
 
@@ -55,7 +55,7 @@ class OracleNode:
         model_version: int,
     ) -> bytes:
         """
-        Sign every caller-controlled field forwarded to ledgerlens-score.
+        Sign every caller-controlled field forwarded to stellar-lense-score.
 
         Returns 64-byte ED25519 signature.
         """

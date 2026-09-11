@@ -1,13 +1,13 @@
 # Oracle Aggregator Contract
 
-Soroban smart contract for the LedgerLens oracle network. Implements k-of-n quorum signature verification for off-chain oracle nodes submitting risk scores on-chain.
+Soroban smart contract for the Stellar Lense oracle network. Implements k-of-n quorum signature verification for off-chain oracle nodes submitting risk scores on-chain.
 
 ## Overview
 
 The Oracle Aggregator is a critical trust boundary component that:
 - Verifies Ed25519 signatures from authorized oracle nodes
 - Enforces a configurable threshold (k-of-n) quorum before accepting scores
-- Forwards validated scores to the main LedgerLens score contract
+- Forwards validated scores to the main Stellar Lense score contract
 - Implements replay protection via timestamp validation
 
 ## Contract Functions
@@ -17,7 +17,7 @@ The Oracle Aggregator is a critical trust boundary component that:
 Initializes the contract with:
 - `threshold` — minimum number of valid signatures required (k in k-of-n)
 - `oracle_keys` — vector of authorized oracle Ed25519 public keys (n oracles total)
-- `score_contract` — address of the LedgerLens score contract to forward to
+- `score_contract` — address of the Stellar Lense score contract to forward to
 
 **Authorization:** No auth required (first-write wins)
 
@@ -28,7 +28,7 @@ Initializes the contract with:
 
 ### `submit_with_quorum(env, wallet, asset_pair, score, benford_flag, ml_flag, timestamp, confidence, model_version, signatures) -> bool`
 
-Verifies k-of-n signatures, invokes the configured `ledgerlens-score`
+Verifies k-of-n signatures, invokes the configured `stellar-lense-score`
 contract, and returns `true` only after that invocation succeeds.
 
 **Parameters:**
@@ -48,7 +48,7 @@ contract, and returns `true` only after that invocation succeeds.
 1. Reject timestamps older than 5 minutes (replay protection)
 2. Verify each signature against `canonical_message`
 3. Count only signatures from keys in `oracle_keys`
-4. Authorize the exact `ledgerlens-score.submit_score` sub-invocation as the
+4. Authorize the exact `stellar-lense-score.submit_score` sub-invocation as the
    aggregator contract
 5. Invoke the current ten-argument ABI and return `true` only after persistence
 
@@ -67,7 +67,7 @@ Constructs the canonical message that oracle nodes sign. Format:
 
 ```
 SHA-256(
-  "LedgerLens-Oracle-v2" || wallet || "|" || asset_pair_scval_xdr || "|" ||
+  "StellarLense-Oracle-v2" || wallet || "|" || asset_pair_scval_xdr || "|" ||
   score_u32_be || benford_flag_u8 || ml_flag_u8 || timestamp_u64_be ||
   confidence_u32_be || model_version_u32_be
 )
@@ -98,7 +98,7 @@ The contract then:
 2. Verifies each signature with `env.crypto().ed25519_verify(public_key, message, signature)`
 3. Counts valid signatures from authorized keys
 4. Accepts the score if count >= threshold
-5. Calls `ledgerlens-score.submit_score` with:
+5. Calls `stellar-lense-score.submit_score` with:
    - `signers = [oracle_aggregator contract address]`
    - all quorum-signed score fields
    - `attestation_input = None`
@@ -203,7 +203,7 @@ The contract is configured as `crate-type = ["cdylib", "rlib"]` so it can be bui
 
 ## References
 
-- [LedgerLens Oracle Quorum design](../../docs/oracle_quorum.md)
+- [Stellar Lense Oracle Quorum design](../../docs/oracle_quorum.md)
 - [Contract fuzzing documentation](../../docs/contract_fuzzing.md)
 - [Soroban SDK documentation](https://soroban.stellar.org/docs/reference/sdk)
 

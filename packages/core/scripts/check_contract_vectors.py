@@ -259,12 +259,12 @@ def main() -> int:
             "  2. Review the git diff of tests/fixtures/contract_vectors.json\n"
             "  3. Update the matching fields in:\n"
             "     - sdk/src/schemas.ts (TypeScript/Zod)\n"
-            "     - crates/ledgerlens-sdk/src/models.rs (Rust)\n"
-            "     - packages/ledgerlens-sdk/src/ledgerlens/models.py (Python SDK)\n"
-            "     - proto/ledgerlens/v1/scoring.proto (Proto)\n"
+            "     - crates/stellar-lense-sdk/src/models.rs (Rust)\n"
+            "     - packages/stellar-lense-sdk/src/stellar_lense/models.py (Python SDK)\n"
+            "     - proto/stellar_lense/v1/scoring.proto (Proto)\n"
             "  4. Run per-language tests to confirm:\n"
             "     pytest tests/test_contract_vectors.py\n"
-            "     cargo test -p ledgerlens-sdk contract_vectors\n"
+            "     cargo test -p stellar-lense-sdk contract_vectors\n"
             "     npx vitest run sdk/tests/contract_vectors.test.ts\n"
         )
         return EXIT_DRIFT

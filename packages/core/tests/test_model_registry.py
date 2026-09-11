@@ -322,7 +322,7 @@ class TestSigningIntegration:
         model_dir = str(tmp_path)
         save_versioned_model(dummy_model, "rf", "v001", model_dir)
         monkeypatch.setattr(settings_module.settings, "model_signing_key", "")
-        with pytest.raises(ModelIntegrityError, match="LEDGERLENS_MODEL_SIGNING_KEY"):
+        with pytest.raises(ModelIntegrityError, match="STELLARLENSE_MODEL_SIGNING_KEY"):
             load_latest_model("rf", model_dir)
 
 

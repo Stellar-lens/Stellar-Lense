@@ -1,24 +1,24 @@
 groups:
-  - name: ledgerlens
+  - name: stellar_lense
     rules:
       - alert: SorobanCircuitBreakerOpen
-        expr: increase(ledgerlens_circuit_breaker_open_total[5m]) > 0
+        expr: increase(stellar_lense_circuit_breaker_open_total[5m]) > 0
         for: 0m
         annotations:
           summary: "Soroban circuit breaker opened"
           description: "The Soroban circuit breaker has opened due to consecutive submission failures. Check RPC connectivity and service key configuration."
-          runbook: "Inspect logs for SorobanCircuitOpenError. Verify SOROBAN_RPC_URL, LEDGERLENS_SERVICE_SECRET_KEY, and contract authorization. Circuit auto-resets after SOROBAN_CIRCUIT_RESET_SECONDS (default 300s)."
+          runbook: "Inspect logs for SorobanCircuitOpenError. Verify SOROBAN_RPC_URL, STELLARLENSE_SERVICE_SECRET_KEY, and contract authorization. Circuit auto-resets after SOROBAN_CIRCUIT_RESET_SECONDS (default 300s)."
 
       - alert: WebhookDeadLetterBacklog
-        expr: increase(ledgerlens_webhook_deliveries_total{result="dead_lettered"}[1h]) > 10
+        expr: increase(stellar_lense_webhook_deliveries_total{result="dead_lettered"}[1h]) > 10
         for: 0m
         annotations:
           summary: "Webhook dead-letter backlog exceeds threshold"
           description: "More than 10 webhook deliveries have permanently failed in the last hour."
-          runbook: "Inspect GET /webhooks/dead-letters. Check subscriber URLs are reachable over HTTPS. Verify LEDGERLENS_WEBHOOK_ENCRYPTION_KEY is set. Dead letters require manual intervention or subscriber re-registration."
+          runbook: "Inspect GET /webhooks/dead-letters. Check subscriber URLs are reachable over HTTPS. Verify STELLARLENSE_WEBHOOK_ENCRYPTION_KEY is set. Dead letters require manual intervention or subscriber re-registration."
 
       - alert: FeatureDriftDetected
-        expr: increase(ledgerlens_drift_detected_total[24h]) > 0
+        expr: increase(stellar_lense_drift_detected_total[24h]) > 0
         for: 0m
         annotations:
           summary: "Feature distribution drift detected"
@@ -26,7 +26,7 @@ groups:
           runbook: "Run `python cli.py retrain-check` to review the drift report. Check /admin/drift-reports for PSI values. If PSI > 0.25 on key Benford features, consider running `cli.py retrain-check --force-retrain`."
 
       - alert: ScoringLatencyHigh
-        expr: histogram_quantile(0.95, rate(ledgerlens_scoring_latency_seconds_bucket[10m])) > 2.0
+        expr: histogram_quantile(0.95, rate(stellar_lense_scoring_latency_seconds_bucket[10m])) > 2.0
         for: 5m
         annotations:
           summary: "p95 scoring latency exceeds 2 seconds"
@@ -34,15 +34,15 @@ groups:
           runbook: "Check Horizon API latency (HORIZON_URL), model inference load, and DB write throughput. Consider reducing TRADE_HISTORY_LOOKBACK_DAYS or scaling the pipeline. Acts as a backstop symptom alert alongside SLO burn-rate alerts."
 
       - alert: PipelineStalled
-        expr: (time() - ledgerlens_pipeline_run_duration_seconds_created) > 300
+        expr: (time() - stellar_lense_pipeline_run_duration_seconds_created) > 300
         for: 0m
         annotations:
           summary: "Pipeline has not run in over 5 minutes"
           description: "The detection pipeline last completed more than 300 seconds ago."
-          runbook: "Check that `python run_pipeline.py` or `cli.py score` is running and not stuck. Review logs for exceptions in horizon ingestion or model loading. Verify LEDGERLENS_DB_PATH is writable."
+          runbook: "Check that `python run_pipeline.py` or `cli.py score` is running and not stuck. Review logs for exceptions in horizon ingestion or model loading. Verify STELLARLENSE_DB_PATH is writable."
 
       - alert: WAFAbuseDetected
-        expr: increase(ledgerlens_waf_blocks_total[5m]) > 10
+        expr: increase(stellar_lense_waf_blocks_total[5m]) > 10
         for: 1m
         annotations:
           summary: "WAF detected potential abuse"
@@ -50,7 +50,7 @@ groups:
           runbook: "Review blocked requests via GET /admin/waf/blocked-requests. Check for SQLi/XSS patterns or oversized requests. Consider adjusting rate limits or blocking specific clients if needed."
 
       - alert: SecretRotationOverdue
-        expr: ledgerlens_secret_rotation_overdue > 0
+        expr: stellar_lense_secret_rotation_overdue > 0
         for: 0m
         annotations:
           summary: "Secret rotation is overdue"

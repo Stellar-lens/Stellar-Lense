@@ -51,9 +51,9 @@ def _isolate_config_propagation_globals(tmp_path, monkeypatch):
     and start from an empty cache, without leaking into other tests in this
     file or the wider suite.
     """
-    db_path = str(tmp_path / "ledgerlens.db")
-    monkeypatch.setenv("LEDGERLENS_DB_PATH", db_path)
-    object.__setattr__(settings_module.settings, "ledgerlens_db_path", db_path)
+    db_path = str(tmp_path / "stellar_lense.db")
+    monkeypatch.setenv("STELLARLENSE_DB_PATH", db_path)
+    object.__setattr__(settings_module.settings, "stellarlense_db_path", db_path)
     original_threshold = settings_module.settings.risk_score_threshold
 
     def _reset():
@@ -127,9 +127,9 @@ class TestCrossProcessPropagation:
         -- no restart, no waiting out the 60s TTL."""
         fakeredis = pytest.importorskip("fakeredis", reason="fakeredis not installed")
 
-        db_path = str(tmp_path / "ledgerlens.db")
+        db_path = str(tmp_path / "stellar_lense.db")
         _make_governance_db(db_path)
-        object.__setattr__(settings_module.settings, "ledgerlens_db_path", db_path)
+        object.__setattr__(settings_module.settings, "stellarlense_db_path", db_path)
 
         fake_client = fakeredis.FakeStrictRedis()
         with patch("redis.from_url", return_value=fake_client):
@@ -151,9 +151,9 @@ class TestCrossProcessPropagation:
         """Without Redis: a second process's cache does NOT see the change
         until its local TTL elapses -- the documented worst-case fallback
         bound, not an unbounded/never-converges failure."""
-        db_path = str(tmp_path / "ledgerlens.db")
+        db_path = str(tmp_path / "stellar_lense.db")
         _make_governance_db(db_path)
-        object.__setattr__(settings_module.settings, "ledgerlens_db_path", db_path)
+        object.__setattr__(settings_module.settings, "stellarlense_db_path", db_path)
 
         # Seed an unrelated row first so the cache's baseline read is
         # non-empty and therefore actually gets cached: an *empty*
@@ -206,9 +206,9 @@ class TestConsumersReflectGovernanceChange:
         """
         import run_pipeline
 
-        db_path = str(tmp_path / "ledgerlens.db")
+        db_path = str(tmp_path / "stellar_lense.db")
         _make_governance_db(db_path)
-        object.__setattr__(settings_module.settings, "ledgerlens_db_path", db_path)
+        object.__setattr__(settings_module.settings, "stellarlense_db_path", db_path)
 
         assert run_pipeline.get_runtime_risk_score_threshold is (
             settings_module.get_runtime_risk_score_threshold
@@ -228,9 +228,9 @@ class TestConsumersReflectGovernanceChange:
         it, proving `alert_engine.py`'s constructor reads the governed value."""
         from detection.alert_engine import AlertDeduplicator
 
-        db_path = str(tmp_path / "ledgerlens.db")
+        db_path = str(tmp_path / "stellar_lense.db")
         _make_governance_db(db_path)
-        object.__setattr__(settings_module.settings, "ledgerlens_db_path", db_path)
+        object.__setattr__(settings_module.settings, "stellarlense_db_path", db_path)
 
         score = 60.0
         wallet = "GALERT" + "A" * 50
@@ -256,9 +256,9 @@ class TestConsumersReflectGovernanceChange:
         from detection.risk_score import RiskScore
         from detection.storage import save_scores
 
-        db_path = str(tmp_path / "ledgerlens.db")
+        db_path = str(tmp_path / "stellar_lense.db")
         _make_governance_db(db_path)
-        object.__setattr__(settings_module.settings, "ledgerlens_db_path", db_path)
+        object.__setattr__(settings_module.settings, "stellarlense_db_path", db_path)
 
         wallet = "GAPIALERT" + "A" * 46
         save_scores(
@@ -309,9 +309,9 @@ class TestConsumersReflectGovernanceChange:
         import detection.counterfactual_engine as cf_engine
         from detection.feature_engineering import FEATURE_NAMES
 
-        db_path = str(tmp_path / "ledgerlens.db")
+        db_path = str(tmp_path / "stellar_lense.db")
         _make_governance_db(db_path)
-        object.__setattr__(settings_module.settings, "ledgerlens_db_path", db_path)
+        object.__setattr__(settings_module.settings, "stellarlense_db_path", db_path)
 
         feature_vector = dict.fromkeys(FEATURE_NAMES, 1.0)
         fixed_score = 65
@@ -343,9 +343,9 @@ class TestHealthReportsConfigVersion:
 
         from api.main import app
 
-        db_path = str(tmp_path / "ledgerlens.db")
+        db_path = str(tmp_path / "stellar_lense.db")
         _make_governance_db(db_path)
-        object.__setattr__(settings_module.settings, "ledgerlens_db_path", db_path)
+        object.__setattr__(settings_module.settings, "stellarlense_db_path", db_path)
 
         _execute_threshold_proposal(db_path, "88", str(tmp_path))
         settings_module.invalidate_runtime_config_cache()
@@ -371,9 +371,9 @@ class TestAdminConfigPatchPropagates:
 
         from api.main import app, require_admin_key
 
-        db_path = str(tmp_path / "ledgerlens.db")
+        db_path = str(tmp_path / "stellar_lense.db")
         _make_governance_db(db_path)
-        object.__setattr__(settings_module.settings, "ledgerlens_db_path", db_path)
+        object.__setattr__(settings_module.settings, "stellarlense_db_path", db_path)
 
         fake_client = fakeredis.FakeStrictRedis()
         with patch("redis.from_url", return_value=fake_client):
@@ -415,9 +415,9 @@ class TestExecuteProposalEndpoint:
 
         from api.main import app, require_admin_key
 
-        db_path = str(tmp_path / "ledgerlens.db")
+        db_path = str(tmp_path / "stellar_lense.db")
         _make_governance_db(db_path)
-        object.__setattr__(settings_module.settings, "ledgerlens_db_path", db_path)
+        object.__setattr__(settings_module.settings, "stellarlense_db_path", db_path)
 
         orig_cwd = os.getcwd()
         os.chdir(tmp_path)
@@ -453,9 +453,9 @@ class TestExecuteProposalEndpoint:
 
         from api.main import app, require_admin_key
 
-        db_path = str(tmp_path / "ledgerlens.db")
+        db_path = str(tmp_path / "stellar_lense.db")
         _make_governance_db(db_path)
-        object.__setattr__(settings_module.settings, "ledgerlens_db_path", db_path)
+        object.__setattr__(settings_module.settings, "stellarlense_db_path", db_path)
 
         engine = GovernanceEngine(db_path=db_path)
         p = engine.submit_proposal(

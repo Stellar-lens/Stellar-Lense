@@ -5,7 +5,7 @@ assignees: []
 ---
 
 ## Summary
-The LedgerLens feature set contains 35+ features derived from the same underlying trade data, many of which share statistical correlations that are not causal. For example, `volume_spike_frequency` and `intra_minute_clustering` are both high for wash-trading bots but one may be a *consequence* of the other rather than an independent causal indicator. Training on spuriously correlated features creates models that are brittle to adversarial evasion: a bot that learns to suppress one correlated feature (e.g., by spacing out trades slightly) can inadvertently evade the model even though the underlying wash-trading pattern is unchanged. Implementing the PC (Peter-Clark) algorithm in `detection/causal_engine.py` to learn a feature causal DAG and removing non-causal features before training improves adversarial robustness.
+The Stellar Lense feature set contains 35+ features derived from the same underlying trade data, many of which share statistical correlations that are not causal. For example, `volume_spike_frequency` and `intra_minute_clustering` are both high for wash-trading bots but one may be a *consequence* of the other rather than an independent causal indicator. Training on spuriously correlated features creates models that are brittle to adversarial evasion: a bot that learns to suppress one correlated feature (e.g., by spacing out trades slightly) can inadvertently evade the model even though the underlying wash-trading pattern is unchanged. Implementing the PC (Peter-Clark) algorithm in `detection/causal_engine.py` to learn a feature causal DAG and removing non-causal features before training improves adversarial robustness.
 
 ## Background & Context
 `detection/causal_engine.py` is a planned file for causal inference analysis. The feature set in `detection/feature_engineering.py` includes several feature groups that may share causal structure:
@@ -118,7 +118,7 @@ If `causal-learn` is unavailable, fall back to the manual Fisher's Z implementat
   - `partial_correlation()` on data where `X = Z + ε` and `Y = Z + δ` (common cause Z): conditioned on Z, partial correlation ≈ 0
   - `CausalFeatureSelector.fit()` on a known DAG: recovers correct feature subset
 - Integration tests covering:
-  - `CausalFeatureSelector.fit()` on synthetic LedgerLens feature matrix (100 samples, 35 features): completes in < 60s
+  - `CausalFeatureSelector.fit()` on synthetic Stellar Lense feature matrix (100 samples, 35 features): completes in < 60s
   - Selected features are subset of full `FEATURE_NAMES`
   - Model trained on causal subset achieves AUC-PR within 5% of full-feature model (quality gate)
 - Edge cases:

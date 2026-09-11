@@ -58,7 +58,7 @@ def _rand_scalar(rng: random.Random | None = None) -> int:
 
 def _fiat_shamir(*parts: bytes) -> int:
     """Hash arbitrary byte strings into a scalar via Fiat-Shamir."""
-    h = hashlib.sha256(b"LedgerLens/zk/v1")
+    h = hashlib.sha256(b"StellarLense/zk/v1")
     for p in parts:
         h.update(p)
     return int.from_bytes(h.digest(), "big") % curve_order

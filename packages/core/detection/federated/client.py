@@ -1,4 +1,4 @@
-"""Federated Learning client for LedgerLens exchange operators.
+"""Federated Learning client for StellarLense exchange operators.
 
 Each operator runs a FederatedClient against their private labelled dataset.
 The client never sends raw transactions or model weights to the server —
@@ -45,7 +45,7 @@ from detection.feature_engineering import FEATURE_NAMES
 from detection.federated.server import FederatedAggregationServer
 from ingestion.synthetic_data import generate_synthetic_dataset
 
-logger = logging.getLogger("ledgerlens.federated.client")
+logger = logging.getLogger("stellar_lense.federated.client")
 
 # Public dataset seed — must be identical for every participant.
 _PUBLIC_DATASET_SEED = 0

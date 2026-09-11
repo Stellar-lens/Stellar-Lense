@@ -1,31 +1,31 @@
-# LedgerLens SDK (Rust)
+# Stellar Lense SDK (Rust)
 
-A typed Rust client for the [LedgerLens](https://ledgerlens.io) risk scoring API,
+A typed Rust client for the [Stellar Lense](https://stellar-lense.io) risk scoring API,
 with optional zero-knowledge proof verification for threshold proofs.
 
 ## Installation
 
 ```toml
 [dependencies]
-ledgerlens-sdk = "0.1.0"
+stellar-lense-sdk = "0.1.0"
 ```
 
 To enable ZK proof verification:
 
 ```toml
 [dependencies]
-ledgerlens-sdk = { version = "0.1.0", features = ["zk-verify"] }
+stellar-lense-sdk = { version = "0.1.0", features = ["zk-verify"] }
 ```
 
 ## Quick Start (REST API)
 
 ```rust
-use ledgerlens_sdk::LedgerLensClient;
+use stellar_lense_sdk::StellarLenseClient;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let client = LedgerLensClient::new(
-        "https://api.ledgerlens.io",
+    let client = StellarLenseClient::new(
+        "https://api.stellar-lense.io",
         Some("sk_your_api_key".into()),
     );
 
@@ -56,7 +56,7 @@ For Soroban contract integrators who need to verify a `ThresholdProof` (the
 locally before trusting an API response:
 
 ```rust,ignore
-use ledgerlens_sdk::{verify_threshold_proof, ThresholdProof};
+use stellar_lense_sdk::{verify_threshold_proof, ThresholdProof};
 
 // Deserialize the proof from an API response
 let proof: ThresholdProof = serde_json::from_str(response_body)?;
@@ -91,7 +91,7 @@ assert!(valid, "ZK proof verification failed");
 ## Security
 
 - **TLS verification is enabled by default.** Use
-  `LedgerLensClient::danger_accept_invalid_certs()` only for local testing.
+  `StellarLenseClient::danger_accept_invalid_certs()` only for local testing.
 - **API keys are redacted from `Debug` output** to prevent accidental logging.
 - **The ZK verifier is a pure verifier** — it never accepts secret blinding factors.
 
@@ -102,7 +102,7 @@ The shared test fixture at `tests/fixtures/contract_vectors.json` (relative to t
 | Language | Test file | CI job |
 |---|---|---|
 | Python | `tests/test_contract_vectors.py` | `contract-vectors` |
-| Rust | `crates/ledgerlens-sdk/tests/contract_vectors_test.rs` | `contract-vectors-rust` |
+| Rust | `crates/stellar-lense-sdk/tests/contract_vectors_test.rs` | `contract-vectors-rust` |
 | TypeScript | `sdk/tests/contract_vectors.test.ts` | `contract-vectors-typescript` |
 
 A change to any shared field that is not reflected in this fixture will fail CI in all three places. The test suite also includes adversarial vectors (wrong field name, out-of-range value) that prove divergence detection works, not just that the fixture can be parsed.
@@ -110,7 +110,7 @@ A change to any shared field that is not reflected in this fixture will fail CI 
 **To run the Rust contract vector tests:**
 
 ```bash
-cargo test -p ledgerlens-sdk contract_vectors
+cargo test -p stellar-lense-sdk contract_vectors
 ```
 
 See [ADR-005](../../docs/adr/ADR-005-schema-contract-enforcement.md) for the full design rationale.

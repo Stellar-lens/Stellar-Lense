@@ -2,27 +2,27 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "ledgerlens.fullname" . }}-ingestion-worker
+  name: {{ include "stellar-lense.fullname" . }}-ingestion-worker
   labels:
-    {{- include "ledgerlens.labels" . | nindent 4 }}
+    {{- include "stellar-lense.labels" . | nindent 4 }}
     app.kubernetes.io/component: ingestion-worker
 spec:
   replicas: {{ .Values.ingestionWorker.replicaCount }}
   selector:
     matchLabels:
-      {{- include "ledgerlens.selectorLabels" . | nindent 6 }}
+      {{- include "stellar-lense.selectorLabels" . | nindent 6 }}
       app.kubernetes.io/component: ingestion-worker
   template:
     metadata:
       labels:
-        {{- include "ledgerlens.labels" . | nindent 8 }}
+        {{- include "stellar-lense.labels" . | nindent 8 }}
         app.kubernetes.io/component: ingestion-worker
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "ledgerlens.serviceAccountName" . }}
+      serviceAccountName: {{ include "stellar-lense.serviceAccountName" . }}
       containers:
         - name: ingestion-worker
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -32,18 +32,18 @@ spec:
             {{- toYaml .Values.ingestionWorker.livenessProbe | nindent 12 }}
           envFrom:
             - configMapRef:
-                name: {{ include "ledgerlens.fullname" . }}
+                name: {{ include "stellar-lense.fullname" . }}
             - secretRef:
-                name: {{ include "ledgerlens.fullname" . }}
+                name: {{ include "stellar-lense.fullname" . }}
           env:
             {{- if .Values.postgresql.enabled }}
             - name: PG_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "ledgerlens.fullname" . }}-postgresql
+                  name: {{ include "stellar-lense.fullname" . }}-postgresql
                   key: postgres-password
-            - name: LEDGERLENS_DB_URL
-              value: "postgresql://{{ .Values.postgresql.auth.username }}:$(PG_PASSWORD)@{{ include "ledgerlens.fullname" . }}-postgresql:5432/{{ .Values.postgresql.auth.database }}"
+            - name: STELLARLENSE_DB_URL
+              value: "postgresql://{{ .Values.postgresql.auth.username }}:$(PG_PASSWORD)@{{ include "stellar-lense.fullname" . }}-postgresql:5432/{{ .Values.postgresql.auth.database }}"
             {{- end }}
           resources:
             {{- toYaml .Values.ingestionWorker.resources | nindent 12 }}
@@ -56,7 +56,7 @@ spec:
         {{- if .Values.persistence.enabled }}
         - name: data
           persistentVolumeClaim:
-            claimName: {{ include "ledgerlens.fullname" . }}
+            claimName: {{ include "stellar-lense.fullname" . }}
         {{- end }}
       {{- with .Values.ingestionWorker.nodeSelector }}
       nodeSelector:

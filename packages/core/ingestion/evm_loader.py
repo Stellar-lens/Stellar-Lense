@@ -31,7 +31,7 @@ import requests
 from pydantic import BaseModel
 
 # ---------------------------------------------------------------------------
-# Optional dependency: web3  (pip install 'ledgerlens-core[chain]')
+# Optional dependency: web3  (pip install 'stellar-lense-core[chain]')
 # ---------------------------------------------------------------------------
 try:
     from web3 import Web3
@@ -45,13 +45,13 @@ def _require_web3(location: str = "ingestion/evm_loader.py") -> None:
     if not _HAS_WEB3:
         raise ImportError(
             f"'web3' is required by {location} but is not installed.\n"
-            "  Install the 'chain' extra:  pip install 'ledgerlens-core[chain]'\n"
+            "  Install the 'chain' extra:  pip install 'stellar-lense-core[chain]'\n"
             "  Or install directly:        pip install web3"
         )
 
 from config.settings import settings
 
-logger = logging.getLogger("ledgerlens.evm_loader")
+logger = logging.getLogger("stellar_lense.evm_loader")
 
 SUPPORTED_CHAINS = ["ethereum", "base", "polygon", "arbitrum"]
 

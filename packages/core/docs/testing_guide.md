@@ -73,7 +73,7 @@ ledger sequence from a factory-generated id.
 
 ## Fuzz Testing
 
-LedgerLens uses [Atheris](https://github.com/google/atheris) coverage-guided fuzzing
+Stellar Lense uses [Atheris](https://github.com/google/atheris) coverage-guided fuzzing
 alongside the Hypothesis property-based test suite. The two approaches are genuinely
 complementary:
 
@@ -170,7 +170,7 @@ practice** — no `.github/workflows/` job runs it and the README badge is updat
 by hand, so run it locally when you touch detection logic or its tests. Target is
 **≥ 80%** mutation score. Full contributor guidance (runtime, when to run, how to
 kill survivors) is in
-[CONTRIBUTING.md → Mutation testing](https://github.com/Ledger-Lenz/Ledgerlens-core/blob/main/CONTRIBUTING.md#mutation-testing).
+[CONTRIBUTING.md → Mutation testing](https://github.com/Stellar-lens/Stellar-Lense/blob/main/CONTRIBUTING.md#mutation-testing).
 
 ## Migrating existing tests
 
@@ -190,8 +190,8 @@ your existing literal field values) when touching other ad hoc
 
 The `tests/e2e_cross_repo/` suite is a Testcontainers-based harness
 that exercises the full end-to-end data flow:
-core computes scores → ledgerlens-api serves them via REST →
-scores above threshold are forwarded to the Soroban ledgerlens-score
+core computes scores → stellar-lense-api serves them via REST →
+scores above threshold are forwarded to the Soroban stellar-lense-score
 contract.
 
 This suite is **not part of the default pytest run** (marked with
@@ -203,17 +203,17 @@ This suite is **not part of the default pytest run** (marked with
 To run locally, we recommend this sibling directory structure:
 ```
 my-workspace/
-├── ledgerlens-core/
-├── ledgerlens-api/
-└── ledgerlens-contracts/
+├── stellar-lense-core/
+├── stellar-lense-api/
+└── stellar-lense-contracts/
 ```
 
 ### Environment Variables
 
-- `LEDGERLENS_API_REPO_PATH`: Optional path to local ledgerlens-api
-  checkout. Defaults to `../ledgerlens-api`.
-- `LEDGERLENS_CONTRACTS_REPO_PATH`: Optional path to local
-  ledgerlens-contracts checkout. Defaults to `../ledgerlens-contracts`.
+- `STELLARLENSE_API_REPO_PATH`: Optional path to local stellar-lense-api
+  checkout. Defaults to `../stellar-lense-api`.
+- `STELLARLENSE_CONTRACTS_REPO_PATH`: Optional path to local
+  stellar-lense-contracts checkout. Defaults to `../stellar-lense-contracts`.
 - `CROSS_REPO_E2E_PINNED_REF`: Git ref to use when cloning sibling
   repos locally if no path is set. Defaults to `main`.
 
@@ -229,9 +229,9 @@ my-workspace/
 
 ### What This Catches That `tests/e2e/` Doesn't
 
-- Schema drift between core's `RiskScore` model and ledgerlens-api's
+- Schema drift between core's `RiskScore` model and stellar-lense-api's
   response models.
-- Integration issues between core's score output and ledgerlens-api's
+- Integration issues between core's score output and stellar-lense-api's
   ingestion.
 - Correctness of the Soroban contract's `submit_score` and `get_score`
   functions when fed real core scores.

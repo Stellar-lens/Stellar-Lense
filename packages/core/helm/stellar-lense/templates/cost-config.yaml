@@ -3,9 +3,9 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "ledgerlens.fullname" . }}-cost-config
+  name: {{ include "stellar-lense.fullname" . }}-cost-config
   labels:
-    {{- include "ledgerlens.labels" . | nindent 4 }}
+    {{- include "stellar-lense.labels" . | nindent 4 }}
     app.kubernetes.io/component: cost-config
 data:
   # Cost coefficients for cloud resource consumption

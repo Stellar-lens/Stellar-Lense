@@ -9,7 +9,7 @@
 //! The challenge is computed as:
 //!
 //! ```text
-//! challenge = SHA256("LedgerLens/zk/v1" || R0_bytes || R1_bytes || B_bytes || context)
+//! challenge = SHA256("StellarLense/zk/v1" || R0_bytes || R1_bytes || B_bytes || context)
 //! ```
 //!
 //! where `context = SHA256(wallet || threshold_byte || score_commit_x || score_commit_y)`.
@@ -79,11 +79,11 @@ fn parse_decimal_string_to_bytes(s: &str) -> Result<Vec<u8>, ZkVerifyError> {
 /// The second generator *H* for Pedersen commitments on BN254.
 ///
 /// Derived deterministically from SHA-256 as:
-/// `H = SHA256("LedgerLens ZK Generator H") * G1`
+/// `H = SHA256("StellarLense ZK Generator H") * G1`
 /// This matches `detection/zk_commitment.py::h_generator()`.
 fn h_generator() -> ark_bn254::G1Affine {
     let g1 = ark_bn254::g1::G1Affine::generator();
-    let digest = Sha256::digest(b"LedgerLens ZK Generator H");
+    let digest = Sha256::digest(b"StellarLense ZK Generator H");
     let scalar = <Bn254 as Pairing>::ScalarField::from_le_bytes_mod_order(&digest);
     (g1 * scalar).into_affine()
 }
@@ -118,7 +118,7 @@ fn point_bytes(p: &ark_bn254::G1Affine) -> Vec<u8> {
 
 /// Fiat-Shamir challenge computation.
 ///
-/// `challenge = SHA256("LedgerLens/zk/v1" || R0_bytes || R1_bytes || B_bytes || context) % curve_order`
+/// `challenge = SHA256("StellarLense/zk/v1" || R0_bytes || R1_bytes || B_bytes || context) % curve_order`
 fn fiat_shamir(
     r0: &ark_bn254::G1Affine,
     r1: &ark_bn254::G1Affine,
@@ -126,7 +126,7 @@ fn fiat_shamir(
     context: &[u8],
 ) -> <Bn254 as Pairing>::ScalarField {
     let mut hasher = Sha256::new();
-    hasher.update(b"LedgerLens/zk/v1");
+    hasher.update(b"StellarLense/zk/v1");
     hasher.update(point_bytes(r0));
     hasher.update(point_bytes(r1));
     hasher.update(point_bytes(b));
@@ -167,16 +167,16 @@ fn build_context(wallet: &str, threshold: u32, score_commit: &ark_bn254::G1Affin
 /// # Examples
 ///
 /// ```no_run
-/// use ledgerlens_sdk::{LedgerLensClient, verify_threshold_proof};
+/// use stellar_lense_sdk::{StellarLenseClient, verify_threshold_proof};
 ///
 /// #[tokio::main]
 /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ///     // Fetch a threshold proof from the API
 ///     // (In practice you would deserialize ThresholdProof from the API response)
-///     let client = LedgerLensClient::new("https://api.ledgerlens.io", None);
+///     let client = StellarLenseClient::new("https://api.stellar-lense.io", None);
 ///
 ///     // Suppose `proof` was obtained from the API response:
-///     // let proof: ledgerlens_sdk::ThresholdProof = /* ... from API ... */;
+///     // let proof: stellar_lense_sdk::ThresholdProof = /* ... from API ... */;
 ///     // let wallet = "GABCDEFGHIJKLMNOPQRSTUVWXYZ012345678901234567890123456";
 ///     // let threshold = 70_u32;
 ///     // let valid = verify_threshold_proof(&proof, threshold, wallet)?;

@@ -134,7 +134,7 @@ class TestKrumStrategyAggregate:
         # Build gradients where index 4 is always a large outlier.
         base = [rng.standard_normal(20) for _ in range(4)]
         strat = KrumStrategy(f=1, min_clients=5)
-        with caplog.at_level(logging.WARNING, logger="ledgerlens.federated.krum"):
+        with caplog.at_level(logging.WARNING, logger="stellar_lense.federated.krum"):
             for _ in range(4):
                 outlier = rng.standard_normal(20) * 1000
                 strat.aggregate(base + [outlier])

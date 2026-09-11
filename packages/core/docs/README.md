@@ -1,6 +1,6 @@
 # docs/
 
-This directory is the source for the LedgerLens Core documentation site, built with [MkDocs](https://www.mkdocs.org/) and the [Material for MkDocs](https://squidfunk.github.io/mkdocs-material/) theme, as configured in [`mkdocs.yml`](../mkdocs.yml). The built site is published at <https://ledger-lenz.github.io/Ledgerlens-core>.
+This directory is the source for the Stellar Lense Core documentation site, built with [MkDocs](https://www.mkdocs.org/) and the [Material for MkDocs](https://squidfunk.github.io/mkdocs-material/) theme, as configured in [`mkdocs.yml`](../mkdocs.yml). The built site is published at <https://ledger-lenz.github.io/StellarLense-core>.
 
 For a project overview, installation instructions, and usage examples, see the root [README.md](../README.md) instead — this file only orients you within the `docs/` source tree.
 

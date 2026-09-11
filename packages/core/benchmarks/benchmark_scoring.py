@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Performance benchmarks for the LedgerLens scoring pipeline.
+"""Performance benchmarks for the StellarLense scoring pipeline.
 
 Measures p50/p95/p99 latency for three scenarios:
 

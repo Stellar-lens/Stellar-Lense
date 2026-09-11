@@ -111,9 +111,9 @@ fn generator_is_on_curve() {
 
 #[test]
 fn h_generator_matches_python_reference() {
-    // H = SHA256("LedgerLens ZK Generator H") mod n * G, computed
+    // H = SHA256("StellarLense ZK Generator H") mod n * G, computed
     // independently via py_ecc.bn128 (detection/zk_commitment.py::h_generator):
-    //   digest = hashlib.sha256(b"LedgerLens ZK Generator H").digest()
+    //   digest = hashlib.sha256(b"StellarLense ZK Generator H").digest()
     //   H = multiply(G1, int.from_bytes(digest, "big") % curve_order)
     // Cross-checks that the runtime-computed H here is the *same* point
     // Python uses, not merely "some" on-curve point derived from a hash.

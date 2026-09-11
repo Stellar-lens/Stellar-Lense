@@ -5,7 +5,7 @@ assignees: []
 ---
 
 ## Summary
-The current LedgerLens feature set aggregates trade history into scalar statistics per rolling window (count, volume, Benford metrics), discarding the sequential structure of individual trades. Wash-trading bots exhibit characteristic temporal patterns — regular timing intervals, alternating buy/sell sequences, burst-then-pause cycles — that are invisible to aggregated features but detectable by a model that processes the ordered sequence of trades directly. This issue implements an LSTM or Transformer-based sequence model in `detection/temporal_model.py` that encodes a wallet's trade sequence into a contextual embedding, fused with the tabular feature vector for final risk scoring.
+The current Stellar Lense feature set aggregates trade history into scalar statistics per rolling window (count, volume, Benford metrics), discarding the sequential structure of individual trades. Wash-trading bots exhibit characteristic temporal patterns — regular timing intervals, alternating buy/sell sequences, burst-then-pause cycles — that are invisible to aggregated features but detectable by a model that processes the ordered sequence of trades directly. This issue implements an LSTM or Transformer-based sequence model in `detection/temporal_model.py` that encodes a wallet's trade sequence into a contextual embedding, fused with the tabular feature vector for final risk scoring.
 
 ## Background & Context
 `detection/feature_engineering.py` extracts aggregate statistics that summarise a wallet's trading behaviour over fixed windows, but the sequence of individual trades contains rich temporal structure:

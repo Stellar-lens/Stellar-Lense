@@ -4,7 +4,7 @@ Isolation strategy
 ------------------
 Every test uses the ``client`` fixture, which:
   1. Creates a fresh tmp_path DB for the test.
-  2. Patches ``config.settings.settings.ledgerlens_db_path`` via
+  2. Patches ``config.settings.settings.stellarlense_db_path`` via
      ``object.__setattr__`` (pydantic-safe) so every module that imports
      ``settings`` (api.main, detection.storage, detection.api_key_store …)
      sees the same isolated path.
@@ -105,14 +105,14 @@ def test_robustness_endpoint_with_report():
 
 
 # ---------------------------------------------------------------------------
-# Shared autouse fixture: LEDGERLENS_WEBHOOK_ENCRYPTION_KEY
+# Shared autouse fixture: STELLARLENSE_WEBHOOK_ENCRYPTION_KEY
 # ---------------------------------------------------------------------------
 
 
 @pytest.fixture(autouse=True)
 def webhook_env(monkeypatch):
     key = base64.b64encode(os.urandom(32)).decode()
-    monkeypatch.setenv("LEDGERLENS_WEBHOOK_ENCRYPTION_KEY", key)
+    monkeypatch.setenv("STELLARLENSE_WEBHOOK_ENCRYPTION_KEY", key)
 
 
 # ---------------------------------------------------------------------------
@@ -126,12 +126,12 @@ def client(tmp_path, monkeypatch):
     ``object.__setattr__`` so every module that imports the singleton
     ``config.settings.settings`` sees the tmp-path DB.
     """
-    db_path = str(tmp_path / "ledgerlens.db")
-    monkeypatch.setenv("LEDGERLENS_DB_PATH", db_path)
+    db_path = str(tmp_path / "stellar_lense.db")
+    monkeypatch.setenv("STELLARLENSE_DB_PATH", db_path)
 
     import config.settings as settings_module
 
-    object.__setattr__(settings_module.settings, "ledgerlens_db_path", db_path)
+    object.__setattr__(settings_module.settings, "stellarlense_db_path", db_path)
 
     # Initialise schema so SELECT 1 succeeds in the health check
     from detection.storage import init_db
@@ -147,7 +147,7 @@ def client(tmp_path, monkeypatch):
 
 @pytest.fixture
 def read_scores_headers(client):
-    """`X-LedgerLens-Api-Key` header for a key scoped to `read:scores`.
+    """`X-StellarLense-Api-Key` header for a key scoped to `read:scores`.
 
     The fixture depends on ``client`` so ``settings.db_path`` is already
     patched to the tmp DB before ``create_api_key`` is called.
@@ -155,7 +155,7 @@ def read_scores_headers(client):
     from detection.api_key_store import create_api_key
 
     key = create_api_key(scopes=["read:scores"])
-    return {"X-LedgerLens-Api-Key": key["plaintext_key"]}
+    return {"X-StellarLense-Api-Key": key["plaintext_key"]}
 
 
 # ---------------------------------------------------------------------------

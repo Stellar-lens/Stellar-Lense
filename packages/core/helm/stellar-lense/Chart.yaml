@@ -1,6 +1,6 @@
 apiVersion: v2
-name: ledgerlens
-description: Helm chart for LedgerLens — Benford's Law + ensemble ML wash-trading detection engine for the Stellar DEX
+name: stellar-lense
+description: Helm chart for Stellar Lense — Benford's Law + ensemble ML wash-trading detection engine for the Stellar DEX
 type: application
 version: 0.1.0
 appVersion: "0.1.0"
@@ -10,9 +10,9 @@ keywords:
   - detection
   - fraud
   - benford
-home: https://github.com/ledgerlens/ledgerlens-core
+home: https://github.com/Stellar-lens/Stellar-Lense
 sources:
-  - https://github.com/ledgerlens/ledgerlens-core
+  - https://github.com/Stellar-lens/Stellar-Lense
 
 dependencies:
   - name: postgresql

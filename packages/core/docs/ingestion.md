@@ -61,7 +61,7 @@ that. It also still backs the existing "delete stale checkpoint on HTTP
   actually loaded from `rolling_window_checkpoints`. A mismatch can only
   happen if the database was altered outside the atomic transaction (manual
   editing, filesystem-level corruption); it is logged at `ERROR` and
-  incremented on `ledgerlens_checkpoint_desync_detected_total` rather than
+  incremented on `stellar_lense_checkpoint_desync_detected_total` rather than
   raised, since the checkpoint layer treats storage corruption as a
   recoverable, operator-visible condition. A nonzero counter means manual
   reconciliation against Horizon ledger history is recommended before
@@ -129,7 +129,7 @@ be added.  Without explicit version checking, a Horizon upgrade can silently
 corrupt ingested data or produce cryptic Pydantic parse failures deep in the
 pipeline with no indication that the root cause is an API version mismatch.
 
-LedgerLens addresses this with a **VersionGuard** middleware layer inside
+Stellar Lense addresses this with a **VersionGuard** middleware layer inside
 `RetryingHorizonClient` (defined in `ingestion/http_client.py`).
 
 ### How it works

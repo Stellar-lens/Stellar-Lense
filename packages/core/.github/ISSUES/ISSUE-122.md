@@ -6,7 +6,7 @@ assignees: []
 
 ## Summary
 
-All LedgerLens clients currently poll `GET /scores/{wallet}` on a fixed interval to detect score changes. A push-based streaming layer — using Server-Sent Events over HTTP/1.1 and Redis Pub/Sub as the message bus — eliminates polling, reduces latency from alert-generation to analyst notification from minutes to sub-second, and decouples the scoring pipeline from the API layer.
+All Stellar Lense clients currently poll `GET /scores/{wallet}` on a fixed interval to detect score changes. A push-based streaming layer — using Server-Sent Events over HTTP/1.1 and Redis Pub/Sub as the message bus — eliminates polling, reduces latency from alert-generation to analyst notification from minutes to sub-second, and decouples the scoring pipeline from the API layer.
 
 ## Background & Context
 
@@ -19,7 +19,7 @@ The solution is a Server-Sent Events (SSE) endpoint `GET /stream/scores` where c
 
 ## Objectives
 
-- [ ] Implement `ScorePublisher` that publishes a `ScoreUpdateEvent` to `Redis PUBLISH ledgerlens:score:{wallet}` after every successful `model_inference.py` run
+- [ ] Implement `ScorePublisher` that publishes a `ScoreUpdateEvent` to `Redis PUBLISH stellar_lense:score:{wallet}` after every successful `model_inference.py` run
 - [ ] Implement `GET /stream/scores?wallets=W1,W2,...` as an SSE endpoint using `fastapi.responses.StreamingResponse`
 - [ ] Implement `SSEConnectionManager` that tracks active SSE connections and manages Redis subscriptions
 - [ ] Implement a Redis `SUBSCRIBE` listener per SSE connection on the channels matching the requested wallets
@@ -72,23 +72,23 @@ class ScoreUpdateEvent:
 
 ```python
 class ScorePublisher:
-    CHANNEL_PREFIX = "ledgerlens:score:"
+    CHANNEL_PREFIX = "stellar_lense:score:"
 
     def __init__(self, redis_client): ...
 
     async def publish(self, event: ScoreUpdateEvent) -> None:
         """
-        Publish event to Redis channel ledgerlens:score:{wallet}.
-        Also publish to ledgerlens:score:* for clients subscribed to all wallets.
-        Store last event per wallet in Redis hash 'ledgerlens:last_event' (TTL 24h).
+        Publish event to Redis channel stellar_lense:score:{wallet}.
+        Also publish to stellar_lense:score:* for clients subscribed to all wallets.
+        Store last event per wallet in Redis hash 'stellar_lense:last_event' (TTL 24h).
         """
         channel = f"{self.CHANNEL_PREFIX}{event.wallet}"
         payload = json.dumps(dataclasses.asdict(event), default=str)
         async with self._redis.pipeline() as pipe:
             pipe.publish(channel, payload)
             pipe.publish(f"{self.CHANNEL_PREFIX}*", payload)
-            pipe.hset("ledgerlens:last_event", event.wallet, payload)
-            pipe.expire("ledgerlens:last_event", 86400)
+            pipe.hset("stellar_lense:last_event", event.wallet, payload)
+            pipe.expire("stellar_lense:last_event", 86400)
             await pipe.execute()
 ```
 
@@ -107,7 +107,7 @@ class SSEConnectionManager:
         """
         1. Validate wallet addresses (alphanumeric + hyphen, max 64 chars each).
         2. If last_event_id is set, replay any events missed since that event ID
-           (look up in Redis 'ledgerlens:last_event' hash).
+           (look up in Redis 'stellar_lense:last_event' hash).
         3. Subscribe to Redis channels for requested wallets.
         4. Yield SSE events as they arrive; yield heartbeat comments every 15s.
         5. On GeneratorExit / CancelledError, unsubscribe and clean up.
@@ -184,7 +184,7 @@ REDIS_PUBSUB_POOL_SIZE=10
 
 - **Namespace isolation**: `SSEConnectionManager.subscribe` must verify that each requested wallet belongs to the authenticated client's namespace. Silently drop (not error) wallets outside the namespace — leaking that a wallet exists in another namespace is a data exposure
 - **Wallet address validation**: validate each wallet against a regex `^[A-Z0-9]{56}$` (Stellar public key format) before subscribing. Reject the entire request with 422 if any address is invalid — prevents Redis channel injection via crafted wallet strings
-- **Connection limit per API key**: enforce a maximum of 10 concurrent SSE connections per API key using a Redis counter (`ledgerlens:sse_connections:{key_id}`). Return 429 when exceeded to prevent resource exhaustion
+- **Connection limit per API key**: enforce a maximum of 10 concurrent SSE connections per API key using a Redis counter (`stellar_lense:sse_connections:{key_id}`). Return 429 when exceeded to prevent resource exhaustion
 - **Heartbeat prevents zombie connections**: SSE connections where the client has disconnected but the TCP session has not timed out will block the generator. The `request.is_disconnected()` check inside the heartbeat loop must trigger generator cleanup within one heartbeat interval
 - **Event replay window**: the 5-minute replay window (`SSE_MISSED_EVENT_REPLAY_WINDOW_SECONDS`) limits how much Redis memory is consumed by `last_event` hashes. Do not replay events older than this window even if the client requests them via `Last-Event-ID`
 

@@ -1,4 +1,4 @@
-"""Backtesting framework for evaluating LedgerLens models against labelled historical data.
+"""Backtesting framework for evaluating StellarLense models against labelled historical data.
 
 Loads a labelled CSV dataset (wallet, label, start_date, end_date),
 runs the feature extraction and scoring pipeline over the specified date range
@@ -15,7 +15,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-logger = logging.getLogger("ledgerlens.backtest")
+logger = logging.getLogger("stellar_lense.backtest")
 
 
 @dataclass

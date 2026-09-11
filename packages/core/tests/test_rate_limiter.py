@@ -165,7 +165,7 @@ def test_sliding_window_counter_atomic_under_concurrency():
 
 def test_falls_back_to_local_when_redis_connect_fails(caplog):
     with patch("redis.from_url", side_effect=ConnectionError("refused")):
-        with caplog.at_level(logging.WARNING, logger="ledgerlens.rate_limiter"):
+        with caplog.at_level(logging.WARNING, logger="stellar_lense.rate_limiter"):
             limiter = DistributedRateLimiter(redis_url="redis://localhost:6379/0")
 
     assert not limiter.is_using_redis
@@ -190,9 +190,9 @@ def test_falls_back_and_emits_metric_when_redis_call_raises_after_connect():
     # register_script wraps the client; force the *script call* to raise.
     limiter._script = MagicMock(side_effect=ConnectionError("timeout"))
 
-    from api.metrics import ledgerlens_rate_limiter_fallback_total
+    from api.metrics import stellar_lense_rate_limiter_fallback_total
 
-    before = ledgerlens_rate_limiter_fallback_total._value.get()
+    before = stellar_lense_rate_limiter_fallback_total._value.get()
 
     from detection.rate_limiter import RATE_LIMITER_FAILURE_THRESHOLD
 
@@ -201,7 +201,7 @@ def test_falls_back_and_emits_metric_when_redis_call_raises_after_connect():
 
     assert limiter.circuit_state == "open"
 
-    after = ledgerlens_rate_limiter_fallback_total._value.get()
+    after = stellar_lense_rate_limiter_fallback_total._value.get()
     assert after - before == RATE_LIMITER_FAILURE_THRESHOLD
 
     # While open, no further attempts are made against the (still-failing) script.
@@ -373,7 +373,7 @@ def test_two_replica_processes_single_process_baseline_would_have_doubled(tcp_fa
 def test_redis_backed_check_latency_within_budget(tcp_fake_redis):
     """Measures real added latency: a genuine loopback TCP round trip to a
     (fake but wire-protocol-real) Redis server, not an in-memory call.
-    LedgerLens's documented SLO (docs/slo.md) is 99% of scoring requests
+    StellarLense's documented SLO (docs/slo.md) is 99% of scoring requests
     under 2.0s; this asserts the added per-check cost is a tiny fraction of
     that budget, and reports the measured numbers for the PR record.
     """

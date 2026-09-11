@@ -5,7 +5,7 @@ assignees: []
 ---
 
 ## Summary
-When LedgerLens retrains its models after concept drift is detected, the relative importance of features may shift significantly — indicating that wash-trading bots have changed their tactics. Currently, `detection/model_registry.py` stores model artifacts but does not track SHAP feature importances per version, making it impossible to audit whether a new model version relies on the same signals as its predecessor. This issue adds per-version SHAP importance tracking, rank-order change detection, and an alert when the top-10 feature ranking changes significantly between versions.
+When Stellar Lense retrains its models after concept drift is detected, the relative importance of features may shift significantly — indicating that wash-trading bots have changed their tactics. Currently, `detection/model_registry.py` stores model artifacts but does not track SHAP feature importances per version, making it impossible to audit whether a new model version relies on the same signals as its predecessor. This issue adds per-version SHAP importance tracking, rank-order change detection, and an alert when the top-10 feature ranking changes significantly between versions.
 
 ## Background & Context
 `detection/model_registry.py` manages versioned model artifacts (`.joblib` files, `latest.txt` pointers, `training_metadata.json`). `detection/shap_explainer.py` computes SHAP values at inference time but does not store aggregate importance summaries per model version.

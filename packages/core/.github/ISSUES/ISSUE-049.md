@@ -10,7 +10,7 @@ Integrate `detection/gnn_model.py` into the inference pipeline. The GNN takes th
 
 ## Background & Context
 
-LedgerLens's current graph-based features (`wash_ring_membership`, `wash_ring_size`, `cycle_volume_ratio`, `timing_tightness_score`) are derived from Tarjan's SCC algorithm, which finds strongly connected components but is binary: a wallet is either in a ring or it is not. This misses:
+Stellar Lense's current graph-based features (`wash_ring_membership`, `wash_ring_size`, `cycle_volume_ratio`, `timing_tightness_score`) are derived from Tarjan's SCC algorithm, which finds strongly connected components but is binary: a wallet is either in a ring or it is not. This misses:
 
 1. **Near-ring structures**: wallets that are one hop outside a ring but route value into it (feeder nodes)
 2. **Hub topology**: a single wallet trading with 50 distinct counterparties in a star pattern — not a ring, but highly suspicious

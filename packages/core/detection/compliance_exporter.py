@@ -1,10 +1,10 @@
 """Regulatory compliance export layer.
 
-Packages LedgerLens risk intelligence into the deliverable formats required by
-financial regulators and by VASPs running LedgerLens as part of an AML program:
+Packages StellarLense risk intelligence into the deliverable formats required by
+financial regulators and by VASPs running StellarLense as part of an AML program:
 
 * **FATF Travel Rule (IVMS 101)** — :func:`augment_ivms_payload` injects a
-  LedgerLens fraud-risk block into an existing IVMS 101 originator/beneficiary
+  StellarLense fraud-risk block into an existing IVMS 101 originator/beneficiary
   payload.
 * **Suspicious Activity Report (FinCEN Form 111)** — :func:`generate_sar_package`
   assembles a self-contained, integrity-verifiable ZIP of evidence (narrative,
@@ -60,9 +60,9 @@ class ComplianceScoreTooLow(RuntimeError):
 
 @dataclass
 class IVMSRiskField:
-    """LedgerLens risk augmentation block for an IVMS 101 Travel Rule payload."""
+    """StellarLense risk augmentation block for an IVMS 101 Travel Rule payload."""
 
-    ledgerlens_score: float
+    stellar_lense_score: float
     risk_level: str          # "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"
     alert_types: list[str]   # e.g. ["WASH_TRADE", "PATH_PAYMENT_CYCLE"]
     score_timestamp: str     # ISO 8601
@@ -99,7 +99,7 @@ def hash_wallet(wallet: str) -> str:
 
 
 def build_ivms_risk_field(wallet: str, db_path: str | None = None) -> IVMSRiskField:
-    """Build the LedgerLens risk block for ``wallet`` from its latest scores/alerts."""
+    """Build the StellarLense risk block for ``wallet`` from its latest scores/alerts."""
     scores = get_latest_scores(wallet=wallet, db_path=db_path)
     if scores:
         peak = max(s.score for s in scores)
@@ -111,7 +111,7 @@ def build_ivms_risk_field(wallet: str, db_path: str | None = None) -> IVMSRiskFi
     alert_types = sorted({a["alert_type"] for a in get_alerts(wallet=wallet, db_path=db_path)})
 
     return IVMSRiskField(
-        ledgerlens_score=float(peak),
+        stellar_lense_score=float(peak),
         risk_level=risk_level_from_score(peak),
         alert_types=alert_types,
         score_timestamp=latest_ts,
@@ -120,14 +120,14 @@ def build_ivms_risk_field(wallet: str, db_path: str | None = None) -> IVMSRiskFi
 
 
 def augment_ivms_payload(ivms_json: dict, wallet: str, db_path: str | None = None) -> dict:
-    """Inject LedgerLens risk fields into an existing IVMS 101 JSON payload.
+    """Inject StellarLense risk fields into an existing IVMS 101 JSON payload.
 
     Returns a new dict (the input is not mutated) with a
-    ``ledgerLensRiskAssessment`` member carrying the :class:`IVMSRiskField`.
+    ``stellarLenseRiskAssessment`` member carrying the :class:`IVMSRiskField`.
     """
     field = build_ivms_risk_field(wallet, db_path=db_path)
     augmented = json.loads(json.dumps(ivms_json))  # deep copy, JSON-safe
-    augmented["ledgerLensRiskAssessment"] = asdict(field)
+    augmented["stellarLenseRiskAssessment"] = asdict(field)
     return augmented
 
 
@@ -367,8 +367,8 @@ def export_sar_package(
         raise ComplianceRateLimitExceeded()
 
     risk = build_ivms_risk_field(wallet, db_path=db_path)
-    if risk.ledgerlens_score < settings.compliance_sar_min_score:
-        raise ComplianceScoreTooLow(risk.ledgerlens_score, settings.compliance_sar_min_score)
+    if risk.stellar_lense_score < settings.compliance_sar_min_score:
+        raise ComplianceScoreTooLow(risk.stellar_lense_score, settings.compliance_sar_min_score)
 
     zip_path = generate_sar_package(wallet, start_date, end_date, output_dir, db_path=db_path)
 
@@ -376,7 +376,7 @@ def export_sar_package(
         log_compliance_export(
             export_type="sar",
             wallet_hash=hash_wallet(wallet),
-            risk_score=int(risk.ledgerlens_score),
+            risk_score=int(risk.stellar_lense_score),
             dry_run=False,
             db_path=db_path,
         )
@@ -396,7 +396,7 @@ def export_travel_rule(wallet: str, dry_run: bool = False, db_path: str | None =
         log_compliance_export(
             export_type="travel_rule",
             wallet_hash=hash_wallet(wallet),
-            risk_score=int(field.ledgerlens_score),
+            risk_score=int(field.stellar_lense_score),
             dry_run=False,
             db_path=db_path,
         )

@@ -1,6 +1,6 @@
-# OpenLineage Lineage Tracking in LedgerLens
+# OpenLineage Lineage Tracking in Stellar Lense
 
-LedgerLens implements OpenLineage-compatible event emission to capture operational metadata about pipelines. This allows engineers to trace which ingestion batch produced a given model or feature distribution snapshot, resolving tracing issues when feature drift occurs.
+Stellar Lense implements OpenLineage-compatible event emission to capture operational metadata about pipelines. This allows engineers to trace which ingestion batch produced a given model or feature distribution snapshot, resolving tracing issues when feature drift occurs.
 
 ## Concepts
 OpenLineage defines a standard schema for tracking lineage as a DAG of **Jobs**, **Runs**, and **Datasets**:
@@ -25,7 +25,7 @@ To run a local Marquez instance via Docker:
 docker run -d -p 5000:5000 -p 5002:5002 --name marquez marquezproject/marquez:latest
 ```
 
-Once Marquez is running, configure LedgerLens in your `.env` file to send HTTP events:
+Once Marquez is running, configure Stellar Lense in your `.env` file to send HTTP events:
 ```env
 LINEAGE_ENABLED=true
 LINEAGE_BACKEND=http
@@ -34,7 +34,7 @@ OPENLINEAGE_URL=http://localhost:5000
 Open your browser to `http://localhost:3000` to view the Marquez UI and explore the lineage graph.
 
 ## Lineage REST API
-LedgerLens includes a built-in admin-only REST API endpoint to retrieve the lineage graph locally without any external dependencies:
+Stellar Lense includes a built-in admin-only REST API endpoint to retrieve the lineage graph locally without any external dependencies:
 
 ```bash
 GET /admin/lineage/{dataset}
@@ -43,7 +43,7 @@ GET /admin/lineage/{dataset}
 ### Example Graph Query
 To fetch the lineage graph for the `trades` dataset:
 ```bash
-curl -H "X-LedgerLens-Admin-Key: <your_admin_key>" http://localhost:8000/admin/lineage/trades
+curl -H "X-StellarLense-Admin-Key: <your_admin_key>" http://localhost:8000/admin/lineage/trades
 ```
 
 This returns a JSON representation of the DAG:
@@ -57,26 +57,26 @@ This returns a JSON representation of the DAG:
       "namespace": "horizon"
     },
     {
-      "id": "job:ledgerlens-core:ingestion.historical_loader.fetch_chunk",
+      "id": "job:stellar-lense-core:ingestion.historical_loader.fetch_chunk",
       "type": "job",
       "name": "ingestion.historical_loader.fetch_chunk",
-      "namespace": "ledgerlens-core"
+      "namespace": "stellar-lense-core"
     },
     {
-      "id": "dataset:ledgerlens-core.sqlite:trades",
+      "id": "dataset:stellar-lense-core.sqlite:trades",
       "type": "dataset",
       "name": "trades",
-      "namespace": "ledgerlens-core.sqlite"
+      "namespace": "stellar-lense-core.sqlite"
     }
   ],
   "edges": [
     {
       "source": "dataset:horizon:trades",
-      "target": "job:ledgerlens-core:ingestion.historical_loader.fetch_chunk"
+      "target": "job:stellar-lense-core:ingestion.historical_loader.fetch_chunk"
     },
     {
-      "source": "job:ledgerlens-core:ingestion.historical_loader.fetch_chunk",
-      "target": "dataset:ledgerlens-core.sqlite:trades"
+      "source": "job:stellar-lense-core:ingestion.historical_loader.fetch_chunk",
+      "target": "dataset:stellar-lense-core.sqlite:trades"
     }
   ]
 }

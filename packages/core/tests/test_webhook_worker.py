@@ -48,7 +48,7 @@ from detection.webhook_worker import (
 def webhook_env(monkeypatch):
     """Inject a fresh random AES-256-GCM key so every test can encrypt secrets."""
     key = base64.b64encode(os.urandom(32)).decode()
-    monkeypatch.setenv("LEDGERLENS_WEBHOOK_ENCRYPTION_KEY", key)
+    monkeypatch.setenv("STELLARLENSE_WEBHOOK_ENCRYPTION_KEY", key)
 
 
 @pytest.fixture
@@ -65,7 +65,7 @@ def _fix_settings(monkeypatch, db_path):
     when called without an explicit ``db_path=`` argument.  Redirecting the
     setting prevents accidental writes to the real database.
     """
-    monkeypatch.setenv("LEDGERLENS_DB_PATH", db_path)
+    monkeypatch.setenv("STELLARLENSE_DB_PATH", db_path)
     import config.settings as s
     try:
         object.__setattr__(s.settings, "db_path", db_path)
@@ -262,7 +262,7 @@ async def test_deliver_moves_to_dead_after_8_attempts(db_path):
 
 @pytest.mark.asyncio
 async def test_deliver_sends_correct_hmac_header(db_path):
-    """The X-LedgerLens-Signature header contains a valid HMAC-SHA256 digest
+    """The X-StellarLense-Signature header contains a valid HMAC-SHA256 digest
     computed from the raw request body and the subscriber secret."""
     init_registry_db(db_path)
     init_queue_db(db_path)
@@ -287,13 +287,13 @@ async def test_deliver_sends_correct_hmac_header(db_path):
         await _deliver(client, deliveries[0], sub, db_path=db_path)
 
     headers = {k.lower(): v for k, v in captured["headers"].items()}
-    assert "x-ledgerlens-signature" in headers
+    assert "x-stellarlense-signature" in headers
 
     expected = (
         "sha256="
         + hmac.new(secret.encode(), captured["body"], hashlib.sha256).hexdigest()
     )
-    assert headers["x-ledgerlens-signature"] == expected
+    assert headers["x-stellarlense-signature"] == expected
 
 
 # ---------------------------------------------------------------------------

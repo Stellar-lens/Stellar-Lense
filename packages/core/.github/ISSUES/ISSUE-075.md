@@ -10,7 +10,7 @@ Extend `ingestion/adversarial_data.py` with adversarial wash-trade pattern gener
 
 ## Background & Context
 
-LedgerLens's synthetic data generator (`ingestion/synthetic_data.py`) creates wash-trade patterns that are representative of naive bot behaviour: fixed lot sizes (easily caught by Benford), regular timing intervals (easily caught by timing features), and simple ring structures (easily caught by SCC detection). Real wash-trade operators, however, adapt: they add noise to amounts to conform to Benford's Law, add timing jitter to avoid periodicity detection, and fragment their trading rings to stay below graph-feature thresholds.
+Stellar Lense's synthetic data generator (`ingestion/synthetic_data.py`) creates wash-trade patterns that are representative of naive bot behaviour: fixed lot sizes (easily caught by Benford), regular timing intervals (easily caught by timing features), and simple ring structures (easily caught by SCC detection). Real wash-trade operators, however, adapt: they add noise to amounts to conform to Benford's Law, add timing jitter to avoid periodicity detection, and fragment their trading rings to stay below graph-feature thresholds.
 
 Adversarial evaluation — testing whether the detection models correctly flag wallets using evasion strategies — is essential for production confidence. Without adversarial test cases, a model can achieve high precision/recall on the naive synthetic test set while being completely blind to evasion.
 
@@ -28,7 +28,7 @@ The adversarial data generator produces labelled trade histories (ground truth: 
 - [ ] Each generator exposes `generate(n_wallets, n_trades_per_wallet, seed) -> list[Trade]`.
 - [ ] All generated trades are validly formatted as `ingestion/data_models.py` `Trade` objects.
 - [ ] Implement `cli.py generate-adversarial` command writing adversarial datasets to CSV (same format as `generate-data`).
-- [ ] Add `tests/test_adversarial_detection.py` asserting that the default LedgerLens detection pipeline achieves ≥60% recall on each evasion strategy.
+- [ ] Add `tests/test_adversarial_detection.py` asserting that the default Stellar Lense detection pipeline achieves ≥60% recall on each evasion strategy.
 - [ ] All generator code covered by tests; ≥90% branch coverage.
 
 ## Technical Requirements
@@ -247,7 +247,7 @@ def test_detection_recall_on_adversarial_strategy(strategy, min_recall, trained_
 
 ## For Contributors
 
-**Ideal contributor profile**: You have experience designing adversarial evaluation frameworks for ML models — generating evasion test cases that probe specific model weaknesses. You understand Benford's Law and how wash-trade bots can be designed to evade Benford-based detection. Familiarity with LedgerLens's feature engineering schema (Benford, timing, graph, cross-pair features) is essential for building evasion strategies that specifically target each feature group. Experience with generative data synthesis for fraud detection or security testing is highly valued.
+**Ideal contributor profile**: You have experience designing adversarial evaluation frameworks for ML models — generating evasion test cases that probe specific model weaknesses. You understand Benford's Law and how wash-trade bots can be designed to evade Benford-based detection. Familiarity with Stellar Lense's feature engineering schema (Benford, timing, graph, cross-pair features) is essential for building evasion strategies that specifically target each feature group. Experience with generative data synthesis for fraud detection or security testing is highly valued.
 
 To apply, please comment on this issue with:
 1. **Specialty area**: your primary expertise (e.g., adversarial ML, fraud detection, data synthesis, blockchain analytics).

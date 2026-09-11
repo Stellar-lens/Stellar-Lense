@@ -16,7 +16,7 @@ use soroban_sdk::{
 };
 
 /// Domain separator. Must stay byte-identical to `detection/oracle_node.py`.
-const DOMAIN_SEPARATOR: &[u8] = b"LedgerLens-Oracle-v2";
+const DOMAIN_SEPARATOR: &[u8] = b"StellarLense-Oracle-v2";
 
 /// Maximum accepted timestamp age, in seconds, before a submission is treated
 /// as a replay.
@@ -37,7 +37,7 @@ pub struct OracleAggregator;
 
 #[contractimpl]
 impl OracleAggregator {
-    /// Initialise with threshold k, list of n authorised oracle public keys, and the ledgerlens-score contract address.
+    /// Initialise with threshold k, list of n authorised oracle public keys, and the stellar-lense-score contract address.
     ///
     /// The `deployer` identity must authorise this call. Because (re)initialisation
     /// is permanently blocked after the first success, whoever presents a valid
@@ -86,7 +86,7 @@ impl OracleAggregator {
             .unwrap_or_else(|| panic!("not initialized"))
     }
 
-    /// Verify k-of-n signatures and forward to ledgerlens-score contract.
+    /// Verify k-of-n signatures and forward to stellar-lense-score contract.
     ///
     /// Returns `false` (without trapping) when the submission is stale or when
     /// too few authorised oracles signed it.
@@ -107,7 +107,7 @@ impl OracleAggregator {
     /// key (or replaying one oracle's signature n times) cannot manufacture a
     /// quorum.
     ///
-    /// # ledgerlens-score ABI and authorization
+    /// # stellar-lense-score ABI and authorization
     ///
     /// The target ABI is:
     /// `submit_score(signers, wallet, asset_pair, score, benford_flag,
@@ -278,7 +278,7 @@ impl OracleAggregator {
     ///
     /// ```text
     /// SHA-256(
-    ///     "LedgerLens-Oracle-v2"
+    ///     "StellarLense-Oracle-v2"
     ///     || wallet_strkey_utf8
     ///     || "|"
     ///     || asset_pair_scval_xdr

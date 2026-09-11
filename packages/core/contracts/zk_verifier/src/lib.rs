@@ -1,4 +1,4 @@
-//! LedgerLens ZK Verifier — Soroban contract
+//! StellarLense ZK Verifier — Soroban contract
 //!
 //! Stores a SHA-256 commitment and Pedersen curve point for every wallet
 //! that has a published risk score, and exposes ``verify_threshold`` so that
@@ -21,7 +21,7 @@
 //! transcript construction both sides must agree on):
 //!   1. For each bit:  ``R0 = s0·H - c0·B_i``,
 //!                      ``R1 = s1·H - c1·(B_i - G)``,
-//!                      ``c = SHA256("LedgerLens/zk/v1" ‖ R0 ‖ R1 ‖ B_i ‖ context) mod n``,
+//!                      ``c = SHA256("StellarLense/zk/v1" ‖ R0 ‖ R1 ‖ B_i ‖ context) mod n``,
 //!                      ``c0 + c1 == c`` (mod n)
 //!   2. ``Σ 2^i · B_i == P - T·G``
 //!
@@ -380,11 +380,11 @@ impl ZkVerifier {
         env.crypto().sha256(&msg).into()
     }
 
-    /// Fiat-Shamir challenge for one bit proof: `SHA256("LedgerLens/zk/v1"
+    /// Fiat-Shamir challenge for one bit proof: `SHA256("StellarLense/zk/v1"
     /// || R0.x || R0.y || R1.x || R1.y || B.x || B.y || context) mod n`.
     ///
     /// Must match `detection/zk_prover.py::_fiat_shamir`'s
-    /// `hashlib.sha256(b"LedgerLens/zk/v1"); h.update(R0_bytes);
+    /// `hashlib.sha256(b"StellarLense/zk/v1"); h.update(R0_bytes);
     /// h.update(R1_bytes); h.update(B_bytes); h.update(context)` byte-for-
     /// byte, including reducing the digest mod the curve order (`Fr`, a
     /// full 254-bit scalar) -- the previous implementation both ignored
@@ -392,7 +392,7 @@ impl ZkVerifier {
     /// hashed something, used `u64` for what must be a ~254-bit scalar.
     fn fiat_shamir(env: &Env, r0: &Point, r1: &Point, b: &Point, context: &BytesN<32>) -> Fr {
         let mut msg = Bytes::new(env);
-        msg.append(&Bytes::from_slice(env, b"LedgerLens/zk/v1"));
+        msg.append(&Bytes::from_slice(env, b"StellarLense/zk/v1"));
         Self::append_point(env, &mut msg, r0);
         Self::append_point(env, &mut msg, r1);
         Self::append_point(env, &mut msg, b);

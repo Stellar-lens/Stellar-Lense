@@ -6,11 +6,11 @@ assignees: []
 
 ## Summary
 
-Extend `detection/feedback_store.py` to persist analyst label corrections (true wash-trade / false positive) with importance weights and feed them back into the retraining pipeline. Implement importance-weighted sampling in `detection/model_training.py` so the next retrain over-samples recently corrected examples, anchoring the model against the specific failure modes analysts have identified in production. This closes the human-in-the-loop gap in LedgerLens's continuous retraining architecture.
+Extend `detection/feedback_store.py` to persist analyst label corrections (true wash-trade / false positive) with importance weights and feed them back into the retraining pipeline. Implement importance-weighted sampling in `detection/model_training.py` so the next retrain over-samples recently corrected examples, anchoring the model against the specific failure modes analysts have identified in production. This closes the human-in-the-loop gap in Stellar Lense's continuous retraining architecture.
 
 ## Background & Context
 
-LedgerLens produces risk scores that are surfaced to analysts through the REST API and dashboard. When an analyst determines that a flagged wallet is a false positive (e.g., a legitimate market-maker) or that a low-scoring wallet is genuinely washing trades, that domain knowledge is currently lost — there is no mechanism to record the correction or feed it back into subsequent retraining cycles.
+Stellar Lense produces risk scores that are surfaced to analysts through the REST API and dashboard. When an analyst determines that a flagged wallet is a false positive (e.g., a legitimate market-maker) or that a low-scoring wallet is genuinely washing trades, that domain knowledge is currently lost — there is no mechanism to record the correction or feed it back into subsequent retraining cycles.
 
 Active learning addresses this by treating analyst corrections as high-value labelled examples. Importance weighting (also called instance weighting) ensures the model pays proportionally more attention to examples that were previously mislabelled during training. The weighting scheme used here follows a recency-decay model: corrections made recently receive higher weight, and weight decays exponentially over time to prevent stale corrections from dominating future training distributions.
 
@@ -149,7 +149,7 @@ class FeedbackSubmission(BaseModel):
 ## Security Considerations
 
 - `wallet` must be validated against the Stellar G-address regex (`^G[A-Z2-7]{55}$`) before storage to prevent SQLite injection via malformed wallet strings. Use the pydantic `pattern` validator.
-- `POST /feedback` should be gated behind `LEDGERLENS_ADMIN_API_KEY` — analyst corrections influence training data and must not be writable by unauthenticated parties.
+- `POST /feedback` should be gated behind `STELLARLENSE_ADMIN_API_KEY` — analyst corrections influence training data and must not be writable by unauthenticated parties.
 - `GET /feedback` similarly requires the admin key; it exposes analyst correction history which may reveal internal fraud investigation priorities.
 - The `confidence` field must be bounded [0, 1] server-side even if the client sends out-of-range values; reject with HTTP 422 rather than clamping silently (fail loudly so integrators notice misconfiguration).
 - Store no PII in the feedback table. `wallet` is a pseudonymous public key, which is acceptable.

@@ -2,8 +2,8 @@
 
 Usage
 -----
-    python -m ledgerlens_fl_client \
-        --server-url https://fl.ledgerlens.io \
+    python -m stellar_lense_fl_client \
+        --server-url https://fl.stellar-lense.io \
         --api-key your-key \
         --data-dir /path/to/data \
         --operator-id exchange-xyz \
@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 def main() -> int:
     """Main entry point for CLI."""
     parser = argparse.ArgumentParser(
-        description="LedgerLens Federated Learning Client",
+        description="StellarLense Federated Learning Client",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(

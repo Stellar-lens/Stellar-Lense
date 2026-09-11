@@ -12,7 +12,7 @@ Extend `detection/amm_engine.py` to detect wash trading in Stellar AMM pools by 
 
 Stellar AMMs (Automated Market Makers) track liquidity via pool shares. Unlike order-book wash trading, AMM-based manipulation is structurally different: an attacker must hold pool shares to benefit from fee capture, and the add→trade→remove lifecycle creates a distinct temporal fingerprint. Because AMM volume feeds directly into 24-hour volume rankings on aggregators (e.g., StellarExpert, Lobstr), inflating this metric is a high-value attack for token issuers seeking organic-looking traction.
 
-Current LedgerLens graph and Benford engines operate on order-book trades. `ingestion/amm_loader.py` already ingests `liquidity_pool_deposit` and `liquidity_pool_withdraw` Horizon operations, but `detection/amm_engine.py` has no anomaly scoring logic. This issue closes that gap.
+Current Stellar Lense graph and Benford engines operate on order-book trades. `ingestion/amm_loader.py` already ingests `liquidity_pool_deposit` and `liquidity_pool_withdraw` Horizon operations, but `detection/amm_engine.py` has no anomaly scoring logic. This issue closes that gap.
 
 The three-phase attack pattern:
 1. **Deposit phase** — wallet adds liquidity via `liquidity_pool_deposit`, obtaining pool shares

@@ -1,7 +1,7 @@
 # `requirements/` — Python dependency lockfiles
 
 This directory holds the **compiled, hash-pinned dependency lockfiles** for every
-Python install surface in `ledgerlens-core`. Each surface is a pair of files:
+Python install surface in `stellar-lense-core`. Each surface is a pair of files:
 
 - **`<surface>.in`** — the *source*. A short list of what the surface needs,
   usually just a reference to `pyproject.toml` extras (`-e ".[test]"`) plus

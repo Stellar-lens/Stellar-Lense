@@ -12,7 +12,7 @@ from datetime import datetime, timedelta, timezone
 
 from ingestion.data_models import BridgeTransfer
 
-logger = logging.getLogger("ledgerlens.cross_chain_correlator")
+logger = logging.getLogger("stellar_lense.cross_chain_correlator")
 
 # Default time window for matching bridge-in / bridge-out events (hours).
 DEFAULT_WINDOW_HOURS = 24

@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 
 # ---------------------------------------------------------------------------
-# Optional dependency: web3  (pip install 'ledgerlens-core[chain]')
+# Optional dependency: web3  (pip install 'stellar-lense-core[chain]')
 # ---------------------------------------------------------------------------
 try:
     from web3 import Web3
@@ -24,7 +24,7 @@ except ImportError:  # pragma: no cover
     _HAS_WEB3 = False
 
 
-logger = logging.getLogger("ledgerlens.uniswap_adapter")
+logger = logging.getLogger("stellar_lense.uniswap_adapter")
 
 if _HAS_WEB3:
     UNISWAP_V3_SWAP_TOPIC = "0x" + Web3.keccak(

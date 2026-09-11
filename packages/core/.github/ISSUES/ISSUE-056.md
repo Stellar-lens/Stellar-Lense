@@ -10,7 +10,7 @@ Extend `detection/adaptive_reweighter.py` to dynamically reweight RF/XGBoost/Lig
 
 ## Background & Context
 
-The LedgerLens ensemble currently uses fixed weights: `0.3 * RF + 0.4 * XGBoost + 0.3 * LightGBM`. These weights were set at training time based on validation AUC-ROC and do not adapt to production feedback. In practice, model performance diverges after deployment:
+The Stellar Lense ensemble currently uses fixed weights: `0.3 * RF + 0.4 * XGBoost + 0.3 * LightGBM`. These weights were set at training time based on validation AUC-ROC and do not adapt to production feedback. In practice, model performance diverges after deployment:
 
 - New market patterns may exploit XGBoost's high sensitivity, producing false positives
 - Random Forest's conservative nature may miss new wash-trade variants that XGBoost catches
@@ -202,7 +202,7 @@ CREATE TABLE IF NOT EXISTS label_feedback (
 ```python
 @router.get("/admin/ensemble-weights")
 async def get_ensemble_weights(
-    x_admin_key: str = Header(..., alias="X-LedgerLens-Admin-Key"),
+    x_admin_key: str = Header(..., alias="X-StellarLense-Admin-Key"),
 ) -> ModelWeightsResponse:
     """Return current and historical ensemble weights (last 30 days)."""
     ...
@@ -210,7 +210,7 @@ async def get_ensemble_weights(
 @router.post("/admin/label-feedback")
 async def submit_label_feedback(
     body: LabelFeedbackRequest,
-    x_admin_key: str = Header(..., alias="X-LedgerLens-Admin-Key"),
+    x_admin_key: str = Header(..., alias="X-StellarLense-Admin-Key"),
 ) -> dict:
     """Submit analyst-confirmed label. Triggers weight update if >= min_feedback_samples."""
     ...

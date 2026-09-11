@@ -12,9 +12,9 @@ body:
     attributes:
       value: |
         Thanks for taking the time to write a feature proposal. Before you submit:
-        - Check the [ROADMAP.md](https://github.com/Ledger-Lenz/Ledgerlens-core/blob/main/ROADMAP.md) — the feature may already be planned.
-        - Search [existing issues](https://github.com/Ledger-Lenz/Ledgerlens-core/issues?q=is%3Aissue+label%3Aenhancement) for similar proposals.
-        - For security-sensitive features (new auth flows, cryptography changes, on-chain contract changes), describe the threat model impact — see [`docs/threat_model.md`](https://github.com/Ledger-Lenz/Ledgerlens-core/blob/main/docs/threat_model.md).
+        - Check the [ROADMAP.md](https://github.com/Stellar-lens/Stellar-Lense/blob/main/ROADMAP.md) — the feature may already be planned.
+        - Search [existing issues](https://github.com/Stellar-lens/Stellar-Lense/issues?q=is%3Aissue+label%3Aenhancement) for similar proposals.
+        - For security-sensitive features (new auth flows, cryptography changes, on-chain contract changes), describe the threat model impact — see [`docs/threat_model.md`](https://github.com/Stellar-lens/Stellar-Lense/blob/main/docs/threat_model.md).
 
   # ── 1. Problem statement ────────────────────────────────────────────────────
   - type: textarea
@@ -99,10 +99,10 @@ body:
         - "api — admin / analyst / audit routers"
         - "contracts — oracle aggregator (Rust/Soroban)"
         - "contracts — ZK verifier (Rust/Soroban)"
-        - "sdk — Python SDK (packages/ledgerlens-sdk)"
+        - "sdk — Python SDK (packages/stellar-lense-sdk)"
         - "sdk — TypeScript SDK (sdk/)"
         - "sdk — Go SDK (go/)"
-        - "sdk — Rust crate (crates/ledgerlens-sdk)"
+        - "sdk — Rust crate (crates/stellar-lense-sdk)"
         - "config / settings / environment variables"
         - "CLI (cli.py)"
         - "pipeline entry point (run_pipeline.py)"
@@ -120,16 +120,16 @@ body:
     attributes:
       label: Cross-repo impact
       description: >
-        LedgerLens is a multi-repo project. Does this change affect shared
+        Stellar Lense is a multi-repo project. Does this change affect shared
         contracts that must be kept in sync across repos?
         See the "Shared Contracts" section in
-        [README.md](https://github.com/Ledger-Lenz/Ledgerlens-core/blob/main/README.md#shared-contracts-must-stay-in-sync-across-repos).
+        [README.md](https://github.com/Stellar-lens/Stellar-Lense/blob/main/README.md#shared-contracts-must-stay-in-sync-across-repos).
       options:
-        - label: "`RiskScore` schema (`detection/risk_score.py`) — also affects `ledgerlens-api` and `ledgerlens-contracts`"
-        - label: "`Trade` / `Asset` / `OrderBookEvent` schemas (`ingestion/data_models.py`) — also affects `ledgerlens-data`"
+        - label: "`RiskScore` schema (`detection/risk_score.py`) — also affects `stellar-lense-api` and `stellar-lense-contracts`"
+        - label: "`Trade` / `Asset` / `OrderBookEvent` schemas (`ingestion/data_models.py`) — also affects `stellar-lense-data`"
         - label: "Environment variables / `.env.example` — also affects other repos that share the same keys"
-        - label: "Soroban contract interface (`submit_score` / `get_score`) — also affects `ledgerlens-contracts` and `ledgerlens-api`"
-        - label: "No cross-repo impact — change is entirely within `ledgerlens-core`"
+        - label: "Soroban contract interface (`submit_score` / `get_score`) — also affects `stellar-lense-contracts` and `stellar-lense-api`"
+        - label: "No cross-repo impact — change is entirely within `stellar-lense-core`"
 
   # ── 6. PR willingness ───────────────────────────────────────────────────────
   - type: dropdown

@@ -1,15 +1,15 @@
-"""ledgerlens-sdk: a typed Python client for the LedgerLens wash-trading
+"""stellar-lense-sdk: a typed Python client for the StellarLense wash-trading
 detection API.
 
-    from ledgerlens import LedgerLensClient
+    from stellar_lense import StellarLenseClient
 
-    client = LedgerLensClient(base_url="https://api.ledgerlens.io", api_key="...")
+    client = StellarLenseClient(base_url="https://api.stellar-lense.io", api_key="...")
     result = client.get_score("GABC...")
 """
 
-from .async_client import AsyncLedgerLensClient
-from .client import LedgerLensClient
-from .exceptions import LedgerLensAPIError, LedgerLensError
+from .async_client import AsyncStellarLenseClient
+from .client import StellarLenseClient
+from .exceptions import StellarLenseAPIError, StellarLenseError
 from .models import (
     AssetRiskRanking,
     CounterfactualResponse,
@@ -28,10 +28,10 @@ from .models import (
 __version__ = "0.1.0"
 
 __all__ = [
-    "LedgerLensClient",
-    "AsyncLedgerLensClient",
-    "LedgerLensError",
-    "LedgerLensAPIError",
+    "StellarLenseClient",
+    "AsyncStellarLenseClient",
+    "StellarLenseError",
+    "StellarLenseAPIError",
     "RiskScore",
     "WalletScoresResponse",
     "CrossChainLink",

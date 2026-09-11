@@ -17,7 +17,7 @@ import httpx
 
 from config.settings import settings
 
-logger = logging.getLogger("ledgerlens.lineage")
+logger = logging.getLogger("stellar_lense.lineage")
 
 
 @dataclass
@@ -119,7 +119,7 @@ class LineageEmitter:
                 }
                 for ds in active_run.outputs
             ],
-            "producer": "https://github.com/Ledger-Lenz/Ledgerlens-core",
+            "producer": "https://github.com/Stellar-lens/Stellar-Lense",
         }
 
         if active_run.parent_run_id:

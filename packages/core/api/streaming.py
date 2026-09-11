@@ -40,7 +40,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import AsyncGenerator, Optional
 
-logger = logging.getLogger("ledgerlens.streaming")
+logger = logging.getLogger("stellar_lense.streaming")
 
 # ---------------------------------------------------------------------------
 # Wallet address validation
@@ -126,12 +126,12 @@ class ScorePublisher:
 
     Channels
     --------
-    - ``ledgerlens:score:{wallet}`` — wallet-specific channel.
-    - ``ledgerlens:score:*`` — wildcard channel for clients subscribed to all
+    - ``stellar_lense:score:{wallet}`` — wallet-specific channel.
+    - ``stellar_lense:score:*`` — wildcard channel for clients subscribed to all
       wallets.
 
     Also stores the last event per wallet in a Redis hash
-    ``ledgerlens:last_event`` with a 24h TTL for reconnect replay.
+    ``stellar_lense:last_event`` with a 24h TTL for reconnect replay.
 
     Parameters
     ----------
@@ -139,8 +139,8 @@ class ScorePublisher:
         An ``aioredis.Redis`` instance (or compatible async client).
     """
 
-    CHANNEL_PREFIX = "ledgerlens:score:"
-    LAST_EVENT_HASH = "ledgerlens:last_event"
+    CHANNEL_PREFIX = "stellar_lense:score:"
+    LAST_EVENT_HASH = "stellar_lense:last_event"
     LAST_EVENT_TTL = 86400  # 24 hours
 
     def __init__(self, redis_client) -> None:
@@ -150,10 +150,10 @@ class ScorePublisher:
         """Publish *event* to Redis.
 
         Atomically (within a pipeline):
-        1. ``PUBLISH ledgerlens:score:{wallet}``
-        2. ``PUBLISH ledgerlens:score:*``
-        3. ``HSET ledgerlens:last_event {wallet} <json>``
-        4. ``EXPIRE ledgerlens:last_event 86400``
+        1. ``PUBLISH stellar_lense:score:{wallet}``
+        2. ``PUBLISH stellar_lense:score:*``
+        3. ``HSET stellar_lense:last_event {wallet} <json>``
+        4. ``EXPIRE stellar_lense:last_event 86400``
         """
         channel = f"{self.CHANNEL_PREFIX}{event.wallet}"
         # Ensure published_at is an ISO string so replay storage is consistent
@@ -193,7 +193,7 @@ class ScorePublisher:
 # Connection limit helpers
 # ---------------------------------------------------------------------------
 
-_CONN_LIMIT_PREFIX = "ledgerlens:sse_connections:"
+_CONN_LIMIT_PREFIX = "stellar_lense:sse_connections:"
 _MAX_CONNECTIONS_PER_KEY = 10
 
 
@@ -384,7 +384,7 @@ class SSEConnectionManager:
 
         # Events in last 60 min (best-effort from Redis — not tracked here)
         try:
-            events_last_hour = await self._redis_pool.get("ledgerlens:sse_events_last_hour")
+            events_last_hour = await self._redis_pool.get("stellar_lense:sse_events_last_hour")
             events_last_hour = int(events_last_hour) if events_last_hour else 0
         except Exception:
             events_last_hour = 0

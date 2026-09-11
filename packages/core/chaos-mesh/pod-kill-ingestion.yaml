@@ -1,13 +1,13 @@
 apiVersion: chaos-mesh.org/v1alpha1
 kind: PodChaos
 metadata:
-  name: ledgerlens-ingestion-pod-kill
+  name: stellar-lense-ingestion-pod-kill
   namespace: chaos-mesh
 spec:
   action: pod-kill
   mode: one
   selector:
-    namespaces: ["ledgerlens-staging"]
+    namespaces: ["stellar-lense-staging"]
     labelSelectors:
       "app.kubernetes.io/component": ingestion-worker
   scheduler:

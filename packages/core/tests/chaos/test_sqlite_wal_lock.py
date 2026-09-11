@@ -52,11 +52,11 @@ class _ChaosClient:
 def chaos_client(tmp_path, monkeypatch) -> _ChaosClient:
     """TestClient pointed at a fresh DB that we can lock externally."""
     db_path = str(tmp_path / "chaos_test.db")
-    monkeypatch.setenv("LEDGERLENS_DB_PATH", db_path)
+    monkeypatch.setenv("STELLARLENSE_DB_PATH", db_path)
 
     import config.settings as settings_module
 
-    object.__setattr__(settings_module.settings, "ledgerlens_db_path", db_path)
+    object.__setattr__(settings_module.settings, "stellarlense_db_path", db_path)
 
     # Initialise schema so the DB file exists before we try to lock it
     from detection.storage import init_db

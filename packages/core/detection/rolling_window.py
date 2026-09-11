@@ -31,7 +31,7 @@ from typing import Deque, Dict, Iterator, List, Optional
 from config.settings import settings
 from ingestion.data_models import Asset, Trade, TradeType
 
-logger = logging.getLogger("ledgerlens.rolling_window")
+logger = logging.getLogger("stellar_lense.rolling_window")
 
 WINDOW_HOURS = [1, 4, 24]
 MAX_TRADES_PER_WALLET_WINDOW = 10_000

@@ -13,7 +13,7 @@ from starlette.responses import JSONResponse, Response
 from config.settings import settings
 from config.correlation import mask_wallet
 
-logger = logging.getLogger("ledgerlens.waf")
+logger = logging.getLogger("stellar_lense.waf")
 
 # SQL injection patterns
 _SQLI_PATTERNS = [
@@ -158,7 +158,7 @@ class WAFMiddleware(BaseHTTPMiddleware):
         namespace_id = ""
         try:
             from detection.api_key_store import lookup_key
-            api_key = request.headers.get("X-LedgerLens-Api-Key")
+            api_key = request.headers.get("X-StellarLense-Api-Key")
             if api_key:
                 key_data = lookup_key(api_key)
                 if key_data:
@@ -179,8 +179,8 @@ class WAFMiddleware(BaseHTTPMiddleware):
 
         # Increment Prometheus counter if available
         try:
-            from api.metrics import ledgerlens_waf_blocks_total
-            ledgerlens_waf_blocks_total.labels(rule=rule, namespace_id=namespace_id).inc()
+            from api.metrics import stellar_lense_waf_blocks_total
+            stellar_lense_waf_blocks_total.labels(rule=rule, namespace_id=namespace_id).inc()
         except Exception:
             pass
 

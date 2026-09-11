@@ -5,7 +5,7 @@ assignees: []
 ---
 
 ## Summary
-Stellar's SDEX introduced AMM (Automated Market Maker) constant-product liquidity pools, and wash trading on AMMs differs structurally from order-book wash trading — it involves coordinated deposit, swap, and withdrawal cycles rather than matched buy/sell orders. LedgerLens currently has no AMM event ingestion, leaving a significant detection gap for this attack surface. `ingestion/amm_loader.py` needs to be built from scratch to ingest pool deposit, withdrawal, and swap events and align them with the existing `Trade` schema for downstream feature engineering.
+Stellar's SDEX introduced AMM (Automated Market Maker) constant-product liquidity pools, and wash trading on AMMs differs structurally from order-book wash trading — it involves coordinated deposit, swap, and withdrawal cycles rather than matched buy/sell orders. Stellar Lense currently has no AMM event ingestion, leaving a significant detection gap for this attack surface. `ingestion/amm_loader.py` needs to be built from scratch to ingest pool deposit, withdrawal, and swap events and align them with the existing `Trade` schema for downstream feature engineering.
 
 ## Background & Context
 Stellar's Horizon API exposes AMM liquidity pool operations through multiple endpoints:

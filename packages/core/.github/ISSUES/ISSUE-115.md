@@ -5,7 +5,7 @@ assignees: []
 ---
 
 ## Summary
-LedgerLens currently uses a single `LEDGERLENS_API_KEY` environment variable for authentication, preventing key rotation, per-consumer rate limiting, and granular permission scopes. An API key management system with per-key scopes (`read:scores`, `write:suppressions`, `admin`), rate limits, and key rotation enables production-grade access control.
+Stellar Lense currently uses a single `STELLARLENSE_API_KEY` environment variable for authentication, preventing key rotation, per-consumer rate limiting, and granular permission scopes. An API key management system with per-key scopes (`read:scores`, `write:suppressions`, `admin`), rate limits, and key rotation enables production-grade access control.
 
 ## Objectives
 - [ ] Implement `api_keys` table in SQLite with: key_hash, namespace_id, scopes, rate_limit_per_minute, created_at, expires_at, last_used_at

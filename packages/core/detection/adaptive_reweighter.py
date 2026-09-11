@@ -14,7 +14,7 @@ from scipy.stats import beta as beta_dist
 
 from config.settings import settings
 
-logger = logging.getLogger("ledgerlens.adaptive_reweighter")
+logger = logging.getLogger("stellar_lense.adaptive_reweighter")
 
 _CLASSIFIER_NAMES = ("random_forest", "xgboost", "lightgbm")
 _UPDATE_INTERVAL_SECONDS = 900  # 15 minutes

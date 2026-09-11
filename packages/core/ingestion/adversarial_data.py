@@ -479,7 +479,7 @@ class AdversarialDataset:
 
     Combines normal-background trades (from ``generate_synthetic_dataset``) with
     evasion-strategy wash trades from the specialist generators, then runs the
-    full LedgerLens feature pipeline (``build_training_dataset``) to produce a
+    full StellarLense feature pipeline (``build_training_dataset``) to produce a
     :class:`~pandas.DataFrame` with ``FEATURE_NAMES`` columns plus a ``label``
     column (0 = normal, 1 = adversarial wash).
     """

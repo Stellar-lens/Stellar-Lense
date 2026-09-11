@@ -50,7 +50,7 @@ Claims expire after `ANALYST_LOCK_TIMEOUT_SECONDS` (default 1800s / 30 min). A b
 ```http
 POST /analyst/wallet/GABC.../claim?asset_pair=XLM/USDC
 Content-Type: application/json
-X-LedgerLens-Admin-Key: <key>
+X-StellarLense-Admin-Key: <key>
 
 {"analyst_key_hash": "a1b2c3d4e5f6"}
 ```
@@ -115,7 +115,7 @@ Each queue item now includes:
 
 ## Security Note
 
-The current auth model uses a shared `X-LedgerLens-Admin-Key`. True per-analyst accountability requires the per-analyst scoped API key work (Issue #195, `api/api_key_router.py`). The `analyst_key_hash` field in request bodies provides identity tracking but relies on clients self-reporting; server-side enforcement will strengthen once per-analyst keys are available.
+The current auth model uses a shared `X-StellarLense-Admin-Key`. True per-analyst accountability requires the per-analyst scoped API key work (Issue #195, `api/api_key_router.py`). The `analyst_key_hash` field in request bodies provides identity tracking but relies on clients self-reporting; server-side enforcement will strengthen once per-analyst keys are available.
 
 ## Background Worker
 

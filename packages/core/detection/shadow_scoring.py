@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 
-logger = logging.getLogger("ledgerlens.shadow_scoring")
+logger = logging.getLogger("stellar_lense.shadow_scoring")
 
 # Prometheus metric (lazy import to avoid hard dependency)
 _shadow_histogram = None
@@ -32,7 +32,7 @@ def _get_histogram():
         from prometheus_client import Histogram
 
         _shadow_histogram = Histogram(
-            "ledgerlens_shadow_score_divergence",
+            "stellar_lense_shadow_score_divergence",
             "Absolute difference between production and shadow model scores",
             buckets=[0.01, 0.02, 0.05, 0.1, 0.15, 0.2, 0.3, 0.5, 1.0],
         )

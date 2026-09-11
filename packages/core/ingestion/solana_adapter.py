@@ -34,7 +34,7 @@ from ingestion.data_models import Asset, Trade, TradeType
 if TYPE_CHECKING:
     from ingestion.dedup import IdempotencyKeyStore
 
-logger = logging.getLogger("ledgerlens.solana_adapter")
+logger = logging.getLogger("stellar_lense.solana_adapter")
 
 __all__ = ["SolanaAdapter"]
 

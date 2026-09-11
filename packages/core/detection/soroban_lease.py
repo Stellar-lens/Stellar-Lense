@@ -4,7 +4,7 @@ import time
 
 from config.settings import settings
 
-logger = logging.getLogger("ledgerlens.soroban_lease")
+logger = logging.getLogger("stellar_lense.soroban_lease")
 
 
 def _load_kube_config(config) -> None:

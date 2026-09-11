@@ -7,20 +7,20 @@ against a real cluster, and by whom.
 
 ## Before you start: what you're rolling back
 
-`ledgerlens` is deployed via `helm/ledgerlens`, either as a plain
+`stellar_lense` is deployed via `helm/stellar_lense`, either as a plain
 `Deployment` (`canary.enabled=false`, the default) or an Argo Rollouts
 `Rollout` (`canary.enabled=true`). Every release — regardless of which mode
 — carries traceability annotations set by `.github/workflows/cd.yml`:
 
 ```
-ledgerlens.io/commit-sha:       <the exact commit that was built and scanned>
-ledgerlens.io/image-digest:     <the exact image digest that was pushed>
-ledgerlens.io/deployed-at:      <UTC timestamp>
-ledgerlens.io/workflow-run-id:  <the CD run that performed this deploy>
+stellar-lense.io/commit-sha:       <the exact commit that was built and scanned>
+stellar-lense.io/image-digest:     <the exact image digest that was pushed>
+stellar-lense.io/deployed-at:      <UTC timestamp>
+stellar-lense.io/workflow-run-id:  <the CD run that performed this deploy>
 ```
 
 These are on both the Deployment/Rollout object itself and its pod template,
-so `kubectl get pods -l app.kubernetes.io/name=ledgerlens -o
+so `kubectl get pods -l app.kubernetes.io/name=stellar_lense -o
 jsonpath='{.items[0].metadata.annotations}'` answers "what commit is
 actually running" from the live pods, not just the release history.
 
@@ -36,21 +36,21 @@ actually running" from the live pods, not just the release history.
 
 1. **Identify the target revision.**
    ```bash
-   helm history ledgerlens
+   helm history stellar_lense
    ```
    Cross-check the revision you intend to roll back to against its recorded
-   commit: `helm get values ledgerlens --revision <REV> | grep commitSha`.
+   commit: `helm get values stellar_lense --revision <REV> | grep commitSha`.
 
 2. **Record current state before changing anything** (so you have a
    before/after diff and a documented "what we rolled back from"):
    ```bash
-   kubectl get deploy,rollout -l app.kubernetes.io/name=ledgerlens \
-     -o jsonpath='{range .items[*]}{.metadata.annotations.ledgerlens\.io/commit-sha}{"\n"}{end}'
+   kubectl get deploy,rollout -l app.kubernetes.io/name=stellar_lense \
+     -o jsonpath='{range .items[*]}{.metadata.annotations.stellar_lense\.io/commit-sha}{"\n"}{end}'
    ```
 
 3. **Roll back.**
    ```bash
-   helm rollback ledgerlens <REV> --wait --timeout 10m
+   helm rollback stellar_lense <REV> --wait --timeout 10m
    ```
    `cd.yml` deploys with `--history-max 20`, so the last 20 revisions are
    available to roll back to without needing to rebuild anything — this is
@@ -59,9 +59,9 @@ actually running" from the live pods, not just the release history.
 4. **Verify.** Confirm the live annotation matches the target revision's
    commit, and that pods are Ready:
    ```bash
-   kubectl get pods -l app.kubernetes.io/name=ledgerlens \
-     -o jsonpath='{.items[0].metadata.annotations.ledgerlens\.io/commit-sha}'
-   kubectl rollout status deployment/ledgerlens-api   # plain Deployment mode
+   kubectl get pods -l app.kubernetes.io/name=stellar_lense \
+     -o jsonpath='{.items[0].metadata.annotations.stellar_lense\.io/commit-sha}'
+   kubectl rollout status deployment/stellar-lense-api   # plain Deployment mode
    ```
 
 **Canary-mode note:** if `canary.enabled=true`, `helm rollback` changes the
@@ -71,7 +71,7 @@ Rollouts *re-run the canary steps forward* (20% → pause → 50% → pause →
 too slow if you're rolling back because production is actively broken. For
 an urgent rollback, follow the `helm rollback` with:
 ```bash
-kubectl argo rollouts undo ledgerlens-api
+kubectl argo rollouts undo stellar-lense-api
 ```
 which is Argo Rollouts' own immediate-rollback primitive (analogous to
 `kubectl rollout undo` for a plain Deployment) — it skips canary
@@ -88,7 +88,7 @@ explicitly asking to deploy a specific already-known commit, not the
 current `main` tip:
 
 ```bash
-gh workflow run cd.yml --repo <org>/Ledgerlens-core -f sha=<commit-sha>
+gh workflow run cd.yml --repo <org>/StellarLense-core -f sha=<commit-sha>
 ```
 
 This re-runs the full build → scan → push → deploy pipeline against
@@ -113,10 +113,10 @@ runbook nobody has executed is a hypothesis, not a procedure:
       target `< 15 min` (bounded by the scan + Helm `--wait` steps in
       `cd.yml`), confirmed the Trivy gate still runs for the rollback
       target.
-- [ ] Post-rollback annotation check: `ledgerlens.io/commit-sha` on the
+- [ ] Post-rollback annotation check: `stellar-lense.io/commit-sha` on the
       live pods matches the intended rollback target, not the commit being
       rolled back from.
-- [ ] Confirm `helm history ledgerlens` still shows the rolled-back-from
+- [ ] Confirm `helm history stellar_lense` still shows the rolled-back-from
       revision (rollback appends a new revision; it doesn't delete
       history).
 
@@ -124,7 +124,7 @@ runbook nobody has executed is a hypothesis, not a procedure:
 
 This runbook was authored and the commands in it verified for syntactic
 and semantic correctness against this repo's actual chart (`helm lint` /
-`helm template` against `helm/ledgerlens`, confirming the annotations these
+`helm template` against `helm/stellar_lense`, confirming the annotations these
 steps depend on actually render — see the PR description for that
 evidence) and against `cd.yml`'s actual `workflow_dispatch` contract.
 
@@ -137,7 +137,7 @@ on `--wait --timeout 10m` in `cd.yml` and typical `helm rollback` latency
 for a small Deployment, not measurements.
 
 **What was rehearsed for real**, live on GitHub Actions against the
-`Ndifreke000/Ledgerlens-core` fork (no production credentials involved):
+`Ndifreke000/StellarLense-core` fork (no production credentials involved):
 the CI-gate mechanism in `cd.yml` end to end (CI passing correctly lets CD
 proceed, pinned to that exact `head_sha`); two rapid successive pushes to
 `main`, where the first commit's CI run was itself superseded/cancelled by

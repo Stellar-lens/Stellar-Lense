@@ -1,4 +1,4 @@
-"""Authentication and authorisation dependencies for LedgerLens API endpoints.
+"""Authentication and authorisation dependencies for StellarLense API endpoints.
 
 .. deprecated::
     ``api/auth.py`` is maintained for backward compatibility during the
@@ -36,7 +36,7 @@ from config.settings import settings
 # ---------------------------------------------------------------------------
 
 
-def require_admin_key(x_ledgerlens_admin_key: str = Header(default="")) -> None:
+def require_admin_key(x_stellarlense_admin_key: str = Header(default="")) -> None:
     """FastAPI dependency gating admin-only endpoints (backward compatible).
 
     Delegates to the gateway's admin-key resolution. Fails closed.
@@ -44,14 +44,14 @@ def require_admin_key(x_ledgerlens_admin_key: str = Header(default="")) -> None:
     if not settings.admin_api_key:
         raise HTTPException(status_code=503, detail="Admin API key is not configured")
 
-    if not x_ledgerlens_admin_key:
-        raise HTTPException(status_code=401, detail="Missing X-LedgerLens-Admin-Key header")
+    if not x_stellarlense_admin_key:
+        raise HTTPException(status_code=401, detail="Missing X-StellarLense-Admin-Key header")
 
-    if not secrets.compare_digest(x_ledgerlens_admin_key, settings.admin_api_key):
+    if not secrets.compare_digest(x_stellarlense_admin_key, settings.admin_api_key):
         raise HTTPException(status_code=403, detail="Invalid admin key")
 
 
-def require_compliance_key(x_ledgerlens_compliance_key: str = Header(default="")) -> None:
+def require_compliance_key(x_stellarlense_compliance_key: str = Header(default="")) -> None:
     """FastAPI dependency gating compliance endpoints (backward compatible).
 
     Delegates to the gateway's compliance-key resolution. Fails closed.
@@ -59,7 +59,7 @@ def require_compliance_key(x_ledgerlens_compliance_key: str = Header(default="")
     if not settings.compliance_api_key:
         raise HTTPException(status_code=503, detail="Compliance API key is not configured")
 
-    if not x_ledgerlens_compliance_key or not secrets.compare_digest(
-        x_ledgerlens_compliance_key, settings.compliance_api_key
+    if not x_stellarlense_compliance_key or not secrets.compare_digest(
+        x_stellarlense_compliance_key, settings.compliance_api_key
     ):
         raise HTTPException(status_code=403, detail="Missing or invalid compliance:read scope")

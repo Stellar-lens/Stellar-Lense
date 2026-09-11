@@ -1,1 +1,1 @@
-# ledgerlens/__init__.py
+# stellar_lense/__init__.py

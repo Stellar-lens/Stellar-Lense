@@ -22,7 +22,7 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 
 # ---------------------------------------------------------------------------
-# Optional heavy dependency: torch  (pip install 'ledgerlens-core[ml]')
+# Optional heavy dependency: torch  (pip install 'stellar-lense-core[ml]')
 # ---------------------------------------------------------------------------
 try:
     import torch
@@ -48,7 +48,7 @@ def _require_torch(location: str = "detection/temporal_model.py") -> None:
     if not _HAS_TORCH:
         raise ImportError(
             f"'torch' is required by {location} but is not installed.\n"
-            "  Install the 'ml' extra:  pip install 'ledgerlens-core[ml]'\n"
+            "  Install the 'ml' extra:  pip install 'stellar-lense-core[ml]'\n"
             "  Or install directly:     pip install torch"
         )
 

@@ -13,9 +13,9 @@ from detection.storage import save_scores, save_feature_vectors
 @pytest.fixture
 def client_with_data(tmp_path, monkeypatch):
     """TestClient with a seeded database containing a feature vector."""
-    db_path = str(tmp_path / "ledgerlens.db")
-    monkeypatch.setenv("LEDGERLENS_DB_PATH", db_path)
-    monkeypatch.setattr("config.settings.settings.ledgerlens_db_path", db_path)
+    db_path = str(tmp_path / "stellar_lense.db")
+    monkeypatch.setenv("STELLARLENSE_DB_PATH", db_path)
+    monkeypatch.setattr("config.settings.settings.stellarlense_db_path", db_path)
 
     # Seed a RiskScore and feature vector
     wallet = "GABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWX"
@@ -50,18 +50,18 @@ def client_with_data(tmp_path, monkeypatch):
     joblib.dump(model, model_dir / "random_forest.joblib")
     (model_dir / "random_forest_latest.txt").write_text("test0001")
 
-    monkeypatch.setenv("LEDGERLENS_MODEL_DIR", str(model_dir))
+    monkeypatch.setenv("STELLARLENSE_MODEL_DIR", str(model_dir))
     monkeypatch.setattr("config.settings.settings.model_dir", str(model_dir))
 
-    monkeypatch.setenv("LEDGERLENS_ADMIN_API_KEY", "test-key")
-    monkeypatch.setattr("config.settings.settings.ledgerlens_admin_api_key", "test-key")
+    monkeypatch.setenv("STELLARLENSE_ADMIN_API_KEY", "test-key")
+    monkeypatch.setattr("config.settings.settings.stellarlense_admin_api_key", "test-key")
 
     from api.main import app
     return TestClient(app)
 
 
 def _admin_headers():
-    return {"X-LedgerLens-Admin-Key": "test-key"}
+    return {"X-StellarLense-Admin-Key": "test-key"}
 
 
 def test_explain_200_returns_waterfall(client_with_data):
@@ -115,7 +115,7 @@ def test_explain_200_with_xgboost_model_param(client_with_data, tmp_path, monkey
     joblib.dump(model, model_dir / "xgboost.joblib")
     (model_dir / "xgboost_latest.txt").write_text("test0002")
 
-    os.environ["LEDGERLENS_MODEL_DIR"] = str(model_dir)
+    os.environ["STELLARLENSE_MODEL_DIR"] = str(model_dir)
     monkeypatch.setattr(settings_module.settings, "model_dir", str(model_dir))
 
     wallet = "GABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWX"

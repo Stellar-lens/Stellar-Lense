@@ -1,4 +1,4 @@
-"""Unit tests for AsyncLedgerLensClient, using httpx.MockTransport so no
+"""Unit tests for AsyncStellarLenseClient, using httpx.MockTransport so no
 real network or server is needed. Also covers concurrent scoring via
 asyncio.gather, per the issue's "async client tested with asyncio.gather
 for concurrent scoring" acceptance criterion."""
@@ -8,13 +8,13 @@ import asyncio
 import httpx
 import pytest
 
-from ledgerlens import AsyncLedgerLensClient, LedgerLensAPIError
+from stellar_lense import AsyncStellarLenseClient, StellarLenseAPIError
 
 
-def _async_client(handler) -> AsyncLedgerLensClient:
+def _async_client(handler) -> AsyncStellarLenseClient:
     transport = httpx.MockTransport(handler)
     http_client = httpx.AsyncClient(base_url="https://test.local", transport=transport)
-    return AsyncLedgerLensClient(base_url="https://test.local", client=http_client)
+    return AsyncStellarLenseClient(base_url="https://test.local", client=http_client)
 
 
 @pytest.mark.asyncio
@@ -47,12 +47,12 @@ async def test_get_score_parses_response():
 
 
 @pytest.mark.asyncio
-async def test_non_2xx_response_raises_ledgerlens_api_error():
+async def test_non_2xx_response_raises_stellar_lense_api_error():
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(404, json={"detail": "not found"})
 
     client = _async_client(handler)
-    with pytest.raises(LedgerLensAPIError) as exc_info:
+    with pytest.raises(StellarLenseAPIError) as exc_info:
         await client.get_score("GABC")
     assert exc_info.value.status_code == 404
     await client.aclose()

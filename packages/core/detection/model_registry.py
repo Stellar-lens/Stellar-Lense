@@ -23,7 +23,7 @@ import numpy as np
 from config.settings import settings
 from detection.model_signing import assert_within_model_dir, safe_joblib_load, sign_model_file
 
-logger = logging.getLogger("ledgerlens.model_registry")
+logger = logging.getLogger("stellar_lense.model_registry")
 
 SHAP_STABILITY_THRESHOLD: float = 0.70
 

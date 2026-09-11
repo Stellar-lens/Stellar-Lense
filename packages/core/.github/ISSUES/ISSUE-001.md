@@ -14,7 +14,7 @@ Currently, the streamer holds this cursor in memory only. Any process restart �
 - **Restart with `cursor=now`**: All events between the crash and restart are permanently lost, creating gaps in detection coverage.
 - **Restart with `cursor=0`**: The full event history is replayed, triggering duplicate detections and flooding the risk-score store with stale data.
 
-The LedgerLens pipeline runs continuously and feeds the ensemble ML classifiers in real time (see `detection/model_inference.py`). Gaps in ingestion directly degrade detection quality — a wash-trading ring that trades during a gap window will not be scored until the next historical backfill run.
+The Stellar Lense pipeline runs continuously and feeds the ensemble ML classifiers in real time (see `detection/model_inference.py`). Gaps in ingestion directly degrade detection quality — a wash-trading ring that trades during a gap window will not be scored until the next historical backfill run.
 
 Cursor checkpointing is a standard pattern in event-streaming systems (Kafka consumer offsets, Kinesis checkpoints). For Horizon SSE, the checkpoint is the last successfully processed `paging_token`. The checkpoint must be written atomically so a crash mid-write does not corrupt the stored cursor.
 

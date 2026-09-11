@@ -1,4 +1,4 @@
-"""Causal inference engine for LedgerLens wash-trading detection.
+"""Causal inference engine for StellarLense wash-trading detection.
 
 This module provides two distinct layers of causal reasoning:
 
@@ -78,7 +78,7 @@ from scipy.stats import norm
 from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.preprocessing import StandardScaler
 
-logger = logging.getLogger("ledgerlens.causal_engine")
+logger = logging.getLogger("stellar_lense.causal_engine")
 
 # ---------------------------------------------------------------------------
 # ATE estimation method labels
@@ -159,7 +159,7 @@ TREATMENT_FEATURES: list[str] = list(OBSERVABLE_FEATURE_NODES)
 
 
 def build_causal_dag() -> nx.DiGraph:
-    """Build and return the LedgerLens causal DAG as a NetworkX DiGraph.
+    """Build and return the StellarLense causal DAG as a NetworkX DiGraph.
 
     The DAG encodes domain knowledge about how wash-trading activity causes
     observable feature signals and ultimately the risk score.  Edge
@@ -331,7 +331,7 @@ def _save_ate_method_cache(
 
 
 class CausalEngine:
-    """DoWhy-based structural causal model over LedgerLens ML features.
+    """DoWhy-based structural causal model over StellarLense ML features.
 
     The engine fits structural equations to a scored-wallet dataset and exposes
     do-calculus interventions so analysts can answer questions like:

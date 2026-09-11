@@ -1,11 +1,11 @@
 # storage/
 
-This directory contains the data lifecycle layer for LedgerLens: the immutable
+This directory contains the data lifecycle layer for Stellar Lense: the immutable
 audit log that records every system event, and the retention engine that
 archives and purges data according to per-table TTL policies.
 
 Both modules operate on the same SQLite database configured by
-`LEDGERLENS_DB_PATH`, but they serve distinct roles:
+`STELLARLENSE_DB_PATH`, but they serve distinct roles:
 
 | File | Purpose |
 |------|---------|
@@ -21,7 +21,7 @@ Each row is cryptographically linked to the previous row via an HMAC-SHA256
 chain hash:
 
 ```
-entry_hash = HMAC-SHA256(key=LEDGERLENS_AUDIT_SECRET,
+entry_hash = HMAC-SHA256(key=STELLARLENSE_AUDIT_SECRET,
                          msg=canonical_json(entry_without_hash))
 ```
 
@@ -44,10 +44,10 @@ to a row breaks the chain and is detected by the verifier.
 
 | Environment variable | Default | Description |
 |----------------------|---------|-------------|
-| `LEDGERLENS_AUDIT_SECRET` | dev-only fallback | HMAC key; **must be set in production** |
-| `LEDGERLENS_DB_PATH` | `./ledgerlens.db` | SQLite database path |
+| `STELLARLENSE_AUDIT_SECRET` | dev-only fallback | HMAC key; **must be set in production** |
+| `STELLARLENSE_DB_PATH` | `./stellar_lense.db` | SQLite database path |
 
-> **Security:** Always set `LEDGERLENS_AUDIT_SECRET` to a secret value in
+> **Security:** Always set `STELLARLENSE_AUDIT_SECRET` to a secret value in
 > production. The default fallback is intentionally weak and logs a warning at
 > startup.
 

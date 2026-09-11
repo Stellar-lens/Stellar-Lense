@@ -12,7 +12,7 @@ Extend `detection/counterfactual_engine.py` to generate minimum-cost counterfact
 
 SHAP explains *why* a score is high (feature attributions) but not *how to change it* (actionable recourse). For legitimate traders who receive a false positive, or for protocol operators who want to explain scoring to their users, SHAP alone is insufficient. Counterfactual explanations answer: "what is the minimum change to this wallet's behaviour that would result in a score below the alert threshold?"
 
-DiCE (Mothilal et al., 2020) generates diverse counterfactuals by optimising a proximity-diversity objective. For LedgerLens, we adapt DiCE to:
+DiCE (Mothilal et al., 2020) generates diverse counterfactuals by optimising a proximity-diversity objective. For Stellar Lense, we adapt DiCE to:
 1. Constrain counterfactuals to be actionable (you cannot change your account age, wash_ring_membership in the past, or network centrality retroactively — these are immutable or semi-immutable features)
 2. Return multiple (≥ 3) diverse counterfactuals, each achieving `score < 50`
 3. Express each counterfactual as a set of plain-language "suggested actions"
@@ -92,7 +92,7 @@ class CounterfactualResponse:
     model_version: str
     disclaimer: str = (
         "These counterfactuals describe feature changes, not guaranteed score changes. "
-        "Consult LedgerLens documentation before taking action."
+        "Consult Stellar Lense documentation before taking action."
     )
 ```
 
@@ -255,7 +255,7 @@ COUNTERFACTUAL_RATE_LIMIT_PER_MIN=10
 
 ## For Contributors
 
-**Ideal contributor profile**: You have experience with ML interpretability libraries — DiCE, LIME, SHAP, or Alibi — and understand the distinction between attribution-based (SHAP) and recourse-based (counterfactual) explanations. Familiarity with sklearn-compatible model interfaces and Pandas DataFrames is essential. Experience working on explainable AI for high-stakes decisions (credit scoring, fraud detection, compliance) is particularly relevant. Knowledge of the LedgerLens feature engineering pipeline will reduce onboarding time significantly.
+**Ideal contributor profile**: You have experience with ML interpretability libraries — DiCE, LIME, SHAP, or Alibi — and understand the distinction between attribution-based (SHAP) and recourse-based (counterfactual) explanations. Familiarity with sklearn-compatible model interfaces and Pandas DataFrames is essential. Experience working on explainable AI for high-stakes decisions (credit scoring, fraud detection, compliance) is particularly relevant. Knowledge of the Stellar Lense feature engineering pipeline will reduce onboarding time significantly.
 
 To apply, please comment on this issue stating:
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { LedgerLensClient, LedgerLensError } from "../src/client";
+import { StellarLenseClient, StellarLenseError } from "../src/client";
 import { RiskScoreSchema } from "../src/schemas";
 
 function mockFetch(status: number, body: unknown): void {
@@ -10,11 +10,11 @@ function mockFetch(status: number, body: unknown): void {
   });
 }
 
-describe("LedgerLensClient", () => {
-  let client: LedgerLensClient;
+describe("StellarLenseClient", () => {
+  let client: StellarLenseClient;
 
   beforeEach(() => {
-    client = new LedgerLensClient({ baseUrl: "http://localhost:8000" });
+    client = new StellarLenseClient({ baseUrl: "http://localhost:8000" });
     vi.resetAllMocks();
   });
 
@@ -35,9 +35,9 @@ describe("LedgerLensClient", () => {
       );
     });
 
-    it("throws LedgerLensError on non-ok response", async () => {
+    it("throws StellarLenseError on non-ok response", async () => {
       mockFetch(503, { detail: "Service unavailable" });
-      await expect(client.getHealth()).rejects.toThrow(LedgerLensError);
+      await expect(client.getHealth()).rejects.toThrow(StellarLenseError);
     });
   });
 
@@ -109,7 +109,7 @@ describe("LedgerLensClient", () => {
 
     it("throws on invalid wallet format response", async () => {
       mockFetch(400, { detail: "Invalid wallet address" });
-      await expect(client.getScore("invalid")).rejects.toThrow(LedgerLensError);
+      await expect(client.getScore("invalid")).rejects.toThrow(StellarLenseError);
     });
   });
 
@@ -145,7 +145,7 @@ describe("LedgerLensClient", () => {
 
   describe("API key headers", () => {
     it("includes admin key header when configured", () => {
-      const adminClient = new LedgerLensClient({
+      const adminClient = new StellarLenseClient({
         baseUrl: "http://localhost:8000",
         adminKey: "admin-secret",
       });
@@ -155,11 +155,11 @@ describe("LedgerLensClient", () => {
 
       const headers = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][1]
         .headers;
-      expect(headers["X-LedgerLens-Admin-Key"]).toBe("admin-secret");
+      expect(headers["X-StellarLense-Admin-Key"]).toBe("admin-secret");
     });
 
     it("includes compliance key header when configured", () => {
-      const compClient = new LedgerLensClient({
+      const compClient = new StellarLenseClient({
         baseUrl: "http://localhost:8000",
         complianceKey: "compliance-secret",
       });
@@ -169,7 +169,7 @@ describe("LedgerLensClient", () => {
 
       const headers = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][1]
         .headers;
-      expect(headers["X-LedgerLens-Compliance-Key"]).toBe("compliance-secret");
+      expect(headers["X-StellarLense-Compliance-Key"]).toBe("compliance-secret");
     });
   });
 
@@ -226,24 +226,24 @@ describe("LedgerLensClient", () => {
   });
 
   describe("error handling", () => {
-    it("throws LedgerLensError on HTTP error with detail", async () => {
+    it("throws StellarLenseError on HTTP error with detail", async () => {
       mockFetch(401, { detail: "Unauthorized" });
 
-      await expect(client.getHealth()).rejects.toThrow(LedgerLensError);
+      await expect(client.getHealth()).rejects.toThrow(StellarLenseError);
       await expect(client.getHealth()).rejects.toMatchObject({
         statusCode: 401,
         message: "Unauthorized",
       });
     });
 
-    it("throws LedgerLensError on response validation failure", async () => {
+    it("throws StellarLenseError on response validation failure", async () => {
       mockFetch(200, { invalid: "data" });
 
       await expect(
         client.getScore(
           "GABCDEF1234567890123456789012345678901234567890123456",
         ),
-      ).rejects.toThrow(LedgerLensError);
+      ).rejects.toThrow(StellarLenseError);
     });
 
     it("handles network errors gracefully", async () => {

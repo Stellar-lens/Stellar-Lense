@@ -4,7 +4,7 @@ Retry schedule: 30 s → 5 min → 30 min (3 attempts total).
 After all retries are exhausted the delivery is written to the
 ``webhook_dlq`` SQLite table and a ``webhook.dead_lettered`` log event
 is emitted.  HMAC-SHA256 signatures are re-computed on every attempt
-using the same ``X-LedgerLens-Signature`` header scheme as the primary
+using the same ``X-StellarLense-Signature`` header scheme as the primary
 delivery worker.
 """
 
@@ -24,7 +24,7 @@ import httpx
 
 from config.settings import settings
 
-logger = logging.getLogger("ledgerlens.webhook.sender")
+logger = logging.getLogger("stellar_lense.webhook.sender")
 
 RETRY_DELAYS = [30, 300, 1800]  # 30 s, 5 min, 30 min
 REQUEST_TIMEOUT = 10.0
@@ -156,8 +156,8 @@ def _build_signature(body: bytes, secret: str) -> str:
 def _build_headers(body: bytes, secret: str) -> dict[str, str]:
     return {
         "Content-Type": "application/json",
-        "X-LedgerLens-Signature": _build_signature(body, secret),
-        "X-LedgerLens-Timestamp": str(int(datetime.now(timezone.utc).timestamp())),
+        "X-StellarLense-Signature": _build_signature(body, secret),
+        "X-StellarLense-Timestamp": str(int(datetime.now(timezone.utc).timestamp())),
     }
 
 

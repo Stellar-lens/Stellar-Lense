@@ -1,15 +1,15 @@
 # Webhook Security Model
 
-This document describes the security properties of the LedgerLens webhook system, covering HMAC signing, replay prevention, secret rotation, dead-letter recovery, and SSRF protection. For a consolidated system threat model, see the [STRIDE Threat Model](threat_model.md).
+This document describes the security properties of the Stellar Lense webhook system, covering HMAC signing, replay prevention, secret rotation, dead-letter recovery, and SSRF protection. For a consolidated system threat model, see the [STRIDE Threat Model](threat_model.md).
 
 ## HMAC Signing Scheme
 
 Every webhook delivery is signed with **HMAC-SHA256** using the subscriber's secret key.
 
-The signature is sent in the `X-LedgerLens-Signature` header:
+The signature is sent in the `X-StellarLense-Signature` header:
 
 ```
-X-LedgerLens-Signature: sha256=<hex-digest>
+X-StellarLense-Signature: sha256=<hex-digest>
 ```
 
 The digest is computed over the **raw request body bytes** (not the parsed JSON). Receivers must verify this signature before trusting the payload:
@@ -17,7 +17,7 @@ The digest is computed over the **raw request body bytes** (not the parsed JSON)
 ```python
 import hmac, hashlib
 
-def verify_ledgerlens_webhook(body: bytes, secret: str, signature: str) -> bool:
+def verify_stellar_lense_webhook(body: bytes, secret: str, signature: str) -> bool:
     if not signature.startswith("sha256="):
         return False
     expected = "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
@@ -29,7 +29,7 @@ def verify_ledgerlens_webhook(body: bytes, secret: str, signature: str) -> bool:
 
 ## Replay Prevention Window
 
-Each delivery includes a `X-LedgerLens-Timestamp` header containing the Unix epoch second when the delivery was attempted.
+Each delivery includes a `X-StellarLense-Timestamp` header containing the Unix epoch second when the delivery was attempted.
 
 Receivers **should** reject payloads whose timestamp falls outside a ±5 minute (300 second) window:
 
@@ -83,19 +83,19 @@ The Go SDK (`go/`) ships an equivalent helper using `hmac.Equal` (constant-time)
 
 ```go
 import (
-    ledgerlens "github.com/Ledger-Lenz/Ledgerlens-core/go"
+    stellar_lense "github.com/Stellar-lens/Stellar-Lense/go"
 )
 
 // In your webhook HTTP handler:
-ok := ledgerlens.VerifyWebhookSignature(body, webhookSecret, r.Header.Get("X-LedgerLens-Signature"))
+ok := stellar_lense.VerifyWebhookSignature(body, webhookSecret, r.Header.Get("X-StellarLense-Signature"))
 if !ok {
     http.Error(w, "invalid signature", http.StatusUnauthorized)
     return
 }
 
-ok = ledgerlens.VerifyWebhookTimestamp(
-    r.Header.Get("X-LedgerLens-Timestamp"),
-    ledgerlens.DefaultWebhookMaxAge, // 5 * time.Minute
+ok = stellar_lense.VerifyWebhookTimestamp(
+    r.Header.Get("X-StellarLense-Timestamp"),
+    stellar_lense.DefaultWebhookMaxAge, // 5 * time.Minute
 )
 if !ok {
     http.Error(w, "timestamp too old", http.StatusUnauthorized)

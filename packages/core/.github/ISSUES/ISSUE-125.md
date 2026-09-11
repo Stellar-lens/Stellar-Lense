@@ -6,7 +6,7 @@ assignees: []
 
 ## Summary
 
-LedgerLens namespaces share a single SQLite database with no enforced row-level isolation — a misconfigured query can read another tenant's scores, alerts, and suppression lists. Complete namespace isolation with SQLite-layer enforcement, API middleware scoping, and an opt-in cross-namespace federation API (for compliance networks where multiple institutions share ring-member signals) is required before LedgerLens can be offered as a multi-tenant SaaS platform.
+Stellar Lense namespaces share a single SQLite database with no enforced row-level isolation — a misconfigured query can read another tenant's scores, alerts, and suppression lists. Complete namespace isolation with SQLite-layer enforcement, API middleware scoping, and an opt-in cross-namespace federation API (for compliance networks where multiple institutions share ring-member signals) is required before Stellar Lense can be offered as a multi-tenant SaaS platform.
 
 ## Background & Context
 

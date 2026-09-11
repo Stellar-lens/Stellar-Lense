@@ -5,7 +5,7 @@ assignees: []
 ---
 
 ## Summary
-When the Stellar Horizon API or Redis feature store is unavailable, the LedgerLens ingestion worker retries indefinitely, exhausting connection pools and causing cascading failures. A circuit breaker that opens after N consecutive failures and half-opens after a recovery timeout prevents resource exhaustion and provides fast-fail behaviour during outages.
+When the Stellar Horizon API or Redis feature store is unavailable, the Stellar Lense ingestion worker retries indefinitely, exhausting connection pools and causing cascading failures. A circuit breaker that opens after N consecutive failures and half-opens after a recovery timeout prevents resource exhaustion and provides fast-fail behaviour during outages.
 
 ## Objectives
 - [ ] Implement `CircuitBreaker` class in `utils/circuit_breaker.py` with `CLOSED`, `OPEN`, `HALF_OPEN` states

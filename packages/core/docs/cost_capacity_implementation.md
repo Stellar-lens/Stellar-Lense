@@ -1,12 +1,12 @@
 # Cost and Capacity Monitoring Implementation Summary
 
-This document summarizes the cost and capacity monitoring implementation for LedgerLens, delivered as part of the observability enhancement initiative.
+This document summarizes the cost and capacity monitoring implementation for Stellar Lense, delivered as part of the observability enhancement initiative.
 
 ## Overview
 
-This implementation adds comprehensive cost visibility and capacity planning to LedgerLens's existing observability stack. It translates Kubernetes resource consumption into financial metrics and provides forward-looking capacity projections to answer:
+This implementation adds comprehensive cost visibility and capacity planning to Stellar Lense's existing observability stack. It translates Kubernetes resource consumption into financial metrics and provides forward-looking capacity projections to answer:
 
-- **What does LedgerLens cost to run?** (per hour, per wallet scored, per pod)
+- **What does Stellar Lense cost to run?** (per hour, per wallet scored, per pod)
 - **How much will it cost next month?** (trend analysis)
 - **When will we run out of capacity?** (days until maxReplicas or PVC full)
 
@@ -27,24 +27,24 @@ This implementation adds comprehensive cost visibility and capacity planning to 
    - Follows existing pydantic-settings pattern
 
 3. **`config/cost_exporter.py`** — NEW: Lightweight exporter that exposes cost coefficients as Prometheus gauges:
-   - `ledgerlens_cost_per_vcpu_hour_usd`
-   - `ledgerlens_cost_per_gb_memory_hour_usd`
-   - `ledgerlens_cost_per_gb_storage_month_usd`
+   - `stellar_lense_cost_per_vcpu_hour_usd`
+   - `stellar_lense_cost_per_gb_memory_hour_usd`
+   - `stellar_lense_cost_per_gb_storage_month_usd`
    - Initialized at application startup in `api/main.py`
 
 ### Prometheus Monitoring
 
 1. **`monitoring/recording_rules_cost.yml`** — NEW: Recording rules for cost and capacity metrics:
    - **Cost metrics:**
-     - `ledgerlens:pod_cost_per_hour:usd` — Per-pod cost (CPU + memory)
-     - `ledgerlens:namespace_cost_per_hour:usd` — Total namespace cost
-     - `ledgerlens:cost_per_wallet_scored:usd` — Unit economics
-     - `ledgerlens:storage_cost_per_hour:usd` — PVC cost
+     - `stellar_lense:pod_cost_per_hour:usd` — Per-pod cost (CPU + memory)
+     - `stellar_lense:namespace_cost_per_hour:usd` — Total namespace cost
+     - `stellar_lense:cost_per_wallet_scored:usd` — Unit economics
+     - `stellar_lense:storage_cost_per_hour:usd` — PVC cost
    - **Capacity metrics:**
-     - `ledgerlens:replica_count_projected_days_to_max` — Days until maxReplicas
-     - `ledgerlens:pvc_projected_days_to_full` — Days until PVC full
-     - `ledgerlens:wallets_scored_per_hour` — Current throughput
-     - `ledgerlens:wallets_scored_per_hour:predicted_7d` — Projected throughput
+     - `stellar_lense:replica_count_projected_days_to_max` — Days until maxReplicas
+     - `stellar_lense:pvc_projected_days_to_full` — Days until PVC full
+     - `stellar_lense:wallets_scored_per_hour` — Current throughput
+     - `stellar_lense:wallets_scored_per_hour:predicted_7d` — Projected throughput
 
 2. **`monitoring/alerts.yml`** — Added `CapacityLimitApproaching` alert:
    - Fires when projected days-to-limit < 14 days
@@ -70,13 +70,13 @@ This implementation adds comprehensive cost visibility and capacity planning to 
    - API Replica Count (time series)
    - PVC Usage % (gauge)
 
-2. **`monitoring/grafana/provisioning/dashboards/ledgerlens.yaml`** — NEW: Dashboard provisioning config for "dashboard-as-code" deployment
+2. **`monitoring/grafana/provisioning/dashboards/stellar_lense.yaml`** — NEW: Dashboard provisioning config for "dashboard-as-code" deployment
 
 ### Helm Chart
 
-1. **`helm/ledgerlens/templates/cost-config.yaml`** — NEW: ConfigMap template for cost configuration
+1. **`helm/stellar_lense/templates/cost-config.yaml`** — NEW: ConfigMap template for cost configuration
 
-2. **`helm/ledgerlens/values.yaml`** — Added `costConfig` section:
+2. **`helm/stellar_lense/values.yaml`** — Added `costConfig` section:
    ```yaml
    costConfig:
      enabled: true
@@ -87,7 +87,7 @@ This implementation adds comprehensive cost visibility and capacity planning to 
      capacityProjectionLeadTimeDays: "14"
    ```
 
-3. **`helm/ledgerlens/templates/api-deployment.yaml`** — Updated to include cost-config ConfigMap in `envFrom`
+3. **`helm/stellar_lense/templates/api-deployment.yaml`** — Updated to include cost-config ConfigMap in `envFrom`
 
 ### Documentation
 
@@ -183,7 +183,7 @@ The cost and capacity features require:
 
 2. **cadvisor** — for CPU/memory usage (included in kubelet, no separate install needed)
 
-3. **Prometheus** — scraping both LedgerLens `/metrics` endpoint and kube-state-metrics
+3. **Prometheus** — scraping both Stellar Lense `/metrics` endpoint and kube-state-metrics
 
 4. **Grafana** — for dashboard visualization (optional but recommended)
 
@@ -215,7 +215,7 @@ echo "COST_PER_GB_STORAGE_MONTH_USD=0.10" >> .env
 uvicorn api.main:app --reload
 
 # 3. Verify cost gauges are exposed
-curl http://localhost:8000/metrics | grep ledgerlens_cost_per
+curl http://localhost:8000/metrics | grep stellar_lense_cost_per
 ```
 
 ### Kubernetes / Helm
@@ -225,7 +225,7 @@ curl http://localhost:8000/metrics | grep ledgerlens_cost_per
 # Or use --set overrides for sensitive values
 
 # 2. Install/upgrade
-helm upgrade --install ledgerlens ./helm/ledgerlens \
+helm upgrade --install stellar_lense ./helm/stellar_lense \
   --set costConfig.costPerVcpuHourUsd=0.0416
 
 # 3. Load Prometheus rules
@@ -234,7 +234,7 @@ kubectl apply -f monitoring/alerts.yml
 
 # 4. Import Grafana dashboard
 # Upload monitoring/grafana/cost_capacity_dashboard.json via Grafana UI
-# Or provision via monitoring/grafana/provisioning/dashboards/ledgerlens.yaml
+# Or provision via monitoring/grafana/provisioning/dashboards/stellar_lense.yaml
 ```
 
 ## Files Changed/Added
@@ -244,9 +244,9 @@ kubectl apply -f monitoring/alerts.yml
 - `config/cost_exporter.py`
 - `monitoring/recording_rules_cost.yml`
 - `monitoring/grafana/cost_capacity_dashboard.json`
-- `monitoring/grafana/provisioning/dashboards/ledgerlens.yaml`
+- `monitoring/grafana/provisioning/dashboards/stellar_lense.yaml`
 - `monitoring/README.md`
-- `helm/ledgerlens/templates/cost-config.yaml`
+- `helm/stellar_lense/templates/cost-config.yaml`
 - `docs/cost_and_capacity.md`
 - `tests/test_cost_metrics.py`
 - `.github/workflows/cost-monitoring-validation.yml`
@@ -257,8 +257,8 @@ kubectl apply -f monitoring/alerts.yml
 - `.env.example` — Added 5 cost/capacity configuration variables
 - `config/settings.py` — Added 5 configuration fields with validators
 - `api/main.py` — Added `init_cost_metrics()` call at startup
-- `helm/ledgerlens/values.yaml` — Added `costConfig` section
-- `helm/ledgerlens/templates/api-deployment.yaml` — Added cost-config ConfigMap to envFrom
+- `helm/stellar_lense/values.yaml` — Added `costConfig` section
+- `helm/stellar_lense/templates/api-deployment.yaml` — Added cost-config ConfigMap to envFrom
 - `monitoring/alerts.yml` — Added `CapacityLimitApproaching` alert
 - `docs/observability.md` — Added cost and capacity section
 - `docs/metrics.md` — Added reference to cost recording rules
@@ -273,7 +273,7 @@ kubectl apply -f monitoring/alerts.yml
   - [x] Grafana dashboard (`monitoring/grafana/cost_capacity_dashboard.json`)
   - [x] Capacity projection recording rules using `predict_linear()`
   - [x] `CapacityLimitApproaching` alert added to `monitoring/alerts.yml`
-  - [x] Dashboard provisioning snippet (`monitoring/grafana/provisioning/dashboards/ledgerlens.yaml`)
+  - [x] Dashboard provisioning snippet (`monitoring/grafana/provisioning/dashboards/stellar_lense.yaml`)
   - [x] Helm cost-config ConfigMap template
 
 - [x] Tests written:
@@ -313,7 +313,7 @@ kubectl apply -f monitoring/alerts.yml
 
 - [Issue #XXX] — Original issue requesting cost and capacity monitoring
 - [docs/cost_and_capacity.md](cost_and_capacity.md) — Comprehensive user guide
-- [monitoring/README.md](https://github.com/Ledger-Lenz/Ledgerlens-core/blob/main/monitoring/README.md) — Monitoring quick reference
+- [monitoring/README.md](https://github.com/Stellar-lens/Stellar-Lense/blob/main/monitoring/README.md) — Monitoring quick reference
 
 ---
 

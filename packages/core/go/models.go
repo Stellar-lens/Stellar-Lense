@@ -1,9 +1,9 @@
-package ledgerlens
+package stellar_lense
 
 import "time"
 
 // RiskScore is a single wallet/asset-pair risk score returned by the
-// LedgerLens scoring pipeline.
+// Stellar Lense scoring pipeline.
 //
 // Field names and units exactly match the cross-repo contract defined in
 // detection/risk_score.py and the Python/TypeScript SDKs. Do not rename

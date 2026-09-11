@@ -1,6 +1,6 @@
 # Executable Architecture Guide (summary)
 
-This document provides a compact, executable view of the LedgerLens Core architecture to help new contributors find code, tests, docs, and deployment boundaries.
+This document provides a compact, executable view of the Stellar Lense Core architecture to help new contributors find code, tests, docs, and deployment boundaries.
 
 Runtimes and primary directories
 - HTTP API: api/ (FastAPI / Starlette handlers and middleware)

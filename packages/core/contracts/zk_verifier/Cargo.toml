@@ -1,8 +1,8 @@
 [package]
-name = "ledgerlens-zk-verifier"
+name = "stellar-lense-zk-verifier"
 version = "0.1.0"
 edition = "2021"
-description = "Soroban contract that verifies zero-knowledge threshold proofs for LedgerLens risk scores"
+description = "Soroban contract that verifies zero-knowledge threshold proofs for Stellar Lense risk scores"
 
 [lib]
 crate-type = ["cdylib", "rlib"]

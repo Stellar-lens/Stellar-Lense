@@ -6,7 +6,7 @@ Use **protocol-first generation with thin hand-written wrappers** for typed
 request/response protocols, and **hand-written resilience adapters** for
 real-time protocols:
 
-- **gRPC:** generate transport bindings from `proto/ledgerlens/v1/scoring.proto`;
+- **gRPC:** generate transport bindings from `proto/stellar_lense/v1/scoring.proto`;
   expose an idiomatic wrapper per SDK for authentication, deadlines, retries,
   and error mapping.
 - **GraphQL:** generate schema and operation types from the GraphQL introspection
@@ -54,14 +54,14 @@ address real-time lifecycle complexity without duplicating protocol schemas.
 ## Proof of concept
 
 `scripts/grpc_client_poc.py` is a small client against the real
-`ledgerlens.v1.ScoringService` generated Python bindings. It exercises both the
+`stellar_lense.v1.ScoringService` generated Python bindings. It exercises both the
 unary `ScoreWallet` RPC and the streaming `BatchScoreWallets` RPC, sends the
 same API-key metadata as the server expects, and supports TLS by default.
 
 Start the local sidecar in one terminal:
 
 ```bash
-LEDGERLENS_ADMIN_API_KEY=local-dev-key \
+STELLARLENSE_ADMIN_API_KEY=local-dev-key \
 GRPC_ALLOW_INSECURE=true \
 python cli.py grpc-serve --port 50051
 ```
@@ -69,7 +69,7 @@ python cli.py grpc-serve --port 50051
 Run the POC in another terminal:
 
 ```bash
-LEDGERLENS_API_KEY=local-dev-key \
+STELLARLENSE_API_KEY=local-dev-key \
 python scripts/grpc_client_poc.py \
   --endpoint localhost:50051 \
   --insecure \
@@ -80,22 +80,22 @@ For production-like TLS, omit `--insecure` and provide the CA certificate when
 using a private certificate authority:
 
 ```bash
-LEDGERLENS_API_KEY="$LEDGERLENS_API_KEY" \
+STELLARLENSE_API_KEY="$STELLARLENSE_API_KEY" \
 python scripts/grpc_client_poc.py \
   --endpoint scoring.example.com:443 \
-  --ca-cert /etc/ledgerlens/ca.pem \
+  --ca-cert /etc/stellar_lense/ca.pem \
   --wallet GABC...XYZ
 ```
 
 The existing `tests/test_grpc_scoring_service.py` verifies the same generated
-stub against the in-process LedgerLens server, including authentication,
+stub against the in-process Stellar Lense server, including authentication,
 optional conformal fields, batch ordering, batch limits, and rate limiting.
 Together, the test and script validate the wire contract without introducing a
 second hand-written protocol implementation.
 
 ## Drift controls
 
-- Treat `proto/ledgerlens/v1/scoring.proto` as the source of truth.
+- Treat `proto/stellar_lense/v1/scoring.proto` as the source of truth.
 - Pin protoc/plugin versions in the future codegen workflow and regenerate all
   language bindings in one change.
 - Add CI checks that generated files are reproducible and that GraphQL generated

@@ -8,7 +8,7 @@ assignees: []
 `horizon_streamer.py` currently passes ingested trade events directly to the detection pipeline without any queue depth limits or producer throttling. Under high-volume conditions — Stellar ledger spikes, burst trading activity, or a slow detection pipeline — unbounded buffering causes runaway memory growth and can OOM-kill the process. Implementing proper backpressure and flow control will bound memory usage, make the system observable, and prevent detection pipeline slowness from cascading into ingestion failures.
 
 ## Background & Context
-The LedgerLens ingestion architecture (see README Layer 1) has `horizon_streamer.py` consuming from the Horizon SSE endpoint and feeding events into `detection/feature_engineering.py`. In the current implementation the handoff between these layers is either a direct synchronous call or an unbounded `asyncio.Queue`. Neither provides backpressure.
+The Stellar Lense ingestion architecture (see README Layer 1) has `horizon_streamer.py` consuming from the Horizon SSE endpoint and feeding events into `detection/feature_engineering.py`. In the current implementation the handoff between these layers is either a direct synchronous call or an unbounded `asyncio.Queue`. Neither provides backpressure.
 
 When the detection pipeline slows down (e.g., during model inference with a large feature batch, or during SHAP computation in `detection/shap_explainer.py`), the producer continues to read from Horizon SSE at full speed, accumulating events in memory. On the Stellar DEX, trading bursts during token launches or market volatility events can produce hundreds of trades per second, making this a realistic production failure mode.
 

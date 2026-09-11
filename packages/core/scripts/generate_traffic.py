@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """generate_traffic.py
 
-Generates synthetic load against the LedgerLens API.
+Generates synthetic load against the StellarLense API.
 Fires HTTP requests sequentially at a steady rate to simulate background user activity.
 """
 
@@ -18,7 +18,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--url",
         default="http://localhost:8000",
-        help="Base URL of the LedgerLens API under test",
+        help="Base URL of the StellarLense API under test",
     )
     parser.add_argument(
         "--duration",
@@ -40,7 +40,7 @@ def main() -> int:
     
     headers = {}
     if args.api_key:
-        headers["X-LedgerLens-Api-Key"] = args.api_key
+        headers["X-StellarLense-Api-Key"] = args.api_key
         
     start_time = time.monotonic()
     end_time = start_time + args.duration

@@ -1,6 +1,6 @@
 # Cross-Chain Detection
 
-LedgerLens extends its wash-trading detection to cover activity that spans the Stellar DEX and EVM-compatible chains (Ethereum, Base, Polygon). Wallets that bridge assets back and forth between Stellar and EVM networks to launder wash-trade proceeds are now detected and factored into the risk score.
+Stellar Lense extends its wash-trading detection to cover activity that spans the Stellar DEX and EVM-compatible chains (Ethereum, Base, Polygon). Wallets that bridge assets back and forth between Stellar and EVM networks to launder wash-trade proceeds are now detected and factored into the risk score.
 
 ## Architecture
 
@@ -261,9 +261,9 @@ API keys embedded in URLs (e.g. `infura.io/v3/SECRET`) are **masked** in all log
 
 ### Threat model
 
-Bridge events are fetched from EVM chains via JSON-RPC (`eth_getLogs`). The on-chain log data is cryptographically committed to the block through the Merkle Patricia Trie, so any tampering would change the block hash. However, the JSON-RPC layer is an untrusted intermediary: a compromised RPC endpoint (e.g. a malicious Infura fork or an MitM proxy) could return fabricated log data that LedgerLens would otherwise accept as authentic — causing false wash-trading alerts against innocent wallets.
+Bridge events are fetched from EVM chains via JSON-RPC (`eth_getLogs`). The on-chain log data is cryptographically committed to the block through the Merkle Patricia Trie, so any tampering would change the block hash. However, the JSON-RPC layer is an untrusted intermediary: a compromised RPC endpoint (e.g. a malicious Infura fork or an MitM proxy) could return fabricated log data that Stellar Lense would otherwise accept as authentic — causing false wash-trading alerts against innocent wallets.
 
-LedgerLens implements two complementary defences:
+Stellar Lense implements two complementary defences:
 
 ### 1. Canonical event hash
 
@@ -282,7 +282,7 @@ canonical = {
 digest = SHA-256(json.dumps(canonical, sort_keys=True, separators=(",", ":")))
 ```
 
-This hash is stored in the `bridge_transfers.canonical_hash` column. It reflects what LedgerLens ingested — not what a subsequent attacker might claim — and can be used for audit and replay detection.
+This hash is stored in the `bridge_transfers.canonical_hash` column. It reflects what Stellar Lense ingested — not what a subsequent attacker might claim — and can be used for audit and replay detection.
 
 ### 2. Receipt-based log verification
 

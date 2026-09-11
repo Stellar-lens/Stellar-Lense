@@ -3,23 +3,23 @@ use serde::{Deserialize, Serialize};
 
 /// A single wallet/asset-pair risk score, as returned by the scoring pipeline.
 ///
-/// Field names and types match the Python SDK (`packages/ledgerlens-sdk/src/ledgerlens/models.py`)
+/// Field names and types match the Python SDK (`packages/stellar-lense-sdk/src/stellar_lense/models.py`)
 /// and the TypeScript SDK (`sdk/`) exactly.
 ///
 /// IMPORTANT: This struct must stay in sync with:
 ///   - detection/risk_score.py (Python canonical model — authoritative)
-///   - packages/ledgerlens-sdk/src/ledgerlens/models.py (Python SDK)
+///   - packages/stellar-lense-sdk/src/stellar_lense/models.py (Python SDK)
 ///   - sdk/src/schemas.ts (TypeScript/Zod)
-///   - proto/ledgerlens/v1/scoring.proto
+///   - proto/stellar_lense/v1/scoring.proto
 ///
 /// The contract is verified by: tests/test_contract_vectors.py (Python),
-/// crates/ledgerlens-sdk/tests/contract_vectors_test.rs (Rust), and
+/// crates/stellar-lense-sdk/tests/contract_vectors_test.rs (Rust), and
 /// sdk/tests/contract_vectors.test.ts (TypeScript).
 ///
 /// # Examples
 ///
 /// ```
-/// use ledgerlens_sdk::RiskScore;
+/// use stellar_lense_sdk::RiskScore;
 ///
 /// let json = r#"{
 ///     "wallet": "GABCDEFGHIJKLMNOPQRSTUVWXYZ012345678901234567890123456",
@@ -95,7 +95,7 @@ pub struct CrossChainLink {
 /// # Examples
 ///
 /// ```
-/// use ledgerlens_sdk::WalletScoresResponse;
+/// use stellar_lense_sdk::WalletScoresResponse;
 ///
 /// let json = r#"{
 ///     "scores": [

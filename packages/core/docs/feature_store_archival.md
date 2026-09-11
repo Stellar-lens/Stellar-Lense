@@ -1,6 +1,6 @@
 # Feature Store Cold-Tier Archival
 
-LedgerLens persists scored feature vectors to the `feature_distribution_snapshots` SQLite table for PSI-based drift detection.  A two-tier storage architecture prevents unbounded growth while preserving full historical data for 60–90 day drift analysis and compliance auditing.
+Stellar Lense persists scored feature vectors to the `feature_distribution_snapshots` SQLite table for PSI-based drift detection.  A two-tier storage architecture prevents unbounded growth while preserving full historical data for 60–90 day drift analysis and compliance auditing.
 
 ## Tiered Storage Architecture
 
@@ -101,7 +101,7 @@ python cli.py retrain-check
 
 ```cron
 # Archive daily at 03:00 UTC
-0 3 * * * cd /opt/ledgerlens && python cli.py archive-features >> logs/archive.log 2>&1
+0 3 * * * cd /opt/stellar_lense && python cli.py archive-features >> logs/archive.log 2>&1
 ```
 
 ## Key Classes
@@ -115,7 +115,7 @@ from pathlib import Path
 from detection.feature_store import FeatureStoreArchiver
 
 archiver = FeatureStoreArchiver(
-    db_path="./ledgerlens.db",
+    db_path="./stellar_lense.db",
     archive_dir=Path("./feature_archive"),
 )
 n_archived = archiver.archive_old_features(cutoff_days=30)
@@ -194,4 +194,4 @@ To repair:
 
 - The archive directory is created with mode **0o700** — readable only by the process owner.
 - `FEATURE_ARCHIVE_DIR` is validated at startup: path traversal outside the working directory raises a `ValueError` and aborts startup.
-- Feature vectors reveal LedgerLens's internal ML features per wallet.  Treat `feature_archive/` as sensitive data and apply the same access controls as the SQLite database.
+- Feature vectors reveal Stellar Lense's internal ML features per wallet.  Treat `feature_archive/` as sensitive data and apply the same access controls as the SQLite database.

@@ -1,6 +1,6 @@
-# LedgerLens Observability Stack
+# Stellar Lense Observability Stack
 
-This document covers structured logging, correlation ID propagation, OpenTelemetry tracing, Prometheus metrics, alerting rules, and the wallet masking policy for `ledgerlens-core`.
+This document covers structured logging, correlation ID propagation, OpenTelemetry tracing, Prometheus metrics, alerting rules, and the wallet masking policy for `stellar-lense-core`.
 
 ---
 
@@ -12,7 +12,7 @@ All log output is JSON (via [structlog](https://www.structlog.org/)). Every reco
 |---|---|
 | `timestamp` | ISO 8601 UTC timestamp |
 | `level` | Log level (`info`, `warning`, `error`) |
-| `logger` | Logger name (e.g. `ledgerlens.pipeline`) |
+| `logger` | Logger name (e.g. `stellar_lense.pipeline`) |
 | `event` | Log message |
 | `correlation_id` | Correlation ID for the current request/pipeline pass |
 | `trace_id` | OpenTelemetry trace ID (32-hex chars; `000...0` when no active span) |
@@ -21,7 +21,7 @@ All log output is JSON (via [structlog](https://www.structlog.org/)). Every reco
 
 ```python
 from config.logging_config import configure_logging
-configure_logging("ledgerlens-api")  # or "ledgerlens-cli", "ledgerlens-pipeline"
+configure_logging("stellar-lense-api")  # or "stellar-lense-cli", "stellar-lense-pipeline"
 ```
 
 This replaces the root logger's handlers with a structlog JSON formatter. All downstream `logging.getLogger(...)` calls automatically produce JSON.
@@ -64,7 +64,7 @@ The masking rule: first 8 characters + `...` + last 4 characters.
 
 ```python
 from config.telemetry import init_telemetry
-init_telemetry("ledgerlens")
+init_telemetry("stellar_lense")
 ```
 
 - If `OTEL_EXPORTER_OTLP_ENDPOINT` is set, spans are exported via OTLP gRPC.
@@ -94,7 +94,7 @@ OTEL_EXPORTER_OTLP_CLIENT_CERTIFICATE=/path/to/client.crt
 
 ### Trace Sampling
 
-LedgerLens supports two sampling strategies:
+Stellar Lense supports two sampling strategies:
 
 1. **Static (head-based)** (default): Makes sampling decisions when spans start, using `OTEL_TRACES_SAMPLER`.
 2. **Tail (tail-based)**: Makes sampling decisions after traces complete, based on trace characteristics.
@@ -110,7 +110,7 @@ When `TRACE_SAMPLING_STRATEGY="tail"`, the following policies are applied:
 | Circuit Open | Always keep traces with `soroban.submit_score` spans where `circuit_state != closed` |
 | Baseline | Keep 5% of remaining "boring" traces (configurable with `TRACE_TAIL_BASELINE_RATIO`) |
 
-All kept traces have a `ledgerlens.sampling.reason` attribute indicating why they were kept (`error`, `slow`, `circuit_open`, or `baseline`).
+All kept traces have a `stellar_lense.sampling.reason` attribute indicating why they were kept (`error`, `slow`, `circuit_open`, or `baseline`).
 
 #### Configuration
 
@@ -135,18 +135,18 @@ Exposed at `GET /metrics` (no auth — standard Prometheus scrape convention).
 
 | Metric | Type | Labels | Description |
 |---|---|---|---|
-| `ledgerlens_wallets_scored_total` | Counter | `asset_pair`, `result` | Total wallets scored |
-| `ledgerlens_scoring_latency_seconds` | Histogram | `asset_pair` | End-to-end wallet scoring time |
-| `ledgerlens_soroban_submissions_total` | Counter | `status` | Total Soroban submissions |
-| `ledgerlens_soroban_submission_latency_seconds` | Histogram | — | `submit_score()` call duration |
-| `ledgerlens_circuit_breaker_open_total` | Counter | — | Circuit breaker open events |
-| `ledgerlens_webhook_deliveries_total` | Counter | `result` | Webhook delivery attempts |
-| `ledgerlens_drift_detected_total` | Counter | — | Feature drift detection events |
-| `ledgerlens_pipeline_run_duration_seconds` | Histogram | — | Full pipeline pass duration |
-| `ledgerlens_api_request_duration_seconds` | Histogram | `method`, `endpoint`, `status_code` | FastAPI request duration |
-| `ledgerlens_model_auc_roc` | Gauge | `model_name` | Latest AUC-ROC per model |
-| `ledgerlens_secret_rotation_total` | Counter | `secret_type`, `result` | Total secret rotation attempts |
-| `ledgerlens_secret_rotation_overdue` | Gauge | — | Count of active keys exceeding maximum age without rotation |
+| `stellar_lense_wallets_scored_total` | Counter | `asset_pair`, `result` | Total wallets scored |
+| `stellar_lense_scoring_latency_seconds` | Histogram | `asset_pair` | End-to-end wallet scoring time |
+| `stellar_lense_soroban_submissions_total` | Counter | `status` | Total Soroban submissions |
+| `stellar_lense_soroban_submission_latency_seconds` | Histogram | — | `submit_score()` call duration |
+| `stellar_lense_circuit_breaker_open_total` | Counter | — | Circuit breaker open events |
+| `stellar_lense_webhook_deliveries_total` | Counter | `result` | Webhook delivery attempts |
+| `stellar_lense_drift_detected_total` | Counter | — | Feature drift detection events |
+| `stellar_lense_pipeline_run_duration_seconds` | Histogram | — | Full pipeline pass duration |
+| `stellar_lense_api_request_duration_seconds` | Histogram | `method`, `endpoint`, `status_code` | FastAPI request duration |
+| `stellar_lense_model_auc_roc` | Gauge | `model_name` | Latest AUC-ROC per model |
+| `stellar_lense_secret_rotation_total` | Counter | `secret_type`, `result` | Total secret rotation attempts |
+| `stellar_lense_secret_rotation_overdue` | Gauge | — | Count of active keys exceeding maximum age without rotation |
 
 **Security**: metric labels never contain wallet addresses, asset pair names beyond their label definition, or any PII.
 
@@ -156,23 +156,23 @@ Exposed at `GET /metrics` (no auth — standard Prometheus scrape convention).
 
 ### SorobanCircuitBreakerOpen
 
-**Condition**: `increase(ledgerlens_circuit_breaker_open_total[5m]) > 0`
+**Condition**: `increase(stellar_lense_circuit_breaker_open_total[5m]) > 0`
 
-**Runbook**: The Soroban publisher has tripped its circuit breaker. Check `SOROBAN_RPC_URL` connectivity, verify `LEDGERLENS_SERVICE_SECRET_KEY` is correct and the service account is authorised to call `submit_score()`. The circuit auto-resets after `SOROBAN_CIRCUIT_RESET_SECONDS` (default 300s). Inspect logs for `SorobanCircuitOpenError`.
+**Runbook**: The Soroban publisher has tripped its circuit breaker. Check `SOROBAN_RPC_URL` connectivity, verify `STELLARLENSE_SERVICE_SECRET_KEY` is correct and the service account is authorised to call `submit_score()`. The circuit auto-resets after `SOROBAN_CIRCUIT_RESET_SECONDS` (default 300s). Inspect logs for `SorobanCircuitOpenError`.
 
 ---
 
 ### WebhookDeadLetterBacklog
 
-**Condition**: `increase(ledgerlens_webhook_deliveries_total{result="dead_lettered"}[1h]) > 10`
+**Condition**: `increase(stellar_lense_webhook_deliveries_total{result="dead_lettered"}[1h]) > 10`
 
-**Runbook**: More than 10 webhook deliveries permanently failed in the last hour. Inspect `GET /webhooks/dead-letters`. Verify subscriber URLs are reachable over HTTPS. Check that `LEDGERLENS_WEBHOOK_ENCRYPTION_KEY` is set. Dead-letter items require manual intervention — delete the subscriber and re-register with a working URL if the endpoint is permanently unreachable.
+**Runbook**: More than 10 webhook deliveries permanently failed in the last hour. Inspect `GET /webhooks/dead-letters`. Verify subscriber URLs are reachable over HTTPS. Check that `STELLARLENSE_WEBHOOK_ENCRYPTION_KEY` is set. Dead-letter items require manual intervention — delete the subscriber and re-register with a working URL if the endpoint is permanently unreachable.
 
 ---
 
 ### FeatureDriftDetected
 
-**Condition**: `increase(ledgerlens_drift_detected_total[24h]) > 0`
+**Condition**: `increase(stellar_lense_drift_detected_total[24h]) > 0`
 
 **Runbook**: Feature distribution drift was recorded. Run `python cli.py retrain-check` to view the PSI report. If PSI > 0.25 on Benford or volume features, run `python cli.py retrain-check --force-retrain`. Check `GET /admin/drift-reports` for the full PSI breakdown.
 
@@ -180,7 +180,7 @@ Exposed at `GET /metrics` (no auth — standard Prometheus scrape convention).
 
 ### ScoringLatencyHigh
 
-**Condition**: `histogram_quantile(0.95, rate(ledgerlens_scoring_latency_seconds_bucket[10m])) > 2.0` for 5 minutes
+**Condition**: `histogram_quantile(0.95, rate(stellar_lense_scoring_latency_seconds_bucket[10m])) > 2.0` for 5 minutes
 
 **Runbook**: p95 wallet scoring latency exceeds 2 seconds. Check Horizon API latency (`HORIZON_URL`), model inference load, and SQLite write throughput. Consider reducing `TRADE_HISTORY_LOOKBACK_DAYS` or running `async_run()` instead of synchronous `run()`. Retained alongside new SLO burn-rate rules as a coarse backstop symptom alert.
 
@@ -188,36 +188,36 @@ Exposed at `GET /metrics` (no auth — standard Prometheus scrape convention).
 
 ### PipelineStalled
 
-**Condition**: `(time() - ledgerlens_pipeline_run_duration_seconds_created) > 300`
+**Condition**: `(time() - stellar_lense_pipeline_run_duration_seconds_created) > 300`
 
-**Runbook**: The detection pipeline has not completed a run in over 5 minutes. Check that `python run_pipeline.py` (or `cli.py score`) is still running and not blocked. Review logs for exceptions in Horizon ingestion or model loading. Verify `LEDGERLENS_DB_PATH` is writable.
+**Runbook**: The detection pipeline has not completed a run in over 5 minutes. Check that `python run_pipeline.py` (or `cli.py score`) is still running and not blocked. Review logs for exceptions in Horizon ingestion or model loading. Verify `STELLARLENSE_DB_PATH` is writable.
 
 ---
 
 ### SecretRotationOverdue
 
-**Condition**: `ledgerlens_secret_rotation_overdue > 0`
+**Condition**: `stellar_lense_secret_rotation_overdue > 0`
 
 **Runbook**: One or more active API keys have exceeded `API_KEY_MAX_AGE_DAYS` without rotation. Identify the overdue keys in the database and coordinate rotation via `POST /admin/api-keys/{key_id}/rotate` or the namespace key rotation endpoint.
 
 ### CapacityLimitApproaching
 
-**Condition**: `ledgerlens:replica_count_projected_days_to_max < 14 or ledgerlens:pvc_projected_days_to_full < 14` for 1 hour
+**Condition**: `stellar_lense:replica_count_projected_days_to_max < 14 or stellar_lense:pvc_projected_days_to_full < 14` for 1 hour
 
-**Runbook**: Current growth trends indicate API replica count or PVC usage will hit configured limits within 14 days. Review `ledgerlens_wallets_scored_total` growth trend in the cost_capacity dashboard. Consider raising `autoscaling.maxReplicas` or `persistence.size` in `helm/ledgerlens/values.yaml`. Investigate unexpected ingestion volume growth with `GET /metrics` and Horizon SSE metrics. See [docs/cost_and_capacity.md](cost_and_capacity.md) for full runbook.
+**Runbook**: Current growth trends indicate API replica count or PVC usage will hit configured limits within 14 days. Review `stellar_lense_wallets_scored_total` growth trend in the cost_capacity dashboard. Consider raising `autoscaling.maxReplicas` or `persistence.size` in `helm/stellar_lense/values.yaml`. Investigate unexpected ingestion volume growth with `GET /metrics` and Horizon SSE metrics. See [docs/cost_and_capacity.md](cost_and_capacity.md) for full runbook.
 
 ---
 
 ## Cost and Capacity Metrics
 
-LedgerLens includes cost visibility and capacity projection metrics. See [docs/cost_and_capacity.md](cost_and_capacity.md) for configuration and the full Grafana dashboard.
+Stellar Lense includes cost visibility and capacity projection metrics. See [docs/cost_and_capacity.md](cost_and_capacity.md) for configuration and the full Grafana dashboard.
 
 **Key metrics:**
 
-- `ledgerlens:pod_cost_per_hour:usd` — Cost per pod (CPU + memory)
-- `ledgerlens:cost_per_wallet_scored:usd` — Unit economics (cost per scored wallet)
-- `ledgerlens:replica_count_projected_days_to_max` — Days until maxReplicas exhausted
-- `ledgerlens:pvc_projected_days_to_full` — Days until PVC full
+- `stellar_lense:pod_cost_per_hour:usd` — Cost per pod (CPU + memory)
+- `stellar_lense:cost_per_wallet_scored:usd` — Unit economics (cost per scored wallet)
+- `stellar_lense:replica_count_projected_days_to_max` — Days until maxReplicas exhausted
+- `stellar_lense:pvc_projected_days_to_full` — Days until PVC full
 
 **Recording rules:** `monitoring/recording_rules_cost.yml`  
 **Alert:** `CapacityLimitApproaching` (fires 14 days before projected limit)
@@ -226,11 +226,11 @@ LedgerLens includes cost visibility and capacity projection metrics. See [docs/c
 
 ### SLO Burn-Rate Alerts
 
-LedgerLens implements multi-window, multi-burn-rate alerting for the core user journeys (scoring latency, webhook delivery, Soroban submission, and score availability). Each journey has two alert rules:
+Stellar Lense implements multi-window, multi-burn-rate alerting for the core user journeys (scoring latency, webhook delivery, Soroban submission, and score availability). Each journey has two alert rules:
 1. **`<Journey>SLOFastBurn`**: Triggers when current consumption rate will exhaust the 30-day budget in under 2 days. Severity is `page` and routes to on-call operators.
 2. **`<Journey>SLOSlowBurn`**: Triggers when current consumption rate will exhaust the 30-day budget in under 5 days. Severity is `ticket` and routes to Slack / ticketing systems.
 
-See [docs/slo.md](file:///c:/Users/hp/drips/kosiso/Ledgerlens-core/docs/slo.md) for full metrics and alerting math details.
+See [docs/slo.md](file:///c:/Users/hp/drips/kosiso/StellarLense-core/docs/slo.md) for full metrics and alerting math details.
 
 ---
 
@@ -254,4 +254,4 @@ See `.env.example` for all configuration variables.
 
 ## Model Cards
 
-For model governance, compliance, and auditing, LedgerLens generates Model Cards for each promoted model version, including a Datasheet for the training dataset. For full details, see the [Model Cards documentation](./model_cards.md).
+For model governance, compliance, and auditing, Stellar Lense generates Model Cards for each promoted model version, including a Datasheet for the training dataset. For full details, see the [Model Cards documentation](./model_cards.md).

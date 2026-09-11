@@ -35,7 +35,7 @@ from ingestion.metrics import get_metrics
 if TYPE_CHECKING:
     from detection.rolling_window import RollingWindowState, RollingWindowStore
 
-logger = logging.getLogger("ledgerlens.stream_checkpoint")
+logger = logging.getLogger("stellar_lense.stream_checkpoint")
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS stream_checkpoint (

@@ -6,7 +6,7 @@ use soroban_sdk::{
     testutils::{Address as _, MockAuth, MockAuthInvoke},
     Address, BytesN, Env, IntoVal,
 };
-use ledgerlens_zk_verifier::{ZkVerifier, ZkVerifierClient};
+use stellar_lense_zk_verifier::{ZkVerifier, ZkVerifierClient};
 
 /// Authorization bypass fuzzing — submit_score must require the *stored*
 /// admin identity, not merely that some address signed the call.

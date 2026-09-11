@@ -1,6 +1,6 @@
 # Model Performance Monitoring
 
-LedgerLens tracks actual prediction accuracy against analyst-verified labels
+Stellar Lense tracks actual prediction accuracy against analyst-verified labels
 using the `PerformanceMonitor` class. When F1 drops by more than 5 percentage
 points from the training baseline, an automatic retraining is triggered.
 
@@ -8,7 +8,7 @@ points from the training baseline, an automatic retraining is triggered.
 
 ### Analyst Guide: Submitting Labels
 
-When an analyst confirms or dismisses a LedgerLens flag, they submit a label
+When an analyst confirms or dismisses a Stellar Lense flag, they submit a label
 via the API:
 
 ```http
@@ -41,7 +41,7 @@ Administrators can view current performance metrics:
 
 ```http
 GET /admin/performance-report
-X-LedgerLens-Admin-Key: <admin-key>
+X-StellarLense-Admin-Key: <admin-key>
 ```
 
 Response includes `precision`, `recall`, `f1`, `n_samples`, and

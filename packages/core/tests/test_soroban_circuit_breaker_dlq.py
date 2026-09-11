@@ -280,14 +280,14 @@ def test_admin_soroban_health_returns_correct_schema(db_path):
 
 
 def test_admin_soroban_health_503_without_key():
-    """require_admin_key dependency raises 503 when LEDGERLENS_ADMIN_API_KEY unset."""
+    """require_admin_key dependency raises 503 when STELLARLENSE_ADMIN_API_KEY unset."""
     from fastapi import HTTPException
     from api.auth import require_admin_key
     from config import settings as settings_mod
 
     with patch.object(type(settings_mod.settings), "admin_api_key", new_callable=lambda: property(lambda self: "")):
         with pytest.raises(HTTPException) as exc_info:
-            require_admin_key(x_ledgerlens_admin_key="")
+            require_admin_key(x_stellarlense_admin_key="")
         assert exc_info.value.status_code == 503
 
 

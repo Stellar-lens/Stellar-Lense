@@ -9,7 +9,7 @@ The existing `Dockerfile` is a single-stage build that runs as root and includes
 
 ## Objectives
 - [ ] Rewrite `Dockerfile` with `builder` stage (Python + build deps) and `runtime` stage (Python slim)
-- [ ] Create non-root user `ledgerlens` (UID 1000) in the final stage; run the process as that user
+- [ ] Create non-root user `stellar_lense` (UID 1000) in the final stage; run the process as that user
 - [ ] Use `COPY --chown` to transfer app files with correct ownership
 - [ ] Reduce final image size to < 500MB (from current ~1.2GB)
 - [ ] Add `.dockerignore` excluding `.git`, `tests/`, `*.md`, and dev config files
@@ -17,6 +17,6 @@ The existing `Dockerfile` is a single-stage build that runs as root and includes
 
 ## Definition of Done
 - [ ] Final image runs all API tests successfully
-- [ ] `docker inspect` shows process user is `ledgerlens`, not `root`
+- [ ] `docker inspect` shows process user is `stellar_lense`, not `root`
 - [ ] Image size verified < 500MB via `docker image ls`
 - [ ] No build tools (`gcc`, `make`) present in final image layer

@@ -1,24 +1,24 @@
 # Kubernetes Deployment
 
-LedgerLens ships with a Helm chart for repeatable, configurable deployment on any Kubernetes cluster.
+Stellar Lense ships with a Helm chart for repeatable, configurable deployment on any Kubernetes cluster.
 
 ## Prerequisites
 
 - Kubernetes 1.24+
 - Helm 3.8+
-- A container registry with the `ledgerlens/core` image
+- A container registry with the `stellar_lense/core` image
 
 ## Quick Start
 
 ```bash
 # Install the chart with default values
-helm install ledgerlens ./helm/ledgerlens
+helm install stellar_lense ./helm/stellar_lense
 
 # Install with ingress enabled
-helm install ledgerlens ./helm/ledgerlens --set ingress.enabled=true
+helm install stellar_lense ./helm/stellar_lense --set ingress.enabled=true
 
 # Install with custom values file
-helm install ledgerlens ./helm/ledgerlens -f my-values.yaml
+helm install stellar_lense ./helm/stellar_lense -f my-values.yaml
 ```
 
 ## Configuration
@@ -30,7 +30,7 @@ The following table lists the configurable parameters and their defaults.
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `replicaCount` | `2` | Number of API server replicas |
-| `image.repository` | `ledgerlens/core` | Container image repository |
+| `image.repository` | `stellar_lense/core` | Container image repository |
 | `image.tag` | `latest` | Container image tag |
 | `image.pullPolicy` | `IfNotPresent` | Image pull policy |
 
@@ -69,7 +69,7 @@ The following table lists the configurable parameters and their defaults.
 | `ingress.enabled` | `false` | Enable ingress (disabled by default) |
 | `ingress.className` | `""` | Ingress class name |
 | `ingress.annotations` | `{}` | Ingress annotations |
-| `ingress.hosts` | `[{"host":"ledgerlens.local","paths":[{"path":"/","pathType":"Prefix"}]}]` | Ingress host rules |
+| `ingress.hosts` | `[{"host":"stellar_lense.local","paths":[{"path":"/","pathType":"Prefix"}]}]` | Ingress host rules |
 | `ingress.tls` | `[]` | TLS configuration |
 
 ### Persistence
@@ -106,25 +106,25 @@ Failure threshold: 2
 ## Deploying with Secrets
 
 ```bash
-helm install ledgerlens ./helm/ledgerlens \
+helm install stellar_lense ./helm/stellar_lense \
   --set ingress.enabled=true \
-  --set secrets.LEDGERLENS_ADMIN_API_KEY=my-admin-key \
-  --set secrets.LEDGERLENS_COMPLIANCE_API_KEY=my-compliance-key \
-  --set secrets.LEDGERLENS_SERVICE_SECRET_KEY=my-soroban-secret \
-  --set secrets.LEDGERLENS_MODEL_SIGNING_KEY=my-signing-key \
-  --set secrets.LEDGERLENS_WEBHOOK_ENCRYPTION_KEY=my-webhook-key
+  --set secrets.STELLARLENSE_ADMIN_API_KEY=my-admin-key \
+  --set secrets.STELLARLENSE_COMPLIANCE_API_KEY=my-compliance-key \
+  --set secrets.STELLARLENSE_SERVICE_SECRET_KEY=my-soroban-secret \
+  --set secrets.STELLARLENSE_MODEL_SIGNING_KEY=my-signing-key \
+  --set secrets.STELLARLENSE_WEBHOOK_ENCRYPTION_KEY=my-webhook-key
 ```
 
 ## Uninstalling
 
 ```bash
-helm uninstall ledgerlens
+helm uninstall stellar_lense
 ```
 
 ## Chart Structure
 
 ```
-helm/ledgerlens/
+helm/stellar_lense/
 ├── Chart.yaml
 ├── values.yaml
 ├── .helmignore

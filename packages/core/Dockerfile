@@ -51,23 +51,23 @@ RUN pip install --no-cache-dir --prefix=/install -r requirements/dev.txt
 # the full annotated list), and the .env file is optional. The container
 # therefore STARTS with no `-e` flags at all:
 #
-#   docker run -p 8000:8000 ledgerlens-core
+#   docker run -p 8000:8000 stellar-lense-core
 #
 # and `/health`, `/health/ready` and the read-only score endpoints work against
-# a fresh ./ledgerlens.db SQLite file. There are NO strictly-required variables:
+# a fresh ./stellar_lense.db SQLite file. There are NO strictly-required variables:
 # nothing left unset aborts startup (verified by loading config.settings.Settings
 # with an empty environment).
 #
 # Variables you almost certainly want to pass for a real deployment
 # (env var -> config/settings.py field (default) -> effect if left unset):
 #
-#   LEDGERLENS_ADMIN_API_KEY -> ledgerlens_admin_api_key ("")
+#   STELLARLENSE_ADMIN_API_KEY -> stellarlense_admin_api_key ("")
 #       /admin/* and /metrics are UNAUTHENTICATED. Startup logs a
 #       "SECURITY WARNING" but does not fail. Set this for any reachable deploy.
-#   LEDGERLENS_DB_PATH -> ledgerlens_db_path ("./ledgerlens.db")
+#   STELLARLENSE_DB_PATH -> stellarlense_db_path ("./stellar_lense.db")
 #       RiskScore store. Default lives inside the container and is lost on
 #       recreate — point at a mounted volume to persist.
-#   LEDGERLENS_CORS_ALLOWED_ORIGINS -> ledgerlens_cors_allowed_origins ("")
+#   STELLARLENSE_CORS_ALLOWED_ORIGINS -> stellarlense_cors_allowed_origins ("")
 #       Empty = deny all browser origins. Set to your dashboard origin(s).
 #       A literal "*" is rejected at startup.
 #   NETWORK -> network ("testnet")
@@ -75,8 +75,8 @@ RUN pip install --no-cache-dir --prefix=/install -r requirements/dev.txt
 #       HORIZON_URL / HORIZON_STREAM_URL / SOROBAN_RPC_URL endpoints.
 #
 # Secrets — no default; the feature stays disabled or fails when invoked:
-#   LEDGERLENS_SERVICE_SECRET_KEY      -> on-chain submit_score() calls fail auth
-#   LEDGERLENS_WEBHOOK_ENCRYPTION_KEY  -> webhook subscriber secrets can't be stored
+#   STELLARLENSE_SERVICE_SECRET_KEY      -> on-chain submit_score() calls fail auth
+#   STELLARLENSE_WEBHOOK_ENCRYPTION_KEY  -> webhook subscriber secrets can't be stored
 #   MODEL_SIGNING_PUBLIC_KEY           -> signed-model verification unavailable
 #
 # Variables that abort startup ONLY when set to an invalid value (never by being
@@ -100,23 +100,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 ARG BUILD_VERSION="0.0.0"
 
-LABEL org.opencontainers.image.title="ledgerlens-core"
+LABEL org.opencontainers.image.title="stellar-lense-core"
 LABEL org.opencontainers.image.description="Benford's Law + ensemble ML wash-trading detection engine"
 LABEL org.opencontainers.image.version="${BUILD_VERSION}"
-LABEL org.opencontainers.image.source="https://github.com/Ledger-Lenz/Ledgerlens-core"
+LABEL org.opencontainers.image.source="https://github.com/Stellar-lens/Stellar-Lense"
 
-RUN groupadd --gid 1000 ledgerlens && \
-    useradd --uid 1000 --gid ledgerlens --shell /bin/bash --create-home ledgerlens
+RUN groupadd --gid 1000 stellar_lense && \
+    useradd --uid 1000 --gid stellar_lense --shell /bin/bash --create-home stellar_lense
 
 WORKDIR /app
 
 # WORKDIR creates /app as root before any COPY runs. `COPY --chown` below
 # only sets ownership on the files/dirs it creates *inside* /app, not on the
-# /app directory entry itself — so without this, ledgerlens (uid 1000) could
+# /app directory entry itself — so without this, stellar_lense (uid 1000) could
 # never create a new top-level file directly under /app (e.g. a SQLite
 # rollback journal next to a bind-mounted db file), even though it can
 # freely write into the subdirectories COPY populated.
-RUN chown ledgerlens:ledgerlens /app
+RUN chown stellar_lense:stellar_lense /app
 
 # Build/runtime hygiene only — application config comes from the environment at
 # runtime (see the "Runtime environment variables" note above), not from ENV here.
@@ -124,14 +124,14 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PATH="/usr/local/bin:${PATH}"
 
-COPY --chown=ledgerlens:ledgerlens . .
+COPY --chown=stellar_lense:stellar_lense . .
 
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
 
-USER ledgerlens
+USER stellar_lense
 
 CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
 

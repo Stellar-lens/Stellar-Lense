@@ -22,7 +22,7 @@ from typing import List, Tuple
 
 import numpy as np
 
-logger = logging.getLogger("ledgerlens.federated.krum")
+logger = logging.getLogger("stellar_lense.federated.krum")
 
 
 class KrumAggregator:

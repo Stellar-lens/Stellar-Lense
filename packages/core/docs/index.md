@@ -1,10 +1,10 @@
-# LedgerLens Core
+# Stellar Lense Core
 
-LedgerLens is a Benford's Law + ensemble ML wash-trading detection engine for the Stellar DEX.
+Stellar Lense is a Benford's Law + ensemble ML wash-trading detection engine for the Stellar DEX.
 
 ## What it does
 
-LedgerLens ingests real-time trade data from the Stellar Horizon API and scores wallet/asset-pair
+Stellar Lense ingests real-time trade data from the Stellar Horizon API and scores wallet/asset-pair
 combinations for wash-trading risk using a multi-layer detection pipeline:
 
 - **Benford's Law analysis** — statistical digit-distribution tests on trade amounts
@@ -58,4 +58,4 @@ Horizon SSE Stream → Ingestion → Feature Store (Redis + SQLite)
 
 ## License
 
-[Apache 2.0](https://github.com/Ledger-Lenz/Ledgerlens-core/blob/main/LICENSE)
+[Apache 2.0](https://github.com/Stellar-lens/Stellar-Lense/blob/main/LICENSE)

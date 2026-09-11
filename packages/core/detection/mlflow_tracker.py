@@ -22,7 +22,7 @@ import time
 from typing import TYPE_CHECKING
 
 # ---------------------------------------------------------------------------
-# Optional dependency: mlflow  (pip install 'ledgerlens-core[ml]')
+# Optional dependency: mlflow  (pip install 'stellar-lense-core[ml]')
 # ---------------------------------------------------------------------------
 try:
     import mlflow
@@ -38,7 +38,7 @@ from config.settings import settings
 if TYPE_CHECKING:
     from collections.abc import Generator
 
-logger = logging.getLogger("ledgerlens.mlflow_tracker")
+logger = logging.getLogger("stellar_lense.mlflow_tracker")
 
 
 def _resolve_tracking_uri(uri: str | None) -> str:
@@ -83,7 +83,7 @@ def mlflow_run(
     ----------
     experiment_name:
         MLflow experiment name.  Falls back to ``settings.mlflow_experiment_name``
-        then ``"ledgerlens-training"``.
+        then ``"stellar-lense-training"``.
     tracking_uri:
         MLflow tracking URI.  Falls back to ``MLFLOW_TRACKING_URI`` env var,
         then ``settings.mlflow_tracking_uri``, then ``./mlruns``.
@@ -98,11 +98,11 @@ def mlflow_run(
     if not _HAS_MLFLOW:
         raise ImportError(
             "'mlflow' is required by detection/mlflow_tracker.py but is not installed.\n"
-            "  Install the 'ml' extra:  pip install 'ledgerlens-core[ml]'\n"
+            "  Install the 'ml' extra:  pip install 'stellar-lense-core[ml]'\n"
             "  Or install directly:     pip install mlflow"
         )
     uri = _resolve_tracking_uri(tracking_uri)
-    exp_name = experiment_name or settings.mlflow_experiment_name or "ledgerlens-training"
+    exp_name = experiment_name or settings.mlflow_experiment_name or "stellar-lense-training"
 
     mlflow.set_tracking_uri(uri)
 

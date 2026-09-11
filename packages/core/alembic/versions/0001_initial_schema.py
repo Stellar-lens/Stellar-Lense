@@ -1,4 +1,4 @@
-"""Create the baseline LedgerLens database schema.
+"""Create the baseline StellarLense database schema.
 
 This migration brings the legacy tables previously created at application
 startup under Alembic management. It creates risk scoring, trade ingestion,

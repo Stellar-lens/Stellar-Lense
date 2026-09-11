@@ -5,7 +5,7 @@ assignees: []
 ---
 
 ## Summary
-Stellar's path payment operations route trades through multiple intermediate assets in a single atomic transaction, but LedgerLens currently ingests these as a single opaque record rather than decomposing them into individual hop trades. This means that wash-trading rings that exploit path payment routing — using intermediate assets to obscure the round-trip structure — are invisible to the graph-based ring detection engine (`detection/graph_engine.py`). `ingestion/path_payment_loader.py` must decompose multi-hop path payments into a sequence of atomic `Trade` records, one per hop, so the full circular routing is visible to Tarjan SCC analysis.
+Stellar's path payment operations route trades through multiple intermediate assets in a single atomic transaction, but Stellar Lense currently ingests these as a single opaque record rather than decomposing them into individual hop trades. This means that wash-trading rings that exploit path payment routing — using intermediate assets to obscure the round-trip structure — are invisible to the graph-based ring detection engine (`detection/graph_engine.py`). `ingestion/path_payment_loader.py` must decompose multi-hop path payments into a sequence of atomic `Trade` records, one per hop, so the full circular routing is visible to Tarjan SCC analysis.
 
 ## Background & Context
 A Stellar path payment `A → [USDC → BTC → ETH] → B` is a single Horizon operation that atomically swaps asset `A` for asset `B` via the intermediate assets USDC, BTC, and ETH. The Horizon API returns this as a single `PathPaymentStrictSend` or `PathPaymentStrictReceive` operation. However, each hop in the path was independently matched against an order book or liquidity pool.

@@ -1,17 +1,17 @@
-# ledgerlens-fl-client
+# stellar-lense-fl-client
 
-Standalone Python library for exchange partners to participate in LedgerLens federated learning without sharing raw trade data.
+Standalone Python library for exchange partners to participate in Stellar Lense federated learning without sharing raw trade data.
 
 ## Installation
 
 ```bash
-pip install ledgerlens-fl-client
+pip install stellar-lense-fl-client
 ```
 
 ## Quick Start
 
 ```python
-from ledgerlens_fl_client import FLClient, DataAdapter
+from stellar_lense_fl_client import FLClient, DataAdapter
 import pandas as pd
 
 class MyExchangeAdapter(DataAdapter):
@@ -21,7 +21,7 @@ class MyExchangeAdapter(DataAdapter):
         yield df
 
 client = FLClient(
-    server_url="https://fl.ledgerlens.io",
+    server_url="https://fl.stellar-lense.io",
     api_key="your-api-key",
     data_adapter=MyExchangeAdapter(),
     operator_id="exchange-xyz",
@@ -57,23 +57,23 @@ The client can run as a container for exchange-side federated learning participa
 ### Build
 
 ```bash
-docker build -t ledgerlens-fl-client packages/ledgerlens-fl-client/
+docker build -t stellar-lense-fl-client packages/stellar-lense-fl-client/
 docker run \
-  -e FL_SERVER_URL=https://fl.ledgerlens.io \
+  -e FL_SERVER_URL=https://fl.stellar-lense.io \
   -e FL_API_KEY=your-api-key \
   -e FL_DATA_DIR=/data \
   -e FL_OPERATOR_ID=exchange-xyz \
   -e FL_ROUNDS=1 \
   -v /path/to/local/data:/data \
-  ledgerlens-fl-client
+  stellar-lense-fl-client
 **Now commit everything and push:**
 
 ```bash
-git add contracts/oracle_aggregator/CHANGELOG.md contracts/oracle_aggregator/README.md contracts/zk_verifier/CHANGELOG.md contracts/zk_verifier/README.md packages/ledgerlens-fl-client/README.md
+git add contracts/oracle_aggregator/CHANGELOG.md contracts/oracle_aggregator/README.md contracts/zk_verifier/CHANGELOG.md contracts/zk_verifier/README.md packages/stellar-lense-fl-client/README.md
 
 git commit -m "docs: document Docker build steps, panic messages, and add CHANGELOGs (#791, #792, #793, #794)
 
-- Document Docker build/run/publish status for ledgerlens-fl-client
+- Document Docker build/run/publish status for stellar-lense-fl-client
 - Document all 4 panic! messages in oracle_aggregator's README table
 - Add CHANGELOG.md to oracle_aggregator and zk_verifier contracts,
   reconstructed from git log, linked from each README"

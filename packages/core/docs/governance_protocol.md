@@ -1,6 +1,6 @@
 # Governance Protocol
 
-This document describes the off-chain governance mechanism for LedgerLens.
+This document describes the off-chain governance mechanism for Stellar Lense.
 
 ## Overview
 
@@ -36,7 +36,7 @@ There is no synchronous "wait for every replica to acknowledge" step before a pr
 - **Durable source of truth**: `execute_proposal` writes the new value to the `runtime_config` SQLite table (same database as everything else), on the *same* `BEGIN EXCLUSIVE` connection/transaction used for the `status='executed'` transition -- the write and the status flip are atomic together. If the write fails, the proposal is marked `failed` (with `execution_error` populated) rather than `executed` without actually propagating.
 - **Canonical read path**: every real consumer of a governed setting (`run_pipeline.py`, `detection/alert_engine.py`, `api/main.py`, `detection/counterfactual_engine.py`) reads through `config.settings.get_runtime_risk_score_threshold()`, never `settings.risk_score_threshold` directly. That function polls `runtime_config` through a local, per-process TTL cache (`RUNTIME_CONFIG_TTL_SECONDS`, default 60s).
 - **Worst-case bound**: with no other infrastructure configured, every process is guaranteed to observe an executed proposal within `RUNTIME_CONFIG_TTL_SECONDS` (default 60s) of execution -- a hard, documented ceiling, not "eventually, someday."
-- **Fast path (Redis configured and reachable)**: `execute_proposal` also bumps a shared Redis counter (`bump_config_version`, default key `ledgerlens:config:version`) after committing. Every process's next config read compares its last-seen counter value against the shared one -- one cheap Redis `GET`, not a new poll cycle -- and re-reads `runtime_config` immediately if the counter moved, regardless of remaining local TTL. In practice this means propagation completes on the very next scoring call / API request / ingestion batch in any process, typically well under a second.
+- **Fast path (Redis configured and reachable)**: `execute_proposal` also bumps a shared Redis counter (`bump_config_version`, default key `stellar_lense:config:version`) after committing. Every process's next config read compares its last-seen counter value against the shared one -- one cheap Redis `GET`, not a new poll cycle -- and re-reads `runtime_config` immediately if the counter moved, regardless of remaining local TTL. In practice this means propagation completes on the very next scoring call / API request / ingestion batch in any process, typically well under a second.
 - **Graceful degradation**: when `REDIS_URL` is unset or Redis is unreachable, the fast path silently no-ops (logged once) and every process falls back to the TTL bound above -- identical to this mechanism's pre-existing behavior with no Redis configured at all, including local `docker-compose up` (no `--profile`), which does not run Redis by default.
 
 This is a *versioned-config-epoch* pattern, not literal pub/sub: no background subscriber thread is needed, which matters because `run_pipeline.py` and CLI batch jobs are not long-running daemons and could never host a subscriber loop anyway.
@@ -99,7 +99,7 @@ Only these keys may be changed via governance. Secret keys are **never** modifia
 
 ## Security notes
 
-- `SettingsReloader.ALLOWED_SETTINGS` is a compile-time frozenset; governance proposals referencing `LEDGERLENS_SERVICE_SECRET_KEY` or `LEDGERLENS_ADMIN_API_KEY` are rejected before any DB write.
+- `SettingsReloader.ALLOWED_SETTINGS` is a compile-time frozenset; governance proposals referencing `STELLARLENSE_SERVICE_SECRET_KEY` or `STELLARLENSE_ADMIN_API_KEY` are rejected before any DB write.
 - `.env` is written atomically via `os.replace(.env.tmp → .env)` (POSIX-atomic rename).
 - `UNIQUE(proposal_id, voter)` in `governance_votes` enforces one-vote-per-member at the database layer.
 - `execute_proposal` uses `BEGIN EXCLUSIVE` to prevent concurrent execution races. `SettingsReloader.apply()` itself must never open a second SQLite connection while this transaction is held -- a prior version's separate `runtime_config` write inside `apply()` deadlocked against the exclusive lock on every real execution, silently swallowed by an overly broad `except Exception: pass`; the write now happens on `execute_proposal`'s own connection instead (see "Configuration propagation" above).

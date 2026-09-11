@@ -2,7 +2,7 @@
 
 Overview
 --------
-LedgerLens ingests data from multiple sources: Stellar Horizon (trades),
+StellarLense ingests data from multiple sources: Stellar Horizon (trades),
 EVM chains (bridge logs), and Solana (swap events). Each source can
 deliver duplicate events due to network retries, restarts, concurrent backfills,
 or block reorganizations.
@@ -31,7 +31,7 @@ from typing import Any
 
 from config.settings import settings
 
-logger = logging.getLogger("ledgerlens.dedup")
+logger = logging.getLogger("stellar_lense.dedup")
 
 
 class DedupResult(Enum):

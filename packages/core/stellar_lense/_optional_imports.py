@@ -1,4 +1,4 @@
-"""ledgerlens._optional_imports
+"""stellar_lense._optional_imports
 ================================
 Lazy-import helpers for optional heavy dependencies.
 
@@ -8,7 +8,7 @@ instead of a generic ModuleNotFoundError.
 
 Usage pattern (module-level guard)::
 
-    from ledgerlens._optional_imports import require_torch, HAS_TORCH
+    from stellar_lense._optional_imports import require_torch, HAS_TORCH
     if not HAS_TORCH:
         raise ImportError(require_torch("detection/temporal_model.py"))
 
@@ -75,7 +75,7 @@ def _install_hint(package: str, caller: str = "") -> str:
     location = f" (imported by {caller})" if caller else ""
     return (
         f"Optional dependency '{pypi}' is not installed{location}.\n"
-        f"  Install the '{extra}' extra:  pip install 'ledgerlens-core[{extra}]'\n"
+        f"  Install the '{extra}' extra:  pip install 'stellar-lense-core[{extra}]'\n"
         f"  Or install directly:          pip install {pypi}"
     )
 

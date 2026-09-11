@@ -4,7 +4,7 @@ Endpoint: GET /ws/alerts?api_key=<key>[&wallet_filter=G...]
 
 Authentication: api_key query param compared against settings.admin_api_key.
 Heartbeat: ping every 30s; connection dropped if no pong within 60s.
-Max connections: settings.ws_max_connections (env var LEDGERLENS_WS_MAX_CONNECTIONS, default 100).
+Max connections: settings.ws_max_connections (env var STELLARLENSE_WS_MAX_CONNECTIONS, default 100).
 """
 
 import asyncio
@@ -19,7 +19,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
 from config.settings import settings
 from detection.risk_score import RiskScore
 
-logger = logging.getLogger("ledgerlens.ws")
+logger = logging.getLogger("stellar_lense.ws")
 
 _HEARTBEAT_INTERVAL = 30  # seconds
 _PONG_TIMEOUT = 60         # seconds without pong → drop

@@ -21,7 +21,7 @@ from detection.webhook_queue import (
 )
 from detection.webhook_registry import get_subscriber, init_db as init_registry_db
 
-logger = logging.getLogger("ledgerlens.webhook.worker")
+logger = logging.getLogger("stellar_lense.webhook.worker")
 
 MAX_CONCURRENT = 10
 REQUEST_TIMEOUT = 10.0
@@ -49,7 +49,7 @@ async def _deliver(
     from config.telemetry import get_tracer
     from api.metrics import webhook_deliveries_total
 
-    tracer = get_tracer("ledgerlens.webhook")
+    tracer = get_tracer("stellar_lense.webhook")
 
     score_data = json.loads(delivery.payload_json)
     payload = build_webhook_payload(score_data)
@@ -58,8 +58,8 @@ async def _deliver(
 
     headers = {
         "Content-Type": "application/json",
-        "X-LedgerLens-Signature": signature,
-        "X-LedgerLens-Timestamp": str(int(datetime.now(timezone.utc).timestamp())),
+        "X-StellarLense-Signature": signature,
+        "X-StellarLense-Timestamp": str(int(datetime.now(timezone.utc).timestamp())),
     }
 
     with tracer.start_as_current_span("webhook.deliver") as span:

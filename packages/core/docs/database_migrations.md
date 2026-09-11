@@ -1,9 +1,9 @@
 # Database Migrations
 
-LedgerLens uses [Alembic](https://alembic.sqlalchemy.org/) for versioned, rollback-capable database migrations.
+Stellar Lense uses [Alembic](https://alembic.sqlalchemy.org/) for versioned, rollback-capable database migrations.
 
 For the contributor workflow, including creating manual revisions and safely
-selecting a development database, see [`alembic/README.md`](https://github.com/Ledger-Lenz/Ledgerlens-core/blob/main/alembic/README.md).
+selecting a development database, see [`alembic/README.md`](https://github.com/Stellar-lens/Stellar-Lense/blob/main/alembic/README.md).
 
 ## Quick reference
 
@@ -18,7 +18,7 @@ selecting a development database, see [`alembic/README.md`](https://github.com/L
 
 ## Configuration
 
-The database path is resolved from the `LEDGERLENS_DB_PATH` environment variable (default `./ledgerlens.db`). Alembic's `env.py` reads this automatically — no changes to `alembic.ini` are needed.
+The database path is resolved from the `STELLARLENSE_DB_PATH` environment variable (default `./stellar_lense.db`). Alembic's `env.py` reads this automatically — no changes to `alembic.ini` are needed.
 
 ## Writing a new migration
 
