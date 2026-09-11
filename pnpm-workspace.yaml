@@ -1,0 +1,5 @@
+packages:
+  - "apps/web"
+  - "apps/bot"
+  - "packages/sdk-ts"
+  - "packages/ui"
