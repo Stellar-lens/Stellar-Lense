@@ -1,4 +1,4 @@
-"""In-memory data store backing the LedgerLens demo API.
+"""In-memory data store backing the StellarLense demo API.
 
 This stands in for the production data layer (populated by the ingestion
 pipeline and Soroban contract reads). It seeds a small set of trades —

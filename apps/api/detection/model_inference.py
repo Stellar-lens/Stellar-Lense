@@ -1,7 +1,7 @@
 """Real-time risk scoring for wallets and asset pairs.
 
 Combines the Benford's Law anomaly engine with the on-chain feature set to
-produce a LedgerLens Risk Score (0-100). Implements the Phase 2 trained ML
+produce a StellarLense Risk Score (0-100). Implements the Phase 2 trained ML
 ensemble with SHAP interpretability, seamlessly falling back to the Phase 1
 weighted heuristic if the model artifact is missing or fails to load.
 """
@@ -69,7 +69,7 @@ def score_wallet(
     wallet: str,
     funder_by_account: Optional[dict[str, str]] = None,
 ) -> dict:
-    """Compute a LedgerLens Risk Score for `wallet` from its trade history."""
+    """Compute a StellarLense Risk Score for `wallet` from its trade history."""
     trades = list(trades)
     wallet_trades = [t for t in trades if wallet in (t.base_account, t.counter_account)]
 

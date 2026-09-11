@@ -1,4 +1,4 @@
-"""Response schemas for the LedgerLens public REST API."""
+"""Response schemas for the StellarLense public REST API."""
 
 from datetime import datetime
 
@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 
 class RiskScore(BaseModel):
-    """LedgerLens Risk Score for a wallet on a given asset pair."""
+    """StellarLense Risk Score for a wallet on a given asset pair."""
 
     wallet: str
     asset_pair: str

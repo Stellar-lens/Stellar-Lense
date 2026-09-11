@@ -1,7 +1,7 @@
 """Benford's Law digit-distribution analysis for transaction amounts.
 
 Implements the chi-square statistic, per-digit z-scores, and the Mean
-Absolute Deviation (MAD) test described in the LedgerLens methodology,
+Absolute Deviation (MAD) test described in the StellarLense methodology,
 applied to the leading digit of trade amounts.
 """
 
