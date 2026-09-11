@@ -1,0 +1,10 @@
+{
+  "name": "@stellar-lense/ui",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Shared design system / component library for apps/web",
+  "scripts": {
+    "lint": "echo \"[ui] no lint configured yet\"",
+    "test": "echo \"[ui] no tests configured yet\""
+  }
+}

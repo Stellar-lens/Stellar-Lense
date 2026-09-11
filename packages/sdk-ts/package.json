@@ -1,0 +1,10 @@
+{
+  "name": "@stellar-lense/sdk-ts",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Stellar Lense TypeScript SDK",
+  "scripts": {
+    "lint": "echo \"[sdk-ts] no lint configured yet\"",
+    "test": "echo \"[sdk-ts] no tests configured yet\""
+  }
+}
