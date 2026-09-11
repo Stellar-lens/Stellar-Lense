@@ -3,28 +3,29 @@
 Wash-trading detection for the Stellar DEX — Benford's Law statistical
 analysis + an ML ensemble + graph-based ring detection, publishing risk
 scores via a Soroban smart contract, a public REST API, and a product
-website. Consolidated monorepo, rebuilt from the `Ledger-Lenz` org's five
-source repos. Full context and roadmap: `docs/stellar-lens-project-plan.md`.
+website. Consolidated monorepo, rebuilt from the five source repos under
+the old LedgerLens org (Ledger-Lenz). Full context and roadmap:
+`docs/stellar-lens-project-plan.md`.
 
 ## Layout
 
 ```
 apps/
-├── web/          Product website (Next.js). Replaces Ledgerlens-dashboard.
-├── api/          Public REST API (FastAPI). From Ledegerlens-api.
+├── web/          Product website (Next.js). Replaces the old LedgerLens dashboard repo.
+├── api/          Public REST API (FastAPI). From the old LedgerLens API repo (Ledegerlens-api).
 └── bot/          Trading bot service (phased: backtest → signal → execution). New.
 
 packages/
-├── core/         Detection engine (ingestion, Benford, ML, SHAP). From Ledgerlens-core.
+├── core/         Detection engine (ingestion, Benford, ML, SHAP). From the old LedgerLens core repo.
 ├── sdk-ts/       TypeScript SDK. From core/sdk.
-├── sdk-py/       Python SDK. From core/packages/ledgerlens-sdk.
+├── sdk-py/       Python SDK. From core/packages/stellar-lense-sdk.
 └── ui/           Shared design system / component library for apps/web. New.
 
 contracts/
-└── soroban/      On-chain risk registry contract(s). From Ledgerlens-contract.
+└── soroban/      On-chain risk registry contract(s). From the old LedgerLens contract repo.
 
 data/
-└── pipelines/    Raw + processed trade data, labelled training sets, ingestion. From Ledgerlens-data.
+└── pipelines/    Raw + processed trade data, labelled training sets, ingestion. From the old LedgerLens data repo.
 
 infra/
 ├── helm/         Deployment charts. New.
