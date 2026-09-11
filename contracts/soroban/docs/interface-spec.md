@@ -1,0 +1,470 @@
+# `ILedgerLensScore` — Composability Interface Specification
+
+**Status:** Stable · **Interface version:** 3 · **Contract:** `LedgerLensScoreContract`
+
+LedgerLens turns off-chain fraud signals (Benford's-Law analysis + an ML
+ensemble) into an on-chain, 0–100 risk score per `(wallet, asset_pair)`. The
+point of putting it on-chain is **composability**: any Soroban protocol — an
+AMM, a lending market, a DEX aggregator — should be able to consult a risk
+score inside its own logic without trusting an external oracle.
+
+This document is the canonical, versioned integration contract for those
+third-party callers. It defines the function signatures you may rely on, the
+exact data layout you decode against, the stability guarantees behind each, and
+the recommended ways to wire LedgerLens into your protocol.
+
+> If you are integrating LedgerLens, **program against this document, not
+> against the source.** Anything not listed here as stable may change between
+> releases.
+>
+> The interface versioning and migration policy (notice periods, what counts as
+> breaking vs. non-breaking, how to detect changes programmatically) is
+> specified separately in
+> [`docs/interface-versioning-policy.md`](interface-versioning-policy.md).
+
+---
+
+## 1. Canonical functions
+
+These are the functions external contracts are expected to call. Build the
+generated `LedgerLensScoreContractClient` against the deployed contract ID and
+invoke them like any other cross-contract call.
+
+### 1.1 `query_risk_gate` — the integration primitive
+
+```rust
+fn query_risk_gate(
+    env: Env,
+    wallet: Address,
+    asset_pair: Symbol,
+    gate_threshold: u32,
+) -> bool
+```yaml
+
+Returns `true` when `wallet`'s latest score for `asset_pair` is **strictly
+below** `gate_threshold` (safe to proceed), and `false` when the score is
+`>= gate_threshold` **or no score exists**.
+
+This is the function you should reach for first. Its design is deliberately
+defensive so it is safe to call from inside another contract's authorization
+path:
+
+- **Infallible.** Returns a plain `bool`, never a `Result`. There is no
+  `try_query_risk_gate` to handle.
+- **Never panics.** It cannot trap the calling transaction, so it cannot be
+  used to grief your protocol's gas or disable your guard clause.
+- **Side-effect free.** It is a pure read and does not even extend storage
+  TTL — calling it does not mutate LedgerLens state.
+- **Conservative on the unknown.** A wallet with no score returns `false`
+  (treated as risky). See [§5](#5-security-considerations).
+
+The comparison is strict (`score < gate_threshold`). A score *equal to* the
+threshold is **not** safe.
+
+Internally, this function delegates to `query_risk_gate_with_confidence` with
+`min_confidence = 0`. All gate logic lives in one place; this function is a
+non-breaking convenience wrapper preserved for backward compatibility.
+
+### 1.2 `query_risk_gate_with_confidence` — confidence-gated integration primitive
+
+```rust
+fn query_risk_gate_with_confidence(
+    env: Env,
+    wallet: Address,
+    asset_pair: Symbol,
+    gate_threshold: u32,
+    min_confidence: u32,
+) -> bool
+
+An extended version of `query_risk_gate` that enforces **both** a maximum risk
+score threshold and a minimum confidence floor. A score whose confidence falls
+below the floor is treated as epistemically equivalent to "no data" — the gate
+returns `false` regardless of the risk score value.
+
+Returns `true` **only** when all three conditions hold simultaneously:
+
+1. A score exists for `(wallet, asset_pair)`.
+2. `score.score < gate_threshold` — the wallet is not too risky.
+3. `score.confidence >= effective_min_confidence` — the model had sufficient
+   data to make a meaningful determination.
+
+Returns `false` in all other cases, including:
+- No score exists (unknown wallet — fail closed).
+- Score is at or above `gate_threshold`.
+- Confidence is below the effective floor (insufficient data — treated as
+  unknown, not as evidence of safety).
+- `gate_threshold > 100` — scores are bounded to 0–100; no wallet can pass.
+- `min_confidence > 100` — confidence is bounded to 0–100; no wallet qualifies.
+
+**Effective confidence floor:** `max(min_confidence, global_min_confidence)`,
+where `global_min_confidence` is the value configured by the admin via
+`set_global_min_confidence` (defaults to `0`). The `max` operator means the
+stricter of the two floors always wins — neither the admin nor the caller can
+unilaterally weaken the other's floor.
+
+This function shares all infallibility and side-effect-free guarantees of
+`query_risk_gate`: it returns `bool`, never panics (including under `u32::MAX`
+inputs), and never calls `extend_ttl`.
+
+Detect this function at runtime with `supports_interface(symbol_short!("cgate"))`.
+
+### 1.3 `supports_interface` — capability detection
+
+```rust
+fn supports_interface(env: Env, capability: Symbol) -> bool
+```yaml
+
+Returns `true` if this deployment supports the named capability. Use it to
+feature-detect at runtime instead of hardcoding a contract version. Recognised
+capabilities (all `symbol_short!`):
+
+| Capability      | Backing functionality                                                |
+|-----------------|----------------------------------------------------------------------|
+| `score`         | `get_score` / `submit_score`                                         |
+| `history`       | `get_score_history`                                                  |
+| `batch`         | `submit_scores_batch`                                                |
+| `gate`          | `query_risk_gate`                                                    |
+| `aggr`          | `get_aggregate_score` (cross-asset aggregate risk)                   |
+| `count`         | `get_score_count`                                                    |
+| `batch_attested`| `submit_scores_batch_attested` (Merkle-root attestation)             |
+| `cgate`         | `query_risk_gate_with_confidence` / global confidence floor         |
+| `emb`           | `set_score_embargo` / `lift_score_embargo`                          |
+| `cons`          | `commit_consensus` / `reveal_consensus` / `set_consensus_config`     |
+| `pr_rd`         | `is_pair_paused`                                                     |
+| `meta`          | `get_interface_metadata`                                             |
+
+Unrecognised capabilities return `false`.
+
+### 1.4 `get_interface_metadata` — versioned metadata discovery
+
+```rust
+fn get_interface_metadata(env: Env) -> InterfaceMetadata
+
+Returns a compact, versioned description of the contract's published surface so
+consumers can discover capabilities and semantic constraints at runtime without
+hard-coding the ABI. The structure is stable across compatible upgrades within
+this interface major version, and integrators should treat it as read-only
+metadata rather than a second source of truth.
+
+```rust
+#[contracttype]
+pub struct InterfaceMetadata {
+    pub interface_version: u32,
+    pub contract_version: u32,
+    pub capabilities: Vec<Symbol>,
+    pub semantic_constraints: Vec<Symbol>,
+}
+```yaml
+
+The metadata currently advertises the following capabilities and constraints:
+
+- Capabilities: `score`, `history`, `batch`, `gate`, `aggr`, `count`, `cgate`, `meta`
+- Semantic constraints: `fail_closed`, `side_effect_free`, `bounded_score_range`
+
+The `meta` capability is reserved for this metadata surface itself; callers can
+use it to detect whether the deployment exports `get_interface_metadata` before
+trying to read it.
+
+> Note: `batch_attested` is a 14-character symbol, longer than
+> `symbol_short!`'s 9-character ceiling, so it is constructed via
+> `Symbol::new(&env, "batch_attested")` rather than the `symbol_short!`
+> macro used for the shorter capabilities. The byte-level equality
+> check `capability == Symbol::new(&env, "batch_attested")` works
+> regardless of how the caller constructed the symbol.
+
+### 1.3 Direct read functions
+
+| Signature | Returns | Notes |
+|-----------|---------|-------|
+| `get_score(env, wallet, asset_pair) -> Result<RiskScore, Error>` | latest score | `Err(ScoreNotFound)` if absent |
+| `get_score_history(env, wallet, asset_pair) -> Vec<RiskScore>` | up to 10 entries, oldest first | empty `Vec` if none |
+| `get_aggregate_score(env, wallet) -> Result<AggregateRiskScore, Error>` | cross-asset weighted view | `Err(ScoreNotFound)` if the wallet has no scores |
+| `get_version(env) -> u32` | contract build version | currently `5` (reflecting the current contract build) |
+
+`get_score` is the right call when you need the full struct (confidence, model
+version, flags) rather than a yes/no gate decision. Prefer `query_risk_gate`
+for guard clauses precisely because `get_score` *can* return an error you would
+then have to handle.
+
+---
+
+## 2. Data layout (`RiskScore`)
+
+Field order is significant: it is part of the XDR serialization that callers in
+other languages decode against. **Do not reorder, remove, or change the type of
+any field** without a breaking-change release.
+
+```rust
+#[contracttype]
+pub struct RiskScore {
+    pub score: u32,         // overall risk, 0–100 (higher = riskier)
+    pub benford_flag: bool, // Benford's-Law engine flagged this entity
+    pub ml_flag: bool,      // ML ensemble flagged this entity
+    pub timestamp: u64,     // ledger time the score was computed off-chain
+    pub confidence: u32,    // model confidence, 0–100
+    pub model_version: u32, // detection-pipeline model version
+}
+
+`AggregateRiskScore` (returned by `get_aggregate_score`) has the following
+stable layout:
+
+```rust
+#[contracttype]
+pub struct AggregateRiskScore {
+    pub aggregate_score: u32,    // weighted average of per-pair scores, 0–100
+    pub pair_count: u32,         // distinct pairs the wallet has a score for
+    pub max_pair_score: u32,     // highest single per-pair score
+    pub max_pair: Symbol,        // the pair that produced max_pair_score
+    pub benford_flag_count: u32, // pairs with benford_flag set
+    pub ml_flag_count: u32,      // pairs with ml_flag set
+    pub last_updated: u64,       // ledger time of the newest component score
+}
+```yaml
+
+### Score scale
+
+`score` and `confidence` are bounded to `0..=100`; submissions outside that
+range are rejected (`get_score` never returns an out-of-range value). Treat
+higher `score` as higher risk. `confidence` and `model_version` let you reason
+about staleness — e.g. ignore a score below some confidence floor, or refresh
+when `model_version` advances.
+
+---
+
+## 3. Versioning policy
+
+There are two independent version numbers:
+
+1. **Contract version** — `get_version()` (backed by `CONTRACT_VERSION`,
+   currently `5`). Bumped on any breaking ABI change.
+2. **Interface version** — the number at the top of this document. It tracks
+   the `ILedgerLensScore` surface specifically.
+
+**How callers should detect compatibility:** prefer `supports_interface` over
+version comparison. Capability detection is forward-compatible — a newer
+deployment that adds capabilities still answers `true` for the ones you depend
+on, whereas a hardcoded `get_version() == 1` check would break on an additive
+upgrade. Reserve `get_version()` for diagnostics, telemetry, and logging.
+
+A capability symbol, once published, will not be removed or repurposed within
+the same interface major version. Removing one is a breaking change and forces
+an interface-version bump.
+
+The full versioning and migration policy — including the definition of breaking
+vs. non-breaking changes, the 30-day notice period for breaking changes, and
+the migration timeline — is specified in
+[`docs/interface-versioning-policy.md`](interface-versioning-policy.md).
+
+---
+
+## 4. Error code stability
+
+Errors are a `#[contracterror] #[repr(u32)]` enum. **The discriminant values
+below are stable** — integrators may match on the numeric code:
+
+| Code | Variant | Meaning |
+|-----:|---------|---------|
+| 1 | `AlreadyInitialized` | `initialize` called twice |
+| 2 | `NotInitialized` | contract not yet initialized |
+| 3 | `Unauthorized` | caller is not the required admin/service |
+| 4 | `InvalidScore` | `score` outside `0..=100` |
+| 5 | `InvalidConfidence` | `confidence` outside `0..=100` |
+| 6 | `ScoreNotFound` | no score for this `(wallet, asset_pair)` / wallet |
+| 7 | `ContractPaused` | circuit breaker active |
+| 8 | `NoPendingAdminTransfer` | no admin transfer in progress |
+| 9 | `EmptyBatch` | `submit_scores_batch` called with no entries |
+| 10 | `BatchTooLarge` | batch exceeds `MAX_BATCH_SIZE` |
+| 11 | `ArithmeticOverflow` | aggregate computation overflowed |
+| 30 | `PairPaused` | submission attempted while this `asset_pair` is individually paused via `set_pair_paused` — superseded by `ContractPaused` when the global circuit breaker is also active |
+
+**Guarantees:**
+
+- Existing variants keep their numeric value across releases within an
+  interface major version.
+- New error variants may be **added** with new, higher discriminants. Callers
+  must therefore treat an unrecognised error code defensively (fail closed)
+  rather than assuming the set is exhaustive.
+- `ScoreNotFound` (6) is the one most integrators handle directly. If you only
+  need a go/no-go decision, use `query_risk_gate`, which folds the
+  not-found case into a conservative `false` and spares you error handling
+  entirely.
+
+---
+
+## 5. Security considerations
+
+- **The gate fails closed.** Because `query_risk_gate` returns `bool`, the
+  "no score" case must collapse to a single value — and that value is `false`.
+  Unknown wallets are treated as *potentially risky*. If you instead want to
+  allow-list unknown wallets, you must make that decision explicitly in your
+  own contract; do not assume `query_risk_gate` will ever return `true` for a
+  wallet LedgerLens has never seen.
+- **Low-confidence scores are epistemically equivalent to "unknown".** A score
+  of `score=30, confidence=5` carries almost no information — the model had
+  too little data to make any meaningful determination. Treating it as evidence
+  of safety (and passing the wallet through) is epistemically unjustified and
+  exploitable: an attacker who can arrange for their wallet to receive a
+  low-confidence score has an easy bypass. `query_risk_gate_with_confidence`
+  closes this gap by treating any score below the confidence floor as if no
+  score exists — the gate returns `false` (fail closed). When in doubt, use
+  this function rather than `query_risk_gate` for high-value guard clauses.
+  The admin-configurable `global_min_confidence` allows a system-wide floor to
+  be enforced without requiring every integrating protocol to specify one.
+- **Freshness is separate from confidence.** A high-confidence score can still
+  be stale if the off-chain pipeline has not published a replacement yet.
+  LedgerLens does not currently bake max-age into `query_risk_gate`, so
+  consumers that care about detection lag must enforce their own freshness
+  bound, re-check their own pause state, and fail closed when the score is too
+  old or the oracle is silent.
+- **`query_risk_gate` and `query_risk_gate_with_confidence` cannot be
+  weaponised against you.** Both are infallible and side-effect free by design,
+  so an attacker cannot craft inputs that make them panic, consume unexpected
+  gas, or mutate state to disable your guard.
+- **Decide your own threshold.** `gate_threshold` is a caller parameter, not a
+  protocol constant. Higher-value actions warrant a lower (stricter) threshold.
+  LedgerLens's own default risk threshold is `75`; it is a reasonable starting
+  point, not a mandate.
+- **Capability removal is breaking.** Treat the capability set as append-only
+  within a major version when designing long-lived integrations.
+
+---
+
+## 6. Recommended integration patterns
+
+### 6.1 Gate-on-threshold (the default)
+
+Call `query_risk_gate` inside your guard clause and refuse risky wallets. This
+is the pattern shown in [`examples/amm_gate.rs`](../examples/amm_gate.rs):
+
+```rust
+let client = LedgerLensScoreContractClient::new(&env, &llens_id);
+if !client.query_risk_gate(&user, &symbol_short!("XLM_USDC"), &75) {
+    return Err(MyError::HighRiskWallet);
+}
+// ... proceed with the protected action ...
+
+### 6.2 Cache with a TTL
+
+Cross-contract calls cost gas. For hot paths, cache the gate result per wallet
+for a short window (e.g. a handful of ledgers) and re-query when the cache
+expires. Keep the TTL short: a wallet's score can change the moment the
+off-chain pipeline submits an update, and a cached *safe* verdict can age into
+the wrong answer during detection lag. Caching trades freshness for cost —
+never cache a safe verdict longer than you are willing to be wrong about it.
+
+If your protocol already tracks a pause state, check that first and short-circuit
+to the fail-closed branch while paused. Then apply a max-age bound to the score
+itself before you treat the gate result as actionable.
+
+### 6.3 Fallback behaviour when `ScoreNotFound`
+
+With `query_risk_gate` the not-found case is already folded into `false`
+(fail closed) — no extra handling required. If you call `get_score` directly,
+handle `Err(ScoreNotFound)` explicitly and default to your protocol's
+fail-closed branch unless you have a deliberate reason to allow unknown wallets
+through. The same rule applies to stale scores: if the age check fails, treat
+the result exactly like `ScoreNotFound`.
+
+### 6.4 Feature-detect before using newer functions
+
+If your integration depends on, say, aggregate risk, gate the code path on
+`supports_interface(symbol_short!("aggr"))` so it degrades gracefully against
+an older deployment instead of trapping on a missing function.
+
+---
+
+## Composability Examples
+
+### AMM liquidity provision (score + confidence gate)
+
+The mock AMM in `contracts/mock-amm/` demonstrates gating liquidity provision
+with `query_risk_gate_with_confidence` — stricter than the swap path, which uses
+score-only `query_risk_gate`. The gate runs **before** any pool state changes:
+
+```rust
+let client = LedgerLensScoreContractClient::new(&env, &ledgerlens_id);
+let is_safe = client.query_risk_gate_with_confidence(
+    &provider,
+    &symbol_short!("XLM_USDC"),
+    &75,  // gate_threshold
+    &50,  // min_confidence
+);
+if !is_safe {
+    return Err(AmmError::HighRiskWallet);
+}
+// ... proceed with liquidity mint / reserve update ...
+```yaml
+
+**No-score policy:** when LedgerLens has no score for the provider,
+`query_risk_gate_with_confidence` returns `false` (fail closed). Liquidity is
+rejected — the same conservative default as swap gating.
+
+Reference implementations:
+
+- [`examples/amm_gate_example.rs`](../examples/amm_gate_example.rs) — standalone example contract
+- [`contracts/mock-amm/src/lib.rs`](../contracts/mock-amm/src/lib.rs) — `provide_liquidity_gated` + `set_risk_oracle`
+- Cross-contract tests: `contracts/mock-amm/src/test.rs`, `tests/composability/`
+
+---
+
+## 7. Aggregator compatibility contract
+
+`ledgerlens-aggregator` is a federating caller of this interface: it fans a
+single query out across a set of registered `ledgerlens-score` shards and
+combines the results. Because the two contracts are separate deployable units
+that evolve independently, a shard whose interface has drifted from what the
+aggregator expects would otherwise be registrable, producing failed or subtly
+incorrect cross-contract calls at query time rather than a clear error up front.
+
+### 7.1 Targeted interface version
+
+The aggregator targets **interface version 3** (the version at the top of this
+document). Concretely, it invokes the following canonical functions on every
+registered shard, each identified by its `supports_interface` capability:
+
+| Aggregator call | Backing shard function | Required capability |
+|-----------------|------------------------|---------------------|
+| `query_risk_gate`               | `query_risk_gate`     | `gate`  |
+| `get_score` / `get_score_across_shards` | `get_score`   | `score` |
+| `get_aggregate_score`           | `get_aggregate_score` | `aggr`  |
+
+These three capabilities — `score`, `gate`, `aggr` — are the aggregator's
+compatibility contract. A shard must advertise all of them.
+
+### 7.2 Enforcement at registration
+
+`add_shard` verifies compatibility **before** accepting a candidate shard. For
+each required capability it calls the shard's `supports_interface`; the shard is
+rejected unless every call returns `true`. Rejection cases:
+
+- The shard reports `false` for a required capability (interface drift).
+- The shard does not expose `supports_interface` at all — an older build that
+  predates capability detection — so the cross-contract call traps. The
+  aggregator invokes it defensively (`try_supports_interface`) and treats a
+  trap as "incompatible" rather than letting it abort the registration
+  transaction.
+
+A rejected shard is never stored, and `add_shard` returns
+`IncompatibleInterface` (discriminant `27`, shared with `InvalidAttestation`;
+the aggregator's error set is not itself part of this stability contract).
+
+Per [§3](#3-versioning-policy), this uses **capability detection rather than a
+`get_version()` comparison**, so an additive upgrade to a shard that keeps the
+three required capabilities still registers cleanly. Removing or repurposing one
+of those capabilities is a breaking change and, by design, causes `add_shard` to
+reject the shard.
+
+### 7.3 Reference
+
+- Enforcement + tests: `contracts/ledgerlens-aggregator/src/lib.rs`,
+  `contracts/ledgerlens-aggregator/src/test.rs`
+
+---
+
+## 8. Reference material
+
+- Reference integration: [`examples/amm_gate.rs`](../examples/amm_gate.rs)
+- Interface stability tests: `contracts/ledgerlens-score/src/test_interface.rs`
+- Batch Attestation spec: [`docs/batch-attestation-spec.md`](batch-attestation-spec.md)
+- Batch Attestation tests: `contracts/ledgerlens-score/src/test_batch_attestation.rs`
+- Contract source: `contracts/ledgerlens-score/src/lib.rs`

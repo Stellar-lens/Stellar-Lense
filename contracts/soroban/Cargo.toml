@@ -1,0 +1,28 @@
+[workspace]
+resolver = "2"
+members = [
+    "contracts/ledgerlens-score",
+    "contracts/ledgerlens-aggregator",
+    "contracts/ledgerlens-test-support",
+    "contracts/mock-amm",
+    "contracts/mock-lending",
+    "tools/replay",
+    "tools/recovery",
+    "tools/schema-gen",
+    "tools/invocation-fuzzer",
+    "tests/composability",
+]
+
+[profile.release]
+opt-level = "z"
+overflow-checks = true
+debug = 0
+debug-assertions = false
+panic = "abort"
+codegen-units = 1
+lto = true
+strip = "symbols"
+
+[profile.release-with-logs]
+inherits = "release"
+debug-assertions = true
