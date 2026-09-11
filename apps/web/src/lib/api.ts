@@ -46,6 +46,12 @@ export type AssetRiskRanking = {
   total_wallets: number;
 };
 
+export type ScoreHistoryPoint = {
+  timestamp: string;
+  average_score: number;
+  max_score: number;
+};
+
 async function apiFetch<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, { cache: "no-store" });
   if (!res.ok) {
@@ -64,4 +70,8 @@ export function getPairScores(pair: string): Promise<RiskScore[]> {
 
 export function getRecentAlerts(limit = 50): Promise<Alert[]> {
   return apiFetch(`/alerts/recent?limit=${limit}`);
+}
+
+export function getScoreHistory(pair: string): Promise<ScoreHistoryPoint[]> {
+  return apiFetch(`/assets/${encodeURIComponent(pair)}/score-history`);
 }
