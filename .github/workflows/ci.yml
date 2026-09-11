@@ -1,0 +1,61 @@
+name: CI
+
+# The single required check for branch protection on main: every PR runs
+# the same `make lint-all` / `make test-all` a contributor would run
+# locally, so "CI is green" and "it works on my machine" mean the same
+# thing. See infra/ci/README.md and docs/stellar-lens-project-plan.md §2/§6.
+
+on:
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-test:
+    name: lint-all + test-all
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "0.12.13"
+          enable-cache: true
+
+      # No `toolchain:`/`components:` input on purpose: contracts/soroban/
+      # rust-toolchain.toml already pins the exact channel/targets/components
+      # this repo needs (1.81.0 - see that file's comment for why: newer
+      # rustc changes wasm32-unknown-unknown codegen incompatibly with the
+      # Soroban host) - @master (not @stable) is what makes this action read
+      # that file instead of installing its own default. Same toolchain
+      # locally (rustup auto-detects rust-toolchain.toml the same way) and
+      # in CI - one source of truth.
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@master
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: contracts/soroban
+
+      - name: Install JS dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: make lint-all
+        run: make lint-all
+
+      - name: make test-all
+        run: make test-all
