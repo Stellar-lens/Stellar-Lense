@@ -3,6 +3,7 @@ import Link from "next/link";
 const LINKS = [
   { href: "/app", label: "Overview" },
   { href: "/app/alerts", label: "Alerts" },
+  { href: "/app/news", label: "News" },
 ];
 
 export function AppNav() {
