@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LedgerLens — Style Guide</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      /* Style-guide-only scaffolding — not part of the design system itself. */
+      .sg-section {
+        margin-bottom: var(--space-7);
+      }
+      .sg-section h2 {
+        border-bottom: none;
+      }
+      .sg-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-4);
+        align-items: flex-start;
+      }
+      .sg-swatch {
+        width: 96px;
+      }
+      .sg-swatch-color {
+        height: 56px;
+        border-radius: var(--radius);
+        border: 1px solid var(--border);
+      }
+      .sg-swatch-label {
+        font-size: var(--text-2xs);
+        color: var(--text-muted);
+        margin-top: var(--space-1);
+        font-family: monospace;
+      }
+      .sg-bar {
+        background: var(--accent);
+        border-radius: 2px;
+        height: 12px;
+      }
+      .sg-spacing-row {
+        display: flex;
+        align-items: center;
+        gap: var(--space-3);
+        margin-bottom: var(--space-2);
+      }
+      .sg-spacing-label {
+        font-family: monospace;
+        font-size: var(--text-xs);
+        color: var(--text-muted);
+        width: 90px;
+      }
+      .sg-type-sample {
+        margin-bottom: var(--space-2);
+      }
+      .sg-type-label {
+        font-family: monospace;
+        font-size: var(--text-2xs);
+        color: var(--text-muted);
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Skip to content</a>
+
+    <header>
+      <span class="logo">LedgerLens</span>
+      <span class="tagline">Style Guide</span>
+      <div class="header-right">
+        <button class="theme-toggle" id="sg-theme-toggle" title="Toggle light/dark theme">
+          🌙
+        </button>
+      </div>
+    </header>
+
+    <main id="main-content">
+      <p>
+        Every component below is rendered with the real <code>dashboard/styles.css</code> — this
+        page has no styling of its own beyond layout scaffolding for the swatches/bars. If it looks
+        right here, it'll look right in the dashboard. See
+        <a href="../DESIGN_SYSTEM.md">DESIGN_SYSTEM.md</a> for usage guidance.
+      </p>
+
+      <section class="card sg-section">
+        <h2>Color</h2>
+        <p style="margin-bottom: var(--space-4); color: var(--text-muted)">
+          Surfaces, text, and brand colors are theme-aware (toggle above). Risk-level tints
+          (<code>--low-bg</code>/<code>--medium-bg</code>/<code>--high-bg</code>) back the
+          score-pill and are the one set of colors this system reasons about semantically rather
+          than by hue name.
+        </p>
+        <div class="sg-row">
+          <div class="sg-swatch">
+            <div class="sg-swatch-color" style="background: var(--bg)"></div>
+            <div class="sg-swatch-label">--bg</div>
+          </div>
+          <div class="sg-swatch">
+            <div class="sg-swatch-color" style="background: var(--surface)"></div>
+            <div class="sg-swatch-label">--surface</div>
+          </div>
+          <div class="sg-swatch">
+            <div class="sg-swatch-color" style="background: var(--border)"></div>
+            <div class="sg-swatch-label">--border</div>
+          </div>
+          <div class="sg-swatch">
+            <div class="sg-swatch-color" style="background: var(--text)"></div>
+            <div class="sg-swatch-label">--text</div>
+          </div>
+          <div class="sg-swatch">
+            <div class="sg-swatch-color" style="background: var(--text-muted)"></div>
+            <div class="sg-swatch-label">--text-muted</div>
+          </div>
+          <div class="sg-swatch">
+            <div class="sg-swatch-color" style="background: var(--accent)"></div>
+            <div class="sg-swatch-label">--accent</div>
+          </div>
+          <div class="sg-swatch">
+            <div class="sg-swatch-color" style="background: var(--accent-dark)"></div>
+            <div class="sg-swatch-label">--accent-dark</div>
+          </div>
+          <div class="sg-swatch">
+            <div class="sg-swatch-color" style="background: var(--green)"></div>
+            <div class="sg-swatch-label">--green</div>
+          </div>
+          <div class="sg-swatch">
+            <div class="sg-swatch-color" style="background: var(--yellow)"></div>
+            <div class="sg-swatch-label">--yellow</div>
+          </div>
+          <div class="sg-swatch">
+            <div class="sg-swatch-color" style="background: var(--red)"></div>
+            <div class="sg-swatch-label">--red</div>
+          </div>
+          <div class="sg-swatch">
+            <div class="sg-swatch-color" style="background: var(--low-bg)"></div>
+            <div class="sg-swatch-label">--low-bg</div>
+          </div>
+          <div class="sg-swatch">
+            <div class="sg-swatch-color" style="background: var(--medium-bg)"></div>
+            <div class="sg-swatch-label">--medium-bg</div>
+          </div>
+          <div class="sg-swatch">
+            <div class="sg-swatch-color" style="background: var(--high-bg)"></div>
+            <div class="sg-swatch-label">--high-bg</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card sg-section">
+        <h2>Type scale</h2>
+        <div class="sg-type-sample" style="font-size: var(--text-2xs)">
+          --text-2xs (11px) — table headers, meta text
+        </div>
+        <div class="sg-type-sample" style="font-size: var(--text-xs)">
+          --text-xs (12px) — labels, tagline
+        </div>
+        <div class="sg-type-sample" style="font-size: var(--text-sm)">
+          --text-sm (13px) — inputs, buttons, table cells
+        </div>
+        <div class="sg-type-sample" style="font-size: var(--text-base)">
+          --text-base (14px) — body default
+        </div>
+        <div class="sg-type-sample" style="font-size: var(--text-md)">
+          --text-md (15px) — asset code
+        </div>
+        <div class="sg-type-sample" style="font-size: var(--text-lg)">
+          --text-lg (18px) — header logo
+        </div>
+        <div class="sg-type-sample" style="font-size: var(--text-xl)">
+          --text-xl (22px) — asset avg score
+        </div>
+        <div class="sg-type-sample" style="font-size: var(--text-2xl)">
+          --text-2xl (28px) — stat tile value
+        </div>
+        <div class="sg-type-sample" style="font-size: var(--text-3xl)">
+          --text-3xl (32px) — score gauge number
+        </div>
+      </section>
+
+      <section class="card sg-section">
+        <h2>Spacing scale</h2>
+        <div class="sg-spacing-row">
+          <span class="sg-spacing-label">--space-1 (4px)</span
+          ><span class="sg-bar" style="width: 4px"></span>
+        </div>
+        <div class="sg-spacing-row">
+          <span class="sg-spacing-label">--space-2 (8px)</span
+          ><span class="sg-bar" style="width: 8px"></span>
+        </div>
+        <div class="sg-spacing-row">
+          <span class="sg-spacing-label">--space-3 (12px)</span
+          ><span class="sg-bar" style="width: 12px"></span>
+        </div>
+        <div class="sg-spacing-row">
+          <span class="sg-spacing-label">--space-4 (16px)</span
+          ><span class="sg-bar" style="width: 16px"></span>
+        </div>
+        <div class="sg-spacing-row">
+          <span class="sg-spacing-label">--space-5 (20px)</span
+          ><span class="sg-bar" style="width: 20px"></span>
+        </div>
+        <div class="sg-spacing-row">
+          <span class="sg-spacing-label">--space-6 (24px)</span
+          ><span class="sg-bar" style="width: 24px"></span>
+        </div>
+        <div class="sg-spacing-row">
+          <span class="sg-spacing-label">--space-7 (32px)</span
+          ><span class="sg-bar" style="width: 32px"></span>
+        </div>
+      </section>
+
+      <section class="card sg-section">
+        <h2>Buttons</h2>
+        <div class="sg-row">
+          <div class="search-row" style="margin-bottom: 0">
+            <button>Primary (.search-row button)</button>
+          </div>
+          <button class="refresh-btn">⟳ Refresh (.refresh-btn)</button>
+          <button class="theme-toggle">🌙 (.theme-toggle)</button>
+          <button class="copy-btn" style="border: 1px solid var(--border); padding: 4px 8px">
+            ⧉ (.copy-btn)
+          </button>
+        </div>
+      </section>
+
+      <section class="card sg-section">
+        <h2>Badges &amp; score pills</h2>
+        <div class="sg-row">
+          <span class="badge benford">Benford anomaly</span>
+          <span class="badge ml">ML flagged</span>
+          <span class="badge clean">Clean signals</span>
+        </div>
+        <div class="sg-row" style="margin-top: var(--space-3)">
+          <span class="score-pill low">32</span>
+          <span class="score-pill medium">58</span>
+          <span class="score-pill high">91</span>
+        </div>
+      </section>
+
+      <section class="card sg-section">
+        <h2>Score gauge</h2>
+        <div class="sg-row">
+          <div class="gauge-wrap">
+            <div class="gauge low">
+              <span class="score-num">32</span>
+              <span class="score-label">/ 100</span>
+            </div>
+            <div style="font-size: var(--text-2xs); color: var(--text-muted)">Low Risk</div>
+          </div>
+          <div class="gauge-wrap">
+            <div class="gauge medium">
+              <span class="score-num">58</span>
+              <span class="score-label">/ 100</span>
+            </div>
+            <div style="font-size: var(--text-2xs); color: var(--text-muted)">Medium Risk</div>
+          </div>
+          <div class="gauge-wrap">
+            <div class="gauge high">
+              <span class="score-num">91</span>
+              <span class="score-label">/ 100</span>
+            </div>
+            <div style="font-size: var(--text-2xs); color: var(--text-muted)">High Risk</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card sg-section">
+        <h2>Status dot</h2>
+        <div class="sg-row" style="align-items: center">
+          <span class="status-dot" title="online"></span>
+          <span style="font-size: var(--text-xs); color: var(--text-muted)">online</span>
+          <span
+            class="status-dot offline"
+            style="margin-left: var(--space-4)"
+            title="offline"
+          ></span>
+          <span style="font-size: var(--text-xs); color: var(--text-muted)">offline</span>
+        </div>
+      </section>
+
+      <section class="sg-section">
+        <h2 style="margin-bottom: var(--space-4)">Stat tile</h2>
+        <div class="stats">
+          <div class="stat">
+            <div class="value">42</div>
+            <div class="label">Populated</div>
+          </div>
+          <div class="stat">
+            <div class="value skeleton">—</div>
+            <div class="label">Loading (.skeleton)</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card sg-section">
+        <h2>Inputs</h2>
+        <div class="search-row">
+          <input type="text" placeholder="search-row input" />
+        </div>
+        <input class="filter-input" type="text" placeholder="filter-input" />
+      </section>
+
+      <section class="card sg-section">
+        <h2>Alerts table</h2>
+        <input class="filter-input" type="text" placeholder="Filter by wallet or asset pair…" />
+        <table class="alerts-table">
+          <thead>
+            <tr>
+              <th>Wallet</th>
+              <th>Asset Pair</th>
+              <th class="sortable sort-desc">Score</th>
+              <th>Reason</th>
+              <th class="sortable">Flagged At</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <span class="wallet-cell">GCEZWKCA5VLD…PMJK</span>
+                <button class="copy-btn" title="Copy wallet address">⧉</button>
+              </td>
+              <td>XLM/USDC:GA5Z…</td>
+              <td><span class="score-pill high">91</span></td>
+              <td>round-trip trading detected</td>
+              <td>Jun 1, 04:00 AM</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="sg-section">
+        <h2 style="margin-bottom: var(--space-4)">Asset card</h2>
+        <div class="asset-grid">
+          <div class="asset-card">
+            <div class="asset-code">XLM/USDC:GA5Z…</div>
+            <div class="asset-avg" style="color: var(--medium)">61</div>
+            <div class="asset-meta">Max 91 · 2/7 flagged</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card sg-section">
+        <h2>Empty state</h2>
+        <div class="empty-state">No wallets currently flagged</div>
+      </section>
+    </main>
+
+    <script>
+      (() => {
+        const KEY = "ledgerlens:theme";
+        const btn = document.querySelector("#sg-theme-toggle");
+        const apply = (theme) => {
+          document.documentElement.dataset.theme = theme;
+          btn.textContent = theme === "light" ? "☀️" : "🌙";
+        };
+        apply(
+          localStorage.getItem(KEY) ||
+            (window.matchMedia?.("(prefers-color-scheme: light)").matches ? "light" : "dark"),
+        );
+        btn.addEventListener("click", () => {
+          const next = document.documentElement.dataset.theme === "light" ? "dark" : "light";
+          localStorage.setItem(KEY, next);
+          apply(next);
+        });
+      })();
+    </script>
+  </body>
+</html>

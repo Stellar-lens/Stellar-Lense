@@ -1,0 +1,4 @@
+// Copy to config.js and load it before app.js in index.html to point the
+// dashboard at your Ledgerlens-api deployment. Left unset, it falls back to
+// http://localhost:8000 (see the API_BASE default in app.js).
+window.LEDGERLENS_API = "http://localhost:8000";
