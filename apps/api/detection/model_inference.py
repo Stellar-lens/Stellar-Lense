@@ -89,15 +89,22 @@ def score_wallet(
         # Predict probability
         prob = model.predict_proba(X)[0][1]
         score = int(round(prob * 100))
-        ml_flag = prob >= ML_CLASSIFIER_THRESHOLD
+        ml_flag = bool(prob >= ML_CLASSIFIER_THRESHOLD)
         
-        # Compute SHAP values for explainability
+        # Compute SHAP values for explainability. TreeExplainer's output shape
+        # for a binary classifier varies by shap/sklearn version:
+        #   - older: list of two (n_samples, n_features) arrays, one per class
+        #   - newer: single (n_samples, n_features, n_classes) array
+        # Either way we want the positive (wash-trading) class's attributions
+        # for our one sample.
         shap_values = explainer.shap_values(X)
         if isinstance(shap_values, list):
             shap_vals = shap_values[1][0]
+        elif shap_values.ndim == 3:
+            shap_vals = shap_values[0, :, 1]
         else:
             shap_vals = shap_values[0]
-            
+
         shap_attributions = {name: float(val) for name, val in zip(feature_names, shap_vals)}
         
         components = {

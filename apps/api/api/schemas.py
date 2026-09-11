@@ -5,8 +5,24 @@ from datetime import datetime
 from pydantic import BaseModel
 
 
+class BenfordReport(BaseModel):
+    """Leading-digit distribution analysis for a wallet's trade amounts."""
+
+    sample_size: int
+    chi_square: float
+    mad: float
+    z_scores: dict[int, float]
+    non_conforming: bool
+
+
 class RiskScore(BaseModel):
-    """StellarLense Risk Score for a wallet on a given asset pair."""
+    """StellarLense Risk Score for a wallet on a given asset pair.
+
+    `features` and `benford` are always present (the heuristic path always
+    computes them). `shap` is only present when the trained ML ensemble
+    artifact is available — see detection/model_inference.py — and is
+    `None` otherwise, e.g. when falling back to the Phase 1 heuristic.
+    """
 
     wallet: str
     asset_pair: str
@@ -15,6 +31,27 @@ class RiskScore(BaseModel):
     ml_flag: bool
     confidence: float
     timestamp: datetime
+    features: dict[str, float]
+    benford: BenfordReport
+    shap: dict[str, float] | None = None
+
+    @classmethod
+    def from_storage_result(cls, result: dict) -> "RiskScore":
+        """Build from the raw dict shape detection.model_inference.score_wallet
+        (via api.storage.compute_risk_score) returns."""
+        components = result["components"]
+        return cls(
+            wallet=result["wallet"],
+            asset_pair=result["asset_pair"],
+            score=result["score"],
+            benford_flag=result["benford_flag"],
+            ml_flag=result["ml_flag"],
+            confidence=result["confidence"],
+            timestamp=result["timestamp"],
+            features=components["features"],
+            benford=components["benford"],
+            shap=components.get("shap"),
+        )
 
 
 class Alert(BaseModel):

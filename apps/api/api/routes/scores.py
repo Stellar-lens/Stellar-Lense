@@ -29,12 +29,4 @@ def get_score(wallet: str, pair: str) -> RiskScore:
         )
 
     result = storage.compute_risk_score(wallet, pair)
-    return RiskScore(
-        wallet=result["wallet"],
-        asset_pair=result["asset_pair"],
-        score=result["score"],
-        benford_flag=result["benford_flag"],
-        ml_flag=result["ml_flag"],
-        confidence=result["confidence"],
-        timestamp=result["timestamp"],
-    )
+    return RiskScore.from_storage_result(result)

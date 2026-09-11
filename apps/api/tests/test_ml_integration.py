@@ -23,7 +23,14 @@ def test_heuristic_fallback_when_model_missing():
         )
     ]
 
-    with patch("detection.model_inference._ML_DEPS_AVAILABLE", False):
+    # _load_model_artifact caches the loaded model/explainer at module scope
+    # on first successful load, independent of _ML_DEPS_AVAILABLE, so an
+    # earlier test in the same process (or the real ensemble.joblib now
+    # present for the ML regression gate below) can leave the cache warm.
+    # Clear it too, or this test only passes by accident of execution order.
+    with patch("detection.model_inference._ML_DEPS_AVAILABLE", False), patch(
+        "detection.model_inference._MODEL_CACHE", None
+    ), patch("detection.model_inference._EXPLAINER_CACHE", None):
         res = score_wallet(mock_trades, "WALLET_A")
         assert "score" in res
         assert "components" in res
