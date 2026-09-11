@@ -17,7 +17,7 @@ use soroban_sdk::{
     Address, Env, Symbol,
 };
 
-use ledgerlens_score::RiskScore;
+use stellar_lense_score::RiskScore;
 
 /// Helper to create a test RiskScore with specified parameters.
 fn make_score(score: u32, confidence: u32, timestamp: u64, model_version: u32) -> RiskScore {

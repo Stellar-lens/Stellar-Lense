@@ -16,15 +16,15 @@ use soroban_sdk::{
     Address, Env, Symbol, Vec,
 };
 
-use crate::{constants::CONTRACT_VERSION, LedgerLensScoreContract, LedgerLensScoreContractClient};
+use crate::{constants::CONTRACT_VERSION, StellarLenseScoreContract, StellarLenseScoreContractClient};
 
-fn setup() -> (Env, LedgerLensScoreContractClient<'static>, Address, Address) {
+fn setup() -> (Env, StellarLenseScoreContractClient<'static>, Address, Address) {
     let env = Env::default();
     env.mock_all_auths();
     env.budget().reset_unlimited();
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
@@ -106,13 +106,13 @@ fn test_get_version_stable_across_submissions() {
 fn test_get_version_consistent_across_instances() {
     let env1 = Env::default();
     env1.mock_all_auths();
-    let contract_id1 = env1.register_contract(None, LedgerLensScoreContract);
-    let client1 = LedgerLensScoreContractClient::new(&env1, &contract_id1);
+    let contract_id1 = env1.register_contract(None, StellarLenseScoreContract);
+    let client1 = StellarLenseScoreContractClient::new(&env1, &contract_id1);
 
     let env2 = Env::default();
     env2.mock_all_auths();
-    let contract_id2 = env2.register_contract(None, LedgerLensScoreContract);
-    let client2 = LedgerLensScoreContractClient::new(&env2, &contract_id2);
+    let contract_id2 = env2.register_contract(None, StellarLenseScoreContract);
+    let client2 = StellarLenseScoreContractClient::new(&env2, &contract_id2);
 
     let version1 = client1.get_version();
     let version2 = client2.get_version();
@@ -126,8 +126,8 @@ fn test_get_version_side_effect_free() {
     let env = Env::default();
     env.budget().reset_unlimited();
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
     // Don't mock auth — if get_version required it, this would fail
     // No mock_all_auths() here

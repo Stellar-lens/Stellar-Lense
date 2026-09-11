@@ -4,11 +4,11 @@ use soroban_sdk::{
     Address, Env, Symbol, Vec,
 };
 
-use crate::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+use crate::{StellarLenseScoreContract, StellarLenseScoreContractClient};
 
 pub(crate) struct BuiltState<'a> {
     pub env: Env,
-    pub client: LedgerLensScoreContractClient<'a>,
+    pub client: StellarLenseScoreContractClient<'a>,
     pub admin: Address,
     pub service: Address,
     pub wallet: Address,
@@ -66,8 +66,8 @@ impl ContractStateBuilder {
         env.budget().reset_unlimited();
         env.ledger().with_mut(|ledger| ledger.timestamp = 100_000);
 
-        let contract_id = env.register_contract(None, LedgerLensScoreContract);
-        let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+        let contract_id = env.register_contract(None, StellarLenseScoreContract);
+        let client = StellarLenseScoreContractClient::new(&env, &contract_id);
         let admin = Address::generate(&env);
         let service = Address::generate(&env);
         let wallet = Address::generate(&env);

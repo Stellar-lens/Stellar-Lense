@@ -121,8 +121,8 @@ impl Error {
     pub const TooManySigners: Error = Error::ServiceSetFull;
 
     // ── Aggregator composability ────────────────────────────────────────────
-    /// Returned by `ledgerlens-aggregator`'s `add_shard` when a candidate shard
-    /// does not advertise the `ILedgerLensScore` capabilities the aggregator
+    /// Returned by `stellar_lense-aggregator`'s `add_shard` when a candidate shard
+    /// does not advertise the `IStellarLenseScore` capabilities the aggregator
     /// invokes across every shard. It signals that the shard's interface has
     /// drifted from the version the aggregator targets, so registering it would
     /// lead to failed or subtly incorrect cross-contract calls.

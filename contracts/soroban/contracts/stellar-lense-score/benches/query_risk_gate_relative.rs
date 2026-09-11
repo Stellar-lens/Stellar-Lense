@@ -1,7 +1,7 @@
 //! Criterion benchmark for `query_risk_gate_relative` at varying scored-wallet
 //! population sizes (issue #1022).
 //!
-//! Run: `cargo bench -p ledgerlens-score --bench query_risk_gate_relative`
+//! Run: `cargo bench -p stellar_lense-score --bench query_risk_gate_relative`
 //!
 //! The gate looks up the wallet's own score, then walks the histogram
 //! buckets strictly below its bucket (at most 9 of the fixed 10 buckets) to
@@ -11,19 +11,19 @@
 //! scored population grows.
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
 use soroban_sdk::{
     testutils::{Address as _, Ledger as _},
     Address, Env, Symbol, Vec,
 };
 
-fn setup(env: &Env) -> (LedgerLensScoreContractClient<'_>, Symbol) {
+fn setup(env: &Env) -> (StellarLenseScoreContractClient<'_>, Symbol) {
     env.mock_all_auths();
     env.budget().reset_unlimited();
     env.ledger().with_mut(|l| l.timestamp = 1_700_000_000);
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(env, &contract_id);
     let admin = Address::generate(env);
     let service = Address::generate(env);
     client.initialize(&admin, &service);
@@ -34,7 +34,7 @@ fn setup(env: &Env) -> (LedgerLensScoreContractClient<'_>, Symbol) {
 
 fn risk_gate_cost(
     env: &Env,
-    client: &LedgerLensScoreContractClient,
+    client: &StellarLenseScoreContractClient,
     asset_pair: &Symbol,
     population: u32,
 ) -> (u64, u64) {

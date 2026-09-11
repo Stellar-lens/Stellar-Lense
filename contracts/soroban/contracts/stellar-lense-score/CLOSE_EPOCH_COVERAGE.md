@@ -55,5 +55,5 @@ window value was left unchanged at its default.
 
 ## Files touched
 
-- `contracts/ledgerlens-score/src/test_epoch.rs`
-- `contracts/ledgerlens-score/src/test_consensus.rs`
+- `contracts/stellar-lense-score/src/test_epoch.rs`
+- `contracts/stellar-lense-score/src/test_consensus.rs`

@@ -13,18 +13,18 @@ use crate::{
     parameter_governance::param_key_cooldown,
     storage,
     types::ParameterProposalStatus,
-    Error, LedgerLensScoreContract, LedgerLensScoreContractClient,
+    Error, StellarLenseScoreContract, StellarLenseScoreContractClient,
 };
 
 const START_TS: u64 = 1_700_000_000;
 
-fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
+fn setup<'a>() -> (Env, StellarLenseScoreContractClient<'a>, Address, Address) {
     let env = Env::default();
     env.mock_all_auths();
     env.ledger().with_mut(|l| l.timestamp = START_TS);
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
@@ -332,8 +332,8 @@ fn test_expired_full_pending_set_is_pruned_before_accepting_new_proposal() {
 fn test_get_pending_param_prop_ids_uninitialized() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
     // Calling before contract initialize() should safely return empty Vec
     let pending = client.get_pending_param_prop_ids();

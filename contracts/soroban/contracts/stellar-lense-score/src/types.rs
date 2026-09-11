@@ -31,7 +31,7 @@ pub struct InterfaceMetadata {
     pub semantic_constraints: Vec<Symbol>,
 }
 
-/// On-chain record of the latest LedgerLens risk assessment for a
+/// On-chain record of the latest StellarLense risk assessment for a
 /// wallet / asset-pair combination.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]

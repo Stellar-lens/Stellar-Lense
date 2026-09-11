@@ -264,17 +264,17 @@ pub use types::{
 /// The 32-byte all-zeros field element used as the value in non-membership proofs.
 pub use verkle::NON_MEMBER_SENTINEL;
 
-/// On-chain truth layer for LedgerLens risk scores.
+/// On-chain truth layer for StellarLense risk scores.
 ///
 /// The off-chain detection pipeline (Benford's Law engine + ML ensemble)
 /// computes a 0-100 risk score per wallet / asset-pair and writes it here
 /// via `submit_score`.  Any Soroban contract can then call `get_score` to
 /// gate suspicious activity without relying on an external oracle.
 #[contract]
-pub struct LedgerLensScoreContract;
+pub struct StellarLenseScoreContract;
 
 #[contractimpl]
-impl LedgerLensScoreContract {
+impl StellarLenseScoreContract {
     fn asset_pair_len(env: &Env, asset_pair: &Symbol) -> Option<u32> {
         let pair_str = SymbolStr::try_from_val(env, &asset_pair.to_symbol_val()).ok()?;
         Some(pair_str.len() as u32)
@@ -307,19 +307,19 @@ impl LedgerLensScoreContract {
 
     /// One-time setup.  `admin` can rotate the scoring service address
     /// and manage contract-wide configuration; `service` is the off-chain
-    /// LedgerLens account authorised to submit scores.
+    /// StellarLense account authorised to submit scores.
     ///
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// # use soroban_sdk::symbol_short;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -347,13 +347,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -438,14 +438,14 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// # use soroban_sdk::symbol_short;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -718,13 +718,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -761,14 +761,14 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// # use soroban_sdk::symbol_short;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -805,14 +805,14 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::{Address as _, Ledger as _}, Env, Address, Vec};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// # use soroban_sdk::symbol_short;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -900,14 +900,14 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// # use soroban_sdk::symbol_short;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -949,13 +949,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -988,13 +988,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+    /// # use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
     /// # use soroban_sdk::symbol_short;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -1043,19 +1043,19 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::{Error, LedgerLensScoreContract, LedgerLensScoreContractClient};
+    /// # use stellar_lense_score::{Error, StellarLenseScoreContract, StellarLenseScoreContractClient};
     /// # use soroban_sdk::{testutils::Address as _, Address, Env, Vec};
     /// # use soroban_sdk::symbol_short;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
     /// let wallet = Address::generate(&env);
     /// let pair = symbol_short!("XLM_USDC");
-    /// let empty_submissions = Vec::<ledgerlens_score::ModelSubmission>::new(&env);
+    /// let empty_submissions = Vec::<stellar_lense_score::ModelSubmission>::new(&env);
     /// let empty_nonces = Vec::<u64>::new(&env);
     /// let result = client.try_reveal_consensus(
     ///     &Vec::new(&env),
@@ -1381,13 +1381,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreSubmission};
+    /// # use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient, ScoreSubmission};
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
     /// # use soroban_sdk::symbol_short;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -1714,16 +1714,16 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::{
-    /// #     BatchAttestation, LedgerLensScoreContract, LedgerLensScoreContractClient,
+    /// # use stellar_lense_score::{
+    /// #     BatchAttestation, StellarLenseScoreContract, StellarLenseScoreContractClient,
     /// #     ScoreSubmissionWithProof,
     /// # };
     /// # use soroban_sdk::{testutils::Address as _, Address, Env, Vec};
     /// # use soroban_sdk::symbol_short;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// // The `submit_scores_batch_attested` new entry point surfaces as a new
     /// // public capability under `supports_interface("batch_attested")`:
     /// let batch_attested_cap = soroban_sdk::Symbol::new(&env, "batch_attested");
@@ -2003,13 +2003,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+    /// # use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
     /// # use soroban_sdk::symbol_short;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -2044,13 +2044,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+    /// # use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
     /// # use soroban_sdk::symbol_short;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -2137,13 +2137,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+    /// # use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
     /// # use soroban_sdk::symbol_short;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -2235,14 +2235,14 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// # use soroban_sdk::symbol_short;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -2267,14 +2267,14 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// # use soroban_sdk::symbol_short;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -2543,13 +2543,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreQuery};
+    /// # use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient, ScoreQuery};
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
     /// # use soroban_sdk::symbol_short;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -2625,13 +2625,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient, EffectiveRiskScore};
+    /// # use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient, EffectiveRiskScore};
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
     /// # use soroban_sdk::symbol_short;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -2785,14 +2785,14 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// # use soroban_sdk::symbol_short;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -2834,13 +2834,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -2868,13 +2868,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -2906,13 +2906,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -2934,14 +2934,14 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::{Address as _, Ledger as _}, Env, Address, Vec};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// # use soroban_sdk::symbol_short;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -3131,12 +3131,12 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient, InterpolationMethod};
+    /// # use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient, InterpolationMethod};
     /// # use soroban_sdk::{testutils::Address as _, Env, Address};
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -3220,14 +3220,14 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// # use soroban_sdk::symbol_short;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -3272,12 +3272,12 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+    /// # use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec, symbol_short};
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -3313,14 +3313,14 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// # use soroban_sdk::symbol_short;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -3349,14 +3349,14 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// # use soroban_sdk::symbol_short;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -3382,14 +3382,14 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// # use soroban_sdk::symbol_short;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -3415,14 +3415,14 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// # use soroban_sdk::symbol_short;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -3474,13 +3474,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::{Address as _, Ledger as _}, Env, Address, Vec, symbol_short};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -3642,13 +3642,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -3720,12 +3720,12 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+    /// # use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
     /// # use soroban_sdk::{testutils::Address as _, Env, Address};
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -3748,12 +3748,12 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+    /// # use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
     /// # use soroban_sdk::{testutils::Address as _, Env, Address};
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -3934,14 +3934,14 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// # use soroban_sdk::symbol_short;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -4061,12 +4061,12 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+    /// # use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec, symbol_short};
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -4158,14 +4158,14 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// # use soroban_sdk::symbol_short;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -4190,14 +4190,14 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// # use soroban_sdk::symbol_short;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -4280,12 +4280,12 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+    /// # use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec, symbol_short};
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -4309,12 +4309,12 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+    /// # use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec, symbol_short};
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -4348,12 +4348,12 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+    /// # use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -4370,12 +4370,12 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+    /// # use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -4412,14 +4412,14 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// # use soroban_sdk::symbol_short;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -4473,13 +4473,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, symbol_short, Env, Address, Vec};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -4556,13 +4556,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -4599,13 +4599,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -4688,7 +4688,7 @@ impl LedgerLensScoreContract {
 
     // ── Composability interface (stable ABI) ─────────────────────────────────
     //
-    // The functions below form the `ILedgerLensScore` composability surface
+    // The functions below form the `IStellarLenseScore` composability surface
     // documented in `docs/interface-spec.md`. They are the canonical,
     // version-stable integration point for third-party Soroban protocols
     // (AMMs, lending markets, DEX aggregators). Their signatures and
@@ -4723,7 +4723,7 @@ impl LedgerLensScoreContract {
     /// # Example (caller side)
     ///
     /// ```ignore
-    /// let client = LedgerLensScoreContractClient::new(&env, &llens_id);
+    /// let client = StellarLenseScoreContractClient::new(&env, &llens_id);
     /// if !client.query_risk_gate(&user, &symbol_short!("XLM_USDC"), &75) {
     ///     return Err(MyError::HighRiskWallet);
     /// }
@@ -4803,12 +4803,12 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+    /// # use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec, symbol_short};
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -4846,12 +4846,12 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+    /// # use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
     /// # use soroban_sdk::{testutils::Address as _, Env, Address};
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -4880,12 +4880,12 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+    /// # use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
     /// # use soroban_sdk::{testutils::Address as _, Env, Address};
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -4905,12 +4905,12 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+    /// # use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -4932,12 +4932,12 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+    /// # use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -4971,12 +4971,12 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+    /// # use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -5141,13 +5141,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreHistogram};
+    /// # use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient, ScoreHistogram};
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
     /// # use soroban_sdk::symbol_short;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -5179,13 +5179,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+    /// # use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
     /// # use soroban_sdk::symbol_short;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -5238,13 +5238,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+    /// # use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
     /// # use soroban_sdk::symbol_short;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -5439,13 +5439,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -5485,12 +5485,12 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+    /// # use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -5518,12 +5518,12 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+    /// # use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -5566,12 +5566,12 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+    /// # use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -5623,12 +5623,12 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+    /// # use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -5678,13 +5678,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -5775,12 +5775,12 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+    /// # use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
     /// # use soroban_sdk::{testutils::{Address as _, Ledger as _}, Env, Address};
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -5806,13 +5806,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+    /// # use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
     /// # use soroban_sdk::{testutils::{Address as _, Ledger as _}, Env, Address, Vec};
     /// # use soroban_sdk::symbol_short;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -5851,12 +5851,12 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+    /// # use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -5884,12 +5884,12 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+    /// # use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
     /// # use soroban_sdk::{testutils::Address as _, Env, Address};
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -5911,12 +5911,12 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+    /// # use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
     /// # use soroban_sdk::{testutils::{Address as _, Ledger as _}, Env, Address};
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -5994,12 +5994,12 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+    /// # use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec, Bytes};
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -6039,12 +6039,12 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+    /// # use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec, Bytes};
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -6071,12 +6071,12 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+    /// # use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec, Bytes};
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -6124,12 +6124,12 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+    /// # use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec, Bytes};
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -6170,12 +6170,12 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+    /// # use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Bytes, Vec};
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -6211,12 +6211,12 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient, Error};
+    /// # use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient, Error};
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Bytes, Vec};
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -6309,13 +6309,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -6351,12 +6351,12 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+    /// # use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
     /// # use soroban_sdk::{testutils::Address as _, Env, Address};
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -6496,13 +6496,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -6539,13 +6539,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -6580,13 +6580,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -6617,13 +6617,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -6654,13 +6654,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -6692,13 +6692,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -6846,14 +6846,14 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// # use soroban_sdk::symbol_short;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -6901,14 +6901,14 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// # use soroban_sdk::symbol_short;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -6930,14 +6930,14 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// # use soroban_sdk::symbol_short;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -7425,13 +7425,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -7460,13 +7460,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -7556,13 +7556,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -7594,13 +7594,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -7617,14 +7617,14 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// # use soroban_sdk::symbol_short;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -7648,14 +7648,14 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// # use soroban_sdk::symbol_short;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -7693,14 +7693,14 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// # use soroban_sdk::symbol_short;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -7736,13 +7736,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::{Address as _, Ledger as _}, Env, Address, Vec, symbol_short};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -7788,13 +7788,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -7818,13 +7818,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::{Address as _, Ledger as _}, Env, Address, Vec, symbol_short};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -7851,13 +7851,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -7887,13 +7887,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -7911,14 +7911,14 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// # use soroban_sdk::symbol_short;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -7952,13 +7952,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -7990,13 +7990,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -8533,13 +8533,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::{Address as _, Ledger as _}, Env, Address, Vec, symbol_short};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -8586,13 +8586,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::{Address as _, Ledger as _}, Env, Address, Vec, symbol_short};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -8633,13 +8633,13 @@ impl LedgerLensScoreContract {
     ///
     /// Set λ to 0.001 per second (half-life ~693 seconds):
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -8696,13 +8696,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -8762,13 +8762,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -8798,13 +8798,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -8829,13 +8829,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -8859,14 +8859,14 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// # use soroban_sdk::symbol_short;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -9458,13 +9458,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -9503,13 +9503,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -9528,13 +9528,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -9550,13 +9550,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -9577,14 +9577,14 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// # use soroban_sdk::symbol_short;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -9607,13 +9607,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -9632,13 +9632,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -9692,13 +9692,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+    /// # use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
     /// # use soroban_sdk::symbol_short;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -9724,13 +9724,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+    /// # use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
     /// # use soroban_sdk::symbol_short;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -9968,13 +9968,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -10090,13 +10090,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -10132,13 +10132,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -10266,13 +10266,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -10305,12 +10305,12 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+    /// # use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
     /// # use soroban_sdk::{testutils::Address as _, Address, Env, Vec};
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -10380,14 +10380,14 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// # use soroban_sdk::symbol_short;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -11724,13 +11724,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -11749,13 +11749,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, symbol_short, Vec};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -11783,13 +11783,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::LedgerLensScoreContractClient;
+    /// # use stellar_lense_score::StellarLenseScoreContractClient;
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
-    /// # use ledgerlens_score::LedgerLensScoreContract;
+    /// # use stellar_lense_score::StellarLenseScoreContract;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -12876,13 +12876,13 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+    /// # use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
     /// # use soroban_sdk::{testutils::Address as _, Env, Address, Vec};
     /// # use soroban_sdk::symbol_short;
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -13407,12 +13407,12 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient, AlertType};
+    /// # use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient, AlertType};
     /// # use soroban_sdk::{testutils::Address as _, symbol_short, BytesN, Env, Address, Vec};
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);
@@ -13454,12 +13454,12 @@ impl LedgerLensScoreContract {
     /// # Examples
     ///
     /// ```
-    /// # use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient, AlertType};
+    /// # use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient, AlertType};
     /// # use soroban_sdk::{testutils::Address as _, symbol_short, BytesN, Env, Address, Vec};
     /// let env = Env::default();
     /// env.mock_all_auths();
-    /// let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    /// let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    /// let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    /// let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     /// let admin = Address::generate(&env);
     /// let service = Address::generate(&env);
     /// client.initialize(&admin, &service);

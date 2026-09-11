@@ -1,10 +1,10 @@
 [package]
-name = "ledgerlens-score"
+name = "stellar-lense-score"
 version = "0.1.0"
 edition = "2021"
 publish = false
-description = "On-chain risk score registry for LedgerLens"
-repository = "https://github.com/ledgerlens/contract"
+description = "On-chain risk score registry for Stellar Lense"
+repository = "https://github.com/Stellar-lens/Stellar-Lense"
 license = "MIT"
 
 [lib]
@@ -17,7 +17,7 @@ libm = "0.2"
 
 [dev-dependencies]
 soroban-sdk = { version = "21.0.0", features = ["testutils"] }
-ledgerlens-test-support = { version = "0.1.0", path = "../ledgerlens-test-support" }
+stellar-lense-test-support = { version = "0.1.0", path = "../stellar-lense-test-support" }
 # Used only by tests, to produce real secp256k1 ECDSA signatures that
 # exercise `verify_attestation` end-to-end (see `test_attestation.rs`).
 k256 = { version = "0.13.4", features = ["ecdsa"] }
@@ -87,8 +87,8 @@ path = "benches/estimate_unique_wallets.rs"
 testutils = ["soroban-sdk/testutils"]
 
 # Reference integration showing how a third-party contract gates on a
-# LedgerLens risk score. Built as a library (it is a Soroban contract, not a
-# `fn main` binary) via: cargo build --example amm_gate -p ledgerlens-score
+# Stellar Lense risk score. Built as a library (it is a Soroban contract, not a
+# `fn main` binary) via: cargo build --example amm_gate -p stellar-lense-score
 [[example]]
 name = "amm_gate"
 path = "../../examples/amm_gate.rs"

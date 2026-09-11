@@ -1,6 +1,6 @@
 import re
 
-with open(r'c:\Users\User\Desktop\Ledgerlens-contract\contracts\ledgerlens-score\src\events.rs', 'r') as f:
+with open(r'c:\Users\User\Desktop\Stellar-Lense\contracts\stellar-lense-score\src\events.rs', 'r') as f:
     content = f.read()
 
 doc_and_const = """// ── Aggregate risk ────────────────────────────────────────────────────────────
@@ -21,5 +21,5 @@ pub const EVENT_VERSION: u32 = 1;
 content = content.replace('// ── Aggregate risk ────────────────────────────────────────────────────────────\n\n', doc_and_const)
 content = re.sub(r'\(symbol_short!\("([^"]+)"\)', r'(symbol_short!("\1"), EVENT_VERSION', content)
 
-with open(r'c:\Users\User\Desktop\Ledgerlens-contract\contracts\ledgerlens-score\src\events.rs', 'w') as f:
+with open(r'c:\Users\User\Desktop\Stellar-Lense\contracts\stellar-lense-score\src\events.rs', 'w') as f:
     f.write(content)

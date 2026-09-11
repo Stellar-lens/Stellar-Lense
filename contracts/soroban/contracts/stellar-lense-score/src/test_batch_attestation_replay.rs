@@ -35,17 +35,17 @@ use soroban_sdk::{
 };
 
 use crate::{
-    BatchAttestation, BatchResult, Error, LedgerLensScoreContract, LedgerLensScoreContractClient,
+    BatchAttestation, BatchResult, Error, StellarLenseScoreContract, StellarLenseScoreContractClient,
     ScoreSubmission, ScoreSubmissionWithProof,
 };
 
 // ── Infrastructure (mirrors test_batch_attestation.rs) ───────────────────────
 
-fn initialized<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
+fn initialized<'a>() -> (Env, StellarLenseScoreContractClient<'a>, Address, Address) {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
     client.initialize(&admin, &service);
@@ -99,7 +99,7 @@ fn payload_commitment(
     model_version: u32,
 ) -> [u8; 32] {
     env.as_contract(contract_id, || {
-        LedgerLensScoreContract::compute_commitment(
+        StellarLenseScoreContract::compute_commitment(
             env,
             wallet,
             pair,
@@ -251,7 +251,7 @@ fn leaves_of(env: &Env, contract: &Address, entries: &[Entry]) -> StdVec<[u8; 32
 /// submission with a *different* index's proof.
 fn run_batch(
     env: &Env,
-    client: &LedgerLensScoreContractClient<'_>,
+    client: &StellarLenseScoreContractClient<'_>,
     sends: &StdVec<(ScoreSubmission, u32)>,
     leaves: &[[u8; 32]],
     attestation: &BatchAttestation,

@@ -6,18 +6,18 @@ use soroban_sdk::{
     Address, Env, IntoVal, Symbol, Vec,
 };
 
-use crate::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+use crate::{StellarLenseScoreContract, StellarLenseScoreContractClient};
 
 const START_TS: u64 = 1_700_000_000;
 const COOLDOWN: u64 = 3_601; // just past the 1-hour default cooldown
 
-fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>) {
+fn setup<'a>() -> (Env, StellarLenseScoreContractClient<'a>) {
     let env = Env::default();
     env.mock_all_auths();
     env.ledger().with_mut(|l| l.timestamp = START_TS);
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
@@ -27,7 +27,7 @@ fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>) {
 
 fn submit(
     env: &Env,
-    client: &LedgerLensScoreContractClient,
+    client: &StellarLenseScoreContractClient,
     wallet: &Address,
     pair: &Symbol,
     score: u32,
@@ -71,10 +71,10 @@ fn test_delta_event_on_first_submission() {
     let (env, client) = setup();
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
 
     // Use a fresh contract so we can track events from the start.
-    let c2 = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let c2 = StellarLenseScoreContractClient::new(&env, &contract_id);
     c2.initialize(&Address::generate(&env), &Address::generate(&env));
 
     submit(&env, &c2, &wallet, &pair, 50);
@@ -102,8 +102,8 @@ fn test_delta_event_rising_trend() {
     let (env, client) = setup();
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let c2 = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let c2 = StellarLenseScoreContractClient::new(&env, &contract_id);
     c2.initialize(&Address::generate(&env), &Address::generate(&env));
 
     submit(&env, &c2, &wallet, &pair, 30); // first
@@ -127,8 +127,8 @@ fn test_delta_event_falling_trend() {
     let (env, client) = setup();
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let c2 = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let c2 = StellarLenseScoreContractClient::new(&env, &contract_id);
     c2.initialize(&Address::generate(&env), &Address::generate(&env));
 
     submit(&env, &c2, &wallet, &pair, 80);
@@ -152,8 +152,8 @@ fn test_delta_consecutive_count_three_rising() {
     let (env, client) = setup();
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let c2 = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let c2 = StellarLenseScoreContractClient::new(&env, &contract_id);
     c2.initialize(&Address::generate(&env), &Address::generate(&env));
 
     submit(&env, &c2, &wallet, &pair, 10);
@@ -182,8 +182,8 @@ fn test_delta_consecutive_count_resets_on_direction_change() {
     let (env, client) = setup();
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let c2 = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let c2 = StellarLenseScoreContractClient::new(&env, &contract_id);
     c2.initialize(&Address::generate(&env), &Address::generate(&env));
 
     submit(&env, &c2, &wallet, &pair, 10);
@@ -208,8 +208,8 @@ fn test_delta_flat_submission_resets_trend() {
     let (env, client) = setup();
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let c2 = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let c2 = StellarLenseScoreContractClient::new(&env, &contract_id);
     c2.initialize(&Address::generate(&env), &Address::generate(&env));
 
     submit(&env, &c2, &wallet, &pair, 40);
@@ -240,8 +240,8 @@ fn test_delta_is_per_pair() {
     let wallet = Address::generate(&env);
     let pair_a = symbol_short!("XLM_USDC");
     let pair_b = symbol_short!("XLM_BTC");
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let c2 = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let c2 = StellarLenseScoreContractClient::new(&env, &contract_id);
     c2.initialize(&Address::generate(&env), &Address::generate(&env));
 
     submit(&env, &c2, &wallet, &pair_a, 10);

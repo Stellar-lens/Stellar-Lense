@@ -2,7 +2,7 @@ extern crate std;
 
 use crate::{
     zk_range_proof::{Fe, Pt, Sc, SeededPrng, Bulletproof, get_generators, compress_pt, decompress_pt_32, is_on_curve, prove_range_proof},
-    LedgerLensScoreContract, LedgerLensScoreContractClient,
+    StellarLenseScoreContract, StellarLenseScoreContractClient,
 };
 use soroban_sdk::{testutils::Address as _, Address, Bytes, BytesN, Env, Symbol, Vec};
 
@@ -11,8 +11,8 @@ fn test_verify_score_range_proof_success() {
     let env = Env::default();
     env.mock_all_auths();
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
@@ -76,8 +76,8 @@ fn test_verify_score_range_proof_invalid_threshold() {
     let env = Env::default();
     env.mock_all_auths();
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
@@ -136,8 +136,8 @@ fn test_verify_score_range_proof_tampered_commitment() {
     let env = Env::default();
     env.mock_all_auths();
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
@@ -198,8 +198,8 @@ fn test_verify_score_range_proof_tampered_proof() {
     let env = Env::default();
     env.mock_all_auths();
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
@@ -273,8 +273,8 @@ fn test_verify_score_range_proof_boundary_score_zero() {
     let env = Env::default();
     env.mock_all_auths();
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
@@ -331,8 +331,8 @@ fn test_verify_score_range_proof_boundary_score_max() {
     let env = Env::default();
     env.mock_all_auths();
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
@@ -388,8 +388,8 @@ fn test_verify_score_range_proof_boundary_score_equals_threshold() {
     let env = Env::default();
     env.mock_all_auths();
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
@@ -450,8 +450,8 @@ fn test_verify_score_range_proof_cross_wallet_commitment_mismatch() {
     let env = Env::default();
     env.mock_all_auths();
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
@@ -533,8 +533,8 @@ fn test_verify_score_range_proof_replayed_across_threshold() {
     let env = Env::default();
     env.mock_all_auths();
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
@@ -604,8 +604,8 @@ fn test_verify_score_range_proof_tampered_fs_challenge() {
     let env = Env::default();
     env.mock_all_auths();
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
     let service = Address::generate(&env);

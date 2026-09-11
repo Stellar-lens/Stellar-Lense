@@ -1,7 +1,7 @@
 //! Criterion benchmarks for the proactive TTL rent-management sweep
 //! (`get_expiring_entries`) at varying tracked-entry-set sizes.
 //!
-//! Run: `cargo bench -p ledgerlens-score --bench rent_sweep`
+//! Run: `cargo bench -p stellar_lense-score --bench rent_sweep`
 //!
 //! Profiles the realistic worst case for the sweep: the tracked-entry index
 //! filled to `size` entries, all touched immediately before the call (so
@@ -11,19 +11,19 @@
 //! exists to lock that in as a regression guard (see issue #422).
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
 use soroban_sdk::{
     testutils::{Address as _, Ledger as _},
     Address, Env, Symbol, Vec,
 };
 
-fn setup(env: &Env) -> (LedgerLensScoreContractClient<'_>, Symbol) {
+fn setup(env: &Env) -> (StellarLenseScoreContractClient<'_>, Symbol) {
     env.mock_all_auths();
     env.budget().reset_unlimited();
     env.ledger().with_mut(|l| l.timestamp = 1_700_000_000);
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(env, &contract_id);
     let admin = Address::generate(env);
     let service = Address::generate(env);
     client.initialize(&admin, &service);
@@ -36,7 +36,7 @@ fn setup(env: &Env) -> (LedgerLensScoreContractClient<'_>, Symbol) {
 /// single `get_expiring_entries` sweep over that index.
 fn sweep_cost(
     env: &Env,
-    client: &LedgerLensScoreContractClient,
+    client: &StellarLenseScoreContractClient,
     asset_pair: &Symbol,
     size: u32,
 ) -> (u64, u64) {

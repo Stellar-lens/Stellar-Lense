@@ -2,11 +2,11 @@
 
 use soroban_sdk::{symbol_short, testutils::Ledger as _, Address, Env, Vec};
 
-use crate::{test::initialized, LedgerLensScoreContract, LedgerLensScoreContractClient};
+use crate::{test::initialized, StellarLenseScoreContract, StellarLenseScoreContractClient};
 
 fn submit(
     env: &Env,
-    client: &LedgerLensScoreContractClient,
+    client: &StellarLenseScoreContractClient,
     wallet: &Address,
     pair: &soroban_sdk::Symbol,
     score: u32,

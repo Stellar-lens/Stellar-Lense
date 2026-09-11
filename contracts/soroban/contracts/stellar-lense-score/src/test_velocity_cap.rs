@@ -8,7 +8,7 @@ use soroban_sdk::{
 };
 
 use crate::{
-    test::initialized, test::setup, Error, LedgerLensScoreContract, LedgerLensScoreContractClient,
+    test::initialized, test::setup, Error, StellarLenseScoreContract, StellarLenseScoreContractClient,
     ScoreSubmission,
 };
 

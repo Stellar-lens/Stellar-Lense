@@ -10,18 +10,18 @@ use soroban_sdk::{
 };
 
 use crate::{
-    Error, LedgerLensScoreContract, LedgerLensScoreContractClient, MaybeScoreAttestation,
+    Error, StellarLenseScoreContract, StellarLenseScoreContractClient, MaybeScoreAttestation,
     MaybeThresholdAttestation, ScoreAttestation, ScoreAttestationInput,
 };
 
 const START_TS: u64 = 1_700_000_000;
 
-fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
+fn setup<'a>() -> (Env, StellarLenseScoreContractClient<'a>, Address, Address) {
     let env = Env::default();
     env.mock_all_auths();
     env.ledger().with_mut(|l| l.timestamp = START_TS);
-    let id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &id);
+    let id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &id);
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
     client.initialize(&admin, &service);
@@ -49,7 +49,7 @@ fn sign(
     pair: &Symbol,
 ) -> ScoreAttestation {
     let digest = env.as_contract(contract_id, || {
-        LedgerLensScoreContract::compute_commitment(
+        StellarLenseScoreContract::compute_commitment(
             env,
             wallet,
             pair,
@@ -80,7 +80,7 @@ fn sign(
 }
 
 fn submit(
-    client: &LedgerLensScoreContractClient,
+    client: &StellarLenseScoreContractClient,
     env: &Env,
     wallet: &Address,
     pair: &Symbol,

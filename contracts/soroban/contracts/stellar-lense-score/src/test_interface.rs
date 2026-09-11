@@ -1,4 +1,4 @@
-//! Interface stability suite for the `ILedgerLensScore` composability surface.
+//! Interface stability suite for the `IStellarLenseScore` composability surface.
 //!
 //! Unlike `test.rs`, which exercises the contract's *implementation* (auth,
 //! pause, batching, aggregation, …), these tests pin the *interface contract*
@@ -14,16 +14,16 @@ use soroban_sdk::{
 };
 
 use crate::{
-    constants::CONTRACT_VERSION, Error, LedgerLensScoreContract, LedgerLensScoreContractClient,
+    constants::CONTRACT_VERSION, Error, StellarLenseScoreContract, StellarLenseScoreContractClient,
     RiskScore,
 };
 
-fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
+fn setup<'a>() -> (Env, StellarLenseScoreContractClient<'a>, Address, Address) {
     let env = Env::default();
     env.mock_all_auths();
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
     let service = Address::generate(&env);

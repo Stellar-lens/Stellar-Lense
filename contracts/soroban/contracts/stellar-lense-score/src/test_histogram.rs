@@ -4,13 +4,13 @@
     Address, Env, Vec,
 };
 
-use crate::{Error, LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreHistogram};
+use crate::{Error, StellarLenseScoreContract, StellarLenseScoreContractClient, ScoreHistogram};
 
-fn initialized<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
+fn initialized<'a>() -> (Env, StellarLenseScoreContractClient<'a>, Address, Address) {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
     client.initialize(&admin, &service);

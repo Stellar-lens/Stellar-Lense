@@ -13,14 +13,14 @@
 use soroban_sdk::{symbol_short, testutils::Address as _, Address, Env};
 
 use crate::types::{DataKey, DataKeyB, DataKeyC, DataKeyD};
-use crate::LedgerLensScoreContract;
+use crate::StellarLenseScoreContract;
 use std::string::String;
 
 /// Test that basic DataKey variants encode distinctly.
 #[test]
 fn test_data_key_variants_distinct() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
     env.as_contract(&contract_id, || {
         // Capture serialized forms of key singleton variants
         let admin_key = DataKey::Admin;
@@ -53,7 +53,7 @@ fn test_data_key_variants_distinct() {
 #[test]
 fn test_data_key_parametrized_distinct() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
     env.as_contract(&contract_id, || {
         let wallet1 = Address::generate(&env);
         let wallet2 = Address::generate(&env);
@@ -109,7 +109,7 @@ fn test_data_key_parametrized_distinct() {
 #[test]
 fn test_data_key_b_variants_distinct() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
     env.as_contract(&contract_id, || {
         let wallet = Address::generate(&env);
         let signer = Address::generate(&env);
@@ -141,7 +141,7 @@ fn test_data_key_b_variants_distinct() {
 #[test]
 fn test_data_key_c_variants_distinct() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
     env.as_contract(&contract_id, || {
         let pair = symbol_short!("EURC");
 
@@ -176,7 +176,7 @@ fn test_data_key_c_variants_distinct() {
 #[test]
 fn test_data_key_d_variants_distinct() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
     env.as_contract(&contract_id, || {
         let pair = symbol_short!("BTC");
 
@@ -205,7 +205,7 @@ fn test_data_key_d_variants_distinct() {
 #[test]
 fn test_cross_family_key_distinctness() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
     env.as_contract(&contract_id, || {
         let wallet = Address::generate(&env);
         let pair = symbol_short!("XLM_USDC");
@@ -253,7 +253,7 @@ fn test_cross_family_key_distinctness() {
 #[test]
 fn test_boundary_parameters_distinct() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
     env.as_contract(&contract_id, || {
         let wallet_min = Address::generate(&env); // Minimum address
         let wallet_max = Address::generate(&env); // Different address
@@ -295,7 +295,7 @@ fn test_boundary_parameters_distinct() {
 #[test]
 fn test_numeric_parameter_collisions() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
     env.as_contract(&contract_id, || {
         // Test u32 parametrized variants
         let key_model_0 = DataKeyB::ModelVersionStatus(0);
@@ -345,7 +345,7 @@ fn test_numeric_parameter_collisions() {
 #[test]
 fn test_compound_parameter_distinctness() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
     env.as_contract(&contract_id, || {
         let wallet1 = Address::generate(&env);
         let wallet2 = Address::generate(&env);

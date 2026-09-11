@@ -1,6 +1,6 @@
 //! Criterion benchmarks for `get_portfolio_var` (issue #1020).
 //!
-//! Run: `cargo bench -p ledgerlens-score --bench portfolio_var`
+//! Run: `cargo bench -p stellar_lense-score --bench portfolio_var`
 //!
 //! Measures Value-at-Risk computation across wallet score pairs.
 //! The algorithm calculates an N x N weighted covariance matrix across all scored pairs,
@@ -12,7 +12,7 @@
 //!   - Realistic / near-limit case: 10 pairs (exercises full O(N^2) pairwise covariance calculations).
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
 use soroban_sdk::{
     testutils::{Address as _, Ledger as _},
     Address, Env, Symbol, Vec,
@@ -20,13 +20,13 @@ use soroban_sdk::{
 
 const START_TS: u64 = 1_700_000_000;
 
-fn setup(env: &Env) -> (LedgerLensScoreContractClient<'_>, Address, Address) {
+fn setup(env: &Env) -> (StellarLenseScoreContractClient<'_>, Address, Address) {
     env.mock_all_auths();
     env.budget().reset_unlimited();
     env.ledger().with_mut(|l| l.timestamp = START_TS);
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(env, &contract_id);
     let admin = Address::generate(env);
     let service = Address::generate(env);
     client.initialize(&admin, &service);
@@ -36,7 +36,7 @@ fn setup(env: &Env) -> (LedgerLensScoreContractClient<'_>, Address, Address) {
 
 fn populate_portfolio(
     env: &Env,
-    client: &LedgerLensScoreContractClient,
+    client: &StellarLenseScoreContractClient,
     wallet: &Address,
     num_pairs: usize,
 ) {

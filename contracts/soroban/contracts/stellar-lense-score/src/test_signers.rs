@@ -6,13 +6,13 @@ use soroban_sdk::{
     Address, Env, Vec,
 };
 
-use crate::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+use crate::{StellarLenseScoreContract, StellarLenseScoreContractClient};
 
-fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
+fn setup<'a>() -> (Env, StellarLenseScoreContractClient<'a>, Address, Address) {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
     client.initialize(&admin, &service);
@@ -21,7 +21,7 @@ fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
 
 fn add_signer(
     env: &Env,
-    client: &LedgerLensScoreContractClient,
+    client: &StellarLenseScoreContractClient,
     _admin: &Address,
     signer: &Address,
 ) {
@@ -31,7 +31,7 @@ fn add_signer(
 
 fn try_submit_at(
     env: &Env,
-    client: &LedgerLensScoreContractClient,
+    client: &StellarLenseScoreContractClient,
     signers: &Vec<Address>,
     timestamp: u64,
 ) -> Result<(), ()> {
@@ -56,7 +56,7 @@ fn try_submit_at(
 
 fn try_submit(
     env: &Env,
-    client: &LedgerLensScoreContractClient,
+    client: &StellarLenseScoreContractClient,
     signers: &Vec<Address>,
 ) -> Result<(), ()> {
     try_submit_at(env, client, signers, 1_000_000)
@@ -64,7 +64,7 @@ fn try_submit(
 
 fn submit_ok(
     env: &Env,
-    client: &LedgerLensScoreContractClient,
+    client: &StellarLenseScoreContractClient,
     signers: &Vec<Address>,
 ) -> bool {
     try_submit(env, client, signers).is_ok()

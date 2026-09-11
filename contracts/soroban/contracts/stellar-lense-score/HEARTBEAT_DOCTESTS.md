@@ -1,7 +1,7 @@
 # Heartbeat monitor rustdoc examples
 
 This change adds runnable `/// examples` (doctests) to four public
-functions in `contracts/ledgerlens-score/src/lib.rs` that previously
+functions in `contracts/stellar-lense-score/src/lib.rs` that previously
 had doc comments but no copy-pasteable example, following the existing
 pattern used throughout the file (e.g. `get_score_trend`,
 `get_score_percentile`, `query_risk_gate_relative`).

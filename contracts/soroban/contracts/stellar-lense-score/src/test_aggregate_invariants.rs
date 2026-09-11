@@ -19,7 +19,7 @@ use soroban_sdk::{
     Address, Env, Symbol, Vec,
 };
 
-use crate::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+use crate::{StellarLenseScoreContract, StellarLenseScoreContractClient};
 
 const START_TS: u64 = 1_700_000_000;
 
@@ -49,13 +49,13 @@ impl Xorshift64 {
 
 // ── Test environment ──────────────────────────────────────────────────────────
 
-fn make_env<'a>() -> (Env, LedgerLensScoreContractClient<'a>) {
+fn make_env<'a>() -> (Env, StellarLenseScoreContractClient<'a>) {
     let env = Env::default();
     env.mock_all_auths();
     env.budget().reset_unlimited();
     env.ledger().with_mut(|l| l.timestamp = START_TS);
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
     client.initialize(&admin, &service);
@@ -82,7 +82,7 @@ fn pair_sym(env: &Env, i: u32) -> Symbol {
 /// Submit a score for a fresh wallet/pair in a fresh env; returns the wallet.
 fn submit_once(
     env: &Env,
-    client: &LedgerLensScoreContractClient,
+    client: &StellarLenseScoreContractClient,
     wallet: &Address,
     pair: &Symbol,
     score: u32,

@@ -1,5 +1,5 @@
 [package]
-name = "ledgerlens-aggregator"
+name = "stellar-lense-aggregator"
 version = "0.1.0"
 edition = "2021"
 publish = false
@@ -11,32 +11,32 @@ doctest = false
 
 [dependencies]
 soroban-sdk = "21.0.0"
-ledgerlens-score = { version = "0.1.0", path = "../ledgerlens-score" }
+stellar-lense-score = { version = "0.1.0", path = "../stellar-lense-score" }
 
 [dev-dependencies]
 soroban-sdk = { version = "21.0.0", features = ["testutils"] }
-ledgerlens-test-support = { version = "0.1.0", path = "../ledgerlens-test-support" }
+stellar-lense-test-support = { version = "0.1.0", path = "../stellar-lense-test-support" }
 
 [features]
 testutils = ["soroban-sdk/testutils"]
 
 # Reference integration showing the recommended fallback pattern when
-# ledgerlens-aggregator can't meaningfully answer a gate query (no shards
+# stellar-lense-aggregator can't meaningfully answer a gate query (no shards
 # registered, or a shard failure) as opposed to a genuine risk-based
 # rejection. Built as a library via:
-# cargo build --example aggregator_gate_example -p ledgerlens-aggregator
+# cargo build --example aggregator_gate_example -p stellar-lense-aggregator
 [[example]]
 name = "aggregator_gate_example"
 path = "../../examples/aggregator_gate_example.rs"
 crate-type = ["lib"]
 
 # Reference integration (degraded-mode counterpart to aggregator_gate_example)
-# showing how a consumer of ledgerlens-aggregator detects and gracefully
+# showing how a consumer of stellar-lense-aggregator detects and gracefully
 # handles a partial-shard pause: one shard paused mid-aggregation makes
 # query_risk_gate fail closed to `false` without updating get_last_shard_failure,
 # so the consumer must probe each registered shard's is_paused() directly.
 # Built as a library via:
-# cargo build --example aggregator_shard_pause_example -p ledgerlens-aggregator
+# cargo build --example aggregator_shard_pause_example -p stellar-lense-aggregator
 [[example]]
 name = "aggregator_shard_pause_example"
 path = "../../examples/aggregator_shard_pause_example.rs"

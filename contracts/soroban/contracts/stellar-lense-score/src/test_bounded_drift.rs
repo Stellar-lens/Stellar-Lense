@@ -35,20 +35,20 @@ use soroban_sdk::{
     Address, Env, IntoVal, Symbol, Vec,
 };
 
-use crate::{LedgerLensScoreContract, LedgerLensScoreContractClient};
+use crate::{StellarLenseScoreContract, StellarLenseScoreContractClient};
 
 const START_TS: u64 = 1_700_000_000;
 const COOLDOWN: u64 = 3_601;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>) {
+fn setup<'a>() -> (Env, StellarLenseScoreContractClient<'a>) {
     let env = Env::default();
     env.mock_all_auths();
     env.budget().reset_unlimited();
     env.ledger().with_mut(|l| l.timestamp = START_TS);
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
     client.initialize(&admin, &service);
@@ -57,7 +57,7 @@ fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>) {
 
 fn submit(
     env: &Env,
-    client: &LedgerLensScoreContractClient,
+    client: &StellarLenseScoreContractClient,
     wallet: &Address,
     score: u32,
     is_flagged: bool,
@@ -91,7 +91,7 @@ fn jump_anomaly_emitted(
     })
 }
 
-fn contract_id(client: &LedgerLensScoreContractClient) -> Address {
+fn contract_id(client: &StellarLenseScoreContractClient) -> Address {
     client.address.clone()
 }
 

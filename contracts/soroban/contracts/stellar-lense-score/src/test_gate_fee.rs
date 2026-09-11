@@ -5,13 +5,13 @@ use soroban_sdk::{
     symbol_short, testutils::Address as _, token::StellarAssetClient, Address, Env, Vec,
 };
 
-use crate::{Error, LedgerLensScoreContract, LedgerLensScoreContractClient};
+use crate::{Error, StellarLenseScoreContract, StellarLenseScoreContractClient};
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 struct Setup<'a> {
     env: Env,
-    client: LedgerLensScoreContractClient<'a>,
+    client: StellarLenseScoreContractClient<'a>,
     token: Address,
 }
 
@@ -19,8 +19,8 @@ fn setup_with_token(initial_balance: i128) -> Setup<'static> {
     let env = Env::default();
     env.mock_all_auths();
 
-    let contract = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract);
+    let contract = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract);
 
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
@@ -35,7 +35,7 @@ fn setup_with_token(initial_balance: i128) -> Setup<'static> {
     client.set_fee_token(&token);
 
     // SAFETY: env is moved into Setup and outlives client.
-    let client: LedgerLensScoreContractClient<'static> =
+    let client: StellarLenseScoreContractClient<'static> =
         unsafe { core::mem::transmute(client) };
     Setup { env, client, token }
 }
@@ -43,12 +43,12 @@ fn setup_with_token(initial_balance: i128) -> Setup<'static> {
 fn setup_no_token() -> Setup<'static> {
     let env = Env::default();
     env.mock_all_auths();
-    let contract = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract);
+    let contract = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract);
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
     client.initialize(&admin, &service);
-    let client: LedgerLensScoreContractClient<'static> =
+    let client: StellarLenseScoreContractClient<'static> =
         unsafe { core::mem::transmute(client) };
     Setup { env, client, token: Address::generate(&env) }
 }
@@ -59,8 +59,8 @@ fn setup_no_token() -> Setup<'static> {
 fn set_gate_query_fee_requires_init() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract);
+    let contract = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract);
     assert_eq!(
         client.try_set_gate_query_fee(&100),
         Err(Ok(Error::NotInitialized))

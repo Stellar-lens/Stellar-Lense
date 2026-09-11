@@ -6,13 +6,13 @@ use soroban_sdk::{
     Address, Env, IntoVal, Vec,
 };
 
-use crate::{Error, LedgerLensScoreContract, LedgerLensScoreContractClient};
+use crate::{Error, StellarLenseScoreContract, StellarLenseScoreContractClient};
 
-fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address) {
+fn setup<'a>() -> (Env, StellarLenseScoreContractClient<'a>, Address) {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
     client.initialize(&admin, &service);
@@ -30,8 +30,8 @@ fn test_set_jump_threshold_happy_path() {
 #[test]
 fn test_set_jump_threshold_emits_event() {
     let (env, client, _admin) = setup();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let c2 = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let c2 = StellarLenseScoreContractClient::new(&env, &contract_id);
     c2.initialize(&Address::generate(&env), &Address::generate(&env));
     let empty: Vec<Address> = Vec::new(&env);
     c2.set_jump_threshold(&empty, &45);
@@ -64,13 +64,13 @@ fn test_set_jump_threshold_rejects_100() {
 #[test]
 fn test_set_jump_threshold_non_admin_rejected() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     env.mock_all_auths();
     client.initialize(&Address::generate(&env), &Address::generate(&env));
 
     let env2 = Env::default();
-    let c2 = LedgerLensScoreContractClient::new(&env2, &contract_id);
+    let c2 = StellarLenseScoreContractClient::new(&env2, &contract_id);
     let non_admin: Vec<Address> = Vec::new(&env2);
     let result = c2.try_set_jump_threshold(&non_admin, &50);
     assert!(result.is_err());

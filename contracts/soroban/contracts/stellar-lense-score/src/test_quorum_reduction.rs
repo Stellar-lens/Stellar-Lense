@@ -9,19 +9,19 @@ use soroban_sdk::{
 };
 
 use crate::{
-    constants::DEFAULT_QUORUM_FAILURE_WINDOW_SECS, Error, LedgerLensScoreContract,
-    LedgerLensScoreContractClient,
+    constants::DEFAULT_QUORUM_FAILURE_WINDOW_SECS, Error, StellarLenseScoreContract,
+    StellarLenseScoreContractClient,
 };
 
 const START_TS: u64 = 1_700_000_000;
 
-fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address) {
+fn setup<'a>() -> (Env, StellarLenseScoreContractClient<'a>, Address) {
     let env = Env::default();
     env.mock_all_auths();
     env.ledger().with_mut(|l| l.timestamp = START_TS);
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
@@ -32,7 +32,7 @@ fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address) {
 
 fn setup_multisig<'a>(
     env: &Env,
-    client: &LedgerLensScoreContractClient<'a>,
+    client: &StellarLenseScoreContractClient<'a>,
     num_signers: u32,
     threshold: u32,
 ) -> Vec<Address> {

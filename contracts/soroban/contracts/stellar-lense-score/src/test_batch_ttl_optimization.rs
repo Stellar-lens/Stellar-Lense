@@ -9,16 +9,16 @@ use crate::{
     constants::MAX_BATCH_SIZE,
     storage,
     types::{RiskScore, ScoreSubmission},
-    LedgerLensScoreContract, LedgerLensScoreContractClient,
+    StellarLenseScoreContract, StellarLenseScoreContractClient,
 };
 
-fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Symbol) {
+fn setup<'a>() -> (Env, StellarLenseScoreContractClient<'a>, Symbol) {
     let env = Env::default();
     env.mock_all_auths();
     env.ledger().with_mut(|l| l.timestamp = 1_700_000_000);
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
     client.initialize(&admin, &service);

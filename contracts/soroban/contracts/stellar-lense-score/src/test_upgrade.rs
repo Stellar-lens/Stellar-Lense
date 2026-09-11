@@ -18,19 +18,19 @@ use soroban_sdk::{
 
 use crate::{
     constants::{DEFAULT_UPGRADE_DELAY_SECS, MAX_UPGRADE_DELAY_SECS, MIN_UPGRADE_DELAY_SECS},
-    storage, Error, LedgerLensScoreContract, LedgerLensScoreContractClient,
+    storage, Error, StellarLenseScoreContract, StellarLenseScoreContractClient,
 };
 
 /// Ledger timestamp the tests start from (an arbitrary fixed instant).
 const START_TS: u64 = 1_700_000_000;
 
-fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address) {
+fn setup<'a>() -> (Env, StellarLenseScoreContractClient<'a>, Address) {
     let env = Env::default();
     env.mock_all_auths();
     env.ledger().with_mut(|l| l.timestamp = START_TS);
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
@@ -173,8 +173,8 @@ fn test_veto_upgrade_before_initialize_rejected() {
     env.mock_all_auths();
     env.ledger().with_mut(|l| l.timestamp = START_TS);
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
     let result = client.try_veto_upgrade(&Vec::new(&env));
     assert_eq!(result, Err(Ok(Error::NotInitialized)));
@@ -246,8 +246,8 @@ fn test_get_upgrade_delay_before_initialize_returns_default() {
     env.mock_all_auths();
 
     // Register the contract but do NOT call initialize — storage is empty.
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
     // Must return the compile-time default, not panic or error.
     assert_eq!(client.get_upgrade_delay(), DEFAULT_UPGRADE_DELAY_SECS);
@@ -311,8 +311,8 @@ fn test_set_upgrade_delay_before_initialize_rejected() {
     env.mock_all_auths();
     env.ledger().with_mut(|l| l.timestamp = START_TS);
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
     // A well-formed, in-bounds delay still fails because there is no admin yet.
     let mid = (MIN_UPGRADE_DELAY_SECS + MAX_UPGRADE_DELAY_SECS) / 2;
@@ -349,8 +349,8 @@ fn test_execute_upgrade_before_initialize_rejected() {
     env.mock_all_auths();
     env.ledger().with_mut(|l| l.timestamp = START_TS);
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
     let result = client.try_execute_upgrade(&Vec::new(&env));
     assert_eq!(result, Err(Ok(Error::NotInitialized)));

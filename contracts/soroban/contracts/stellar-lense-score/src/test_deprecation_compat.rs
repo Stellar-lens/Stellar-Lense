@@ -1,4 +1,4 @@
-//! Compatibility tests that pin the behaviour of the `ILedgerLensScore`
+//! Compatibility tests that pin the behaviour of the `IStellarLenseScore`
 //! composability surface across interface versions.
 //!
 //! # Purpose
@@ -31,20 +31,20 @@ use soroban_sdk::{
     Address, Env, Symbol, Vec,
 };
 
-use crate::{Error, LedgerLensScoreContract, LedgerLensScoreContractClient};
+use crate::{Error, StellarLenseScoreContract, StellarLenseScoreContractClient};
 
-fn setup(env: &Env) -> LedgerLensScoreContractClient<'_> {
+fn setup(env: &Env) -> StellarLenseScoreContractClient<'_> {
     env.mock_all_auths();
     env.ledger().with_mut(|l| l.timestamp = 1_700_000_000);
-    let id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(env, &id);
+    let id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(env, &id);
     let admin = Address::generate(env);
     let service = Address::generate(env);
     client.initialize(&admin, &service);
     client
 }
 
-fn submit_score(env: &Env, client: &LedgerLensScoreContractClient, wallet: &Address, score: u32) {
+fn submit_score(env: &Env, client: &StellarLenseScoreContractClient, wallet: &Address, score: u32) {
     client.submit_score(
         &Vec::new(env),
         wallet,

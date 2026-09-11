@@ -1,7 +1,7 @@
 # Aggregator Split-Brain Detection
 
 This document defines the observable contract for detecting conflicting
-configuration across `ledgerlens-aggregator` shards.
+configuration across `stellar-lense-aggregator` shards.
 
 ## PR Checklist
 
@@ -31,7 +31,7 @@ Errors affected:
 
 Tests affected:
 
-- `contracts/ledgerlens-aggregator/src/test.rs`
+- `contracts/stellar-lense-aggregator/src/test.rs`
 - `tests/composability/tests/aggregator_fanout.rs`
 
 ## Design

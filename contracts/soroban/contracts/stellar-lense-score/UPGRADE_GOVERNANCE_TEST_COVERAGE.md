@@ -2,15 +2,15 @@
 
 This documents four unit tests added to close gaps in direct coverage (per
 CONTRIBUTING.md) for the upgrade-governance functions in
-`contracts/ledgerlens-score/src/lib.rs`.
+`contracts/stellar-lense-score/src/lib.rs`.
 
 ## Files checked before writing new tests
 
-- `contracts/ledgerlens-score/src/test_upgrade.rs`
-- `contracts/ledgerlens-score/src/test_upgrade_multisig.rs`
-- `contracts/ledgerlens-score/src/test_param_timelock.rs`
-- `contracts/ledgerlens-score/src/test_governance_action_registry.rs`
-- `contracts/ledgerlens-score/src/test_public_error_snapshots.rs`
+- `contracts/stellar-lense-score/src/test_upgrade.rs`
+- `contracts/stellar-lense-score/src/test_upgrade_multisig.rs`
+- `contracts/stellar-lense-score/src/test_param_timelock.rs`
+- `contracts/stellar-lense-score/src/test_governance_action_registry.rs`
+- `contracts/stellar-lense-score/src/test_public_error_snapshots.rs`
 
 Every existing test that touches `veto_upgrade`, `set_upgrade_delay`,
 `get_upgrade_approval_count`, or `get_pending_upgrade` goes through the

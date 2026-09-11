@@ -27,7 +27,7 @@ use soroban_sdk::{
     Address, Env, Symbol, Vec,
 };
 
-use crate::{Error, LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreSubmission};
+use crate::{Error, StellarLenseScoreContract, StellarLenseScoreContractClient, ScoreSubmission};
 
 const START_TS: u64 = 1_700_000_000;
 /// Number of chaos sequences to run.
@@ -76,13 +76,13 @@ fn make_wallets(env: &Env) -> Vec<Address> {
 
 // ── Harness setup ─────────────────────────────────────────────────────────────
 
-fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address) {
+fn setup<'a>() -> (Env, StellarLenseScoreContractClient<'a>, Address) {
     let env = Env::default();
     env.mock_all_auths();
     env.budget().reset_unlimited();
     env.ledger().with_mut(|l| l.timestamp = START_TS);
-    let id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &id);
+    let id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &id);
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
     client.initialize(&admin, &service);
@@ -130,7 +130,7 @@ impl Oracle {
 
 fn check_invariants(
     env: &Env,
-    client: &LedgerLensScoreContractClient,
+    client: &StellarLenseScoreContractClient,
     oracle: &Oracle,
     pairs: &[Symbol; NUM_PAIRS as usize],
     wallets: &Vec<Address>,

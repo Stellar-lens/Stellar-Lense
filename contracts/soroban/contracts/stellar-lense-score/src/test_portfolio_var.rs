@@ -3,27 +3,27 @@
 
 use soroban_sdk::{symbol_short, testutils::Address as _, Address, Env, Symbol, Vec};
 
-use crate::{Error, LedgerLensScoreContract, LedgerLensScoreContractClient};
+use crate::{Error, StellarLenseScoreContract, StellarLenseScoreContractClient};
 
 struct Setup<'a> {
     env: Env,
-    client: LedgerLensScoreContractClient<'a>,
+    client: StellarLenseScoreContractClient<'a>,
 }
 
 fn setup() -> Setup<'static> {
     let env = Env::default();
     env.mock_all_auths();
-    let contract = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract);
+    let contract = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract);
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
     client.initialize(&admin, &service);
-    let client: LedgerLensScoreContractClient<'static> =
+    let client: StellarLenseScoreContractClient<'static> =
         unsafe { core::mem::transmute(client) };
     Setup { env, client }
 }
 
-fn submit(env: &Env, client: &LedgerLensScoreContractClient, wallet: &Address, pair: Symbol, score: u32) {
+fn submit(env: &Env, client: &StellarLenseScoreContractClient, wallet: &Address, pair: Symbol, score: u32) {
     client
         .submit_score(&Vec::new(env), wallet, &pair, &score, &false, &false, &1, &90, &1, &None)
         .unwrap();

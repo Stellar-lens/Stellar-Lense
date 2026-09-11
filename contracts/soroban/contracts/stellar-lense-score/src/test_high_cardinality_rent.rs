@@ -1,6 +1,6 @@
 use soroban_sdk::{symbol_short, testutils::Address as _, Address, Env, Vec};
 
-use crate::{storage, types::DataKeyB, types::RiskScore, LedgerLensScoreContract};
+use crate::{storage, types::DataKeyB, types::RiskScore, StellarLenseScoreContract};
 
 // ── Rent griefing via high-cardinality monitored wallets (issue #799) ─────
 //
@@ -45,7 +45,7 @@ fn fill_index_to_cap(env: &Env, pair: &soroban_sdk::Symbol) -> Vec<(Address, sor
 #[test]
 fn test_score_entry_index_bounded_under_high_cardinality_submissions() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
     let pair = symbol_short!("XLM_USDC");
 
     env.as_contract(&contract_id, || {
@@ -64,7 +64,7 @@ fn test_score_entry_index_bounded_under_high_cardinality_submissions() {
 #[test]
 fn test_writes_beyond_index_cap_still_persist_their_own_score() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
     let pair = symbol_short!("XLM_USDC");
 
     env.as_contract(&contract_id, || {

@@ -10,18 +10,18 @@ use soroban_sdk::{
     Address, Env, IntoVal, Symbol, Vec,
 };
 
-use crate::{Error, LedgerLensScoreContract, LedgerLensScoreContractClient};
+use crate::{Error, StellarLenseScoreContract, StellarLenseScoreContractClient};
 
 const START_TS: u64 = 1_700_000_000;
 const COOLDOWN: u64 = 3_601;
 
-fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>) {
+fn setup<'a>() -> (Env, StellarLenseScoreContractClient<'a>) {
     let env = Env::default();
     env.mock_all_auths();
     env.ledger().with_mut(|l| l.timestamp = START_TS);
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
@@ -31,7 +31,7 @@ fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>) {
 
 fn submit(
     env: &Env,
-    client: &LedgerLensScoreContractClient,
+    client: &StellarLenseScoreContractClient,
     wallet: &Address,
     pair: &Symbol,
     score: u32,
@@ -84,8 +84,8 @@ fn test_first_submission_no_jump_event() {
     let (env, client) = setup();
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let c2 = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let c2 = StellarLenseScoreContractClient::new(&env, &contract_id);
     c2.initialize(&Address::generate(&env), &Address::generate(&env));
 
     submit(&env, &c2, &wallet, &pair, 50);
@@ -102,8 +102,8 @@ fn test_jump_at_threshold_no_event() {
     let (env, client) = setup();
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let c2 = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let c2 = StellarLenseScoreContractClient::new(&env, &contract_id);
     c2.initialize(&Address::generate(&env), &Address::generate(&env));
 
     // First: score = 10
@@ -124,8 +124,8 @@ fn test_jump_one_above_threshold_emits_event() {
     let (env, client) = setup();
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let c2 = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let c2 = StellarLenseScoreContractClient::new(&env, &contract_id);
     c2.initialize(&Address::generate(&env), &Address::generate(&env));
 
     // First: score = 10
@@ -152,8 +152,8 @@ fn test_negative_jump_emits_event() {
     let (env, client) = setup();
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let c2 = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let c2 = StellarLenseScoreContractClient::new(&env, &contract_id);
     c2.initialize(&Address::generate(&env), &Address::generate(&env));
 
     // First: score = 80
@@ -181,8 +181,8 @@ fn test_batch_mixed_jumps() {
     let wallet_b = Address::generate(&env);
     let wallet_c = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let c2 = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let c2 = StellarLenseScoreContractClient::new(&env, &contract_id);
     c2.initialize(&Address::generate(&env), &Address::generate(&env));
 
     // Pre-populate scores so second submissions have a previous to diff.
@@ -264,8 +264,8 @@ fn test_custom_threshold_emits_event() {
     let (env, client) = setup();
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let c2 = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let c2 = StellarLenseScoreContractClient::new(&env, &contract_id);
     c2.initialize(&Address::generate(&env), &Address::generate(&env));
     c2.set_jump_threshold(&Vec::new(&env), &10);
 

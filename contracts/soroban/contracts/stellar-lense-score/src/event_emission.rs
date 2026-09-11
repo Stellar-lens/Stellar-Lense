@@ -6,15 +6,15 @@ mod test_event_schema {
         Address, Env, IntoVal, Symbol, Vec,
     };
 
-    use crate::{events::EVENT_VERSION, LedgerLensScoreContract, LedgerLensScoreContractClient};
+    use crate::{events::EVENT_VERSION, StellarLenseScoreContract, StellarLenseScoreContractClient};
 
     #[test]
     fn test_all_events_carry_schema_version() {
         let env = Env::default();
         env.mock_all_auths();
 
-        let contract_id = env.register_contract(None, LedgerLensScoreContract);
-        let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+        let contract_id = env.register_contract(None, StellarLenseScoreContract);
+        let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
         let admin = Address::generate(&env);
         let service = Address::generate(&env);
@@ -55,8 +55,8 @@ mod test_event_schema {
         let env = Env::default();
         env.mock_all_auths();
 
-        let contract_id = env.register_contract(None, LedgerLensScoreContract);
-        let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+        let contract_id = env.register_contract(None, StellarLenseScoreContract);
+        let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
         let admin = Address::generate(&env);
         let service = Address::generate(&env);

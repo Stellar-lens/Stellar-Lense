@@ -1,6 +1,6 @@
 //! Worst-case batch submission resource profiles (issue #757).
 //!
-//! Run: `cargo bench -p ledgerlens-score --bench batch_worst_case_profiles`
+//! Run: `cargo bench -p stellar_lense-score --bench batch_worst_case_profiles`
 //!
 //! Measures accepted, rejected, attested, and mixed batch submissions at the
 //! boundary sizes that represent realistic worst cases for on-chain resource
@@ -45,8 +45,8 @@
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use k256::ecdsa::SigningKey;
-use ledgerlens_score::{
-    BatchAttestation, LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreSubmission,
+use stellar_lense_score::{
+    BatchAttestation, StellarLenseScoreContract, StellarLenseScoreContractClient, ScoreSubmission,
     ScoreSubmissionWithProof,
 };
 use soroban_sdk::{
@@ -183,17 +183,17 @@ fn sign_root(env: &Env, key: &SigningKey, root: &[u8; 32]) -> BatchAttestation {
 
 // ── Contract setup ───────────────────────────────────────────────────────────
 
-fn setup_plain(env: &Env) -> (LedgerLensScoreContractClient<'_>, Symbol) {
+fn setup_plain(env: &Env) -> (StellarLenseScoreContractClient<'_>, Symbol) {
     env.mock_all_auths();
     env.budget().reset_unlimited();
     env.ledger().with_mut(|l| l.timestamp = START_TS);
-    let id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(env, &id);
+    let id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(env, &id);
     client.initialize(&Address::generate(env), &Address::generate(env));
     (client, Symbol::new(env, "XLM_USDC"))
 }
 
-fn setup_attested(env: &Env) -> (LedgerLensScoreContractClient<'_>, Symbol, SigningKey) {
+fn setup_attested(env: &Env) -> (StellarLenseScoreContractClient<'_>, Symbol, SigningKey) {
     let (client, pair) = setup_plain(env);
     let key = signing_key(1);
     client.set_service_pubkey(&Vec::new(env), &pubkey_bytes(env, &key));
@@ -254,7 +254,7 @@ fn build_mixed_batch(env: &Env, pair: &Symbol, count: u32) -> Vec<ScoreSubmissio
 /// invalid scores depending on `reject`.
 fn build_attested_batch(
     env: &Env,
-    client: &LedgerLensScoreContractClient,
+    client: &StellarLenseScoreContractClient,
     pair: &Symbol,
     key: &SigningKey,
     count: u32,
@@ -304,7 +304,7 @@ fn build_attested_batch(
 /// Build a mixed attested batch: even indices valid, odd indices score=200.
 fn build_attested_mixed(
     env: &Env,
-    client: &LedgerLensScoreContractClient,
+    client: &StellarLenseScoreContractClient,
     pair: &Symbol,
     key: &SigningKey,
     count: u32,

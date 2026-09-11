@@ -33,7 +33,7 @@ use soroban_sdk::{
     Address, Env, Vec,
 };
 
-use crate::{Error, LedgerLensScoreContract, LedgerLensScoreContractClient};
+use crate::{Error, StellarLenseScoreContract, StellarLenseScoreContractClient};
 
 /// Simple xorshift32 PRNG for deterministic seed generation.
 struct Xorshift32(u32);
@@ -53,13 +53,13 @@ impl Xorshift32 {
 
 const START_TS: u64 = 1_700_000_000;
 
-fn make_env<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
+fn make_env<'a>() -> (Env, StellarLenseScoreContractClient<'a>, Address, Address) {
     let env = Env::default();
     env.mock_all_auths();
     env.budget().reset_unlimited();
     env.ledger().with_mut(|l| l.timestamp = START_TS);
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
     client.initialize(&admin, &service);
@@ -73,8 +73,8 @@ fn fuzz_not_initialized() {
     let env = Env::default();
     env.mock_all_auths();
     env.budget().reset_unlimited();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     let wallet = Address::generate(&env);
     let pair = symbol_short!("XLM_USDC");
     let result = client.try_submit_score(

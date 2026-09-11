@@ -6,7 +6,7 @@ extern crate std;
 #[cfg(test)]
 mod test;
 const REQUIRED_SHARD_CAPABILITIES: [&str; 4] = ["score", "gate", "aggr", "arch"];
-use ledgerlens_score::{AggregateRiskScore, Error as ScoreError, RiskScore};
+use stellar_lense_score::{AggregateRiskScore, Error as ScoreError, RiskScore};
 use soroban_sdk::{
     contract, contracterror, contractimpl, contracttype, symbol_short, vec, Address, Env, Symbol,
     TryFromVal, Vec,
@@ -16,12 +16,12 @@ pub const MAX_SHARDS: usize = 10;
 const FAILURE_TRANSPORT: u32 = 0;
 const FAILURE_CONTRACT_ERROR: u32 = 1;
 
-/// Errors surfaced directly by `LedgerLensAggregator`'s own bookkeeping
+/// Errors surfaced directly by `StellarLenseAggregator`'s own bookkeeping
 /// (shard registry, admin gating). `query_risk_gate` itself is infallible —
 /// see its doc comment — and reports every failure case by returning `false`
 /// rather than one of these variants. Errors that originate from a specific
-/// shard's `ledgerlens-score` deployment (e.g. an incompatible interface) are
-/// reported as their own `ledgerlens_score::Error` (`ScoreError`) value
+/// shard's `stellar_lense-score` deployment (e.g. an incompatible interface) are
+/// reported as their own `stellar_lense_score::Error` (`ScoreError`) value
 /// instead of being wrapped here.
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
@@ -99,7 +99,7 @@ pub struct SplitBrainReport {
     pub diagnostics: Vec<ShardConfigDiagnostic>,
 }
 
-/// Capabilities of the `ILedgerLensScore` interface (interface version 2, see
+/// Capabilities of the `IStellarLenseScore` interface (interface version 2, see
 /// `docs/interface-spec.md`) that this aggregator invokes on every registered
 /// shard: `query_risk_gate` (`gate`), `get_score` (`score`), and
 /// `get_aggregate_score` (`aggr`). `add_shard` requires a candidate shard to
@@ -113,7 +113,7 @@ const MAX_ASSET_PAIR_BYTES: u32 = 9;
 /// does not expose `supports_interface` at all (an older or drifted build) is
 /// treated as incompatible.
 fn shard_supports_required_interface(env: &Env, shard: &Address) -> bool {
-    let client = ledgerlens_score::LedgerLensScoreContractClient::new(env, shard);
+    let client = stellar_lense_score::StellarLenseScoreContractClient::new(env, shard);
 
     // 1. Verify standard capability flags
     for capability in REQUIRED_SHARD_CAPABILITIES {
@@ -144,10 +144,10 @@ fn asset_pair_is_bounded(env: &Env, asset_pair: &Symbol) -> bool {
 }
 
 #[contract]
-pub struct LedgerLensAggregator;
+pub struct StellarLenseAggregator;
 
 #[contractimpl]
-impl LedgerLensAggregator {
+impl StellarLenseAggregator {
     pub fn initialize(env: Env, admin: Address) -> Result<(), Error> {
         if env.storage().instance().has(&DataKey::Admin) {
             return Err(Error::AlreadyInitialized);
@@ -181,7 +181,7 @@ impl LedgerLensAggregator {
         let shards: Vec<Address> =
             env.storage().instance().get(&DataKey::Shards).unwrap_or_else(|| Vec::new(&env));
         let primary = shards.get(0).ok_or(ScoreError::ScoreNotFound)?;
-        let client = ledgerlens_score::LedgerLensScoreContractClient::new(&env, &primary);
+        let client = stellar_lense_score::StellarLenseScoreContractClient::new(&env, &primary);
 
         match client.try_get_decay_rate() {
             Ok(Ok(rate)) => Ok(rate),
@@ -200,7 +200,7 @@ impl LedgerLensAggregator {
         let shards: Vec<Address> =
             env.storage().instance().get(&DataKey::Shards).unwrap_or_else(|| Vec::new(&env));
         let primary = shards.get(0).ok_or(ScoreError::ScoreNotFound)?;
-        let client = ledgerlens_score::LedgerLensScoreContractClient::new(&env, &primary);
+        let client = stellar_lense_score::StellarLenseScoreContractClient::new(&env, &primary);
 
         match client.try_get_consensus_config() {
             Ok(Ok(config)) => Ok(config.0),
@@ -223,7 +223,7 @@ impl LedgerLensAggregator {
             env.storage().instance().get(&DataKey::Shards).unwrap_or_else(|| Vec::new(&env));
         for i in 0..shards.len() {
             let shard = shards.get(i).unwrap();
-            let client = ledgerlens_score::LedgerLensScoreContractClient::new(&env, &shard);
+            let client = stellar_lense_score::StellarLenseScoreContractClient::new(&env, &shard);
             if let Ok(Ok(true)) = client.try_is_watchlisted(&wallet) {
                 return true;
             }
@@ -315,7 +315,7 @@ impl LedgerLensAggregator {
         if snapshot.is_empty() {
             return false;
         }
-        let client = ledgerlens_score::LedgerLensScoreContractClient::new(&env, &shard);
+        let client = stellar_lense_score::StellarLenseScoreContractClient::new(&env, &shard);
         for i in 0..snapshot.len() {
             let cap = snapshot.get(i).unwrap();
             match client.try_supports_interface(&cap) {
@@ -327,7 +327,7 @@ impl LedgerLensAggregator {
     }
 
     /// Infallible, side-effect-free (beyond recording `LastShardFailure`) gate
-    /// check, mirroring `ledgerlens-score`'s own `query_risk_gate`: every
+    /// check, mirroring `stellar_lense-score`'s own `query_risk_gate`: every
     /// registered, healthy shard must agree the wallet clears `gate_threshold`
     /// (an AND across shards), and any shard that is unhealthy is skipped, but
     /// a shard whose cross-contract call itself fails (unreachable contract,
@@ -352,7 +352,7 @@ impl LedgerLensAggregator {
             if !is_shard_healthy(&env, &shard) {
                 continue;
             }
-            let client = ledgerlens_score::LedgerLensScoreContractClient::new(&env, &shard);
+            let client = stellar_lense_score::StellarLenseScoreContractClient::new(&env, &shard);
             match client.try_query_risk_gate(&wallet, &asset_pair, &gate_threshold) {
                 Ok(Ok(true)) => {}
                 Ok(Ok(false)) => return false,
@@ -383,7 +383,7 @@ impl LedgerLensAggregator {
             if !is_shard_healthy(&env, &shard) {
                 continue;
             }
-            let client = ledgerlens_score::LedgerLensScoreContractClient::new(&env, &shard);
+            let client = stellar_lense_score::StellarLenseScoreContractClient::new(&env, &shard);
             match client.try_get_score(&wallet, &asset_pair) {
                 Ok(Ok(score)) => match &best {
                     None => best = Some(score),
@@ -420,7 +420,7 @@ impl LedgerLensAggregator {
             if !is_shard_healthy(&env, &shard) {
                 continue;
             }
-            let client = ledgerlens_score::LedgerLensScoreContractClient::new(&env, &shard);
+            let client = stellar_lense_score::StellarLenseScoreContractClient::new(&env, &shard);
             match client.try_get_aggregate_score(&wallet) {
                 Ok(Ok(agg)) => match &best {
                     None => best = Some(agg),
@@ -479,7 +479,7 @@ impl LedgerLensAggregator {
             if !is_shard_healthy(&env, &shard) {
                 continue;
             }
-            let client = ledgerlens_score::LedgerLensScoreContractClient::new(&env, &shard);
+            let client = stellar_lense_score::StellarLenseScoreContractClient::new(&env, &shard);
             match client.try_get_score(&wallet, &asset_pair) {
                 Ok(Ok(score)) => out.push_back((shard.clone(), Some(score))),
                 _ => out.push_back((shard.clone(), None)),
@@ -503,7 +503,7 @@ impl LedgerLensAggregator {
             if !is_shard_healthy(&env, &shard) {
                 continue;
             }
-            let client = ledgerlens_score::LedgerLensScoreContractClient::new(&env, &shard);
+            let client = stellar_lense_score::StellarLenseScoreContractClient::new(&env, &shard);
             match client.try_get_contagion_depth(&wallet, &asset_pair) {
                 Ok(Ok(depth)) => {
                     if depth > max_depth {
@@ -567,7 +567,7 @@ impl LedgerLensAggregator {
                 continue;
             }
             healthy_count += 1;
-            let client = ledgerlens_score::LedgerLensScoreContractClient::new(&env, &shard);
+            let client = stellar_lense_score::StellarLenseScoreContractClient::new(&env, &shard);
             match client.try_get_score(&wallet, &asset_pair) {
                 Ok(Ok(_)) => match client.try_is_score_stale(&wallet, &asset_pair) {
                     Ok(Ok(true)) => {
@@ -693,7 +693,7 @@ fn probe_capabilities(env: &Env, shard: &Address) -> Vec<Symbol> {
         Symbol::new(env, "health"),
         Symbol::new(env, "batch_attested"),
     ];
-    let client = ledgerlens_score::LedgerLensScoreContractClient::new(env, shard);
+    let client = stellar_lense_score::StellarLenseScoreContractClient::new(env, shard);
     let mut found: Vec<Symbol> = Vec::new(env);
     for i in 0..all_caps.len() {
         let cap = all_caps.get(i).unwrap();
@@ -720,7 +720,7 @@ fn is_shard_registered(env: &Env, shard: &Address) -> bool {
 }
 
 fn read_config_fingerprint(env: &Env, shard: &Address) -> Option<AggregatorConfigFingerprint> {
-    let client = ledgerlens_score::LedgerLensScoreContractClient::new(env, shard);
+    let client = stellar_lense_score::StellarLenseScoreContractClient::new(env, shard);
     let decay = match client.try_get_decay_rate() {
         Ok(Ok(rate)) => rate,
         _ => return None,

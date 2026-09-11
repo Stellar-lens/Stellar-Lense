@@ -1,6 +1,6 @@
 # Model Version Governance Documentation
 
-This document describes the implemented model version governance and submission gating mechanism in `ledgerlens-score`.
+This document describes the implemented model version governance and submission gating mechanism in `stellar-lense-score`.
 
 ## Overview & Governance Flow
 
@@ -59,4 +59,4 @@ Model version acceptance controls what data the off-chain ML pipeline can write 
   - Batch rejection: proposed and deprecated version entries rejected with correct `rejection_code`.
 
 ## Step 7 — Build & test
-- [x] Run `cargo test -p ledgerlens-score`.
+- [x] Run `cargo test -p stellar-lense-score`.

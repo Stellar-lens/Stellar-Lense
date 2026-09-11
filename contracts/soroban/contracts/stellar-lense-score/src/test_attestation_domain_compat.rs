@@ -30,17 +30,17 @@ use soroban_sdk::{
 };
 
 use crate::{
-    Error, LedgerLensScoreContract, LedgerLensScoreContractClient, MaybeScoreAttestation,
+    Error, StellarLenseScoreContract, StellarLenseScoreContractClient, MaybeScoreAttestation,
     MaybeThresholdAttestation, ScoreAttestation, ScoreAttestationInput,
 };
 
 // ── Fixtures ──────────────────────────────────────────────────────────────
 
-fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
+fn setup<'a>() -> (Env, StellarLenseScoreContractClient<'a>, Address, Address) {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
     (env, client, admin, service)
@@ -167,7 +167,7 @@ fn reference_digest(env: &Env, contract: &Address, v: &Vector) -> [u8; 32] {
 /// values — the same digest `submit_score` recomputes.
 fn digest_of(env: &Env, contract: &Address, v: &Vector) -> [u8; 32] {
     env.as_contract(contract, || {
-        LedgerLensScoreContract::compute_commitment(
+        StellarLenseScoreContract::compute_commitment(
             env,
             &v.wallet,
             &v.pair,
@@ -334,8 +334,8 @@ fn test_deployment_is_domain_separated() {
     // attestations. The contract address is self-derived from the executor.
     let env = Env::default();
     env.mock_all_auths();
-    let deploy_a = env.register_contract(None, LedgerLensScoreContract);
-    let deploy_b = env.register_contract(None, LedgerLensScoreContract);
+    let deploy_a = env.register_contract(None, StellarLenseScoreContract);
+    let deploy_b = env.register_contract(None, StellarLenseScoreContract);
     assert_ne!(deploy_a, deploy_b);
 
     let v = Vector::base(&env);

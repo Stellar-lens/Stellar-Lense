@@ -20,15 +20,15 @@ use soroban_sdk::{
 };
 
 #[cfg(test)]
-use crate::{Error, LedgerLensScoreContract, ScoreSubmission};
+use crate::{Error, StellarLenseScoreContract, ScoreSubmission};
 
 #[cfg(test)]
 fn setup(
-) -> (Env, crate::LedgerLensScoreContractClient<'static>, Address, Address, soroban_sdk::Symbol) {
+) -> (Env, crate::StellarLenseScoreContractClient<'static>, Address, Address, soroban_sdk::Symbol) {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = crate::LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = crate::StellarLenseScoreContractClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
     client.initialize(&admin, &service);

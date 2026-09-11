@@ -7,7 +7,7 @@
 
 ## Context
 
-Storage keys in `contracts/ledgerlens-score/src/types.rs` are split across five
+Storage keys in `contracts/stellar-lense-score/src/types.rs` are split across five
 `#[contracttype]` enums:
 
 | Enum | Variants | Purpose |
@@ -135,4 +135,4 @@ which would orphan the data stored under the removed variant's key.
 ## References
 
 - GitHub issue: [#420](https://github.com/Ledger-Lenz/Ledgerlens-contract/issues/420)
-- Source: `contracts/ledgerlens-score/src/types.rs`
+- Source: `contracts/stellar-lense-score/src/types.rs`

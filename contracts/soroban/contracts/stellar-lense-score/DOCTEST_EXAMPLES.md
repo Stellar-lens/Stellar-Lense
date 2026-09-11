@@ -1,10 +1,10 @@
 # Service pubkey rustdoc examples
 
 Adds runnable `# Examples` blocks to the four service-pubkey admin/query
-functions in `contracts/ledgerlens-score/src/lib.rs`, following the existing
+functions in `contracts/stellar-lense-score/src/lib.rs`, following the existing
 pattern used by `get_score_trend`, `get_score_percentile`, and
 `query_risk_gate_relative` (test `Env`, `mock_all_auths`, register the
-contract, call through `LedgerLensScoreContractClient`).
+contract, call through `StellarLenseScoreContractClient`).
 
 - `set_service_pubkey`: sets a 33-byte compressed pubkey and confirms it via
   `get_service_pubkey`.

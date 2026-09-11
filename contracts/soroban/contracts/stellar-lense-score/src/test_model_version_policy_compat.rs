@@ -33,7 +33,7 @@ use soroban_sdk::{
 };
 
 use crate::{
-    types::ModelVersionStatus, LedgerLensScoreContract, LedgerLensScoreContractClient,
+    types::ModelVersionStatus, StellarLenseScoreContract, StellarLenseScoreContractClient,
     ScoreSubmission,
 };
 
@@ -42,13 +42,13 @@ const COOLDOWN: u64 = 3_601;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address) {
+fn setup<'a>() -> (Env, StellarLenseScoreContractClient<'a>, Address) {
     let env = Env::default();
     env.mock_all_auths();
     env.budget().reset_unlimited();
     env.ledger().with_mut(|l| l.timestamp = START_TS);
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
     client.initialize(&admin, &service);
@@ -57,7 +57,7 @@ fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address) {
 
 fn register_version(
     env: &Env,
-    client: &LedgerLensScoreContractClient,
+    client: &StellarLenseScoreContractClient,
     version: u32,
     activate_delay: u64,
 ) {
@@ -65,14 +65,14 @@ fn register_version(
     client.register_model_version(&version, &metadata, &activate_delay);
 }
 
-fn activate_version(env: &Env, client: &LedgerLensScoreContractClient, version: u32) {
+fn activate_version(env: &Env, client: &StellarLenseScoreContractClient, version: u32) {
     // Register with zero delay so it is immediately active.
     register_version(env, client, version, 0);
 }
 
 fn submit_with_version(
     env: &Env,
-    client: &LedgerLensScoreContractClient,
+    client: &StellarLenseScoreContractClient,
     wallet: &Address,
     score: u32,
     version: u32,

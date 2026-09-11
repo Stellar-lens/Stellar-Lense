@@ -22,23 +22,23 @@ use soroban_sdk::{
 };
 
 use crate::{
-    Error, LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreAttestation,
+    Error, StellarLenseScoreContract, StellarLenseScoreContractClient, ScoreAttestation,
     ThresholdAttestation,
 };
 
 // ── Test infrastructure ──────────────────────────────────────────────────────
 
-fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
+fn setup<'a>() -> (Env, StellarLenseScoreContractClient<'a>, Address, Address) {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
     (env, client, admin, service)
 }
 
-fn initialized<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
+fn initialized<'a>() -> (Env, StellarLenseScoreContractClient<'a>, Address, Address) {
     let (env, client, admin, service) = setup();
     client.initialize(&admin, &service);
     (env, client, admin, service)
@@ -74,7 +74,7 @@ fn commitment(
     model_version: u32,
 ) -> [u8; 32] {
     env.as_contract(contract_id, || {
-        LedgerLensScoreContract::compute_commitment(
+        StellarLenseScoreContract::compute_commitment(
             env,
             wallet,
             pair,

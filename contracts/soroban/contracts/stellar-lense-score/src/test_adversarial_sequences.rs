@@ -3,7 +3,7 @@ use soroban_sdk::{
     BytesN, Vec,
 };
 
-use crate::{test_builders::ContractStateBuilder, Error, LedgerLensScoreContractClient};
+use crate::{test_builders::ContractStateBuilder, Error, StellarLenseScoreContractClient};
 
 #[derive(Clone, Copy, Debug)]
 enum Op {
@@ -16,7 +16,7 @@ enum Op {
 }
 
 fn assert_invariants(
-    client: &LedgerLensScoreContractClient,
+    client: &StellarLenseScoreContractClient,
     paused: bool,
     service_threshold: u32,
     expected_service_signers: u32,

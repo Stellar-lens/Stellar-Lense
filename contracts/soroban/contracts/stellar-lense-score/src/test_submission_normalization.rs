@@ -17,17 +17,17 @@
 
 use soroban_sdk::{symbol_short, testutils::Address as _, vec, Address, Env, Vec};
 
-use crate::{Error, LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreSubmission};
-use ledgerlens_test_support::{
+use crate::{Error, StellarLenseScoreContract, StellarLenseScoreContractClient, ScoreSubmission};
+use stellar_lense_test_support::{
     generate_score_roles, set_ledger_timestamp, test_env_with_unlimited_budget,
 };
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
-fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
+fn setup<'a>() -> (Env, StellarLenseScoreContractClient<'a>, Address, Address) {
     let env = test_env_with_unlimited_budget();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     let (admin, service) = generate_score_roles(&env);
     set_ledger_timestamp(&env, 100_000);
     client.initialize(&admin, &service);

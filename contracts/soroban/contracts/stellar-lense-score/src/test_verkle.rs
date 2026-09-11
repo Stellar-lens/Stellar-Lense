@@ -14,21 +14,21 @@ use soroban_sdk::{
     Address, Bytes, BytesN, Env, Symbol, SymbolStr, TryFromVal, Vec,
 };
 
-use crate::{verkle, LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreSubmission};
+use crate::{verkle, StellarLenseScoreContract, StellarLenseScoreContractClient, ScoreSubmission};
 
 // ── Test infrastructure ──────────────────────────────────────────────────────
 
-fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
+fn setup<'a>() -> (Env, StellarLenseScoreContractClient<'a>, Address, Address) {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
     (env, client, admin, service)
 }
 
-fn initialized<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
+fn initialized<'a>() -> (Env, StellarLenseScoreContractClient<'a>, Address, Address) {
     let (env, client, admin, service) = setup();
     client.initialize(&admin, &service);
     (env, client, admin, service)
@@ -642,7 +642,7 @@ fn reference_commitment(env: &Env, leaves: &[[u8; 32]]) -> [u8; 32] {
     env.crypto().sha256(&Bytes::from_array(env, &buf)).to_bytes().to_array()
 }
 
-fn raw_commitment(env: &Env, client: &LedgerLensScoreContractClient) -> [u8; 32] {
+fn raw_commitment(env: &Env, client: &StellarLenseScoreContractClient) -> [u8; 32] {
     let b48 = client.get_state_commitment();
     let arr = b48.to_array();
     let mut raw = [0u8; 32];

@@ -6,16 +6,16 @@ use soroban_sdk::{
     Address, Env, Vec,
 };
 
-use crate::{Error, LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreSubmission};
+use crate::{Error, StellarLenseScoreContract, StellarLenseScoreContractClient, ScoreSubmission};
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
+fn setup<'a>() -> (Env, StellarLenseScoreContractClient<'a>, Address, Address) {
     let env = Env::default();
     env.mock_all_auths();
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
@@ -28,7 +28,7 @@ fn setup<'a>() -> (Env, LedgerLensScoreContractClient<'a>, Address, Address) {
 /// calls for the same (wallet, pair) are always accepted.
 fn submit(
     env: &Env,
-    client: &LedgerLensScoreContractClient,
+    client: &StellarLenseScoreContractClient,
     wallet: &Address,
     pair: &soroban_sdk::Symbol,
     score: u32,
@@ -737,14 +737,14 @@ fn test_set_hysteresis_margin_below_risk_threshold_accepted() {
 #[test]
 fn test_set_hysteresis_margin_non_admin_rejected() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(&env, &contract_id);
     env.mock_all_auths();
     client.initialize(&Address::generate(&env), &Address::generate(&env));
 
     // Fresh env without mock_all_auths so admin auth check fires.
     let env2 = Env::default();
-    let c2 = LedgerLensScoreContractClient::new(&env2, &contract_id);
+    let c2 = StellarLenseScoreContractClient::new(&env2, &contract_id);
     let result = c2.try_set_hysteresis_margin(&10);
     assert!(result.is_err());
 }

@@ -1,6 +1,6 @@
 //! Per-entry-point Soroban resource budgets (issue #756).
 //!
-//! Run: `cargo bench -p ledgerlens-score --bench entry_point_budgets`
+//! Run: `cargo bench -p stellar_lense-score --bench entry_point_budgets`
 //!
 //! Each benchmark measures the CPU-instruction and memory-byte cost of a
 //! single representative call to every public contract entry point so that
@@ -38,7 +38,7 @@
 //!   extend_entry_ttls (size 1 / size 20)
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreSubmission};
+use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient, ScoreSubmission};
 use soroban_sdk::{
     symbol_short,
     testutils::{Address as _, Ledger as _},
@@ -53,13 +53,13 @@ const COOLDOWN: u64 = 3_601; // just over the default 1-hour cooldown
 // ── Harness helpers ─────────────────────────────────────────────────────────
 
 /// Initialize a fresh contract and return (client, admin, service, asset_pair).
-fn setup(env: &Env) -> (LedgerLensScoreContractClient<'_>, Address, Address, Symbol) {
+fn setup(env: &Env) -> (StellarLenseScoreContractClient<'_>, Address, Address, Symbol) {
     env.mock_all_auths();
     env.budget().reset_unlimited();
     env.ledger().with_mut(|l| l.timestamp = START_TS);
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(env, &contract_id);
     let admin = Address::generate(env);
     let service = Address::generate(env);
     client.initialize(&admin, &service);
@@ -71,7 +71,7 @@ fn setup(env: &Env) -> (LedgerLensScoreContractClient<'_>, Address, Address, Sym
 /// Submit one score for wallet/pair at the current ledger timestamp.
 fn submit_one(
     env: &Env,
-    client: &LedgerLensScoreContractClient,
+    client: &StellarLenseScoreContractClient,
     wallet: &Address,
     asset_pair: &Symbol,
     score: u32,
@@ -353,8 +353,8 @@ fn bench_initialize(c: &mut Criterion) {
             env.budget().reset_unlimited();
             env.ledger().with_mut(|l| l.timestamp = START_TS);
 
-            let contract_id = env.register_contract(None, LedgerLensScoreContract);
-            let client = LedgerLensScoreContractClient::new(&env, &contract_id);
+            let contract_id = env.register_contract(None, StellarLenseScoreContract);
+            let client = StellarLenseScoreContractClient::new(&env, &contract_id);
             let admin = Address::generate(&env);
             let service = Address::generate(&env);
 

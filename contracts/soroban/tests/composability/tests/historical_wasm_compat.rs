@@ -10,7 +10,7 @@
 //! No production entry point, storage key, event, or error discriminant is
 //! changed by this suite.
 
-use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient, RiskScore};
+use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient, RiskScore};
 use mock_amm::{FailPolicy as AmmFailPolicy, MockAmm, MockAmmClient, MockAmmError};
 use mock_lending::{MockLending, MockLendingClient, MockLendingError};
 use sha2::{Digest, Sha256};
@@ -186,11 +186,11 @@ fn current_abi_golden() -> String {
     }
 
     let entries = [
-        entry(LedgerLensScoreContract::spec_xdr_get_version()),
-        entry(LedgerLensScoreContract::spec_xdr_initialize()),
-        entry(LedgerLensScoreContract::spec_xdr_query_risk_gate()),
-        entry(LedgerLensScoreContract::spec_xdr_query_risk_gate_with_confidence()),
-        entry(LedgerLensScoreContract::spec_xdr_supports_interface()),
+        entry(StellarLenseScoreContract::spec_xdr_get_version()),
+        entry(StellarLenseScoreContract::spec_xdr_initialize()),
+        entry(StellarLenseScoreContract::spec_xdr_query_risk_gate()),
+        entry(StellarLenseScoreContract::spec_xdr_query_risk_gate_with_confidence()),
+        entry(StellarLenseScoreContract::spec_xdr_supports_interface()),
         entry(RiskScore::spec_xdr()),
     ];
     stable_abi_golden(&entries)
@@ -198,7 +198,7 @@ fn current_abi_golden() -> String {
 
 struct HistoricalFixture<'a> {
     env: Env,
-    score: LedgerLensScoreContractClient<'a>,
+    score: StellarLenseScoreContractClient<'a>,
     amm: MockAmmClient<'a>,
     lending: MockLendingClient<'a>,
 }
@@ -220,7 +220,7 @@ fn setup_historical<'a>() -> HistoricalFixture<'a> {
     });
 
     let score_id = env.register_contract_wasm(None, HISTORICAL_WASM);
-    let score = LedgerLensScoreContractClient::new(&env, &score_id);
+    let score = StellarLenseScoreContractClient::new(&env, &score_id);
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
     score.initialize(&admin, &service);
@@ -395,8 +395,8 @@ fn historical_client_calls_the_current_stable_gate_surface() {
         ledger.sequence_number = 100;
         ledger.timestamp = 1_700_000_000;
     });
-    let current_id = env.register_contract(None, LedgerLensScoreContract);
-    let current = LedgerLensScoreContractClient::new(&env, &current_id);
+    let current_id = env.register_contract(None, StellarLenseScoreContract);
+    let current = StellarLenseScoreContractClient::new(&env, &current_id);
     let admin = Address::generate(&env);
     let service = Address::generate(&env);
     current.initialize(&admin, &service);

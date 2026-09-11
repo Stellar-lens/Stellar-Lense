@@ -1,4 +1,4 @@
----------------------------- MODULE LedgerLens ----------------------------
+---------------------------- MODULE StellarLense ----------------------------
 EXTENDS Integers, Sequences, FiniteSets, TLC
 
 CONSTANTS 

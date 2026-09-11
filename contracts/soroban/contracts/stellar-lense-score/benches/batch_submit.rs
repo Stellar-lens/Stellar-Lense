@@ -1,12 +1,12 @@
 //! Criterion benchmarks for `submit_scores_batch` throughput at varying batch sizes.
 //!
-//! Run: `cargo bench -p ledgerlens-score --bench batch_submit`
+//! Run: `cargo bench -p stellar_lense-score --bench batch_submit`
 //!
 //! Batch sizes above [`MAX_BATCH`] are submitted as multiple contract calls
 //! (ceil(n / MAX_BATCH)) because on-chain `MAX_BATCH_SIZE` is 20.
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use ledgerlens_score::{LedgerLensScoreContract, LedgerLensScoreContractClient, ScoreSubmission};
+use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient, ScoreSubmission};
 use soroban_sdk::{
     testutils::{Address as _, Ledger as _},
     Address, Env, Symbol, Vec,
@@ -14,13 +14,13 @@ use soroban_sdk::{
 
 const MAX_BATCH: u32 = 20;
 
-fn setup(env: &Env) -> (LedgerLensScoreContractClient<'_>, Symbol) {
+fn setup(env: &Env) -> (StellarLenseScoreContractClient<'_>, Symbol) {
     env.mock_all_auths();
     env.budget().reset_unlimited();
     env.ledger().with_mut(|l| l.timestamp = 1_700_000_000);
 
-    let contract_id = env.register_contract(None, LedgerLensScoreContract);
-    let client = LedgerLensScoreContractClient::new(env, &contract_id);
+    let contract_id = env.register_contract(None, StellarLenseScoreContract);
+    let client = StellarLenseScoreContractClient::new(env, &contract_id);
     let admin = Address::generate(env);
     let service = Address::generate(env);
     client.initialize(&admin, &service);
@@ -54,7 +54,7 @@ fn build_entries(
 
 fn submit_n_entries(
     env: &Env,
-    client: &LedgerLensScoreContractClient,
+    client: &StellarLenseScoreContractClient,
     asset_pair: &Symbol,
     total: u32,
 ) -> (u64, u64) {
