@@ -81,7 +81,28 @@ class RiskScoreStore:
                             index_elements=["wallet", "asset_pair"],
                             set_=update_columns,
                         )
-                    )
+                    elif dialect_name == "sqlite":
+                        # SYNTAX-ONLY FIX: the line above this comment used to be a
+                        # stray, unbalanced ")" — presumably a lost "elif
+                        # dialect_name == 'sqlite':" from a bad merge — which made
+                        # this whole module fail to parse (tests/conftest.py's
+                        # source-integrity gate hard-blocks the *entire* pytest
+                        # session on any unparseable file, so this was blocking
+                        # unrelated test runs too). Restoring the elif is the
+                        # minimal change that makes the file valid Python again.
+                        #
+                        # It does NOT make this branch correct: `table`, `values`,
+                        # and `update_columns` are undefined names below (used by
+                        # the dead `dialect_insert(table)...` fragment a few lines
+                        # down, left over from what looks like an abandoned
+                        # raw-SQL-upsert attempt that the ORM-style
+                        # fetch/create/assign code beneath it was meant to
+                        # replace). Calling _upsert_impl against a sqlite session
+                        # will still raise NameError. Out of scope to reconstruct
+                        # properly here — this function is unrelated to what this
+                        # session's task touched; flagging for real review rather
+                        # than guessing at the intended upsert semantics.
+                        pass
                     if existing is None:
                         existing = RiskScoreRecord(wallet=wallet, asset_pair=asset_pair)
                         session.add(existing)

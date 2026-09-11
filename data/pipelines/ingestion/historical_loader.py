@@ -11,6 +11,7 @@ from stellar_sdk import Server
 from config import config
 from ingestion.data_models import Trade
 from ingestion.horizon_fetcher import fetch as horizon_fetch
+from ingestion.exceptions import RecordValidationError
 from ingestion.horizon_streamer import _to_trade
 from ingestion.untrusted_input import UntrustedInputError, validate_trade
 from utils.logging import get_logger
@@ -54,7 +55,19 @@ def load_trades(
             try:
                 trade = _to_trade(record)
                 validate_trade(trade, source="historical_loader")
-            except (UntrustedInputError, ValidationError, KeyError, ValueError) as exc:
+            except (
+                UntrustedInputError,
+                ValidationError,
+                KeyError,
+                ValueError,
+                # _to_trade wraps its own failures (e.g. a zero-denominator
+                # price fraction) in RecordValidationError via record_context.
+                # RecordValidationError deliberately does NOT inherit
+                # KeyError/ValueError (see ingestion/exceptions.py), so
+                # without this it propagated past this per-record guard and
+                # crashed the whole page/generator instead of being skipped.
+                RecordValidationError,
+            ) as exc:
                 logger.warning(
                     "Rejected malformed trade record from Horizon (id=%s): %s",
                     record.get("id", "?"),

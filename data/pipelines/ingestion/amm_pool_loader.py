@@ -16,7 +16,12 @@ from stellar_sdk import Server
 
 from config import config
 from ingestion.data_models import Asset, Trade
-from ingestion.exceptions import InvalidInputError, SourceUnavailableError, record_context
+from ingestion.exceptions import (
+    InvalidInputError,
+    RecordValidationError,
+    SourceUnavailableError,
+    record_context,
+)
 from ingestion.untrusted_input import UntrustedInputError, safe_ratio, validate_trade
 from utils.logging import get_logger
 from utils.retry import retry_with_backoff
@@ -122,10 +127,18 @@ def iter_amm_pool_trades(
                 continue
             seen_paging_tokens.add(paging_token)
 
-            trade = _amm_record_to_trade(record)
             try:
+                trade = _amm_record_to_trade(record)
                 validate_trade(trade, source="amm_pool_loader")
-            except (UntrustedInputError, ValidationError) as exc:
+            except (
+                UntrustedInputError,
+                ValidationError,
+                # _amm_record_to_trade used to be called outside this try
+                # block, so its RecordValidationError (e.g. a NaN amount)
+                # propagated unguarded instead of being skipped like a
+                # validate_trade() rejection is.
+                RecordValidationError,
+            ) as exc:
                 logger.warning(
                     "Rejected malformed AMM trade record from Horizon (pool=%s, paging_token=%s): %s",
                     pool_id,
@@ -224,7 +237,16 @@ def stream_amm_pool_trades(pool_id: str) -> Generator[Trade, None, None]:
                 try:
                     trade = _amm_record_to_trade(record)
                     validate_trade(trade, source="amm_pool_loader_stream")
-                except (UntrustedInputError, ValidationError, KeyError, ValueError) as exc:
+                except (
+                    UntrustedInputError,
+                    ValidationError,
+                    KeyError,
+                    ValueError,
+                    # Same gap as historical_loader.load_trades(): _amm_record_to_trade
+                    # wraps its own failures in RecordValidationError via record_context,
+                    # which deliberately doesn't inherit KeyError/ValueError.
+                    RecordValidationError,
+                ) as exc:
                     logger.warning(
                         "Rejected malformed AMM trade record for pool %s (paging_token=%s): %s",
                         pool_id,

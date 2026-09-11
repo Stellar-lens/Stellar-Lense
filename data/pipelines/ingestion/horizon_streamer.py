@@ -235,12 +235,16 @@ def _to_trade(record: dict) -> Trade:
             ledger_close_time=record["ledger_close_time"],
             base_account=record["base_account"],
             counter_account=record["counter_account"],
+            # Horizon omits *_asset_code/*_asset_issuer entirely for native
+            # XLM legs (only *_asset_type: "native" is present) rather than
+            # sending an empty string — direct indexing here raised KeyError
+            # on every native-asset trade, which on the SDEX is most of them.
             base_asset=Asset(
-                code=record["base_asset_code"] or "XLM",
+                code=record.get("base_asset_code") or "XLM",
                 issuer=record.get("base_asset_issuer"),
             ),
             counter_asset=Asset(
-                code=record["counter_asset_code"] or "XLM",
+                code=record.get("counter_asset_code") or "XLM",
                 issuer=record.get("counter_asset_issuer"),
             ),
             base_amount=float(record["base_amount"]),
