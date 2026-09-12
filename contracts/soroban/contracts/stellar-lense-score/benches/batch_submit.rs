@@ -6,10 +6,12 @@
 //! (ceil(n / MAX_BATCH)) because on-chain `MAX_BATCH_SIZE` is 20.
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient, ScoreSubmission};
 use soroban_sdk::{
     testutils::{Address as _, Ledger as _},
     Address, Env, Symbol, Vec,
+};
+use stellar_lense_score::{
+    ScoreSubmission, StellarLenseScoreContract, StellarLenseScoreContractClient,
 };
 
 const MAX_BATCH: u32 = 20;

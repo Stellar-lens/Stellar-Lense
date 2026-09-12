@@ -24,12 +24,12 @@
 //! than unbounded.
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
 use soroban_sdk::{
     symbol_short,
     testutils::{Address as _, Ledger as _},
     Address, Env, Symbol, Vec,
 };
+use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
 
 const MAX_HISTORY_DEPTH: u32 = 50;
 const PARAM_CHANGE_DELAY: u64 = 86_401;

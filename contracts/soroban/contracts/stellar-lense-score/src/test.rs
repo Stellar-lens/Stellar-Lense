@@ -6,8 +6,8 @@ use soroban_sdk::{
 
 use crate::storage;
 use crate::{
-    BatchResult, DeletionAuditWarning, Error, StellarLenseScoreContract,
-    StellarLenseScoreContractClient, ScoreQuery, ScoreSubmission,
+    BatchResult, DeletionAuditWarning, Error, ScoreQuery, ScoreSubmission,
+    StellarLenseScoreContract, StellarLenseScoreContractClient,
 };
 use stellar_lense_test_support::{
     generate_score_roles, set_ledger_timestamp, test_env_with_unlimited_budget,

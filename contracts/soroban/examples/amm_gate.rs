@@ -23,10 +23,10 @@
 
 #![no_std]
 
-use stellar_lense_score::StellarLenseScoreContractClient;
 use soroban_sdk::{
     contract, contracterror, contractimpl, contracttype, symbol_short, Address, Env,
 };
+use stellar_lense_score::StellarLenseScoreContractClient;
 
 /// Errors surfaced by the gated AMM. `HighRiskWallet` is the one produced by
 /// the StellarLense guard clause; the rest are ordinary AMM bookkeeping.

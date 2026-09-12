@@ -42,8 +42,8 @@
 
 #![no_std]
 
-use stellar_lense_aggregator::StellarLenseAggregatorClient;
 use soroban_sdk::{contract, contracterror, contractimpl, Address, Env, Symbol};
+use stellar_lense_aggregator::StellarLenseAggregatorClient;
 
 /// Errors surfaced by the gated AMM. `AggregatorUnavailable` is the
 /// fallback-policy branch (the aggregator could not meaningfully answer at
@@ -116,13 +116,13 @@ impl AggregatorGatedAmm {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use stellar_lense_aggregator::{StellarLenseAggregator, StellarLenseAggregatorClient};
-    use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
     use soroban_sdk::{
         symbol_short,
         testutils::{Address as _, Ledger as _},
         Vec,
     };
+    use stellar_lense_aggregator::{StellarLenseAggregator, StellarLenseAggregatorClient};
+    use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
 
     const GATE_THRESHOLD: u32 = 75;
 

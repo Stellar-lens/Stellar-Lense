@@ -1,8 +1,8 @@
 use anyhow::{anyhow, bail, Result};
-use stellar_lense_score::CONFIG_DRIFT_MANIFEST_FIELDS;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::collections::BTreeSet;
+use stellar_lense_score::CONFIG_DRIFT_MANIFEST_FIELDS;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DriftDiffEntry {

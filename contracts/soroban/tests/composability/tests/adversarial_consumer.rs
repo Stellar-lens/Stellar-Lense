@@ -34,12 +34,12 @@
 //! free (`docs/interface-spec.md` §1.1–§1.2).  These tests prove that
 //! property holds under adversarial access patterns.
 
-use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
 use soroban_sdk::{
     symbol_short,
     testutils::{Address as _, Ledger as _},
     Address, Env, Vec,
 };
+use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -109,8 +109,12 @@ fn repeated_query_risk_gate_with_confidence_calls_are_idempotent() {
     let wallet = Address::generate(&env);
     submit_score(&env, &stellar_lense, &wallet, 10, 90);
 
-    let first =
-        stellar_lense.query_risk_gate_with_confidence(&wallet, &symbol_short!("XLM_USDC"), &75, &50);
+    let first = stellar_lense.query_risk_gate_with_confidence(
+        &wallet,
+        &symbol_short!("XLM_USDC"),
+        &75,
+        &50,
+    );
     for _ in 0..19 {
         let result = stellar_lense.query_risk_gate_with_confidence(
             &wallet,

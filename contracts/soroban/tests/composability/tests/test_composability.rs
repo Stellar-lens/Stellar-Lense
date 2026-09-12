@@ -9,7 +9,6 @@
 //! `client.swap(...)` / `client.borrow(...)` invoking the mocks, which in
 //! turn invoke StellarLense — rather than calling the gate functions directly.
 
-use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
 use mock_amm::{FailPolicy as AmmFailPolicy, MockAmm, MockAmmClient, MockAmmError};
 use mock_lending::{MockLending, MockLendingClient, MockLendingError};
 use soroban_sdk::{
@@ -17,6 +16,7 @@ use soroban_sdk::{
     testutils::{Address as _, Ledger as _},
     Address, Env, Vec,
 };
+use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
 
 const GATE_THRESHOLD: u32 = 75;
 const MIN_CONFIDENCE: u32 = 50;

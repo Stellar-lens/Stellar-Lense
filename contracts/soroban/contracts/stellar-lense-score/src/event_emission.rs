@@ -6,7 +6,9 @@ mod test_event_schema {
         Address, Env, IntoVal, Symbol, Vec,
     };
 
-    use crate::{events::EVENT_VERSION, StellarLenseScoreContract, StellarLenseScoreContractClient};
+    use crate::{
+        events::EVENT_VERSION, StellarLenseScoreContract, StellarLenseScoreContractClient,
+    };
 
     #[test]
     fn test_all_events_carry_schema_version() {

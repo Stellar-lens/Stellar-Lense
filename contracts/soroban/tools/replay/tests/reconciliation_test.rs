@@ -6,11 +6,11 @@
 
 #[cfg(test)]
 mod reconciliation_tests {
-    use stellar_lense_score::{
-        StellarLenseScoreContract, StellarLenseScoreContractClient, ScoreSubmission,
-    };
     use soroban_sdk::testutils::{Address as _, Ledger as _};
     use soroban_sdk::{Address, Env, Symbol, Vec as SVec};
+    use stellar_lense_score::{
+        ScoreSubmission, StellarLenseScoreContract, StellarLenseScoreContractClient,
+    };
 
     const BASE_TS: u64 = 1_700_000_000;
 

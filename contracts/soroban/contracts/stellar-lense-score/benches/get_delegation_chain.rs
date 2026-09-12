@@ -17,11 +17,11 @@
 //! is a key component of delegation-related resource billing.
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use stellar_lense_score::StellarLenseScoreContractClient;
 use soroban_sdk::{
     testutils::{Address as _, Ledger as _},
     Address, Env,
 };
+use stellar_lense_score::StellarLenseScoreContractClient;
 
 const START_TS: u64 = 1_700_000_000;
 

@@ -14,8 +14,8 @@ use soroban_sdk::{
 };
 
 use crate::{
-    constants::CONTRACT_VERSION, Error, StellarLenseScoreContract, StellarLenseScoreContractClient,
-    RiskScore,
+    constants::CONTRACT_VERSION, Error, RiskScore, StellarLenseScoreContract,
+    StellarLenseScoreContractClient,
 };
 
 fn setup<'a>() -> (Env, StellarLenseScoreContractClient<'a>, Address, Address) {

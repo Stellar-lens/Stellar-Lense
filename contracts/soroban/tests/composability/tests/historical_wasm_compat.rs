@@ -10,7 +10,6 @@
 //! No production entry point, storage key, event, or error discriminant is
 //! changed by this suite.
 
-use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient, RiskScore};
 use mock_amm::{FailPolicy as AmmFailPolicy, MockAmm, MockAmmClient, MockAmmError};
 use mock_lending::{MockLending, MockLendingClient, MockLendingError};
 use sha2::{Digest, Sha256};
@@ -23,6 +22,7 @@ use soroban_sdk::{
     },
     Address, Env, IntoVal, TryFromVal, Val, Vec,
 };
+use stellar_lense_score::{RiskScore, StellarLenseScoreContract, StellarLenseScoreContractClient};
 
 const HISTORICAL_WASM: &[u8] =
     include_bytes!("../../fixtures/historical/ledgerlens-score-v3-8336828.wasm");

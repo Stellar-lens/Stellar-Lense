@@ -9,8 +9,8 @@
 
 #![no_std]
 
-use stellar_lense_score::StellarLenseScoreContractClient;
 use soroban_sdk::{contract, contracterror, contractimpl, Address, Env, Symbol};
+use stellar_lense_score::StellarLenseScoreContractClient;
 
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
@@ -68,9 +68,9 @@ impl SimpleAMM {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use stellar_lense_score::StellarLenseScoreContract;
     use soroban_sdk::testutils::{Address as _, Ledger as _};
     use soroban_sdk::{symbol_short, Vec};
+    use stellar_lense_score::StellarLenseScoreContract;
 
     const GATE_THRESHOLD: u32 = 75;
 

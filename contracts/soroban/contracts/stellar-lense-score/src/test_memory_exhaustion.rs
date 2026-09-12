@@ -26,8 +26,8 @@ use k256::ecdsa::SigningKey;
 use soroban_sdk::{symbol_short, testutils::Address as _, Address, Bytes, BytesN, Env, Vec};
 
 use crate::{
-    constants, BatchAttestation, Error, StellarLenseScoreContract, StellarLenseScoreContractClient,
-    ScoreSubmission, ScoreSubmissionWithProof,
+    constants, BatchAttestation, Error, ScoreSubmission, ScoreSubmissionWithProof,
+    StellarLenseScoreContract, StellarLenseScoreContractClient,
 };
 
 // ── Test infrastructure ─────────────────────────────────────────────────────

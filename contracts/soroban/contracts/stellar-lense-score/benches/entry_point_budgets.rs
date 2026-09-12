@@ -38,11 +38,13 @@
 //!   extend_entry_ttls (size 1 / size 20)
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient, ScoreSubmission};
 use soroban_sdk::{
     symbol_short,
     testutils::{Address as _, Ledger as _},
     Address, Bytes, Env, Symbol, Vec,
+};
+use stellar_lense_score::{
+    ScoreSubmission, StellarLenseScoreContract, StellarLenseScoreContractClient,
 };
 
 // ── Shared constants ────────────────────────────────────────────────────────

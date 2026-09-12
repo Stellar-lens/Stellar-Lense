@@ -19,12 +19,12 @@
 //! regardless of total contract state size due to the constant-size polynomial commitment proof structure.
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
 use soroban_sdk::{
     symbol_short,
     testutils::{Address as _, Ledger as _},
     Address, Env, Symbol, Vec,
 };
+use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
 
 const START_TS: u64 = 1_700_000_000;
 

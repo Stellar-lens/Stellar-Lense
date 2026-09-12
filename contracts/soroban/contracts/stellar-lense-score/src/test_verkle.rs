@@ -14,7 +14,7 @@ use soroban_sdk::{
     Address, Bytes, BytesN, Env, Symbol, SymbolStr, TryFromVal, Vec,
 };
 
-use crate::{verkle, StellarLenseScoreContract, StellarLenseScoreContractClient, ScoreSubmission};
+use crate::{verkle, ScoreSubmission, StellarLenseScoreContract, StellarLenseScoreContractClient};
 
 // ── Test infrastructure ──────────────────────────────────────────────────────
 

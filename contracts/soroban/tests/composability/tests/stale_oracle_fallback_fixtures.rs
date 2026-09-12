@@ -21,7 +21,6 @@
 //! issue #717). The `setup_*` helpers document the exact deploy/config steps
 //! a real AMM or lending contract must replicate.
 
-use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
 use mock_amm::{FailPolicy as AmmFailPolicy, MockAmm, MockAmmClient, MockAmmError};
 use mock_lending::{MockLending, MockLendingClient, MockLendingError};
 use soroban_sdk::{
@@ -29,6 +28,7 @@ use soroban_sdk::{
     testutils::{Address as _, Ledger as _},
     Address, Env, Vec,
 };
+use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
 
 const GATE_THRESHOLD: u32 = 75;
 const MIN_CONFIDENCE: u32 = 50;

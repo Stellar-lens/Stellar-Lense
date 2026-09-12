@@ -14,8 +14,8 @@ use soroban_sdk::{
 
 use crate::{
     constants::{DEFAULT_COOLDOWN_SECS, MAX_COOLDOWN_SECS, MIN_COOLDOWN_SECS},
-    Error, StellarLenseScoreContract, StellarLenseScoreContractClient, ModelSubmission,
-    ScoreAttestation, ScoreSubmission,
+    Error, ModelSubmission, ScoreAttestation, ScoreSubmission, StellarLenseScoreContract,
+    StellarLenseScoreContractClient,
 };
 
 const START_TS: u64 = 1_700_000_000;

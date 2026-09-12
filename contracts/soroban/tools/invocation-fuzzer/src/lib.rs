@@ -1,6 +1,4 @@
 use anyhow::{anyhow, bail, Context, Result};
-use stellar_lense_aggregator::{StellarLenseAggregator, StellarLenseAggregatorClient};
-use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
 use mock_amm::{FailPolicy as AmmFailPolicy, MockAmm, MockAmmClient};
 use mock_lending::{MockLending, MockLendingClient};
 use serde::{Deserialize, Serialize};
@@ -11,6 +9,8 @@ use soroban_sdk::{
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
+use stellar_lense_aggregator::{StellarLenseAggregator, StellarLenseAggregatorClient};
+use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
 
 pub const FORMAT_VERSION: u32 = 1;
 pub const MAX_OPERATIONS: usize = 16;

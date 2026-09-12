@@ -11,7 +11,8 @@ use soroban_sdk::{
 };
 
 use crate::{
-    constants::FAILOVER_STALENESS_WINDOW, StellarLenseScoreContract, StellarLenseScoreContractClient,
+    constants::FAILOVER_STALENESS_WINDOW, StellarLenseScoreContract,
+    StellarLenseScoreContractClient,
 };
 
 const START_TS: u64 = 1_700_000_000;
@@ -19,7 +20,8 @@ const START_TS: u64 = 1_700_000_000;
 /// Set up two independent contract instances in the same `Env`.
 /// Returns `(env, primary_client, secondary_client, admin, service)`.
 fn setup_two<'a>(
-) -> (Env, StellarLenseScoreContractClient<'a>, StellarLenseScoreContractClient<'a>, Address, Address) {
+) -> (Env, StellarLenseScoreContractClient<'a>, StellarLenseScoreContractClient<'a>, Address, Address)
+{
     let env = Env::default();
     env.mock_all_auths();
     env.ledger().with_mut(|l| l.timestamp = START_TS);

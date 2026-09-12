@@ -8,8 +8,8 @@ use soroban_sdk::{
 };
 
 use crate::{
-    Error, StellarLenseScoreContract, StellarLenseScoreContractClient, MaybeScoreAttestation,
-    MaybeThresholdAttestation, ModelSubmission, ScoreAttestation, ScoreAttestationInput,
+    Error, MaybeScoreAttestation, MaybeThresholdAttestation, ModelSubmission, ScoreAttestation,
+    ScoreAttestationInput, StellarLenseScoreContract, StellarLenseScoreContractClient,
 };
 
 const START_TS: u64 = 1_000_000;

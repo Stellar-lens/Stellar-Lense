@@ -1,10 +1,10 @@
 #[cfg(test)]
 mod tests {
-    use stellar_lense_score::{
-        StellarLenseScoreContract, StellarLenseScoreContractClient, ScoreSubmission,
-    };
     use soroban_sdk::testutils::Address as _;
     use soroban_sdk::{Address, Env, Symbol, Vec as SVec};
+    use stellar_lense_score::{
+        ScoreSubmission, StellarLenseScoreContract, StellarLenseScoreContractClient,
+    };
 
     fn init_contract(env: &Env) -> (StellarLenseScoreContractClient<'_>, Address, Address) {
         env.mock_all_auths();

@@ -16,11 +16,11 @@
 //! and its cost must be predictable and invariant for budget planning.
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use stellar_lense_score::StellarLenseScoreContractClient;
 use soroban_sdk::{
     testutils::{Address as _, Ledger as _},
     Address, Env, Symbol, Vec,
 };
+use stellar_lense_score::StellarLenseScoreContractClient;
 
 const START_TS: u64 = 1_700_000_000;
 

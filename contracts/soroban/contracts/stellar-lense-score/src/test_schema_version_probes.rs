@@ -16,7 +16,9 @@ use soroban_sdk::{
     Address, Env, Symbol, Vec,
 };
 
-use crate::{constants::CONTRACT_VERSION, StellarLenseScoreContract, StellarLenseScoreContractClient};
+use crate::{
+    constants::CONTRACT_VERSION, StellarLenseScoreContract, StellarLenseScoreContractClient,
+};
 
 fn setup() -> (Env, StellarLenseScoreContractClient<'static>, Address, Address) {
     let env = Env::default();

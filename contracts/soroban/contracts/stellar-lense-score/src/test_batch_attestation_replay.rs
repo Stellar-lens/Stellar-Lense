@@ -35,8 +35,8 @@ use soroban_sdk::{
 };
 
 use crate::{
-    BatchAttestation, BatchResult, Error, StellarLenseScoreContract, StellarLenseScoreContractClient,
-    ScoreSubmission, ScoreSubmissionWithProof,
+    BatchAttestation, BatchResult, Error, ScoreSubmission, ScoreSubmissionWithProof,
+    StellarLenseScoreContract, StellarLenseScoreContractClient,
 };
 
 // ── Infrastructure (mirrors test_batch_attestation.rs) ───────────────────────

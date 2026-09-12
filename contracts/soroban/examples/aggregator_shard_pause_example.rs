@@ -65,9 +65,9 @@
 
 #![no_std]
 
+use soroban_sdk::{contract, contracterror, contractimpl, contracttype, Address, Env, Symbol, Vec};
 use stellar_lense_aggregator::StellarLenseAggregatorClient;
 use stellar_lense_score::StellarLenseScoreContractClient;
-use soroban_sdk::{contract, contracterror, contractimpl, contracttype, Address, Env, Symbol, Vec};
 
 /// Errors surfaced by the gated AMM. `PartialShardPause` is the degraded-mode
 /// branch new to this example — one or more shards is paused, so the
@@ -201,13 +201,13 @@ impl PauseAwareGatedAmm {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use stellar_lense_aggregator::{StellarLenseAggregator, StellarLenseAggregatorClient};
-    use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
     use soroban_sdk::{
         symbol_short,
         testutils::{Address as _, Ledger as _},
         Vec,
     };
+    use stellar_lense_aggregator::{StellarLenseAggregator, StellarLenseAggregatorClient};
+    use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
 
     const GATE_THRESHOLD: u32 = 75;
 

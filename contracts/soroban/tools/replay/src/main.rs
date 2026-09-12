@@ -14,8 +14,10 @@ use soroban_sdk::testutils::Address as _;
 use soroban_sdk::testutils::Ledger as _;
 use soroban_sdk::{Address, Env, Symbol, Vec as SVec};
 
-use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient, ScoreSubmission};
 use schema::ReplayFileHeader;
+use stellar_lense_score::{
+    ScoreSubmission, StellarLenseScoreContract, StellarLenseScoreContractClient,
+};
 
 #[derive(Debug, Deserialize)]
 struct SnapshotEntry {

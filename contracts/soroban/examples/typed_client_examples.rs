@@ -30,12 +30,12 @@ extern crate std;
 /// This is the most basic integration: the off-chain detection pipeline writes
 /// a risk score and any caller reads it.
 pub mod score_flow {
-    use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
     use soroban_sdk::{
         symbol_short,
         testutils::{Address as _, Ledger as _},
         Address, Env, Vec,
     };
+    use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
 
     /// Helper: deploy + initialize StellarLense, return (client, admin, service).
     fn setup(env: &Env) -> (StellarLenseScoreContractClient<'_>, Address, Address) {
@@ -177,12 +177,12 @@ pub mod score_flow {
 /// `query_risk_gate` is **infallible** and **side-effect free** — use it
 /// directly inside a guard clause without a `try_*` wrapper.
 pub mod gate_flow {
-    use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
     use soroban_sdk::{
         symbol_short,
         testutils::{Address as _, Ledger as _},
         Address, Env, Vec,
     };
+    use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
 
     fn setup(env: &Env) -> StellarLenseScoreContractClient<'_> {
         env.mock_all_auths();
@@ -309,12 +309,12 @@ pub mod gate_flow {
 /// The default depth is 10; the admin can change it (with a time-lock) to any
 /// value in [1, 50].
 pub mod history_flow {
-    use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
     use soroban_sdk::{
         symbol_short,
         testutils::{Address as _, Ledger as _},
         Address, Env, Vec,
     };
+    use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
 
     fn setup(env: &Env) -> (StellarLenseScoreContractClient<'_>, Address) {
         env.mock_all_auths();
@@ -428,11 +428,11 @@ pub mod history_flow {
 /// Every upgrade is gated behind a mandatory delay (≥ 48 hours) so the
 /// community has time to inspect the new WASM hash and veto if needed.
 pub mod governance_flow {
-    use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
     use soroban_sdk::{
         testutils::{Address as _, Ledger as _},
         Address, BytesN, Env, Vec,
     };
+    use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
 
     fn setup(env: &Env) -> (StellarLenseScoreContractClient<'_>, Address) {
         env.mock_all_auths();

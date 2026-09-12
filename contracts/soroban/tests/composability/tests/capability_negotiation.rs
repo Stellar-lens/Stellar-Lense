@@ -31,9 +31,9 @@
 //! These are integration tests that drive real deployed contracts, not unit
 //! tests of the capability flag table.
 
+use soroban_sdk::{symbol_short, testutils::Address as _, Address, Env, Symbol};
 use stellar_lense_aggregator::{StellarLenseAggregator, StellarLenseAggregatorClient};
 use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
-use soroban_sdk::{symbol_short, testutils::Address as _, Address, Env, Symbol};
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

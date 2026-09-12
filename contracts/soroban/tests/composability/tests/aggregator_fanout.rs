@@ -5,14 +5,16 @@
 //! links, and delegation setups, then exercises every aggregator read
 //! function against the heterogeneous multi-shard environment.
 
-use stellar_lense_aggregator::{StellarLenseAggregator, StellarLenseAggregatorClient, SplitBrainStatus};
-use stellar_lense_score::{
-    Error as ScoreError, StellarLenseScoreContract, StellarLenseScoreContractClient,
-};
 use soroban_sdk::{
     symbol_short,
     testutils::{Address as _, Ledger as _},
     Address, Env, Vec,
+};
+use stellar_lense_aggregator::{
+    SplitBrainStatus, StellarLenseAggregator, StellarLenseAggregatorClient,
+};
+use stellar_lense_score::{
+    Error as ScoreError, StellarLenseScoreContract, StellarLenseScoreContractClient,
 };
 
 const GATE_THRESHOLD: u32 = 60;

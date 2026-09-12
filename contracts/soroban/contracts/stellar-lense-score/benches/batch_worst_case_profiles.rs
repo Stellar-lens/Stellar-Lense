@@ -45,13 +45,13 @@
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use k256::ecdsa::SigningKey;
-use stellar_lense_score::{
-    BatchAttestation, StellarLenseScoreContract, StellarLenseScoreContractClient, ScoreSubmission,
-    ScoreSubmissionWithProof,
-};
 use soroban_sdk::{
     testutils::{Address as _, Ledger as _},
     Address, Bytes, BytesN, Env, Symbol, SymbolStr, TryFromVal, Vec,
+};
+use stellar_lense_score::{
+    BatchAttestation, ScoreSubmission, ScoreSubmissionWithProof, StellarLenseScoreContract,
+    StellarLenseScoreContractClient,
 };
 
 const START_TS: u64 = 1_700_000_000;

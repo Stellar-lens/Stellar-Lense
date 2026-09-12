@@ -9,12 +9,12 @@
 //! Each step asserts both return values and storage state. Ledger time is
 //! advanced explicitly via env.ledger().set_timestamp().
 
-use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
 use soroban_sdk::{
     symbol_short,
     testutils::{Address as _, Ledger as _},
     Address, Env, Symbol, Vec,
 };
+use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
 
 struct Lifecycle<'a> {
     env: Env,

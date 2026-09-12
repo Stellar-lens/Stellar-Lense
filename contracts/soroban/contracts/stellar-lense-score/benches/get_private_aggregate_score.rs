@@ -20,11 +20,11 @@
 //! scales with the number of asset pairs the wallet has scores for.
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
 use soroban_sdk::{
     testutils::{Address as _, Ledger as _},
     Address, Env, Symbol, Vec,
 };
+use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
 
 const START_TS: u64 = 1_700_000_000;
 

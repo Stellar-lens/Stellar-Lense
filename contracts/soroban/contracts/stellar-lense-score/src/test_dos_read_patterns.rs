@@ -38,7 +38,7 @@ use soroban_sdk::{
 
 use crate::{
     constants::{BATCH_READ_MAX, MAX_EXPIRING_ENTRIES_PER_CALL},
-    Error, StellarLenseScoreContract, StellarLenseScoreContractClient, ScoreQuery,
+    Error, ScoreQuery, StellarLenseScoreContract, StellarLenseScoreContractClient,
 };
 
 const START_TS: u64 = 1_700_000_000;

@@ -17,7 +17,7 @@
 
 use soroban_sdk::{symbol_short, testutils::Address as _, vec, Address, Env, Vec};
 
-use crate::{Error, StellarLenseScoreContract, StellarLenseScoreContractClient, ScoreSubmission};
+use crate::{Error, ScoreSubmission, StellarLenseScoreContract, StellarLenseScoreContractClient};
 use stellar_lense_test_support::{
     generate_score_roles, set_ledger_timestamp, test_env_with_unlimited_budget,
 };

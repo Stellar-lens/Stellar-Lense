@@ -14,8 +14,8 @@
 //! the score is stale, the oracle is silent, or the protocol's own pause state
 //! is active.
 
-use stellar_lense_score::StellarLenseScoreContractClient;
 use soroban_sdk::{contract, contracterror, contractimpl, contracttype, Address, Env, Symbol};
+use stellar_lense_score::StellarLenseScoreContractClient;
 
 #[contracttype]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]

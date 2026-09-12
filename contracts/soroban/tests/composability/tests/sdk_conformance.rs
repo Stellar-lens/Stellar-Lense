@@ -1,4 +1,3 @@
-use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
 use mock_amm::{FailPolicy as AmmFailPolicy, MockAmm, MockAmmClient, MockAmmError};
 use serde::Deserialize;
 use soroban_sdk::{
@@ -6,6 +5,7 @@ use soroban_sdk::{
     testutils::{Address as _, Ledger as _},
     Address, Env, Vec,
 };
+use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
 
 #[derive(Debug, Deserialize)]
 struct FixtureData {

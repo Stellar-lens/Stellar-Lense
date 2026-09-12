@@ -13,15 +13,15 @@
 //! the real cross-contract call path (`aggregator.query_risk_gate(...)`
 //! invoking each shard), rather than asserting on the AND logic in isolation.
 
-use stellar_lense_aggregator::{
-    Error as AggregatorError, StellarLenseAggregator, StellarLenseAggregatorClient,
-};
-use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
 use soroban_sdk::{
     symbol_short,
     testutils::{Address as _, Ledger as _},
     Address, Env, Symbol, Vec,
 };
+use stellar_lense_aggregator::{
+    Error as AggregatorError, StellarLenseAggregator, StellarLenseAggregatorClient,
+};
+use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
 
 const GATE_THRESHOLD: u32 = 75;
 

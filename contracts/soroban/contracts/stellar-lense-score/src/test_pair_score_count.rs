@@ -10,7 +10,7 @@ use soroban_sdk::{
     Address, Env, Vec,
 };
 
-use crate::{StellarLenseScoreContract, StellarLenseScoreContractClient, ScoreSubmission};
+use crate::{ScoreSubmission, StellarLenseScoreContract, StellarLenseScoreContractClient};
 
 const START_TS: u64 = 1_700_000_000;
 

@@ -6,11 +6,11 @@ extern crate std;
 #[cfg(test)]
 mod test;
 const REQUIRED_SHARD_CAPABILITIES: [&str; 4] = ["score", "gate", "aggr", "arch"];
-use stellar_lense_score::{AggregateRiskScore, Error as ScoreError, RiskScore};
 use soroban_sdk::{
     contract, contracterror, contractimpl, contracttype, symbol_short, vec, Address, Env, Symbol,
     TryFromVal, Vec,
 };
+use stellar_lense_score::{AggregateRiskScore, Error as ScoreError, RiskScore};
 
 pub const MAX_SHARDS: usize = 10;
 const FAILURE_TRANSPORT: u32 = 0;

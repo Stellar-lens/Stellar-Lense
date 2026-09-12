@@ -20,7 +20,7 @@ use soroban_sdk::{
 };
 
 #[cfg(test)]
-use crate::{Error, StellarLenseScoreContract, ScoreSubmission};
+use crate::{Error, ScoreSubmission, StellarLenseScoreContract};
 
 #[cfg(test)]
 fn setup(

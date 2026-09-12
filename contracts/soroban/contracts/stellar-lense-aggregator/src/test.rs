@@ -1,14 +1,14 @@
 use crate::{
-    AggregatorConfigFingerprint, Error, StellarLenseAggregator, StellarLenseAggregatorClient,
-    MaybeAggregatorConfigFingerprint, ShardProbeStatus, SplitBrainStatus,
+    AggregatorConfigFingerprint, Error, MaybeAggregatorConfigFingerprint, ShardProbeStatus,
+    SplitBrainStatus, StellarLenseAggregator, StellarLenseAggregatorClient,
 };
-use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
-use stellar_lense_test_support::{generate_score_roles, test_env};
 use soroban_sdk::{
     symbol_short,
     testutils::{Address as _, Ledger as _},
     Address, Env, Symbol, Vec,
 };
+use stellar_lense_score::{StellarLenseScoreContract, StellarLenseScoreContractClient};
+use stellar_lense_test_support::{generate_score_roles, test_env};
 
 /// A shard whose interface has fully drifted: it advertises no capability the
 /// aggregator depends on.

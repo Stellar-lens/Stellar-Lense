@@ -14,10 +14,10 @@
 //! of the StellarLense gate so a stale-but-safe score cannot bypass a high-value
 //! action during detection lag.
 
-use stellar_lense_score::StellarLenseScoreContractClient;
 use soroban_sdk::{
     contract, contracterror, contractimpl, contracttype, symbol_short, Address, Env, Symbol,
 };
+use stellar_lense_score::StellarLenseScoreContractClient;
 
 #[contracttype]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
