@@ -12,4 +12,6 @@ packages/core/*.db
 *.db
 data/horizon_cursor.json.lock
 __pycache__/
+drift_reports/
+model_cards/
 

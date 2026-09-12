@@ -14,7 +14,31 @@ lint-py:
 	# also pulls in atheris (fuzz), which fails to build on Python 3.12 - see
 	# atheris#pybind11-precall-issue. uvx installs just ruff, isolated from
 	# all of that.
-	uvx ruff check .
+	#
+	# Pinned per-project, not floating: neither packages/core nor apps/api
+	# pins a `select` list in [tool.ruff.lint], so both rely on ruff's
+	# *default* rule set - and that default has grown enormously between
+	# versions (0.4.10 -> 0.16.7 added ~800 newly-enabled rules: isort,
+	# flake8-bugbear, pyupgrade, refurb, ruff-specific...). packages/core's
+	# own original CI (packages/core/.github/workflows/ci.yml) pinned
+	# `ruff==0.4.10` for exactly this reason; its per-file-ignores above were
+	# curated against that version. An unpinned `uvx ruff` here silently
+	# reran the whole codebase against ~800 rules nobody has ever triaged,
+	# surfacing ~1250 findings that are new-rule noise, not regressions.
+	# apps/api has no ruff config of its own but shares the same code
+	# heritage and the same failure mode (verified: pinning collapses its
+	# 42 latest-ruff findings, all in the same rule families, down to the
+	# 1 real one) - pinned to match packages/core rather than left floating.
+	#
+	# data/pipelines is excluded here for the same reason test-py excludes
+	# it above: standalone project, not a workspace member, own Makefile/CI
+	# - see data/pipelines/README.md. Unlike the version-drift findings
+	# above, its lint debt (159 findings even at its own lockfile-pinned
+	# ruff==0.16.1, including genuine bugs like an undefined `logger` in
+	# detection/forensic_report.py) is real and pre-existing; fixing it is
+	# out of scope for this monorepo-consolidation pass.
+	cd packages/core && uvx ruff@0.4.10 check .
+	cd apps/api && uvx ruff@0.4.10 check .
 
 lint-rust:
 	cd contracts/soroban && cargo fmt --all -- --check && cargo clippy --workspace --all-targets --all-features -- -D warnings

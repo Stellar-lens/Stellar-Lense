@@ -12,7 +12,9 @@ Data ingestion, fraud-detection engine, and feature pipeline for **Stellar Lense
 
 ## Overview
 
-This repository holds the data and detection layer of Stellar Lense: the pipelines that pull trade data from the Stellar Horizon API, compute Benford's Law anomaly metrics, extract on-chain ML features, train and run the ensemble classifiers, and produce the **Stellar Lense Risk Score (0–100)** consumed by the API, dashboard, and Soroban contract layer.
+This directory holds the data and detection layer of Stellar Lense: the pipelines that pull trade data from the Stellar Horizon API, compute Benford's Law anomaly metrics, extract on-chain ML features, train and run the ensemble classifiers, and produce the **Stellar Lense Risk Score (0–100)** consumed by the API, dashboard, and Soroban contract layer.
+
+**Monorepo scope note:** `data/pipelines` was migrated here via `git subtree` from its own former repo and keeps its own standalone Python environment, `Makefile`, and `ruff`/`pytest` configuration — it is not a `[tool.uv.workspace]` member (see the root `pyproject.toml`) and is intentionally excluded from the root `make lint-all`/`make test-all` targets that gate CI. Use the targets in this directory's own `Makefile` (`make lint`, `make test`) to check it locally; its own lint/test debt is pre-existing and tracked separately from the monorepo consolidation work.
 
 ## The Problem
 

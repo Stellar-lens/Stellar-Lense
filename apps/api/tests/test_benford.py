@@ -7,7 +7,6 @@ from detection.benford_engine import (
     digit_distribution,
     is_non_conforming,
     leading_digit,
-    mad_score,
 )
 
 
