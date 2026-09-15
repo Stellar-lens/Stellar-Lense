@@ -54,8 +54,15 @@ test-py:
 	# out of scope here - see data/pipelines/README.md) and nested SDK
 	# packages under packages/core/packages/ - producing import collisions
 	# and ModuleNotFoundErrors unrelated to actual test failures.
-	uv run --package stellar-lense-core --extra test pytest packages/core/tests
-	uv run --package stellar-lense-api --extra test pytest apps/api/tests
+	#
+	# COLUMNS is pinned wide: some CLI tests assert on Typer/Rich --help
+	# output containing specific option names, and Rich wraps/truncates
+	# that output to the terminal width it detects. A non-interactive CI
+	# runner has no controlling terminal and can fall back to a width
+	# narrow enough to wrap option names across lines, breaking a plain
+	# substring check even though the command's exit code is still 0.
+	COLUMNS=200 uv run --package stellar-lense-core --extra test pytest packages/core/tests
+	COLUMNS=200 uv run --package stellar-lense-api --extra test pytest apps/api/tests
 
 test-rust:
 	cd contracts/soroban && cargo test --workspace
