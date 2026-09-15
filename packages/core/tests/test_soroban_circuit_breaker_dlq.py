@@ -11,6 +11,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from config.settings import settings
 from detection.soroban_publisher import (
     SorobanCircuitOpenError,
     SorobanHealthStatus,
@@ -140,8 +141,13 @@ def test_manual_reset_clears_consecutive_failures(publisher):
 # ---------------------------------------------------------------------------
 
 
-def test_dlq_written_when_circuit_open(publisher, db_path):
+def test_dlq_written_when_circuit_open(publisher, db_path, monkeypatch):
     """When circuit is open and submit_batch is called, DLQ rows should be written."""
+    # This test is about circuit-breaker/DLQ behaviour, not multi-region lease
+    # coordination — disable the lease so submit_score doesn't require the
+    # optional `kubernetes` package (not installed in the CI test extra).
+    monkeypatch.setattr(settings, "soroban_submission_lease_enabled", False)
+
     # Force circuit open
     for _ in range(3):
         publisher._record_failure("err")

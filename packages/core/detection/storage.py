@@ -611,6 +611,26 @@ _MIGRATIONS: list[tuple[int, str, str]] = [
             ON pending_chain_submissions (override_id);
         """,
     ),
+    (
+        21,
+        "dead_letter_queue for ingestion/dlq.py's TradeDLQ",
+        """
+        CREATE TABLE IF NOT EXISTS dead_letter_queue (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            source TEXT NOT NULL,
+            error_class TEXT NOT NULL,
+            error_message TEXT NOT NULL,
+            raw_record_json TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            retry_count INTEGER NOT NULL DEFAULT 0,
+            status TEXT NOT NULL DEFAULT 'pending',
+            replayed_at TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_dead_letter_queue_status ON dead_letter_queue (status);
+        CREATE INDEX IF NOT EXISTS idx_dead_letter_queue_error_class ON dead_letter_queue (error_class);
+        CREATE INDEX IF NOT EXISTS idx_dead_letter_queue_source ON dead_letter_queue (source);
+        """,
+    ),
 ]
 
 
