@@ -28,27 +28,26 @@ _JOB_TTL_HOURS = 24
 def _connect() -> sqlite3.Connection:
     conn = sqlite3.connect(settings.db_path)
     conn.row_factory = sqlite3.Row
+    # CREATE TABLE IF NOT EXISTS, so this is cheap and idempotent. Ensuring
+    # the schema here (rather than once at module import time) means every
+    # caller gets a working table even if settings.db_path changes after
+    # import — e.g. per-test isolated DBs, or an admin rotating the
+    # configured path at runtime.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS batch_jobs (
+            job_id TEXT PRIMARY KEY,
+            status TEXT NOT NULL,
+            priority TEXT NOT NULL,
+            wallets_json TEXT NOT NULL,
+            result_json TEXT,
+            total_wallets INTEGER NOT NULL,
+            completed_wallets INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            completed_at TEXT
+        )
+    """)
+    conn.commit()
     return conn
-
-
-def _init_batch_table() -> None:
-    with _connect() as conn:
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS batch_jobs (
-                job_id TEXT PRIMARY KEY,
-                status TEXT NOT NULL,
-                priority TEXT NOT NULL,
-                wallets_json TEXT NOT NULL,
-                result_json TEXT,
-                total_wallets INTEGER NOT NULL,
-                completed_wallets INTEGER NOT NULL DEFAULT 0,
-                created_at TEXT NOT NULL,
-                completed_at TEXT
-            )
-        """)
-
-
-_init_batch_table()
 
 
 def _get_job(job_id: str) -> sqlite3.Row | None:

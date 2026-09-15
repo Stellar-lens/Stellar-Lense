@@ -34,18 +34,21 @@ def _connect():
     conn = sqlite3.connect(settings.db_path)
     conn.row_factory = sqlite3.Row
     try:
+        # CREATE TABLE/INDEX IF NOT EXISTS, so this is cheap and idempotent.
+        # Ensuring the schema here (rather than once at module import time)
+        # means every caller gets a working table even if settings.db_path
+        # changes after import — e.g. per-test isolated DBs, or an admin
+        # rotating the configured path at runtime.
+        conn.executescript(_CREATE_TABLE)
+        conn.commit()
         yield conn
     finally:
         conn.close()
 
 
 def init_override_table() -> None:
-    with _connect() as conn:
-        conn.executescript(_CREATE_TABLE)
-
-
-# Initialize table at module import time
-init_override_table()
+    with _connect():
+        pass
 
 
 def add_override(wallet: str, list_type: str, reason: str, added_by: str) -> dict:
