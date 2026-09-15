@@ -124,7 +124,11 @@ def test_score_feature_vector_uses_runtime_settings_weights(monkeypatch):
         "settings",
         SimpleNamespace(ensemble_weight_rf=0.0, ensemble_weight_xgb=1.0, ensemble_weight_lgbm=0.0),
     )
+    # adversarial_feature_score=1.0 (from fromkeys) would trigger
+    # apply_adversarial_boost and mask the weighted-average result this
+    # test is actually checking — zero it out.
     feature_vector = dict.fromkeys(FEATURE_NAMES, 1.0)
+    feature_vector["adversarial_feature_score"] = 0.0
 
     probability, _confidence = score_feature_vector(
         {
@@ -144,7 +148,11 @@ def test_score_feature_vector_normalizes_non_unit_weights(monkeypatch):
         "settings",
         SimpleNamespace(ensemble_weight_rf=2.0, ensemble_weight_xgb=1.0, ensemble_weight_lgbm=0.0),
     )
+    # See test_score_feature_vector_uses_runtime_settings_weights above —
+    # zero out adversarial_feature_score so the boost doesn't mask the
+    # weighted-average result this test is actually checking.
     feature_vector = dict.fromkeys(FEATURE_NAMES, 1.0)
+    feature_vector["adversarial_feature_score"] = 0.0
 
     probability, _confidence = score_feature_vector(
         {

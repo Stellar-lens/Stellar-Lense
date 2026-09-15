@@ -348,7 +348,19 @@ def _score_feature_matrix_base(
     else:
         confidences = np.zeros(len(feature_vectors))
 
-    return [(float(weighted_probs[i]), float(confidences[i])) for i in range(len(feature_vectors))]
+    # score_feature_vector() applies this per-vector; without it here, batch
+    # results silently diverge from per-vector ones for any row whose
+    # adversarial_feature_score meets the boost threshold.
+    boosted_probs = [
+        apply_adversarial_boost(
+            int(round(float(weighted_probs[i]) * 100)),
+            float(feature_vectors[i].get("adversarial_feature_score", 0.0)),
+        )
+        / 100.0
+        for i in range(len(feature_vectors))
+    ]
+
+    return [(boosted_probs[i], float(confidences[i])) for i in range(len(feature_vectors))]
 
 
 def score_with_uncertainty(
