@@ -645,6 +645,44 @@ _MIGRATIONS: list[tuple[int, str, str]] = [
         CREATE INDEX IF NOT EXISTS idx_filtered_trades_filtered_at ON filtered_trades (filtered_at);
         """,
     ),
+    (
+        23,
+        "hop_payment_cycles for save_hop_payment_cycles/get_hop_payment_cycles",
+        """
+        CREATE TABLE IF NOT EXISTS hop_payment_cycles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            origin_wallet TEXT NOT NULL,
+            origin_asset TEXT NOT NULL,
+            path_length INTEGER NOT NULL,
+            recovery_ratio REAL NOT NULL,
+            cycle_duration_seconds REAL NOT NULL,
+            counterparty_overlap REAL NOT NULL,
+            cycle_score REAL NOT NULL,
+            hop_json TEXT NOT NULL,
+            detected_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_hop_payment_cycles_origin_wallet ON hop_payment_cycles (origin_wallet);
+        CREATE INDEX IF NOT EXISTS idx_hop_payment_cycles_cycle_score ON hop_payment_cycles (cycle_score);
+        """,
+    ),
+    (
+        24,
+        "fl_aggregation_log for log_krum_aggregation/get_krum_aggregation_log",
+        """
+        CREATE TABLE IF NOT EXISTS fl_aggregation_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            round_number INTEGER NOT NULL,
+            n_clients INTEGER NOT NULL,
+            f_tolerance INTEGER NOT NULL,
+            m_selected INTEGER NOT NULL,
+            selected_indices TEXT NOT NULL,
+            excluded_indices TEXT NOT NULL,
+            krum_scores TEXT NOT NULL,
+            recorded_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_fl_aggregation_log_round_number ON fl_aggregation_log (round_number);
+        """,
+    ),
 ]
 
 
