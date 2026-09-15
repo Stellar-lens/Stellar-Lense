@@ -63,6 +63,7 @@ from ingestion.http_client import (
     AsyncHorizonClient,
     HorizonSchemaError,
     HorizonVersionError,
+    MaxRetriesExceededError,
     VersionGuard,
     validate_list_response,
     validate_single_record_response,
@@ -633,6 +634,10 @@ async def test_regression_async_client_retries_on_retryable_status():
 
 @pytest.mark.asyncio
 async def test_regression_async_client_raises_after_exhausting_retries():
+    # AsyncHorizonClient.get() wraps retry exhaustion in MaxRetriesExceededError
+    # (a clearer, more specific signal than re-raising the last transient
+    # httpx error) — see the equivalent test_async_client_raises_after_exhausting_retries
+    # in test_http_client.py, which already covers this current behaviour.
     resp = _make_mock_response(429)
     client = AsyncHorizonClient(
         "https://horizon.stellar.org", max_retries=2, version_guard=None
@@ -640,7 +645,7 @@ async def test_regression_async_client_raises_after_exhausting_retries():
     _patch_make_request(client, resp)
 
     with patch("ingestion.http_client.asyncio.sleep"):
-        with pytest.raises(httpx.HTTPStatusError):
+        with pytest.raises(MaxRetriesExceededError):
             await client.get("/trades")
 
     await client.close()
