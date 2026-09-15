@@ -78,8 +78,13 @@ def test_link_wallets_excludes_old_transfers(tmp_path):
     stellar_kp = Keypair.random()
     stellar_wallet = stellar_kp.public_key
 
-    old_ts = NOW - timedelta(days=91)
-    recent_ts = NOW - timedelta(days=30)
+    # link_wallets -> get_bridge_transfers filters by the *actual* current
+    # time (datetime.now(timezone.utc)), not the module's fixed NOW fixture
+    # constant — compute relative to real now so "recent" is actually within
+    # the lookback window regardless of how far NOW has drifted from today.
+    real_now = datetime.now(timezone.utc)
+    old_ts = real_now - timedelta(days=91)
+    recent_ts = real_now - timedelta(days=30)
 
     _transfer(stellar_wallet, EVM_WALLET_A, ts=old_ts, db_path=db)
     _transfer(stellar_wallet, EVM_WALLET_B, ts=recent_ts, db_path=db)
