@@ -631,6 +631,20 @@ _MIGRATIONS: list[tuple[int, str, str]] = [
         CREATE INDEX IF NOT EXISTS idx_dead_letter_queue_source ON dead_letter_queue (source);
         """,
     ),
+    (
+        22,
+        "filtered_trades for store_filtered_trade/prune_filtered_trades",
+        """
+        CREATE TABLE IF NOT EXISTS filtered_trades (
+            id TEXT NOT NULL,
+            paging_token TEXT PRIMARY KEY,
+            ledger_close_time TEXT NOT NULL,
+            rejection_reason TEXT NOT NULL,
+            filtered_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_filtered_trades_filtered_at ON filtered_trades (filtered_at);
+        """,
+    ),
 ]
 
 

@@ -19,6 +19,8 @@ import pytest
 import responses as responses_lib
 from stellar_sdk import Keypair
 
+pytest.importorskip("web3", reason="web3 required for EVM bridge loader tests")
+
 from ingestion.bridge_loader import (
     ALLBRIDGE_TOKENS_SENT_TOPIC,
     BridgeEventVerifier,
