@@ -150,19 +150,21 @@ def validate_webhook_url(url: str) -> None:
 def _connect(db_path: str | None = None):
     conn = sqlite3.connect(db_path or settings.db_path)
     try:
+        # CREATE TABLE/INDEX IF NOT EXISTS, so this is cheap and idempotent.
+        # Ensuring the schema here (rather than once at module import time)
+        # means every caller gets a working table even if settings.db_path
+        # changes after import — e.g. per-test isolated DBs, or an admin
+        # rotating the configured path at runtime.
+        conn.executescript(_SCHEMA)
+        conn.commit()
         yield conn
     finally:
         conn.close()
 
 
 def init_db(db_path: str | None = None):
-    with _connect(db_path) as conn:
-        conn.executescript(_SCHEMA)
-        conn.commit()
-
-
-# Initialize database at module import time (idempotent)
-init_db()
+    with _connect(db_path):
+        pass
 
 
 def _row_to_subscriber(row) -> Subscriber:

@@ -66,6 +66,14 @@ class WAFMiddleware(BaseHTTPMiddleware):
             if body is None:
                 return self._block_request(request, "slow_request", "Request timed out")
 
+            # Cache the body the same way Request.body() would (setting the
+            # private _body attribute Starlette's own _CachedRequest.wrapped_receive
+            # checks for). Without this, having read the body via .stream()
+            # alone makes wrapped_receive replay an *empty* body to every
+            # downstream middleware/handler instead of the real one — .stream()
+            # consumption only tells it not to hang, not what to replay.
+            request._body = body
+
             # If body is JSON, scan it
             if body and request.headers.get("content-type", "").startswith("application/json"):
                 try:
