@@ -5,12 +5,14 @@ manual reset, and dead-letter queue (Issue #143).
 from __future__ import annotations
 
 import sqlite3
+import sys
 import time
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
 
+import detection.soroban_publisher as _soroban_publisher_module
 from config.settings import settings
 from detection.soroban_publisher import (
     SorobanCircuitOpenError,
@@ -21,6 +23,34 @@ from detection.soroban_publisher import (
     init_dlq_schema,
 )
 from detection.risk_score import RiskScore
+
+
+@pytest.fixture(autouse=True)
+def _real_soroban_publisher_in_sys_modules():
+    """Guard against test_soroban_publisher.py's collection-time stellar_sdk
+    mock leaking here.
+
+    That file replaces sys.modules["detection.soroban_publisher"] with a
+    module reloaded against a MagicMock stellar_sdk. unittest.mock.patch()
+    resolves a dotted-string target via the *current* sys.modules entry, not
+    via whichever module object a class's methods actually resolve globals
+    against — so once both files have been collected, patch(
+    "detection.soroban_publisher.Keypair") in the ``publisher`` fixture
+    below silently patches that other (mock-backed) module instead of this
+    one, and SorobanPublisher.__init__ calls the *real* Keypair.from_secret()
+    on a fake 56-char secret and raises before the mock ever applies.
+    Pin sys.modules to the real module (captured at this file's own import
+    time, above) for the duration of every test here.
+    """
+    saved = sys.modules.get("detection.soroban_publisher")
+    sys.modules["detection.soroban_publisher"] = _soroban_publisher_module
+    try:
+        yield
+    finally:
+        if saved is not None:
+            sys.modules["detection.soroban_publisher"] = saved
+        else:
+            sys.modules.pop("detection.soroban_publisher", None)
 
 
 # ---------------------------------------------------------------------------
