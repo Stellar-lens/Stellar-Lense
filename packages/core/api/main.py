@@ -207,6 +207,12 @@ async def _nightly_retention_task() -> None:
 async def _lifespan(application: FastAPI):
     """Load trained models at startup; drain requests and clean up on shutdown."""
     global _models, _shutting_down
+    # Reset from a previous run's shutdown — _lifespan is re-entered whenever
+    # the same app object gets a new ASGI lifespan cycle (e.g. a fresh
+    # TestClient context manager in tests); without this, _shutting_down
+    # stays True forever after the first shutdown and every later run
+    # rejects all requests with 503 "Server is shutting down."
+    _shutting_down = False
     configure_tracing()
 
     # ── Cost metrics initialization ───────────────────────────────────────

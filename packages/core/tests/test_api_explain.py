@@ -18,7 +18,7 @@ def client_with_data(tmp_path, monkeypatch):
     monkeypatch.setattr("config.settings.settings.stellarlense_db_path", db_path)
 
     # Seed a RiskScore and feature vector
-    wallet = "GABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWX"
+    wallet = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
     pair = "XLM/USDC"
     ts = datetime.now(timezone.utc)
 
@@ -45,9 +45,13 @@ def client_with_data(tmp_path, monkeypatch):
     model_dir.mkdir()
     from sklearn.ensemble import RandomForestClassifier
     import joblib
+    from detection.model_signing import sign_model_file
+    from tests.conftest import TEST_SIGNING_KEY
     model = RandomForestClassifier(n_estimators=10, random_state=0)
     model.fit([[0, 0], [1, 1]] * 5, [0, 1] * 5)
-    joblib.dump(model, model_dir / "random_forest.joblib")
+    model_path = model_dir / "random_forest.joblib"
+    joblib.dump(model, model_path)
+    sign_model_file(str(model_path), TEST_SIGNING_KEY.encode())
     (model_dir / "random_forest_latest.txt").write_text("test0001")
 
     monkeypatch.setenv("STELLARLENSE_MODEL_DIR", str(model_dir))
@@ -57,7 +61,13 @@ def client_with_data(tmp_path, monkeypatch):
     monkeypatch.setattr("config.settings.settings.stellarlense_admin_api_key", "test-key")
 
     from api.main import app
-    return TestClient(app)
+    # A bare TestClient(app) never runs the FastAPI lifespan at all in this
+    # Starlette version (only __enter__ does) — since /explain's models are
+    # loaded once inside _lifespan, not per-request, that left this fixture's
+    # own model_dir invisible to the endpoint. Enter it as a context manager
+    # so startup actually runs with settings.model_dir already patched above.
+    with TestClient(app) as client:
+        yield client
 
 
 def _admin_headers():
@@ -66,7 +76,7 @@ def _admin_headers():
 
 def test_explain_200_returns_waterfall(client_with_data):
     """GET /v1/scores/{wallet}/explain returns 200 with waterfall data."""
-    wallet = "GABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWX"
+    wallet = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
     resp = client_with_data.get(
         f"/v1/scores/{wallet}/explain?asset_pair=XLM/USDC",
         headers=_admin_headers(),
@@ -84,7 +94,7 @@ def test_explain_200_returns_waterfall(client_with_data):
 
 def test_explain_404_no_feature_vector(client_with_data):
     """GET /v1/scores/{wallet}/explain returns 404 for unknown wallet."""
-    wallet = "GXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZX"
+    wallet = "GZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ"
     resp = client_with_data.get(
         f"/v1/scores/{wallet}/explain?asset_pair=XLM/USDC",
         headers=_admin_headers(),
@@ -94,7 +104,7 @@ def test_explain_404_no_feature_vector(client_with_data):
 
 def test_explain_422_invalid_model(client_with_data):
     """GET /v1/scores/{wallet}/explain?model=catboost returns 422."""
-    wallet = "GABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWX"
+    wallet = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
     resp = client_with_data.get(
         f"/v1/scores/{wallet}/explain?asset_pair=XLM/USDC&model=catboost",
         headers=_admin_headers(),
@@ -118,7 +128,7 @@ def test_explain_200_with_xgboost_model_param(client_with_data, tmp_path, monkey
     os.environ["STELLARLENSE_MODEL_DIR"] = str(model_dir)
     monkeypatch.setattr(settings_module.settings, "model_dir", str(model_dir))
 
-    wallet = "GABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWX"
+    wallet = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
     from api.main import app
     # Need to reload models with new model_dir
     # For this test, we just check that 422 is not returned;
