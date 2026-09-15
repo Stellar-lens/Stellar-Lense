@@ -76,18 +76,6 @@ class WAFMiddleware(BaseHTTPMiddleware):
                 except json.JSONDecodeError:
                     pass  # Not valid JSON, pass through
 
-            # Replace request body so it can be read again by downstream
-            consumed = False
-
-            async def mock_receive():
-                nonlocal consumed
-                # Return the body on the first call, then empty chunks afterwards.
-                if not consumed:
-                    consumed = True
-                    return {"type": "http.request", "body": body or b"", "more_body": False}
-                return {"type": "http.request", "body": b"", "more_body": False}
-
-            request._receive = mock_receive
             return await call_next(request)
 
         except Exception as e:
@@ -95,25 +83,29 @@ class WAFMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
     async def _safe_read_body(self, request: Request) -> Optional[bytes]:
-        """Read body with timeout to prevent slowloris attacks."""
+        """Read body with timeout to prevent slowloris attacks.
+
+        Reads via `request.stream()` rather than draining `request.receive()`
+        directly. Fully consuming `stream()` is what lets Starlette's own
+        `_CachedRequest.wrapped_receive` replay the body (and then a correctly
+        sequenced `http.disconnect`) to every downstream `BaseHTTPMiddleware`
+        layer — bypassing it by reading raw ASGI messages and monkey-patching
+        `request._receive` (the previous approach here) breaks that replay for
+        any middleware layered around this one.
+        """
         try:
             body = b""
             remaining = self.max_body_bytes
             start_time = time.monotonic()
 
-            while True:
+            async for chunk in request.stream():
                 if time.monotonic() - start_time > self.slow_request_timeout:
                     return None
-
-                message = await request.receive()
-                if message["type"] == "http.request":
-                    chunk = message.get("body", b"")
-                    if len(chunk) > remaining:
-                        return None  # Oversized
-                    body += chunk
-                    remaining -= len(chunk)
-                    if not message.get("more_body"):
-                        return body
+                if len(chunk) > remaining:
+                    return None  # Oversized
+                body += chunk
+                remaining -= len(chunk)
+            return body
         except Exception:
             return None
 
