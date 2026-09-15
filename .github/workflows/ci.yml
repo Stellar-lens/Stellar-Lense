@@ -36,16 +36,28 @@ jobs:
           version: "0.12.13"
           enable-cache: true
 
-      # No `toolchain:`/`components:` input on purpose: contracts/soroban/
-      # rust-toolchain.toml already pins the exact channel/targets/components
-      # this repo needs (1.81.0 - see that file's comment for why: newer
-      # rustc changes wasm32-unknown-unknown codegen incompatibly with the
-      # Soroban host) - @master (not @stable) is what makes this action read
-      # that file instead of installing its own default. Same toolchain
-      # locally (rustup auto-detects rust-toolchain.toml the same way) and
-      # in CI - one source of truth.
+      # contracts/soroban/rust-toolchain.toml pins the exact channel/targets/
+      # components this repo needs (1.81.0 - see that file's comment for why:
+      # newer rustc changes wasm32-unknown-unknown codegen incompatibly with
+      # the Soroban host). dtolnay/rust-toolchain@master used to auto-detect
+      # that file when no `toolchain:` input was given; as of some point
+      # after this workflow was written, the action made `toolchain` a
+      # strictly required input with no such fallback (see its action.yml —
+      # it now errors "'toolchain' is a required input" immediately if
+      # empty), which silently broke every job before it ever reached
+      # `make test-all`. Read the channel out of the toml file at runtime
+      # instead of hardcoding it here too, so rust-toolchain.toml stays the
+      # single source of truth rather than drifting out of sync with a
+      # second copy of the version pin.
+      - name: Read Rust toolchain channel from rust-toolchain.toml
+        id: rust_toolchain
+        run: |
+          channel=$(grep -m1 '^channel' contracts/soroban/rust-toolchain.toml | sed -E 's/channel *= *"([^"]+)"/\1/')
+          echo "channel=$channel" >> "$GITHUB_OUTPUT"
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.rust_toolchain.outputs.channel }}
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
         with:
