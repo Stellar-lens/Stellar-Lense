@@ -55,14 +55,22 @@ test-py:
 	# packages under packages/core/packages/ - producing import collisions
 	# and ModuleNotFoundErrors unrelated to actual test failures.
 	#
-	# COLUMNS is pinned wide: some CLI tests assert on Typer/Rich --help
-	# output containing specific option names, and Rich wraps/truncates
-	# that output to the terminal width it detects. A non-interactive CI
-	# runner has no controlling terminal and can fall back to a width
-	# narrow enough to wrap option names across lines, breaking a plain
-	# substring check even though the command's exit code is still 0.
-	COLUMNS=200 uv run --package stellar-lense-core --extra test pytest packages/core/tests
-	COLUMNS=200 uv run --package stellar-lense-api --extra test pytest apps/api/tests
+	# FORCE_COLOR is cleared and COLUMNS pinned wide: some CLI tests assert
+	# on Typer/Rich --help output containing specific option names as a
+	# plain substring. When FORCE_COLOR is set (as GitHub Actions runners
+	# do), Rich's Console.is_terminal returns True unconditionally -- it
+	# checks FORCE_COLOR before ever looking at NO_COLOR or the stream's
+	# actual isatty() -- so it emits ANSI styling for --help even though
+	# CliRunner's captured stream isn't a real terminal. Rich's highlighter
+	# then wraps the leading "--" of an option name in its own SGR span
+	# separately from the rest (e.g. "--start" becomes two escape-delimited
+	# fragments), which breaks a plain `"--start" in result.output` check
+	# even though the command's exit code is still 0. Clearing FORCE_COLOR
+	# here (rather than relying on NO_COLOR, which does not take
+	# precedence over it) restores the plain-text rendering these tests
+	# were written against.
+	FORCE_COLOR= COLUMNS=200 uv run --package stellar-lense-core --extra test pytest packages/core/tests
+	FORCE_COLOR= COLUMNS=200 uv run --package stellar-lense-api --extra test pytest apps/api/tests
 
 test-rust:
 	cd contracts/soroban && cargo test --workspace

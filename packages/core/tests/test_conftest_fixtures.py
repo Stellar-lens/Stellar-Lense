@@ -87,6 +87,7 @@ def test_real_stellar_sdk_set_contains_expected_files():
         "test_bridge_loader.py",
         "test_cross_chain_linker.py",
         "test_cross_chain_features.py",
+        "test_trade_filters.py",
     }
     assert expected == _REAL_STELLAR_SDK_TEST_FILES
 
