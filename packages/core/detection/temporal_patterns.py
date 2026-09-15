@@ -188,7 +188,11 @@ class TradeTimeSeries:
         counts = np.zeros(n_bins, dtype=np.float64)
 
         for ts, amt in zip(f_times, f_amounts):
-            bin_idx = int((ts - t_min) / bin_secs)
+            # t_max (the most recent trade, by construction of t_min above)
+            # always computes bin_idx == n_bins exactly — one past the last
+            # valid bin — and would be silently dropped every time without
+            # clamping it into the final bin.
+            bin_idx = min(int((ts - t_min) / bin_secs), n_bins - 1)
             if 0 <= bin_idx < n_bins:
                 log_amounts[bin_idx] += max(amt, 0.0)
                 counts[bin_idx] += 1.0
