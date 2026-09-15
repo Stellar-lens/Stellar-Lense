@@ -96,11 +96,16 @@ def mlflow_run(
         The MLflow ``run_id`` of the started (or resumed) run.
     """
     if not _HAS_MLFLOW:
-        raise ImportError(
-            "'mlflow' is required by detection/mlflow_tracker.py but is not installed.\n"
-            "  Install the 'ml' extra:  pip install 'stellar-lense-core[ml]'\n"
-            "  Or install directly:     pip install mlflow"
+        # Every caller of mlflow_run already treats a falsy run_id as "no
+        # tracking active, skip logging" (e.g. train_ensemble's
+        # `if run_id: log_training_dataset_metadata(...)`) — so training
+        # itself must not hard-require the optional 'ml' extra just to run.
+        logger.warning(
+            "mlflow not installed; training will proceed without experiment tracking. "
+            "Install the 'ml' extra (pip install 'stellar-lense-core[ml]') to enable it."
         )
+        yield None
+        return
     uri = _resolve_tracking_uri(tracking_uri)
     exp_name = experiment_name or settings.mlflow_experiment_name or "stellar-lense-training"
 
