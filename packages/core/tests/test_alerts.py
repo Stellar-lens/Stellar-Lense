@@ -68,4 +68,7 @@ def test_each_annotation_has_summary(alerts_doc):
 
 def test_exactly_13_rules(alerts_doc):
     rules = _collect_rules(alerts_doc)
-    assert len(rules) == 13, f"Expected 13 alert rules, got {len(rules)}"
+    # 13 required (see REQUIRED_ALERTS) + 2 ops alerts outside the SLO
+    # framework (WAFAbuseDetected, SecretRotationOverdue).
+    expected = len(REQUIRED_ALERTS) + 2
+    assert len(rules) == expected, f"Expected {expected} alert rules, got {len(rules)}"

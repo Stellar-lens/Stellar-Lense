@@ -56,3 +56,125 @@ groups:
           summary: "Secret rotation is overdue"
           description: "One or more active API keys have exceeded the maximum age without rotation."
           runbook: "Identify the overdue key using the API key metadata or database. Rotate the key immediately via the POST /admin/api-keys/{key_id}/rotate endpoint or namespace rotation."
+
+      # -----------------------------------------------------------------
+      # SLO burn-rate alerts (multi-window, multi-burn-rate — see docs/slo.md)
+      #
+      # Each SLO gets a fast-burn (14.4x, 1h+5m windows, page) and a
+      # slow-burn (6.0x, 6h+30m windows, ticket) alert. Both windows must
+      # exceed the burn-rate threshold simultaneously — this is what
+      # distinguishes a real, sustained budget burn from a short blip that
+      # a single-window threshold would either miss or false-positive on.
+      # Uses the same good/total metric definitions as the ratio_rate5m /
+      # error_budget_remaining recording rules in recording_rules.yml,
+      # just evaluated directly over each alert's own window instead of
+      # the fixed 5m the recording rules use.
+      # -----------------------------------------------------------------
+
+      # --- Score Availability (target 99.5%, error budget 0.5%) ---
+      - alert: ScoreAvailabilitySLOFastBurn
+        expr: |
+          (
+            (1 - (sum(rate(stellar_lense_api_request_duration_seconds_count{method="GET",endpoint=~"/v1/scores/\{wallet\}|/scores/\{wallet\}",status_code!~"5.."}[1h])) / sum(rate(stellar_lense_api_request_duration_seconds_count{method="GET",endpoint=~"/v1/scores/\{wallet\}|/scores/\{wallet\}"}[1h])))) > (14.4 * 0.005)
+          and
+            (1 - (sum(rate(stellar_lense_api_request_duration_seconds_count{method="GET",endpoint=~"/v1/scores/\{wallet\}|/scores/\{wallet\}",status_code!~"5.."}[5m])) / sum(rate(stellar_lense_api_request_duration_seconds_count{method="GET",endpoint=~"/v1/scores/\{wallet\}|/scores/\{wallet\}"}[5m])))) > (14.4 * 0.005)
+          )
+        for: 2m
+        annotations:
+          summary: "Score Availability SLO: fast error-budget burn"
+          description: "GET /scores/{wallet} is on track to exhaust its 30-day error budget in ~2 days at the current 5xx rate."
+          runbook: "Check GET /admin/slo-status for current budget. Investigate recent deploys, DB contention, and upstream Horizon errors. This is a page-worthy burn rate — page the on-call."
+
+      - alert: ScoreAvailabilitySLOSlowBurn
+        expr: |
+          (
+            (1 - (sum(rate(stellar_lense_api_request_duration_seconds_count{method="GET",endpoint=~"/v1/scores/\{wallet\}|/scores/\{wallet\}",status_code!~"5.."}[6h])) / sum(rate(stellar_lense_api_request_duration_seconds_count{method="GET",endpoint=~"/v1/scores/\{wallet\}|/scores/\{wallet\}"}[6h])))) > (6.0 * 0.005)
+          and
+            (1 - (sum(rate(stellar_lense_api_request_duration_seconds_count{method="GET",endpoint=~"/v1/scores/\{wallet\}|/scores/\{wallet\}",status_code!~"5.."}[30m])) / sum(rate(stellar_lense_api_request_duration_seconds_count{method="GET",endpoint=~"/v1/scores/\{wallet\}|/scores/\{wallet\}"}[30m])))) > (6.0 * 0.005)
+          )
+        for: 15m
+        annotations:
+          summary: "Score Availability SLO: slow error-budget burn"
+          description: "GET /scores/{wallet} is on track to exhaust its 30-day error budget in ~5 days at the current 5xx rate."
+          runbook: "Check GET /admin/slo-status for current budget. File a ticket for triage during business hours — not page-worthy yet."
+
+      # --- Scoring Latency (target 99% under 2.0s, error budget 1%) ---
+      - alert: ScoringLatencySLOFastBurn
+        expr: |
+          (
+            (1 - (sum(rate(stellar_lense_scoring_latency_seconds_bucket{le="2.0"}[1h])) / sum(rate(stellar_lense_scoring_latency_seconds_count[1h])))) > (14.4 * 0.01)
+          and
+            (1 - (sum(rate(stellar_lense_scoring_latency_seconds_bucket{le="2.0"}[5m])) / sum(rate(stellar_lense_scoring_latency_seconds_count[5m])))) > (14.4 * 0.01)
+          )
+        for: 2m
+        annotations:
+          summary: "Scoring Latency SLO: fast error-budget burn"
+          description: "Wallet scoring is on track to exhaust its 30-day <2.0s latency budget in ~2 days."
+          runbook: "Check Horizon API latency, model inference load, and DB write throughput (see ScoringLatencyHigh's runbook). Page-worthy burn rate."
+
+      - alert: ScoringLatencySLOSlowBurn
+        expr: |
+          (
+            (1 - (sum(rate(stellar_lense_scoring_latency_seconds_bucket{le="2.0"}[6h])) / sum(rate(stellar_lense_scoring_latency_seconds_count[6h])))) > (6.0 * 0.01)
+          and
+            (1 - (sum(rate(stellar_lense_scoring_latency_seconds_bucket{le="2.0"}[30m])) / sum(rate(stellar_lense_scoring_latency_seconds_count[30m])))) > (6.0 * 0.01)
+          )
+        for: 15m
+        annotations:
+          summary: "Scoring Latency SLO: slow error-budget burn"
+          description: "Wallet scoring is on track to exhaust its 30-day <2.0s latency budget in ~5 days."
+          runbook: "Check GET /admin/slo-status for current budget. File a ticket for triage during business hours — not page-worthy yet."
+
+      # --- Webhook Delivery (target 99%, error budget 1%) ---
+      - alert: WebhookDeliverySLOFastBurn
+        expr: |
+          (
+            (1 - (sum(rate(stellar_lense_webhook_deliveries_total{result="delivered"}[1h])) / sum(rate(stellar_lense_webhook_deliveries_total[1h])))) > (14.4 * 0.01)
+          and
+            (1 - (sum(rate(stellar_lense_webhook_deliveries_total{result="delivered"}[5m])) / sum(rate(stellar_lense_webhook_deliveries_total[5m])))) > (14.4 * 0.01)
+          )
+        for: 2m
+        annotations:
+          summary: "Webhook Delivery SLO: fast error-budget burn"
+          description: "Webhook deliveries are on track to exhaust the 30-day success-rate budget in ~2 days."
+          runbook: "Check GET /webhooks/dead-letters and subscriber URL reachability (see WebhookDeadLetterBacklog's runbook). Page-worthy burn rate."
+
+      - alert: WebhookDeliverySLOSlowBurn
+        expr: |
+          (
+            (1 - (sum(rate(stellar_lense_webhook_deliveries_total{result="delivered"}[6h])) / sum(rate(stellar_lense_webhook_deliveries_total[6h])))) > (6.0 * 0.01)
+          and
+            (1 - (sum(rate(stellar_lense_webhook_deliveries_total{result="delivered"}[30m])) / sum(rate(stellar_lense_webhook_deliveries_total[30m])))) > (6.0 * 0.01)
+          )
+        for: 15m
+        annotations:
+          summary: "Webhook Delivery SLO: slow error-budget burn"
+          description: "Webhook deliveries are on track to exhaust the 30-day success-rate budget in ~5 days."
+          runbook: "Check GET /admin/slo-status for current budget. File a ticket for triage during business hours — not page-worthy yet."
+
+      # --- Soroban Submission (target 99% success, excluding dry runs, error budget 1%) ---
+      - alert: SorobanSubmissionSLOFastBurn
+        expr: |
+          (
+            (1 - (sum(rate(stellar_lense_soroban_submissions_total{status="success"}[1h])) / sum(rate(stellar_lense_soroban_submissions_total{status!="skipped"}[1h])))) > (14.4 * 0.01)
+          and
+            (1 - (sum(rate(stellar_lense_soroban_submissions_total{status="success"}[5m])) / sum(rate(stellar_lense_soroban_submissions_total{status!="skipped"}[5m])))) > (14.4 * 0.01)
+          )
+        for: 2m
+        annotations:
+          summary: "Soroban Submission SLO: fast error-budget burn"
+          description: "On-chain score submissions are on track to exhaust the 30-day success-rate budget in ~2 days."
+          runbook: "Check the Soroban circuit breaker state (see SorobanCircuitBreakerOpen's runbook), RPC connectivity, and service key authorization. Page-worthy burn rate."
+
+      - alert: SorobanSubmissionSLOSlowBurn
+        expr: |
+          (
+            (1 - (sum(rate(stellar_lense_soroban_submissions_total{status="success"}[6h])) / sum(rate(stellar_lense_soroban_submissions_total{status!="skipped"}[6h])))) > (6.0 * 0.01)
+          and
+            (1 - (sum(rate(stellar_lense_soroban_submissions_total{status="success"}[30m])) / sum(rate(stellar_lense_soroban_submissions_total{status!="skipped"}[30m])))) > (6.0 * 0.01)
+          )
+        for: 15m
+        annotations:
+          summary: "Soroban Submission SLO: slow error-budget burn"
+          description: "On-chain score submissions are on track to exhaust the 30-day success-rate budget in ~5 days."
+          runbook: "Check GET /admin/slo-status for current budget. File a ticket for triage during business hours — not page-worthy yet."
