@@ -480,7 +480,9 @@ _MIGRATIONS: list[tuple[int, str, str]] = [
             ON case_assignments (lock_expires_at)
             WHERE status = 'assigned';
 
-        -- analyst_feedback table for verdicts (distinct from feedback_store's analyst_feedback)
+        -- analyst_feedback table for verdicts (distinct from feedback_store's
+        -- analyst_label_corrections table — the two used to collide on this
+        -- same table name before the rename).
         CREATE TABLE IF NOT EXISTS analyst_feedback (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             wallet TEXT NOT NULL,
