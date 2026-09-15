@@ -2,12 +2,13 @@ from datetime import datetime, timezone, timedelta
 from ingestion.graph_builder import TemporalGraphBuilder
 
 class FakeTrade:
-    def __init__(self, base_account, counter_account, base_amount, ledger_close_time, trade_type="standard"):
+    def __init__(self, base_account, counter_account, base_amount, ledger_close_time, trade_type="standard", price=None):
         self.base_account = base_account
         self.counter_account = counter_account
         self.base_amount = base_amount
         self.ledger_close_time = ledger_close_time
         self.trade_type = trade_type
+        self.price = price
 
 def _trades(n=5, start=None):
     # Safely within the lookback window
