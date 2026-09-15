@@ -25,19 +25,30 @@ import pytest
 
 
 def _unregister_stellar_lense_metrics():
-    """Remove all previously registered StellarLense collectors from the default registry."""
+    """Remove the current IngestionMetricsCollector singleton's own counters
+    from the default registry.
+
+    Must inspect (and be called against) the *live* singleton rather than
+    string-matching every ``stellar_lense_*`` name in the registry: this
+    process's global ``REGISTRY`` also holds unrelated, process-lifetime
+    counters from ``api/metrics.py`` (e.g. ``wallets_scored_total``) that
+    share the same prefix. A prefix-based sweep unregisters those too,
+    permanently -- since they are only ever created once at import time,
+    nothing re-registers them afterwards, breaking every later test that
+    reads them from ``/metrics``.
+    """
     try:
         from prometheus_client import REGISTRY
-        collectors_to_remove = [
-            c for c in list(REGISTRY._names_to_collectors.values())
-            if hasattr(c, "_name") and c._name.startswith("stellar_lense_")
-        ]
-        seen = set()
-        for c in collectors_to_remove:
-            if id(c) not in seen:
-                seen.add(id(c))
+        from prometheus_client.metrics import MetricWrapperBase
+        from ingestion.metrics import IngestionMetricsCollector
+
+        instance = IngestionMetricsCollector._instance
+        if instance is None:
+            return
+        for v in vars(instance).values():
+            if isinstance(v, MetricWrapperBase):
                 try:
-                    REGISTRY.unregister(c)
+                    REGISTRY.unregister(v)
                 except Exception:
                     pass
     except Exception:
@@ -72,15 +83,21 @@ def _resync_cached_metrics_refs():
 
 @pytest.fixture(autouse=True)
 def isolate_registry():
-    """Clear the IngestionMetricsCollector singleton and unregister metrics before each test."""
+    """Clear the IngestionMetricsCollector singleton and unregister metrics before each test.
+
+    Unregisters against the *current* singleton before resetting it --
+    ``reset_for_testing()`` drops the only reference that lets
+    ``_unregister_stellar_lense_metrics`` find just this collector's own
+    metric objects, so it must run first.
+    """
     from ingestion.metrics import IngestionMetricsCollector
-    IngestionMetricsCollector.reset_for_testing()
     _unregister_stellar_lense_metrics()
+    IngestionMetricsCollector.reset_for_testing()
     _resync_cached_metrics_refs()
     yield
     from ingestion.metrics import IngestionMetricsCollector
-    IngestionMetricsCollector.reset_for_testing()
     _unregister_stellar_lense_metrics()
+    IngestionMetricsCollector.reset_for_testing()
 
 
 # ---------------------------------------------------------------------------
@@ -170,8 +187,8 @@ class TestIngestionMetricsCollectorSingleton:
     def test_reset_for_testing_allows_new_instance(self):
         from ingestion.metrics import IngestionMetricsCollector
         a = IngestionMetricsCollector.instance()
-        IngestionMetricsCollector.reset_for_testing()
         _unregister_stellar_lense_metrics()
+        IngestionMetricsCollector.reset_for_testing()
         b = IngestionMetricsCollector.instance()
         assert a is not b
 
