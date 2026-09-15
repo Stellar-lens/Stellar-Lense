@@ -148,13 +148,26 @@ def test_console_backend(clean_db, monkeypatch, caplog):
     monkeypatch.setattr(settings, "lineage_enabled", True)
     monkeypatch.setattr(settings, "lineage_backend", "console")
 
+    # caplog normally captures via a handler pytest attaches to the root
+    # logger, relying on propagation from named loggers. But
+    # config.logging_config.configure_logging() (invoked by api.main's
+    # FastAPI lifespan, which any TestClient(app) use in this same test
+    # session triggers) does `root.handlers.clear()`, permanently removing
+    # that handler for the rest of the session regardless of test order.
+    # Attach caplog's handler directly to this logger instead of relying
+    # on root propagation, so this test doesn't depend on whether some
+    # other test already triggered that lifespan startup.
+    lineage_logger = logging.getLogger("stellar_lense.lineage")
+    lineage_logger.addHandler(caplog.handler)
+    lineage_logger.setLevel(logging.INFO)
+
     emitter = LineageEmitter()
     try:
-        with caplog.at_level(logging.INFO, logger="stellar_lense.lineage"):
-            with emitter.run("job_console", []):
-                pass
+        with emitter.run("job_console", []):
+            pass
     finally:
         emitter.stop()
+        lineage_logger.removeHandler(caplog.handler)
 
     console_logs = [
         rec.message for rec in caplog.records if "OpenLineage event:" in rec.message

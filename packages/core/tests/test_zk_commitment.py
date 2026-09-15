@@ -7,6 +7,7 @@ both positive cases and attack / tamper scenarios.
 from __future__ import annotations
 
 import copy
+import random
 from unittest import mock
 
 import pytest
@@ -24,6 +25,7 @@ from detection.zk_commitment import (
 from detection.zk_prover import (
     NUM_BITS,
     ProofError,
+    _rand_scalar,
     generate_threshold_proof,
     verify_threshold_proof,
 )
@@ -365,19 +367,33 @@ class TestMalformedProofs:
 
 def test_pedersen_commit_accepted_by_both():
     """The same pedersen_commit output coordinates are used by both proof systems."""
-    # Generate Pedersen commitment coordinates
     score = 85
+
+    # 1. Sigma proof commitment: generate_threshold_proof derives the score's
+    # blinding internally as a weighted sum of NUM_BITS per-bit blindings
+    # drawn from its own RNG (there's no way to hand it a fixed blinding
+    # directly) — so with a seeded RNG (_rng_seed), replicate that exact
+    # derivation here and confirm pedersen_commit() with the resulting
+    # blinding reproduces the coordinates generate_threshold_proof returned.
+    seed = 20260615
+    rng = random.Random(seed)
+    r = sum((1 << i) * _rand_scalar(rng) for i in range(NUM_BITS)) % curve_order
+    expected_px, expected_py = serialize_point(pedersen_commit(score, r))
+
+    _, sigma_commit, sigma_proof = generate_threshold_proof(
+        WALLET, score, FEATURES, SALT, 70, _rng_seed=seed
+    )
+    assert sigma_commit == (expected_px, expected_py)
+    assert sigma_proof["score_commit_x"] == expected_px
+    assert sigma_proof["score_commit_y"] == expected_py
+
+    # 2. SNARK proof commitment matches — independent of the sigma proof's
+    # own derivation above; generate_snark_range_proof takes the commitment
+    # point as an explicit argument, so this just checks it echoes whatever
+    # point it's given into its public signals.
     blinding = 12345
     pt = pedersen_commit(score, blinding)
     px, py = serialize_point(pt)
-
-    # 1. Sigma proof commitment
-    _, sigma_commit, sigma_proof = generate_threshold_proof(WALLET, score, FEATURES, SALT, 70)
-    assert sigma_commit == (px, py)
-    assert sigma_proof["score_commit_x"] == px
-    assert sigma_proof["score_commit_y"] == py
-
-    # 2. SNARK proof commitment matches
     with mock.patch("os.path.exists", return_value=True), \
          mock.patch("subprocess.run") as mock_run, \
          mock.patch("builtins.open") as mock_file:

@@ -98,7 +98,7 @@ C' = SHA-256(0x06 || (SHA-256(0x06 || (C XOR old_leaf)) XOR new_leaf))
 The commitment is exposed as **48 bytes** to match the BLS12-381 G1 compressed point size expected by the specification:
 
 ```
-output[0..16]  = b"LEDGERLENS_KZG_1"   // context prefix (version tag)
+output[0..16]  = b"STELLARLENSEKZG1"   // context prefix (version tag)
 output[16..48] = 32-byte commitment hash
 
 The prefix makes commitments version-locked: a proof from a different protocol version has an incompatible context prefix and cannot be used against a current commitment.
@@ -273,7 +273,7 @@ C_0   = 0x00...00   (initial zero state)
 C_1   = SHA-256(0x06 || (C_0 XOR leaf_A))
 C_2   = SHA-256(0x06 || (C_1 XOR leaf_B))
 
-commitment = b"LEDGERLENS_KZG_1" || C_2   // 48 bytes
+commitment = b"STELLARLENSEKZG1" || C_2   // 48 bytes
 
 ### Membership Proof for Entry A
 

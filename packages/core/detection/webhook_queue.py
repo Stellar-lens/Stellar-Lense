@@ -50,23 +50,34 @@ class Delivery:
     delivered_at: str | None
 
 
+_schema_initialized_paths: set[str] = set()
+
+
 @contextmanager
 def _connect(db_path: str | None = None):
-    conn = sqlite3.connect(db_path or settings.db_path)
+    resolved_path = db_path or settings.db_path
+    conn = sqlite3.connect(resolved_path)
     try:
+        # CREATE TABLE/INDEX IF NOT EXISTS, so this is cheap and idempotent —
+        # but still a write, so only run it once per path per process rather
+        # than on every connection (which would turn every read into a
+        # write, adding lock contention under WAL). Ensuring the schema per
+        # path (rather than once at module import time) means every caller
+        # gets a working table even if settings.db_path changes after
+        # import — e.g. per-test isolated DBs, or an admin rotating the
+        # configured path at runtime.
+        if resolved_path not in _schema_initialized_paths:
+            conn.executescript(_SCHEMA)
+            conn.commit()
+            _schema_initialized_paths.add(resolved_path)
         yield conn
     finally:
         conn.close()
 
 
 def init_db(db_path: str | None = None):
-    with _connect(db_path) as conn:
-        conn.executescript(_SCHEMA)
-        conn.commit()
-
-
-# Initialize database at module import time (idempotent)
-init_db()
+    with _connect(db_path):
+        pass
 
 
 def _row_to_delivery(row) -> Delivery:

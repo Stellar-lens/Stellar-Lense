@@ -121,9 +121,24 @@ def test_effects_asset_mismatch_returns_empty_with_warning(caplog):
 def test_non_positive_amount_returns_empty(caplog):
     import logging
     op = _op(path=[])
-    effects = [_effect(XLM, "0", USDC, "95")]
+    # TradeEffect.sold_amount is gt=0-constrained, so a real effect can never
+    # actually carry a non-positive amount — this exercises the decomposer's
+    # own belt-and-suspenders guard directly by bypassing that validation,
+    # the way a malformed/hand-built effect from an untrusted source might.
+    effect = TradeEffect.model_construct(
+        id="eff",
+        account=SRC,
+        sold_asset_type="native",
+        sold_asset_code=None,
+        sold_asset_issuer=None,
+        sold_amount=Decimal("0"),
+        bought_asset_type="credit_alphanum4",
+        bought_asset_code=USDC.code,
+        bought_asset_issuer=USDC.issuer,
+        bought_amount=Decimal("95"),
+    )
     with caplog.at_level(logging.WARNING, logger="stellar_lense.path_payment_loader"):
-        trades = PathPaymentDecomposer().decompose(op, effects)
+        trades = PathPaymentDecomposer().decompose(op, [effect])
     assert trades == []
 
 
@@ -136,12 +151,13 @@ def test_amount_exceeds_bound_returns_empty(caplog):
     assert trades == []
 
 
-def test_no_effects_falls_back_to_approximate_decomposition():
+def test_no_effects_returns_empty_rather_than_approximate():
+    """Without effects, hop amounts can't be accurately reconstructed — the
+    decomposer deliberately returns [] rather than a misleading guess
+    (see PathPaymentDecomposer._decompose_without_effects's docstring)."""
     op = _op(path=[BTC])  # XLM → BTC → USDC
     trades = PathPaymentDecomposer().decompose(op, effects=[])
-    assert len(trades) == 2
-    assert trades[0].hop_index == 0
-    assert trades[1].hop_index == 1
+    assert trades == []
 
 
 def test_path_payment_id_on_all_hops():

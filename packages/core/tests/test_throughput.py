@@ -40,6 +40,7 @@ def _make_mock_client(latency: float = 0.10, max_concurrency: int = 20) -> Async
         class _Resp:
             status_code = 200
             request = None
+            headers: dict = {}
 
             def json(self):
                 return {"_embedded": {"records": []}, "_links": {}}

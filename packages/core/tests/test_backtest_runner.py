@@ -29,7 +29,7 @@ class TestLoadLabelledDataset:
 
     def test_missing_columns_raises(self, tmp_path):
         path = _write_csv(tmp_path, "name,value\nfoo,1\n")
-        with pytest.raises(ValueError, match="Missing required columns"):
+        with pytest.raises(ValueError, match="missing required column"):
             load_labelled_dataset(path)
 
 

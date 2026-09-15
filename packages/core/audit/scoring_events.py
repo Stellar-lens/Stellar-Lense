@@ -427,6 +427,7 @@ class ScoringEventStore:
 
     async def current_score(self, wallet: str) -> Optional[int]:
         """Return the score from the most recent event, or None."""
+        await self._ensure_schema()
         latest = await self._get_latest_event(wallet)
         return latest.score if latest else None
 

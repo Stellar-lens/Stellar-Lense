@@ -25,14 +25,21 @@ _JOB_TTL_HOURS = 24
 # DB helpers
 # ---------------------------------------------------------------------------
 
+_schema_initialized_paths: set[str] = set()
+
+
 def _connect() -> sqlite3.Connection:
-    conn = sqlite3.connect(settings.db_path)
+    resolved_path = settings.db_path
+    conn = sqlite3.connect(resolved_path)
     conn.row_factory = sqlite3.Row
-    return conn
-
-
-def _init_batch_table() -> None:
-    with _connect() as conn:
+    # CREATE TABLE IF NOT EXISTS, so this is cheap and idempotent — but
+    # still a write, so only run it once per path per process rather than
+    # on every connection (which would turn every read into a write, adding
+    # lock contention under WAL). Ensuring the schema per path (rather than
+    # once at module import time) means every caller gets a working table
+    # even if settings.db_path changes after import — e.g. per-test
+    # isolated DBs, or an admin rotating the configured path at runtime.
+    if resolved_path not in _schema_initialized_paths:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS batch_jobs (
                 job_id TEXT PRIMARY KEY,
@@ -46,9 +53,9 @@ def _init_batch_table() -> None:
                 completed_at TEXT
             )
         """)
-
-
-_init_batch_table()
+        conn.commit()
+        _schema_initialized_paths.add(resolved_path)
+    return conn
 
 
 def _get_job(job_id: str) -> sqlite3.Row | None:

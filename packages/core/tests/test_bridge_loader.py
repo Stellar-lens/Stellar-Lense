@@ -60,6 +60,7 @@ MOCK_BLOCK = {
 @responses_lib.activate
 def test_allbridge_tokens_sent_parsed_into_bridge_transfer():
     """A well-formed TokensSent log is parsed into a BridgeTransfer."""
+    pytest.importorskip("web3", reason="web3 required to construct BridgeTransferLoader")
     from stellar_sdk import Keypair
     stellar_kp = Keypair.random()
     recipient_raw = stellar_kp.raw_public_key()
@@ -168,6 +169,7 @@ def test_bridge_transfers_empty_for_unknown_wallet(tmp_path):
 
 def test_bridge_transfers_persist_via_loader(tmp_path):
     """BridgeTransferLoader.load_transfers() saves records to the DB."""
+    pytest.importorskip("web3", reason="web3 required to construct BridgeTransferLoader")
     from stellar_sdk import Keypair
     from detection.storage import get_bridge_transfers
 

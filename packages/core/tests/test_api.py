@@ -542,7 +542,24 @@ def test_wallet_scores_cross_chain_links_present_when_bridge_data_exists(
 # ---------------------------------------------------------------------------
 
 
-def test_alerts_filters_by_threshold(client):
+@pytest.fixture
+def _restore_risk_score_threshold():
+    """Save/restore settings.risk_score_threshold around a test.
+
+    It's a raw process-wide singleton attribute, not something monkeypatch
+    can restore on its own: mutating it via plain assignment is blocked (the
+    settings model requires ``object.__setattr__``), and without an explicit
+    restore a test that sets it to a non-default value (e.g. 0) leaks that
+    value into every other test file in the same pytest session.
+    """
+    import config.settings as settings_module
+
+    original = settings_module.settings.risk_score_threshold
+    yield
+    object.__setattr__(settings_module.settings, "risk_score_threshold", original)
+
+
+def test_alerts_filters_by_threshold(client, _restore_risk_score_threshold):
     import config.settings as settings_module
     import detection.storage as storage_module
 
@@ -563,7 +580,7 @@ def test_alerts_filters_by_threshold(client):
     assert body[0]["wallet"] == "G" + "A" * 55
 
 
-def test_alerts_accepts_limit_offset(client):
+def test_alerts_accepts_limit_offset(client, _restore_risk_score_threshold):
     import config.settings as settings_module
     import detection.storage as storage_module
 

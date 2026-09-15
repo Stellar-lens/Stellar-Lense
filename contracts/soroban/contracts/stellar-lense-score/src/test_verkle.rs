@@ -58,12 +58,12 @@ fn commitment_has_protocol_prefix() {
     let (env, client, admin, service) = initialized();
     let c = client.get_state_commitment();
     let arr = c.to_array();
-    // First 16 bytes = b"LEDGERLENS_KZG_1"
-    let expected_prefix = b"LEDGERLENS_KZG_1";
+    // First 16 bytes = b"STELLARLENSEKZG1"
+    let expected_prefix = b"STELLARLENSEKZG1";
     assert_eq!(
         &arr[..16],
         expected_prefix,
-        "commitment must carry the LEDGERLENS_KZG_1 protocol prefix"
+        "commitment must carry the STELLARLENSEKZG1 protocol prefix"
     );
 }
 

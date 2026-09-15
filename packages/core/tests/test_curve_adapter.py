@@ -3,6 +3,9 @@
 import os
 from unittest.mock import patch
 
+import pytest
+
+pytest.importorskip("web3", reason="web3 required for the Curve EVM adapter")
 
 from ingestion.curve_adapter import CurveAdapter, _is_enabled
 

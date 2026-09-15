@@ -168,7 +168,7 @@ def get_recent_feedback(
 FEEDBACK_DECAY_LAMBDA = 0.05
 
 _ANALYST_CREATE_SQL = """
-CREATE TABLE IF NOT EXISTS analyst_feedback (
+CREATE TABLE IF NOT EXISTS analyst_label_corrections (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     wallet          TEXT NOT NULL,
     asset_pair      TEXT NOT NULL,
@@ -178,8 +178,8 @@ CREATE TABLE IF NOT EXISTS analyst_feedback (
     has_feature_vector INTEGER NOT NULL DEFAULT 0,
     created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX IF NOT EXISTS idx_feedback_wallet ON analyst_feedback(wallet);
-CREATE INDEX IF NOT EXISTS idx_feedback_created ON analyst_feedback(created_at);
+CREATE INDEX IF NOT EXISTS idx_feedback_wallet ON analyst_label_corrections(wallet);
+CREATE INDEX IF NOT EXISTS idx_feedback_created ON analyst_label_corrections(created_at);
 """
 
 
@@ -233,13 +233,13 @@ class AnalystFeedbackStore:
         if not (0.0 <= confidence <= 1.0):
             raise ValueError("confidence must be in [0.0, 1.0]")
 
-        has_fv = self._check_feature_vector(wallet)
+        has_fv = self._check_feature_vector(wallet, asset_pair)
         now = datetime.now(timezone.utc)
 
         conn = self._connect_and_init()
         try:
             cursor = conn.execute(
-                """INSERT INTO analyst_feedback
+                """INSERT INTO analyst_label_corrections
                    (wallet, asset_pair, analyst_label, original_score, confidence,
                     has_feature_vector, created_at)
                    VALUES (?, ?, ?, ?, ?, ?, ?)""",
@@ -280,7 +280,7 @@ class AnalystFeedbackStore:
         try:
             rows = conn.execute(
                 """SELECT wallet, analyst_label, confidence, created_at
-                   FROM analyst_feedback
+                   FROM analyst_label_corrections
                    WHERE has_feature_vector = 1 AND created_at >= ?
                    ORDER BY created_at DESC""",
                 (cutoff,),
@@ -308,12 +308,12 @@ class AnalystFeedbackStore:
         """Return paginated correction history (most recent first)."""
         conn = self._connect_and_init()
         try:
-            total = conn.execute("SELECT COUNT(*) FROM analyst_feedback").fetchone()[0]
+            total = conn.execute("SELECT COUNT(*) FROM analyst_label_corrections").fetchone()[0]
             offset = (page - 1) * page_size
             rows = conn.execute(
                 """SELECT id, wallet, asset_pair, analyst_label, original_score,
                           confidence, has_feature_vector, created_at
-                   FROM analyst_feedback
+                   FROM analyst_label_corrections
                    ORDER BY created_at DESC
                    LIMIT ? OFFSET ?""",
                 (page_size, offset),
@@ -347,16 +347,16 @@ class AnalystFeedbackStore:
         """Total number of persisted corrections."""
         conn = self._connect_and_init()
         try:
-            return conn.execute("SELECT COUNT(*) FROM analyst_feedback").fetchone()[0]
+            return conn.execute("SELECT COUNT(*) FROM analyst_label_corrections").fetchone()[0]
         finally:
             conn.close()
 
-    def _check_feature_vector(self, wallet: str) -> bool:
-        """Check if a feature vector exists for this wallet."""
+    def _check_feature_vector(self, wallet: str, asset_pair: str) -> bool:
+        """Check if a feature vector exists for this wallet/asset pair."""
         try:
             from detection.storage import get_feature_vector
 
-            fv = get_feature_vector(wallet, db_path=self._db_path)
+            fv = get_feature_vector(wallet, asset_pair, db_path=self._db_path)
             return fv is not None and len(fv) > 0
         except (ValueError, LookupError, OSError, sqlite3.Error):
             return False

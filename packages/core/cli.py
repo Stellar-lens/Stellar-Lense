@@ -2028,6 +2028,29 @@ def db_retention(
             typer.echo(f"{prefix}{table}: archived {archived} rows → {path}")
 
 
+audit_app = typer.Typer(help="Immutable HMAC-SHA256 audit log commands")
+app.add_typer(audit_app, name="audit")
+
+
+@audit_app.command("verify")
+def audit_verify(
+    db_path: str = typer.Option(None, "--db-path", help="Path to SQLite database (defaults to STELLARLENSE_DB_PATH)"),
+) -> None:
+    """Verify the audit log's hash chain from genesis forward.
+
+    Exits 0 and reports "intact" if every entry's stored hash and prev_hash
+    link check out; exits 1 and reports the first broken link otherwise.
+    """
+    from storage.audit_log import verify_chain
+
+    results = verify_chain(db_path)
+    broken = [r for r in results if r["error"] is not None]
+    if broken:
+        typer.echo(f"Chain broken: {broken[0]['error']}", err=True)
+        raise typer.Exit(1)
+    typer.echo(f"Audit log chain intact ({len(results)} entries).")
+
+
 api_app = typer.Typer(help="API utility commands")
 app.add_typer(api_app, name="api")
 

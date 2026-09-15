@@ -1995,7 +1995,7 @@ impl StellarLenseScoreContract {
     /// storage. It is updated atomically on every accepted `submit_score` /
     /// `submit_scores_batch` / `submit_scores_batch_attested` write.
     ///
-    /// The first 16 bytes are the context prefix `b"LEDGERLENS_KZG_1"` (encoding
+    /// The first 16 bytes are the context prefix `b"STELLARLENSEKZG1"` (encoding
     /// the protocol version); the remaining 32 bytes are the running hash
     /// accumulator. Any party holding this value can verify membership and
     /// non-membership proofs without querying the contract again.
