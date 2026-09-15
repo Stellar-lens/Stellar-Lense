@@ -40,6 +40,7 @@ _REAL_STELLAR_SDK_TEST_FILES = frozenset([
     "test_bridge_loader.py",
     "test_cross_chain_linker.py",
     "test_cross_chain_features.py",
+    "test_trade_filters.py",
 ])
 
 
