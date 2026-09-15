@@ -47,7 +47,7 @@ def test_patch_signing_key_injects_env_var():
 
 def test_test_file_name_returns_basename_only():
     """_test_file_name must return just the filename, not the full path."""
-    from conftest import _test_file_name  # noqa: PLC0415
+    from tests.conftest import _test_file_name  # noqa: PLC0415
 
     class _FakeRequest:
         """Simulates pytest's request object with a path attribute."""
@@ -63,7 +63,7 @@ def test_test_file_name_returns_basename_only():
 def test_test_file_name_fallback_uses_pathlib():
     """_test_file_name fallback (fspath) must still return basename only."""
 
-    from conftest import _test_file_name  # noqa: PLC0415
+    from tests.conftest import _test_file_name  # noqa: PLC0415
 
     class _FakeRequestLegacy:
         """Simulates a pre-pytest-7 request object with fspath but no path."""
@@ -80,7 +80,7 @@ def test_test_file_name_fallback_uses_pathlib():
 # ---------------------------------------------------------------------------
 
 def test_real_stellar_sdk_set_contains_expected_files():
-    from conftest import _REAL_STELLAR_SDK_TEST_FILES  # noqa: PLC0415
+    from tests.conftest import _REAL_STELLAR_SDK_TEST_FILES  # noqa: PLC0415
 
     expected = {
         "test_bridge_integrity.py",
@@ -92,6 +92,6 @@ def test_real_stellar_sdk_set_contains_expected_files():
 
 
 def test_real_stellar_sdk_set_is_frozenset():
-    from conftest import _REAL_STELLAR_SDK_TEST_FILES  # noqa: PLC0415
+    from tests.conftest import _REAL_STELLAR_SDK_TEST_FILES  # noqa: PLC0415
 
     assert isinstance(_REAL_STELLAR_SDK_TEST_FILES, frozenset)

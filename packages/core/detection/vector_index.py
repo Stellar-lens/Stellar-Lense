@@ -69,10 +69,20 @@ class FaissVectorIndex:
         if self.backend == "faiss_flat":
             self._index = faiss.IndexFlatIP(self.dim)
         elif self.backend == "faiss_ivf":
-            # Use IVF with nlist=100 (a reasonable default)
+            # FAISS requires at least `nlist` training points. ivf_threshold
+            # is the smallest dataset size this index is ever built for
+            # (either passed in directly, or the point add_batch's flat->ivf
+            # upgrade fires), so it's a safe upper bound for nlist — capped
+            # at 100 clusters since more doesn't help small datasets anyway.
+            nlist = min(100, max(1, self.ivf_threshold))
             quantizer = faiss.IndexFlatIP(self.dim)
-            self._index = faiss.IndexIVFFlat(quantizer, self.dim, 100)
-            self._index.nprobe = 10  # Search 10 out of 100 clusters
+            # IndexIVFFlat defaults to L2 distance regardless of the
+            # quantizer's metric — without this, search() returns L2
+            # distances (0.0 for an exact match) while callers, and the flat
+            # backend, expect inner-product cosine similarity (1.0 for an
+            # exact match on normalized vectors).
+            self._index = faiss.IndexIVFFlat(quantizer, self.dim, nlist, faiss.METRIC_INNER_PRODUCT)
+            self._index.nprobe = min(10, nlist)  # Search up to 10 of nlist clusters
         else:
             raise ValueError(f"Unknown backend: {self.backend}")
 
