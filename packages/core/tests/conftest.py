@@ -90,3 +90,23 @@ def _stellar_sdk_isolation(request):
 
     # Restore the saved (possibly mocked) state.
     sys.modules.update(saved)
+
+
+@pytest.fixture(autouse=True)
+def _reset_api_shutdown_flag():
+    """Reset ``api.main``'s shutdown latch after every test.
+
+    ``api.main.app`` is a process-wide singleton reused by every test file.
+    Its ``_shutting_down`` flag is set ``True`` when a
+    ``with TestClient(app) as client:`` block exits (real ASGI shutdown) and
+    is only reset ``False`` on the *next* lifespan startup. A test that
+    constructs a bare ``TestClient(app)`` (never entered as a context
+    manager, so its lifespan never runs) would otherwise inherit a stale
+    ``True`` left behind by an earlier, unrelated test in the same pytest
+    process -- 503'ing every request it makes. Resetting here after each
+    test keeps the latch scoped to whichever test actually exercises
+    shutdown.
+    """
+    yield
+    import api.main
+    api.main._shutting_down = False
