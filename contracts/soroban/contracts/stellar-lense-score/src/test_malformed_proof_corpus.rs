@@ -286,8 +286,8 @@ fn test_commitment_prefix_malformed_corpus() {
     // context prefix ties a commitment to one curve tag + protocol version.
     let corpus = [
         ("zero_prefix", make(&[0u8; 16])),
-        ("version_2", make(b"LEDGERLENS_KZG_2")),
-        ("truncated_tag", make(b"LEDGERLENS_KZG\0\0")),
+        ("version_2", make(b"STELLARLENSEKZG2")),
+        ("truncated_tag", make(b"STELLARLENSEKZ\0\0")),
     ];
 
     for (name, b48) in corpus {

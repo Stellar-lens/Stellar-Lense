@@ -515,7 +515,7 @@ class TestLoadProductionFeatures:
 
 
 class TestFeatureStoreStatsEndpoint:
-    def test_stats_endpoint_returns_expected_fields(self, tmp_path: Path) -> None:
+    def test_stats_endpoint_returns_expected_fields(self, tmp_path: Path, monkeypatch) -> None:
         try:
             from fastapi.testclient import TestClient
             import api.admin_router  # noqa: F401 — skip if dependencies missing
@@ -533,11 +533,15 @@ class TestFeatureStoreStatsEndpoint:
         mock_cold.row_count.return_value = 0
         mock_cold.oldest_record.return_value = None
 
-        with (
-            patch("api.admin_router.settings.db_path", db_path),
-            patch("api.admin_router.settings.feature_archive_dir", str(archive_dir)),
-            patch("api.admin_router.ParquetFeatureColdTier", return_value=mock_cold),
-        ):
+        # db_path/feature_archive_dir are properties on the pydantic Settings
+        # model; unittest.mock.patch's teardown restores via delattr(), which
+        # pydantic's BaseModel.__delattr__ rejects for non-field attributes.
+        # monkeypatch.setattr restores via setattr() instead, so use that for
+        # these two (mock.patch is still fine for the plain class patch below).
+        monkeypatch.setattr("api.admin_router.settings.db_path", db_path)
+        monkeypatch.setattr("api.admin_router.settings.feature_archive_dir", str(archive_dir))
+
+        with patch("detection.feature_store.ParquetFeatureColdTier", return_value=mock_cold):
             from api.admin_router import router
             from fastapi import FastAPI
 

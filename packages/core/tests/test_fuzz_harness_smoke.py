@@ -259,6 +259,7 @@ _EVM_INPUTS: list[bytes] = [
 
 @pytest.mark.parametrize("sample", _EVM_INPUTS)
 def test_fuzz_evm_rpc_parser_smoke(sample: bytes) -> None:
+    pytest.importorskip("web3", reason="web3 required for the EVM adapters' checksum-address path")
     _call_evm_parser(sample)  # must not raise
 
 

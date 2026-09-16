@@ -267,7 +267,7 @@ def test_sqlite_trigger_prevents_update(db_path):
 
     # Direct UPDATE should be blocked by the trigger
     conn = sqlite3.connect(db_path)
-    with pytest.raises(sqlite3.OperationalError, match="append-only"):
+    with pytest.raises(sqlite3.IntegrityError, match="append-only"):
         conn.execute(
             "UPDATE scoring_events SET score = 99 WHERE wallet = ?", (wallet,)
         )
@@ -288,7 +288,7 @@ def test_sqlite_trigger_prevents_delete(db_path):
     asyncio.run(setup())
 
     conn = sqlite3.connect(db_path)
-    with pytest.raises(sqlite3.OperationalError, match="append-only"):
+    with pytest.raises(sqlite3.IntegrityError, match="append-only"):
         conn.execute("DELETE FROM scoring_events WHERE wallet = ?", (wallet,))
         conn.commit()
     conn.close()

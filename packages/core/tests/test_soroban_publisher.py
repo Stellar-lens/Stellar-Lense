@@ -33,6 +33,19 @@ from detection.soroban_publisher import (  # noqa: E402
     SorobanSubmissionError,
 )
 
+
+@pytest.fixture(autouse=True)
+def _disable_soroban_lease(monkeypatch):
+    """submit_score() acquires a multi-region lease by default, which
+    requires the optional `kubernetes` package (not installed in the CI
+    test extra). None of these tests exercise lease coordination itself, so
+    disable it rather than requiring kubernetes just to test publishing.
+    """
+    from config.settings import settings
+
+    monkeypatch.setattr(settings, "soroban_submission_lease_enabled", False)
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

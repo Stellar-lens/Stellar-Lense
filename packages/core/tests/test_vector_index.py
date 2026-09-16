@@ -4,7 +4,7 @@ from detection.vector_index import create_vector_index, FaissVectorIndex
 
 
 def test_faiss_flat_index():
-    index = FaissVectorIndex(backend="flat", dim=64)
+    index = FaissVectorIndex(backend="faiss_flat", dim=64)
     
     # Add vectors
     wallets = ["GABC", "GDEF", "GHIJ"]
@@ -25,7 +25,7 @@ def test_faiss_flat_index():
 
 
 def test_faiss_ivf_index():
-    index = FaissVectorIndex(backend="ivf", dim=64, ivf_threshold=3)
+    index = FaissVectorIndex(backend="faiss_ivf", dim=64, ivf_threshold=3)
     
     # Add vectors (more than ivf_threshold)
     wallets = [f"GWALLET{i}" for i in range(10)]
@@ -48,16 +48,16 @@ def test_create_vector_index():
     # Test with flat
     index = create_vector_index(backend="faiss_flat", dim=64)
     assert isinstance(index, FaissVectorIndex)
-    assert index.backend == "flat"
+    assert index.backend == "faiss_flat"
     
     # Test with ivf
     index = create_vector_index(backend="faiss_ivf", dim=64)
     assert isinstance(index, FaissVectorIndex)
-    assert index.backend == "ivf"
+    assert index.backend == "faiss_ivf"
 
 
 def test_clear_index():
-    index = FaissVectorIndex(backend="flat", dim=64)
+    index = FaissVectorIndex(backend="faiss_flat", dim=64)
     index.add_batch(["GABC"], np.array([np.random.rand(64).astype(np.float32)]))
     assert index.size() == 1
     index.clear()

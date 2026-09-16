@@ -3,6 +3,9 @@
 import os
 from unittest.mock import patch
 
+import pytest
+
+pytest.importorskip("web3", reason="web3 required for the Uniswap EVM adapter")
 
 from ingestion.uniswap_adapter import UniswapV3Adapter, _is_enabled
 

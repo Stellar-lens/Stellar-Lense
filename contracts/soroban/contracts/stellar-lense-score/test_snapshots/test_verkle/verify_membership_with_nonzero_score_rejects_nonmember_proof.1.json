@@ -260,7 +260,7 @@
               }
             ],
             "data": {
-              "bytes": "4c45444745524c454e535f4b5a475f31fdfdd5396ba68d416587eb28ee4dbdcb3cb04c34e0c7bb63f393afa769cd74f4"
+              "bytes": "5354454c4c41524c454e53454b5a4731fdfdd5396ba68d416587eb28ee4dbdcb3cb04c34e0c7bb63f393afa769cd74f4"
             }
           }
         }
@@ -344,7 +344,7 @@
             "data": {
               "vec": [
                 {
-                  "bytes": "4c45444745524c454e535f4b5a475f31fdfdd5396ba68d416587eb28ee4dbdcb3cb04c34e0c7bb63f393afa769cd74f4"
+                  "bytes": "5354454c4c41524c454e53454b5a4731fdfdd5396ba68d416587eb28ee4dbdcb3cb04c34e0c7bb63f393afa769cd74f4"
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"

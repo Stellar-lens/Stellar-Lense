@@ -330,14 +330,14 @@ pub fn decode_proof(proof: &Bytes) -> Option<DecodedProof> {
 /// The BLS12-381 G1 compressed point is 48 bytes. We emulate this format:
 ///
 /// ```text
-/// output[0..16]  = context prefix: b"LEDGERLENS_KZG_1" (16 bytes)
+/// output[0..16]  = context prefix: b"STELLARLENSEKZG1" (16 bytes)
 /// output[16..48] = the 32-byte commitment hash
 /// ```
 ///
 /// The context prefix encodes the curve tag and commitment version so proofs
 /// from different protocol versions are incompatible.
 pub fn commitment_to_bytes48(env: &Env, commit: &[u8; 32]) -> BytesN<48> {
-    let prefix: &[u8; 16] = b"LEDGERLENS_KZG_1";
+    let prefix: &[u8; 16] = b"STELLARLENSEKZG1";
     let mut buf = [0u8; 48];
     buf[0..16].copy_from_slice(prefix);
     buf[16..48].copy_from_slice(commit);
@@ -348,7 +348,7 @@ pub fn commitment_to_bytes48(env: &Env, commit: &[u8; 32]) -> BytesN<48> {
 /// Returns `None` if the context prefix does not match (version mismatch).
 pub fn bytes48_to_commitment(b48: &BytesN<48>) -> Option<[u8; 32]> {
     let arr = b48.to_array();
-    let prefix: &[u8; 16] = b"LEDGERLENS_KZG_1";
+    let prefix: &[u8; 16] = b"STELLARLENSEKZG1";
     if &arr[0..16] != prefix {
         return None;
     }

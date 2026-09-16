@@ -480,7 +480,9 @@ _MIGRATIONS: list[tuple[int, str, str]] = [
             ON case_assignments (lock_expires_at)
             WHERE status = 'assigned';
 
-        -- analyst_feedback table for verdicts (distinct from feedback_store's analyst_feedback)
+        -- analyst_feedback table for verdicts (distinct from feedback_store's
+        -- analyst_label_corrections table — the two used to collide on this
+        -- same table name before the rename).
         CREATE TABLE IF NOT EXISTS analyst_feedback (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             wallet TEXT NOT NULL,
@@ -609,6 +611,78 @@ _MIGRATIONS: list[tuple[int, str, str]] = [
             ON pending_chain_submissions (status, next_attempt_at);
         CREATE INDEX IF NOT EXISTS idx_pending_chain_submissions_override
             ON pending_chain_submissions (override_id);
+        """,
+    ),
+    (
+        21,
+        "dead_letter_queue for ingestion/dlq.py's TradeDLQ",
+        """
+        CREATE TABLE IF NOT EXISTS dead_letter_queue (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            source TEXT NOT NULL,
+            error_class TEXT NOT NULL,
+            error_message TEXT NOT NULL,
+            raw_record_json TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            retry_count INTEGER NOT NULL DEFAULT 0,
+            status TEXT NOT NULL DEFAULT 'pending',
+            replayed_at TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_dead_letter_queue_status ON dead_letter_queue (status);
+        CREATE INDEX IF NOT EXISTS idx_dead_letter_queue_error_class ON dead_letter_queue (error_class);
+        CREATE INDEX IF NOT EXISTS idx_dead_letter_queue_source ON dead_letter_queue (source);
+        """,
+    ),
+    (
+        22,
+        "filtered_trades for store_filtered_trade/prune_filtered_trades",
+        """
+        CREATE TABLE IF NOT EXISTS filtered_trades (
+            id TEXT NOT NULL,
+            paging_token TEXT PRIMARY KEY,
+            ledger_close_time TEXT NOT NULL,
+            rejection_reason TEXT NOT NULL,
+            filtered_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_filtered_trades_filtered_at ON filtered_trades (filtered_at);
+        """,
+    ),
+    (
+        23,
+        "hop_payment_cycles for save_hop_payment_cycles/get_hop_payment_cycles",
+        """
+        CREATE TABLE IF NOT EXISTS hop_payment_cycles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            origin_wallet TEXT NOT NULL,
+            origin_asset TEXT NOT NULL,
+            path_length INTEGER NOT NULL,
+            recovery_ratio REAL NOT NULL,
+            cycle_duration_seconds REAL NOT NULL,
+            counterparty_overlap REAL NOT NULL,
+            cycle_score REAL NOT NULL,
+            hop_json TEXT NOT NULL,
+            detected_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_hop_payment_cycles_origin_wallet ON hop_payment_cycles (origin_wallet);
+        CREATE INDEX IF NOT EXISTS idx_hop_payment_cycles_cycle_score ON hop_payment_cycles (cycle_score);
+        """,
+    ),
+    (
+        24,
+        "fl_aggregation_log for log_krum_aggregation/get_krum_aggregation_log",
+        """
+        CREATE TABLE IF NOT EXISTS fl_aggregation_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            round_number INTEGER NOT NULL,
+            n_clients INTEGER NOT NULL,
+            f_tolerance INTEGER NOT NULL,
+            m_selected INTEGER NOT NULL,
+            selected_indices TEXT NOT NULL,
+            excluded_indices TEXT NOT NULL,
+            krum_scores TEXT NOT NULL,
+            recorded_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_fl_aggregation_log_round_number ON fl_aggregation_log (round_number);
         """,
     ),
 ]

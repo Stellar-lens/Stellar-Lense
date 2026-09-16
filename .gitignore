@@ -5,10 +5,9 @@ node_modules/
 # packages/core's test suite writes these relative to CWD, not its own
 # package dir - `make test-py` (and CI) runs it from the repo root, so they
 # land here too, not just under packages/core/.
-packages/core/.ledgerlens_audit_secret
+packages/core/.stellar_lense_audit_secret
 packages/core/*.db
 .stellar_lense_audit_secret
-.ledgerlens_audit_secret
 *.db
 data/horizon_cursor.json.lock
 __pycache__/
