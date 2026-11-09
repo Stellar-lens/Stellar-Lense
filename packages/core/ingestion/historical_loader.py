@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 
 import httpx
 import pandas as pd
+from pydantic import ValidationError
 
 from config.settings import settings
 from ingestion.trade_parser import parse_trade
@@ -105,7 +106,24 @@ def _asset_params(prefix: str, asset: str) -> dict[str, str]:
 
 
 def _to_dataframe(records: list[dict]) -> pd.DataFrame:
-    return pd.DataFrame([parse_trade(record).model_dump() for record in records])
+    """Parse records, skipping any `Trade` rejects.
+
+    Horizon does return trades the model can't represent, e.g. dust trades
+    whose amount rounds to "0.0000000". One such record must not discard
+    the rest of the page; skipped ids are logged and counted in
+    ``df.attrs["skipped"]``.
+    """
+    parsed, skipped = [], []
+    for record in records:
+        try:
+            parsed.append(parse_trade(record).model_dump())
+        except ValidationError:
+            skipped.append(record.get("id"))
+    if skipped:
+        logger.warning("skipped %d unparseable Horizon trade(s), e.g. %s", len(skipped), skipped[:3])
+    df = pd.DataFrame(parsed)
+    df.attrs["skipped"] = len(skipped)
+    return df
 
 
 async def async_load_historical_trades(

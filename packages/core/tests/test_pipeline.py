@@ -122,3 +122,19 @@ def test_default_pair_file_is_valid():
     assert config.network == "mainnet"
     assert 10 <= len(config.pairs) <= 20
     assert len({p.id for p in config.pairs}) == len(config.pairs)
+
+
+def test_dust_trade_with_zero_amount_is_skipped_not_fatal(tmp_path):
+    records = wash_and_organic(NOW)
+    dust = trade_record(999, NOW - timedelta(minutes=1), "GDUST", "GOTHER", 1.0)
+    dust["counter_amount"] = "0.0000000"
+    df = load_historical_trades(
+        "XLM", USDC, since=NOW - timedelta(days=1),
+        horizon_url="https://horizon.test", client=FakeHorizon(records + [dust]).client(),
+    )
+    assert len(df) == 60
+    assert df.attrs["skipped"] == 1
+
+    store = Store(tmp_path / "db.sqlite")
+    summary = ingest(store, CONFIG, client=FakeHorizon(records + [dust]).client(), now=NOW)
+    assert summary[PAIR.id]["inserted"] == 60
