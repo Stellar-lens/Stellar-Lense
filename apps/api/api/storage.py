@@ -1,197 +1,149 @@
-"""In-memory data store backing the StellarLense demo API.
+"""Where the API's data comes from.
 
-This stands in for the production data layer (populated by the ingestion
-pipeline and Soroban contract reads). It seeds a small set of trades —
-including a synthetic wash-trading pattern — so the API endpoints have
-realistic data to serve.
+* Live (default): reads the SQLite store written by packages/core's pipeline
+  (`python -m pipeline run`) at DB_PATH. Serves the latest completed score
+  run; earlier runs are the score history.
+* Demo (DEMO_MODE=1): api/demo.py's 12 hard-coded synthetic trades.
+
+Routes call `backend()` and never branch on the mode themselves.
 """
 
-from datetime import datetime, timedelta, timezone
+from __future__ import annotations
 
-from detection.scoring import score_wallet as _core_score_wallet
-from detection.scoring import trades_to_frame
-from ingestion.data_models import Asset, Trade
+import os
+from functools import lru_cache
+from types import ModuleType
+from typing import Protocol
 
-# Risk score at or above this value generates an alert.
-ALERT_THRESHOLD = 50
-
-XLM = Asset(code="XLM")
-USDC = Asset(code="USDC", issuer="GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN")
-YBX = Asset(code="YBX", issuer="GBYBXAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+from api import demo
+from api.alerts import ALERT_THRESHOLD, to_alert
+from pipeline.store import Store
 
 
-def score_wallet(trades: list[Trade], wallet: str) -> dict:
-    """Score `wallet` with packages/core's engine over the given trades."""
-    return _core_score_wallet(trades_to_frame(trades), wallet)
+class NoDataYet(Exception):
+    """Live mode, but the pipeline hasn't completed a score run yet."""
 
 
-def _trade(trade_id, base_account, counter_account, when, base_asset, counter_asset, amount, price, base_is_seller=False):
-    return Trade(
-        id=trade_id,
-        ledger_close_time=when,
-        base_account=base_account,
-        counter_account=counter_account,
-        base_asset=base_asset,
-        counter_asset=counter_asset,
-        base_amount=amount,
-        counter_amount=amount * price,
-        price=price,
-        base_is_seller=base_is_seller,
-    )
+class Backend(Protocol):
+    def meta(self) -> dict: ...
+    def known_pairs(self) -> list[str]: ...
+    def pair_scores(self, pair: str) -> list[dict] | None: ...
+    def wallet_score(self, wallet: str, pair: str) -> dict | None: ...
+    def recent_alerts(self, limit: int = 20) -> list[dict]: ...
+    def asset_risk_ranking(self) -> list[dict]: ...
+    def pair_score_history(self, pair: str) -> list[dict]: ...
+    def market(self) -> list[dict]: ...
 
 
-_T0 = datetime(2026, 6, 1, 0, 0, 0, tzinfo=timezone.utc)
+class LiveBackend:
+    def __init__(self, db_path: str):
+        self.db_path = db_path
 
-# Synthetic wash-trading cluster: two wallets repeatedly trade fixed-size
-# round-number lots back and forth on the XLM/USDC pair.
-_WASH_TRADES = [
-    _trade("wash-1", "GWASHAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "GWASHBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", _T0, XLM, USDC, 5000, 0.1, base_is_seller=False),
-    _trade("wash-2", "GWASHAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "GWASHBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", _T0 + timedelta(seconds=20), XLM, USDC, 5000, 0.1, base_is_seller=True),
-    _trade("wash-3", "GWASHAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "GWASHBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", _T0 + timedelta(minutes=2), XLM, USDC, 5000, 0.1, base_is_seller=False),
-    _trade("wash-4", "GWASHAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "GWASHBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", _T0 + timedelta(minutes=2, seconds=15), XLM, USDC, 5000, 0.1, base_is_seller=True),
-    _trade("wash-5", "GWASHAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "GWASHBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", _T0 + timedelta(minutes=4), XLM, USDC, 5000, 0.1, base_is_seller=False),
-]
+    def _store(self) -> Store:
+        if not os.path.exists(self.db_path):
+            raise NoDataYet(f"no database at {self.db_path}; run the pipeline first")
+        return Store(self.db_path, readonly=True)
 
-# Synthetic organic activity: a market maker trading varied amounts with
-# many different counterparties on the XLM/USDC pair.
-_CLEAN_TRADES = [
-    _trade("clean-1", "GMAKERAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "GTRADERAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", _T0 + timedelta(hours=1), XLM, USDC, 1872, 0.0998),
-    _trade("clean-2", "GMAKERAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "GTRADERBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", _T0 + timedelta(hours=2), XLM, USDC, 342, 0.1003),
-    _trade("clean-3", "GMAKERAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "GTRADERCAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", _T0 + timedelta(hours=5), XLM, USDC, 91, 0.1001),
-    _trade("clean-4", "GMAKERAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "GTRADERDAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", _T0 + timedelta(hours=9), XLM, USDC, 27840, 0.0997),
-    _trade("clean-5", "GMAKERAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "GTRADEREAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", _T0 + timedelta(hours=14), XLM, USDC, 615, 0.1002),
-]
+    def _run(self) -> tuple[Store, dict]:
+        store = self._store()
+        run = store.latest_score_run()
+        if run is None:
+            raise NoDataYet("the pipeline hasn't completed a score run yet")
+        return store, run
 
-# A second, less severe wash pattern on a smaller asset pair (XLM/YBX).
-_MINOR_WASH_TRADES = [
-    _trade("ybx-1", "GWASHCAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "GWASHDAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", _T0, XLM, YBX, 1000, 2.5, base_is_seller=False),
-    _trade("ybx-2", "GWASHCAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "GWASHDAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", _T0 + timedelta(minutes=1), XLM, YBX, 1000, 2.5, base_is_seller=True),
-]
-
-ALL_TRADES: list[Trade] = _WASH_TRADES + _CLEAN_TRADES + _MINOR_WASH_TRADES
-
-
-def _pair_id(trade: Trade) -> str:
-    return trade.asset_pair
-
-
-def trades_for_pair(pair_id: str) -> list[Trade]:
-    return [t for t in ALL_TRADES if _pair_id(t) == pair_id]
-
-
-def known_pairs() -> list[str]:
-    seen = []
-    for t in ALL_TRADES:
-        pid = _pair_id(t)
-        if pid not in seen:
-            seen.append(pid)
-    return seen
-
-
-def wallets_for_pair(pair_id: str) -> set[str]:
-    wallets: set[str] = set()
-    for t in trades_for_pair(pair_id):
-        wallets.add(t.base_account)
-        wallets.add(t.counter_account)
-    return wallets
-
-
-def compute_risk_score(wallet: str, pair_id: str) -> dict:
-    """Score `wallet` using only trades on `pair_id`."""
-    trades = trades_for_pair(pair_id)
-    result = score_wallet(trades, wallet)
-    result["asset_pair"] = pair_id
-    result["timestamp"] = ALL_TRADES[-1].ledger_close_time
-    return result
-
-
-def all_scores() -> list[dict]:
-    """Risk scores for every wallet/asset-pair combination present in the data."""
-    scores = []
-    for pair_id in known_pairs():
-        for wallet in wallets_for_pair(pair_id):
-            scores.append(compute_risk_score(wallet, pair_id))
-    return scores
-
-
-def recent_alerts(limit: int = 20) -> list[dict]:
-    """Wallet/asset-pair combinations whose risk score meets ALERT_THRESHOLD."""
-    flagged = [s for s in all_scores() if s["score"] >= ALERT_THRESHOLD]
-    flagged.sort(key=lambda s: s["score"], reverse=True)
-    alerts = []
-    for s in flagged[:limit]:
-        reasons = []
-        if s["benford_flag"]:
-            reasons.append("non-conforming digit distribution")
-        if s["features"]["round_trip_trade_frequency"] > 0:
-            reasons.append("round-trip trading detected")
-        if s["features"]["counterparty_concentration_ratio"] > 0.8:
-            reasons.append("high counterparty concentration")
-        reason = "; ".join(reasons) or "elevated risk score"
-        alerts.append(
-            {
-                "id": f"{s['asset_pair']}:{s['wallet']}",
-                "wallet": s["wallet"],
-                "asset_pair": s["asset_pair"],
-                "score": s["score"],
-                "reason": reason,
-                "timestamp": s["timestamp"],
-            }
+    def meta(self) -> dict:
+        store, run = self._run()
+        model = (
+            {"model_id": run["model_id"], "trained_on": run["model_trained_on"]}
+            if run["model_id"]
+            else None
         )
-    return alerts
+        return {
+            "mode": "live",
+            "network": os.environ.get("STELLAR_NETWORK", "mainnet"),
+            "data_as_of": run["data_as_of"],
+            "scored_at": run["finished_at"],
+            "last_ingest": store.last_ingest(),
+            "pairs_tracked": len(store.pairs_scored(run["id"])),
+            "scoring": {
+                "method": run["method"],
+                "model": model,
+                "min_trades": run["min_trades"],
+                "window_start": run["window_start"],
+                "window_end": run["window_end"],
+            },
+            "notice": None,
+        }
 
+    def known_pairs(self) -> list[str]:
+        store, run = self._run()
+        return store.pairs_scored(run["id"])
 
-def asset_risk_ranking() -> list[dict]:
-    """Aggregate risk ranking for each asset pair."""
-    rankings = []
-    for pair_id in known_pairs():
-        scores = [compute_risk_score(w, pair_id) for w in wallets_for_pair(pair_id)]
-        if not scores:
-            continue
-        values = [s["score"] for s in scores]
-        rankings.append(
+    def pair_scores(self, pair: str) -> list[dict] | None:
+        store, run = self._run()
+        if pair not in store.pairs_scored(run["id"]):
+            return None
+        return store.scores(run["id"], pair)
+
+    def wallet_score(self, wallet: str, pair: str) -> dict | None:
+        store, run = self._run()
+        found = store.scores(run["id"], pair, wallet)
+        return found[0] if found else None
+
+    def recent_alerts(self, limit: int = 20) -> list[dict]:
+        store, run = self._run()
+        flagged = [s for s in store.scores(run["id"]) if s["score"] >= ALERT_THRESHOLD]
+        flagged.sort(key=lambda s: s["score"], reverse=True)
+        return [to_alert(s) for s in flagged[:limit]]
+
+    def asset_risk_ranking(self) -> list[dict]:
+        store, run = self._run()
+        rankings = []
+        for pair in store.pairs_scored(run["id"]):
+            values = [s["score"] for s in store.scores(run["id"], pair)]
+            rankings.append(
+                {
+                    "asset_pair": pair,
+                    "average_score": round(sum(values) / len(values), 2),
+                    "max_score": max(values),
+                    "flagged_wallets": sum(1 for v in values if v >= ALERT_THRESHOLD),
+                    "total_wallets": len(values),
+                }
+            )
+        rankings.sort(key=lambda r: r["average_score"], reverse=True)
+        return rankings
+
+    def pair_score_history(self, pair: str) -> list[dict]:
+        return self._store().pair_history(pair)
+
+    def market(self) -> list[dict]:
+        rows = self._store().market()
+        return [
             {
-                "asset_pair": pair_id,
-                "average_score": round(sum(values) / len(values), 2),
-                "max_score": max(values),
-                "flagged_wallets": sum(1 for v in values if v >= ALERT_THRESHOLD),
-                "total_wallets": len(values),
+                "asset_pair": r["pair"],
+                "price": r["price"],
+                "change_24h_pct": r["change_24h_pct"],
+                "base_volume_24h": r["base_volume_24h"],
+                "counter_volume_24h": r["counter_volume_24h"],
+                "trade_count_24h": r["trade_count_24h"],
+                "window_start": r["window_start"],
+                "window_end": r["window_end"],
+                "fetched_at": r["fetched_at"],
             }
-        )
-    rankings.sort(key=lambda r: r["average_score"], reverse=True)
-    return rankings
+            for r in rows
+        ]
 
 
-def pair_score_history(pair_id: str) -> list[dict]:
-    """Coarse historical view of a pair's aggregate risk score.
+def demo_mode() -> bool:
+    return os.environ.get("DEMO_MODE", "") in ("1", "true", "yes")
 
-    This demo API has no running ingestion pipeline persisting scores over
-    time (unlike packages/core/detection/storage.py's get_score_history,
-    which reads a real risk_scores table a live pipeline writes to) — so
-    there's no genuine time series to read. This derives one instead: at
-    each distinct trade timestamp for the pair, recompute every wallet's
-    score using only trades up to that point, exactly like
-    asset_risk_ranking() does for the *current* moment. The result is real
-    variation grounded in the actual seeded trade data, not fabricated
-    numbers — just a simulation of history rather than a persisted one.
-    """
-    trades = trades_for_pair(pair_id)
-    if not trades:
-        return []
 
-    cutoffs = sorted({t.ledger_close_time for t in trades})
-    history = []
-    for cutoff in cutoffs:
-        window = [t for t in trades if t.ledger_close_time <= cutoff]
-        wallets = {w for t in window for w in (t.base_account, t.counter_account)}
-        scores = [score_wallet(window, w)["score"] for w in wallets]
-        if not scores:
-            continue
-        history.append(
-            {
-                "timestamp": cutoff,
-                "average_score": round(sum(scores) / len(scores), 2),
-                "max_score": max(scores),
-            }
-        )
-    return history
+@lru_cache(maxsize=1)
+def _live(db_path: str) -> LiveBackend:
+    return LiveBackend(db_path)
+
+
+def backend() -> Backend | ModuleType:
+    if demo_mode():
+        return demo
+    return _live(os.environ.get("DB_PATH", "./data/stellar_lense.db"))

@@ -1,11 +1,8 @@
-"""Environment-driven configuration for the StellarLense API.
+"""Environment-driven CORS configuration for the StellarLense API.
 
-This service has no database and doesn't call CryptoPanic/CoinDesk — those
-are apps/web's concerns (its own Next.js API route proxies the news feed
-server-side; see apps/web/.env.example). The only genuine runtime config
-this API reads is CORS, so that's the only thing here. Deliberately not a
-pydantic-settings model or similar framework: two os.environ reads don't
-need one, and this codebase doesn't otherwise use that pattern.
+The other variables this service reads (DB_PATH, DEMO_MODE,
+STELLAR_NETWORK) are read where they're used, in api/storage.py; see
+apps/api/.env.example for the full list.
 """
 
 import os

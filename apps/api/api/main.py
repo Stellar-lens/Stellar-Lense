@@ -1,10 +1,12 @@
 """FastAPI entry point for the StellarLense public REST API."""
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.config import cors_allowed_origins
-from api.routes import alerts, assets, scores
+from api.routes import alerts, assets, market, meta, scores
+from api.storage import NoDataYet
 
 app = FastAPI(
     title="StellarLense API",
@@ -31,6 +33,13 @@ app.add_middleware(
 app.include_router(scores.router)
 app.include_router(alerts.router)
 app.include_router(assets.router)
+app.include_router(market.router)
+app.include_router(meta.router)
+
+
+@app.exception_handler(NoDataYet)
+def no_data_yet(_request: Request, exc: NoDataYet) -> JSONResponse:
+    return JSONResponse(status_code=503, content={"detail": str(exc)})
 
 
 @app.get("/health", tags=["health"])
