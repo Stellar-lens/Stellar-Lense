@@ -4,7 +4,7 @@ import { getPairScores } from "@/lib/api";
 import {
   formatFeatureName,
   isFlagged,
-  pairIssuer,
+  pairIssuers,
   pairSymbol,
   shortenWallet,
 } from "@/lib/format";
@@ -48,11 +48,11 @@ export default async function AssetDetailPage({
 
       <div className="mt-2 flex items-baseline gap-3">
         <h1 className="text-h3 text-text">{pairSymbol(pair)}</h1>
-        {pairIssuer(pair) && (
-          <span className="text-label text-muted">
-            {shortenWallet(pairIssuer(pair)!)}
+        {pairIssuers(pair).map((issuer) => (
+          <span key={issuer} className="text-label text-muted">
+            {shortenWallet(issuer)}
           </span>
-        )}
+        ))}
       </div>
 
       <dl className="mt-5 grid grid-cols-4 gap-5 border-b border-border pb-5">
@@ -112,7 +112,11 @@ export default async function AssetDetailPage({
                     <ScoreBadge score={s.score} />
                   </td>
                   <td className="py-2.5 pr-4 text-right text-label text-muted">
-                    {s.benford_flag ? "non-conforming" : "conforming"}
+                    {!s.benford.sufficient_sample
+                      ? "n/a"
+                      : s.benford_flag
+                        ? "non-conforming"
+                        : "conforming"}
                   </td>
                   <td className="py-2.5 text-right text-data-base text-muted">
                     {s.confidence.toFixed(0)}%
@@ -141,8 +145,10 @@ export default async function AssetDetailPage({
             </div>
           ) : (
             <p className="mt-3 text-body-sm text-muted">
-              No trained model attribution available for this wallet;
-              scored on the Benford + heuristic fallback path.
+              Scored with the fixed heuristic (weighted trade-pattern
+              features plus a Benford term), not a trained model, so there
+              is no SHAP attribution. The raw features below are the whole
+              explanation.
             </p>
           )}
 
@@ -165,6 +171,11 @@ export default async function AssetDetailPage({
                 <dt className="text-label text-muted">Sample</dt>
                 <dd className="mt-1 text-data-base text-text">
                   {active.benford.sample_size}
+                  {!active.benford.sufficient_sample && (
+                    <span className="ml-1 text-label text-muted">
+                      (too few to judge)
+                    </span>
+                  )}
                 </dd>
               </div>
             </div>

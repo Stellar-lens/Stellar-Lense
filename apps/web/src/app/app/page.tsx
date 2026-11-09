@@ -1,23 +1,25 @@
 import Link from "next/link";
-import { getRiskRanking } from "@/lib/api";
+import { getMarket, getRiskRanking } from "@/lib/api";
 import {
   formatPercent,
   formatPrice,
   formatVolume,
+  pairAssets,
   pairSymbol,
   riskScoreColorClass,
 } from "@/lib/format";
-import { getPlaceholderMarketData } from "@/lib/placeholder-market";
 
 export default async function OverviewPage() {
-  const ranking = await getRiskRanking();
+  const [ranking, market] = await Promise.all([getRiskRanking(), getMarket()]);
+  const marketByPair = new Map(market.map((m) => [m.asset_pair, m]));
 
   return (
     <div>
       <h1 className="text-h3 text-text">Asset Risk Rankings</h1>
       <p className="mt-1 text-body-sm text-muted">
-        Every asset pair on the Stellar DEX, ranked by average wallet risk
-        score.
+        Tracked Stellar DEX pairs, ranked by the average risk score of the
+        wallets trading them. Price is in counter-asset units; 24h change
+        and volume come from Horizon trade aggregations.
       </p>
 
       <table className="mt-5 w-full border-collapse text-left">
@@ -28,20 +30,22 @@ export default async function OverviewPage() {
             <th className="py-2 pr-4 text-right font-normal">Risk Score</th>
             <th className="py-2 pr-4 text-right font-normal">Price</th>
             <th className="py-2 pr-4 text-right font-normal">24h</th>
-            <th className="py-2 pr-4 text-right font-normal">Volume</th>
+            <th className="py-2 pr-4 text-right font-normal">24h volume</th>
             <th className="py-2 text-right font-normal">Flags</th>
           </tr>
         </thead>
         <tbody>
           {ranking.map((r, i) => {
             const score = Math.round(r.average_score);
-            const market = getPlaceholderMarketData(r.asset_pair);
+            const m = marketByPair.get(r.asset_pair);
+            const counter = pairAssets(r.asset_pair)[1].code;
+            const change = m?.change_24h_pct ?? null;
             const changeColor =
-              market.change24h > 0
-                ? "text-up"
-                : market.change24h < 0
-                  ? "text-down"
-                  : "text-muted";
+              change === null || change === 0
+                ? "text-muted"
+                : change > 0
+                  ? "text-up"
+                  : "text-down";
             const clean = r.flagged_wallets === 0;
 
             return (
@@ -66,13 +70,13 @@ export default async function OverviewPage() {
                   {score}
                 </td>
                 <td className="py-2.5 pr-4 text-right text-data-base text-text">
-                  {formatPrice(market.price)}
+                  {m?.price != null ? formatPrice(m.price, counter) : "—"}
                 </td>
                 <td className={`py-2.5 pr-4 text-right text-data-base ${changeColor}`}>
-                  {formatPercent(market.change24h)}
+                  {change !== null ? formatPercent(change) : "—"}
                 </td>
                 <td className="py-2.5 pr-4 text-right text-data-base text-muted">
-                  {formatVolume(market.volume)}
+                  {m ? formatVolume(m.counter_volume_24h, counter) : "—"}
                 </td>
                 <td
                   className={`py-2.5 text-right text-data-base ${clean ? "text-muted" : "text-flag"}`}

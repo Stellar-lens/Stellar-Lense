@@ -174,7 +174,7 @@ def meta() -> dict:
         "last_ingest": None,
         "pairs_tracked": len(known_pairs()),
         "scoring": {"method": "heuristic", "model": None, "min_trades": 1},
-        "notice": "Demo mode: 12 hard-coded synthetic trades, not Stellar network data.",
+        "notice": "12 hard-coded synthetic trades, not Stellar network data.",
     }
 
 

@@ -25,15 +25,30 @@ export function shortenWallet(wallet: string): string {
   return `${wallet.slice(0, 4)}…${wallet.slice(-4)}`;
 }
 
-/** "XLM/USDC:GA5ZS...KZVN" -> "XLM/USDC" */
-export function pairSymbol(pair: string): string {
-  return pair.split(":")[0];
+export type PairAsset = { code: string; issuer: string | null };
+
+/** "XLM/USDC:GA5Z…" -> [{XLM, null}, {USDC, "GA5Z…"}]. Each side of a pair
+ * id is "XLM" or "CODE:ISSUER"; issuers never contain "/". */
+export function pairAssets(pair: string): [PairAsset, PairAsset] {
+  const [base, counter] = pair.split("/");
+  const parse = (side: string = ""): PairAsset => {
+    const [code, issuer] = side.split(":");
+    return { code, issuer: issuer ?? null };
+  };
+  return [parse(base), parse(counter)];
 }
 
-/** The issuer address after the ":" in a pair identifier, if any. */
-export function pairIssuer(pair: string): string | null {
-  const parts = pair.split(":");
-  return parts.length > 1 ? parts[1] : null;
+/** "yUSDC:GDGT…/USDC:GA5Z…" -> "yUSDC/USDC" */
+export function pairSymbol(pair: string): string {
+  const [base, counter] = pairAssets(pair);
+  return `${base.code}/${counter.code}`;
+}
+
+/** Issuers of the pair's credit assets, e.g. ["GA5Z…"] for XLM/USDC. */
+export function pairIssuers(pair: string): string[] {
+  return pairAssets(pair)
+    .map((a) => a.issuer)
+    .filter((i): i is string => i !== null);
 }
 
 export function formatTimestamp(iso: string): string {
@@ -44,9 +59,10 @@ export function formatFeatureName(name: string): string {
   return name.replace(/_/g, " ");
 }
 
-export function formatPrice(price: number): string {
-  const decimals = price < 1 ? 4 : 2;
-  return `$${price.toFixed(decimals)}`;
+/** Price in counter-asset units, e.g. "0.1003 USDC". */
+export function formatPrice(price: number, unit: string): string {
+  const decimals = price < 1 ? 4 : price < 1000 ? 2 : 0;
+  return `${price.toFixed(decimals)} ${unit}`;
 }
 
 export function formatPercent(pct: number): string {
@@ -54,8 +70,9 @@ export function formatPercent(pct: number): string {
   return `${sign}${pct.toFixed(2)}%`;
 }
 
-export function formatVolume(volume: number): string {
-  if (volume >= 1_000_000) return `$${(volume / 1_000_000).toFixed(2)}M`;
-  if (volume >= 1_000) return `$${(volume / 1_000).toFixed(1)}K`;
-  return `$${volume.toFixed(0)}`;
+/** Compact amount in the given asset's units, e.g. "4.81M USDC". */
+export function formatVolume(volume: number, unit: string): string {
+  if (volume >= 1_000_000) return `${(volume / 1_000_000).toFixed(2)}M ${unit}`;
+  if (volume >= 1_000) return `${(volume / 1_000).toFixed(1)}K ${unit}`;
+  return `${volume.toFixed(0)} ${unit}`;
 }
