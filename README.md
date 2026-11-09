@@ -2,7 +2,7 @@
 
 [![Built on Stellar](https://img.shields.io/badge/Built%20on-Stellar-blue?logo=stellar)](https://stellar.org)
 [![Soroban Smart Contracts](https://img.shields.io/badge/Smart%20Contracts-Soroban-purple)](https://soroban.stellar.org)
-[![License: TBD](https://img.shields.io/badge/License-TBD-lightgrey.svg)](#license)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![CI](https://github.com/Stellar-lens/Stellar-Lense/actions/workflows/ci.yml/badge.svg)](https://github.com/Stellar-lens/Stellar-Lense/actions/workflows/ci.yml)
 
 **Wash-trading detection for the Stellar DEX.**
@@ -308,7 +308,7 @@ The Soroban contract publishes on-chain risk data and will eventually gate bot e
 
 ## License
 
-[License to be finalized before public launch — confirm terms before removing public access to any previously open-sourced component.]
+MIT — see [`LICENSE`](LICENSE). The same terms already applied to `packages/core` (`packages/core/LICENSE`); this makes them explicit for the whole repository.
 
 ## Contributing
 
