@@ -249,3 +249,29 @@ def test_build_feature_vector_returns_all_feature_names():
     features = build_feature_vector(trades, "A", as_of)
 
     assert set(features.keys()) == set(FEATURE_NAMES)
+
+
+def test_round_trip_uses_base_is_seller_for_same_side_wash():
+    """A wallet that is always the base party but alternately sells and buys
+    the base asset is round-tripping; direction comes from base_is_seller."""
+    now = pd.Timestamp("2026-06-12T00:00:00Z")
+    xlm = {"code": "XLM", "issuer": None}
+    usdc = {"code": "USDC", "issuer": "GISSUER"}
+    trades = pd.DataFrame(
+        [
+            {
+                "ledger_close_time": now + pd.Timedelta(seconds=20 * i),
+                "base_account": "A",
+                "counter_account": "B",
+                "base_amount": 100.0,
+                "base_asset": xlm,
+                "counter_asset": usdc,
+                "base_is_seller": i % 2 == 0,
+            }
+            for i in range(4)
+        ]
+    )
+    assert round_trip_trade_frequency(trades, "A") == 0.75
+
+    one_way = trades.assign(base_is_seller=True)
+    assert round_trip_trade_frequency(one_way, "A") == 0.0

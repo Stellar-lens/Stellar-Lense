@@ -259,11 +259,13 @@ def round_trip_trade_frequency(trades: pd.DataFrame, account: str, max_trades: i
     `account` just received in exchange for the asset it just gave up
     (regardless of amount) — a hallmark of circular wash-trading routes.
 
-    Simplification: the asset `account` gives up / receives is taken as
-    `base_asset`/`counter_asset` when `account` is the base side, and
-    vice versa when it is the counter side (Horizon's `base_is_seller`
-    flag is not consulted). This is sufficient to flag circular routing
-    between the same two assets.
+    Direction comes from Horizon's `base_is_seller`: the base party gives
+    up the base asset when it is the seller, and the counter party gives up
+    the base asset when it isn't. This matters on the SDEX, where a wash
+    trader commonly stays on the same (base) side of every match while
+    alternately buying and selling. When `base_is_seller` is absent (older
+    callers, hand-built frames) the base side is assumed to give up the
+    base asset.
 
     Uses a Numba-JIT two-pointer-free O(n * max_trades) scan when available
     and enabled (`FEATURE_ENGINE_JIT_ENABLED`), falling back to the pure
@@ -275,12 +277,16 @@ def round_trip_trade_frequency(trades: pd.DataFrame, account: str, max_trades: i
     if n < 2:
         return 0.0
 
+    has_side = "base_is_seller" in account_trades.columns
     legs = []
     for _, row in account_trades.iterrows():
-        if row["base_account"] == account:
-            legs.append((_asset_symbol(row["base_asset"]), _asset_symbol(row["counter_asset"])))
+        account_is_base = row["base_account"] == account
+        base_is_seller = bool(row["base_is_seller"]) if has_side and pd.notna(row["base_is_seller"]) else True
+        base, counter = _asset_symbol(row["base_asset"]), _asset_symbol(row["counter_asset"])
+        if account_is_base == base_is_seller:
+            legs.append((base, counter))
         else:
-            legs.append((_asset_symbol(row["counter_asset"]), _asset_symbol(row["base_asset"])))
+            legs.append((counter, base))
 
     if _HAS_NUMBA and settings.feature_engine_jit_enabled:
         symbol_to_id: dict[str, int] = {}
