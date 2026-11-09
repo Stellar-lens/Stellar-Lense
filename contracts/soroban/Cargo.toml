@@ -1,17 +1,11 @@
 [workspace]
 resolver = "2"
 members = [
-    "contracts/stellar-lense-score",
-    "contracts/stellar-lense-aggregator",
-    "contracts/stellar-lense-test-support",
-    "contracts/mock-amm",
-    "contracts/mock-lending",
-    "tools/replay",
-    "tools/recovery",
-    "tools/schema-gen",
-    "tools/invocation-fuzzer",
-    "tests/composability",
+    "contracts/stellar-lense-registry",
 ]
+# The original stellar-lense-score contract and its tooling: a separate
+# workspace, not built, tested or deployed by default. See experimental/README.md.
+exclude = ["experimental"]
 
 [profile.release]
 opt-level = "z"
