@@ -73,10 +73,6 @@ importers:
         specifier: ^5
         version: 5.9.3
 
-  packages/sdk-ts: {}
-
-  packages/ui: {}
-
 packages:
 
   '@alloc/quick-lru@5.3.0':

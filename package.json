@@ -2,7 +2,7 @@
   "name": "stellar-lense",
   "private": true,
   "version": "0.0.0",
-  "description": "Stellar Lense monorepo root — orchestrates the pnpm workspace (apps/web, apps/bot, packages/sdk-ts, packages/ui)",
+  "description": "Stellar Lense monorepo root — orchestrates the pnpm workspace (apps/web, apps/bot)",
   "packageManager": "pnpm@9.0.0",
   "scripts": {
     "lint": "pnpm -r --if-present run lint",
