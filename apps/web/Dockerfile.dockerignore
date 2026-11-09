@@ -1,0 +1,8 @@
+# Context for apps/web/Dockerfile (built from the repo root).
+**
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!apps/web/**
+apps/web/node_modules
+apps/web/.next
