@@ -664,6 +664,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "mock-amm"
+version = "0.2.0"
+dependencies = [
+ "soroban-sdk",
+ "stellar-lense-registry",
+]
+
+[[package]]
 name = "num-bigint"
 version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"

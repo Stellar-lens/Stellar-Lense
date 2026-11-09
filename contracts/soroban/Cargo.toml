@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "contracts/stellar-lense-registry",
+    "contracts/mock-amm",
 ]
 # The original stellar-lense-score contract and its tooling: a separate
 # workspace, not built, tested or deployed by default. See experimental/README.md.
