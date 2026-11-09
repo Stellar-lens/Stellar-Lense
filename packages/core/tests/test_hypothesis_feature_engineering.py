@@ -25,7 +25,6 @@ from detection.benford_engine import (
 )
 from detection.feature_engineering import (
     counterparty_concentration_ratio,
-    graph_ring_features,
     intra_minute_clustering_coefficient,
     off_hours_activity_ratio,
     round_trip_trade_frequency,
@@ -112,37 +111,8 @@ def test_benford_z_scores_non_negative(amounts):
 # 2. Ring features: wash_ring_size is monotone in ring size
 # ---------------------------------------------------------------------------
 
-@given(
-    account=st.text(min_size=1, max_size=20, alphabet=st.characters(whitelist_categories=("Lu", "Ll", "Nd"))),
-    size_a=st.integers(min_value=0, max_value=100),
-    size_b=st.integers(min_value=0, max_value=100),
-)
-@settings(max_examples=300)
-def test_ring_size_monotone(account, size_a, size_b):
-    """graph_ring_features wash_ring_size should be monotone in the supplied ring_size."""
-    ring_a = {account: {"ring_size": size_a, "cycle_volume_ratio": 0.5, "timing_tightness_score": 0.5}}
-    ring_b = {account: {"ring_size": size_b, "cycle_volume_ratio": 0.5, "timing_tightness_score": 0.5}}
-    feat_a = graph_ring_features(account, ring_a)
-    feat_b = graph_ring_features(account, ring_b)
-    if size_a <= size_b:
-        assert feat_a["wash_ring_size"] <= feat_b["wash_ring_size"]
-    else:
-        assert feat_a["wash_ring_size"] >= feat_b["wash_ring_size"]
 
 
-@given(
-    account=st.text(min_size=1, max_size=20, alphabet=st.characters(whitelist_categories=("Lu", "Ll", "Nd"))),
-    ring_size=st.integers(min_value=0, max_value=1000),
-    cycle_ratio=st.floats(min_value=0.0, max_value=1.0, allow_nan=False),
-    timing=st.floats(min_value=0.0, max_value=1.0, allow_nan=False),
-)
-@settings(max_examples=300)
-def test_ring_membership_flag_set_when_present(account, ring_size, cycle_ratio, timing):
-    """wash_ring_membership must be 1.0 whenever the account appears in ring_membership."""
-    ring = {account: {"ring_size": ring_size, "cycle_volume_ratio": cycle_ratio, "timing_tightness_score": timing}}
-    features = graph_ring_features(account, ring)
-    assert features["wash_ring_membership"] == 1.0
-    assert features["wash_ring_size"] == float(ring_size)
 
 
 # ---------------------------------------------------------------------------

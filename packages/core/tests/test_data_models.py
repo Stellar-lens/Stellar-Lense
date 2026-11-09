@@ -16,7 +16,7 @@ from ingestion.data_models import (
     Trade,
     TradeType,
 )
-from ingestion.horizon_streamer import _parse_trade
+from ingestion.trade_parser import _parse_trade
 
 FIXTURE = Path(__file__).parent / "fixtures" / "horizon_trade.json"
 
