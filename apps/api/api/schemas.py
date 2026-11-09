@@ -1,35 +1,54 @@
 """Response schemas for the StellarLense public REST API."""
 
 from datetime import datetime
+from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class BenfordReport(BaseModel):
-    """Leading-digit distribution analysis for a wallet's trade amounts."""
+    """Leading-digit distribution analysis for a wallet's trade amounts.
+
+    `non_conforming` is only ever true when `sufficient_sample` is: with too
+    few trades a first-digit test says nothing, so it isn't used.
+    """
 
     sample_size: int
     chi_square: float
+    chi_square_pvalue: float
     mad: float
     z_scores: dict[int, float]
+    sufficient_sample: bool
     non_conforming: bool
+
+
+class ModelInfo(BaseModel):
+    """Identity of the ML model that produced a score (method == "ml")."""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    model_id: str
+    trained_on: str
 
 
 class RiskScore(BaseModel):
     """StellarLense Risk Score for a wallet on a given asset pair.
 
-    `features` and `benford` are always present (the heuristic path always
-    computes them). `shap` is only present when the trained ML ensemble
-    artifact is available — see detection/model_inference.py — and is
-    `None` otherwise, e.g. when falling back to the Phase 1 heuristic.
+    `method` says how the score was produced: "heuristic" (a fixed weighted
+    sum of the features below plus a capped Benford term; see
+    packages/core/detection/scoring.py) or "ml" (a trained model, identified
+    by `model`). `shap` is only present for "ml" scores.
     """
 
     wallet: str
     asset_pair: str
     score: int
+    method: Literal["heuristic", "ml"]
+    model: ModelInfo | None = None
     benford_flag: bool
     ml_flag: bool
     confidence: float
+    trade_count: int
     timestamp: datetime
     features: dict[str, float]
     benford: BenfordReport
@@ -37,20 +56,22 @@ class RiskScore(BaseModel):
 
     @classmethod
     def from_storage_result(cls, result: dict) -> "RiskScore":
-        """Build from the raw dict shape detection.model_inference.score_wallet
-        (via api.storage.compute_risk_score) returns."""
-        components = result["components"]
+        """Build from the dict detection.scoring.score_wallet returns (plus
+        the asset_pair/timestamp the storage layer adds)."""
         return cls(
             wallet=result["wallet"],
             asset_pair=result["asset_pair"],
             score=result["score"],
+            method=result["method"],
+            model=result["model"],
             benford_flag=result["benford_flag"],
             ml_flag=result["ml_flag"],
             confidence=result["confidence"],
+            trade_count=result["trade_count"],
             timestamp=result["timestamp"],
-            features=components["features"],
-            benford=components["benford"],
-            shap=components.get("shap"),
+            features=result["features"],
+            benford=result["benford"],
+            shap=result.get("shap"),
         )
 
 

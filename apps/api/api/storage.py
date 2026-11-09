@@ -6,9 +6,10 @@ including a synthetic wash-trading pattern — so the API endpoints have
 realistic data to serve.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
-from detection.model_inference import score_wallet
+from detection.scoring import score_wallet as _core_score_wallet
+from detection.scoring import trades_to_frame
 from ingestion.data_models import Asset, Trade
 
 # Risk score at or above this value generates an alert.
@@ -17,6 +18,11 @@ ALERT_THRESHOLD = 50
 XLM = Asset(code="XLM")
 USDC = Asset(code="USDC", issuer="GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN")
 YBX = Asset(code="YBX", issuer="GBYBXAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+
+
+def score_wallet(trades: list[Trade], wallet: str) -> dict:
+    """Score `wallet` with packages/core's engine over the given trades."""
+    return _core_score_wallet(trades_to_frame(trades), wallet)
 
 
 def _trade(trade_id, base_account, counter_account, when, base_asset, counter_asset, amount, price, base_is_seller=False):
@@ -34,7 +40,7 @@ def _trade(trade_id, base_account, counter_account, when, base_asset, counter_as
     )
 
 
-_T0 = datetime(2026, 6, 1, 0, 0, 0)
+_T0 = datetime(2026, 6, 1, 0, 0, 0, tzinfo=timezone.utc)
 
 # Synthetic wash-trading cluster: two wallets repeatedly trade fixed-size
 # round-number lots back and forth on the XLM/USDC pair.
@@ -66,7 +72,7 @@ ALL_TRADES: list[Trade] = _WASH_TRADES + _CLEAN_TRADES + _MINOR_WASH_TRADES
 
 
 def _pair_id(trade: Trade) -> str:
-    return trade.pair.identifier
+    return trade.asset_pair
 
 
 def trades_for_pair(pair_id: str) -> list[Trade]:
@@ -117,9 +123,9 @@ def recent_alerts(limit: int = 20) -> list[dict]:
         reasons = []
         if s["benford_flag"]:
             reasons.append("non-conforming digit distribution")
-        if s["components"]["features"]["round_trip_trade_frequency"] > 0:
+        if s["features"]["round_trip_trade_frequency"] > 0:
             reasons.append("round-trip trading detected")
-        if s["components"]["features"]["counterparty_concentration_ratio"] > 0.8:
+        if s["features"]["counterparty_concentration_ratio"] > 0.8:
             reasons.append("high counterparty concentration")
         reason = "; ".join(reasons) or "elevated risk score"
         alerts.append(
