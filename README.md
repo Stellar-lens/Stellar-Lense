@@ -19,29 +19,32 @@ What works today, and what doesn't. Nothing in this table is aspirational.
 
 | Component | Status | Notes |
 |---|---|---|
-| Benford + heuristic scoring engine (`packages/core`) | ✅ working | Tested (`make test-py`). Weights and thresholds are fixed and documented in `detection/scoring.py`. |
-| Horizon trade loader (`packages/core/ingestion`) | ✅ working | Pages Horizon `/trades` for a pair. Not yet run on a schedule or wired to the API. |
-| REST API (`apps/api`) | 🟡 demo data | Serves scores from 12 hard-coded synthetic trades. Every score says how it was made (`method: heuristic` or `ml`). |
-| Dashboard (`apps/web`) | 🟡 demo data | Shows the API's demo scores. Price / 24h / volume columns are placeholders. |
-| Optional ML model | 🟡 synthetic only | `packages/core/scripts/train_model.py` trains a random forest on synthetic data. It is off unless you build it, and labelled as synthetic when on. |
+| Horizon ingestion (`packages/core/pipeline`) | ✅ working | Pulls recent trades and 24h market data for 14 liquid mainnet SDEX pairs into SQLite. Read-only. |
+| Benford + heuristic scoring (`packages/core`) | ✅ working | Scores every wallet with ≥ 5 trades in the last 24h. Weights are fixed and documented below. |
+| REST API (`apps/api`) | ✅ live data | Serves the latest scoring run, its history and market data. Every response says how the score was made. Synthetic demo data only with `DEMO_MODE=1`. |
+| Dashboard (`apps/web`) | ✅ live data | Risk ranking with real price / 24h change / volume, per-pair drill-down, alerts, "data as of" label; a banner in demo mode. |
+| Evaluation | 🟡 not yet meaningful | A reproducible script and report exist, but public on-chain data yielded only 28 labelled wallets (1 positive), so the precision/recall it reports say nothing yet. See [the report](packages/core/evaluation/REPORT.md). |
+| Optional ML model | 🟡 synthetic only | `packages/core/scripts/train_model.py` trains a random forest on synthetic data. Off by default; labelled as synthetic when on. |
 | Soroban risk-score contract (`contracts/soroban`) | 🟡 builds and tests | Not deployed; nothing writes to it yet. |
-| Evaluation on labelled real-world cases | ⬜ not built | No precision/recall numbers exist yet. |
+| Validation against confirmed wash-trading cases | ⬜ not built | No confirmed real-world labels exist yet. |
 
 ## How it fits together
 
 ```mermaid
 flowchart LR
-    H[Stellar Horizon /trades] --> L[core: historical_loader]
-    L --> S[core: scoring.score_wallet<br/>Benford + heuristics]
-    S --> A[apps/api<br/>FastAPI]
+    H[Stellar Horizon<br/>/trades, /trade_aggregations] --> P[pipeline: ingest]
+    P --> D[(SQLite)]
+    D --> S[pipeline: score<br/>Benford + heuristics]
+    S --> D
+    D --> A[apps/api<br/>FastAPI]
     A --> W[apps/web<br/>Next.js dashboard]
     S -.planned.-> C[contracts/soroban<br/>risk-score registry]
 ```
 
 | Directory | What it is |
 |---|---|
-| [`packages/core`](packages/core) | Python detection engine: Horizon loader, Benford statistics, features, `score_wallet`. |
-| [`apps/api`](apps/api) | FastAPI service: `/score/{wallet}/{pair}`, `/assets/risk-ranking`, `/assets/{pair}/scores`, `/assets/{pair}/score-history`, `/alerts/recent`. |
+| [`packages/core`](packages/core) | Python detection engine (Horizon loader, Benford statistics, features, `score_wallet`) and the `pipeline` that ingests and scores on a schedule. |
+| [`apps/api`](apps/api) | FastAPI service: `/meta`, `/market`, `/score/{wallet}/{pair}`, `/assets/risk-ranking`, `/assets/{pair}/scores`, `/assets/{pair}/score-history`, `/alerts/recent`. |
 | [`apps/web`](apps/web) | Next.js dashboard: risk ranking, per-pair drill-down, alerts, news feed. |
 | [`contracts/soroban`](contracts/soroban) | Rust/Soroban risk-score registry contract. |
 | [`docs`](docs) | Design system and project plan. |
@@ -60,17 +63,33 @@ For one wallet on one asset pair, over that wallet's trades:
 | Benford MAD | up to 15 | Deviation of first digits from Benford's Law; only used with ≥ 30 trades. |
 
 The score is the weighted sum, clamped to 0–100. These weights are hand-set,
-not learned, and have not yet been validated against confirmed real-world
-wash-trading cases.
+not learned, and have not been validated against confirmed real-world
+wash-trading cases (the evaluation report explains why that hasn't been
+possible yet).
+Self-matching is always zero on the SDEX, where the protocol won't let an
+account fill its own offer (0 of 81,268 trades in a 24h sample), so the
+highest score reachable on SDEX data is 80.
 
 ## Quick start
 
-Requires [uv](https://docs.astral.sh/uv/), Node 22 and pnpm 9.
+Requires Docker. The first scoring run takes a few minutes (the busiest
+pairs have tens of thousands of trades a day); the dashboard comes up when
+it completes.
 
 ```bash
-pnpm install && uv sync --all-packages
-(cd apps/api && uv run uvicorn api.main:app --port 8000) &
-pnpm --filter @stellar-lense/web dev   # http://localhost:3000
+git clone https://github.com/Stellar-lens/Stellar-Lense.git && cd Stellar-Lense
+docker compose up --build
+open http://localhost:3000   # API at http://localhost:8000/docs
+```
+
+`DEMO_MODE=1 docker compose up` serves hard-coded synthetic data instead.
+To run the pieces without Docker:
+
+```bash
+uv sync --all-packages && pnpm install
+(cd packages/core && DB_PATH=../../data/stellar_lense.db uv run python -m pipeline run)
+(cd apps/api && DB_PATH=../../data/stellar_lense.db uv run uvicorn api.main:app) &
+pnpm --filter @stellar-lense/web dev
 ```
 
 ## Development
