@@ -29,14 +29,6 @@ lint-py:
 	# heritage and the same failure mode (verified: pinning collapses its
 	# 42 latest-ruff findings, all in the same rule families, down to the
 	# 1 real one) - pinned to match packages/core rather than left floating.
-	#
-	# data/pipelines is excluded here for the same reason test-py excludes
-	# it above: standalone project, not a workspace member, own Makefile/CI
-	# - see data/pipelines/README.md. Unlike the version-drift findings
-	# above, its lint debt (159 findings even at its own lockfile-pinned
-	# ruff==0.16.1, including genuine bugs like an undefined `logger` in
-	# detection/forensic_report.py) is real and pre-existing; fixing it is
-	# out of scope for this monorepo-consolidation pass.
 	cd packages/core && uvx ruff@0.4.10 check .
 	cd apps/api && uvx ruff@0.4.10 check .
 
@@ -50,9 +42,7 @@ test-py:
 	# Scoped per uv workspace member ([tool.uv.workspace] in /pyproject.toml:
 	# packages/core, apps/api) rather than a bare `uv run pytest`, which at
 	# the workspace root collects every tests/ dir it can find on disk -
-	# including data/pipelines (not a workspace member; standalone venv,
-	# out of scope here - see data/pipelines/README.md) and nested SDK
-	# packages under packages/core/packages/ - producing import collisions
+	# including nested packages that aren't workspace members - producing import collisions
 	# and ModuleNotFoundErrors unrelated to actual test failures.
 	#
 	# _TYPER_FORCE_DISABLE_TERMINAL=1 and COLUMNS are pinned: some CLI tests

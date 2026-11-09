@@ -46,7 +46,6 @@ A quick map of the top-level directories so you can navigate the codebase before
 | `packages/sdk-py/` | Python (`stellar-lense-sdk`) | Python client SDK |
 | `packages/ui/` | TypeScript | Shared design system / component library for `apps/web` |
 | `contracts/soroban/` | Rust (Soroban) | On-chain risk-score registry smart contract (`stellar-lense-score`) |
-| `data/pipelines/` | Python | Raw + processed trade data, labelled training sets |
 | `infra/helm/` | YAML (Helm) | Kubernetes deployment charts |
 | `infra/monitoring/` | YAML / JSON | Prometheus alert rules and Grafana dashboards |
 | `infra/ci/` | Docs | Notes on the CI workflow (the actual workflow GitHub Actions reads lives at `/.github/workflows`) |
