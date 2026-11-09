@@ -14,3 +14,6 @@ __pycache__/
 drift_reports/
 model_cards/
 
+
+# Local deploy/publisher keys (testnet). Never commit.
+.secrets/
