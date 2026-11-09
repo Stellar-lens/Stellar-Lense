@@ -54,9 +54,8 @@ Risk Score (0-100)**, derived from:
   with `benford_flag`, `ml_flag`, and a confidence value
 
 This repository implements the API, ingestion, and detection layers of
-Stellar Lense. The on-chain registry contract is mirrored here in `contracts/`
-and developed in full in
-[Stellar Lense-contract](https://github.com/Stellar-lens/Stellar-Lense).
+Stellar Lense. The on-chain registry contract lives in
+[`contracts/soroban`](../../contracts/soroban) at the repository root.
 
 ## Features
 
@@ -134,7 +133,6 @@ graph TB
 - **api/main.py**: FastAPI application
 - **api/storage.py**: Demo data store and score aggregation
 - **api/routes/**: `scores`, `alerts`, and `assets` route handlers
-- **contracts/stellar-lense-score**: Soroban on-chain risk-score registry
 - **run_pipeline.py**: Batch scoring CLI entry point
 
 ## API Endpoints
@@ -204,12 +202,11 @@ with SHAP values providing interpretable explanations for each risk score.
 
 ## On-Chain Registry
 
-`contracts/stellar-lense-score` is a Soroban contract that stores the latest
+[`contracts/soroban`](../../contracts/soroban) holds a Soroban contract that stores the latest
 risk score per `(wallet, asset_pair)`. The authorised Stellar Lense service
 account writes scores via `submit_score`; any other contract can read them
 via `get_score`, enabling composable on-chain risk gating for AMMs, lending
-protocols, and DEX aggregators. The full standalone contract project lives
-in [Stellar Lense-contract](https://github.com/Stellar-lens/Stellar-Lense).
+protocols, and DEX aggregators.
 
 ## Testing
 
@@ -302,12 +299,6 @@ python3 run_pipeline.py XLM "USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5
 │       ├── scores.py              ← GET /score/{wallet}/{pair}
 │       ├── alerts.py              ← GET /alerts/recent
 │       └── assets.py              ← GET /assets/risk-ranking
-│
-├── contracts/
-│   ├── stellar-lense-score/          ← Soroban smart contract (Rust)
-│   │   ├── src/lib.rs
-│   │   └── Cargo.toml
-│   └── deploy.sh                  ← Testnet deployment script
 │
 └── tests/
     ├── test_benford.py
