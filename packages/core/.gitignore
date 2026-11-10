@@ -16,6 +16,10 @@ node_modules/
 
 # Data & models (large/binary artifacts, not checked into core)
 data/
+# ...except the small labelled evaluation set, which evaluate.py and
+# tests/test_evaluation.py read and which must be committed to reproduce
+# evaluation/REPORT.md.
+!/evaluation/data/
 models/*.pkl
 models/*.joblib
 models/optuna_studies/

@@ -5,7 +5,7 @@ these numbers exactly from the committed data.
 
 ## Bottom line
 
-**This evaluation is not yet meaningful.** Only 1 positive and 27 negative wallets could be labelled from public data, so precision and recall below are reported for completeness but say essentially nothing about the scorer (look at the interval widths). Most sampled wallets are long-running bots whose account creation predates public Horizon's retained history and whose payment histories are too long to scan. The finding is that this labelling approach doesn't yield enough cases; a better source of ground truth is needed, not a better threshold.
+**This evaluation is not yet meaningful.** Only 1 positive and 32 negative wallets could be labelled from public data, so precision and recall below are reported for completeness but say essentially nothing about the scorer (look at the interval widths). Most sampled wallets are long-running bots whose account creation predates public Horizon's retained history and whose payment histories are too long to scan. The finding is that this labelling approach doesn't yield enough cases; a better source of ground truth is needed, not a better threshold.
 
 ## Read this first
 
@@ -15,7 +15,7 @@ these numbers exactly from the committed data.
   (Horizon history). See `build_dataset.py` for the exact rule. An exchange funding many unrelated
   users can create false positives; a wash trader using unrelated funding
   sources is labelled negative.
-* **The sample is small** (28 labelled wallets, 1 positive),
+* **The sample is small** (33 labelled wallets, 1 positive),
   so the 95% intervals below are wide. Treat the point estimates as rough.
 * **The sample is not random.** Every wallet scoring 40 or more was
   included, plus a random sample of the rest, so precision/recall here do
@@ -25,21 +25,21 @@ these numbers exactly from the committed data.
 
 ## Data
 
-built 2026-11-09T22:18:08.477783+00:00 from score run 2 (window 2026-11-08 21:56:56.742884+00:00 .. 2026-11-09 21:56:56.742884+00:00), 150 wallets, 22601 trades, seed 7
+built 2026-11-10T10:25:14.528374+00:00 from score run 1 (window 2026-11-09 10:08:13.491696+00:00 .. 2026-11-10 10:08:13.491696+00:00), 150 wallets, 40208 trades, seed 7
 
 | | Wallets |
 |---|---|
 | Labelled positive (funding or payment link) | 1 |
-| Labelled negative (no link, check complete) | 27 |
-| Unknown, excluded (no link found but the check was incomplete) | 122 |
+| Labelled negative (no link, check complete) | 32 |
+| Unknown, excluded (no link found but the check was incomplete) | 117 |
 
-Label reasons: no link found, check incomplete: 122, no link (creators known): 26, no link (full payment histories scanned): 1, same creator: 1.
+Label reasons: no link found, check incomplete: 114, no link (creators known): 32, no wallet counterparty (pool trades only): 3, same creator: 1.
 
 ## Results
 
-Ranking quality (AUC, positive vs negative): **0.52**
-(0.5 = no better than chance). Mean score: positives 34.00,
-negatives 33.70.
+Ranking quality (AUC, positive vs negative): **0.73**
+(0.5 = no better than chance). Mean score: positives 43.00,
+negatives 34.72.
 
 Precision and recall when flagging wallets at or above each score
 threshold (95% Wilson intervals). The API's alert threshold is
@@ -47,14 +47,14 @@ threshold (95% Wilson intervals). The API's alert threshold is
 
 | Threshold | TP | FP | FN | TN | Precision | Recall |
 |---|---|---|---|---|---|---|
-| 30 | 1 | 19 | 0 | 8 | 0.05 [0.01, 0.24] | 1.00 [0.21, 1.00] |
-| 40 | 0 | 9 | 1 | 18 | 0.00 [0.00, 0.30] | 0.00 [0.00, 0.79] |
-| 50 | 0 | 1 | 1 | 26 | 0.00 [0.00, 0.79] | 0.00 [0.00, 0.79] |
-| 60 | 0 | 0 | 1 | 27 | n/a | 0.00 [0.00, 0.79] |
-| 70 | 0 | 0 | 1 | 27 | n/a | 0.00 [0.00, 0.79] |
+| 30 | 1 | 22 | 0 | 10 | 0.04 [0.01, 0.21] | 1.00 [0.21, 1.00] |
+| 40 | 1 | 12 | 0 | 20 | 0.08 [0.01, 0.33] | 1.00 [0.21, 1.00] |
+| 50 | 0 | 2 | 1 | 30 | 0.00 [0.00, 0.66] | 0.00 [0.00, 0.79] |
+| 60 | 0 | 0 | 1 | 32 | n/a | 0.00 [0.00, 0.79] |
+| 70 | 0 | 0 | 1 | 32 | n/a | 0.00 [0.00, 0.79] |
 
-At the alert threshold, the scorer flagged 1 of
-28 labelled wallets, with precision 0.00 [0.00, 0.79]
+At the alert threshold, the scorer flagged 2 of
+33 labelled wallets, with precision 0.00 [0.00, 0.66]
 and recall 0.00 [0.00, 0.79] against the proxy labels.
 
 ## What this does and doesn't show

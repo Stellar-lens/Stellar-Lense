@@ -23,7 +23,7 @@ What works today, and what doesn't. Nothing in this table is aspirational.
 | Benford + heuristic scoring (`packages/core`) | ✅ working | Scores every wallet with ≥ 5 trades in the last 24h. Weights are fixed and documented below. |
 | REST API (`apps/api`) | ✅ live data | Serves the latest scoring run, its history and market data. Every response says how the score was made. Synthetic demo data only with `DEMO_MODE=1`. |
 | Dashboard (`apps/web`) | ✅ live data | Risk ranking with real price / 24h change / volume, per-pair drill-down, alerts, "data as of" label; a banner in demo mode. |
-| Evaluation | 🟡 not yet meaningful | A reproducible script and report exist, but public on-chain data yielded only 28 labelled wallets (1 positive), so the precision/recall it reports say nothing yet. See [the report](packages/core/evaluation/REPORT.md). |
+| Evaluation | 🟡 not yet meaningful | A reproducible script and report exist, but public on-chain data yielded only 33 labelled wallets (1 positive), so the precision/recall it reports say nothing yet. See [the report](packages/core/evaluation/REPORT.md). |
 | Optional ML model | 🟡 synthetic only | `packages/core/scripts/train_model.py` trains a random forest on synthetic data. Off by default; labelled as synthetic when on. |
 | Soroban risk-score contract (`contracts/soroban`) | 🟡 builds and tests | Not deployed; nothing writes to it yet. |
 | Validation against confirmed wash-trading cases | ⬜ not built | No confirmed real-world labels exist yet. |
