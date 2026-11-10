@@ -1,33 +1,21 @@
 # infra/ci
 
 GitHub Actions only reads workflows from `.github/workflows/` at the repo
-root — it can't be pointed at `infra/ci/`, so the actual workflow lives at
-[`/.github/workflows/ci.yml`](../../.github/workflows/ci.yml), not here.
-This file just documents the CI setup and its history.
+root, so the workflows live there; this file documents them.
 
-Runs `make lint-all` and `make test-all` (see `/Makefile`) on every pull
-request into `main` — the single required check for branch protection.
+| Workflow | Trigger | What it runs |
+|---|---|---|
+| [`ci.yml`](../../.github/workflows/ci.yml) | every pull request into `main` | `make lint-all` and `make test-all` (JS, Python, Rust); the required check for branch protection |
 
-## What replaced
+`make lint-all` / `make test-all` are the same commands a contributor runs
+locally, so "CI is green" and "it works on my machine" mean the same thing.
+See the comments on each target in [`/Makefile`](../../Makefile) for the
+non-obvious details (pinned ruff version, per-package pytest scoping, Typer
+terminal-detection workaround).
 
-Each of the 5 source repos this monorepo was assembled from still has its
-own `.github/workflows/` from before the migration (`data/pipelines/`,
-`packages/core/`, `contracts/soroban/`, one org-wide `.github` repo whose
-content was intentionally skipped per
-`docs/stellar-lens-project-plan.md` §2 — "skip `.github`'s content, fold
-its CI patterns in"). None of those nested `.github/workflows/` directories
-do anything now — GitHub Actions doesn't look inside subdirectories for
-workflows — they're inert leftovers from the `git subtree` migration, not
-active CI. `.github/workflows/ci.yml` is what replaced them for the
-lint/test check; those nested files haven't been individually reviewed for
-other patterns worth porting (lock-file freshness checks, deploy smoke
-tests, etc.) - that's a separate follow-up, not done here.
+## History
 
-## Known issues as of the last CI audit
-
-See the CI-readiness report for the full breakdown (pass/fail per
-ecosystem, and what's blocking branch protection). Two Makefile bugs were
-fixed as part of getting this workflow to actually run at all:
-`lint-py`/`test-py` previously used bare `uv run ruff`/`uv run pytest` at
-the workspace root, which either failed outright or silently collected the
-wrong tests - see the comments on those targets in `/Makefile`.
+This repository was assembled from several source repos with `git subtree`.
+Each brought its own `.github/workflows/`, which GitHub never ran from a
+subdirectory. Those inert copies were removed in the consolidation pass;
+they remain on the `archive/pre-consolidation` branch.

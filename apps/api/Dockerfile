@@ -27,17 +27,15 @@ ENV UV_COMPILE_BYTECODE=1 \
 # invalidates when a pyproject.toml/uv.lock actually changes, not on every
 # apps/api source edit.
 COPY pyproject.toml uv.lock ./
-# packages/core is a workspace member the lockfile resolves against; uv
-# needs its pyproject.toml present to validate the workspace even though
-# stellar-lense-api doesn't depend on it at runtime. Its actual source is
-# excluded via .dockerignore.
-COPY packages/core/pyproject.toml packages/core/pyproject.toml
+# apps/api imports packages/core (the detection engine) at runtime, so the
+# image needs core's source as well as its pyproject.toml.
+COPY packages/core packages/core
 COPY apps/api apps/api
 
-# --package scopes the sync to apps/api's own dependency set (fastapi,
-# scikit-learn, etc.) rather than the whole workspace's (which would also
-# pull in packages/core's — much heavier — dependency set).
-RUN uv sync --frozen --no-dev --package stellar-lense-api --project apps/api
+# --package scopes the sync to apps/api's dependency set (which includes
+# stellar-lense-core); --extra ml adds scikit-learn/shap so a model bundle,
+# if mounted, can be used.
+RUN uv sync --frozen --no-dev --package stellar-lense-api --extra ml
 
 ENV PATH="/workspace/.venv/bin:${PATH}"
 WORKDIR /workspace/apps/api

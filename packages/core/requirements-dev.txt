@@ -1,3 +1,0 @@
-# Development dependencies for contract testing (not required for production).
-pact-python==2.2.0
-uvicorn==0.29.0

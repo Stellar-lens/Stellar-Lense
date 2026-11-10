@@ -5,8 +5,6 @@ from hypothesis import given, strategies as st
 from detection.feature_engineering import (
     _round_trip_count_jit,
     _round_trip_count_python,
-    _burst_overlap_count_jit,
-    _burst_overlap_count_python,
     round_trip_trade_frequency,
 )
 from config.settings import settings
@@ -29,37 +27,12 @@ def test_round_trip_jit_matches_python(legs, max_trades):
     assert jit_result == python_result
 
 
-@given(
-    times_a=st.lists(st.integers(0, 10**6), max_size=100),
-    times_b=st.lists(st.integers(0, 10**6), max_size=100),
-    window_us=st.integers(1, 10**5),
-)
-def test_burst_overlap_jit_matches_python(times_a, times_b, window_us):
-    a = np.array(times_a, dtype=np.int64)
-    b_sorted = np.sort(np.array(times_b, dtype=np.int64))
-
-    jit_result = _burst_overlap_count_jit(a, b_sorted, window_us)
-    python_result = _burst_overlap_count_python(a, b_sorted, window_us)
-
-    assert jit_result == python_result
 
 
-def test_burst_overlap_empty_arrays():
-    empty = np.array([], dtype=np.int64)
-    assert _burst_overlap_count_jit(empty, empty, 1000) == 0
-    assert _burst_overlap_count_python(empty, empty, 1000) == 0
 
 
-def test_burst_overlap_no_overlap():
-    a = np.array([0, 1], dtype=np.int64)
-    b = np.array([10**6, 10**6 + 1], dtype=np.int64)
-    assert _burst_overlap_count_jit(a, b, 10) == 0
 
 
-def test_burst_overlap_all_overlapping():
-    a = np.array([100, 100, 100], dtype=np.int64)
-    b = np.array([100, 100, 100], dtype=np.int64)
-    assert _burst_overlap_count_jit(a, b, 10) == 3
 
 
 def test_jit_disabled_flag_forces_python_path(monkeypatch):

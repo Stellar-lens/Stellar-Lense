@@ -4,7 +4,6 @@ const LINKS = [
   { href: "/app", label: "Rankings" },
   { href: "/app/alerts", label: "Alerts" },
   { href: "/app/news", label: "News" },
-  { href: "/app/bot", label: "Bot" },
 ];
 
 export function AppNav() {

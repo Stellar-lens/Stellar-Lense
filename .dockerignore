@@ -22,19 +22,14 @@ __pycache__/
 .mypy_cache/
 **/.mypy_cache/
 
-# packages/core is a uv workspace member apps/api's Docker build needs to
-# know *about* (its pyproject.toml, for workspace resolution) but does not
-# actually depend on or run — its full source (~600MB+, including data/
-# models/notebooks) would otherwise bloat the build context for no reason.
-packages/core/**
-!packages/core/pyproject.toml
+# packages/core is copied in (apps/api imports it); only its tests are excluded.
+packages/core/tests/
 
 # Not needed to build/run apps/api.
 apps/web/
-apps/bot/
-data/
 contracts/
 docs/
 *.md
+!packages/core/README.md
 
 .DS_Store

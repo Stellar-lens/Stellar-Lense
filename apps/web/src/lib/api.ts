@@ -8,24 +8,36 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 export type BenfordReport = {
   sample_size: number;
   chi_square: number;
+  chi_square_pvalue: number;
   mad: number;
   /** Leading digit (1-9, as string keys once JSON round-trips) -> z-score. */
   z_scores: Record<string, number>;
+  /** False when there were too few trades for a first-digit test to mean anything. */
+  sufficient_sample: boolean;
   non_conforming: boolean;
+};
+
+export type ModelInfo = {
+  model_id: string;
+  trained_on: string;
 };
 
 export type RiskScore = {
   wallet: string;
   asset_pair: string;
   score: number;
+  /** How the score was produced: fixed heuristic weights, or a trained model. */
+  method: "heuristic" | "ml";
+  /** Which model, and what it was trained on; null for heuristic scores. */
+  model: ModelInfo | null;
   benford_flag: boolean;
   ml_flag: boolean;
   confidence: number;
+  trade_count: number;
   timestamp: string;
   features: Record<string, number>;
   benford: BenfordReport;
-  /** Present only when the ML ensemble artifact is loaded; null on the
-   * heuristic fallback path. See detection/model_inference.py. */
+  /** SHAP attributions; present only for method === "ml". */
   shap: Record<string, number> | null;
 };
 

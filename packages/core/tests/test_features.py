@@ -1,4 +1,3 @@
-import pytest
 import pandas as pd
 
 from detection.feature_engineering import (
@@ -8,7 +7,6 @@ from detection.feature_engineering import (
     build_feature_vector,
     counterparty_concentration_ratio,
     funding_source_similarity_score,
-    graph_ring_features,
     intra_minute_clustering_coefficient,
     network_centrality,
     off_hours_activity_ratio,
@@ -251,139 +249,29 @@ def test_build_feature_vector_returns_all_feature_names():
     features = build_feature_vector(trades, "A", as_of)
 
     assert set(features.keys()) == set(FEATURE_NAMES)
-    assert "wash_ring_membership" in features
-    assert "wash_ring_size" in features
-    assert "cycle_volume_ratio" in features
-    assert "timing_tightness_score" in features
 
 
-def test_graph_ring_features_zero_for_non_member():
-    assert graph_ring_features("D", {}) == {
-        "wash_ring_membership": 0.0,
-        "wash_ring_size": 0.0,
-        "cycle_volume_ratio": 0.0,
-        "timing_tightness_score": 0.0,
-    }
-
-
-def test_graph_ring_features_for_ring_member():
-    from detection.graph_engine import build_ring_membership_index, build_transaction_graph, find_wash_rings
-
-    base = pd.Timestamp("2026-06-12T00:00:00Z")
+def test_round_trip_uses_base_is_seller_for_same_side_wash():
+    """A wallet that is always the base party but alternately sells and buys
+    the base asset is round-tripping; direction comes from base_is_seller."""
+    now = pd.Timestamp("2026-06-12T00:00:00Z")
+    xlm = {"code": "XLM", "issuer": None}
+    usdc = {"code": "USDC", "issuer": "GISSUER"}
     trades = pd.DataFrame(
         [
-            {"ledger_close_time": base, "base_account": "A", "counter_account": "B", "base_amount": 100.0},
-                {"ledger_close_time": base + pd.Timedelta(seconds=1), "base_account": "B", "counter_account": "C", "base_amount": 100.0},
-                {"ledger_close_time": base + pd.Timedelta(seconds=2), "base_account": "C", "counter_account": "A", "base_amount": 100.0},
-
+            {
+                "ledger_close_time": now + pd.Timedelta(seconds=20 * i),
+                "base_account": "A",
+                "counter_account": "B",
+                "base_amount": 100.0,
+                "base_asset": xlm,
+                "counter_asset": usdc,
+                "base_is_seller": i % 2 == 0,
+            }
+            for i in range(4)
         ]
     )
-    graph = build_transaction_graph(trades)
-    rings = find_wash_rings(graph)
-    membership = build_ring_membership_index(rings, trades=trades)
+    assert round_trip_trade_frequency(trades, "A") == 0.75
 
-    features = graph_ring_features("A", membership)
-
-    assert features["wash_ring_membership"] == 1.0
-    assert features["wash_ring_size"] == 3.0
-    assert features["cycle_volume_ratio"] == 1.0
-    assert features["timing_tightness_score"] == 1.0
-
-
-# ---------------------------------------------------------------------------
-# Cross-pair feature tests
-# ---------------------------------------------------------------------------
-
-
-def _make_pair_trades(
-    times: list[pd.Timestamp],
-    amounts: list[float],
-    wallet: str = "W1",
-    counter: str = "W2",
-) -> pd.DataFrame:
-    return pd.DataFrame(
-        {
-            "ledger_close_time": times,
-            "base_account": wallet,
-            "counter_account": counter,
-            "base_amount": amounts,
-            "base_asset": [{"code": "XLM", "issuer": None}] * len(times),
-            "counter_asset": [{"code": "USDC", "issuer": "GISSUER"}] * len(times),
-        }
-    )
-
-
-def test_cross_pair_features_zero_when_no_cross_pair_data():
-    from detection.feature_engineering import cross_pair_features, CROSS_PAIR_FEATURE_NAMES
-
-    result = cross_pair_features("W1", None, None, None)
-    assert set(result.keys()) == set(CROSS_PAIR_FEATURE_NAMES)
-    assert all(v == 0.0 for v in result.values())
-
-
-def test_cross_pair_activity_count_for_burst_wallet():
-    from detection.feature_engineering import cross_pair_features
-
-    base = pd.Timestamp("2026-06-12T00:00:00Z")
-    t = base
-
-    df_a = _make_pair_trades([t], [100.0], "W1", "W2")
-    df_b = _make_pair_trades([t + pd.Timedelta(minutes=3)], [80.0], "W1", "W3")
-
-    trades_by_pair = {"XLM/USDC": df_a, "XLM/AQUA": df_b}
-    correlated = [("XLM/USDC", "XLM/AQUA", 0.9)]
-    cross_wallets = {"W1": ["XLM/USDC", "XLM/AQUA"]}
-
-    result = cross_pair_features("W1", trades_by_pair, correlated, cross_wallets)
-
-    assert result["cross_pair_activity_count"] == 2.0
-    assert result["cross_pair_synchrony_score"] == pytest.approx(0.9)
-
-
-def test_non_burst_wallet_has_zero_cross_pair_features():
-    from detection.feature_engineering import cross_pair_features
-
-    base = pd.Timestamp("2026-06-12T00:00:00Z")
-    t = base
-
-    df_a = _make_pair_trades([t], [100.0], "W1", "W2")
-    df_b = _make_pair_trades([t + pd.Timedelta(minutes=3)], [80.0], "W1", "W3")
-
-    trades_by_pair = {"XLM/USDC": df_a, "XLM/AQUA": df_b}
-    correlated = [("XLM/USDC", "XLM/AQUA", 0.9)]
-    cross_wallets = {"W1": ["XLM/USDC", "XLM/AQUA"]}
-
-    # W9 is not in any burst window
-    result = cross_pair_features("W9", trades_by_pair, correlated, cross_wallets)
-    assert result["cross_pair_activity_count"] == 0.0
-    assert result["cross_pair_synchrony_score"] == 0.0
-    assert result["cross_pair_burst_overlap_ratio"] == 0.0
-    assert result["shared_wallet_cluster_size"] == 0.0
-    assert result["cross_pair_volume_concentration"] == 0.0
-
-
-def test_build_feature_vector_with_cross_pair_data():
-    from detection.feature_engineering import FEATURE_NAMES, CROSS_PAIR_FEATURE_NAMES
-
-    base = pd.Timestamp("2026-06-12T00:00:00Z")
-    t = base
-
-    df_a = _make_pair_trades([t - pd.Timedelta(minutes=1)], [100.0], "W1", "W2")
-    df_b = _make_pair_trades([t + pd.Timedelta(minutes=3)], [80.0], "W1", "W3")
-
-    trades_by_pair = {"XLM/USDC": df_a, "XLM/AQUA": df_b}
-    correlated = [("XLM/USDC", "XLM/AQUA", 0.9)]
-    cross_wallets = {"W1": ["XLM/USDC", "XLM/AQUA"]}
-
-    features = build_feature_vector(
-        df_a,
-        "W1",
-        base,
-        trades_by_pair=trades_by_pair,
-        correlated_pairs=correlated,
-        cross_pair_wallets=cross_wallets,
-    )
-
-    assert set(features.keys()) == set(FEATURE_NAMES)
-    for name in CROSS_PAIR_FEATURE_NAMES:
-        assert name in features
+    one_way = trades.assign(base_is_seller=True)
+    assert round_trip_trade_frequency(one_way, "A") == 0.0
