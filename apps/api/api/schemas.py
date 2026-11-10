@@ -99,11 +99,55 @@ class AssetRiskRanking(BaseModel):
 class ScoreHistoryPoint(BaseModel):
     """One point in a pair's aggregate risk-score history.
 
-    Not a persisted time series — this demo API has no running pipeline
-    writing scores over time (see api.storage.pair_score_history) — but a
-    genuine derivation from the same seeded trade data, recomputed at each
-    distinct trade timestamp for the pair, not fabricated values."""
+    Live mode: one point per completed scoring run (timestamp = the run's
+    window end). Demo mode: recomputed at each distinct seeded trade time."""
 
     timestamp: datetime
     average_score: float
     max_score: int
+
+
+class ScoringInfo(BaseModel):
+    """How the scores currently served were produced."""
+
+    method: Literal["heuristic", "ml"]
+    model: ModelInfo | None = None
+    min_trades: int
+    window_start: datetime | None = None
+    window_end: datetime | None = None
+
+
+class Meta(BaseModel):
+    """Provenance of the data behind every other endpoint.
+
+    `mode` is "live" (Stellar network data ingested by the pipeline) or
+    "demo" (hard-coded synthetic trades; `notice` explains). `data_as_of`
+    is the close time of the newest trade the current scores are based on.
+    """
+
+    mode: Literal["live", "demo"]
+    network: str | None
+    data_as_of: datetime | None
+    scored_at: datetime | None
+    last_ingest: datetime | None
+    pairs_tracked: int
+    scoring: ScoringInfo
+    notice: str | None = None
+
+
+class MarketData(BaseModel):
+    """24h market summary for a pair from Horizon trade aggregations.
+
+    `price` is in counter-asset units per base unit (null if no trades in
+    the window); `change_24h_pct` runs from the first hourly candle's open
+    to the latest close."""
+
+    asset_pair: str
+    price: float | None
+    change_24h_pct: float | None
+    base_volume_24h: float
+    counter_volume_24h: float
+    trade_count_24h: int
+    window_start: datetime
+    window_end: datetime
+    fetched_at: datetime

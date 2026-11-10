@@ -1,32 +1,31 @@
 """GET /score/{wallet}/{pair} — StellarLense Risk Score lookup."""
 
+import re
+
 from fastapi import APIRouter, HTTPException
 
-from api import storage
 from api.schemas import RiskScore
+from api.storage import backend
 
 router = APIRouter(prefix="/score", tags=["scores"])
+
+_STELLAR_ACCOUNT = re.compile(r"^G[A-Z2-7]{55}$")
 
 
 @router.get("/{wallet}/{pair:path}", response_model=RiskScore)
 def get_score(wallet: str, pair: str) -> RiskScore:
     """Return the current StellarLense Risk Score for `wallet` on `pair`.
 
-    `pair` is an asset pair identifier in `BASE/COUNTER` form, e.g.
-    `XLM/USDC:GISSUER...`.
+    `pair` is `BASE/COUNTER` with each asset `XLM` or `CODE:ISSUER`, e.g.
+    `XLM/USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN`.
     """
-    import re
-    if not re.match(r"^G[A-Z2-7]{55}$", wallet):
-        raise HTTPException(
-            status_code=400, detail="Invalid Stellar account ID format"
-        )
+    if not _STELLAR_ACCOUNT.match(wallet):
+        raise HTTPException(status_code=400, detail="Invalid Stellar account ID format")
 
-    if pair not in storage.known_pairs():
+    data = backend()
+    if pair not in data.known_pairs():
         raise HTTPException(status_code=404, detail=f"Unknown asset pair: {pair}")
-    if wallet not in storage.wallets_for_pair(pair):
-        raise HTTPException(
-            status_code=404, detail=f"No activity for wallet {wallet} on {pair}"
-        )
-
-    result = storage.compute_risk_score(wallet, pair)
+    result = data.wallet_score(wallet, pair)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"No score for wallet {wallet} on {pair}")
     return RiskScore.from_storage_result(result)

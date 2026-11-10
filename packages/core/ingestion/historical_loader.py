@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 
 import httpx
 import pandas as pd
+from pydantic import ValidationError
 
 from config.settings import settings
 from ingestion.trade_parser import parse_trade
@@ -40,10 +41,23 @@ def load_historical_trades(
     base_asset: str | None = None,
     counter_asset: str | None = None,
     lookback_days: int | None = None,
+    *,
+    since: datetime | None = None,
+    max_records: int | None = None,
+    horizon_url: str | None = None,
+    client: httpx.Client | None = None,
 ) -> pd.DataFrame:
-    """Fetch historical trades sequentially and return a DataFrame."""
+    """Fetch trades newest-first from Horizon `/trades` and return a DataFrame.
+
+    Paging stops at the first trade older than the lookback cutoff, at or
+    before `since` (for incremental loads: pass the newest trade time you
+    already have), or once `max_records` trades have been collected.
+    Assets are ``"XLM"`` or ``"CODE:ISSUER"``.
+    """
     lookback_days = lookback_days or settings.trade_history_lookback_days
     cutoff = datetime.now(timezone.utc) - timedelta(days=lookback_days)
+    if since is not None:
+        cutoff = max(cutoff, _utc(since))
     params: dict[str, str | int] = {"limit": PAGE_LIMIT, "order": "desc"}
     if base_asset:
         params.update(_asset_params("base", base_asset))
@@ -51,8 +65,10 @@ def load_historical_trades(
         params.update(_asset_params("counter", counter_asset))
 
     records: list[dict] = []
-    url = f"{settings.horizon_url}/trades"
-    with httpx.Client(timeout=30.0) as client:
+    url: str | None = f"{horizon_url or settings.horizon_url}/trades"
+    owns_client = client is None
+    client = client or httpx.Client(timeout=30.0)
+    try:
         while url:
             response = get_with_retry(client, url, params=params)
             payload = response.json()
@@ -63,11 +79,17 @@ def load_historical_trades(
                 close_time = datetime.fromisoformat(
                     record["ledger_close_time"].replace("Z", "+00:00")
                 )
-                if close_time < cutoff:
+                stale = close_time <= cutoff if since is not None else close_time < cutoff
+                if stale:
                     return _to_dataframe(records)
                 records.append(record)
+                if max_records is not None and len(records) >= max_records:
+                    return _to_dataframe(records)
             url = payload["_links"]["next"]["href"]
             params = {}
+    finally:
+        if owns_client:
+            client.close()
     return _to_dataframe(records)
 
 
@@ -84,7 +106,24 @@ def _asset_params(prefix: str, asset: str) -> dict[str, str]:
 
 
 def _to_dataframe(records: list[dict]) -> pd.DataFrame:
-    return pd.DataFrame([parse_trade(record).model_dump() for record in records])
+    """Parse records, skipping any `Trade` rejects.
+
+    Horizon does return trades the model can't represent, e.g. dust trades
+    whose amount rounds to "0.0000000". One such record must not discard
+    the rest of the page; skipped ids are logged and counted in
+    ``df.attrs["skipped"]``.
+    """
+    parsed, skipped = [], []
+    for record in records:
+        try:
+            parsed.append(parse_trade(record).model_dump())
+        except ValidationError:
+            skipped.append(record.get("id"))
+    if skipped:
+        logger.warning("skipped %d unparseable Horizon trade(s), e.g. %s", len(skipped), skipped[:3])
+    df = pd.DataFrame(parsed)
+    df.attrs["skipped"] = len(skipped)
+    return df
 
 
 async def async_load_historical_trades(

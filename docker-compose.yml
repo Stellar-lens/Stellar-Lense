@@ -1,0 +1,78 @@
+# Runs the whole product locally against real Stellar mainnet data:
+#
+#   pipeline: ingest recent trades for the pairs in
+#             packages/core/pipeline/pairs.mainnet.json from Horizon
+#             (read-only), then score wallets; repeats every REFRESH_SECONDS.
+#   api:      serves the stored scores and market data (waits for the
+#             pipeline's first completed scoring run).
+#   web:      the dashboard at http://localhost:3000.
+#
+#   docker compose up --build
+#
+# Set DEMO_MODE=1 to have the API serve hard-coded synthetic data instead.
+
+x-python-image: &python-image
+  build:
+    context: .
+    dockerfile: apps/api/Dockerfile
+  image: stellar-lense-python
+
+services:
+  pipeline:
+    <<: *python-image
+    working_dir: /workspace/packages/core
+    command: ["python", "-m", "pipeline", "run", "--every", "${REFRESH_SECONDS:-900}"]
+    environment:
+      DB_PATH: /data/stellar_lense.db
+      LOOKBACK_HOURS: ${LOOKBACK_HOURS:-24}
+      MAX_TRADES_PER_PAIR: ${MAX_TRADES_PER_PAIR:-20000}
+      SCORE_WINDOW_HOURS: ${SCORE_WINDOW_HOURS:-24}
+      MIN_TRADES: ${MIN_TRADES:-5}
+    volumes:
+      - data:/data
+    healthcheck:
+      # Healthy once the first ingest + score run has completed (a few
+      # minutes on first start: the busiest pairs have tens of thousands of
+      # trades per day).
+      test: ["CMD", "python", "-m", "pipeline", "healthcheck"]
+      interval: 15s
+      timeout: 10s
+      retries: 80
+    restart: unless-stopped
+
+  api:
+    <<: *python-image
+    environment:
+      DB_PATH: /data/stellar_lense.db
+      DEMO_MODE: ${DEMO_MODE:-0}
+      STELLAR_NETWORK: mainnet
+      CORS_ALLOWED_ORIGINS: http://localhost:3000
+    volumes:
+      - data:/data
+    ports:
+      - "8000:8000"
+    depends_on:
+      pipeline:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    environment:
+      API_URL: http://api:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  data:

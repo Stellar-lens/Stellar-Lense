@@ -1,9 +1,18 @@
+"""API behaviour in DEMO_MODE=1 (hard-coded synthetic trades)."""
+
+import pytest
 from fastapi.testclient import TestClient
 
-from api import storage
+from api import demo as storage
+from api.alerts import ALERT_THRESHOLD
 from api.main import app
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def _demo_mode(monkeypatch):
+    monkeypatch.setenv("DEMO_MODE", "1")
 
 
 def test_health():
@@ -64,7 +73,7 @@ def test_recent_alerts():
     body = response.json()
     assert isinstance(body, list)
     for alert in body:
-        assert alert["score"] >= storage.ALERT_THRESHOLD
+        assert alert["score"] >= ALERT_THRESHOLD
         assert "reason" in alert
 
 
@@ -121,3 +130,21 @@ def test_pair_score_history():
 def test_pair_score_history_unknown_pair_returns_404():
     response = client.get("/assets/NOT/A/REAL/PAIR/score-history")
     assert response.status_code == 404
+
+
+def test_meta_says_demo():
+    body = client.get("/meta").json()
+    assert body["mode"] == "demo"
+    assert "synthetic" in body["notice"]
+    assert body["scoring"]["method"] == "heuristic"
+
+
+def test_demo_has_no_market_data():
+    assert client.get("/market").json() == []
+
+
+def test_scores_are_labelled_heuristic():
+    pair = storage.known_pairs()[0]
+    for r in client.get(f"/assets/{pair}/scores").json():
+        assert r["method"] == "heuristic"
+        assert r["model"] is None
