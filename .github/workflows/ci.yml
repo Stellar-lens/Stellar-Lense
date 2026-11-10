@@ -8,6 +8,10 @@ name: CI
 on:
   pull_request:
     branches: [main]
+  # Also run on pushes to main, so the README's CI badge (which reports the
+  # default branch) shows main's real status instead of "no status".
+  push:
+    branches: [main]
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
