@@ -1,292 +1,159 @@
 #![no_std]
 
-//! Minimal mock AMM used to exercise StellarLense's composability primitives
-//! (`docs/interface-spec.md` §1.1–§1.2) from a genuinely separate, independently
-//! deployed contract.
+//! How a protocol uses the Stellar Lense registry.
 //!
-//! This is **not** a real AMM — there are no reserves, no pricing curve, no
-//! transfers. It exists solely to prove that `swap` / `provide_liquidity_gated`
-//! can call StellarLense gate functions and refuse risky wallets, mirroring the
-//! patterns in `examples/amm_gate.rs` and `examples/amm_gate_example.rs`.
+//! An AMM-shaped contract (no reserves, no pricing; it only decides whether
+//! a swap may proceed) that asks the registry's risk gate before letting a
+//! wallet trade a pair:
 //!
-//! The mock intentionally focuses on confidence-gated access control. Real
-//! integrations should layer their own max-age and pause-state checks on top
-//! of the StellarLense gate so a stale-but-safe score cannot bypass a high-value
-//! action during detection lag.
+//! ```text
+//! registry.check(trader, pair, max_score, max_age_secs)
+//!   Allow    -> swap proceeds
+//!   HighRisk -> refused
+//!   Stale    -> refused unless the AMM opted into fail-open
+//!   NoScore  -> refused unless the AMM opted into fail-open
+//! ```
+//!
+//! The registry is declared below as a one-function client trait, so this
+//! contract's Wasm contains none of the registry's code.
 
 use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttype, symbol_short, Address, Env, Symbol,
+    contract, contractclient, contracterror, contractimpl, contracttype, symbol_short, Address,
+    Env, String,
 };
-use stellar_lense_score::StellarLenseScoreContractClient;
 
+/// Mirror of `stellar_lense_registry::Decision` (same u32 discriminants).
 #[contracttype]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub enum FailPolicy {
-    FailClosed = 0,
-    FailOpen = 1,
+#[repr(u32)]
+pub enum Decision {
+    Allow = 0,
+    HighRisk = 1,
+    NoScore = 2,
+    Stale = 3,
+}
+
+#[contractclient(name = "RegistryClient")]
+pub trait Registry {
+    fn check(
+        env: Env,
+        wallet: Address,
+        pair: String,
+        max_score: u32,
+        max_age_secs: u64,
+    ) -> Decision;
 }
 
 #[contracterror]
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
-pub enum MockAmmError {
-    /// `initialize` / `set_risk_oracle` has not been called yet.
+pub enum Error {
     NotConfigured = 1,
-    /// StellarLense's gate returned `false` because the provider's risk score is
-    /// at or above the configured threshold, or no score exists (fail closed).
-    HighRiskWallet = 2,
-    /// Liquidity amount must be positive.
-    InvalidAmount = 3,
-    /// StellarLense's gate returned `false` because the score's confidence is
-    /// below the configured minimum.
-    LowConfidence = 4,
-    /// The configured oracle call trapped or could not be decoded.
-    OracleUnavailable = 5,
-    /// The stored score is older than the configured fixture freshness window.
+    AlreadyInitialized = 2,
+    NotAdmin = 3,
+    InvalidAmount = 4,
+    HighRiskWallet = 5,
     StaleScore = 6,
-    /// The configured oracle does not expose the required contract version.
-    UnsupportedVersion = 7,
-    /// Caller is not the configured fixture admin.
-    Unauthorized = 8,
+    NoScore = 7,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Config {
+    pub registry: Address,
+    /// Refuse wallets scoring at or above this (0-100).
+    pub max_score: u32,
+    /// Refuse scores older than this many seconds.
+    pub max_age_secs: u64,
+    /// Let wallets with no score, or a stale one, trade anyway.
+    pub fail_open: bool,
 }
 
 #[contracttype]
 enum DataKey {
     Admin,
-    /// Contract ID of the StellarLense score registry this AMM trusts.
-    StellarLense,
-    /// Risk-gate threshold (0-100) this AMM enforces.
-    GateThreshold,
-    /// Minimum confidence (0-100) required of the score backing a gate decision.
-    MinConfidence,
-    FailPolicy,
-    MaxStalenessSecs,
-    RequiredOracleVersion,
-    ExpandedRiskScore,
+    Config,
 }
 
 #[contract]
 pub struct MockAmm;
 
+fn config(env: &Env) -> Result<Config, Error> {
+    env.storage().instance().get(&DataKey::Config).ok_or(Error::NotConfigured)
+}
+
 #[contractimpl]
 impl MockAmm {
-    /// One-time wiring: record the StellarLense deployment, admin, version
-    /// expectation, bounded freshness window, and failure policy enforced by
-    /// this SDK conformance fixture.
-    pub fn initialize(env: Env, admin: Address, stellar_lense: Address, gate_threshold: u32) {
-        admin.require_auth();
-        env.storage().instance().set(&DataKey::Admin, &admin);
-        env.storage().instance().set(&DataKey::StellarLense, &stellar_lense);
-        env.storage().instance().set(&DataKey::GateThreshold, &gate_threshold);
-        env.storage().instance().set(&DataKey::MinConfidence, &0u32);
-        env.storage().instance().set(&DataKey::FailPolicy, &FailPolicy::FailClosed);
-        env.storage().instance().set(&DataKey::MaxStalenessSecs, &604_800u64);
-        env.storage().instance().set(&DataKey::RequiredOracleVersion, &0u32);
-        let expanded_score = Self::oracle_has_expanded_score(&env, &stellar_lense);
-        env.storage().instance().set(&DataKey::ExpandedRiskScore, &expanded_score);
-    }
-
-    /// Register or rotate the StellarLense oracle this AMM consults for gate checks.
-    pub fn set_risk_oracle(env: Env, admin: Address, oracle: Address) -> Result<(), MockAmmError> {
-        Self::require_admin(&env, &admin)?;
-        env.storage().instance().set(&DataKey::StellarLense, &oracle);
-        let expanded_score = Self::oracle_has_expanded_score(&env, &oracle);
-        env.storage().instance().set(&DataKey::ExpandedRiskScore, &expanded_score);
-        Ok(())
-    }
-
-    /// Configure the score and confidence floors enforced by
-    /// `provide_liquidity_gated`.
-    pub fn set_liquidity_gate_config(
+    pub fn initialize(
         env: Env,
         admin: Address,
-        gate_threshold: u32,
-        min_confidence: u32,
-        fail_policy: FailPolicy,
-        max_staleness_secs: u64,
-        required_oracle_version: u32,
-    ) -> Result<(), MockAmmError> {
-        Self::require_admin(&env, &admin)?;
-        env.storage().instance().set(&DataKey::GateThreshold, &gate_threshold);
-        env.storage().instance().set(&DataKey::MinConfidence, &min_confidence);
-        env.storage().instance().set(&DataKey::FailPolicy, &fail_policy);
-        env.storage().instance().set(&DataKey::MaxStalenessSecs, &max_staleness_secs);
-        env.storage().instance().set(&DataKey::RequiredOracleVersion, &required_oracle_version);
-        Ok(())
-    }
-
-    fn require_admin(env: &Env, admin: &Address) -> Result<(), MockAmmError> {
-        let configured: Address =
-            env.storage().instance().get(&DataKey::Admin).ok_or(MockAmmError::NotConfigured)?;
-        if &configured != admin {
-            return Err(MockAmmError::Unauthorized);
+        registry: Address,
+        max_score: u32,
+        max_age_secs: u64,
+    ) -> Result<(), Error> {
+        if env.storage().instance().has(&DataKey::Admin) {
+            return Err(Error::AlreadyInitialized);
         }
         admin.require_auth();
+        env.storage().instance().set(&DataKey::Admin, &admin);
+        env.storage()
+            .instance()
+            .set(&DataKey::Config, &Config { registry, max_score, max_age_secs, fail_open: false });
         Ok(())
     }
 
-    fn gate_config(env: &Env) -> Result<(Address, u32, u32, FailPolicy, u64, u32), MockAmmError> {
-        let stellar_lense: Address = env
-            .storage()
-            .instance()
-            .get(&DataKey::StellarLense)
-            .ok_or(MockAmmError::NotConfigured)?;
-        let gate_threshold: u32 = env
-            .storage()
-            .instance()
-            .get(&DataKey::GateThreshold)
-            .ok_or(MockAmmError::NotConfigured)?;
-        let min_confidence: u32 =
-            env.storage().instance().get(&DataKey::MinConfidence).unwrap_or(0);
-        let fail_policy: FailPolicy =
-            env.storage().instance().get(&DataKey::FailPolicy).unwrap_or(FailPolicy::FailClosed);
-        let max_staleness_secs: u64 =
-            env.storage().instance().get(&DataKey::MaxStalenessSecs).unwrap_or(604_800);
-        let required_oracle_version: u32 =
-            env.storage().instance().get(&DataKey::RequiredOracleVersion).unwrap_or(0);
-        Ok((
-            stellar_lense,
-            gate_threshold,
-            min_confidence,
-            fail_policy,
-            max_staleness_secs,
-            required_oracle_version,
+    pub fn set_fail_open(env: Env, admin: Address, fail_open: bool) -> Result<(), Error> {
+        admin.require_auth();
+        let stored: Address =
+            env.storage().instance().get(&DataKey::Admin).ok_or(Error::NotConfigured)?;
+        if stored != admin {
+            return Err(Error::NotAdmin);
+        }
+        let mut cfg = config(&env)?;
+        cfg.fail_open = fail_open;
+        env.storage().instance().set(&DataKey::Config, &cfg);
+        Ok(())
+    }
+
+    /// What the gate would decide for `trader` right now (no auth, no state change).
+    pub fn preview(env: Env, trader: Address, pair: String) -> Result<Decision, Error> {
+        let cfg = config(&env)?;
+        Ok(RegistryClient::new(&env, &cfg.registry).check(
+            &trader,
+            &pair,
+            &cfg.max_score,
+            &cfg.max_age_secs,
         ))
     }
 
-    fn allow_on_unavailable(policy: FailPolicy) -> Result<(), MockAmmError> {
-        match policy {
-            FailPolicy::FailOpen => Ok(()),
-            FailPolicy::FailClosed => Err(MockAmmError::OracleUnavailable),
-        }
-    }
-
-    fn oracle_has_expanded_score(env: &Env, oracle: &Address) -> bool {
-        let client = StellarLenseScoreContractClient::new(env, oracle);
-        matches!(client.try_get_version(), Ok(Ok(version)) if version >= 5)
-    }
-
-    /// Attempt a swap for `user` on `asset_pair`. Rejected with
-    /// `HighRiskWallet` whenever StellarLense's `query_risk_gate` says the
-    /// wallet is not safe — note there is no `try_query_risk_gate` and no
-    /// `?`, since the gate is infallible by design. Callers that need
-    /// freshness guarantees must add their own max-age bound before invoking
-    /// this method.
-    pub fn swap(
-        env: Env,
-        user: Address,
-        asset_pair: Symbol,
-        amount: i128,
-    ) -> Result<(), MockAmmError> {
+    /// Accepts the swap (returning `amount`) only if the registry's gate allows it.
+    pub fn swap(env: Env, trader: Address, pair: String, amount: i128) -> Result<i128, Error> {
+        trader.require_auth();
         if amount <= 0 {
-            return Err(MockAmmError::InvalidAmount);
+            return Err(Error::InvalidAmount);
         }
-
-        let (stellar_lense, gate_threshold, _, fail_policy, max_staleness_secs, required_version) =
-            Self::gate_config(&env)?;
-
-        let client = StellarLenseScoreContractClient::new(&env, &stellar_lense);
-        if required_version > 0 {
-            match client.try_get_contract_version() {
-                Ok(Ok(version)) if version >= required_version => {}
-                Ok(Ok(_)) => return Err(MockAmmError::UnsupportedVersion),
-                _ => return Self::allow_on_unavailable(fail_policy),
-            }
+        let cfg = config(&env)?;
+        let decision = RegistryClient::new(&env, &cfg.registry).check(
+            &trader,
+            &pair,
+            &cfg.max_score,
+            &cfg.max_age_secs,
+        );
+        match decision {
+            Decision::Allow => {}
+            Decision::HighRisk => return Err(Error::HighRiskWallet),
+            Decision::Stale if !cfg.fail_open => return Err(Error::StaleScore),
+            Decision::NoScore if !cfg.fail_open => return Err(Error::NoScore),
+            Decision::Stale | Decision::NoScore => {}
         }
-        let is_safe = match client.try_query_risk_gate(&user, &asset_pair, &gate_threshold) {
-            Ok(Ok(v)) => v,
-            _ => return Self::allow_on_unavailable(fail_policy),
-        };
-        if !is_safe {
-            return Err(MockAmmError::HighRiskWallet);
-        }
-        // RiskScore gained additional fields in contract version 5. Older
-        // oracles still implement the stable gate surface, but decoding their
-        // smaller RiskScore with the current client would abort in the host.
-        let expanded_score =
-            env.storage().instance().get(&DataKey::ExpandedRiskScore).unwrap_or(false);
-        if expanded_score {
-            // A successful primary gate may have delegated to a configured
-            // failover. In that case the primary has no local score to decode,
-            // and the gate has already enforced the failover freshness window.
-            if let Ok(Ok(score)) = client.try_get_score(&user, &asset_pair) {
-                if env.ledger().timestamp().saturating_sub(score.timestamp) > max_staleness_secs {
-                    return Err(MockAmmError::StaleScore);
-                }
-            }
-        }
-
-        Ok(())
+        env.events().publish((symbol_short!("swap"), trader), (pair, amount));
+        Ok(amount)
     }
 
-    /// Provide liquidity for `provider`, gated by StellarLense risk score and
-    /// confidence. The gate check runs **before** any state changes — no funds
-    /// are moved until the provider clears the oracle. Real deployments should
-    /// also cap score age and respect their own pause state before allowing a
-    /// deposit through.
-    ///
-    /// When no score exists for the provider, the gate fails closed (same as
-    /// `query_risk_gate_with_confidence` returning `false`) and the call is
-    /// rejected with `HighRiskWallet`.
-    pub fn provide_liquidity_gated(
-        env: Env,
-        provider: Address,
-        amount: i128,
-    ) -> Result<(), MockAmmError> {
-        if amount <= 0 {
-            return Err(MockAmmError::InvalidAmount);
-        }
-
-        let (
-            stellar_lense,
-            gate_threshold,
-            min_confidence,
-            fail_policy,
-            max_staleness_secs,
-            required_version,
-        ) = Self::gate_config(&env)?;
-        let asset_pair = symbol_short!("XLM_USDC");
-
-        let client = StellarLenseScoreContractClient::new(&env, &stellar_lense);
-        if required_version > 0 {
-            match client.try_get_contract_version() {
-                Ok(Ok(version)) if version >= required_version => {}
-                Ok(Ok(_)) => return Err(MockAmmError::UnsupportedVersion),
-                _ => return Self::allow_on_unavailable(fail_policy),
-            }
-        }
-        let is_safe = match client.try_query_risk_gate_with_confidence(
-            &provider,
-            &asset_pair,
-            &gate_threshold,
-            &min_confidence,
-        ) {
-            Ok(Ok(v)) => v,
-            _ => return Self::allow_on_unavailable(fail_policy),
-        };
-        if !is_safe {
-            let expanded_score =
-                env.storage().instance().get(&DataKey::ExpandedRiskScore).unwrap_or(false);
-            if expanded_score {
-                match client.try_get_score(&provider, &asset_pair) {
-                    Ok(Ok(score)) if score.confidence < min_confidence => {
-                        return Err(MockAmmError::LowConfidence);
-                    }
-                    _ => {}
-                }
-            }
-            return Err(MockAmmError::HighRiskWallet);
-        }
-        let expanded_score =
-            env.storage().instance().get(&DataKey::ExpandedRiskScore).unwrap_or(false);
-        if expanded_score {
-            if let Ok(Ok(score)) = client.try_get_score(&provider, &asset_pair) {
-                if env.ledger().timestamp().saturating_sub(score.timestamp) > max_staleness_secs {
-                    return Err(MockAmmError::StaleScore);
-                }
-            }
-        }
-
-        Ok(())
+    pub fn config(env: Env) -> Result<Config, Error> {
+        config(&env)
     }
 }
+
+#[cfg(test)]
+mod test;

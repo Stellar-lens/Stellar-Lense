@@ -1,0 +1,34 @@
+{
+  "network": "testnet",
+  "rpc_url": "https://soroban-testnet.stellar.org",
+  "network_passphrase": "Test SDF Network ; September 2015",
+  "deployed_at": "2026-11-09T22:27:23+00:00",
+  "source_commit": "59c3c91cb600ea20898a6c2477714de51acc6c5f",
+  "registry": {
+    "contract_id": "CC4SWEQBSIY7OFBBY37TZGJVDETMDIG5DVYGHPTEWJO2Q6BJK3V5EEQG",
+    "wasm_hash": "a71f4a018e862594fef1ec9e54c219f45b1115a13a9bb6231c582fc441f91911",
+    "wasm_size_bytes": 30515,
+    "admin": "GCKFBQSPGX7J7ZWMI4X4OAUBNS3ZEHPNTPKZHVYQBJEYMVMSFVFCPEFY",
+    "signers": [
+      "GBA6XMPEFUFCCGTRDYECQCT4QZQFGO5QOHLJPKFJKQBD5SS5DAC3WAWX"
+    ],
+    "threshold": 70,
+    "transactions": {
+      "upload": "e8dd0b11aa7ac00a8b0845e8909da1f52b616ca2079ad412b3d7be400b877523",
+      "create": "c8d4abbbf0553863cde5267611c86ea07dbd7ef0e850b499d1d83466587ae99f",
+      "initialize": "25e4f3e9814932bd10e95c3d2bad0c04078a7b3b57b5a9323c40bb90cd80bf8c"
+    }
+  },
+  "mock_amm": {
+    "contract_id": "CA2IDVGG66MSBIVXKTONRQP6FRRIHIBZBOGCHUGGYQLIIWIANC3ALE6P",
+    "wasm_hash": "f0136cdcd5aa29d9a869d1237972acd9a83263fa85f53bdca8f42db63564b488",
+    "registry": "CC4SWEQBSIY7OFBBY37TZGJVDETMDIG5DVYGHPTEWJO2Q6BJK3V5EEQG",
+    "max_score": 70,
+    "max_age_secs": 172800,
+    "transactions": {
+      "upload": "9dcc3ba87feeec952598f49e592e52cf5014b5bd61da221b8d33eb932a239e2a",
+      "create": "bee8b0562e1dcb7b1c84164ece3437e323ac3f3169a9a4c95e4cfd60eda1a64b",
+      "initialize": "0835046c398b0ff829c3991c101356f62de5d2eab7037c69e5c17e0ae674c0ec"
+    }
+  }
+}

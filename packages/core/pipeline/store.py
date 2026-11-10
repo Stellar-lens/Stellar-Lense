@@ -8,6 +8,7 @@ Tables:
 * ``score_runs`` / ``scores``: each scoring run and the per-wallet scores it
   produced. The API serves the latest *completed* run; earlier runs form
   each pair's score history.
+* ``published_runs``: which runs were pushed to which on-chain registry.
 
 SQLite in WAL mode lets the API read while the pipeline writes.
 """
@@ -98,6 +99,14 @@ CREATE TABLE IF NOT EXISTS scores (
     PRIMARY KEY (run_id, pair, wallet)
 );
 CREATE INDEX IF NOT EXISTS scores_run_pair ON scores (run_id, pair, score DESC);
+
+CREATE TABLE IF NOT EXISTS published_runs (
+    run_id INTEGER NOT NULL REFERENCES score_runs (id),
+    contract_id TEXT NOT NULL,
+    published_at TEXT NOT NULL,
+    transactions INTEGER NOT NULL,
+    PRIMARY KEY (run_id, contract_id)
+);
 """
 
 
@@ -407,3 +416,20 @@ class Store:
             }
             for r in reversed(rows)
         ]
+
+    # ── on-chain publishing ───────────────────────────────────────────────────
+
+    def was_published(self, run_id: int, contract_id: str) -> bool:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT 1 FROM published_runs WHERE run_id = ? AND contract_id = ?",
+                (run_id, contract_id),
+            ).fetchone()
+        return row is not None
+
+    def mark_published(self, run_id: int, contract_id: str, transactions: int) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO published_runs VALUES (?,?,?,?)",
+                (run_id, contract_id, _iso(datetime.now(timezone.utc)), transactions),
+            )

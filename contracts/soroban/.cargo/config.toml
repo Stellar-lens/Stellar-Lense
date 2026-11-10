@@ -1,5 +1,5 @@
 [alias]
-# Build contract as optimised wasm: cargo wasm -p stellar-lense-score
+# Build contract as optimised wasm: cargo wasm -p stellar-lense-registry
 wasm = "build --target wasm32-unknown-unknown --release"
 # Run all workspace tests on the host: cargo test-all
 test-all = "test --workspace"
@@ -7,5 +7,4 @@ test-all = "test --workspace"
 [build]
 # Extra linting; the CI enforces these too but having them locally
 # means the developer sees the same errors before pushing.
-# The host/toolchain support policy lives in docs/host-version-support-policy.md.
 rustflags = ["-D", "warnings"]

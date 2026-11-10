@@ -25,7 +25,7 @@ What works today, and what doesn't. Nothing in this table is aspirational.
 | Dashboard (`apps/web`) | ✅ live data | Risk ranking with real price / 24h change / volume, per-pair drill-down, alerts, "data as of" label; a banner in demo mode. |
 | Evaluation | 🟡 not yet meaningful | A reproducible script and report exist, but public on-chain data yielded only 28 labelled wallets (1 positive), so the precision/recall it reports say nothing yet. See [the report](packages/core/evaluation/REPORT.md). |
 | Optional ML model | 🟡 synthetic only | `packages/core/scripts/train_model.py` trains a random forest on synthetic data. Off by default; labelled as synthetic when on. |
-| Soroban risk-score contract (`contracts/soroban`) | 🟡 builds and tests | Not deployed; nothing writes to it yet. |
+| Soroban risk-score registry (`contracts/soroban`) | ✅ on testnet | Contract `CC4SWEQBSIY7OFBBY37TZGJVDETMDIG5DVYGHPTEWJO2Q6BJK3V5EEQG` (Wasm `a71f4a018e862594…`, see [`deployments/testnet.json`](deployments/testnet.json)). The pipeline publishes each scoring run when `REGISTRY_CONTRACT_ID`/`PUBLISHER_SECRET` are set; a nightly job reads scores back. Example gated AMM: `CA2IDVGG66MSBIVXKTONRQP6FRRIHIBZBOGCHUGGYQLIIWIANC3ALE6P`. Not on mainnet. |
 | Validation against confirmed wash-trading cases | ⬜ not built | No confirmed real-world labels exist yet. |
 
 ## How it fits together
@@ -38,7 +38,7 @@ flowchart LR
     S --> D
     D --> A[apps/api<br/>FastAPI]
     A --> W[apps/web<br/>Next.js dashboard]
-    S -.planned.-> C[contracts/soroban<br/>risk-score registry]
+    D --> PUB[pipeline: publish] --> C[testnet registry<br/>stellar-lense-registry]
 ```
 
 | Directory | What it is |

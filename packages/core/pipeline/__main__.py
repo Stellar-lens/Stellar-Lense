@@ -2,8 +2,9 @@
 
     python -m pipeline ingest        # pull recent trades + market data from Horizon
     python -m pipeline score         # score wallets from stored trades
-    python -m pipeline run           # ingest then score, once
+    python -m pipeline run           # ingest, score (and publish, if configured), once
     python -m pipeline run --every 900   # ... and repeat every 15 minutes
+    python -m pipeline publish       # push the latest score run to the Soroban registry
     python -m pipeline healthcheck   # exit 0 once a completed score run exists
 
 Configuration (environment variables):
@@ -15,6 +16,14 @@ Configuration (environment variables):
     SCORE_WINDOW_HOURS   trades considered when scoring (default 24)
     MIN_TRADES        wallets with fewer trades in the window aren't scored (default 5)
     MODEL_PATH        optional ML bundle from scripts/train_model.py; heuristic if absent
+
+On-chain publishing (all optional; `run` skips publishing unless both of
+the first two are set):
+
+    REGISTRY_CONTRACT_ID  stellar-lense-registry contract (C...)
+    PUBLISHER_SECRET      secret key (S...) of an account the registry lists as signer
+    SOROBAN_RPC_URL       default https://soroban-testnet.stellar.org
+    PUBLISH_TOP_K         wallets per pair to publish (default 10)
 """
 
 from __future__ import annotations
@@ -45,9 +54,36 @@ def _load_model():
     return bundle
 
 
+def _publisher_configured() -> bool:
+    return bool(os.environ.get("REGISTRY_CONTRACT_ID") and os.environ.get("PUBLISHER_SECRET"))
+
+
+def _publish(store: Store) -> None:
+    if not _publisher_configured():
+        raise SystemExit("set REGISTRY_CONTRACT_ID and PUBLISHER_SECRET to publish")
+    from stellar_sdk import Keypair
+
+    from pipeline.publish import publish
+    from pipeline.soroban import TESTNET_RPC, RegistryClient
+
+    client = RegistryClient(
+        os.environ["REGISTRY_CONTRACT_ID"], rpc_url=os.environ.get("SOROBAN_RPC_URL", TESTNET_RPC)
+    )
+    try:
+        result = publish(
+            store,
+            client,
+            Keypair.from_secret(os.environ["PUBLISHER_SECRET"]),
+            top_k=int(_env_float("PUBLISH_TOP_K", 10)),
+        )
+        logging.info("publish: %s", result)
+    except Exception as exc:  # keep the ingest/score loop alive
+        logging.error("publish failed: %r", exc)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m pipeline")
-    parser.add_argument("command", choices=["ingest", "score", "run", "healthcheck"])
+    parser.add_argument("command", choices=["ingest", "score", "publish", "run", "healthcheck"])
     parser.add_argument("--every", type=float, default=0, help="repeat every N seconds")
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -80,6 +116,8 @@ def main(argv: list[str] | None = None) -> int:
                 model_bundle=model,
             )
             logging.info("score run %s complete; data as of %s", result["run_id"], result["data_as_of"])
+        if args.command == "publish" or (args.command == "run" and _publisher_configured()):
+            _publish(store)
         if not args.every:
             return 0
         time.sleep(args.every)

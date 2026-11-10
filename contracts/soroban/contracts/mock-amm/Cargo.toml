@@ -1,10 +1,10 @@
 [package]
 name = "mock-amm"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 publish = false
 license = "MIT"
-description = "Minimal mock AMM that gates swaps on Stellar Lense's query_risk_gate, used by the cross-contract composability integration suite"
+description = "Example: an AMM-shaped contract that refuses swaps from wallets the Stellar Lense registry rates high-risk"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -12,10 +12,12 @@ doctest = false
 
 [dependencies]
 soroban-sdk = "21.0.0"
-stellar-lense-score = { version = "0.1.0", path = "../stellar-lense-score" }
 
 [dev-dependencies]
 soroban-sdk = { version = "21.0.0", features = ["testutils"] }
+# Only tests link the registry itself; the contract talks to it through the
+# one-function client declared in src/lib.rs.
+stellar-lense-registry = { path = "../stellar-lense-registry" }
 
 [features]
 testutils = ["soroban-sdk/testutils"]
