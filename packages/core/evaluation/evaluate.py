@@ -96,6 +96,15 @@ def main() -> int:
         for r in rows
     )
     reasons = scored["label_reason"].value_counts().to_dict()
+    # With a handful of positives, AUC is just where those few wallets happen
+    # to rank among the negatives; say so instead of presenting it as a result.
+    auc_caveat = (
+        f" With only {n_pos} positive{'s' if n_pos != 1 else ''}, this is just "
+        f"where {'that wallet ranks' if n_pos == 1 else 'those wallets rank'} "
+        "among the negatives, not a measure of ranking quality."
+        if n_pos < 10
+        else ""
+    )
     if n_pos < 10 or n_neg < 10:
         bottom_line = (
             f"**This evaluation is not yet meaningful.** Only {n_pos} positive and "
@@ -154,8 +163,8 @@ Label reasons: {", ".join(f"{k}: {v}" for k, v in reasons.items())}.
 
 ## Results
 
-Ranking quality (AUC, positive vs negative): **{fmt(area)}**
-(0.5 = no better than chance). Mean score: positives {fmt(mean_pos)},
+Ranking quality (AUC, positive vs negative): {fmt(area)}
+(0.5 = no better than chance).{auc_caveat} Mean score: positives {fmt(mean_pos)},
 negatives {fmt(mean_neg)}.
 
 Precision and recall when flagging wallets at or above each score

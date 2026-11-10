@@ -37,8 +37,8 @@ Label reasons: no link found, check incomplete: 114, no link (creators known): 3
 
 ## Results
 
-Ranking quality (AUC, positive vs negative): **0.73**
-(0.5 = no better than chance). Mean score: positives 43.00,
+Ranking quality (AUC, positive vs negative): 0.73
+(0.5 = no better than chance). With only 1 positive, this is just where that wallet ranks among the negatives, not a measure of ranking quality. Mean score: positives 43.00,
 negatives 34.72.
 
 Precision and recall when flagging wallets at or above each score
