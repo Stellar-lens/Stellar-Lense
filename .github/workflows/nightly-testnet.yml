@@ -1,0 +1,26 @@
+name: Nightly testnet read-back
+
+# Reads published scores back from the stellar-lense-registry deployment
+# recorded in deployments/testnet.json. Read-only (Soroban simulations):
+# no secrets. Fails if the contract is gone (e.g. after an SDF testnet
+# reset), reports the wrong version, has no published pair scores, or
+# hasn't been updated in 48h (publisher stopped).
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  read-back:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "0.12.13"
+          enable-cache: true
+      - name: Read scores from testnet
+        run: uv run --package stellar-lense-core --extra chain python contracts/soroban/deploy/check_testnet.py
